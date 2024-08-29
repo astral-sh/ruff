@@ -307,6 +307,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     /// Infers types in the given [`InferenceRegion`].
+    #[tracing::instrument(skip_all)]
     fn infer_region(&mut self) {
         match self.region {
             InferenceRegion::Scope(scope) => self.infer_region_scope(scope),
@@ -316,9 +317,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
+    #[tracing::instrument(skip_all)]
     fn infer_region_scope(&mut self, scope: ScopeId<'db>) {
-        let _span = tracing::trace_span!("infer_region_scope").entered();
-
         let node = scope.node(self.db);
         match node {
             NodeWithScopeKind::Module => {
@@ -363,6 +363,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
+    #[tracing::instrument(skip_all)]
     fn infer_region_definition(&mut self, definition: Definition<'db>) {
         match definition.node(self.db) {
             DefinitionKind::Function(function) => {
@@ -421,6 +422,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
+    #[tracing::instrument(skip_all)]
     fn infer_region_deferred(&mut self, definition: Definition<'db>) {
         match definition.node(self.db) {
             DefinitionKind::Function(function) => self.infer_function_deferred(function.node()),
@@ -432,10 +434,12 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
+    #[tracing::instrument(skip_all)]
     fn infer_region_expression(&mut self, expression: Expression<'db>) {
         self.infer_expression(expression.node_ref(self.db));
     }
 
+    #[tracing::instrument(skip_all)]
     fn infer_module(&mut self, module: &ast::ModModule) {
         self.infer_body(&module.body);
     }
@@ -517,16 +521,19 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
+    #[tracing::instrument(skip_all)]
     fn infer_definition(&mut self, node: impl Into<DefinitionNodeKey>) {
         let definition = self.index.definition(node);
         let result = infer_definition_types(self.db, definition);
         self.extend(result);
     }
 
+    #[tracing::instrument(skip_all)]
     fn infer_function_definition_statement(&mut self, function: &ast::StmtFunctionDef) {
         self.infer_definition(function);
     }
 
+    #[tracing::instrument(skip_all)]
     fn infer_function_definition(
         &mut self,
         function: &ast::StmtFunctionDef,
@@ -576,6 +583,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.types.definitions.insert(definition, function_ty);
     }
 
+    #[tracing::instrument(skip_all)]
     fn infer_parameters(&mut self, parameters: &ast::Parameters) {
         let ast::Parameters {
             range: _,
@@ -597,6 +605,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
+    #[tracing::instrument(skip_all)]
     fn infer_parameter_with_default(&mut self, parameter_with_default: &ast::ParameterWithDefault) {
         let ast::ParameterWithDefault {
             range: _,
@@ -609,6 +618,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_definition(parameter_with_default);
     }
 
+    #[tracing::instrument(skip_all)]
     fn infer_parameter(&mut self, parameter: &ast::Parameter) {
         let ast::Parameter {
             range: _,
@@ -623,13 +633,18 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_parameter_with_default_definition(
         &mut self,
-        _parameter_with_default: &ast::ParameterWithDefault,
+        parameter_with_default: &ast::ParameterWithDefault,
         definition: Definition<'db>,
     ) {
+        tracing::trace!(
+            param = ?parameter_with_default,
+            "infer_parameter_with_default_definition",
+        );
         // TODO(dhruvmanila): Infer types from annotation or default expression
         self.types.definitions.insert(definition, Type::Unknown);
     }
 
+    #[tracing::instrument(skip_all)]
     fn infer_parameter_definition(
         &mut self,
         _parameter: &ast::Parameter,
@@ -640,10 +655,12 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.types.definitions.insert(definition, Type::Unknown);
     }
 
+    #[tracing::instrument(skip_all)]
     fn infer_class_definition_statement(&mut self, class: &ast::StmtClassDef) {
         self.infer_definition(class);
     }
 
+    #[tracing::instrument(skip_all)]
     fn infer_class_definition(&mut self, class: &ast::StmtClassDef, definition: Definition<'db>) {
         let ast::StmtClassDef {
             range: _,
