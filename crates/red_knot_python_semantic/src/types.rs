@@ -321,6 +321,30 @@ impl<'db> Type<'db> {
     }
 
     #[must_use]
+    pub fn call(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        match self {
+            Type::Function(function_type) => function_type.returns(db).or(Some(Type::Unknown)),
+
+            // TODO: handle class constructors
+            Type::Class(_class_ty) => Some(Type::Unknown),
+
+            // TODO: handle classes which implement the Callable protocol
+            Type::Instance(_instance_ty) => Some(Type::Unknown),
+
+            // `Any` is callable, and its return type is also `Any`.
+            Type::Any => Some(Type::Any),
+
+            Type::Unknown => Some(Type::Unknown),
+
+            // TODO: union and intersection types, if they reduce to `Callable`
+            Type::Union(_) => Some(Type::Unknown),
+            Type::Intersection(_) => Some(Type::Unknown),
+
+            _ => None,
+        }
+    }
+
+    #[must_use]
     pub fn instance(&self) -> Type<'db> {
         match self {
             Type::Any => Type::Any,
@@ -549,5 +573,33 @@ mod tests {
         let b_file = system_path_to_file(&db, "/src/b.py").unwrap();
         let b_file_diagnostics = super::check_types(&db, b_file);
         assert_eq!(&*b_file_diagnostics, &[]);
+    }
+
+    #[test]
+    fn invalid_callable() {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            nonsense = 123
+            x = nonsense()
+            ",
+        )
+        .unwrap();
+
+        let a_file = system_path_to_file(&db, "/src/a.py").unwrap();
+        let a_file_diagnostics = super::check_types(&db, a_file);
+        // TODO: this currently produces two copies of the message because `infer_call_expression`
+        // gets called twice for inferring/checking the above code. However, that may involve more
+        // significant refactors, and this makes sure we have coverage on this behavior in the
+        // meantime.
+        assert_diagnostic_messages(
+            &a_file_diagnostics,
+            &[
+                "Object of type 'Literal[123]' is not callable",
+                "Object of type 'Literal[123]' is not callable",
+            ],
+        );
     }
 }

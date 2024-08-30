@@ -1746,39 +1746,18 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = call_expression;
 
         self.infer_arguments(arguments);
-        self.infer_expression(func);
-
-        match func.as_ref() {
-            name_expr @ ast::Expr::Name(..) => {
-                let name_expr_id = name_expr.scoped_ast_id(self.db, self.scope);
-                let Some(named_type) = self.types.expressions.get(&name_expr_id) else {
-                    return Type::Unbound;
-                };
-
-                match named_type {
-                    Type::Function(function_type) => {
-                        function_type.returns(self.db).unwrap_or(Type::Unknown)
-                    }
-
-                    // TODO: handle class constructors
-                    // TODO: handle classes which implement the Callable protocol
-                    Type::Class(_class_type) => Type::Unknown,
-
-                    // `Any` is callable, and its return type is also `Any`.
-                    Type::Any => Type::Any,
-
-                    // TODO: union and intersection types, if they reduce to `Callable`?
-                    Type::Union(_) => todo!(),
-                    Type::Intersection(_) => todo!(),
-
-                    _ => Type::Unknown,
-                }
-            }
-
-            ast::Expr::Lambda(_lambda_expr) => Type::Unknown, // TODO
-
-            _ => Type::Unknown,
-        }
+        let function_type = self.infer_expression(func);
+        function_type.call(self.db).unwrap_or_else(|| {
+            self.add_diagnostic(
+                func.as_ref().into(),
+                "call-non-callable",
+                format_args!(
+                    "Object of type '{}' is not callable",
+                    function_type.display(self.db)
+                ),
+            );
+            Type::Unknown
+        })
     }
 
     fn infer_starred_expression(&mut self, starred: &ast::ExprStarred) -> Type<'db> {
