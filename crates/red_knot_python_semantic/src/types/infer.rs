@@ -927,7 +927,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         self.infer_optional_expression(value.as_deref());
 
-        let annotation_ty = self.infer_expression(annotation);
+        let annotation_ty = self.infer_annotation_expression(annotation);
 
         self.infer_expression(target);
 
@@ -2787,7 +2787,7 @@ mod tests {
 
         // TODO: update this once `infer_ellipsis_literal_expression` correctly
         // infers `types.EllipsisType`.
-        assert_public_ty(&db, "src/a.py", "x", "Unknown | Literal[EllipsisType]");
+        assert_public_ty(&db, "src/a.py", "x", "Unknown | ellipsis");
 
         Ok(())
     }
