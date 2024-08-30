@@ -2835,6 +2835,24 @@ mod tests {
     }
 
     #[test]
+    fn class_constructor_call_expression() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            class Foo: ...
+
+            x = Foo()
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "x", "Foo");
+
+        Ok(())
+    }
+
+    #[test]
     fn resolve_union() -> anyhow::Result<()> {
         let mut db = setup_db();
 
