@@ -26,10 +26,12 @@
 //! represents the lint-rule analysis phase. In the future, these steps may be separated into
 //! distinct passes over the AST.
 
+use std::cell::RefCell;
 use std::path::Path;
 
 use itertools::Itertools;
 use log::debug;
+use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, IsolationLevel};
 use ruff_notebook::{CellOffsets, NotebookIndex};
@@ -176,10 +178,34 @@ impl ExpectedDocstringKind {
     }
 }
 
+#[derive(Debug, Default)]
+struct ParsedAnnotationsCache<'a>(RefCell<FxHashMap<TextSize, &'a AnnotationParseResult>>);
+
+impl<'a> ParsedAnnotationsCache<'a> {
+    fn lookup_or_parse(
+        &self,
+        annotation: &ast::ExprStringLiteral,
+        source: &str,
+        allocator: &'a typed_arena::Arena<AnnotationParseResult>,
+    ) -> &'a AnnotationParseResult {
+        self.0
+            .borrow_mut()
+            .entry(annotation.start())
+            .or_insert_with(|| allocator.alloc(parse_type_annotation(annotation, source)))
+    }
+
+    fn clear(&self) {
+        self.0.borrow_mut().clear();
+    }
+}
+
 pub(crate) struct Checker<'a> {
     /// The [`Parsed`] output for the source code.
     parsed: &'a Parsed<ModModule>,
+    /// A [`typed_arena::Arena`] in which parsed string annotations will be allocated.
     parsed_annotations_arena: &'a typed_arena::Arena<AnnotationParseResult>,
+    /// An internal cache for parsed string annotations
+    parsed_annotations_cache: ParsedAnnotationsCache<'a>,
     /// The [`Parsed`] output for the type annotation the checker is currently in.
     parsed_type_annotation: Option<&'a ParsedAnnotation>,
     /// The [`Path`] to the file under analysis.
@@ -250,6 +276,7 @@ impl<'a> Checker<'a> {
             parsed,
             parsed_type_annotation: None,
             parsed_annotations_arena,
+            parsed_annotations_cache: ParsedAnnotationsCache::default(),
             settings,
             noqa_line_for,
             noqa,
@@ -409,6 +436,22 @@ impl<'a> Checker<'a> {
         node_id
             .map(|node_id| IsolationLevel::Group(node_id.into()))
             .unwrap_or_default()
+    }
+
+    /// Parse a stringified type annotation as an AST expression,
+    /// e.g. `"List[str]"` in `x: "List[str]"`
+    ///
+    /// This method is a wrapper around [`ruff_python_parser::typing::parse_type_annotation`]
+    /// that adds caching.
+    pub(crate) fn parse_type_annotation(
+        &self,
+        annotation: &ast::ExprStringLiteral,
+    ) -> &'a AnnotationParseResult {
+        self.parsed_annotations_cache.lookup_or_parse(
+            annotation,
+            self.locator.contents(),
+            self.parsed_annotations_arena,
+        )
     }
 }
 
@@ -2178,9 +2221,7 @@ impl<'a> Checker<'a> {
         while !self.visit.string_type_definitions.is_empty() {
             let type_definitions = std::mem::take(&mut self.visit.string_type_definitions);
             for (string_expr, snapshot) in type_definitions {
-                let annotation_parse_result = self
-                    .parsed_annotations_arena
-                    .alloc(parse_type_annotation(string_expr, self.locator.contents()));
+                let annotation_parse_result = self.parse_type_annotation(string_expr);
                 if let Ok(parsed_annotation) = annotation_parse_result {
                     self.parsed_type_annotation = Some(parsed_annotation);
 
@@ -2222,6 +2263,10 @@ impl<'a> Checker<'a> {
                     }
                 }
             }
+            // If we're parsing string annotations inside string annotations
+            // (which is the only reason we might enter a second iteration of this loop),
+            // the cache is no longer valid. We must invalidate it to avoid an infinite loop:
+            self.parsed_annotations_cache.clear();
         }
         self.semantic.restore(snapshot);
     }
