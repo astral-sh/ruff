@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Decorator};
+use ruff_python_ast::{self as ast, Decorator, Expr};
 
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
@@ -87,6 +87,27 @@ where
                     .clone()
                     .any(|extra_property| extra_property == qualified_name)
             })
+    })
+}
+
+/// Returns `true` if a function definition is an `attrs`-like validator based on its decorators.
+pub fn is_validator(decorator_list: &[Decorator], semantic: &SemanticModel) -> bool {
+    decorator_list.iter().any(|decorator| {
+        let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = &decorator.expression else {
+            return false;
+        };
+
+        if attr.as_str() != "validator" {
+            return false;
+        }
+
+        let Expr::Name(value) = value.as_ref() else {
+            return false;
+        };
+
+        semantic
+            .resolve_name(value)
+            .is_some_and(|id| semantic.binding(id).kind.is_assignment())
     })
 }
 

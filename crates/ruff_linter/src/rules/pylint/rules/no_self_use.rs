@@ -87,6 +87,7 @@ pub(crate) fn no_self_use(
         || visibility::is_override(decorator_list, semantic)
         || visibility::is_overload(decorator_list, semantic)
         || visibility::is_property(decorator_list, extra_property_decorators, semantic)
+        || visibility::is_validator(decorator_list, semantic)
     {
         return;
     }
