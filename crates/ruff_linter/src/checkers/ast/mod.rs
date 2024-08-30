@@ -178,32 +178,38 @@ impl ExpectedDocstringKind {
     }
 }
 
-#[derive(Debug, Default)]
-struct ParsedAnnotationsCache<'a>(RefCell<FxHashMap<TextSize, &'a AnnotationParseResult>>);
+struct ParsedAnnotationsCache<'a> {
+    arena: &'a typed_arena::Arena<AnnotationParseResult>,
+    offset_to_parse_result: RefCell<FxHashMap<TextSize, &'a AnnotationParseResult>>,
+}
 
 impl<'a> ParsedAnnotationsCache<'a> {
+    fn new(arena: &'a typed_arena::Arena<AnnotationParseResult>) -> Self {
+        Self {
+            arena,
+            offset_to_parse_result: RefCell::default(),
+        }
+    }
+
     fn lookup_or_parse(
         &self,
         annotation: &ast::ExprStringLiteral,
         source: &str,
-        allocator: &'a typed_arena::Arena<AnnotationParseResult>,
     ) -> &'a AnnotationParseResult {
-        self.0
+        self.offset_to_parse_result
             .borrow_mut()
             .entry(annotation.start())
-            .or_insert_with(|| allocator.alloc(parse_type_annotation(annotation, source)))
+            .or_insert_with(|| self.arena.alloc(parse_type_annotation(annotation, source)))
     }
 
     fn clear(&self) {
-        self.0.borrow_mut().clear();
+        self.offset_to_parse_result.borrow_mut().clear();
     }
 }
 
 pub(crate) struct Checker<'a> {
     /// The [`Parsed`] output for the source code.
     parsed: &'a Parsed<ModModule>,
-    /// A [`typed_arena::Arena`] in which parsed string annotations will be allocated.
-    parsed_annotations_arena: &'a typed_arena::Arena<AnnotationParseResult>,
     /// An internal cache for parsed string annotations
     parsed_annotations_cache: ParsedAnnotationsCache<'a>,
     /// The [`Parsed`] output for the type annotation the checker is currently in.
@@ -275,8 +281,7 @@ impl<'a> Checker<'a> {
         Checker {
             parsed,
             parsed_type_annotation: None,
-            parsed_annotations_arena,
-            parsed_annotations_cache: ParsedAnnotationsCache::default(),
+            parsed_annotations_cache: ParsedAnnotationsCache::new(parsed_annotations_arena),
             settings,
             noqa_line_for,
             noqa,
@@ -447,11 +452,8 @@ impl<'a> Checker<'a> {
         &self,
         annotation: &ast::ExprStringLiteral,
     ) -> &'a AnnotationParseResult {
-        self.parsed_annotations_cache.lookup_or_parse(
-            annotation,
-            self.locator.contents(),
-            self.parsed_annotations_arena,
-        )
+        self.parsed_annotations_cache
+            .lookup_or_parse(annotation, self.locator.contents())
     }
 }
 

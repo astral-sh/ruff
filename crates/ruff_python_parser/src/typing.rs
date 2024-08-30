@@ -24,10 +24,6 @@ impl ParsedAnnotation {
         self.parsed.expr()
     }
 
-    pub fn into_expression(self) -> Expr {
-        self.parsed.into_expr()
-    }
-
     pub fn kind(&self) -> AnnotationKind {
         self.kind
     }
