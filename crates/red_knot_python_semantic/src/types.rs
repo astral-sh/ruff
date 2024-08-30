@@ -593,10 +593,6 @@ mod tests {
 
         let a_file = system_path_to_file(&db, "/src/a.py").unwrap();
         let a_file_diagnostics = super::check_types(&db, a_file);
-        // TODO: this currently produces two copies of the message because `infer_call_expression`
-        // gets called twice for inferring/checking the above code. However, that may involve more
-        // significant refactors, and this makes sure we have coverage on this behavior in the
-        // meantime.
         assert_diagnostic_messages(
             &a_file_diagnostics,
             &["Object of type 'Literal[123]' is not callable"],
