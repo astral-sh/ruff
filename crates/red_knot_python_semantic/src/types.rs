@@ -328,7 +328,8 @@ impl<'db> Type<'db> {
         match self {
             Type::Function(function_type) => function_type.returns(db).or(Some(Type::Unknown)),
 
-            Type::Class(_class_ty) => Some(self.instance()),
+            // TODO annotated return type on `__new__` or metaclass `__call__`
+            Type::Class(class) => Some(Type::Instance(*class)),
 
             // TODO: handle classes which implement the Callable protocol
             Type::Instance(_instance_ty) => Some(Type::Unknown),
