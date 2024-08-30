@@ -12,6 +12,7 @@ mod tests {
 
     use crate::assert_messages;
     use crate::registry::Rule;
+    use crate::settings::types::PythonVersion;
     use crate::settings::LinterSettings;
     use crate::test::test_path;
 
@@ -109,6 +110,20 @@ mod tests {
             },
         )?;
 
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::BuiltinImportShadowing, Path::new("A004.py"))]
+    fn rules_py312(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}_py38", rule_code.noqa_code(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_builtins").join(path).as_path(),
+            &LinterSettings {
+                target_version: PythonVersion::Py38,
+                ..LinterSettings::for_rule(rule_code)
+            },
+        )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
     }

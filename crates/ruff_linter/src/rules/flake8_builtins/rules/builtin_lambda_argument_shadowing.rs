@@ -42,8 +42,9 @@ pub(crate) fn builtin_lambda_argument_shadowing(checker: &mut Checker, lambda: &
         let name = &param.parameter.name;
         if shadows_builtin(
             name.as_ref(),
-            &checker.settings.flake8_builtins.builtins_ignorelist,
             checker.source_type,
+            &checker.settings.flake8_builtins.builtins_ignorelist,
+            checker.settings.target_version,
         ) {
             checker.diagnostics.push(Diagnostic::new(
                 BuiltinLambdaArgumentShadowing {

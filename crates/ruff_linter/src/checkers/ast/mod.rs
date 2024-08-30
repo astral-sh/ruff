@@ -55,7 +55,7 @@ use ruff_python_semantic::{
     ModuleKind, ModuleSource, NodeId, ScopeId, ScopeKind, SemanticModel, SemanticModelFlags,
     StarImport, SubmoduleImport,
 };
-use ruff_python_stdlib::builtins::{IPYTHON_BUILTINS, MAGIC_GLOBALS, PYTHON_BUILTINS};
+use ruff_python_stdlib::builtins::{python_builtins, IPYTHON_BUILTINS, MAGIC_GLOBALS};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::{Locator, OneIndexed, SourceRow};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -1912,7 +1912,7 @@ impl<'a> Checker<'a> {
     }
 
     fn bind_builtins(&mut self) {
-        for builtin in PYTHON_BUILTINS
+        for builtin in python_builtins(self.settings.target_version.minor())
             .iter()
             .chain(MAGIC_GLOBALS.iter())
             .chain(
