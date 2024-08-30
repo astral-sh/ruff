@@ -18,6 +18,7 @@ print("", *args)
 print("", *args, sep="")
 print("", **kwargs)
 print(sep="\t")
+print(sep=print(1))
 
 # OK.
 
