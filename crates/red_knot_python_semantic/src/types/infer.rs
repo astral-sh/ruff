@@ -1748,8 +1748,37 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_arguments(arguments);
         self.infer_expression(func);
 
-        // TODO resolve to return type of `func`, if its a callable type
-        Type::Unknown
+        match func.as_ref() {
+            name_expr @ ast::Expr::Name(..) => {
+                let name_expr_id = name_expr.scoped_ast_id(self.db, self.scope);
+                let Some(named_type) = self.types.expressions.get(&name_expr_id) else {
+                    return Type::Unbound;
+                };
+
+                match named_type {
+                    Type::Function(function_type) => {
+                        function_type.returns(self.db).unwrap_or(Type::Unknown)
+                    }
+
+                    // TODO: handle class constructors
+                    // TODO: handle classes which implement the Callable protocol
+                    Type::Class(_class_type) => Type::Unknown,
+
+                    // `Any` is callable, and its return type is also `Any`.
+                    Type::Any => Type::Any,
+
+                    // TODO: union and intersection types, if they reduce to `Callable`?
+                    Type::Union(_) => todo!(),
+                    Type::Intersection(_) => todo!(),
+
+                    _ => Type::Unknown,
+                }
+            }
+
+            ast::Expr::Lambda(_lambda_expr) => Type::Unknown, // TODO
+
+            _ => Type::Unknown,
+        }
     }
 
     fn infer_starred_expression(&mut self, starred: &ast::ExprStarred) -> Type<'db> {
@@ -2804,6 +2833,25 @@ mod tests {
             .expect("There is a return type on the function");
 
         assert_eq!(returns.display(&db).to_string(), "int");
+
+        Ok(())
+    }
+
+    #[test]
+    fn basic_call_expression() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            def get_int() -> int:
+                return 42
+
+            x = get_int()
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "x", "int");
 
         Ok(())
     }
