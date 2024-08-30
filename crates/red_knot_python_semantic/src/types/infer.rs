@@ -2835,14 +2835,15 @@ mod tests {
         assert_eq!(params.len(), 1);
         assert_eq!(params[0].display(&db).to_string(), "int");
 
-        let with_multiple_params_ty = global_symbol_ty_by_name(&db, mod_a, "example");
+        let with_multiple_params_ty = global_symbol_ty_by_name(&db, mod_a, "with_multiple_params");
         let Type::Function(with_multiple_params) = with_multiple_params_ty else {
-            panic!("example is not a function");
+            panic!("with_multiple_params is not a function");
         };
 
         let params = with_multiple_params.params(&db).collect::<Vec<_>>();
-        assert_eq!(params.len(), 1);
+        assert_eq!(params.len(), 2);
         assert_eq!(params[0].display(&db).to_string(), "int");
+        assert_eq!(params[1].display(&db).to_string(), "str");
 
         Ok(())
     }
