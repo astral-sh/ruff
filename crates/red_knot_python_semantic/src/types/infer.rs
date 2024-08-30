@@ -2814,7 +2814,7 @@ mod tests {
 
         // TODO: update this once `infer_ellipsis_literal_expression` correctly
         // infers `types.EllipsisType`.
-        assert_public_ty(&db, "src/a.py", "x", "Unknown | Literal[EllipsisType]");
+        assert_public_ty(&db, "src/a.py", "x", "Literal[EllipsisType] | Unknown");
 
         Ok(())
     }
