@@ -2121,8 +2121,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     name.ctx
                 );
 
-                let instance = self.infer_name_expression(name).instance();
-                instance
+                self.infer_name_expression(name).instance()
             }
 
             ast::Expr::NoneLiteral(_literal) => Type::None,
