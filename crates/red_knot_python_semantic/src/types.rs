@@ -328,8 +328,7 @@ impl<'db> Type<'db> {
         match self {
             Type::Function(function_type) => function_type.returns(db).or(Some(Type::Unknown)),
 
-            // TODO: handle class constructors
-            Type::Class(_class_ty) => Some(Type::Unknown),
+            Type::Class(_class_ty) => Some(self.instance()),
 
             // TODO: handle classes which implement the Callable protocol
             Type::Instance(_instance_ty) => Some(Type::Unknown),
