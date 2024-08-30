@@ -336,6 +336,8 @@ pub struct FunctionType<'db> {
     /// name of the function at definition
     pub name: ast::name::Name,
 
+    definition: Definition<'db>,
+
     /// types of all decorators on this function
     decorators: Vec<Type<'db>>,
 }
@@ -343,6 +345,19 @@ pub struct FunctionType<'db> {
 impl<'db> FunctionType<'db> {
     pub fn has_decorator(self, db: &dyn Db, decorator: Type<'_>) -> bool {
         self.decorators(db).contains(&decorator)
+    }
+
+    /// annotated return type for this function, if any
+    pub fn returns(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let definition = self.definition(db);
+        let DefinitionKind::Function(function_stmt_node) = definition.node(db) else {
+            panic!("Function type definition must have `DefinitionKind::Function`")
+        };
+
+        function_stmt_node
+            .returns
+            .as_ref()
+            .map(|returns| definition_expression_ty(db, definition, returns.as_ref()))
     }
 }
 
