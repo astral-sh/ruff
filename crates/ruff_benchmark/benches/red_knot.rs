@@ -24,6 +24,7 @@ const TOMLLIB_312_URL: &str = "https://raw.githubusercontent.com/python/cpython/
 // The "unresolved import" is because we don't understand `*` imports yet.
 static EXPECTED_DIAGNOSTICS: &[&str] = &[
     "/src/tomllib/_parser.py:7:29: Module 'collections.abc' has no member 'Iterable'",
+    "/src/tomllib/_parser.py:686:23: Object of type 'Unbound' is not callable",
     "Line 69 is too long (89 characters)",
     "Use double quotes for strings",
     "Use double quotes for strings",

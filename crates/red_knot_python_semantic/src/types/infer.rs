@@ -868,19 +868,16 @@ impl<'db> TypeInferenceBuilder<'db> {
             value,
         } = assignment;
 
-        // TODO remove once we infer definitions in unpacking assignment, since that infers the RHS
-        // too, and uses the `infer_expression_types` query to do it
-        self.infer_expression(value);
-
         for target in targets {
-            match target {
-                ast::Expr::Name(name) => {
-                    self.infer_definition(name);
-                }
-                _ => {
-                    // TODO infer definitions in unpacking assignment
-                    self.infer_expression(target);
-                }
+            if let ast::Expr::Name(name) = target {
+                self.infer_definition(name);
+            } else {
+                // TODO infer definitions in unpacking assignment. When we do, this duplication of
+                // the "get `Expression`, call `infer_expression_types` on it, `self.extend`" dance
+                // will be removed; it'll all happen in `infer_assignment_definition` instead.
+                let expression = self.index.expression(value.as_ref());
+                self.extend(infer_expression_types(self.db, expression));
+                self.infer_expression(target);
             }
         }
     }
@@ -1363,7 +1360,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         };
 
         let expr_id = expression.scoped_ast_id(self.db, self.scope);
-        self.types.expressions.insert(expr_id, ty);
+        let previous = self.types.expressions.insert(expr_id, ty);
+        assert!(previous.is_none());
 
         ty
     }
@@ -1746,10 +1744,18 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = call_expression;
 
         self.infer_arguments(arguments);
-        self.infer_expression(func);
-
-        // TODO resolve to return type of `func`, if its a callable type
-        Type::Unknown
+        let function_type = self.infer_expression(func);
+        function_type.call(self.db).unwrap_or_else(|| {
+            self.add_diagnostic(
+                func.as_ref().into(),
+                "call-non-callable",
+                format_args!(
+                    "Object of type '{}' is not callable",
+                    function_type.display(self.db)
+                ),
+            );
+            Type::Unknown
+        })
     }
 
     fn infer_starred_expression(&mut self, starred: &ast::ExprStarred) -> Type<'db> {
@@ -2247,7 +2253,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         };
 
         let expr_id = expression.scoped_ast_id(self.db, self.scope);
-        self.types.expressions.insert(expr_id, ty);
+        let previous = self.types.expressions.insert(expr_id, ty);
+        assert!(previous.is_none());
 
         ty
     }
@@ -2804,6 +2811,25 @@ mod tests {
             .expect("There is a return type on the function");
 
         assert_eq!(returns.display(&db).to_string(), "int");
+
+        Ok(())
+    }
+
+    #[test]
+    fn basic_call_expression() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            def get_int() -> int:
+                return 42
+
+            x = get_int()
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "x", "int");
 
         Ok(())
     }
