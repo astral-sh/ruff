@@ -2095,7 +2095,7 @@ bitflags! {
         /// `__future__`-style type annotations are enabled in this model.
         /// That could be because it's a stub file,
         /// or it could be because it's a non-stub file that has `from __future__ import annotations`
-        /// a the top of the module.
+        /// at the top of the module.
         const FUTURE_ANNOTATIONS_OR_STUB = Self::FUTURE_ANNOTATIONS.bits() | Self::STUB_FILE.bits();
 
         /// The model has traversed past the module docstring.
