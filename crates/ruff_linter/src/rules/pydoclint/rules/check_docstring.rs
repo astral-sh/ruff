@@ -647,6 +647,12 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
                     is_none_return: value.is_none_literal_expr(),
                 });
             }
+            Stmt::Return(ast::StmtReturn { range, value: None }) => {
+                self.returns.push(ReturnEntry {
+                    range: *range,
+                    is_none_return: true,
+                });
+            }
             Stmt::FunctionDef(_) | Stmt::ClassDef(_) => return,
             _ => {}
         }

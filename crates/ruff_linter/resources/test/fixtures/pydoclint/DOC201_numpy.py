@@ -187,3 +187,9 @@ def foo(s: str) -> str | None:
         A string.
     """
     return None
+
+
+# DOC201
+def bar() -> int | None:
+    """Bar-y method"""
+    return
