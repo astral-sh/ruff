@@ -599,10 +599,7 @@ mod tests {
         // meantime.
         assert_diagnostic_messages(
             &a_file_diagnostics,
-            &[
-                "Object of type 'Literal[123]' is not callable",
-                "Object of type 'Literal[123]' is not callable",
-            ],
+            &["Object of type 'Literal[123]' is not callable"],
         );
     }
 }

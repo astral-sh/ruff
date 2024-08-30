@@ -868,19 +868,16 @@ impl<'db> TypeInferenceBuilder<'db> {
             value,
         } = assignment;
 
-        // TODO remove once we infer definitions in unpacking assignment, since that infers the RHS
-        // too, and uses the `infer_expression_types` query to do it
-        self.infer_expression(value);
-
         for target in targets {
-            match target {
-                ast::Expr::Name(name) => {
-                    self.infer_definition(name);
-                }
-                _ => {
-                    // TODO infer definitions in unpacking assignment
-                    self.infer_expression(target);
-                }
+            if let ast::Expr::Name(name) = target {
+                self.infer_definition(name);
+            } else {
+                // TODO infer definitions in unpacking assignment. When we do, this duplication of
+                // the "get `Expression`, call `infer_expression_types` on it, `self.extend`" dance
+                // will be removed; it'll all happen in `infer_assignment_definition` instead.
+                let expression = self.index.expression(value.as_ref());
+                self.extend(infer_expression_types(self.db, expression));
+                self.infer_expression(target);
             }
         }
     }
@@ -1363,7 +1360,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         };
 
         let expr_id = expression.scoped_ast_id(self.db, self.scope);
-        self.types.expressions.insert(expr_id, ty);
+        let previous = self.types.expressions.insert(expr_id, ty);
+        assert!(previous.is_none());
 
         ty
     }
@@ -2255,7 +2253,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         };
 
         let expr_id = expression.scoped_ast_id(self.db, self.scope);
-        self.types.expressions.insert(expr_id, ty);
+        let previous = self.types.expressions.insert(expr_id, ty);
+        assert!(previous.is_none());
 
         ty
     }
