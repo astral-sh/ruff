@@ -605,7 +605,7 @@ where
                 cases,
                 range: _,
             }) => {
-                self.add_standalone_expression(&subject);
+                self.add_standalone_expression(subject);
                 self.visit_expr(subject);
                 for case in cases {
                     self.visit_match_case(case);
