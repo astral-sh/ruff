@@ -377,28 +377,23 @@ impl<'db> FunctionType<'db> {
 
     /// annotated return type for this function, if any
     pub fn returns(&self, db: &'db dyn Db) -> Option<Type<'db>> {
-        let definition = self.definition(db);
-        let function_stmt_node = Self::node(db, definition);
-
-        function_stmt_node
+        self.node(db)
             .returns
             .as_ref()
-            .map(|returns| definition_expression_ty(db, definition, returns.as_ref()))
+            .map(|returns| definition_expression_ty(db, self.definition(db), returns.as_ref()))
     }
 
-    pub fn params(&self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
-        let definition = self.definition(db);
-        let function_stmt_node = Self::node(db, definition);
-
-        function_stmt_node
+    /// annotated parameter types for this function, if any
+    pub fn params<'a>(&'a self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> + 'a {
+        self.node(db)
             .parameters
             .iter()
             .filter_map(ast::AnyParameterRef::annotation)
-            .map(move |annotation| definition_expression_ty(db, definition, annotation))
+            .map(|annotation| definition_expression_ty(db, self.definition(db), annotation))
     }
 
-    fn node(db: &'db dyn Db, definition: Definition<'db>) -> &'db AstNodeRef<ast::StmtFunctionDef> {
-        let DefinitionKind::Function(function_stmt_node) = definition.node(db) else {
+    fn node(self, db: &'db dyn Db) -> &'db AstNodeRef<ast::StmtFunctionDef> {
+        let DefinitionKind::Function(function_stmt_node) = self.definition(db).node(db) else {
             panic!("Function type definition must have `DefinitionKind::Function`")
         };
 
