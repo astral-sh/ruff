@@ -1,0 +1,202 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+unnecessary_assignment.py:2:4: PLR6103 [*] Use walrus operator `(bad1 := 'example')`.
+  |
+1 | bad1 = 'example'
+2 | if bad1: # [consider-using-assignment-expr]
+  |    ^^^^ PLR6103
+3 |     pass
+  |
+  = help: Moves assignment into check using walrus operator (`bad1 := 'example'`).
+
+ℹ Unsafe fix
+1   |-bad1 = 'example'
+2   |-if bad1: # [consider-using-assignment-expr]
+  1 |+if (bad1 := 'example'): # [consider-using-assignment-expr]
+3 2 |     pass
+4 3 | 
+5 4 | bad2 = 'example'
+
+unnecessary_assignment.py:6:4: PLR6103 [*] Use walrus operator `(bad2 := 'example')`.
+  |
+5 | bad2 = 'example'
+6 | if bad2 and True: # [consider-using-assignment-expr]
+  |    ^^^^ PLR6103
+7 |     pass
+  |
+  = help: Moves assignment into check using walrus operator (`bad2 := 'example'`).
+
+ℹ Unsafe fix
+2 2 | if bad1: # [consider-using-assignment-expr]
+3 3 |     pass
+4 4 | 
+5   |-bad2 = 'example'
+6   |-if bad2 and True: # [consider-using-assignment-expr]
+  5 |+if (bad2 := 'example') and True: # [consider-using-assignment-expr]
+7 6 |     pass
+8 7 | 
+9 8 | bad3 = 'example'
+
+unnecessary_assignment.py:10:4: PLR6103 [*] Use walrus operator `(bad3 := 'example')`.
+   |
+ 9 | bad3 = 'example'
+10 | if bad3 and bad3 == 'example': # [consider-using-assignment-expr]
+   |    ^^^^ PLR6103
+11 |     pass
+   |
+   = help: Moves assignment into check using walrus operator (`bad3 := 'example'`).
+
+ℹ Unsafe fix
+6  6  | if bad2 and True: # [consider-using-assignment-expr]
+7  7  |     pass
+8  8  | 
+9     |-bad3 = 'example'
+10    |-if bad3 and bad3 == 'example': # [consider-using-assignment-expr]
+   9  |+if (bad3 := 'example') and bad3 == 'example': # [consider-using-assignment-expr]
+11 10 |     pass
+12 11 | 
+13 12 | 
+
+unnecessary_assignment.py:16:8: PLR6103 [*] Use walrus operator `(bad4 := 0)`.
+   |
+14 | def foo():
+15 |     bad4 = 0
+16 |     if bad4: # [consider-using-assignment-expr]
+   |        ^^^^ PLR6103
+17 |         pass
+   |
+   = help: Moves assignment into check using walrus operator (`bad4 := 0`).
+
+ℹ Unsafe fix
+12 12 | 
+13 13 | 
+14 14 | def foo():
+15    |-    bad4 = 0
+16    |-    if bad4: # [consider-using-assignment-expr]
+   15 |+    if (bad4 := 0): # [consider-using-assignment-expr]
+17 16 |         pass
+18 17 | 
+19 18 | bad5 = 'example'
+
+unnecessary_assignment.py:20:4: PLR6103 [*] Use walrus operator `(bad5 := 'example')`.
+   |
+19 | bad5 = 'example'
+20 | if bad5: # [consider-using-assignment-expr]
+   |    ^^^^ PLR6103
+21 |     print(bad5)
+   |
+   = help: Moves assignment into check using walrus operator (`bad5 := 'example'`).
+
+ℹ Unsafe fix
+16 16 |     if bad4: # [consider-using-assignment-expr]
+17 17 |         pass
+18 18 | 
+19    |-bad5 = 'example'
+20    |-if bad5: # [consider-using-assignment-expr]
+   19 |+if (bad5 := 'example'): # [consider-using-assignment-expr]
+21 20 |     print(bad5)
+22 21 | 
+23 22 | 
+
+unnecessary_assignment.py:28:6: PLR6103 [*] Use walrus operator `(bad6_1 := 0)`.
+   |
+26 | if True:
+27 |     pass
+28 | elif bad6_1: # [consider-using-assignment-expr]
+   |      ^^^^^^ PLR6103
+29 |     pass
+30 | elif bad6_2: # [consider-using-assignment-expr]
+   |
+   = help: Moves assignment into check using walrus operator (`bad6_1 := 0`).
+
+ℹ Unsafe fix
+21 21 |     print(bad5)
+22 22 | 
+23 23 | 
+24    |-bad6_1 = 0
+25 24 | bad6_2 = 0
+26 25 | if True:
+27 26 |     pass
+28    |-elif bad6_1: # [consider-using-assignment-expr]
+   27 |+elif (bad6_1 := 0): # [consider-using-assignment-expr]
+29 28 |     pass
+30 29 | elif bad6_2: # [consider-using-assignment-expr]
+31 30 |     pass
+
+unnecessary_assignment.py:30:6: PLR6103 [*] Use walrus operator `(bad6_2 := 0)`.
+   |
+28 | elif bad6_1: # [consider-using-assignment-expr]
+29 |     pass
+30 | elif bad6_2: # [consider-using-assignment-expr]
+   |      ^^^^^^ PLR6103
+31 |     pass
+   |
+   = help: Moves assignment into check using walrus operator (`bad6_2 := 0`).
+
+ℹ Unsafe fix
+22 22 | 
+23 23 | 
+24 24 | bad6_1 = 0
+25    |-bad6_2 = 0
+26 25 | if True:
+27 26 |     pass
+28 27 | elif bad6_1: # [consider-using-assignment-expr]
+29 28 |     pass
+30    |-elif bad6_2: # [consider-using-assignment-expr]
+   29 |+elif (bad6_2 := 0): # [consider-using-assignment-expr]
+31 30 |     pass
+32 31 | 
+33 32 | bad7 = (
+
+unnecessary_assignment.py:45:4: PLR6103 [*] Use walrus operator `(bad7 := 'example', 'example', 'example', 'example', 'example', 'example', 'example', 'example', 'example', 'example')`.
+   |
+43 |     'example',
+44 | )
+45 | if bad7: # [consider-using-assignment-expr]
+   |    ^^^^ PLR6103
+46 |     pass
+   |
+   = help: Moves assignment into check using walrus operator (`bad7 := 'example', 'example', 'example', 'example', 'example', 'example', 'example', 'example', 'example', 'example'`).
+
+ℹ Unsafe fix
+30 30 | elif bad6_2: # [consider-using-assignment-expr]
+31 31 |     pass
+32 32 | 
+33    |-bad7 = (
+34    |-    'example',
+35    |-    'example',
+36    |-    'example',
+37    |-    'example',
+38    |-    'example',
+39    |-    'example',
+40    |-    'example',
+41    |-    'example',
+42    |-    'example',
+43    |-    'example',
+44    |-)
+45    |-if bad7: # [consider-using-assignment-expr]
+   33 |+if (bad7 := 'example', 'example', 'example', 'example', 'example', 'example', 'example', 'example', 'example', 'example'): # [consider-using-assignment-expr]
+46 34 |     pass
+47 35 | 
+48 36 | bad8 = 'example'
+
+unnecessary_assignment.py:49:4: PLR6103 [*] Use walrus operator `(bad8 := 'example')`.
+   |
+48 | bad8 = 'example'
+49 | if bad8 is not None: # [consider-using-assignment-expr]
+   |    ^^^^ PLR6103
+50 |     pass
+   |
+   = help: Moves assignment into check using walrus operator (`bad8 := 'example'`).
+
+ℹ Unsafe fix
+45 45 | if bad7: # [consider-using-assignment-expr]
+46 46 |     pass
+47 47 | 
+48    |-bad8 = 'example'
+49    |-if bad8 is not None: # [consider-using-assignment-expr]
+   48 |+if (bad8 := 'example') is not None: # [consider-using-assignment-expr]
+50 49 |     pass
+51 50 | 
+52 51 | good1_1 = 'example'
