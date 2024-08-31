@@ -76,3 +76,10 @@ def start():
     # PLR1736
     for index, list_item in enumerate(some_list):
         print(some_list[index])
+
+
+def nested_index_lookup():
+    data = {"a": 1, "b": 2}
+    column_names = ["a", "b"]
+    for index, column_name in enumerate(column_names):
+        _ = data[column_names[index]]  # PLR1736

@@ -218,3 +218,6 @@ unnecessary_list_index_lookup.py:78:15: PLR1736 [*] List index lookup in `enumer
 77 77 |     for index, list_item in enumerate(some_list):
 78    |-        print(some_list[index])
    78 |+        print(list_item)
+79 79 | 
+80 80 | 
+81 81 | def nested_index_lookup():
