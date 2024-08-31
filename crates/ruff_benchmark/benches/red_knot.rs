@@ -21,10 +21,8 @@ struct Case {
 
 const TOMLLIB_312_URL: &str = "https://raw.githubusercontent.com/python/cpython/8e8a4baf652f6e1cee7acde9d78c4b6154539748/Lib/tomllib";
 
-// The "unresolved import" is because we don't understand `*` imports yet.
 static EXPECTED_DIAGNOSTICS: &[&str] = &[
     "/src/tomllib/_parser.py:7:29: Module 'collections.abc' has no member 'Iterable'",
-    "/src/tomllib/_parser.py:686:23: Object of type 'Unbound' is not callable",
     "Line 69 is too long (89 characters)",
     "Use double quotes for strings",
     "Use double quotes for strings",
@@ -33,10 +31,7 @@ static EXPECTED_DIAGNOSTICS: &[&str] = &[
     "Use double quotes for strings",
     "Use double quotes for strings",
     "Use double quotes for strings",
-    "/src/tomllib/_parser.py:330:32: Name 'header' used when not defined.",
-    "/src/tomllib/_parser.py:330:41: Name 'key' used when not defined.",
     "/src/tomllib/_parser.py:628:75: Name 'e' used when not defined.",
-    "/src/tomllib/_parser.py:686:23: Name 'parse_float' used when not defined.",
 ];
 
 fn get_test_file(name: &str) -> TestFile {
