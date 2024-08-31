@@ -28,6 +28,8 @@
 use crate::types::{IntersectionType, Type, UnionType};
 use crate::{Db, FxOrderSet};
 
+use super::builtins_symbol_ty_by_name;
+
 pub(crate) struct UnionBuilder<'db> {
     elements: FxOrderSet<Type<'db>>,
     db: &'db dyn Db,
@@ -60,6 +62,11 @@ impl<'db> UnionBuilder<'db> {
         match self.elements.len() {
             0 => Type::Never,
             1 => self.elements[0],
+            2 if self.elements.contains(&Type::BooleanLiteral(true))
+                && self.elements.contains(&Type::BooleanLiteral(false)) =>
+            {
+                builtins_symbol_ty_by_name(self.db, "bool")
+            }
             _ => Type::Union(UnionType::new(self.db, self.elements)),
         }
     }
