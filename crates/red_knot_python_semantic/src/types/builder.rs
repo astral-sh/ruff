@@ -65,7 +65,12 @@ impl<'db> UnionBuilder<'db> {
             2 if self.elements.contains(&Type::BooleanLiteral(true))
                 && self.elements.contains(&Type::BooleanLiteral(false)) =>
             {
-                builtins_symbol_ty_by_name(self.db, "bool")
+                let ty = builtins_symbol_ty_by_name(self.db, "bool");
+                if ty.is_unbound() {
+                    Type::Union(UnionType::new(self.db, self.elements))
+                } else {
+                    ty
+                }
             }
             _ => Type::Union(UnionType::new(self.db, self.elements)),
         }
