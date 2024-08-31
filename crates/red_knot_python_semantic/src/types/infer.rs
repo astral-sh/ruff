@@ -2835,6 +2835,26 @@ mod tests {
     }
 
     #[test]
+    fn basic_async_call_expression() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            async def get_int_async() -> int:
+                return 42
+
+            x = get_int_async()
+            ",
+        )?;
+
+        // TODO: Generic `types.CoroutineType`!
+        assert_public_ty(&db, "src/a.py", "x", "Unknown");
+
+        Ok(())
+    }
+
+    #[test]
     fn class_constructor_call_expression() -> anyhow::Result<()> {
         let mut db = setup_db();
 
