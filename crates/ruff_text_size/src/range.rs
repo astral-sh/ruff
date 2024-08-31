@@ -11,7 +11,7 @@ use {
 /// A range in text, represented as a pair of [`TextSize`][struct@TextSize].
 ///
 /// It is a logic error for `start` to be greater than `end`.
-#[derive(Default, Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Default, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct TextRange {
     // Invariant: start <= end
     start: TextSize,
