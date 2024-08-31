@@ -141,7 +141,7 @@ impl SarifResult {
         Ok(Self {
             rule: message.rule(),
             level: "error".to_string(),
-            message: message.name().to_string(),
+            message: message.body().to_string(),
             uri: path.display().to_string(),
             start_line: start_location.row,
             start_column: start_location.column,
