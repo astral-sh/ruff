@@ -732,26 +732,74 @@ fn yields_documented(
         || (matches!(convention, Some(Convention::Google)) && starts_with_yields(docstring))
 }
 
-/// Returns the first subscript element of a generator annotation, if it exists.
-fn generator_yield_annotation<'a>(expr: &'a Expr, checker: &'a Checker) -> Option<&'a Expr> {
-    let slice = expr.as_subscript_expr()?.slice.as_tuple_expr()?;
-    if matches!(
-        checker
-            .semantic()
-            .resolve_qualified_name(map_subscript(expr))?
-            .segments(),
-        [
-            "typing" | "typing_extensions",
-            "Generator" | "AsyncGenerator" | "Iterator" | "AsyncIterator"
-        ] | [
-            "collections",
-            "abc",
-            "Generator" | "AsyncGenerator" | "Iterator" | "AsyncIterator"
-        ]
-    ) {
-        return slice.elts.first();
+#[derive(Debug, Copy, Clone)]
+enum GeneratorOrIteratorArguments<'a> {
+    Unparameterized,
+    Single(&'a Expr),
+    Several(&'a [Expr]),
+}
+
+impl<'a> GeneratorOrIteratorArguments<'a> {
+    fn first(self) -> Option<&'a Expr> {
+        match self {
+            Self::Unparameterized => None,
+            Self::Single(element) => Some(element),
+            Self::Several(elements) => elements.first(),
+        }
     }
-    None
+
+    fn indicates_none_returned(self) -> bool {
+        match self {
+            Self::Unparameterized => true,
+            Self::Single(_) => true,
+            Self::Several(elements) => elements.get(2).map_or(true, Expr::is_none_literal_expr),
+        }
+    }
+}
+
+/// Returns the arguments to a generator annotation, if it exists.
+fn generator_annotation_arguments<'a>(
+    expr: &'a Expr,
+    semantic: &'a SemanticModel,
+) -> Option<GeneratorOrIteratorArguments<'a>> {
+    let qualified_name = semantic.resolve_qualified_name(map_subscript(expr))?;
+    match qualified_name.segments() {
+        ["typing" | "typing_extensions", "Iterable" | "AsyncIterable" | "Iterator" | "AsyncIterator"]
+        | ["collections", "abc", "Iterable" | "AsyncIterable" | "Iterator" | "AsyncIterator"] => {
+            match expr {
+                Expr::Subscript(ast::ExprSubscript { slice, .. }) => {
+                    Some(GeneratorOrIteratorArguments::Single(slice))
+                }
+                _ => Some(GeneratorOrIteratorArguments::Unparameterized),
+            }
+        }
+        ["typing" | "typing_extensions", "Generator" | "AsyncGenerator"]
+        | ["collections", "abc", "Generator" | "AsyncGenerator"] => match expr {
+            Expr::Subscript(ast::ExprSubscript { slice, .. }) => {
+                if let Expr::Tuple(tuple) = &**slice {
+                    Some(GeneratorOrIteratorArguments::Several(tuple.elts.as_slice()))
+                } else {
+                    // `Generator[int]` implies `Generator[int, None, None]`
+                    // as it uses a PEP-696 TypeVar with default values
+                    Some(GeneratorOrIteratorArguments::Single(slice))
+                }
+            }
+            _ => Some(GeneratorOrIteratorArguments::Unparameterized),
+        },
+        _ => None,
+    }
+}
+
+fn is_generator_function_annotated_as_returning_none(
+    entries: &BodyEntries,
+    return_annotations: &Expr,
+    semantic: &SemanticModel,
+) -> bool {
+    if entries.yields.is_empty() {
+        return false;
+    }
+    generator_annotation_arguments(return_annotations, semantic)
+        .is_some_and(GeneratorOrIteratorArguments::indicates_none_returned)
 }
 
 /// DOC201, DOC202, DOC402, DOC403, DOC501, DOC502
@@ -769,8 +817,10 @@ pub(crate) fn check_docstring(
         return;
     };
 
+    let semantic = checker.semantic();
+
     // Ignore stubs.
-    if function_type::is_stub(function_def, checker.semantic()) {
+    if function_type::is_stub(function_def, semantic) {
         return;
     }
 
@@ -786,7 +836,7 @@ pub(crate) fn check_docstring(
     };
 
     let body_entries = {
-        let mut visitor = BodyVisitor::new(checker.semantic());
+        let mut visitor = BodyVisitor::new(semantic);
         visitor.visit_body(&function_def.body);
         visitor.finish()
     };
@@ -795,12 +845,26 @@ pub(crate) fn check_docstring(
     if checker.enabled(Rule::DocstringMissingReturns) {
         if !returns_documented(docstring, &docstring_sections, convention) {
             let extra_property_decorators = checker.settings.pydocstyle.property_decorators();
-            if !definition.is_property(extra_property_decorators, checker.semantic()) {
+            if !definition.is_property(extra_property_decorators, semantic) {
                 if let Some(body_return) = body_entries.returns.first() {
                     match function_def.returns.as_deref() {
-                        Some(returns) if !Expr::is_none_literal_expr(returns) => diagnostics.push(
-                            Diagnostic::new(DocstringMissingReturns, body_return.range()),
-                        ),
+                        Some(returns) => {
+                            // Ignore it if it's annotated as returning `None`
+                            // or it's a generator function annotated as returning `None`,
+                            // i.e. any of `-> None`, `-> Iterator[...]` or `-> Generator[..., ..., None]`
+                            if !returns.is_none_literal_expr()
+                                && !is_generator_function_annotated_as_returning_none(
+                                    &body_entries,
+                                    returns,
+                                    semantic,
+                                )
+                            {
+                                diagnostics.push(Diagnostic::new(
+                                    DocstringMissingReturns,
+                                    body_return.range(),
+                                ));
+                            }
+                        }
                         None if body_entries
                             .returns
                             .iter()
@@ -824,8 +888,9 @@ pub(crate) fn check_docstring(
             if let Some(body_yield) = body_entries.yields.first() {
                 match function_def.returns.as_deref() {
                     Some(returns)
-                        if generator_yield_annotation(returns, checker)
-                            .map_or(true, |expr| !Expr::is_none_literal_expr(expr)) =>
+                        if !generator_annotation_arguments(returns, semantic).is_some_and(
+                            |arguments| arguments.first().map_or(true, Expr::is_none_literal_expr),
+                        ) =>
                     {
                         diagnostics
                             .push(Diagnostic::new(DocstringMissingYields, body_yield.range()));
@@ -872,7 +937,7 @@ pub(crate) fn check_docstring(
 
     // Avoid applying "extraneous" rules to abstract methods. An abstract method's docstring _could_
     // document that it raises an exception without including the exception in the implementation.
-    if !visibility::is_abstract(&function_def.decorator_list, checker.semantic()) {
+    if !visibility::is_abstract(&function_def.decorator_list, semantic) {
         // DOC202
         if checker.enabled(Rule::DocstringExtraneousReturns) {
             if let Some(ref docstring_returns) = docstring_sections.returns {

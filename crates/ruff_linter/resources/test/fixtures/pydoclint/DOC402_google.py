@@ -89,11 +89,19 @@ def f(num: int):
     yield 1
 
 
-from collections import abc
+import collections.abc
 
 
 # DOC402
-def foo() -> abc.Generator[int | None, None, None]:
+def foo() -> collections.abc.Generator[int | None, None, None]:
+    """
+    Do something
+    """
+    yield
+
+
+# DOC402
+def bar() -> collections.abc.Iterator[int | None]:
     """
     Do something
     """

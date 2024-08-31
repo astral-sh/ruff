@@ -130,3 +130,11 @@ def foo():
     """
     yield 1
     yield
+
+
+# DOC402
+def bar() -> typing.Iterator[int | None]:
+    """
+    Do something
+    """
+    yield

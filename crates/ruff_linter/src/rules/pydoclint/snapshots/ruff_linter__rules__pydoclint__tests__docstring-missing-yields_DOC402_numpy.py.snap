@@ -57,3 +57,12 @@ DOC402_numpy.py:131:5: DOC402 `yield` is not documented in docstring
 132 |     yield
     |
     = help: Add a "Yields" section to the docstring
+
+DOC402_numpy.py:140:5: DOC402 `yield` is not documented in docstring
+    |
+138 |     Do something
+139 |     """
+140 |     yield
+    |     ^^^^^ DOC402
+    |
+    = help: Add a "Yields" section to the docstring
