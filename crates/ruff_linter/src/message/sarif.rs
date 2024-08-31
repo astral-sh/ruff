@@ -215,7 +215,10 @@ mod tests {
             .unwrap();
         let results = sarif["runs"][0]["results"].as_array().unwrap();
         assert_eq!(results.len(), 3);
-        assert_eq!(results[0]["message"]["text"].as_str().unwrap(), "`os` imported but unused");
+        assert_eq!(
+            results[0]["message"]["text"].as_str().unwrap(),
+            "`os` imported but unused"
+        );
         assert!(rules.len() > 3);
     }
 }
