@@ -121,7 +121,7 @@ impl SarifResult {
         Ok(Self {
             rule: message.rule(),
             level: "error".to_string(),
-            message: message.name().to_string(),
+            message: message.body().to_string(),
             uri: url::Url::from_file_path(&path)
                 .map_err(|()| anyhow::anyhow!("Failed to convert path to URL: {}", path.display()))?
                 .to_string(),
@@ -215,6 +215,7 @@ mod tests {
             .unwrap();
         let results = sarif["runs"][0]["results"].as_array().unwrap();
         assert_eq!(results.len(), 3);
+        assert_eq!(results[0]["message"]["text"].as_str().unwrap(), "`os` imported but unused");
         assert!(rules.len() > 3);
     }
 }
