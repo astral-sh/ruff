@@ -254,6 +254,11 @@ impl<'db> InnerIntersectionBuilder<'db> {
 mod tests {
     use super::{IntersectionBuilder, IntersectionType, Type, UnionBuilder, UnionType};
     use crate::db::tests::TestDb;
+    use crate::program::{Program, SearchPathSettings};
+    use crate::python_version::PythonVersion;
+    use crate::types::builtins_symbol_ty_by_name;
+    use crate::ProgramSettings;
+    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
     fn setup_db() -> TestDb {
         TestDb::new()
@@ -263,6 +268,26 @@ mod tests {
         fn elements_vec(self, db: &'db TestDb) -> Vec<Type<'db>> {
             self.elements(db).into_iter().collect()
         }
+    }
+
+    fn setup_db_with_python() -> TestDb {
+        let db = TestDb::new();
+
+        let src_root = SystemPathBuf::from("/src");
+        db.memory_file_system()
+            .create_directory_all(&src_root)
+            .unwrap();
+
+        Program::from_settings(
+            &db,
+            &ProgramSettings {
+                target_version: PythonVersion::default(),
+                search_paths: SearchPathSettings::new(src_root),
+            },
+        )
+        .expect("Valid search path settings");
+
+        db
     }
 
     #[test]
@@ -301,6 +326,20 @@ mod tests {
         let ty = UnionBuilder::new(&db).add(t0).add(Type::Never).build();
 
         assert_eq!(ty, t0);
+    }
+
+    #[test]
+    fn build_union_bool() {
+        let db = setup_db_with_python();
+        let ty_expect = builtins_symbol_ty_by_name(&db, "bool");
+        let t0 = Type::BooleanLiteral(true);
+        let t1 = Type::BooleanLiteral(true);
+        let t2 = Type::BooleanLiteral(false);
+        let ty_true = UnionBuilder::new(&db).add(t0).add(t1).build();
+        let ty = UnionBuilder::new(&db).add(t0).add(t1).add(t2).build();
+
+        assert_eq!(ty_true, Type::BooleanLiteral(true));
+        assert_eq!(ty, ty_expect);
     }
 
     #[test]
