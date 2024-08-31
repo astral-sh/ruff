@@ -1863,16 +1863,16 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             // No nonlocal binding, check module globals. Avoid infinite recursion if `self.scope`
             // already is module globals.
-            let unbound_ty = if file_scope_id == FileScopeId::global() {
+            let ty = if file_scope_id == FileScopeId::global() {
                 Type::Unbound
             } else {
                 global_symbol_ty_by_name(self.db, self.file, name)
             };
-            // Fallback to builtins.
-            if unbound_ty.may_be_unbound(self.db) && Some(self.scope) != builtins_scope(self.db) {
-                unbound_ty.replace_unbound_with(self.db, builtins_symbol_ty_by_name(self.db, name))
+            // Fallback to builtins (without infinite recursion if we're already in builtins.)
+            if ty.may_be_unbound(self.db) && Some(self.scope) != builtins_scope(self.db) {
+                ty.replace_unbound_with(self.db, builtins_symbol_ty_by_name(self.db, name))
             } else {
-                unbound_ty
+                ty
             }
         } else {
             Type::Unbound
