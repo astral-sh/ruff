@@ -331,16 +331,29 @@ mod tests {
 
     #[test]
     fn build_union_bool() {
-        let db = setup_db_with_python();
-        let ty_expect = builtins_symbol_ty_by_name(&db, "bool");
+        let db = setup_db();
+        let bool_ty = builtins_symbol_ty_by_name(&db, "bool");
+
         let t0 = Type::BooleanLiteral(true);
         let t1 = Type::BooleanLiteral(true);
         let t2 = Type::BooleanLiteral(false);
-        let ty_true = UnionBuilder::new(&db).add(t0).add(t1).build();
-        let ty = UnionBuilder::new(&db).add(t0).add(t1).add(t2).build();
+        let t3 = Type::IntLiteral(17);
 
-        assert_eq!(ty_true, Type::BooleanLiteral(true));
-        assert_eq!(ty, ty_expect);
+        let Type::Union(union) = UnionBuilder::new(&db).add(t0).add(t1).add(t3).build() else {
+            panic!("expected a union");
+        };
+        assert_eq!(union.elements_vec(&db), &[t0, t3]);
+        let Type::Union(union) = UnionBuilder::new(&db)
+            .add(t0)
+            .add(t1)
+            .add(t2)
+            .add(t3)
+            .build()
+        else {
+            panic!("expected a union");
+        };
+
+        assert_eq!(union.elements_vec(&db), &[t3, bool_ty]);
     }
 
     #[test]
