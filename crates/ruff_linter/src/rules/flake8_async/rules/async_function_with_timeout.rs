@@ -13,8 +13,8 @@ use crate::settings::types::PythonVersion;
 ///
 /// ## Why is this bad?
 /// Rather than implementing asynchronous timeout behavior manually, prefer
-/// built-in timeout functionality, such as `asyncio.timeout`,
-/// `trio.fail_after`, or `anyio.move_on_after`, among others.
+/// built-in timeout functionality, such as `asyncio.timeout`, `trio.fail_after`,
+/// or `anyio.move_on_after`, among others.
 ///
 /// This rule is highly opinionated to enforce a design pattern
 /// called ["structured concurrency"] that allows for
