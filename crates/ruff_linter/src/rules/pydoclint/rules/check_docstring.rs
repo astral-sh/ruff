@@ -513,7 +513,7 @@ impl Ranged for YieldEntry {
 #[allow(clippy::enum_variant_names)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ReturnEntryKind {
-    NoneNone,
+    NotNone,
     ImplicitNone,
     ExplicitNone,
 }
@@ -668,7 +668,7 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
                     kind: if value.is_none_literal_expr() {
                         ReturnEntryKind::ExplicitNone
                     } else {
-                        ReturnEntryKind::NoneNone
+                        ReturnEntryKind::NotNone
                     },
                 });
             }
