@@ -33,7 +33,8 @@ from collections.abc import Awaitable, Callable, Iterable, Iterator, MutableSet,
 from io import BufferedRandom, BufferedReader, BufferedWriter, FileIO, TextIOWrapper
 from types import CellType, CodeType, TracebackType
 
-# mypy crashes if any of {ByteString, Sequence, MutableSequence, Mapping, MutableMapping} are imported from collections.abc in builtins.pyi
+# mypy crashes if any of {ByteString, Sequence, MutableSequence, Mapping, MutableMapping}
+# are imported from collections.abc in builtins.pyi
 from typing import (  # noqa: Y022
     IO,
     Any,
@@ -967,7 +968,9 @@ class tuple(Sequence[_T_co]):
     if sys.version_info >= (3, 9):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
 
-# Doesn't exist at runtime, but deleting this breaks mypy. See #2999
+# Doesn't exist at runtime, but deleting this breaks mypy and pyright. See:
+# https://github.com/python/typeshed/issues/7580
+# https://github.com/python/mypy/issues/8240
 @final
 @type_check_only
 class function:
@@ -1084,7 +1087,8 @@ class dict(MutableMapping[_KT, _VT]):
     def keys(self) -> dict_keys[_KT, _VT]: ...
     def values(self) -> dict_values[_KT, _VT]: ...
     def items(self) -> dict_items[_KT, _VT]: ...
-    # Signature of `dict.fromkeys` should be kept identical to `fromkeys` methods of `OrderedDict`/`ChainMap`/`UserDict` in `collections`
+    # Signature of `dict.fromkeys` should be kept identical to
+    # `fromkeys` methods of `OrderedDict`/`ChainMap`/`UserDict` in `collections`
     # TODO: the true signature of `dict.fromkeys` is not expressible in the current type system.
     # See #3800 & https://github.com/python/typing/issues/548#issuecomment-683336963.
     @classmethod

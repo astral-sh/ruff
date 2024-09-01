@@ -3,8 +3,9 @@ import types
 from _socket import _Address, _RetAddress
 from _typeshed import ReadableBuffer
 from collections.abc import Callable
+from io import BufferedIOBase
 from socket import socket as _socket
-from typing import Any, BinaryIO, ClassVar
+from typing import Any, ClassVar
 from typing_extensions import Self, TypeAlias
 
 __all__ = [
@@ -158,11 +159,11 @@ class StreamRequestHandler(BaseRequestHandler):
     timeout: ClassVar[float | None]  # undocumented
     disable_nagle_algorithm: ClassVar[bool]  # undocumented
     connection: Any  # undocumented
-    rfile: BinaryIO
-    wfile: BinaryIO
+    rfile: BufferedIOBase
+    wfile: BufferedIOBase
 
 class DatagramRequestHandler(BaseRequestHandler):
-    packet: _socket  # undocumented
+    packet: bytes  # undocumented
     socket: _socket  # undocumented
-    rfile: BinaryIO
-    wfile: BinaryIO
+    rfile: BufferedIOBase
+    wfile: BufferedIOBase

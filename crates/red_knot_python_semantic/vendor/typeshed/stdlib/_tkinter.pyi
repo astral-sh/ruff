@@ -106,8 +106,8 @@ EXCEPTION: Final = 8
 READABLE: Final = 2
 WRITABLE: Final = 4
 
-TCL_VERSION: str
-TK_VERSION: str
+TCL_VERSION: Final[str]
+TK_VERSION: Final[str]
 
 @final
 class TkttType:

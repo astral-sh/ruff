@@ -556,7 +556,9 @@ class Notebook(Widget):
         sticky: str = ...,  # consists of letters 'n', 's', 'w', 'e', no repeats, may be empty
         padding: _Padding = ...,
         text: str = ...,
-        image=...,  # Sequence of an image name, followed by zero or more (sequences of one or more state names followed by an image name)
+        # `image` is a sequence of an image name, followed by zero or more
+        # (sequences of one or more state names followed by an image name)
+        image=...,
         compound: tkinter._Compound = ...,
         underline: int = ...,
     ) -> None: ...

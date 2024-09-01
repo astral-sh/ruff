@@ -28,9 +28,9 @@ S_IFDIR: Final = 0o040000
 
 # These are 0 on systems that don't support the specific kind of file.
 # Example: Linux doesn't support door files, so S_IFDOOR is 0 on linux.
-S_IFDOOR: int
-S_IFPORT: int
-S_IFWHT: int
+S_IFDOOR: Final[int]
+S_IFPORT: Final[int]
+S_IFWHT: Final[int]
 
 S_ISUID: Final = 0o4000
 S_ISGID: Final = 0o2000
@@ -79,9 +79,9 @@ def S_ISWHT(mode: int, /) -> bool: ...
 def filemode(mode: int, /) -> str: ...
 
 if sys.platform == "win32":
-    IO_REPARSE_TAG_SYMLINK: int
-    IO_REPARSE_TAG_MOUNT_POINT: int
-    IO_REPARSE_TAG_APPEXECLINK: int
+    IO_REPARSE_TAG_SYMLINK: Final = 0xA000000C
+    IO_REPARSE_TAG_MOUNT_POINT: Final = 0xA0000003
+    IO_REPARSE_TAG_APPEXECLINK: Final = 0x8000001B
 
 if sys.platform == "win32":
     FILE_ATTRIBUTE_ARCHIVE: Final = 32

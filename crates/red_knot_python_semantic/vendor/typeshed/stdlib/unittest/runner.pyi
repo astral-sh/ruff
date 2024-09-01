@@ -2,36 +2,52 @@ import sys
 import unittest.case
 import unittest.result
 import unittest.suite
-from _typeshed import Incomplete
+from _typeshed import SupportsFlush, SupportsWrite
 from collections.abc import Callable, Iterable
-from typing import TextIO
-from typing_extensions import TypeAlias
+from typing import Any, Generic, Protocol, TypeVar
+from typing_extensions import Never, TypeAlias
 
-_ResultClassType: TypeAlias = Callable[[TextIO, bool, int], unittest.result.TestResult]
+_ResultClassType: TypeAlias = Callable[[_TextTestStream, bool, int], TextTestResult]
 
-class TextTestResult(unittest.result.TestResult):
+class _SupportsWriteAndFlush(SupportsWrite[str], SupportsFlush, Protocol): ...
+
+# All methods used by unittest.runner.TextTestResult's stream
+class _TextTestStream(_SupportsWriteAndFlush, Protocol):
+    def writeln(self, arg: str | None = None) -> str: ...
+
+# _WritelnDecorator should have all the same attrs as its stream param.
+# But that's not feasible to do Generically
+# We can expand the attributes if requested
+class _WritelnDecorator(_TextTestStream):
+    def __init__(self, stream: _TextTestStream) -> None: ...
+    def __getattr__(self, attr: str) -> Any: ...  # Any attribute from the stream type passed to __init__
+    # These attributes are prevented by __getattr__
+    stream: Never
+    __getstate__: Never
+
+_StreamT = TypeVar("_StreamT", bound=_TextTestStream, default=_WritelnDecorator)
+
+class TextTestResult(unittest.result.TestResult, Generic[_StreamT]):
     descriptions: bool  # undocumented
     dots: bool  # undocumented
     separator1: str
     separator2: str
     showAll: bool  # undocumented
-    stream: TextIO  # undocumented
+    stream: _StreamT  # undocumented
     if sys.version_info >= (3, 12):
         durations: unittest.result._DurationsType | None
         def __init__(
-            self, stream: TextIO, descriptions: bool, verbosity: int, *, durations: unittest.result._DurationsType | None = None
+            self, stream: _StreamT, descriptions: bool, verbosity: int, *, durations: unittest.result._DurationsType | None = None
         ) -> None: ...
     else:
-        def __init__(self, stream: TextIO, descriptions: bool, verbosity: int) -> None: ...
+        def __init__(self, stream: _StreamT, descriptions: bool, verbosity: int) -> None: ...
 
     def getDescription(self, test: unittest.case.TestCase) -> str: ...
     def printErrorList(self, flavour: str, errors: Iterable[tuple[unittest.case.TestCase, str]]) -> None: ...
 
 class TextTestRunner:
     resultclass: _ResultClassType
-    # TODO: add `_WritelnDecorator` type
-    # stream: _WritelnDecorator
-    stream: Incomplete
+    stream: _WritelnDecorator
     descriptions: bool
     verbosity: int
     failfast: bool
@@ -43,7 +59,7 @@ class TextTestRunner:
         durations: unittest.result._DurationsType | None
         def __init__(
             self,
-            stream: TextIO | None = None,
+            stream: _SupportsWriteAndFlush | None = None,
             descriptions: bool = True,
             verbosity: int = 1,
             failfast: bool = False,
@@ -57,7 +73,7 @@ class TextTestRunner:
     else:
         def __init__(
             self,
-            stream: TextIO | None = None,
+            stream: _SupportsWriteAndFlush | None = None,
             descriptions: bool = True,
             verbosity: int = 1,
             failfast: bool = False,
@@ -68,5 +84,5 @@ class TextTestRunner:
             tb_locals: bool = False,
         ) -> None: ...
 
-    def _makeResult(self) -> unittest.result.TestResult: ...
-    def run(self, test: unittest.suite.TestSuite | unittest.case.TestCase) -> unittest.result.TestResult: ...
+    def _makeResult(self) -> TextTestResult: ...
+    def run(self, test: unittest.suite.TestSuite | unittest.case.TestCase) -> TextTestResult: ...

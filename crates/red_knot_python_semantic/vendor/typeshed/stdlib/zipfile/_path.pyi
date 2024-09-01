@@ -31,6 +31,7 @@ if sys.version_info >= (3, 12):
 
     class Path:
         root: CompleteDirs
+        at: str
         def __init__(self, root: ZipFile | StrPath | IO[bytes], at: str = "") -> None: ...
         @property
         def name(self) -> str: ...

@@ -1,12 +1,12 @@
 from typing import Final
 
 # These are not actually bools. See #4669
-NO: bool
-YES: bool
-TRUE: bool
-FALSE: bool
-ON: bool
-OFF: bool
+NO: Final[bool]
+YES: Final[bool]
+TRUE: Final[bool]
+FALSE: Final[bool]
+ON: Final[bool]
+OFF: Final[bool]
 N: Final = "n"
 S: Final = "s"
 W: Final = "w"

@@ -229,18 +229,17 @@ if sys.version_info >= (3, 9):
 else:
     class _InitVarMeta(type):
         # Not used, instead `InitVar.__class_getitem__` is called.
-        # pyright ignore is needed because pyright (not unreasonably) thinks this
-        # is an invalid use of InitVar.
-        def __getitem__(self, params: Any) -> InitVar[Any]: ...  # pyright: ignore
+        # pyright (not unreasonably) thinks this is an invalid use of InitVar.
+        def __getitem__(self, params: Any) -> InitVar[Any]: ...  # pyright: ignore[reportInvalidTypeForm]
 
 class InitVar(Generic[_T], metaclass=_InitVarMeta):
     type: Type[_T]
     def __init__(self, type: Type[_T]) -> None: ...
     if sys.version_info >= (3, 9):
         @overload
-        def __class_getitem__(cls, type: Type[_T]) -> InitVar[_T]: ...  # pyright: ignore
+        def __class_getitem__(cls, type: Type[_T]) -> InitVar[_T]: ...  # pyright: ignore[reportInvalidTypeForm]
         @overload
-        def __class_getitem__(cls, type: Any) -> InitVar[Any]: ...  # pyright: ignore
+        def __class_getitem__(cls, type: Any) -> InitVar[Any]: ...  # pyright: ignore[reportInvalidTypeForm]
 
 if sys.version_info >= (3, 12):
     def make_dataclass(
