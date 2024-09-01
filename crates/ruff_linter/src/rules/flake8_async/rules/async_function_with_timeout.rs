@@ -9,10 +9,11 @@ use crate::rules::flake8_async::helpers::AsyncModule;
 use crate::settings::types::PythonVersion;
 
 /// ## What it does
-/// Checks for `async` functions with a `timeout` argument.
+/// Checks for `async` functions (from `anyio`, `asyncio`, or `trio`)
+/// with a `timeout` argument.
 ///
-/// This rule is only applied for Python 3.11 and newer,
-/// as `asyncio.timeout` was added in Python 3.11.
+/// Note `asyncio.timeout` was added in Python 3.11,
+/// so this rule is only applicable to `asyncio` functions in Python 3.11+.
 ///
 /// ## Why is this bad?
 /// Rather than implementing asynchronous timeout behavior manually, prefer
