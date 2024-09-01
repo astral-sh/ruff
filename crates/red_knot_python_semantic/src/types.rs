@@ -1,6 +1,7 @@
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 
+use crate::ast_node_ref::AstNodeRef;
 use crate::builtins::builtins_scope;
 use crate::semantic_index::ast_ids::HasScopedAstId;
 use crate::semantic_index::definition::{Definition, DefinitionKind};
@@ -376,15 +377,27 @@ impl<'db> FunctionType<'db> {
 
     /// annotated return type for this function, if any
     pub fn returns(&self, db: &'db dyn Db) -> Option<Type<'db>> {
-        let definition = self.definition(db);
-        let DefinitionKind::Function(function_stmt_node) = definition.node(db) else {
+        self.node(db)
+            .returns
+            .as_ref()
+            .map(|returns| definition_expression_ty(db, self.definition(db), returns.as_ref()))
+    }
+
+    /// annotated parameter types for this function, if any
+    pub fn params<'a>(&'a self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> + 'a {
+        self.node(db)
+            .parameters
+            .iter()
+            .filter_map(ast::AnyParameterRef::annotation)
+            .map(|annotation| definition_expression_ty(db, self.definition(db), annotation))
+    }
+
+    fn node(self, db: &'db dyn Db) -> &'db AstNodeRef<ast::StmtFunctionDef> {
+        let DefinitionKind::Function(function_stmt_node) = self.definition(db).node(db) else {
             panic!("Function type definition must have `DefinitionKind::Function`")
         };
 
         function_stmt_node
-            .returns
-            .as_ref()
-            .map(|returns| definition_expression_ty(db, definition, returns.as_ref()))
     }
 }
 

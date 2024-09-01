@@ -460,13 +460,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             panic!("function type params scope without type params");
         };
 
-        // TODO: this should also be applied to parameter annotations.
         if !self.is_stub() {
             self.infer_optional_expression(function.returns.as_deref());
+            self.infer_parameters(&function.parameters);
         }
 
         self.infer_type_parameters(type_params);
-        self.infer_parameters(&function.parameters);
     }
 
     fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
@@ -556,10 +555,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         // If there are type params, parameters and returns are evaluated in that scope, that is, in
         // `infer_function_type_params`, rather than here.
         if type_params.is_none() {
-            self.infer_parameters(parameters);
-
-            // TODO: this should also be applied to parameter annotations.
             if !self.is_stub() {
+                self.infer_parameters(parameters);
                 self.infer_optional_annotation_expression(returns.as_deref());
             }
         }
@@ -602,7 +599,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             default: _,
         } = parameter_with_default;
 
-        self.infer_optional_expression(parameter.annotation.as_deref());
+        self.infer_optional_annotation_expression(parameter.annotation.as_deref());
 
         self.infer_definition(parameter_with_default);
     }
@@ -614,7 +611,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             annotation,
         } = parameter;
 
-        self.infer_optional_expression(annotation.as_deref());
+        self.infer_optional_annotation_expression(annotation.as_deref());
 
         self.infer_definition(parameter);
     }
@@ -686,6 +683,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_function_deferred(&mut self, function: &ast::StmtFunctionDef) {
         if self.is_stub() {
             self.types.has_deferred = true;
+            self.infer_parameters(function.parameters.as_ref());
             self.infer_optional_annotation_expression(function.returns.as_deref());
         }
     }
@@ -2811,6 +2809,41 @@ mod tests {
             .expect("There is a return type on the function");
 
         assert_eq!(returns.display(&db).to_string(), "int");
+
+        Ok(())
+    }
+
+    #[test]
+    fn function_param_type() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            def example(a: int): ...
+            def with_multiple_params(a: int, b: str): ...
+            ",
+        )?;
+
+        let mod_a = system_path_to_file(&db, "src/a.py").unwrap();
+        let example_ty = global_symbol_ty_by_name(&db, mod_a, "example");
+        let Type::Function(example) = example_ty else {
+            panic!("example is not a function");
+        };
+
+        let params = example.params(&db).collect::<Vec<_>>();
+        assert_eq!(params.len(), 1);
+        assert_eq!(params[0].display(&db).to_string(), "int");
+
+        let with_multiple_params_ty = global_symbol_ty_by_name(&db, mod_a, "with_multiple_params");
+        let Type::Function(with_multiple_params) = with_multiple_params_ty else {
+            panic!("with_multiple_params is not a function");
+        };
+
+        let params = with_multiple_params.params(&db).collect::<Vec<_>>();
+        assert_eq!(params.len(), 2);
+        assert_eq!(params[0].display(&db).to_string(), "int");
+        assert_eq!(params[1].display(&db).to_string(), "str");
 
         Ok(())
     }
