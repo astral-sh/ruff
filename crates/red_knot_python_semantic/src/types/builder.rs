@@ -265,17 +265,13 @@ mod tests {
     use crate::ProgramSettings;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
-    fn setup_db() -> TestDb {
-        TestDb::new()
-    }
-
     impl<'db> UnionType<'db> {
         fn elements_vec(self, db: &'db TestDb) -> Vec<Type<'db>> {
             self.elements(db).into_iter().collect()
         }
     }
 
-    fn setup_db_with_python() -> TestDb {
+    fn setup_db() -> TestDb {
         let db = TestDb::new();
 
         let src_root = SystemPathBuf::from("/src");
