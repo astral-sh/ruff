@@ -46,7 +46,7 @@ use crate::checkers::ast::Checker;
 ///     bar: InitVar[int] = 1
 ///     baz: InitVar[int] = 2
 ///
-///     def __post_init__(self, bar, baz) -> None:
+///     def __post_init__(self, bar: int, baz: int) -> None:
 ///         print(bar, baz)
 ///
 ///
