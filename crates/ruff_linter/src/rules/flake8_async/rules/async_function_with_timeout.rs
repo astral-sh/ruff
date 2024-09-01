@@ -20,6 +20,12 @@ use crate::settings::types::PythonVersion;
 /// built-in timeout functionality, such as `asyncio.timeout`,
 /// `trio.fail_after`, or `anyio.move_on_after`, among others.
 ///
+/// This rule is highly opinionated to enforce a design pattern
+/// called "structured concurrency" that allows for
+/// `async` functions to be oblivious to timeouts,
+/// instead letting callers to handle the logic with a context manager
+/// ([relevant blog](https://vorpus.org/blog/some-thoughts-on-asynchronous-api-design-in-a-post-asyncawait-world/#timeouts-and-cancellation).
+///
 /// For functions that wrap `asyncio.timeout`,
 /// false positives from this rule can be sidestepped
 /// by using a more verbose parameter name
