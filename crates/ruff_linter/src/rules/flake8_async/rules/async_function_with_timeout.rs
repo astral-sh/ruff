@@ -9,7 +9,7 @@ use crate::rules::flake8_async::helpers::AsyncModule;
 use crate::settings::types::PythonVersion;
 
 /// ## What it does
-/// Checks for `async` function definitions with a `timeout` parameter.
+/// Checks for `async` function definitions with `timeout` parameters.
 ///
 /// ## Why is this bad?
 /// Rather than implementing asynchronous timeout behavior manually, prefer
