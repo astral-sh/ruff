@@ -68,11 +68,9 @@ impl<'db> UnionBuilder<'db> {
             .is_superset(&[Type::BooleanLiteral(true), Type::BooleanLiteral(false)].into())
         {
             let bool_ty = builtins_symbol_ty_by_name(self.db, "bool");
-            if !bool_ty.is_unbound() {
-                self.elements.remove(&Type::BooleanLiteral(true));
-                self.elements.remove(&Type::BooleanLiteral(false));
-                self.elements.insert(bool_ty);
-            }
+            self.elements.remove(&Type::BooleanLiteral(true));
+            self.elements.remove(&Type::BooleanLiteral(false));
+            self.elements.insert(bool_ty);
         }
     }
 
