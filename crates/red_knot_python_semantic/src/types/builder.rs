@@ -58,20 +58,29 @@ impl<'db> UnionBuilder<'db> {
         self
     }
 
-    pub(crate) fn build(self) -> Type<'db> {
+    /// Performs the following normalizations:
+    ///     - Replaces `Literal[True,False]` with `bool`.
+    ///     - TODO For enums `E` with members `X1`,...,`Xn`, replaces
+    ///     `Literal[E.X1,...,E.Xn]` with `E`.
+    fn simplify(&mut self) {
+        if self
+            .elements
+            .is_superset(&[Type::BooleanLiteral(true), Type::BooleanLiteral(false)].into())
+        {
+            let bool_ty = builtins_symbol_ty_by_name(self.db, "bool");
+            if !bool_ty.is_unbound() {
+                self.elements.remove(&Type::BooleanLiteral(true));
+                self.elements.remove(&Type::BooleanLiteral(false));
+                self.elements.insert(bool_ty);
+            }
+        }
+    }
+
+    pub(crate) fn build(mut self) -> Type<'db> {
+        self.simplify();
         match self.elements.len() {
             0 => Type::Never,
             1 => self.elements[0],
-            2 if self.elements.contains(&Type::BooleanLiteral(true))
-                && self.elements.contains(&Type::BooleanLiteral(false)) =>
-            {
-                let ty = builtins_symbol_ty_by_name(self.db, "bool");
-                if ty.is_unbound() {
-                    Type::Union(UnionType::new(self.db, self.elements))
-                } else {
-                    ty
-                }
-            }
             _ => Type::Union(UnionType::new(self.db, self.elements)),
         }
     }
