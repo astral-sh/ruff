@@ -1,9 +1,11 @@
 use ruff_diagnostics::{Diagnostic, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, ParameterWithDefault};
+use ruff_python_ast::{self as ast, ParameterWithDefault, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+
+use super::helpers::is_dataclass;
 
 /// ## What it does
 /// Checks for `__post_init__` dataclass methods with argument defaults.
@@ -75,22 +77,30 @@ impl Violation for PostInitDefault {
 }
 
 /// RUF033
-pub(crate) fn post_init_default(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
-    if &function_def.name != "__post_init__" {
+pub(crate) fn post_init_default(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+    if !is_dataclass(class_def, checker.semantic()) {
         return;
     }
 
-    for ParameterWithDefault {
-        parameter: _,
-        default,
-        range: _,
-    } in function_def.parameters.iter_non_variadic_params()
-    {
-        let Some(default) = default else {
-            continue;
-        };
-        checker
-            .diagnostics
-            .push(Diagnostic::new(PostInitDefault, default.range()));
+    for statement in &class_def.body {
+        if let Stmt::FunctionDef(function_def) = statement {
+            if &function_def.name != "__post_init__" {
+                continue;
+            }
+
+            for ParameterWithDefault {
+                parameter: _,
+                default,
+                range: _,
+            } in function_def.parameters.iter_non_variadic_params()
+            {
+                let Some(default) = default else {
+                    continue;
+                };
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(PostInitDefault, default.range()));
+            }
+        }
     }
 }

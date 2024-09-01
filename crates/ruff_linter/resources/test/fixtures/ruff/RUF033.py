@@ -29,3 +29,12 @@ class Foo:
 @dataclass
 class Foo:
     def __something_else__(self, bar = 11, baz = 11) -> None: ...
+
+
+# OK
+def __post_init__(foo: bool = True) -> None: ...
+
+
+# OK
+class Foo:
+    def __post_init__(self, x="hmm") -> None: ...
