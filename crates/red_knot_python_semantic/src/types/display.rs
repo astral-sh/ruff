@@ -80,9 +80,8 @@ impl Display for DisplayUnionType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let union = self.ty;
 
-        // Group literals by type: {int, string, bytes, boolean, function, class}
-        let mut all_literals: Vec<Vec<String>> =
-            vec![vec![], vec![], vec![], vec![], vec![], vec![]];
+        // Group literals by type: {int, string, bytes, function, class}
+        let mut all_literals: Vec<Vec<String>> = vec![vec![], vec![], vec![], vec![], vec![]];
         let mut other_types = vec![];
 
         union
@@ -100,13 +99,8 @@ impl Display for DisplayUnionType<'_> {
                         all_literals[2].push(string);
                     }
                 }
-                Type::BooleanLiteral(b) => all_literals[3].push(if b {
-                    "True".to_string()
-                } else {
-                    "False".to_string()
-                }),
-                Type::Class(c) => all_literals[4].push(c.name(self.db).to_string()),
-                Type::Function(f) => all_literals[5].push(f.name(self.db).to_string()),
+                Type::Class(c) => all_literals[3].push(c.name(self.db).to_string()),
+                Type::Function(f) => all_literals[4].push(f.name(self.db).to_string()),
                 _ => other_types.push(ty),
             });
 
@@ -249,15 +243,15 @@ mod tests {
             Type::IntLiteral(1),
             Type::IntLiteral(-1),
             Type::IntLiteral(0),
-            // Other non Literals
+            // Functions
             global_symbol_ty_by_name(&db, mod_file, "foo"),
             global_symbol_ty_by_name(&db, mod_file, "bar"),
+            // Classes
             global_symbol_ty_by_name(&db, mod_file, "A"),
             global_symbol_ty_by_name(&db, mod_file, "B"),
-            Type::None,
-            // Booleans Literals
-            Type::BooleanLiteral(false),
+            // Other non-grouped types
             Type::BooleanLiteral(true),
+            Type::None,
         ];
         let builder = vec.iter().fold(UnionBuilder::new(&db), |builder, literal| {
             builder.add(*literal)
@@ -272,9 +266,9 @@ mod tests {
                 "Literal[-1, 0, 1] | ",
                 "Literal[\"A\", \"B\"] | ",
                 "Literal[b\"\\x00\", b\"\\x07\"] | ",
-                "Literal[False, True] | ",
                 "Literal[A, B] | ",
                 "Literal[bar, foo] | ",
+                "Literal[True] | ",
                 "None"
             )
         );
