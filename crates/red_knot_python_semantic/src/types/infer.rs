@@ -2806,10 +2806,7 @@ mod tests {
             panic!("example is not a function");
         };
 
-        let returns = function
-            .returns(&db)
-            .expect("There is a return type on the function");
-
+        let returns = function.return_type(&db);
         assert_eq!(returns.display(&db).to_string(), "int");
 
         Ok(())
@@ -2849,6 +2846,35 @@ mod tests {
         )?;
 
         // TODO: Generic `types.CoroutineType`!
+        assert_public_ty(&db, "src/a.py", "x", "Unknown");
+
+        Ok(())
+    }
+
+    #[test]
+    fn basic_decorated_call_expression() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            from typing import Callable
+
+            def foo() -> int:
+                return 42
+
+            def decorator(func) -> Callable[[], int]:
+                return foo
+
+            @decorator
+            def bar() -> str:
+                return 'bar'
+
+            x = bar()
+            ",
+        )?;
+
+        // TODO: should be `int`!
         assert_public_ty(&db, "src/a.py", "x", "Unknown");
 
         Ok(())
