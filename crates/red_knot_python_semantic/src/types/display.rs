@@ -2,6 +2,8 @@
 
 use std::fmt::{Display, Formatter};
 
+use hashbrown::HashMap;
+
 use ruff_python_ast::str::Quote;
 use ruff_python_literal::escape::AsciiEscape;
 
@@ -99,51 +101,82 @@ struct DisplayUnionType<'db> {
     db: &'db dyn Db,
 }
 
+// Enumeration for literals that are displayed in a condensed form (e.g. `Literal[... | ...]`)
+#[derive(Hash, PartialEq, Eq)]
+enum CondensedLiteral {
+    Int,
+    String,
+    Bytes,
+    Function,
+    Class,
+}
+
+impl CondensedLiteral {
+    fn iter() -> impl Iterator<Item = &'static Self> {
+        // Order of the literals in the condensed form
+        [
+            Self::Int,
+            Self::String,
+            Self::Bytes,
+            Self::Class,
+            Self::Function,
+        ]
+        .iter()
+    }
+}
+
 impl Display for DisplayUnionType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let union = self.ty;
 
         // Group literals by type: {int, string, bytes, function, class}
-        let mut all_literals: Vec<Vec<String>> = vec![vec![], vec![], vec![], vec![], vec![]];
+        let mut literals_representation_map = HashMap::<CondensedLiteral, Vec<String>>::new();
         let mut other_types = vec![];
 
         union.elements(self.db).iter().copied().for_each(|ty| {
             // Find which group the type belongs to, None means other types
-            let maybe_index = match ty {
-                Type::IntLiteral(_) => Some(0),
-                Type::StringLiteral(_) => Some(1),
-                Type::BytesLiteral(_) => Some(2),
-                Type::Class(_) => Some(3),
-                Type::Function(_) => Some(4),
+            let maybe_condensed_literal = match ty {
+                Type::IntLiteral(_) => Some(CondensedLiteral::Int),
+                Type::StringLiteral(_) => Some(CondensedLiteral::String),
+                Type::BytesLiteral(_) => Some(CondensedLiteral::Bytes),
+                Type::Class(_) => Some(CondensedLiteral::Class),
+                Type::Function(_) => Some(CondensedLiteral::Function),
                 _ => None,
             };
-            if let Some(index) = maybe_index {
-                // For literals, push the representation, adding `Literal[...]` is done later
-                all_literals[index].push(ty.display(self.db).representation());
+            if let Some(condensed_literal) = maybe_condensed_literal {
+                // For literals, push the representation. Adding `Literal[...]` is done later
+                literals_representation_map
+                    .entry(condensed_literal)
+                    .or_insert_with(Vec::new)
+                    .push(ty.display(self.db).representation());
             } else {
                 other_types.push(ty);
             }
         });
 
-        all_literals
-            .iter_mut()
+        literals_representation_map
+            .values_mut()
             .for_each(|group| group.sort_unstable());
 
         let mut first = true;
-        for literals_group in all_literals.iter().filter(|group| !group.is_empty()) {
-            if !first {
-                f.write_str(" | ")?;
-            };
-            first = false;
+        for condensed_literal in CondensedLiteral::iter() {
+            if let Some(literals_representation) =
+                literals_representation_map.remove(condensed_literal)
+            {
+                if !first {
+                    f.write_str(" | ")?;
+                };
+                first = false;
 
-            f.write_str("Literal[")?;
-            for (i, literal) in literals_group.iter().enumerate() {
-                if i > 0 {
-                    f.write_str(", ")?;
+                f.write_str("Literal[")?;
+                for (i, literal_repr) in literals_representation.iter().enumerate() {
+                    if i > 0 {
+                        f.write_str(", ")?;
+                    }
+                    write!(f, "{literal_repr}")?;
                 }
-                write!(f, "{literal}")?;
+                f.write_str("]")?;
             }
-            f.write_str("]")?;
         }
 
         for ty in other_types {
