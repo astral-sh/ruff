@@ -187,3 +187,50 @@ def foo(s: str) -> str | None:
         A string.
     """
     return None
+
+
+# DOC201
+def bar() -> int | None:
+    """Bar-y method"""
+    return
+
+
+from collections.abc import Iterator, Generator
+
+
+# This is okay -- returning `None` is implied by `Iterator[str]`;
+# no need to document it
+def generator_function() -> Iterator[str]:
+    """Generate some strings"""
+    yield from "abc"
+    return
+
+
+# This is okay -- returning `None` is stated by `Generator[str, None, None]`;
+# no need to document it
+def generator_function_2() -> Generator[str, None, None]:
+    """Generate some strings"""
+    yield from "abc"
+    return
+
+
+# DOC201 -- returns None but `Generator[str, None, int | None]`
+# indicates it could sometimes return `int`
+def generator_function_3() -> Generator[str, None, int | None]:
+    """Generate some strings"""
+    yield from "abc"
+    return
+
+
+# DOC201 -- no type annotation and a non-None return
+# indicates it could sometimes return `int`
+def generator_function_4():
+    """Generate some strings"""
+    yield from "abc"
+    return 42
+
+
+# DOC201 -- no `yield` expressions, so not a generator function
+def not_a_generator() -> Iterator[int]:
+    """"No returns documented here, oh no"""
+    return (x for x in range(42))
