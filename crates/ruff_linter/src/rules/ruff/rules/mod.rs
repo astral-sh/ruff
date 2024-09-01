@@ -74,3 +74,6 @@ pub(crate) enum Context {
     Docstring,
     Comment,
 }
+pub(crate) use post_init_default::*;
+
+mod post_init_default;
