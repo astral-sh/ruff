@@ -28,6 +28,8 @@
 use crate::types::{IntersectionType, Type, UnionType};
 use crate::{Db, FxOrderSet};
 
+use super::builtins_symbol_ty_by_name;
+
 pub(crate) struct UnionBuilder<'db> {
     elements: FxOrderSet<Type<'db>>,
     db: &'db dyn Db,
@@ -56,7 +58,24 @@ impl<'db> UnionBuilder<'db> {
         self
     }
 
-    pub(crate) fn build(self) -> Type<'db> {
+    /// Performs the following normalizations:
+    ///     - Replaces `Literal[True,False]` with `bool`.
+    ///     - TODO For enums `E` with members `X1`,...,`Xn`, replaces
+    ///     `Literal[E.X1,...,E.Xn]` with `E`.
+    fn simplify(&mut self) {
+        if self
+            .elements
+            .is_superset(&[Type::BooleanLiteral(true), Type::BooleanLiteral(false)].into())
+        {
+            let bool_ty = builtins_symbol_ty_by_name(self.db, "bool");
+            self.elements.remove(&Type::BooleanLiteral(true));
+            self.elements.remove(&Type::BooleanLiteral(false));
+            self.elements.insert(bool_ty);
+        }
+    }
+
+    pub(crate) fn build(mut self) -> Type<'db> {
+        self.simplify();
         match self.elements.len() {
             0 => Type::Never,
             1 => self.elements[0],
@@ -247,15 +266,36 @@ impl<'db> InnerIntersectionBuilder<'db> {
 mod tests {
     use super::{IntersectionBuilder, IntersectionType, Type, UnionBuilder, UnionType};
     use crate::db::tests::TestDb;
-
-    fn setup_db() -> TestDb {
-        TestDb::new()
-    }
+    use crate::program::{Program, SearchPathSettings};
+    use crate::python_version::PythonVersion;
+    use crate::types::builtins_symbol_ty_by_name;
+    use crate::ProgramSettings;
+    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
     impl<'db> UnionType<'db> {
         fn elements_vec(self, db: &'db TestDb) -> Vec<Type<'db>> {
             self.elements(db).into_iter().collect()
         }
+    }
+
+    fn setup_db() -> TestDb {
+        let db = TestDb::new();
+
+        let src_root = SystemPathBuf::from("/src");
+        db.memory_file_system()
+            .create_directory_all(&src_root)
+            .unwrap();
+
+        Program::from_settings(
+            &db,
+            &ProgramSettings {
+                target_version: PythonVersion::default(),
+                search_paths: SearchPathSettings::new(src_root),
+            },
+        )
+        .expect("Valid search path settings");
+
+        db
     }
 
     #[test]
@@ -294,6 +334,33 @@ mod tests {
         let ty = UnionBuilder::new(&db).add(t0).add(Type::Never).build();
 
         assert_eq!(ty, t0);
+    }
+
+    #[test]
+    fn build_union_bool() {
+        let db = setup_db();
+        let bool_ty = builtins_symbol_ty_by_name(&db, "bool");
+
+        let t0 = Type::BooleanLiteral(true);
+        let t1 = Type::BooleanLiteral(true);
+        let t2 = Type::BooleanLiteral(false);
+        let t3 = Type::IntLiteral(17);
+
+        let Type::Union(union) = UnionBuilder::new(&db).add(t0).add(t1).add(t3).build() else {
+            panic!("expected a union");
+        };
+        assert_eq!(union.elements_vec(&db), &[t0, t3]);
+        let Type::Union(union) = UnionBuilder::new(&db)
+            .add(t0)
+            .add(t1)
+            .add(t2)
+            .add(t3)
+            .build()
+        else {
+            panic!("expected a union");
+        };
+
+        assert_eq!(union.elements_vec(&db), &[t3, bool_ty]);
     }
 
     #[test]
