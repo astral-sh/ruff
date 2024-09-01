@@ -11,7 +11,7 @@ use crate::checkers::ast::Checker;
 /// ## Why is this bad?
 /// Variables that are only used during initialization should be instantiated
 /// as an init-only pseudo-field using `dataclasses.InitVar`. According to the
-/// [documentation],
+/// [documentation]:
 ///
 /// > Init-only fields are added as parameters to the generated `__init__()`
 /// > method, and are passed to the optional `__post_init__()` method. They are
