@@ -17,7 +17,7 @@ use crate::checkers::ast::Checker;
 /// > method, and are passed to the optional `__post_init__()` method. They are
 /// > not otherwise used by dataclasses.
 ///
-/// Default values for `__post_init__` arguments that exist as init-only field
+/// Default values for `__post_init__` arguments that exist as init-only fields
 /// as well will be overridden by the `dataclasses.InitVar` value.
 ///
 /// ## Example
