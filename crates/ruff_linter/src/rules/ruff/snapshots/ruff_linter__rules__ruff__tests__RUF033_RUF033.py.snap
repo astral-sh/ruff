@@ -1,34 +1,38 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF033.py:19:35: RUF033 `__post_init__` method has argument defaults, use `dataclasses.InitVar` instead
+RUF033.py:19:35: RUF033 `__post_init__` method with argument defaults
    |
 17 |     baz: InitVar[int] = 1
 18 | 
 19 |     def __post_init__(self, bar = 11, baz = 11) -> None: ...
    |                                   ^^ RUF033
    |
+   = help: Use `dataclasses.InitVar` instead
 
-RUF033.py:19:45: RUF033 `__post_init__` method has argument defaults, use `dataclasses.InitVar` instead
+RUF033.py:19:45: RUF033 `__post_init__` method with argument defaults
    |
 17 |     baz: InitVar[int] = 1
 18 | 
 19 |     def __post_init__(self, bar = 11, baz = 11) -> None: ...
    |                                             ^^ RUF033
    |
+   = help: Use `dataclasses.InitVar` instead
 
-RUF033.py:25:35: RUF033 `__post_init__` method has argument defaults, use `dataclasses.InitVar` instead
+RUF033.py:25:35: RUF033 `__post_init__` method with argument defaults
    |
 23 | @dataclass
 24 | class Foo:
 25 |     def __post_init__(self, bar = 11, baz = 11) -> None: ...
    |                                   ^^ RUF033
    |
+   = help: Use `dataclasses.InitVar` instead
 
-RUF033.py:25:45: RUF033 `__post_init__` method has argument defaults, use `dataclasses.InitVar` instead
+RUF033.py:25:45: RUF033 `__post_init__` method with argument defaults
    |
 23 | @dataclass
 24 | class Foo:
 25 |     def __post_init__(self, bar = 11, baz = 11) -> None: ...
    |                                             ^^ RUF033
    |
+   = help: Use `dataclasses.InitVar` instead

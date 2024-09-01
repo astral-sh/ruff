@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{Diagnostic, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, ParameterWithDefault};
 use ruff_text_size::Ranged;
@@ -62,13 +62,15 @@ use crate::checkers::ast::Checker;
 pub struct PostInitDefault;
 
 impl Violation for PostInitDefault {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`__post_init__` method with argument defaults")
     }
-    
-    fn fix_title(&self) -> String {
-        format!("Use `dataclasses.InitVar` instead"")
+
+    fn fix_title(&self) -> Option<String> {
+        Some(format!("Use `dataclasses.InitVar` instead"))
     }
 }
 
