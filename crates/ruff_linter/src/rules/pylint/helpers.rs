@@ -144,27 +144,25 @@ impl<'a> Visitor<'_> for SequenceIndexVisitor<'a> {
         if self.modified {
             return;
         }
-        match expr {
-            Expr::Subscript(ast::ExprSubscript {
-                value,
-                slice,
-                range,
-                ..
-            }) => {
-                let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
-                    return;
-                };
+        if let Expr::Subscript(ast::ExprSubscript {
+            value,
+            slice,
+            range,
+            ..
+        }) = expr
+        {
+            if let Expr::Name(ast::ExprName { id, .. }) = &**value {
                 if id == self.sequence_name {
-                    let Expr::Name(ast::ExprName { id, .. }) = slice.as_ref() else {
-                        return;
-                    };
-                    if id == self.index_name {
-                        self.accesses.push(*range);
+                    if let Expr::Name(ast::ExprName { id, .. }) = &**slice {
+                        if id == self.index_name {
+                            self.accesses.push(*range);
+                        }
                     }
                 }
             }
-            _ => visitor::walk_expr(self, expr),
         }
+
+        visitor::walk_expr(self, expr);
     }
 }
 
