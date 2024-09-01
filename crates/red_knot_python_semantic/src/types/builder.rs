@@ -25,12 +25,9 @@
 //!   * No type in an intersection can be a supertype of any other type in the intersection (just
 //!     eliminate the supertype from the intersection).
 //!   * An intersection containing two non-overlapping types should simplify to [`Type::Never`].
-
-use crate::types::{IntersectionType, Type, UnionType};
+use crate::types::{builtins_symbol_ty_by_name, IntersectionType, Type, UnionType};
 use crate::{Db, FxOrderSet};
 use ordermap::set::MutableValues;
-
-use super::builtins_symbol_ty_by_name;
 
 pub(crate) struct UnionBuilder<'db> {
     elements: FxOrderSet<Type<'db>>,

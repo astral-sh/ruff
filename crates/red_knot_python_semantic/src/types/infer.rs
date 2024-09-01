@@ -37,7 +37,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext, UnaryOp};
 use ruff_text_size::Ranged;
 
-use crate::builtins::builtins_scope;
+use crate::core_stdlib_modules::builtins_scope;
 use crate::module_name::ModuleName;
 use crate::module_resolver::{file_to_module, resolve_module};
 use crate::semantic_index::ast_ids::{HasScopedAstId, HasScopedUseId, ScopedExpressionId};
@@ -1043,18 +1043,17 @@ impl<'db> TypeInferenceBuilder<'db> {
             .types
             .expression_ty(iterable.scoped_ast_id(self.db, self.scope));
 
-        // TODO(Alex): only a valid iterable if the *type* of `iterable_ty` has an `__iter__`
-        // member (dunders are never looked up on an instance)
-        let _dunder_iter_ty = iterable_ty.member(self.db, &ast::name::Name::from("__iter__"));
-
-        // TODO(Alex):
-        // - infer the return type of the `__iter__` method, which gives us the iterator
-        // - lookup the `__next__` method on the iterator
-        // - infer the return type of the iterator's `__next__` method,
-        //   which gives us the type of the variable being bound here
-        //   (...or the type of the object being unpacked into multiple definitions, if it's something like
-        //   `for k, v in d.items(): ...`)
-        let loop_var_value_ty = Type::Unknown;
+        let loop_var_value_ty = iterable_ty.iterate(self.db).unwrap_or_else(|| {
+            self.add_diagnostic(
+                iterable.into(),
+                "not-iterable",
+                format_args!(
+                    "Object of type '{}' is not iterable",
+                    iterable_ty.display(self.db)
+                ),
+            );
+            Type::Unknown
+        });
 
         self.types
             .expressions
@@ -1482,7 +1481,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    #[allow(clippy::unused_self)]
     fn infer_ellipsis_literal_expression(
         &mut self,
         _literal: &ast::ExprEllipsisLiteral,
@@ -2380,7 +2378,7 @@ mod tests {
     use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast::name::Name;
 
-    use crate::builtins::builtins_scope;
+    use crate::core_stdlib_modules::builtins_scope;
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
@@ -2971,6 +2969,52 @@ mod tests {
 
         // TODO: should be `int`!
         assert_public_ty(&db, "src/a.py", "x", "Unknown");
+
+        Ok(())
+    }
+
+    #[test]
+    fn basic_for_loop() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            class IntIterator:
+                def __next__(self) -> int:
+                    return 42
+
+            class IntIterable:
+                def __iter__(self) -> IntIterator:
+                    return IntIterator()
+
+            for x in IntIterable():
+                pass
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "x", "int");
+
+        Ok(())
+    }
+
+    #[test]
+    fn for_loop_with_old_style_iteration_protocol() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            class OldStyleIterable:
+                def __getitem__(self, key: int) -> int:
+                    return 42
+
+            for x in OldStyleIterable():
+                pass
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "x", "int");
 
         Ok(())
     }
