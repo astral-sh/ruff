@@ -1,10 +1,10 @@
-from typing import Any
+from typing import Any, Final
 
-DEBUG: int
-INFO: int
-WARN: int
-ERROR: int
-FATAL: int
+DEBUG: Final = 1
+INFO: Final = 2
+WARN: Final = 3
+ERROR: Final = 4
+FATAL: Final = 5
 
 class Log:
     def __init__(self, threshold: int = 3) -> None: ...
