@@ -20,41 +20,64 @@ pub struct DisplayType<'db> {
     db: &'db dyn Db,
 }
 
-impl Display for DisplayType<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl DisplayType<'_> {
+    /// Returns the string representation of a type, which is the value displayed either as
+    /// `Literal[<repr>]` or `Literal[<repr1>, <repr2>]` for literal types or as `<repr>` for non
+    /// literals
+    fn representation(&self) -> String {
+        // This methods avoids duplicating individual types representation logic in `UnionType`
         match self.ty {
-            Type::Any => f.write_str("Any"),
-            Type::Never => f.write_str("Never"),
-            Type::Unknown => f.write_str("Unknown"),
-            Type::Unbound => f.write_str("Unbound"),
-            Type::None => f.write_str("None"),
+            Type::Any => "Any".to_string(),
+            Type::Never => "Never".to_string(),
+            Type::Unknown => "Unknown".to_string(),
+            Type::Unbound => "Unbound".to_string(),
+            Type::None => "None".to_string(),
             Type::Module(file) => {
-                write!(f, "<module '{:?}'>", file.path(self.db))
+                format!("<module '{:?}'>", file.path(self.db))
             }
             // TODO functions and classes should display using a fully qualified name
-            Type::Class(class) => write!(f, "Literal[{}]", class.name(self.db)),
-            Type::Instance(class) => f.write_str(class.name(self.db)),
-            Type::Function(function) => write!(f, "Literal[{}]", function.name(self.db)),
-            Type::Union(union) => union.display(self.db).fmt(f),
-            Type::Intersection(intersection) => intersection.display(self.db).fmt(f),
-            Type::IntLiteral(n) => write!(f, "Literal[{n}]"),
+            Type::Class(class) => class.name(self.db).to_string(),
+            Type::Instance(class) => class.name(self.db).to_string(),
+            Type::Function(function) => function.name(self.db).to_string(),
+            Type::Union(union) => union.display(self.db).to_string(),
+            Type::Intersection(intersection) => intersection.display(self.db).to_string(),
+            Type::IntLiteral(n) => n.to_string(),
             Type::BooleanLiteral(boolean) => {
-                write!(f, "Literal[{}]", if *boolean { "True" } else { "False" })
+                if *boolean {
+                    "True".to_string()
+                } else {
+                    "False".to_string()
+                }
             }
-            Type::StringLiteral(string) => write!(
-                f,
-                r#"Literal["{}"]"#,
-                string.value(self.db).replace('"', r#"\""#)
-            ),
-            Type::LiteralString => write!(f, "LiteralString"),
+            Type::StringLiteral(string) => {
+                format!(r#""{}""#, string.value(self.db).replace('"', r#"\""#))
+            }
+            Type::LiteralString => "LiteralString".to_string(),
             Type::BytesLiteral(bytes) => {
                 let escape =
                     AsciiEscape::with_preferred_quote(bytes.value(self.db).as_ref(), Quote::Double);
+                escape.bytes_repr().to_string().unwrap_or_default()
+            }
+        }
+    }
+}
 
+impl Display for DisplayType<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self.ty {
+            // Literal types -> `Literal[<repr>]`
+            Type::Class(_)
+            | Type::Function(_)
+            | Type::IntLiteral(_)
+            | Type::BooleanLiteral(_)
+            | Type::StringLiteral(_)
+            | Type::BytesLiteral(_) => {
                 f.write_str("Literal[")?;
-                escape.bytes_repr().write(f)?;
+                f.write_str(&self.representation())?;
                 f.write_str("]")
             }
+            // Non literal types -> `<repr>`
+            _ => f.write_str(&self.representation()),
         }
     }
 }
@@ -84,25 +107,23 @@ impl Display for DisplayUnionType<'_> {
         let mut all_literals: Vec<Vec<String>> = vec![vec![], vec![], vec![], vec![], vec![]];
         let mut other_types = vec![];
 
-        union
-            .elements(self.db)
-            .iter()
-            .copied()
-            .for_each(|ty| match ty {
-                // Write a String for each literal type appended in order of appearance
-                Type::IntLiteral(n) => all_literals[0].push(format!("{n}")),
-                Type::StringLiteral(s) => all_literals[1].push(format!("\"{}\"", s.value(self.db))),
-                Type::BytesLiteral(b) => {
-                    let escape =
-                        AsciiEscape::with_preferred_quote(b.value(self.db).as_ref(), Quote::Double);
-                    if let Some(string) = escape.bytes_repr().to_string() {
-                        all_literals[2].push(string);
-                    }
-                }
-                Type::Class(c) => all_literals[3].push(c.name(self.db).to_string()),
-                Type::Function(f) => all_literals[4].push(f.name(self.db).to_string()),
-                _ => other_types.push(ty),
-            });
+        union.elements(self.db).iter().copied().for_each(|ty| {
+            // Find which group the type belongs to, None means other types
+            let maybe_index = match ty {
+                Type::IntLiteral(_) => Some(0),
+                Type::StringLiteral(_) => Some(1),
+                Type::BytesLiteral(_) => Some(2),
+                Type::Class(_) => Some(3),
+                Type::Function(_) => Some(4),
+                _ => None,
+            };
+            if let Some(index) = maybe_index {
+                // For literals, push the representation, adding `Literal[...]` is done later
+                all_literals[index].push(ty.display(self.db).representation());
+            } else {
+                other_types.push(ty);
+            }
+        });
 
         all_literals
             .iter_mut()
