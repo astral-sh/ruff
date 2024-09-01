@@ -307,3 +307,30 @@ pub(super) fn is_known_dunder_method(method: &str) -> bool {
             | "_generate_next_value_"
     )
 }
+
+/// Returns `true` if the method is a known dunder method that is only allowed in Python 2.
+pub(super) fn is_deprecated_dunder_method_in_python3(method: &str) -> bool {
+    matches!(
+        method,
+        "__unicode__"
+            | "__div__"
+            | "__rdiv__"
+            | "__idiv__"
+            | "__nonzero__"
+            | "__metaclass__"
+            | "__cmp__"
+            | "__getslice__"
+            | "__setslice__"
+            | "__delslice__"
+            | "__oct__"
+            | "__hex__"
+            | "__members__"
+            | "__method__"
+            | "__corece__"
+            | "__long__"
+            | "__rcmp__"
+            | "__iop__"
+            | "__rop__"
+            | "__op__"
+    )
+}
