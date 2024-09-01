@@ -20,10 +20,10 @@ use crate::settings::types::PythonVersion;
 /// built-in timeout functionality, such as `asyncio.timeout`,
 /// `trio.fail_after`, or `anyio.move_on_after`, among others.
 ///
-/// If you are abstracting `asyncio` within a function
-/// that internally utilizes `asyncio.timeout`,
-/// this rule can be disabled, or use a more specific timeout name
-/// such as `your_behavior_timeout`.
+/// For functions that wrap `asyncio.timeout`,
+/// false positives from this rule can be sidestepped
+/// by using a more verbose parameter name
+/// describing the behavior wrapped with `asyncio.timeout`.
 ///
 /// ## Example
 ///
