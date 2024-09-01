@@ -358,7 +358,7 @@ impl<'db> Type<'db> {
     /// us to explicitly consider whether to handle an error or propagate
     /// it up the call stack.
     #[must_use]
-    pub fn member(&self, db: &'db dyn Db, name: &ast::name::Name) -> Type<'db> {
+    pub fn member(&self, db: &'db dyn Db, name: &str) -> Type<'db> {
         match self {
             Type::Any => Type::Any,
             Type::Never => {
@@ -450,12 +450,10 @@ impl<'db> Type<'db> {
         // `self` represents the type of the iterable;
         // `__iter__` and `__next__` are both looked up on the class of the iterable:
         let type_of_class = self.to_type_of_class(db);
-        let dunder_iter_method = type_of_class.member(db, &ast::name::Name::from("__iter__"));
+        let dunder_iter_method = type_of_class.member(db, "__iter__");
         if !dunder_iter_method.is_unbound() {
             let iterator_ty = dunder_iter_method.call(db)?;
-            let dunder_next_method = iterator_ty
-                .to_type_of_class(db)
-                .member(db, &ast::name::Name::from("__next__"));
+            let dunder_next_method = iterator_ty.to_type_of_class(db).member(db, "__next__");
             return dunder_next_method.call(db);
         }
         // Although it's not considered great practice,
@@ -464,8 +462,7 @@ impl<'db> Type<'db> {
         //
         // TODO this is only valid if the `__getitem__` method is annotated as
         // accepting `int` or `SupportsIndex`
-        let dunder_get_item_method =
-            type_of_class.member(db, &ast::name::Name::from("__getitem__"));
+        let dunder_get_item_method = type_of_class.member(db, "__getitem__");
         dunder_get_item_method.call(db)
     }
 
@@ -586,7 +583,7 @@ impl<'db> ClassType<'db> {
     /// Returns the class member of this class named `name`.
     ///
     /// The member resolves to a member of the class itself or any of its bases.
-    pub fn class_member(self, db: &'db dyn Db, name: &ast::name::Name) -> Type<'db> {
+    pub fn class_member(self, db: &'db dyn Db, name: &str) -> Type<'db> {
         let member = self.own_class_member(db, name);
         if !member.is_unbound() {
             return member;
@@ -596,12 +593,12 @@ impl<'db> ClassType<'db> {
     }
 
     /// Returns the inferred type of the class member named `name`.
-    pub fn own_class_member(self, db: &'db dyn Db, name: &ast::name::Name) -> Type<'db> {
+    pub fn own_class_member(self, db: &'db dyn Db, name: &str) -> Type<'db> {
         let scope = self.body_scope(db);
         symbol_ty_by_name(db, scope, name)
     }
 
-    pub fn inherited_class_member(self, db: &'db dyn Db, name: &ast::name::Name) -> Type<'db> {
+    pub fn inherited_class_member(self, db: &'db dyn Db, name: &str) -> Type<'db> {
         for base in self.bases(db) {
             let member = base.member(db, name);
             if !member.is_unbound() {
