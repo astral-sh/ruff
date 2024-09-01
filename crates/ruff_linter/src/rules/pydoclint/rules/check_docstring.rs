@@ -510,11 +510,32 @@ impl Ranged for YieldEntry {
     }
 }
 
+#[allow(clippy::enum_variant_names)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ReturnEntryKind {
+    NoneNone,
+    ImplicitNone,
+    ExplicitNone,
+}
+
 /// An individual `return` statement in a function body.
 #[derive(Debug)]
 struct ReturnEntry {
     range: TextRange,
-    is_none_return: bool,
+    kind: ReturnEntryKind,
+}
+
+impl ReturnEntry {
+    const fn is_none_return(&self) -> bool {
+        matches!(
+            &self.kind,
+            ReturnEntryKind::ExplicitNone | ReturnEntryKind::ImplicitNone
+        )
+    }
+
+    const fn is_implicit(&self) -> bool {
+        matches!(&self.kind, ReturnEntryKind::ImplicitNone)
+    }
 }
 
 impl Ranged for ReturnEntry {
@@ -644,13 +665,17 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
             }) => {
                 self.returns.push(ReturnEntry {
                     range: *range,
-                    is_none_return: value.is_none_literal_expr(),
+                    kind: if value.is_none_literal_expr() {
+                        ReturnEntryKind::ExplicitNone
+                    } else {
+                        ReturnEntryKind::NoneNone
+                    },
                 });
             }
             Stmt::Return(ast::StmtReturn { range, value: None }) => {
                 self.returns.push(ReturnEntry {
                     range: *range,
-                    is_none_return: true,
+                    kind: ReturnEntryKind::ImplicitNone,
                 });
             }
             Stmt::FunctionDef(_) | Stmt::ClassDef(_) => return,
@@ -868,7 +893,7 @@ pub(crate) fn check_docstring(
                         None if body_entries
                             .returns
                             .iter()
-                            .any(|entry| !entry.is_none_return) =>
+                            .any(|entry| !entry.is_none_return()) =>
                         {
                             diagnostics.push(Diagnostic::new(
                                 DocstringMissingReturns,
@@ -941,7 +966,9 @@ pub(crate) fn check_docstring(
         // DOC202
         if checker.enabled(Rule::DocstringExtraneousReturns) {
             if let Some(ref docstring_returns) = docstring_sections.returns {
-                if body_entries.returns.is_empty() {
+                if body_entries.returns.is_empty()
+                    || body_entries.returns.iter().all(ReturnEntry::is_implicit)
+                {
                     let diagnostic =
                         Diagnostic::new(DocstringExtraneousReturns, docstring_returns.range());
                     diagnostics.push(diagnostic);
