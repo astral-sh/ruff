@@ -1,166 +1,3 @@
-/// A list of all Python builtins.
-///
-/// Intended to be kept in sync with [`is_python_builtin`].
-pub const PYTHON_BUILTINS: &[&str] = &[
-    "ArithmeticError",
-    "AssertionError",
-    "AttributeError",
-    "BaseException",
-    "BaseExceptionGroup",
-    "BlockingIOError",
-    "BrokenPipeError",
-    "BufferError",
-    "BytesWarning",
-    "ChildProcessError",
-    "ConnectionAbortedError",
-    "ConnectionError",
-    "ConnectionRefusedError",
-    "ConnectionResetError",
-    "DeprecationWarning",
-    "EOFError",
-    "Ellipsis",
-    "EncodingWarning",
-    "EnvironmentError",
-    "Exception",
-    "ExceptionGroup",
-    "False",
-    "FileExistsError",
-    "FileNotFoundError",
-    "FloatingPointError",
-    "FutureWarning",
-    "GeneratorExit",
-    "IOError",
-    "ImportError",
-    "ImportWarning",
-    "IndentationError",
-    "IndexError",
-    "InterruptedError",
-    "IsADirectoryError",
-    "KeyError",
-    "KeyboardInterrupt",
-    "LookupError",
-    "MemoryError",
-    "ModuleNotFoundError",
-    "NameError",
-    "None",
-    "NotADirectoryError",
-    "NotImplemented",
-    "NotImplementedError",
-    "OSError",
-    "OverflowError",
-    "PendingDeprecationWarning",
-    "PermissionError",
-    "ProcessLookupError",
-    "RecursionError",
-    "ReferenceError",
-    "ResourceWarning",
-    "RuntimeError",
-    "RuntimeWarning",
-    "StopAsyncIteration",
-    "StopIteration",
-    "SyntaxError",
-    "SyntaxWarning",
-    "SystemError",
-    "SystemExit",
-    "TabError",
-    "TimeoutError",
-    "True",
-    "TypeError",
-    "UnboundLocalError",
-    "UnicodeDecodeError",
-    "UnicodeEncodeError",
-    "UnicodeError",
-    "UnicodeTranslateError",
-    "UnicodeWarning",
-    "UserWarning",
-    "ValueError",
-    "Warning",
-    "ZeroDivisionError",
-    "__build_class__",
-    "__debug__",
-    "__doc__",
-    "__import__",
-    "__loader__",
-    "__name__",
-    "__package__",
-    "__spec__",
-    "abs",
-    "aiter",
-    "all",
-    "anext",
-    "any",
-    "ascii",
-    "bin",
-    "bool",
-    "breakpoint",
-    "bytearray",
-    "bytes",
-    "callable",
-    "chr",
-    "classmethod",
-    "compile",
-    "complex",
-    "copyright",
-    "credits",
-    "delattr",
-    "dict",
-    "dir",
-    "divmod",
-    "enumerate",
-    "eval",
-    "exec",
-    "exit",
-    "filter",
-    "float",
-    "format",
-    "frozenset",
-    "getattr",
-    "globals",
-    "hasattr",
-    "hash",
-    "help",
-    "hex",
-    "id",
-    "input",
-    "int",
-    "isinstance",
-    "issubclass",
-    "iter",
-    "len",
-    "license",
-    "list",
-    "locals",
-    "map",
-    "max",
-    "memoryview",
-    "min",
-    "next",
-    "object",
-    "oct",
-    "open",
-    "ord",
-    "pow",
-    "print",
-    "property",
-    "quit",
-    "range",
-    "repr",
-    "reversed",
-    "round",
-    "set",
-    "setattr",
-    "slice",
-    "sorted",
-    "staticmethod",
-    "str",
-    "sum",
-    "super",
-    "tuple",
-    "type",
-    "vars",
-    "zip",
-];
-
 /// A list of all builtins that are available in IPython.
 ///
 /// How to create this list:
@@ -186,170 +23,343 @@ pub const MAGIC_GLOBALS: &[&str] = &[
     "__file__",
 ];
 
+/// Return the list of builtins for the given Python minor version.
+///
+/// Intended to be kept in sync with [`is_python_builtin`].
+pub fn python_builtins(minor: u8) -> Vec<&'static str> {
+    let mut builtins = vec![
+        "ArithmeticError",
+        "AssertionError",
+        "AttributeError",
+        "BaseException",
+        "BlockingIOError",
+        "BrokenPipeError",
+        "BufferError",
+        "BytesWarning",
+        "ChildProcessError",
+        "ConnectionAbortedError",
+        "ConnectionError",
+        "ConnectionRefusedError",
+        "ConnectionResetError",
+        "DeprecationWarning",
+        "EOFError",
+        "Ellipsis",
+        "EnvironmentError",
+        "Exception",
+        "False",
+        "FileExistsError",
+        "FileNotFoundError",
+        "FloatingPointError",
+        "FutureWarning",
+        "GeneratorExit",
+        "IOError",
+        "ImportError",
+        "ImportWarning",
+        "IndentationError",
+        "IndexError",
+        "InterruptedError",
+        "IsADirectoryError",
+        "KeyError",
+        "KeyboardInterrupt",
+        "LookupError",
+        "MemoryError",
+        "ModuleNotFoundError",
+        "NameError",
+        "None",
+        "NotADirectoryError",
+        "NotImplemented",
+        "NotImplementedError",
+        "OSError",
+        "OverflowError",
+        "PendingDeprecationWarning",
+        "PermissionError",
+        "ProcessLookupError",
+        "RecursionError",
+        "ReferenceError",
+        "ResourceWarning",
+        "RuntimeError",
+        "RuntimeWarning",
+        "StopAsyncIteration",
+        "StopIteration",
+        "SyntaxError",
+        "SyntaxWarning",
+        "SystemError",
+        "SystemExit",
+        "TabError",
+        "TimeoutError",
+        "True",
+        "TypeError",
+        "UnboundLocalError",
+        "UnicodeDecodeError",
+        "UnicodeEncodeError",
+        "UnicodeError",
+        "UnicodeTranslateError",
+        "UnicodeWarning",
+        "UserWarning",
+        "ValueError",
+        "Warning",
+        "ZeroDivisionError",
+        "__build_class__",
+        "__debug__",
+        "__doc__",
+        "__import__",
+        "__loader__",
+        "__name__",
+        "__package__",
+        "__spec__",
+        "abs",
+        "all",
+        "any",
+        "ascii",
+        "bin",
+        "bool",
+        "breakpoint",
+        "bytearray",
+        "bytes",
+        "callable",
+        "chr",
+        "classmethod",
+        "compile",
+        "complex",
+        "copyright",
+        "credits",
+        "delattr",
+        "dict",
+        "dir",
+        "divmod",
+        "enumerate",
+        "eval",
+        "exec",
+        "exit",
+        "filter",
+        "float",
+        "format",
+        "frozenset",
+        "getattr",
+        "globals",
+        "hasattr",
+        "hash",
+        "help",
+        "hex",
+        "id",
+        "input",
+        "int",
+        "isinstance",
+        "issubclass",
+        "iter",
+        "len",
+        "license",
+        "list",
+        "locals",
+        "map",
+        "max",
+        "memoryview",
+        "min",
+        "next",
+        "object",
+        "oct",
+        "open",
+        "ord",
+        "pow",
+        "print",
+        "property",
+        "quit",
+        "range",
+        "repr",
+        "reversed",
+        "round",
+        "set",
+        "setattr",
+        "slice",
+        "sorted",
+        "staticmethod",
+        "str",
+        "sum",
+        "super",
+        "tuple",
+        "type",
+        "vars",
+        "zip",
+    ];
+
+    if minor >= 10 {
+        builtins.extend(vec!["EncodingWarning", "aiter", "anext"]);
+    }
+
+    if minor >= 11 {
+        builtins.extend(vec!["BaseExceptionGroup", "ExceptionGroup"]);
+    }
+
+    if minor >= 13 {
+        builtins.extend(vec!["PythonFinalizationError"]);
+    }
+
+    builtins
+}
+
 /// Returns `true` if the given name is that of a Python builtin.
 ///
-/// Intended to be kept in sync with [`PYTHON_BUILTINS`].
-pub fn is_python_builtin(name: &str) -> bool {
-    // Constructed by converting the `PYTHON_BUILTINS` slice to a `match` expression.
+/// Intended to be kept in sync with [`python_builtins`].
+pub fn is_python_builtin(name: &str, minor_version: u8) -> bool {
     matches!(
-        name,
-        "ArithmeticError"
-            | "AssertionError"
-            | "AttributeError"
-            | "BaseException"
-            | "BaseExceptionGroup"
-            | "BlockingIOError"
-            | "BrokenPipeError"
-            | "BufferError"
-            | "BytesWarning"
-            | "ChildProcessError"
-            | "ConnectionAbortedError"
-            | "ConnectionError"
-            | "ConnectionRefusedError"
-            | "ConnectionResetError"
-            | "DeprecationWarning"
-            | "EOFError"
-            | "Ellipsis"
-            | "EncodingWarning"
-            | "EnvironmentError"
-            | "Exception"
-            | "ExceptionGroup"
-            | "False"
-            | "FileExistsError"
-            | "FileNotFoundError"
-            | "FloatingPointError"
-            | "FutureWarning"
-            | "GeneratorExit"
-            | "IOError"
-            | "ImportError"
-            | "ImportWarning"
-            | "IndentationError"
-            | "IndexError"
-            | "InterruptedError"
-            | "IsADirectoryError"
-            | "KeyError"
-            | "KeyboardInterrupt"
-            | "LookupError"
-            | "MemoryError"
-            | "ModuleNotFoundError"
-            | "NameError"
-            | "None"
-            | "NotADirectoryError"
-            | "NotImplemented"
-            | "NotImplementedError"
-            | "OSError"
-            | "OverflowError"
-            | "PendingDeprecationWarning"
-            | "PermissionError"
-            | "ProcessLookupError"
-            | "RecursionError"
-            | "ReferenceError"
-            | "ResourceWarning"
-            | "RuntimeError"
-            | "RuntimeWarning"
-            | "StopAsyncIteration"
-            | "StopIteration"
-            | "SyntaxError"
-            | "SyntaxWarning"
-            | "SystemError"
-            | "SystemExit"
-            | "TabError"
-            | "TimeoutError"
-            | "True"
-            | "TypeError"
-            | "UnboundLocalError"
-            | "UnicodeDecodeError"
-            | "UnicodeEncodeError"
-            | "UnicodeError"
-            | "UnicodeTranslateError"
-            | "UnicodeWarning"
-            | "UserWarning"
-            | "ValueError"
-            | "Warning"
-            | "ZeroDivisionError"
-            | "__build_class__"
-            | "__debug__"
-            | "__doc__"
-            | "__import__"
-            | "__loader__"
-            | "__name__"
-            | "__package__"
-            | "__spec__"
-            | "abs"
-            | "aiter"
-            | "all"
-            | "anext"
-            | "any"
-            | "ascii"
-            | "bin"
-            | "bool"
-            | "breakpoint"
-            | "bytearray"
-            | "bytes"
-            | "callable"
-            | "chr"
-            | "classmethod"
-            | "compile"
-            | "complex"
-            | "copyright"
-            | "credits"
-            | "delattr"
-            | "dict"
-            | "dir"
-            | "divmod"
-            | "enumerate"
-            | "eval"
-            | "exec"
-            | "exit"
-            | "filter"
-            | "float"
-            | "format"
-            | "frozenset"
-            | "getattr"
-            | "globals"
-            | "hasattr"
-            | "hash"
-            | "help"
-            | "hex"
-            | "id"
-            | "input"
-            | "int"
-            | "isinstance"
-            | "issubclass"
-            | "iter"
-            | "len"
-            | "license"
-            | "list"
-            | "locals"
-            | "map"
-            | "max"
-            | "memoryview"
-            | "min"
-            | "next"
-            | "object"
-            | "oct"
-            | "open"
-            | "ord"
-            | "pow"
-            | "print"
-            | "property"
-            | "quit"
-            | "range"
-            | "repr"
-            | "reversed"
-            | "round"
-            | "set"
-            | "setattr"
-            | "slice"
-            | "sorted"
-            | "staticmethod"
-            | "str"
-            | "sum"
-            | "super"
-            | "tuple"
-            | "type"
-            | "vars"
-            | "zip"
+        (minor_version, name),
+        (
+            _,
+            "ArithmeticError"
+                | "AssertionError"
+                | "AttributeError"
+                | "BaseException"
+                | "BlockingIOError"
+                | "BrokenPipeError"
+                | "BufferError"
+                | "BytesWarning"
+                | "ChildProcessError"
+                | "ConnectionAbortedError"
+                | "ConnectionError"
+                | "ConnectionRefusedError"
+                | "ConnectionResetError"
+                | "DeprecationWarning"
+                | "EOFError"
+                | "Ellipsis"
+                | "EnvironmentError"
+                | "Exception"
+                | "False"
+                | "FileExistsError"
+                | "FileNotFoundError"
+                | "FloatingPointError"
+                | "FutureWarning"
+                | "GeneratorExit"
+                | "IOError"
+                | "ImportError"
+                | "ImportWarning"
+                | "IndentationError"
+                | "IndexError"
+                | "InterruptedError"
+                | "IsADirectoryError"
+                | "KeyError"
+                | "KeyboardInterrupt"
+                | "LookupError"
+                | "MemoryError"
+                | "ModuleNotFoundError"
+                | "NameError"
+                | "None"
+                | "NotADirectoryError"
+                | "NotImplemented"
+                | "NotImplementedError"
+                | "OSError"
+                | "OverflowError"
+                | "PendingDeprecationWarning"
+                | "PermissionError"
+                | "ProcessLookupError"
+                | "RecursionError"
+                | "ReferenceError"
+                | "ResourceWarning"
+                | "RuntimeError"
+                | "RuntimeWarning"
+                | "StopAsyncIteration"
+                | "StopIteration"
+                | "SyntaxError"
+                | "SyntaxWarning"
+                | "SystemError"
+                | "SystemExit"
+                | "TabError"
+                | "TimeoutError"
+                | "True"
+                | "TypeError"
+                | "UnboundLocalError"
+                | "UnicodeDecodeError"
+                | "UnicodeEncodeError"
+                | "UnicodeError"
+                | "UnicodeTranslateError"
+                | "UnicodeWarning"
+                | "UserWarning"
+                | "ValueError"
+                | "Warning"
+                | "ZeroDivisionError"
+                | "__build_class__"
+                | "__debug__"
+                | "__doc__"
+                | "__import__"
+                | "__loader__"
+                | "__name__"
+                | "__package__"
+                | "__spec__"
+                | "abs"
+                | "all"
+                | "any"
+                | "ascii"
+                | "bin"
+                | "bool"
+                | "breakpoint"
+                | "bytearray"
+                | "bytes"
+                | "callable"
+                | "chr"
+                | "classmethod"
+                | "compile"
+                | "complex"
+                | "copyright"
+                | "credits"
+                | "delattr"
+                | "dict"
+                | "dir"
+                | "divmod"
+                | "enumerate"
+                | "eval"
+                | "exec"
+                | "exit"
+                | "filter"
+                | "float"
+                | "format"
+                | "frozenset"
+                | "getattr"
+                | "globals"
+                | "hasattr"
+                | "hash"
+                | "help"
+                | "hex"
+                | "id"
+                | "input"
+                | "int"
+                | "isinstance"
+                | "issubclass"
+                | "iter"
+                | "len"
+                | "license"
+                | "list"
+                | "locals"
+                | "map"
+                | "max"
+                | "memoryview"
+                | "min"
+                | "next"
+                | "object"
+                | "oct"
+                | "open"
+                | "ord"
+                | "pow"
+                | "print"
+                | "property"
+                | "quit"
+                | "range"
+                | "repr"
+                | "reversed"
+                | "round"
+                | "set"
+                | "setattr"
+                | "slice"
+                | "sorted"
+                | "staticmethod"
+                | "str"
+                | "sum"
+                | "super"
+                | "tuple"
+                | "type"
+                | "vars"
+                | "zip"
+        ) | (10..=13, "EncodingWarning" | "aiter" | "anext")
+            | (11..=13, "BaseExceptionGroup" | "ExceptionGroup")
+            | (13, "PythonFinalizationError")
     )
 }
 
