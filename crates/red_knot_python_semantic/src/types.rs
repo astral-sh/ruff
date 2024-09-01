@@ -381,10 +381,14 @@ impl<'db> FunctionType<'db> {
             panic!("Function type definition must have `DefinitionKind::Function`")
         };
 
-        function_stmt_node
-            .returns
-            .as_ref()
-            .map(|returns| definition_expression_ty(db, definition, returns.as_ref()))
+        function_stmt_node.returns.as_ref().map(|returns| {
+            if function_stmt_node.is_async {
+                // TODO: generic `types.CoroutineType`!
+                Type::Unknown
+            } else {
+                definition_expression_ty(db, definition, returns.as_ref())
+            }
+        })
     }
 }
 
