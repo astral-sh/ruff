@@ -64,7 +64,11 @@ pub struct PostInitDefault;
 impl Violation for PostInitDefault {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`__post_init__` method has argument defaults, use `dataclasses.InitVar` instead")
+        format!("`__post_init__` method with argument defaults")
+    }
+    
+    fn fix_title(&self) -> String {
+        format!("Use `dataclasses.InitVar` instead"")
     }
 }
 
