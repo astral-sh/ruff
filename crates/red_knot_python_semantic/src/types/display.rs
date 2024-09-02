@@ -95,38 +95,42 @@ impl Display for DisplayUnionType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let union = self.ty;
 
-        // Group literals types by discriminant
+        // Group all types by discriminant
         let mut literals_map = FxHashMap::default();
-        // Non-literal types are all in order of appearance
-        let mut other_types: Vec<Type> = vec![];
-        // Remember all discriminants in order of appearance, duplicates are not a problem
-        let mut literals_discriminants = vec![];
+        // Remember all discriminants (& whether they're a literal variant) in order of
+        // appearance
+        let mut discriminants = vec![];
 
         union.elements(self.db).iter().copied().for_each(|ty| {
-            if ty.is_literal() {
-                // Store literals in a map by discriminant (same variant)
-                let discriminant = std::mem::discriminant(&ty);
-                literals_map
-                    .entry(discriminant)
-                    .or_insert_with(Vec::new)
-                    .push(ty);
-                literals_discriminants.push(discriminant);
-            } else {
-                // Store non-literals in a separate list
-                other_types.push(ty);
+            let discriminant = std::mem::discriminant(&ty);
+            let is_literal = ty.is_literal();
+            // Remember all discriminant in order of appearance, and mark if they're literals
+            // Only remember the first occurrence of literals, as they will be condensed.
+            if !is_literal || !literals_map.contains_key(&discriminant) {
+                discriminants.push((is_literal, discriminant));
             }
+            // Then store all literals by discriminant
+            literals_map
+                .entry(discriminant)
+                .or_insert_with(Vec::new)
+                .push(ty);
         });
 
         let mut first = true;
-        for discriminant in literals_discriminants {
-            // On first encounter of discriminant, write all literals of that type. The group will
-            // be removed for further occurrences of the same discriminant
-            if let Some(literals_ty) = literals_map.remove(&discriminant) {
-                if !first {
-                    f.write_str(" | ")?;
-                };
-                first = false;
-
+        for (is_literal, discriminant) in discriminants {
+            if !first {
+                f.write_str(" | ")?;
+            };
+            first = false;
+            if !is_literal {
+                // For non literals variants, display individually, in order of addition to
+                // the vec (first in first out)
+                literals_map
+                    .get_mut(&discriminant)
+                    .map(|literals| write!(f, "{}", literals.remove(0).display(self.db)));
+            } else if let Some(literals_ty) = literals_map.remove(&discriminant) {
+                // For literals, display the full vec at once, condensed. They should appear
+                // once per variant.
                 f.write_str("Literal[")?;
                 for (i, literal_ty) in literals_ty.iter().enumerate() {
                     if i > 0 {
@@ -136,14 +140,6 @@ impl Display for DisplayUnionType<'_> {
                 }
                 f.write_str("]")?;
             }
-        }
-
-        for ty in other_types {
-            if !first {
-                f.write_str(" | ")?;
-            };
-            first = false;
-            write!(f, "{}", ty.display(self.db))?;
         }
 
         Ok(())
@@ -271,14 +267,13 @@ mod tests {
         assert_eq!(
             display,
             concat!(
+                "Unknown | ",
                 "Literal[-1, 0, 1] | ",
                 "Literal[A, B] | ",
                 "Literal[\"A\", \"B\"] | ",
                 "Literal[b\"\\x00\", b\"\\x07\"] | ",
                 "Literal[foo, bar] | ",
-                // TODO: Non literals always come after Literals, which might be unwanted
                 "Literal[True] | ",
-                "Unknown | ",
                 "None"
             )
         );
