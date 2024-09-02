@@ -156,7 +156,8 @@ pub(crate) struct ForStmtDefinitionNodeRef<'a> {
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ComprehensionDefinitionNodeRef<'a> {
-    pub(crate) node: &'a ast::Comprehension,
+    pub(crate) iterable: &'a ast::Expr,
+    pub(crate) target: &'a ast::ExprName,
     pub(crate) first: bool,
 }
 
@@ -211,12 +212,15 @@ impl DefinitionNodeRef<'_> {
                     target: AstNodeRef::new(parsed, target),
                 })
             }
-            DefinitionNodeRef::Comprehension(ComprehensionDefinitionNodeRef { node, first }) => {
-                DefinitionKind::Comprehension(ComprehensionDefinitionKind {
-                    node: AstNodeRef::new(parsed, node),
-                    first,
-                })
-            }
+            DefinitionNodeRef::Comprehension(ComprehensionDefinitionNodeRef {
+                iterable,
+                target,
+                first,
+            }) => DefinitionKind::Comprehension(ComprehensionDefinitionKind {
+                iterable: AstNodeRef::new(parsed.clone(), iterable),
+                target: AstNodeRef::new(parsed, target),
+                first,
+            }),
             DefinitionNodeRef::Parameter(parameter) => match parameter {
                 ast::AnyParameterRef::Variadic(parameter) => {
                     DefinitionKind::Parameter(AstNodeRef::new(parsed, parameter))
@@ -262,7 +266,7 @@ impl DefinitionNodeRef<'_> {
                 iterable: _,
                 target,
             }) => target.into(),
-            Self::Comprehension(ComprehensionDefinitionNodeRef { node, first: _ }) => node.into(),
+            Self::Comprehension(ComprehensionDefinitionNodeRef { target, .. }) => target.into(),
             Self::Parameter(node) => match node {
                 ast::AnyParameterRef::Variadic(parameter) => parameter.into(),
                 ast::AnyParameterRef::NonVariadic(parameter) => parameter.into(),
@@ -313,13 +317,18 @@ impl MatchPatternDefinitionKind {
 
 #[derive(Clone, Debug)]
 pub struct ComprehensionDefinitionKind {
-    node: AstNodeRef<ast::Comprehension>,
+    iterable: AstNodeRef<ast::Expr>,
+    target: AstNodeRef<ast::ExprName>,
     first: bool,
 }
 
 impl ComprehensionDefinitionKind {
-    pub(crate) fn node(&self) -> &ast::Comprehension {
-        self.node.node()
+    pub(crate) fn iterable(&self) -> &ast::Expr {
+        self.iterable.node()
+    }
+
+    pub(crate) fn target(&self) -> &ast::ExprName {
+        self.target.node()
     }
 
     pub(crate) fn is_first(&self) -> bool {
@@ -439,12 +448,6 @@ impl From<&ast::StmtAugAssign> for DefinitionNodeKey {
 impl From<&ast::StmtFor> for DefinitionNodeKey {
     fn from(value: &ast::StmtFor) -> Self {
         Self(NodeKey::from_node(value))
-    }
-}
-
-impl From<&ast::Comprehension> for DefinitionNodeKey {
-    fn from(node: &ast::Comprehension) -> Self {
-        Self(NodeKey::from_node(node))
     }
 }
 
