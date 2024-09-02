@@ -110,10 +110,8 @@ impl<'a> TypingTarget<'a> {
             Expr::StringLiteral(string_expr) => checker
                 .parse_type_annotation(string_expr)
                 .as_ref()
-                .map_or(None, |parsed_annotation| {
-                    Some(TypingTarget::ForwardReference(
-                        parsed_annotation.expression(),
-                    ))
+                .map(|parsed_annotation| {
+                    TypingTarget::ForwardReference(parsed_annotation.expression())
                 }),
             _ => semantic.resolve_qualified_name(expr).map_or(
                 // If we can't resolve the call path, it must be defined in the

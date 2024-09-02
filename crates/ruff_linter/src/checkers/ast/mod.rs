@@ -48,9 +48,7 @@ use ruff_python_ast::{
 use ruff_python_ast::{helpers, str, visitor, PySourceType};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
-use ruff_python_parser::typing::{
-    parse_type_annotation, AnnotationKind, AnnotationParseResult, ParsedAnnotation,
-};
+use ruff_python_parser::typing::{parse_type_annotation, AnnotationKind, ParsedAnnotation};
 use ruff_python_parser::{Parsed, Tokens};
 use ruff_python_semantic::all::{DunderAllDefinition, DunderAllFlags};
 use ruff_python_semantic::analyze::{imports, typing};
@@ -235,7 +233,7 @@ impl<'a> Checker<'a> {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         parsed: &'a Parsed<ModModule>,
-        parsed_annotations_arena: &'a typed_arena::Arena<AnnotationParseResult>,
+        parsed_annotations_arena: &'a typed_arena::Arena<ParsedAnnotation>,
         settings: &'a LinterSettings,
         noqa_line_for: &'a NoqaMapping,
         noqa: flags::Noqa,
@@ -422,7 +420,7 @@ impl<'a> Checker<'a> {
     pub(crate) fn parse_type_annotation(
         &self,
         annotation: &ast::ExprStringLiteral,
-    ) -> &'a AnnotationParseResult {
+    ) -> Option<&'a ParsedAnnotation> {
         self.parsed_annotations_cache
             .lookup_or_parse(annotation, self.locator.contents())
     }
@@ -2195,7 +2193,7 @@ impl<'a> Checker<'a> {
             let type_definitions = std::mem::take(&mut self.visit.string_type_definitions);
             for (string_expr, snapshot) in type_definitions {
                 let annotation_parse_result = self.parse_type_annotation(string_expr);
-                if let Ok(parsed_annotation) = annotation_parse_result {
+                if let Some(parsed_annotation) = annotation_parse_result {
                     self.parsed_type_annotation = Some(parsed_annotation);
 
                     let annotation = string_expr.value.to_str();
@@ -2404,12 +2402,12 @@ impl<'a> Checker<'a> {
 }
 
 struct ParsedAnnotationsCache<'a> {
-    arena: &'a typed_arena::Arena<AnnotationParseResult>,
-    by_offset: RefCell<FxHashMap<TextSize, &'a AnnotationParseResult>>,
+    arena: &'a typed_arena::Arena<ParsedAnnotation>,
+    by_offset: RefCell<FxHashMap<TextSize, Option<&'a ParsedAnnotation>>>,
 }
 
 impl<'a> ParsedAnnotationsCache<'a> {
-    fn new(arena: &'a typed_arena::Arena<AnnotationParseResult>) -> Self {
+    fn new(arena: &'a typed_arena::Arena<ParsedAnnotation>) -> Self {
         Self {
             arena,
             by_offset: RefCell::default(),
@@ -2420,11 +2418,18 @@ impl<'a> ParsedAnnotationsCache<'a> {
         &self,
         annotation: &ast::ExprStringLiteral,
         source: &str,
-    ) -> &'a AnnotationParseResult {
-        self.by_offset
+    ) -> Option<&'a ParsedAnnotation> {
+        *self
+            .by_offset
             .borrow_mut()
             .entry(annotation.start())
-            .or_insert_with(|| self.arena.alloc(parse_type_annotation(annotation, source)))
+            .or_insert_with(|| {
+                if let Ok(annotation) = parse_type_annotation(annotation, source) {
+                    Some(self.arena.alloc(annotation))
+                } else {
+                    None
+                }
+            })
     }
 
     fn clear(&self) {

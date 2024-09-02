@@ -7,7 +7,7 @@ use ruff_text_size::Ranged;
 
 use crate::{parse_expression, parse_expression_range, ParseError, Parsed};
 
-pub type AnnotationParseResult = Result<ParsedAnnotation, ParseError>;
+type AnnotationParseResult = Result<ParsedAnnotation, ParseError>;
 
 #[derive(Debug)]
 pub struct ParsedAnnotation {
