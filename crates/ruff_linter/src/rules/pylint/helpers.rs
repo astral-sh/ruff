@@ -326,11 +326,8 @@ pub(super) fn is_deprecated_dunder_method_in_python3(method: &str) -> bool {
             | "__hex__"
             | "__members__"
             | "__method__"
-            | "__corece__"
+            | "__coerce__"
             | "__long__"
             | "__rcmp__"
-            | "__iop__"
-            | "__rop__"
-            | "__op__"
     )
 }
