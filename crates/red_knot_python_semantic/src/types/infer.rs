@@ -826,12 +826,15 @@ impl<'db> TypeInferenceBuilder<'db> {
         definition: Definition<'db>,
     ) {
         // TODO(dhruvmanila): The correct way to infer types here is to perform structural matching
-        // against the subject expression type (available in `self.index.expression_ty(subject)`)
-        // and extract the type at the `index` position if the pattern matches.
+        // against the subject expression type (which we can query via `infer_expression_types`)
+        // and extract the type at the `index` position if the pattern matches. This will be
+        // similar to the logic in `self.infer_assignment_definition`.
         self.types.definitions.insert(definition, Type::Unknown);
     }
 
     fn infer_match_pattern(&mut self, pattern: &ast::Pattern) {
+        // TODO(dhruvmanila): Add a Salsa query for inferring pattern types and matching against
+        // the subject expression: https://github.com/astral-sh/ruff/pull/13147#discussion_r1739424510
         match pattern {
             ast::Pattern::MatchValue(match_value) => {
                 self.infer_expression(&match_value.value);

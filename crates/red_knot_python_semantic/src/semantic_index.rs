@@ -1087,8 +1087,8 @@ match subject:
 ",
         );
 
-        let index = semantic_index(&db, file);
-        let global_table = symbol_table(&db, global_scope(&db, file));
+        let global_scope_id = global_scope(&db, file);
+        let global_table = symbol_table(&db, global_scope_id);
 
         assert!(global_table.symbol_by_name("Foo").unwrap().is_used());
         assert_eq!(
@@ -1096,7 +1096,7 @@ match subject:
             vec!["subject", "a", "b", "c", "d", "e", "f", "g", "h", "Foo", "i", "j", "k", "l"]
         );
 
-        let use_def = index.use_def_map(FileScopeId::global());
+        let use_def = use_def_map(&db, global_scope_id);
         for name in ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"] {
             let definition = use_def
                 .first_public_definition(
