@@ -1097,16 +1097,30 @@ match subject:
         );
 
         let use_def = use_def_map(&db, global_scope_id);
-        for name in ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"] {
+        for (name, expected_index) in [
+            ("a", 0),
+            ("b", 0),
+            ("c", 1),
+            ("d", 2),
+            ("e", 0),
+            ("f", 1),
+            ("g", 0),
+            ("h", 1),
+            ("i", 0),
+            ("j", 1),
+            ("k", 0),
+            ("l", 1),
+        ] {
             let definition = use_def
                 .first_public_definition(
                     global_table.symbol_id_by_name(name).expect("symbol exists"),
                 )
                 .expect("Expected with item definition for {name}");
-            assert!(matches!(
-                definition.node(&db),
-                DefinitionKind::MatchPattern(_)
-            ));
+            if let DefinitionKind::MatchPattern(pattern) = definition.node(&db) {
+                assert_eq!(pattern.index(), expected_index);
+            } else {
+                panic!("Expected match pattern definition for {name}");
+            }
         }
     }
 
