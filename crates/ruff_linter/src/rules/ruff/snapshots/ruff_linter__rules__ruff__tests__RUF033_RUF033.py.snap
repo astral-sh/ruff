@@ -109,13 +109,11 @@ RUF033.py:59:40: RUF033 [*] `__post_init__` method with argument defaults
    = help: Use `dataclasses.InitVar` instead
 
 ℹ Unsafe fix
-54 54 |     Docstrings are very important and totally not a waste of time.
-55 55 |     """
 56 56 | 
-   57 |+    bar: InitVar[int] = 11
-57 58 |     ping = "pong"
-58 59 | 
+57 57 |     ping = "pong"
+58 58 | 
 59    |-    def __post_init__(self, bar: int = 11, baz: int = 12) -> None: ...
+   59 |+    bar: InitVar[int] = 11
    60 |+    def __post_init__(self, bar: int, baz: int = 12) -> None: ...
 60 61 | 
 61 62 | 
@@ -131,13 +129,11 @@ RUF033.py:59:55: RUF033 [*] `__post_init__` method with argument defaults
    = help: Use `dataclasses.InitVar` instead
 
 ℹ Unsafe fix
-54 54 |     Docstrings are very important and totally not a waste of time.
-55 55 |     """
 56 56 | 
-   57 |+    baz: InitVar[int] = 12
-57 58 |     ping = "pong"
-58 59 | 
+57 57 |     ping = "pong"
+58 58 | 
 59    |-    def __post_init__(self, bar: int = 11, baz: int = 12) -> None: ...
+   59 |+    baz: InitVar[int] = 12
    60 |+    def __post_init__(self, bar: int = 11, baz: int) -> None: ...
 60 61 | 
 61 62 | 
