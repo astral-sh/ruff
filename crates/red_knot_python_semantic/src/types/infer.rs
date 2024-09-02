@@ -564,10 +564,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             self.infer_parameters(parameters);
 
             // TODO: this should also be applied to parameter annotations.
-            if !self.is_stub() {
-                self.infer_optional_annotation_expression(returns.as_deref());
-            } else {
+            if self.is_stub() {
                 self.types.has_deferred = true;
+            } else {
+                self.infer_optional_annotation_expression(returns.as_deref());
             }
         }
 
@@ -683,12 +683,12 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         // inference of bases deferred in stubs
         // TODO also defer stringified generic type parameters
-        if !self.is_stub() {
+        if self.is_stub() {
+            self.types.has_deferred = true;
+        } else {
             for base in class.bases() {
                 self.infer_expression(base);
             }
-        } else {
-            self.types.has_deferred = true;
         }
     }
 
