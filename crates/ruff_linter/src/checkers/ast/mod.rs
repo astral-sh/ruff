@@ -26,10 +26,12 @@
 //! represents the lint-rule analysis phase. In the future, these steps may be separated into
 //! distinct passes over the AST.
 
+use std::cell::RefCell;
 use std::path::Path;
 
 use itertools::Itertools;
 use log::debug;
+use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, IsolationLevel};
 use ruff_notebook::{CellOffsets, NotebookIndex};
@@ -40,13 +42,13 @@ use ruff_python_ast::str::Quote;
 use ruff_python_ast::visitor::{walk_except_handler, walk_pattern, Visitor};
 use ruff_python_ast::{
     self as ast, AnyParameterRef, Comprehension, ElifElseClause, ExceptHandler, Expr, ExprContext,
-    FStringElement, Keyword, MatchCase, ModExpression, ModModule, Parameter, Parameters, Pattern,
-    Stmt, Suite, UnaryOp,
+    FStringElement, Keyword, MatchCase, ModModule, Parameter, Parameters, Pattern, Stmt, Suite,
+    UnaryOp,
 };
 use ruff_python_ast::{helpers, str, visitor, PySourceType};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
-use ruff_python_parser::typing::{parse_type_annotation, AnnotationKind};
+use ruff_python_parser::typing::{parse_type_annotation, AnnotationKind, ParsedAnnotation};
 use ruff_python_parser::{Parsed, Tokens};
 use ruff_python_semantic::all::{DunderAllDefinition, DunderAllFlags};
 use ruff_python_semantic::analyze::{imports, typing};
@@ -177,8 +179,10 @@ impl ExpectedDocstringKind {
 pub(crate) struct Checker<'a> {
     /// The [`Parsed`] output for the source code.
     parsed: &'a Parsed<ModModule>,
+    /// An internal cache for parsed string annotations
+    parsed_annotations_cache: ParsedAnnotationsCache<'a>,
     /// The [`Parsed`] output for the type annotation the checker is currently in.
-    parsed_type_annotation: Option<&'a Parsed<ModExpression>>,
+    parsed_type_annotation: Option<&'a ParsedAnnotation>,
     /// The [`Path`] to the file under analysis.
     path: &'a Path,
     /// The [`Path`] to the package containing the current file.
@@ -229,6 +233,7 @@ impl<'a> Checker<'a> {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         parsed: &'a Parsed<ModModule>,
+        parsed_annotations_arena: &'a typed_arena::Arena<ParsedAnnotation>,
         settings: &'a LinterSettings,
         noqa_line_for: &'a NoqaMapping,
         noqa: flags::Noqa,
@@ -245,6 +250,7 @@ impl<'a> Checker<'a> {
         Checker {
             parsed,
             parsed_type_annotation: None,
+            parsed_annotations_cache: ParsedAnnotationsCache::new(parsed_annotations_arena),
             settings,
             noqa_line_for,
             noqa,
@@ -333,8 +339,8 @@ impl<'a> Checker<'a> {
     /// Returns the [`Tokens`] for the parsed type annotation if the checker is in a typing context
     /// or the parsed source code.
     pub(crate) fn tokens(&self) -> &'a Tokens {
-        if let Some(parsed_type_annotation) = self.parsed_type_annotation {
-            parsed_type_annotation.tokens()
+        if let Some(type_annotation) = self.parsed_type_annotation {
+            type_annotation.parsed().tokens()
         } else {
             self.parsed.tokens()
         }
@@ -404,6 +410,19 @@ impl<'a> Checker<'a> {
         node_id
             .map(|node_id| IsolationLevel::Group(node_id.into()))
             .unwrap_or_default()
+    }
+
+    /// Parse a stringified type annotation as an AST expression,
+    /// e.g. `"List[str]"` in `x: "List[str]"`
+    ///
+    /// This method is a wrapper around [`ruff_python_parser::typing::parse_type_annotation`]
+    /// that adds caching.
+    pub(crate) fn parse_type_annotation(
+        &self,
+        annotation: &ast::ExprStringLiteral,
+    ) -> Option<&'a ParsedAnnotation> {
+        self.parsed_annotations_cache
+            .lookup_or_parse(annotation, self.locator.contents())
     }
 }
 
@@ -2168,18 +2187,13 @@ impl<'a> Checker<'a> {
     ///
     /// class Bar: pass
     /// ```
-    fn visit_deferred_string_type_definitions(
-        &mut self,
-        allocator: &'a typed_arena::Arena<Parsed<ModExpression>>,
-    ) {
+    fn visit_deferred_string_type_definitions(&mut self) {
         let snapshot = self.semantic.snapshot();
         while !self.visit.string_type_definitions.is_empty() {
             let type_definitions = std::mem::take(&mut self.visit.string_type_definitions);
             for (string_expr, snapshot) in type_definitions {
-                if let Ok((parsed_annotation, kind)) =
-                    parse_type_annotation(string_expr, self.locator.contents())
-                {
-                    let parsed_annotation = allocator.alloc(parsed_annotation);
+                let annotation_parse_result = self.parse_type_annotation(string_expr);
+                if let Some(parsed_annotation) = annotation_parse_result {
                     self.parsed_type_annotation = Some(parsed_annotation);
 
                     let annotation = string_expr.value.to_str();
@@ -2198,7 +2212,7 @@ impl<'a> Checker<'a> {
                         }
                     }
 
-                    let type_definition_flag = match kind {
+                    let type_definition_flag = match parsed_annotation.kind() {
                         AnnotationKind::Simple => SemanticModelFlags::SIMPLE_STRING_TYPE_DEFINITION,
                         AnnotationKind::Complex => {
                             SemanticModelFlags::COMPLEX_STRING_TYPE_DEFINITION
@@ -2207,7 +2221,7 @@ impl<'a> Checker<'a> {
 
                     self.semantic.flags |=
                         SemanticModelFlags::TYPE_DEFINITION | type_definition_flag;
-                    self.visit_expr(parsed_annotation.expr());
+                    self.visit_expr(parsed_annotation.expression());
                     self.parsed_type_annotation = None;
                 } else {
                     if self.enabled(Rule::ForwardAnnotationSyntaxError) {
@@ -2220,6 +2234,35 @@ impl<'a> Checker<'a> {
                     }
                 }
             }
+
+            // If we're parsing string annotations inside string annotations
+            // (which is the only reason we might enter a second iteration of this loop),
+            // the cache is no longer valid. We must invalidate it to avoid an infinite loop.
+            //
+            // For example, consider the following annotation:
+            // ```python
+            // x: "list['str']"
+            // ```
+            //
+            // The first time we visit the AST, we see `"list['str']"`
+            // and identify it as a stringified annotation.
+            // We store it in `self.visit.string_type_definitions` to be analyzed later.
+            //
+            // After the entire tree has been visited, we look through
+            // `self.visit.string_type_definitions` and find `"list['str']"`.
+            // We parse it, and it becomes `list['str']`.
+            // After parsing it, we call `self.visit_expr()` on the `list['str']` node,
+            // and that `visit_expr` call is going to find `'str'` inside that node and
+            // identify it as a string type definition, appending it to
+            // `self.visit.string_type_definitions`, ensuring that there will be one
+            // more iteration of this loop.
+            //
+            // Unfortunately, the `TextRange` of `'str'`
+            // here will be *relative to the parsed `list['str']` node* rather than
+            // *relative to the original module*, meaning the cache
+            // (which uses `TextSize` as the key) becomes invalid on the second
+            // iteration of this loop.
+            self.parsed_annotations_cache.clear();
         }
         self.semantic.restore(snapshot);
     }
@@ -2283,14 +2326,14 @@ impl<'a> Checker<'a> {
     /// After initial traversal of the source tree has been completed,
     /// recursively visit all AST nodes that were deferred on the first pass.
     /// This includes lambdas, functions, type parameters, and type annotations.
-    fn visit_deferred(&mut self, allocator: &'a typed_arena::Arena<Parsed<ModExpression>>) {
+    fn visit_deferred(&mut self) {
         while !self.visit.is_empty() {
             self.visit_deferred_class_bases();
             self.visit_deferred_functions();
             self.visit_deferred_type_param_definitions();
             self.visit_deferred_lambdas();
             self.visit_deferred_future_type_definitions();
-            self.visit_deferred_string_type_definitions(allocator);
+            self.visit_deferred_string_type_definitions();
         }
     }
 
@@ -2358,6 +2401,42 @@ impl<'a> Checker<'a> {
     }
 }
 
+struct ParsedAnnotationsCache<'a> {
+    arena: &'a typed_arena::Arena<ParsedAnnotation>,
+    by_offset: RefCell<FxHashMap<TextSize, Option<&'a ParsedAnnotation>>>,
+}
+
+impl<'a> ParsedAnnotationsCache<'a> {
+    fn new(arena: &'a typed_arena::Arena<ParsedAnnotation>) -> Self {
+        Self {
+            arena,
+            by_offset: RefCell::default(),
+        }
+    }
+
+    fn lookup_or_parse(
+        &self,
+        annotation: &ast::ExprStringLiteral,
+        source: &str,
+    ) -> Option<&'a ParsedAnnotation> {
+        *self
+            .by_offset
+            .borrow_mut()
+            .entry(annotation.start())
+            .or_insert_with(|| {
+                if let Ok(annotation) = parse_type_annotation(annotation, source) {
+                    Some(self.arena.alloc(annotation))
+                } else {
+                    None
+                }
+            })
+    }
+
+    fn clear(&self) {
+        self.by_offset.borrow_mut().clear();
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn check_ast(
     parsed: &Parsed<ModModule>,
@@ -2393,8 +2472,10 @@ pub(crate) fn check_ast(
         python_ast: parsed.suite(),
     };
 
+    let allocator = typed_arena::Arena::new();
     let mut checker = Checker::new(
         parsed,
+        &allocator,
         settings,
         noqa_line_for,
         noqa,
@@ -2417,8 +2498,7 @@ pub(crate) fn check_ast(
     // Visit any deferred syntax nodes. Take care to visit in order, such that we avoid adding
     // new deferred nodes after visiting nodes of that kind. For example, visiting a deferred
     // function can add a deferred lambda, but the opposite is not true.
-    let allocator = typed_arena::Arena::new();
-    checker.visit_deferred(&allocator);
+    checker.visit_deferred();
     checker.visit_exports();
 
     // Check docstrings, bindings, and unresolved references.
