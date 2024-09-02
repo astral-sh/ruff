@@ -1073,7 +1073,7 @@ def x():
     }
 
     #[test]
-    fn match_stmt_symbols() {
+    fn match_stmt() {
         let TestCase { db, file } = test_case(
             "
 match subject:
@@ -1087,13 +1087,27 @@ match subject:
 ",
         );
 
-        let global_table = symbol_table(&db, global_scope(&db, file));
+        let global_scope_id = global_scope(&db, file);
+        let global_table = symbol_table(&db, global_scope_id);
 
         assert!(global_table.symbol_by_name("Foo").unwrap().is_used());
         assert_eq!(
             names(&global_table),
-            vec!["subject", "a", "b", "c", "d", "f", "e", "h", "g", "Foo", "i", "j", "k", "l"]
+            vec!["subject", "a", "b", "c", "d", "e", "f", "g", "h", "Foo", "i", "j", "k", "l"]
         );
+
+        let use_def = use_def_map(&db, global_scope_id);
+        for name in ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"] {
+            let definition = use_def
+                .first_public_definition(
+                    global_table.symbol_id_by_name(name).expect("symbol exists"),
+                )
+                .expect("Expected with item definition for {name}");
+            assert!(matches!(
+                definition.node(&db),
+                DefinitionKind::MatchPattern(_)
+            ));
+        }
     }
 
     #[test]
