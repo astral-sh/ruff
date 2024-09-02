@@ -24,16 +24,26 @@ fn corpus_no_panic() -> anyhow::Result<()> {
     let corpus = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/test/corpus");
     let system_corpus =
         SystemPathBuf::from_path_buf(corpus.clone()).expect("corpus path to be UTF8");
+    let stub_dir = tempfile::TempDir::new()?;
     let db = setup_db(&system_corpus)?;
 
     for path in fs::read_dir(&corpus).expect("corpus to be a directory") {
         let path = path.expect("path to not be an error").path();
         println!("checking {path:?}");
-        let path = SystemPathBuf::from_path_buf(path.clone()).expect("path to be UTF-8");
+        let syspath = SystemPathBuf::from_path_buf(path.clone()).expect("path to be UTF-8");
         // this test is only asserting that we can pull every expression type without a panic
         // (and some non-expressions that clearly define a single type)
-        let file = system_path_to_file(&db, path).expect("file to exist");
+        let file = system_path_to_file(&db, syspath).expect("file to exist");
+        pull_types(&db, file);
 
+        // try the file as a stub also
+        let stub_path = stub_dir
+            .path()
+            .join(format!("{}i", path.file_name().unwrap().to_str().unwrap()));
+        std::fs::copy(path, stub_path.clone())?;
+        println!("checking {stub_path:?}");
+        let syspath = SystemPathBuf::from_path_buf(stub_path).unwrap();
+        let file = system_path_to_file(&db, syspath).unwrap();
         pull_types(&db, file);
     }
     Ok(())

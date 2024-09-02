@@ -468,11 +468,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             .as_deref()
             .expect("function type params scope without type params");
 
-        // TODO: this should also be applied to parameter annotations.
-        if !self.is_stub() {
-            self.infer_optional_expression(function.returns.as_deref());
-        }
-
+        // TODO: defer annotation resolution in stubs, with __future__.annotations, or stringified
+        self.infer_optional_expression(function.returns.as_deref());
         self.infer_type_parameters(type_params);
         self.infer_parameters(&function.parameters);
     }
@@ -569,6 +566,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             // TODO: this should also be applied to parameter annotations.
             if !self.is_stub() {
                 self.infer_optional_annotation_expression(returns.as_deref());
+            } else {
+                self.types.has_deferred = true;
             }
         }
 
@@ -688,19 +687,19 @@ impl<'db> TypeInferenceBuilder<'db> {
             for base in class.bases() {
                 self.infer_expression(base);
             }
+        } else {
+            self.types.has_deferred = true;
         }
     }
 
     fn infer_function_deferred(&mut self, function: &ast::StmtFunctionDef) {
         if self.is_stub() {
-            self.types.has_deferred = true;
             self.infer_optional_annotation_expression(function.returns.as_deref());
         }
     }
 
     fn infer_class_deferred(&mut self, class: &ast::StmtClassDef) {
         if self.is_stub() {
-            self.types.has_deferred = true;
             for base in class.bases() {
                 self.infer_expression(base);
             }
