@@ -11,7 +11,7 @@ use ruff_python_ast::comparable::ComparableExpr;
 /// ## Why is this bad?
 /// Redundant conditional expressions add unnecessary complexity to the code without
 /// providing any logical benefit.
-/// 
+///
 /// Assigning the value directly is clearer and more explicit, and
 /// should be preferred.
 ///
