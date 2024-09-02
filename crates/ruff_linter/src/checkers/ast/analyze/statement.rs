@@ -380,6 +380,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::WhitespaceAfterDecorator) {
                 pycodestyle::rules::whitespace_after_decorator(checker, decorator_list);
             }
+            if checker.enabled(Rule::PostInitDefault) {
+                ruff::rules::post_init_default(checker, function_def);
+            }
         }
         Stmt::Return(_) => {
             if checker.enabled(Rule::ReturnOutsideFunction) {
