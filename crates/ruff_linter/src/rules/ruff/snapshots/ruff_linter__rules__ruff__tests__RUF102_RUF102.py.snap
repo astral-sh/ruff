@@ -1,0 +1,27 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF102.py:5:5: RUF102 Replace redundant ternary with direct assignment
+  |
+4 | # Invalid
+5 | x = 1 if True else 1
+  |     ^^^^^^^^^^^^^^^^ RUF102
+6 | 
+7 | # Invalid
+  |
+
+RUF102.py:8:5: RUF102 Replace redundant ternary with direct assignment
+   |
+ 7 | # Invalid
+ 8 | x = "a" if True else "a"
+   |     ^^^^^^^^^^^^^^^^^^^^ RUF102
+ 9 | 
+10 | # Invalid
+   |
+
+RUF102.py:11:5: RUF102 Replace redundant ternary with direct assignment
+   |
+10 | # Invalid
+11 | x = 0.1 if False else 0.1
+   |     ^^^^^^^^^^^^^^^^^^^^^ RUF102
+   |
