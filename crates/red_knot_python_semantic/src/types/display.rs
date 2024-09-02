@@ -2,7 +2,7 @@
 
 use std::fmt::{Display, Formatter};
 
-use hashbrown::HashMap;
+use rustc_hash::FxHashMap;
 
 use ruff_python_ast::str::Quote;
 use ruff_python_literal::escape::AsciiEscape;
@@ -23,42 +23,38 @@ pub struct DisplayType<'db> {
 }
 
 impl DisplayType<'_> {
-    /// Returns the string representation of a type, which is the value displayed either as
-    /// `Literal[<repr>]` or `Literal[<repr1>, <repr2>]` for literal types or as `<repr>` for non
-    /// literals
-    fn representation(&self) -> String {
-        // This methods avoids duplicating individual types representation logic in `UnionType`
+    /// Writes the string representation of a type, which is the value displayed either as
+    /// `Literal[<repr>]` or `Literal[<repr1>, <repr2>]` for literal types or as `<repr>` for
+    /// non literals
+    fn write_representation(&self, f: &mut Formatter) -> std::fmt::Result {
+        // This methods avoids duplicating individual types representation logic in
+        // `UnionType`
         match self.ty {
-            Type::Any => "Any".to_string(),
-            Type::Never => "Never".to_string(),
-            Type::Unknown => "Unknown".to_string(),
-            Type::Unbound => "Unbound".to_string(),
-            Type::None => "None".to_string(),
+            Type::Any => f.write_str("Any"),
+            Type::Never => f.write_str("Never"),
+            Type::Unknown => f.write_str("Unknown"),
+            Type::Unbound => f.write_str("Unbound"),
+            Type::None => f.write_str("None"),
             Type::Module(file) => {
-                format!("<module '{:?}'>", file.path(self.db))
+                write!(f, "<module '{:?}'>", file.path(self.db))
             }
             // TODO functions and classes should display using a fully qualified name
-            Type::Class(class) => class.name(self.db).to_string(),
-            Type::Instance(class) => class.name(self.db).to_string(),
-            Type::Function(function) => function.name(self.db).to_string(),
-            Type::Union(union) => union.display(self.db).to_string(),
-            Type::Intersection(intersection) => intersection.display(self.db).to_string(),
-            Type::IntLiteral(n) => n.to_string(),
-            Type::BooleanLiteral(boolean) => {
-                if *boolean {
-                    "True".to_string()
-                } else {
-                    "False".to_string()
-                }
-            }
+            Type::Class(class) => f.write_str(class.name(self.db)),
+            Type::Instance(class) => f.write_str(class.name(self.db)),
+            Type::Function(function) => f.write_str(function.name(self.db)),
+            Type::Union(union) => union.display(self.db).fmt(f),
+            Type::Intersection(intersection) => intersection.display(self.db).fmt(f),
+            Type::IntLiteral(n) => write!(f, "{n}"),
+            Type::BooleanLiteral(boolean) => f.write_str(if *boolean { "True" } else { "False" }),
             Type::StringLiteral(string) => {
-                format!(r#""{}""#, string.value(self.db).replace('"', r#"\""#))
+                write!(f, r#""{}""#, string.value(self.db).replace('"', r#"\""#))
             }
-            Type::LiteralString => "LiteralString".to_string(),
+            Type::LiteralString => f.write_str("LiteralString"),
             Type::BytesLiteral(bytes) => {
                 let escape =
                     AsciiEscape::with_preferred_quote(bytes.value(self.db).as_ref(), Quote::Double);
-                escape.bytes_repr().to_string().unwrap_or_default()
+
+                escape.bytes_repr().write(f)
             }
         }
     }
@@ -66,21 +62,15 @@ impl DisplayType<'_> {
 
 impl Display for DisplayType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self.ty {
-            // Literal types -> `Literal[<repr>]`
-            Type::Class(_)
-            | Type::Function(_)
-            | Type::IntLiteral(_)
-            | Type::BooleanLiteral(_)
-            | Type::StringLiteral(_)
-            | Type::BytesLiteral(_) => {
-                f.write_str("Literal[")?;
-                f.write_str(&self.representation())?;
-                f.write_str("]")
-            }
-            // Non literal types -> `<repr>`
-            _ => f.write_str(&self.representation()),
+        let is_literal = self.ty.is_literal();
+        if is_literal {
+            f.write_str("Literal[")?;
         }
+        self.write_representation(f)?;
+        if is_literal {
+            f.write_str("]")?;
+        }
+        Ok(())
     }
 }
 
@@ -101,79 +91,48 @@ struct DisplayUnionType<'db> {
     db: &'db dyn Db,
 }
 
-// Enumeration for literals that are displayed in a condensed form (e.g. `Literal[... | ...]`)
-#[derive(Hash, PartialEq, Eq)]
-enum CondensedLiteral {
-    Int,
-    String,
-    Bytes,
-    Function,
-    Class,
-}
-
-impl CondensedLiteral {
-    fn iter() -> impl Iterator<Item = &'static Self> {
-        // Order of the literals in the condensed form
-        [
-            Self::Int,
-            Self::String,
-            Self::Bytes,
-            Self::Class,
-            Self::Function,
-        ]
-        .iter()
-    }
-}
-
 impl Display for DisplayUnionType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let union = self.ty;
 
-        // Group literals by type: {int, string, bytes, function, class}
-        let mut literals_representation_map = HashMap::<CondensedLiteral, Vec<String>>::new();
-        let mut other_types = vec![];
+        // Group literals types by discriminant
+        let mut literals_map = FxHashMap::default();
+        // Non-literal types are all in order of appearance
+        let mut other_types: Vec<Type> = vec![];
+        // Remember all discriminants in order of appearance, duplicates are not a problem
+        let mut literals_discriminants = vec![];
 
         union.elements(self.db).iter().copied().for_each(|ty| {
-            // Find which group the type belongs to, None means other types
-            let maybe_condensed_literal = match ty {
-                Type::IntLiteral(_) => Some(CondensedLiteral::Int),
-                Type::StringLiteral(_) => Some(CondensedLiteral::String),
-                Type::BytesLiteral(_) => Some(CondensedLiteral::Bytes),
-                Type::Class(_) => Some(CondensedLiteral::Class),
-                Type::Function(_) => Some(CondensedLiteral::Function),
-                _ => None,
-            };
-            if let Some(condensed_literal) = maybe_condensed_literal {
-                // For literals, push the representation. Adding `Literal[...]` is done later
-                literals_representation_map
-                    .entry(condensed_literal)
+            if ty.is_literal() {
+                // Store literals in a map by discriminant (same variant)
+                let discriminant = std::mem::discriminant(&ty);
+                literals_map
+                    .entry(discriminant)
                     .or_insert_with(Vec::new)
-                    .push(ty.display(self.db).representation());
+                    .push(ty);
+                literals_discriminants.push(discriminant);
             } else {
+                // Store non-literals in a separate list
                 other_types.push(ty);
             }
         });
 
-        literals_representation_map
-            .values_mut()
-            .for_each(|group| group.sort_unstable());
-
         let mut first = true;
-        for condensed_literal in CondensedLiteral::iter() {
-            if let Some(literals_representation) =
-                literals_representation_map.remove(condensed_literal)
-            {
+        for discriminant in literals_discriminants {
+            // On first encounter of discriminant, write all literals of that type. The group will
+            // be removed for further occurrences of the same discriminant
+            if let Some(literals_ty) = literals_map.remove(&discriminant) {
                 if !first {
                     f.write_str(" | ")?;
                 };
                 first = false;
 
                 f.write_str("Literal[")?;
-                for (i, literal_repr) in literals_representation.iter().enumerate() {
+                for (i, literal_ty) in literals_ty.iter().enumerate() {
                     if i > 0 {
                         f.write_str(", ")?;
                     }
-                    write!(f, "{literal_repr}")?;
+                    literal_ty.display(self.db).write_representation(f)?;
                 }
                 f.write_str("]")?;
             }
@@ -287,23 +246,18 @@ mod tests {
         let mod_file = system_path_to_file(&db, "src/main.py").expect("Expected file to exist.");
 
         let vec: Vec<Type<'_>> = vec![
-            // Bytes Literals
-            Type::BytesLiteral(BytesLiteralType::new(&db, Box::from([7]))),
-            Type::BytesLiteral(BytesLiteralType::new(&db, Box::from([0]))),
-            // Strings Literals
-            Type::StringLiteral(StringLiteralType::new(&db, Box::from("B"))),
-            Type::StringLiteral(StringLiteralType::new(&db, Box::from("A"))),
-            // Integers Literals
-            Type::IntLiteral(1),
+            Type::Unknown,
             Type::IntLiteral(-1),
+            global_symbol_ty_by_name(&db, mod_file, "A"),
+            Type::StringLiteral(StringLiteralType::new(&db, Box::from("A"))),
+            Type::BytesLiteral(BytesLiteralType::new(&db, Box::from([0]))),
+            Type::BytesLiteral(BytesLiteralType::new(&db, Box::from([7]))),
             Type::IntLiteral(0),
-            // Functions
+            Type::IntLiteral(1),
+            Type::StringLiteral(StringLiteralType::new(&db, Box::from("B"))),
             global_symbol_ty_by_name(&db, mod_file, "foo"),
             global_symbol_ty_by_name(&db, mod_file, "bar"),
-            // Classes
-            global_symbol_ty_by_name(&db, mod_file, "A"),
             global_symbol_ty_by_name(&db, mod_file, "B"),
-            // Other non-grouped types
             Type::BooleanLiteral(true),
             Type::None,
         ];
@@ -318,11 +272,13 @@ mod tests {
             display,
             concat!(
                 "Literal[-1, 0, 1] | ",
+                "Literal[A, B] | ",
                 "Literal[\"A\", \"B\"] | ",
                 "Literal[b\"\\x00\", b\"\\x07\"] | ",
-                "Literal[A, B] | ",
-                "Literal[bar, foo] | ",
+                "Literal[foo, bar] | ",
+                // TODO: Non literals always come after Literals, which might be unwanted
                 "Literal[True] | ",
+                "Unknown | ",
                 "None"
             )
         );

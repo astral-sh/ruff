@@ -224,6 +224,19 @@ impl<'db> Type<'db> {
         matches!(self, Type::Never)
     }
 
+    /// Returns `true` if this type should be displayed as a literal value.
+    pub const fn is_literal(&self) -> bool {
+        matches!(
+            self,
+            Type::IntLiteral(_)
+                | Type::BooleanLiteral(_)
+                | Type::StringLiteral(_)
+                | Type::BytesLiteral(_)
+                | Type::Class(_)
+                | Type::Function(_)
+        )
+    }
+
     pub fn may_be_unbound(&self, db: &'db dyn Db) -> bool {
         match self {
             Type::Unbound => true,

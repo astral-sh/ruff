@@ -3356,7 +3356,7 @@ mod tests {
 
         assert_eq!(
             y_ty.display(&db).to_string(),
-            "Literal[1] | Literal[copyright]"
+            "Literal[copyright] | Literal[1]"
         );
 
         Ok(())
@@ -3596,7 +3596,7 @@ mod tests {
         assert_public_ty(&db, "/src/a.py", "x", "Literal[2, 3]");
         // if just-body were possible without the break, then 0 would be possible for y
         // 1 and 2 both being possible for y shows that we can hit else with or without body
-        assert_public_ty(&db, "/src/a.py", "y", "Literal[1, 2, 4]");
+        assert_public_ty(&db, "/src/a.py", "y", "Literal[4, 1, 2]");
 
         Ok(())
     }
