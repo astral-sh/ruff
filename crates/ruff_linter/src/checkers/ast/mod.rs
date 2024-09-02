@@ -178,35 +178,6 @@ impl ExpectedDocstringKind {
     }
 }
 
-struct ParsedAnnotationsCache<'a> {
-    arena: &'a typed_arena::Arena<AnnotationParseResult>,
-    offset_to_parse_result: RefCell<FxHashMap<TextSize, &'a AnnotationParseResult>>,
-}
-
-impl<'a> ParsedAnnotationsCache<'a> {
-    fn new(arena: &'a typed_arena::Arena<AnnotationParseResult>) -> Self {
-        Self {
-            arena,
-            offset_to_parse_result: RefCell::default(),
-        }
-    }
-
-    fn lookup_or_parse(
-        &self,
-        annotation: &ast::ExprStringLiteral,
-        source: &str,
-    ) -> &'a AnnotationParseResult {
-        self.offset_to_parse_result
-            .borrow_mut()
-            .entry(annotation.start())
-            .or_insert_with(|| self.arena.alloc(parse_type_annotation(annotation, source)))
-    }
-
-    fn clear(&self) {
-        self.offset_to_parse_result.borrow_mut().clear();
-    }
-}
-
 pub(crate) struct Checker<'a> {
     /// The [`Parsed`] output for the source code.
     parsed: &'a Parsed<ModModule>,
@@ -2265,9 +2236,34 @@ impl<'a> Checker<'a> {
                     }
                 }
             }
+
             // If we're parsing string annotations inside string annotations
             // (which is the only reason we might enter a second iteration of this loop),
-            // the cache is no longer valid. We must invalidate it to avoid an infinite loop:
+            // the cache is no longer valid. We must invalidate it to avoid an infinite loop.
+            //
+            // For example, consider the following annotation:
+            // ```python
+            // x: "list['str']"
+            // ```
+            //
+            // The first time we visit the AST, we see `"list['str']"`
+            // and identify it as a stringified annotation.
+            // We store it in `self.visit.string_type_definitions` to be analyzed later.
+            //
+            // After the entire tree has been visited, we look through
+            // `self.visit.string_type_definitions` and find `"list['str']"`.
+            // We parse it, and it becomes `list['str']`.
+            // After parsing it, we call `self.visit_expr()` on the `list['str']` node,
+            // and that `visit_expr` call is going to find `'str'` inside that node and
+            // identify it as a string type definition, appending it to
+            // `self.visit.string_type_definitions`, ensuring that there will be one
+            // more iteration of this loop.
+            //
+            // Unfortunately, the `TextRange` of `'str'`
+            // here will be *relative to the parsed `list['str']` node* rather than
+            // *relative to the original module*, meaning the cache
+            // (which uses `TextSize` as the key) becomes invalid on the second
+            // iteration of this loop.
             self.parsed_annotations_cache.clear();
         }
         self.semantic.restore(snapshot);
@@ -2404,6 +2400,35 @@ impl<'a> Checker<'a> {
         }
 
         self.semantic.restore(snapshot);
+    }
+}
+
+struct ParsedAnnotationsCache<'a> {
+    arena: &'a typed_arena::Arena<AnnotationParseResult>,
+    by_offset: RefCell<FxHashMap<TextSize, &'a AnnotationParseResult>>,
+}
+
+impl<'a> ParsedAnnotationsCache<'a> {
+    fn new(arena: &'a typed_arena::Arena<AnnotationParseResult>) -> Self {
+        Self {
+            arena,
+            by_offset: RefCell::default(),
+        }
+    }
+
+    fn lookup_or_parse(
+        &self,
+        annotation: &ast::ExprStringLiteral,
+        source: &str,
+    ) -> &'a AnnotationParseResult {
+        self.by_offset
+            .borrow_mut()
+            .entry(annotation.start())
+            .or_insert_with(|| self.arena.alloc(parse_type_annotation(annotation, source)))
+    }
+
+    fn clear(&self) {
+        self.by_offset.borrow_mut().clear();
     }
 }
 
