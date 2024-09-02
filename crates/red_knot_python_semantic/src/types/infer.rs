@@ -37,7 +37,6 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext, UnaryOp};
 use ruff_text_size::Ranged;
 
-use crate::stdlib::builtins_scope;
 use crate::module_name::ModuleName;
 use crate::module_resolver::{file_to_module, resolve_module};
 use crate::semantic_index::ast_ids::{HasScopedAstId, HasScopedUseId, ScopedExpressionId};
@@ -46,6 +45,7 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::{NodeWithScopeKind, NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
+use crate::stdlib::builtins_scope;
 use crate::types::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 use crate::types::{
     builtins_symbol_ty_by_name, definitions_ty, global_symbol_ty_by_name, symbol_ty,
@@ -2378,13 +2378,13 @@ mod tests {
     use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast::name::Name;
 
-    use crate::stdlib::builtins_scope;
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
     use crate::semantic_index::definition::Definition;
     use crate::semantic_index::symbol::FileScopeId;
     use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
+    use crate::stdlib::builtins_scope;
     use crate::types::{global_symbol_ty_by_name, infer_definition_types, symbol_ty_by_name};
     use crate::{HasTy, ProgramSettings, SemanticModel};
 

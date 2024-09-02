@@ -10,7 +10,6 @@ pub use python_version::PythonVersion;
 pub use semantic_model::{HasTy, SemanticModel};
 
 pub mod ast_node_ref;
-mod stdlib;
 mod db;
 mod module_name;
 mod module_resolver;
@@ -20,6 +19,7 @@ mod python_version;
 pub mod semantic_index;
 mod semantic_model;
 pub(crate) mod site_packages;
+mod stdlib;
 pub mod types;
 
 type FxOrderSet<V> = ordermap::set::OrderSet<V, BuildHasherDefault<FxHasher>>;

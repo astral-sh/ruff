@@ -8,7 +8,7 @@ use crate::semantic_index::{
     global_scope, semantic_index, symbol_table, use_def_map, DefinitionWithConstraints,
     DefinitionWithConstraintsIterator,
 };
-use crate::stdlib::{builtins_scope, types_scope, typeshed_scope};
+use crate::stdlib::{builtins_symbol_ty_by_name, CoreStdlibModule};
 use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet};
 
@@ -73,44 +73,6 @@ pub(crate) fn symbol_ty_by_name<'db>(
 /// Shorthand for `symbol_ty` that looks up a module-global symbol by name in a file.
 pub(crate) fn global_symbol_ty_by_name<'db>(db: &'db dyn Db, file: File, name: &str) -> Type<'db> {
     symbol_ty_by_name(db, global_scope(db, file), name)
-}
-
-/// Enumeration of various core stdlib modules, for which we have dedicated Salsa queries.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum CoreStdlibModule {
-    Builtins,
-    Types,
-    Typeshed,
-}
-
-impl CoreStdlibModule {
-    /// Retrieve the global scope of the given module.
-    ///
-    /// Returns `None` if the given module isn't available for some reason.
-    pub(crate) fn global_scope(self, db: &dyn Db) -> Option<ScopeId<'_>> {
-        match self {
-            Self::Builtins => builtins_scope(db),
-            Self::Types => types_scope(db),
-            Self::Typeshed => typeshed_scope(db),
-        }
-    }
-
-    /// Shorthand for `symbol_ty` that looks up a symbol in the scope of a given core module.
-    ///
-    /// Returns `Unbound` if the given module isn't available for some reason.
-    pub(crate) fn symbol_ty_by_name<'db>(self, db: &'db dyn Db, name: &str) -> Type<'db> {
-        self.global_scope(db)
-            .map(|globals| symbol_ty_by_name(db, globals, name))
-            .unwrap_or(Type::Unbound)
-    }
-}
-
-/// Shorthand for `symbol_ty` that looks up a symbol in the `builtins` scope.
-///
-/// Returns `Unbound` if the `builtins` module isn't available for some reason.
-#[inline]
-pub(crate) fn builtins_symbol_ty_by_name<'db>(db: &'db dyn Db, name: &str) -> Type<'db> {
-    CoreStdlibModule::Builtins.symbol_ty_by_name(db, name)
 }
 
 /// Infer the type of a [`Definition`].
@@ -632,7 +594,7 @@ impl<'db> UnionType<'db> {
         self.elements(db)
             .into_iter()
             .fold(UnionBuilder::new(db), |builder, element| {
-                builder.add(transform_fn(&element))
+                builder.add(transform_fn(element))
             })
             .build()
     }
