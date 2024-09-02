@@ -10,7 +10,7 @@ pub use python_version::PythonVersion;
 pub use semantic_model::{HasTy, SemanticModel};
 
 pub mod ast_node_ref;
-mod core_stdlib_modules;
+mod stdlib;
 mod db;
 mod module_name;
 mod module_resolver;

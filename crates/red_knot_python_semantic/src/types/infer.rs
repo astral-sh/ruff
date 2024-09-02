@@ -37,7 +37,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext, UnaryOp};
 use ruff_text_size::Ranged;
 
-use crate::core_stdlib_modules::builtins_scope;
+use crate::stdlib::builtins_scope;
 use crate::module_name::ModuleName;
 use crate::module_resolver::{file_to_module, resolve_module};
 use crate::semantic_index::ast_ids::{HasScopedAstId, HasScopedUseId, ScopedExpressionId};
@@ -2378,7 +2378,7 @@ mod tests {
     use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast::name::Name;
 
-    use crate::core_stdlib_modules::builtins_scope;
+    use crate::stdlib::builtins_scope;
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;

@@ -1,7 +1,6 @@
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 
-use crate::core_stdlib_modules::{builtins_scope, types_scope, typeshed_scope};
 use crate::semantic_index::ast_ids::HasScopedAstId;
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId};
@@ -9,6 +8,7 @@ use crate::semantic_index::{
     global_scope, semantic_index, symbol_table, use_def_map, DefinitionWithConstraints,
     DefinitionWithConstraintsIterator,
 };
+use crate::stdlib::{builtins_scope, types_scope, typeshed_scope};
 use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet};
 
@@ -76,8 +76,6 @@ pub(crate) fn global_symbol_ty_by_name<'db>(db: &'db dyn Db, file: File, name: &
 }
 
 /// Enumeration of various core stdlib modules, for which we have dedicated Salsa queries.
-///
-/// Things will start getting very strange during type-checking if one of these doesn't exist.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum CoreStdlibModule {
     Builtins,
@@ -338,7 +336,7 @@ impl<'db> Type<'db> {
         match self {
             Type::Unbound => replacement,
             Type::Union(union) => {
-                union.transform(db, |element| element.replace_unbound_with(db, replacement))
+                union.map(db, |element| element.replace_unbound_with(db, replacement))
             }
             ty => *ty,
         }
@@ -381,7 +379,7 @@ impl<'db> Type<'db> {
                 // TODO MRO? get_own_instance_member, get_instance_member
                 Type::Unknown
             }
-            Type::Union(union) => union.transform(db, |element| element.member(db, name)),
+            Type::Union(union) => union.map(db, |element| element.member(db, name)),
             Type::Intersection(_) => {
                 // TODO perform the get_member on each type in the intersection
                 // TODO return the intersection of those results
@@ -450,12 +448,14 @@ impl<'db> Type<'db> {
         // `self` represents the type of the iterable;
         // `__iter__` and `__next__` are both looked up on the class of the iterable:
         let type_of_class = self.to_type_of_class(db);
+
         let dunder_iter_method = type_of_class.member(db, "__iter__");
         if !dunder_iter_method.is_unbound() {
             let iterator_ty = dunder_iter_method.call(db)?;
             let dunder_next_method = iterator_ty.to_type_of_class(db).member(db, "__next__");
             return dunder_next_method.call(db);
         }
+
         // Although it's not considered great practice,
         // classes that define `__getitem__` are also iterable,
         // even if they do not define `__iter__`.
@@ -484,7 +484,7 @@ impl<'db> Type<'db> {
             Type::Unbound => Type::Unbound,
             Type::Never => Type::Never,
             Type::Instance(class) => Type::Class(*class),
-            Type::Union(union) => union.transform(db, |ty| ty.to_type_of_class(db)),
+            Type::Union(union) => union.map(db, |ty| ty.to_type_of_class(db)),
             Type::BooleanLiteral(_) => builtins_symbol_ty_by_name(db, "bool"),
             Type::BytesLiteral(_) => builtins_symbol_ty_by_name(db, "bytes"),
             Type::IntLiteral(_) => builtins_symbol_ty_by_name(db, "int"),
@@ -624,7 +624,7 @@ impl<'db> UnionType<'db> {
 
     /// Apply a transformation function to all elements of the union,
     /// and create a new union from the resulting set of types
-    pub fn transform(
+    pub fn map(
         &self,
         db: &'db dyn Db,
         mut transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
