@@ -1,7 +1,7 @@
 use std::io::Write;
 use std::path::Path;
 
-use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite};
+use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite, XmlString};
 
 use ruff_source_file::SourceLocation;
 
@@ -25,7 +25,7 @@ impl Emitter for JunitEmitter {
             let mut test_suite = TestSuite::new("ruff");
             test_suite
                 .extra
-                .insert("package".to_string(), "org.ruff".to_string());
+                .insert(XmlString::new("package"), XmlString::new("org.ruff"));
             let mut case = TestCase::new("No errors found", TestCaseStatus::success());
             case.set_classname("ruff");
             test_suite.add_test_case(case);
@@ -35,7 +35,7 @@ impl Emitter for JunitEmitter {
                 let mut test_suite = TestSuite::new(filename);
                 test_suite
                     .extra
-                    .insert("package".to_string(), "org.ruff".to_string());
+                    .insert(XmlString::new("package"), XmlString::new("org.ruff"));
 
                 for message in messages {
                     let MessageWithLocation {
@@ -70,10 +70,14 @@ impl Emitter for JunitEmitter {
                     let file_stem = file_path.file_stem().unwrap().to_str().unwrap();
                     let classname = file_path.parent().unwrap().join(file_stem);
                     case.set_classname(classname.to_str().unwrap());
-                    case.extra
-                        .insert("line".to_string(), location.row.to_string());
-                    case.extra
-                        .insert("column".to_string(), location.column.to_string());
+                    case.extra.insert(
+                        XmlString::new("line"),
+                        XmlString::new(location.row.to_string()),
+                    );
+                    case.extra.insert(
+                        XmlString::new("column"),
+                        XmlString::new(location.column.to_string()),
+                    );
 
                     test_suite.add_test_case(case);
                 }
