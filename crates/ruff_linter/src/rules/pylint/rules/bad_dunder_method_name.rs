@@ -5,20 +5,19 @@ use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility;
 
 use crate::checkers::ast::Checker;
-use crate::rules::pylint::helpers::is_deprecated_dunder_method_in_python3;
-use crate::rules::pylint::helpers::is_known_dunder_method;
+use crate::rules::pylint::helpers::{dunder_method_kind, DunderMethodKind};
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 enum Kind {
     Misspelled,
-    DeprecatedInPython3,
+    RemovedInPython3,
 }
 
 /// ## What it does
-/// Checks for misspelled, unknown, and deprecated dunder names in method definitions.
+/// Checks for misspelled, unknown, and no longer supported dunder names in method definitions.
 ///
 /// ## Why is this bad?
-/// Misspelled or deprecated dunder name methods may cause your code to not function
+/// Misspelled or no longer supported dunder name methods may cause your code to not function
 /// as expected.
 ///
 /// Since dunder methods are associated with customizing the behavior
@@ -61,8 +60,8 @@ impl Violation for BadDunderMethodName {
         let BadDunderMethodName { name, kind } = self;
         match kind {
             Kind::Misspelled => format!("Bad or misspelled dunder method name `{name}`"),
-            Kind::DeprecatedInPython3 => {
-                format!("Deprecated dunder method name in Python 3 `{name}`")
+            Kind::RemovedInPython3 => {
+                format!("Python 2 or older only dunder method name `{name}`")
             }
         }
     }
@@ -76,12 +75,11 @@ pub(crate) fn bad_dunder_method_name(checker: &mut Checker, method: &ast::StmtFu
     }
 
     // If the name is explicitly allowed, skip it.
-    if is_known_dunder_method(&method.name)
-        || checker
-            .settings
-            .pylint
-            .allow_dunder_method_names
-            .contains(method.name.as_str())
+    if checker
+        .settings
+        .pylint
+        .allow_dunder_method_names
+        .contains(method.name.as_str())
         || matches!(method.name.as_str(), "_")
     {
         return;
@@ -91,10 +89,11 @@ pub(crate) fn bad_dunder_method_name(checker: &mut Checker, method: &ast::StmtFu
         return;
     }
 
-    let kind = if is_deprecated_dunder_method_in_python3(&method.name) {
-        Kind::DeprecatedInPython3
-    } else {
-        Kind::Misspelled
+    // If the method is known, skip it.
+    let kind = match dunder_method_kind(&method.name) {
+        Some(DunderMethodKind::Known) => return,
+        Some(DunderMethodKind::Removed) => Kind::RemovedInPython3,
+        None => Kind::Misspelled,
     };
 
     checker.diagnostics.push(Diagnostic::new(

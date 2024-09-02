@@ -168,10 +168,16 @@ impl<'a> Visitor<'_> for SequenceIndexVisitor<'a> {
     }
 }
 
-/// Returns `true` if a method is a known dunder method.
-pub(super) fn is_known_dunder_method(method: &str) -> bool {
-    matches!(
-        method,
+/// The kind of dunder method.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub(super) enum DunderMethodKind {
+    Known,
+    Removed,
+}
+
+/// Returns the kind of dunder method.
+pub(super) fn dunder_method_kind(method: &str) -> Option<DunderMethodKind> {
+    match method {
         "__abs__"
             | "__add__"
             | "__aenter__"
@@ -304,14 +310,7 @@ pub(super) fn is_known_dunder_method(method: &str) -> bool {
             | "_missing_"
             | "_ignore_"
             | "_order_"
-            | "_generate_next_value_"
-    )
-}
-
-/// Returns `true` if the method is a known dunder method that is only allowed in Python 2.
-pub(super) fn is_deprecated_dunder_method_in_python3(method: &str) -> bool {
-    matches!(
-        method,
+            | "_generate_next_value_" => Some(DunderMethodKind::Known),
         "__unicode__"
             | "__div__"
             | "__rdiv__"
@@ -328,6 +327,12 @@ pub(super) fn is_deprecated_dunder_method_in_python3(method: &str) -> bool {
             | "__method__"
             | "__coerce__"
             | "__long__"
-            | "__rcmp__"
-    )
+            | "__rcmp__" => Some(DunderMethodKind::Removed),
+            _ => None,
+        }
+}
+
+/// Returns `true` if a method is a known dunder method.
+pub(super) fn is_known_dunder_method(method: &str) -> bool {
+    dunder_method_kind(method) == Some(DunderMethodKind::Known)
 }
