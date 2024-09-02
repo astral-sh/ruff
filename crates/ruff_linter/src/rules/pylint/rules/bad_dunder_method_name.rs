@@ -14,7 +14,7 @@ enum Kind {
 }
 
 /// ## What it does
-/// Checks for misspelled, unknown, and no longer supported dunder names in method definitions.
+/// Checks for misspelled, unknown and no longer supported dunder names in method definitions.
 ///
 /// ## Why is this bad?
 /// Misspelled or no longer supported dunder name methods may cause your code to not function
