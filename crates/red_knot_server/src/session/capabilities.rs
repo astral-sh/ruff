@@ -1,5 +1,4 @@
 use lsp_types::ClientCapabilities;
-use ruff_linter::display_settings;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 #[allow(clippy::struct_excessive_bools)]
@@ -64,22 +63,5 @@ impl ResolvedClientCapabilities {
             workspace_refresh,
             pull_diagnostics,
         }
-    }
-}
-
-impl std::fmt::Display for ResolvedClientCapabilities {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        display_settings! {
-            formatter = f,
-            namespace = "capabilities",
-            fields = [
-                self.code_action_deferred_edit_resolution,
-                self.apply_edit,
-                self.document_changes,
-                self.workspace_refresh,
-                self.pull_diagnostics,
-            ]
-        };
-        Ok(())
     }
 }

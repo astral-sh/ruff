@@ -94,6 +94,20 @@ class ZipExtFile(io.BufferedIOBase):
 class _Writer(Protocol):
     def write(self, s: str, /) -> object: ...
 
+class _ZipReadable(Protocol):
+    def seek(self, offset: int, whence: int = 0, /) -> int: ...
+    def read(self, n: int = -1, /) -> bytes: ...
+
+class _ZipTellable(Protocol):
+    def tell(self) -> int: ...
+
+class _ZipReadableTellable(_ZipReadable, _ZipTellable, Protocol): ...
+
+class _ZipWritable(Protocol):
+    def flush(self) -> None: ...
+    def close(self) -> None: ...
+    def write(self, b: bytes, /) -> int: ...
+
 class ZipFile:
     filename: str | None
     debug: int
@@ -106,24 +120,50 @@ class ZipFile:
     compresslevel: int | None  # undocumented
     mode: _ZipFileMode  # undocumented
     pwd: bytes | None  # undocumented
+    # metadata_encoding is new in 3.11
     if sys.version_info >= (3, 11):
         @overload
         def __init__(
             self,
             file: StrPath | IO[bytes],
+            mode: _ZipFileMode = "r",
+            compression: int = 0,
+            allowZip64: bool = True,
+            compresslevel: int | None = None,
+            *,
+            strict_timestamps: bool = True,
+            metadata_encoding: str | None = None,
+        ) -> None: ...
+        # metadata_encoding is only allowed for read mode
+        @overload
+        def __init__(
+            self,
+            file: StrPath | _ZipReadable,
             mode: Literal["r"] = "r",
             compression: int = 0,
             allowZip64: bool = True,
             compresslevel: int | None = None,
             *,
             strict_timestamps: bool = True,
-            metadata_encoding: str | None,
+            metadata_encoding: str | None = None,
         ) -> None: ...
         @overload
         def __init__(
             self,
-            file: StrPath | IO[bytes],
-            mode: _ZipFileMode = "r",
+            file: StrPath | _ZipWritable,
+            mode: Literal["w", "x"] = ...,
+            compression: int = 0,
+            allowZip64: bool = True,
+            compresslevel: int | None = None,
+            *,
+            strict_timestamps: bool = True,
+            metadata_encoding: None = None,
+        ) -> None: ...
+        @overload
+        def __init__(
+            self,
+            file: StrPath | _ZipReadableTellable,
+            mode: Literal["a"] = ...,
             compression: int = 0,
             allowZip64: bool = True,
             compresslevel: int | None = None,
@@ -132,10 +172,44 @@ class ZipFile:
             metadata_encoding: None = None,
         ) -> None: ...
     else:
+        @overload
         def __init__(
             self,
             file: StrPath | IO[bytes],
             mode: _ZipFileMode = "r",
+            compression: int = 0,
+            allowZip64: bool = True,
+            compresslevel: int | None = None,
+            *,
+            strict_timestamps: bool = True,
+        ) -> None: ...
+        @overload
+        def __init__(
+            self,
+            file: StrPath | _ZipReadable,
+            mode: Literal["r"] = "r",
+            compression: int = 0,
+            allowZip64: bool = True,
+            compresslevel: int | None = None,
+            *,
+            strict_timestamps: bool = True,
+        ) -> None: ...
+        @overload
+        def __init__(
+            self,
+            file: StrPath | _ZipWritable,
+            mode: Literal["w", "x"] = ...,
+            compression: int = 0,
+            allowZip64: bool = True,
+            compresslevel: int | None = None,
+            *,
+            strict_timestamps: bool = True,
+        ) -> None: ...
+        @overload
+        def __init__(
+            self,
+            file: StrPath | _ZipReadableTellable,
+            mode: Literal["a"] = ...,
             compression: int = 0,
             allowZip64: bool = True,
             compresslevel: int | None = None,
@@ -230,6 +304,7 @@ else:
 
     class Path:
         root: CompleteDirs
+        at: str
         def __init__(self, root: ZipFile | StrPath | IO[bytes], at: str = "") -> None: ...
         @property
         def name(self) -> str: ...

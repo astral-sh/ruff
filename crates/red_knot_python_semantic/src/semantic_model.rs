@@ -1,7 +1,7 @@
 use ruff_db::files::{File, FilePath};
 use ruff_db::source::line_index;
 use ruff_python_ast as ast;
-use ruff_python_ast::{Expr, ExpressionRef, StmtClassDef};
+use ruff_python_ast::{Expr, ExpressionRef};
 use ruff_source_file::LineIndex;
 
 use crate::module_name::ModuleName;
@@ -147,29 +147,24 @@ impl HasTy for ast::Expr {
     }
 }
 
-impl HasTy for ast::StmtFunctionDef {
-    fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
-        let index = semantic_index(model.db, model.file);
-        let definition = index.definition(self);
-        definition_ty(model.db, definition)
-    }
+macro_rules! impl_definition_has_ty {
+    ($ty: ty) => {
+        impl HasTy for $ty {
+            #[inline]
+            fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
+                let index = semantic_index(model.db, model.file);
+                let definition = index.definition(self);
+                definition_ty(model.db, definition)
+            }
+        }
+    };
 }
 
-impl HasTy for StmtClassDef {
-    fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
-        let index = semantic_index(model.db, model.file);
-        let definition = index.definition(self);
-        definition_ty(model.db, definition)
-    }
-}
-
-impl HasTy for ast::Alias {
-    fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
-        let index = semantic_index(model.db, model.file);
-        let definition = index.definition(self);
-        definition_ty(model.db, definition)
-    }
-}
+impl_definition_has_ty!(ast::StmtFunctionDef);
+impl_definition_has_ty!(ast::StmtClassDef);
+impl_definition_has_ty!(ast::Alias);
+impl_definition_has_ty!(ast::Parameter);
+impl_definition_has_ty!(ast::ParameterWithDefault);
 
 #[cfg(test)]
 mod tests {
@@ -189,14 +184,9 @@ mod tests {
 
         Program::from_settings(
             &db,
-            ProgramSettings {
+            &ProgramSettings {
                 target_version: PythonVersion::default(),
-                search_paths: SearchPathSettings {
-                    extra_paths: vec![],
-                    src_root: SystemPathBuf::from("/src"),
-                    site_packages: vec![],
-                    custom_typeshed: None,
-                },
+                search_paths: SearchPathSettings::new(SystemPathBuf::from("/src")),
             },
         )?;
 

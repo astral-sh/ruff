@@ -39,12 +39,17 @@ impl<'db> Definition<'db> {
 pub(crate) enum DefinitionNodeRef<'a> {
     Import(&'a ast::Alias),
     ImportFrom(ImportFromDefinitionNodeRef<'a>),
+    For(ForStmtDefinitionNodeRef<'a>),
     Function(&'a ast::StmtFunctionDef),
     Class(&'a ast::StmtClassDef),
     NamedExpression(&'a ast::ExprNamed),
     Assignment(AssignmentDefinitionNodeRef<'a>),
     AnnotatedAssignment(&'a ast::StmtAnnAssign),
+    AugmentedAssignment(&'a ast::StmtAugAssign),
     Comprehension(ComprehensionDefinitionNodeRef<'a>),
+    Parameter(ast::AnyParameterRef<'a>),
+    WithItem(WithItemDefinitionNodeRef<'a>),
+    MatchPattern(MatchPatternDefinitionNodeRef<'a>),
 }
 
 impl<'a> From<&'a ast::StmtFunctionDef> for DefinitionNodeRef<'a> {
@@ -71,6 +76,12 @@ impl<'a> From<&'a ast::StmtAnnAssign> for DefinitionNodeRef<'a> {
     }
 }
 
+impl<'a> From<&'a ast::StmtAugAssign> for DefinitionNodeRef<'a> {
+    fn from(node: &'a ast::StmtAugAssign) -> Self {
+        Self::AugmentedAssignment(node)
+    }
+}
+
 impl<'a> From<&'a ast::Alias> for DefinitionNodeRef<'a> {
     fn from(node_ref: &'a ast::Alias) -> Self {
         Self::Import(node_ref)
@@ -83,15 +94,39 @@ impl<'a> From<ImportFromDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
     }
 }
 
+impl<'a> From<ForStmtDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
+    fn from(value: ForStmtDefinitionNodeRef<'a>) -> Self {
+        Self::For(value)
+    }
+}
+
 impl<'a> From<AssignmentDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
     fn from(node_ref: AssignmentDefinitionNodeRef<'a>) -> Self {
         Self::Assignment(node_ref)
     }
 }
 
+impl<'a> From<WithItemDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
+    fn from(node_ref: WithItemDefinitionNodeRef<'a>) -> Self {
+        Self::WithItem(node_ref)
+    }
+}
+
 impl<'a> From<ComprehensionDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
     fn from(node: ComprehensionDefinitionNodeRef<'a>) -> Self {
         Self::Comprehension(node)
+    }
+}
+
+impl<'a> From<ast::AnyParameterRef<'a>> for DefinitionNodeRef<'a> {
+    fn from(node: ast::AnyParameterRef<'a>) -> Self {
+        Self::Parameter(node)
+    }
+}
+
+impl<'a> From<MatchPatternDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
+    fn from(node: MatchPatternDefinitionNodeRef<'a>) -> Self {
+        Self::MatchPattern(node)
     }
 }
 
@@ -108,9 +143,32 @@ pub(crate) struct AssignmentDefinitionNodeRef<'a> {
 }
 
 #[derive(Copy, Clone, Debug)]
+pub(crate) struct WithItemDefinitionNodeRef<'a> {
+    pub(crate) node: &'a ast::WithItem,
+    pub(crate) target: &'a ast::ExprName,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct ForStmtDefinitionNodeRef<'a> {
+    pub(crate) iterable: &'a ast::Expr,
+    pub(crate) target: &'a ast::ExprName,
+}
+
+#[derive(Copy, Clone, Debug)]
 pub(crate) struct ComprehensionDefinitionNodeRef<'a> {
     pub(crate) node: &'a ast::Comprehension,
     pub(crate) first: bool,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct MatchPatternDefinitionNodeRef<'a> {
+    /// The outermost pattern node in which the identifier being defined occurs.
+    pub(crate) pattern: &'a ast::Pattern,
+    /// The identifier being defined.
+    pub(crate) identifier: &'a ast::Identifier,
+    /// The index of the identifier in the pattern when visiting the `pattern` node in evaluation
+    /// order.
+    pub(crate) index: u32,
 }
 
 impl DefinitionNodeRef<'_> {
@@ -144,12 +202,44 @@ impl DefinitionNodeRef<'_> {
             DefinitionNodeRef::AnnotatedAssignment(assign) => {
                 DefinitionKind::AnnotatedAssignment(AstNodeRef::new(parsed, assign))
             }
+            DefinitionNodeRef::AugmentedAssignment(augmented_assignment) => {
+                DefinitionKind::AugmentedAssignment(AstNodeRef::new(parsed, augmented_assignment))
+            }
+            DefinitionNodeRef::For(ForStmtDefinitionNodeRef { iterable, target }) => {
+                DefinitionKind::For(ForStmtDefinitionKind {
+                    iterable: AstNodeRef::new(parsed.clone(), iterable),
+                    target: AstNodeRef::new(parsed, target),
+                })
+            }
             DefinitionNodeRef::Comprehension(ComprehensionDefinitionNodeRef { node, first }) => {
                 DefinitionKind::Comprehension(ComprehensionDefinitionKind {
                     node: AstNodeRef::new(parsed, node),
                     first,
                 })
             }
+            DefinitionNodeRef::Parameter(parameter) => match parameter {
+                ast::AnyParameterRef::Variadic(parameter) => {
+                    DefinitionKind::Parameter(AstNodeRef::new(parsed, parameter))
+                }
+                ast::AnyParameterRef::NonVariadic(parameter) => {
+                    DefinitionKind::ParameterWithDefault(AstNodeRef::new(parsed, parameter))
+                }
+            },
+            DefinitionNodeRef::WithItem(WithItemDefinitionNodeRef { node, target }) => {
+                DefinitionKind::WithItem(WithItemDefinitionKind {
+                    node: AstNodeRef::new(parsed.clone(), node),
+                    target: AstNodeRef::new(parsed, target),
+                })
+            }
+            DefinitionNodeRef::MatchPattern(MatchPatternDefinitionNodeRef {
+                pattern,
+                identifier,
+                index,
+            }) => DefinitionKind::MatchPattern(MatchPatternDefinitionKind {
+                pattern: AstNodeRef::new(parsed.clone(), pattern),
+                identifier: AstNodeRef::new(parsed, identifier),
+                index,
+            }),
         }
     }
 
@@ -167,7 +257,20 @@ impl DefinitionNodeRef<'_> {
                 target,
             }) => target.into(),
             Self::AnnotatedAssignment(node) => node.into(),
+            Self::AugmentedAssignment(node) => node.into(),
+            Self::For(ForStmtDefinitionNodeRef {
+                iterable: _,
+                target,
+            }) => target.into(),
             Self::Comprehension(ComprehensionDefinitionNodeRef { node, first: _ }) => node.into(),
+            Self::Parameter(node) => match node {
+                ast::AnyParameterRef::Variadic(parameter) => parameter.into(),
+                ast::AnyParameterRef::NonVariadic(parameter) => parameter.into(),
+            },
+            Self::WithItem(WithItemDefinitionNodeRef { node: _, target }) => target.into(),
+            Self::MatchPattern(MatchPatternDefinitionNodeRef { identifier, .. }) => {
+                identifier.into()
+            }
         }
     }
 }
@@ -181,7 +284,31 @@ pub enum DefinitionKind {
     NamedExpression(AstNodeRef<ast::ExprNamed>),
     Assignment(AssignmentDefinitionKind),
     AnnotatedAssignment(AstNodeRef<ast::StmtAnnAssign>),
+    AugmentedAssignment(AstNodeRef<ast::StmtAugAssign>),
+    For(ForStmtDefinitionKind),
     Comprehension(ComprehensionDefinitionKind),
+    Parameter(AstNodeRef<ast::Parameter>),
+    ParameterWithDefault(AstNodeRef<ast::ParameterWithDefault>),
+    WithItem(WithItemDefinitionKind),
+    MatchPattern(MatchPatternDefinitionKind),
+}
+
+#[derive(Clone, Debug)]
+#[allow(dead_code)]
+pub struct MatchPatternDefinitionKind {
+    pattern: AstNodeRef<ast::Pattern>,
+    identifier: AstNodeRef<ast::Identifier>,
+    index: u32,
+}
+
+impl MatchPatternDefinitionKind {
+    pub(crate) fn pattern(&self) -> &ast::Pattern {
+        self.pattern.node()
+    }
+
+    pub(crate) fn index(&self) -> u32 {
+        self.index
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -217,7 +344,6 @@ impl ImportFromDefinitionKind {
 }
 
 #[derive(Clone, Debug)]
-#[allow(dead_code)]
 pub struct AssignmentDefinitionKind {
     assignment: AstNodeRef<ast::StmtAssign>,
     target: AstNodeRef<ast::ExprName>,
@@ -226,6 +352,42 @@ pub struct AssignmentDefinitionKind {
 impl AssignmentDefinitionKind {
     pub(crate) fn assignment(&self) -> &ast::StmtAssign {
         self.assignment.node()
+    }
+
+    pub(crate) fn target(&self) -> &ast::ExprName {
+        self.target.node()
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct WithItemDefinitionKind {
+    node: AstNodeRef<ast::WithItem>,
+    target: AstNodeRef<ast::ExprName>,
+}
+
+impl WithItemDefinitionKind {
+    pub(crate) fn node(&self) -> &ast::WithItem {
+        self.node.node()
+    }
+
+    pub(crate) fn target(&self) -> &ast::ExprName {
+        self.target.node()
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ForStmtDefinitionKind {
+    iterable: AstNodeRef<ast::Expr>,
+    target: AstNodeRef<ast::ExprName>,
+}
+
+impl ForStmtDefinitionKind {
+    pub(crate) fn iterable(&self) -> &ast::Expr {
+        self.iterable.node()
+    }
+
+    pub(crate) fn target(&self) -> &ast::ExprName {
+        self.target.node()
     }
 }
 
@@ -268,8 +430,38 @@ impl From<&ast::StmtAnnAssign> for DefinitionNodeKey {
     }
 }
 
+impl From<&ast::StmtAugAssign> for DefinitionNodeKey {
+    fn from(node: &ast::StmtAugAssign) -> Self {
+        Self(NodeKey::from_node(node))
+    }
+}
+
+impl From<&ast::StmtFor> for DefinitionNodeKey {
+    fn from(value: &ast::StmtFor) -> Self {
+        Self(NodeKey::from_node(value))
+    }
+}
+
 impl From<&ast::Comprehension> for DefinitionNodeKey {
     fn from(node: &ast::Comprehension) -> Self {
         Self(NodeKey::from_node(node))
+    }
+}
+
+impl From<&ast::Parameter> for DefinitionNodeKey {
+    fn from(node: &ast::Parameter) -> Self {
+        Self(NodeKey::from_node(node))
+    }
+}
+
+impl From<&ast::ParameterWithDefault> for DefinitionNodeKey {
+    fn from(node: &ast::ParameterWithDefault) -> Self {
+        Self(NodeKey::from_node(node))
+    }
+}
+
+impl From<&ast::Identifier> for DefinitionNodeKey {
+    fn from(identifier: &ast::Identifier) -> Self {
+        Self(NodeKey::from_node(identifier))
     }
 }

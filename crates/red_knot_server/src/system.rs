@@ -8,25 +8,38 @@ use ruff_db::file_revision::FileRevision;
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
     DirectoryEntry, FileType, Metadata, OsSystem, Result, System, SystemPath, SystemPathBuf,
-    SystemVirtualPath,
+    SystemVirtualPath, SystemVirtualPathBuf,
 };
 use ruff_notebook::{Notebook, NotebookError};
 
 use crate::session::index::Index;
 use crate::DocumentQuery;
 
-/// Converts the given [`Url`] to a [`SystemPathBuf`].
+/// Converts the given [`Url`] to an [`AnySystemPath`].
+///
+/// If the URL scheme is `file`, then the path is converted to a [`SystemPathBuf`]. Otherwise, the
+/// URL is converted to a [`SystemVirtualPathBuf`].
 ///
 /// This fails in the following cases:
-/// * The URL scheme is not `file`.
 /// * The URL cannot be converted to a file path (refer to [`Url::to_file_path`]).
 /// * If the URL is not a valid UTF-8 string.
-pub(crate) fn url_to_system_path(url: &Url) -> std::result::Result<SystemPathBuf, ()> {
+pub(crate) fn url_to_any_system_path(url: &Url) -> std::result::Result<AnySystemPath, ()> {
     if url.scheme() == "file" {
-        Ok(SystemPathBuf::from_path_buf(url.to_file_path()?).map_err(|_| ())?)
+        Ok(AnySystemPath::System(
+            SystemPathBuf::from_path_buf(url.to_file_path()?).map_err(|_| ())?,
+        ))
     } else {
-        Err(())
+        Ok(AnySystemPath::SystemVirtual(
+            SystemVirtualPath::new(url.as_str()).to_path_buf(),
+        ))
     }
+}
+
+/// Represents either a [`SystemPath`] or a [`SystemVirtualPath`].
+#[derive(Debug)]
+pub(crate) enum AnySystemPath {
+    System(SystemPathBuf),
+    SystemVirtual(SystemVirtualPathBuf),
 }
 
 #[derive(Debug)]
@@ -142,19 +155,6 @@ impl System for LSPSystem {
             Some(DocumentQuery::Notebook { notebook, .. }) => Ok(notebook.make_ruff_notebook()),
             None => self.os_system.read_to_notebook(path),
         }
-    }
-
-    fn virtual_path_metadata(&self, path: &SystemVirtualPath) -> Result<Metadata> {
-        // Virtual paths only exists in the LSP system, so we don't need to check the OS system.
-        let document = self
-            .system_virtual_path_to_document_ref(path)?
-            .ok_or_else(|| virtual_path_not_found(path))?;
-
-        Ok(Metadata::new(
-            document_revision(&document),
-            None,
-            FileType::File,
-        ))
     }
 
     fn read_virtual_path_to_string(&self, path: &SystemVirtualPath) -> Result<String> {

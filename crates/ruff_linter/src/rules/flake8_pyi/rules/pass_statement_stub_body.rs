@@ -13,12 +13,12 @@ use crate::checkers::ast::Checker;
 /// in stub files.
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// def foo(bar: int) -> list[int]: pass
 /// ```
 ///
 /// Use instead:
-/// ```python
+/// ```pyi
 /// def foo(bar: int) -> list[int]: ...
 /// ```
 ///

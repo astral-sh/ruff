@@ -1,5 +1,3 @@
-use std::fmt;
-
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -20,6 +18,7 @@ use crate::registry::Rule;
 
 use super::helpers::{
     get_mark_decorators, is_pytest_fixture, is_pytest_yield_fixture, keyword_is_literal,
+    Parentheses,
 };
 
 /// ## What it does
@@ -32,22 +31,11 @@ use super::helpers::{
 /// optional.
 ///
 /// Either removing those unnecessary parentheses _or_ requiring them for all
-/// fixtures is fine, but it's best to be consistent.
-///
-/// In [preview], this rule defaults to removing unnecessary parentheses, to match
-/// the behavior of official pytest projects.
+/// fixtures is fine, but it's best to be consistent. The rule defaults to
+/// removing unnecessary parentheses, to match the documentation of the
+/// official pytest projects.
 ///
 /// ## Example
-///
-/// ```python
-/// import pytest
-///
-///
-/// @pytest.fixture
-/// def my_fixture(): ...
-/// ```
-///
-/// Use instead:
 ///
 /// ```python
 /// import pytest
@@ -57,13 +45,21 @@ use super::helpers::{
 /// def my_fixture(): ...
 /// ```
 ///
+/// Use instead:
+///
+/// ```python
+/// import pytest
+///
+///
+/// @pytest.fixture
+/// def my_fixture(): ...
+/// ```
+///
 /// ## Options
 /// - `lint.flake8-pytest-style.fixture-parentheses`
 ///
 /// ## References
 /// - [`pytest` documentation: API Reference: Fixtures](https://docs.pytest.org/en/latest/reference/reference.html#fixtures-api)
-///
-/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct PytestFixtureIncorrectParenthesesStyle {
     expected: Parentheses,
@@ -170,6 +166,10 @@ impl AlwaysFixableViolation for PytestExtraneousScopeFunction {
     }
 }
 
+/// ## Deprecation
+/// Marking fixtures that do not return a value with an underscore
+/// isn't a practice recommended by the pytest community.
+///
 /// ## What it does
 /// Checks for `pytest` fixtures that do not return a value, but are not named
 /// with a leading underscore.
@@ -227,6 +227,10 @@ impl Violation for PytestMissingFixtureNameUnderscore {
     }
 }
 
+/// ## Deprecation
+/// Marking fixtures that do not return a value with an underscore
+/// isn't a practice recommended by the pytest community.
+///
 /// ## What it does
 /// Checks for `pytest` fixtures that return a value, but are named with a
 /// leading underscore.
@@ -600,21 +604,6 @@ impl AlwaysFixableViolation for PytestUnnecessaryAsyncioMarkOnFixture {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
-enum Parentheses {
-    None,
-    Empty,
-}
-
-impl fmt::Display for Parentheses {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Parentheses::None => fmt.write_str(""),
-            Parentheses::Empty => fmt.write_str("()"),
-        }
-    }
-}
-
 /// Visitor that skips functions
 #[derive(Debug, Default)]
 struct SkipFunctionsVisitor<'a> {
@@ -930,9 +919,7 @@ pub(crate) fn fixture(
             check_fixture_decorator(checker, name, decorator);
         }
 
-        if checker.enabled(Rule::PytestDeprecatedYieldFixture)
-            && checker.settings.flake8_pytest_style.fixture_parentheses
-        {
+        if checker.enabled(Rule::PytestDeprecatedYieldFixture) {
             check_fixture_decorator_name(checker, decorator);
         }
 

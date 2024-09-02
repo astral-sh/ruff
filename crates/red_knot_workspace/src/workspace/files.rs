@@ -1,4 +1,4 @@
-use std::iter::FusedIterator;
+use std::marker::PhantomData;
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -10,6 +10,9 @@ use ruff_db::files::File;
 use crate::db::Db;
 use crate::workspace::Package;
 
+/// Cheap cloneable hash set of files.
+type FileSet = Arc<FxHashSet<File>>;
+
 /// The indexed files of a package.
 ///
 /// The indexing happens lazily, but the files are then cached for subsequent reads.
@@ -18,7 +21,7 @@ use crate::workspace::Package;
 /// The implementation uses internal mutability to transition between the lazy and indexed state
 /// without triggering a new salsa revision. This is safe because the initial indexing happens on first access,
 /// so no query can be depending on the contents of the indexed files before that. All subsequent mutations to
-/// the indexed files must go through `IndexedFilesMut`, which uses the Salsa setter `package.set_file_set` to
+/// the indexed files must go through `IndexedMut`, which uses the Salsa setter `package.set_file_set` to
 /// ensure that Salsa always knows when the set of indexed files have changed.
 #[derive(Debug)]
 pub struct PackageFiles {
@@ -32,46 +35,67 @@ impl PackageFiles {
         }
     }
 
-    fn indexed(indexed_files: IndexedFiles) -> Self {
+    fn indexed(files: FileSet) -> Self {
         Self {
-            state: std::sync::Mutex::new(State::Indexed(indexed_files)),
+            state: std::sync::Mutex::new(State::Indexed(files)),
         }
     }
 
-    pub fn get(&self) -> Index {
+    pub(super) fn get(&self) -> Index {
         let state = self.state.lock().unwrap();
 
         match &*state {
             State::Lazy => Index::Lazy(LazyFiles { files: state }),
-            State::Indexed(files) => Index::Indexed(files.clone()),
+            State::Indexed(files) => Index::Indexed(Indexed {
+                files: Arc::clone(files),
+                _lifetime: PhantomData,
+            }),
         }
     }
 
-    pub fn is_lazy(&self) -> bool {
+    pub(super) fn is_lazy(&self) -> bool {
         matches!(*self.state.lock().unwrap(), State::Lazy)
     }
 
     /// Returns a mutable view on the index that allows cheap in-place mutations.
     ///
     /// The changes are automatically written back to the database once the view is dropped.
-    pub fn indexed_mut(db: &mut dyn Db, package: Package) -> Option<IndexedFilesMut> {
+    pub(super) fn indexed_mut(db: &mut dyn Db, package: Package) -> Option<IndexedMut> {
         // Calling `zalsa_mut` cancels all pending salsa queries. This ensures that there are no pending
         // reads to the file set.
         // TODO: Use a non-internal API instead https://salsa.zulipchat.com/#narrow/stream/333573-salsa-3.2E0/topic/Expose.20an.20API.20to.20cancel.20other.20queries
         let _ = db.as_dyn_database_mut().zalsa_mut();
 
-        let files = package.file_set(db);
-
-        let indexed = match &*files.state.lock().unwrap() {
-            State::Lazy => return None,
-            State::Indexed(indexed) => indexed.clone(),
+        // Replace the state with lazy. The `IndexedMut` guard restores the state
+        // to `State::Indexed`  or sets a new `PackageFiles` when it gets dropped to ensure the state
+        // is restored to how it has been before replacing the value.
+        //
+        // It isn't necessary to hold on to the lock after this point:
+        // * The above call to `zalsa_mut` guarantees that there's exactly **one** DB reference.
+        // * `Indexed` has a `'db` lifetime, and this method requires a `&mut db`.
+        //   This means that there can't be any pending reference to `Indexed` because Rust
+        //   doesn't allow borrowing `db` as mutable (to call this method) and immutable (`Indexed<'db>`) at the same time.
+        //   There can't be any other `Indexed<'db>` references created by clones of this DB because
+        //   all clones must have been dropped at this point and the `Indexed`
+        //   can't outlive the database (constrained by the `db` lifetime).
+        let state = {
+            let files = package.file_set(db);
+            let mut locked = files.state.lock().unwrap();
+            std::mem::replace(&mut *locked, State::Lazy)
         };
 
-        Some(IndexedFilesMut {
+        let indexed = match state {
+            // If it's already lazy, just return. We also don't need to restore anything because the
+            // replace above was a no-op.
+            State::Lazy => return None,
+            State::Indexed(indexed) => indexed,
+        };
+
+        Some(IndexedMut {
             db: Some(db),
             package,
-            new_revision: indexed.revision,
-            indexed,
+            files: indexed,
+            did_change: false,
         })
     }
 }
@@ -88,152 +112,95 @@ enum State {
     Lazy,
 
     /// The files are indexed. Stores the known files of a package.
-    Indexed(IndexedFiles),
+    Indexed(FileSet),
 }
 
-pub enum Index<'a> {
+pub(super) enum Index<'db> {
     /// The index has not yet been computed. Allows inserting the files.
-    Lazy(LazyFiles<'a>),
+    Lazy(LazyFiles<'db>),
 
-    Indexed(IndexedFiles),
+    Indexed(Indexed<'db>),
 }
 
 /// Package files that have not been indexed yet.
-pub struct LazyFiles<'a> {
-    files: std::sync::MutexGuard<'a, State>,
+pub(super) struct LazyFiles<'db> {
+    files: std::sync::MutexGuard<'db, State>,
 }
 
-impl<'a> LazyFiles<'a> {
+impl<'db> LazyFiles<'db> {
     /// Sets the indexed files of a package to `files`.
-    pub fn set(mut self, files: FxHashSet<File>) -> IndexedFiles {
-        let files = IndexedFiles::new(files);
-        *self.files = State::Indexed(files.clone());
+    pub(super) fn set(mut self, files: FxHashSet<File>) -> Indexed<'db> {
+        let files = Indexed {
+            files: Arc::new(files),
+            _lifetime: PhantomData,
+        };
+        *self.files = State::Indexed(Arc::clone(&files.files));
         files
     }
 }
 
 /// The indexed files of a package.
 ///
-/// # Salsa integration
-/// The type is cheap clonable and allows for in-place mutation of the files. The in-place mutation requires
-/// extra care because the type is used as the result of Salsa queries and Salsa relies on a type's equality
-/// to determine if the output has changed. This is accomplished by using a `revision` that gets incremented
-/// whenever the files are changed. The revision ensures that salsa's comparison of the
-/// previous [`IndexedFiles`] with the next [`IndexedFiles`] returns false even though they both
-/// point to the same underlying hash set.
-///
-/// # Equality
-/// Two [`IndexedFiles`] are only equal if they have the same revision and point to the **same** (identity) hash set.
-#[derive(Debug, Clone)]
-pub struct IndexedFiles {
-    revision: u64,
-    files: Arc<std::sync::Mutex<FxHashSet<File>>>,
+/// Note: This type is intentionally non-cloneable. Making it cloneable requires
+/// revisiting the locking behavior in [`PackageFiles::indexed_mut`].
+#[derive(Debug, PartialEq, Eq)]
+pub struct Indexed<'db> {
+    files: FileSet,
+    // Preserve the lifetime of `PackageFiles`.
+    _lifetime: PhantomData<&'db ()>,
 }
 
-impl IndexedFiles {
-    fn new(files: FxHashSet<File>) -> Self {
-        Self {
-            files: Arc::new(std::sync::Mutex::new(files)),
-            revision: 0,
-        }
-    }
-
-    /// Locks the file index for reading.
-    pub fn read(&self) -> IndexedFilesGuard {
-        IndexedFilesGuard {
-            guard: self.files.lock().unwrap(),
-        }
-    }
-}
-
-impl PartialEq for IndexedFiles {
-    fn eq(&self, other: &Self) -> bool {
-        self.revision == other.revision && Arc::ptr_eq(&self.files, &other.files)
-    }
-}
-
-impl Eq for IndexedFiles {}
-
-pub struct IndexedFilesGuard<'a> {
-    guard: std::sync::MutexGuard<'a, FxHashSet<File>>,
-}
-
-impl Deref for IndexedFilesGuard<'_> {
+impl Deref for Indexed<'_> {
     type Target = FxHashSet<File>;
 
     fn deref(&self) -> &Self::Target {
-        &self.guard
+        &self.files
     }
 }
 
-impl<'a> IntoIterator for &'a IndexedFilesGuard<'a> {
+pub(super) type IndexedIter<'a> = std::iter::Copied<std::collections::hash_set::Iter<'a, File>>;
+
+impl<'a> IntoIterator for &'a Indexed<'_> {
     type Item = File;
-    type IntoIter = IndexedFilesIter<'a>;
+    type IntoIter = IndexedIter<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        IndexedFilesIter {
-            inner: self.guard.iter(),
-        }
+        self.files.iter().copied()
     }
 }
-
-/// Iterator over the indexed files.
-///
-/// # Locks
-/// Holding on to the iterator locks the file index for reading.
-pub struct IndexedFilesIter<'a> {
-    inner: std::collections::hash_set::Iter<'a, File>,
-}
-
-impl<'a> Iterator for IndexedFilesIter<'a> {
-    type Item = File;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next().copied()
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.inner.size_hint()
-    }
-}
-
-impl FusedIterator for IndexedFilesIter<'_> {}
-
-impl ExactSizeIterator for IndexedFilesIter<'_> {}
 
 /// A Mutable view of a package's indexed files.
 ///
 /// Allows in-place mutation of the files without deep cloning the hash set.
 /// The changes are written back when the mutable view is dropped or by calling [`Self::set`] manually.
-pub struct IndexedFilesMut<'db> {
+pub(super) struct IndexedMut<'db> {
     db: Option<&'db mut dyn Db>,
     package: Package,
-    indexed: IndexedFiles,
-    new_revision: u64,
+    files: FileSet,
+    did_change: bool,
 }
 
-impl IndexedFilesMut<'_> {
-    pub fn insert(&mut self, file: File) -> bool {
-        if self.indexed.files.lock().unwrap().insert(file) {
-            self.new_revision += 1;
+impl IndexedMut<'_> {
+    pub(super) fn insert(&mut self, file: File) -> bool {
+        if self.files_mut().insert(file) {
+            self.did_change = true;
             true
         } else {
             false
         }
     }
 
-    pub fn remove(&mut self, file: File) -> bool {
-        if self.indexed.files.lock().unwrap().remove(&file) {
-            self.new_revision += 1;
+    pub(super) fn remove(&mut self, file: File) -> bool {
+        if self.files_mut().remove(&file) {
+            self.did_change = true;
             true
         } else {
             false
         }
     }
 
-    /// Writes the changes back to the database.
-    pub fn set(mut self) {
-        self.set_impl();
+    fn files_mut(&mut self) -> &mut FxHashSet<File> {
+        Arc::get_mut(&mut self.files).expect("All references to `FilesSet` to have been dropped")
     }
 
     fn set_impl(&mut self) {
@@ -241,19 +208,70 @@ impl IndexedFilesMut<'_> {
             return;
         };
 
-        if self.indexed.revision != self.new_revision {
+        let files = Arc::clone(&self.files);
+
+        if self.did_change {
+            // If there are changes, set the new file_set to trigger a salsa revision change.
             self.package
                 .set_file_set(db)
-                .to(PackageFiles::indexed(IndexedFiles {
-                    revision: self.new_revision,
-                    files: self.indexed.files.clone(),
-                }));
+                .to(PackageFiles::indexed(files));
+        } else {
+            // The `indexed_mut` replaced the `state` with Lazy. Restore it back to the indexed state.
+            *self.package.file_set(db).state.lock().unwrap() = State::Indexed(files);
         }
     }
 }
 
-impl Drop for IndexedFilesMut<'_> {
+impl Drop for IndexedMut<'_> {
     fn drop(&mut self) {
         self.set_impl();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use rustc_hash::FxHashSet;
+
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+    use ruff_python_ast::name::Name;
+
+    use crate::db::tests::TestDb;
+    use crate::workspace::files::Index;
+    use crate::workspace::Package;
+
+    #[test]
+    fn re_entrance() -> anyhow::Result<()> {
+        let mut db = TestDb::new();
+
+        db.write_file("test.py", "")?;
+
+        let package = Package::new(&db, Name::new("test"), SystemPathBuf::from("/test"));
+
+        let file = system_path_to_file(&db, "test.py").unwrap();
+
+        let files = match package.file_set(&db).get() {
+            Index::Lazy(lazy) => lazy.set(FxHashSet::from_iter([file])),
+            Index::Indexed(files) => files,
+        };
+
+        // Calling files a second time should not dead-lock.
+        // This can e.g. happen when `check_file` iterates over all files and
+        // `is_file_open` queries the open files.
+        let files_2 = package.file_set(&db).get();
+
+        match files_2 {
+            Index::Lazy(_) => {
+                panic!("Expected indexed files, got lazy files");
+            }
+            Index::Indexed(files_2) => {
+                assert_eq!(
+                    files_2.iter().collect::<Vec<_>>(),
+                    files.iter().collect::<Vec<_>>()
+                );
+            }
+        }
+
+        Ok(())
     }
 }

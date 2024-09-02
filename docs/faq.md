@@ -103,13 +103,7 @@ conflicts with the isort rules, like `I001`).
 
 Beyond the rule set, Ruff's primary limitation vis-à-vis Flake8 is that it does not support custom
 lint rules. (Instead, popular Flake8 plugins are re-implemented in Rust as part of Ruff itself.)
-
-There are a few other minor incompatibilities between Ruff and the originating Flake8 plugins:
-
-- Ruff doesn't implement all the "opinionated" lint rules from flake8-bugbear.
-- Depending on your project structure, Ruff and isort can differ in their detection of first-party
-    code. (This is often solved by modifying the `src` property, e.g., to `src = ["src"]`, if your
-    code is nested in a `src` directory.)
+One minor difference is that Ruff doesn't include all the 'opinionated' rules from flake8-bugbear.
 
 ## How does Ruff's linter compare to Pylint?
 
@@ -292,13 +286,14 @@ When Ruff sees an import like `import foo`, it will then iterate over the `src` 
 looking for a corresponding Python module (in reality, a directory named `foo` or a file named
 `foo.py`).
 
-If the `src` field is omitted, Ruff will default to using the "project root" as the only
-first-party source. The "project root" is typically the directory containing your `pyproject.toml`,
-`ruff.toml`, or `.ruff.toml` file, unless a configuration file is provided on the command-line via
-the `--config` option, in which case, the current working directory is used as the project root.
+If the `src` field is omitted, Ruff will default to using the "project root", along with a `"src"`
+subdirectory, as the first-party sources, to support both flat and nested project layouts.
+The "project root" is typically the directory containing your `pyproject.toml`, `ruff.toml`, or
+`.ruff.toml` file, unless a configuration file is provided on the command-line via the `--config`
+option, in which case, the current working directory is used as the project root.
 
-In this case, Ruff would only check the top-level directory. Instead, we can configure Ruff to
-consider `src` as a first-party source like so:
+In this case, Ruff would check the `"src"` directory by default, but we can configure it as an
+explicit, exclusive first-party source like so:
 
 === "pyproject.toml"
 
@@ -397,30 +392,8 @@ them. You can find the supported settings in the [API reference](settings.md#lin
 
 ## Does Ruff support Jupyter Notebooks?
 
-Ruff has built-in support for linting [Jupyter Notebooks](https://jupyter.org/).
-
-To opt in to linting Jupyter Notebook (`.ipynb`) files, add the `*.ipynb` pattern to your
-[`extend-include`](settings.md#extend-include) setting, like so:
-
-=== "pyproject.toml"
-
-    ```toml
-    [tool.ruff]
-    extend-include = ["*.ipynb"]
-    ```
-
-=== "ruff.toml"
-
-    ```toml
-    extend-include = ["*.ipynb"]
-    ```
-
-This will prompt Ruff to discover Jupyter Notebook (`.ipynb`) files in any specified
-directories, then lint and format them accordingly.
-
-Alternatively, pass the notebook file(s) to `ruff` on the command-line directly. For example,
-`ruff check /path/to/notebook.ipynb` will always lint `notebook.ipynb`. Similarly,
-`ruff format /path/to/notebook.ipynb` will always format `notebook.ipynb`.
+Ruff has built-in support for linting and formatting [Jupyter Notebooks](https://jupyter.org/). Refer to the
+[Jupyter Notebook section](configuration.md#jupyter-notebook-discovery) for more details.
 
 Ruff also integrates with [nbQA](https://github.com/nbQA-dev/nbQA), a tool for running linters and
 code formatters over Jupyter Notebooks.

@@ -38,3 +38,16 @@ def value_intentionally_unused():
         print(FRUITS[fruit_name])  # OK
         blah = FRUITS[fruit_name]  # OK
         assert FRUITS[fruit_name] == "pear"  # OK
+
+
+def rewrite_client_arrays(value_arrays: dict[str, list[int]]) -> dict[str, list[int]]:
+    """Function from https://github.com/zulip/zulip/blob/3da91e951cd03cfa0b9c67378224e348353f36a6/analytics/views/stats.py#L617C1-L626C25"""
+    mapped_arrays: dict[str, list[int]] = {}
+    for label, array in value_arrays.items():
+        mapped_label = client_label_map(label)
+        if mapped_label in mapped_arrays:
+            for i in range(len(array)):
+                mapped_arrays[mapped_label][i] += value_arrays[label][i]  # PLR1733
+        else:
+            mapped_arrays[mapped_label] = [value_arrays[label][i] for i in range(len(array))]  # PLR1733
+    return mapped_arrays

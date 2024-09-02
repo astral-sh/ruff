@@ -296,4 +296,202 @@ ISC.py:73:20: ISC001 [*] Implicitly concatenated string literals on one line
 75 75 |     f"def"} g"
 76 76 | 
 
+ISC.py:84:5: ISC001 [*] Implicitly concatenated string literals on one line
+   |
+83 | # See https://github.com/astral-sh/ruff/issues/12936
+84 | _ = "\12""0" # fix should be "\0120"
+   |     ^^^^^^^^ ISC001
+85 | _ = "\\12""0" # fix should be "\\120"
+86 | _ = "\\\12""0" # fix should be "\\\0120"
+   |
+   = help: Combine string literals
 
+ℹ Safe fix
+81 81 |     + f"second"} d"
+82 82 | 
+83 83 | # See https://github.com/astral-sh/ruff/issues/12936
+84    |-_ = "\12""0" # fix should be "\0120"
+   84 |+_ = "\0120" # fix should be "\0120"
+85 85 | _ = "\\12""0" # fix should be "\\120"
+86 86 | _ = "\\\12""0" # fix should be "\\\0120"
+87 87 | _ = "\12 0""0" # fix should be "\12 00"
+
+ISC.py:85:5: ISC001 [*] Implicitly concatenated string literals on one line
+   |
+83 | # See https://github.com/astral-sh/ruff/issues/12936
+84 | _ = "\12""0" # fix should be "\0120"
+85 | _ = "\\12""0" # fix should be "\\120"
+   |     ^^^^^^^^^ ISC001
+86 | _ = "\\\12""0" # fix should be "\\\0120"
+87 | _ = "\12 0""0" # fix should be "\12 00"
+   |
+   = help: Combine string literals
+
+ℹ Safe fix
+82 82 | 
+83 83 | # See https://github.com/astral-sh/ruff/issues/12936
+84 84 | _ = "\12""0" # fix should be "\0120"
+85    |-_ = "\\12""0" # fix should be "\\120"
+   85 |+_ = "\\120" # fix should be "\\120"
+86 86 | _ = "\\\12""0" # fix should be "\\\0120"
+87 87 | _ = "\12 0""0" # fix should be "\12 00"
+88 88 | _ = r"\12"r"0" # fix should be r"\120"
+
+ISC.py:86:5: ISC001 [*] Implicitly concatenated string literals on one line
+   |
+84 | _ = "\12""0" # fix should be "\0120"
+85 | _ = "\\12""0" # fix should be "\\120"
+86 | _ = "\\\12""0" # fix should be "\\\0120"
+   |     ^^^^^^^^^^ ISC001
+87 | _ = "\12 0""0" # fix should be "\12 00"
+88 | _ = r"\12"r"0" # fix should be r"\120"
+   |
+   = help: Combine string literals
+
+ℹ Safe fix
+83 83 | # See https://github.com/astral-sh/ruff/issues/12936
+84 84 | _ = "\12""0" # fix should be "\0120"
+85 85 | _ = "\\12""0" # fix should be "\\120"
+86    |-_ = "\\\12""0" # fix should be "\\\0120"
+   86 |+_ = "\\\0120" # fix should be "\\\0120"
+87 87 | _ = "\12 0""0" # fix should be "\12 00"
+88 88 | _ = r"\12"r"0" # fix should be r"\120"
+89 89 | _ = "\12 and more""0" # fix should be "\12 and more0"
+
+ISC.py:87:5: ISC001 [*] Implicitly concatenated string literals on one line
+   |
+85 | _ = "\\12""0" # fix should be "\\120"
+86 | _ = "\\\12""0" # fix should be "\\\0120"
+87 | _ = "\12 0""0" # fix should be "\12 00"
+   |     ^^^^^^^^^^ ISC001
+88 | _ = r"\12"r"0" # fix should be r"\120"
+89 | _ = "\12 and more""0" # fix should be "\12 and more0"
+   |
+   = help: Combine string literals
+
+ℹ Safe fix
+84 84 | _ = "\12""0" # fix should be "\0120"
+85 85 | _ = "\\12""0" # fix should be "\\120"
+86 86 | _ = "\\\12""0" # fix should be "\\\0120"
+87    |-_ = "\12 0""0" # fix should be "\12 00"
+   87 |+_ = "\12 00" # fix should be "\12 00"
+88 88 | _ = r"\12"r"0" # fix should be r"\120"
+89 89 | _ = "\12 and more""0" # fix should be "\12 and more0"
+90 90 | _ = "\8""0" # fix should be "\80"
+
+ISC.py:88:5: ISC001 [*] Implicitly concatenated string literals on one line
+   |
+86 | _ = "\\\12""0" # fix should be "\\\0120"
+87 | _ = "\12 0""0" # fix should be "\12 00"
+88 | _ = r"\12"r"0" # fix should be r"\120"
+   |     ^^^^^^^^^^ ISC001
+89 | _ = "\12 and more""0" # fix should be "\12 and more0"
+90 | _ = "\8""0" # fix should be "\80"
+   |
+   = help: Combine string literals
+
+ℹ Safe fix
+85 85 | _ = "\\12""0" # fix should be "\\120"
+86 86 | _ = "\\\12""0" # fix should be "\\\0120"
+87 87 | _ = "\12 0""0" # fix should be "\12 00"
+88    |-_ = r"\12"r"0" # fix should be r"\120"
+   88 |+_ = r"\120" # fix should be r"\120"
+89 89 | _ = "\12 and more""0" # fix should be "\12 and more0"
+90 90 | _ = "\8""0" # fix should be "\80"
+91 91 | _ = "\12""8" # fix should be "\128"
+
+ISC.py:89:5: ISC001 [*] Implicitly concatenated string literals on one line
+   |
+87 | _ = "\12 0""0" # fix should be "\12 00"
+88 | _ = r"\12"r"0" # fix should be r"\120"
+89 | _ = "\12 and more""0" # fix should be "\12 and more0"
+   |     ^^^^^^^^^^^^^^^^^ ISC001
+90 | _ = "\8""0" # fix should be "\80"
+91 | _ = "\12""8" # fix should be "\128"
+   |
+   = help: Combine string literals
+
+ℹ Safe fix
+86 86 | _ = "\\\12""0" # fix should be "\\\0120"
+87 87 | _ = "\12 0""0" # fix should be "\12 00"
+88 88 | _ = r"\12"r"0" # fix should be r"\120"
+89    |-_ = "\12 and more""0" # fix should be "\12 and more0"
+   89 |+_ = "\12 and more0" # fix should be "\12 and more0"
+90 90 | _ = "\8""0" # fix should be "\80"
+91 91 | _ = "\12""8" # fix should be "\128"
+92 92 | _ = "\12""foo" # fix should be "\12foo"
+
+ISC.py:90:5: ISC001 [*] Implicitly concatenated string literals on one line
+   |
+88 | _ = r"\12"r"0" # fix should be r"\120"
+89 | _ = "\12 and more""0" # fix should be "\12 and more0"
+90 | _ = "\8""0" # fix should be "\80"
+   |     ^^^^^^^ ISC001
+91 | _ = "\12""8" # fix should be "\128"
+92 | _ = "\12""foo" # fix should be "\12foo"
+   |
+   = help: Combine string literals
+
+ℹ Safe fix
+87 87 | _ = "\12 0""0" # fix should be "\12 00"
+88 88 | _ = r"\12"r"0" # fix should be r"\120"
+89 89 | _ = "\12 and more""0" # fix should be "\12 and more0"
+90    |-_ = "\8""0" # fix should be "\80"
+   90 |+_ = "\80" # fix should be "\80"
+91 91 | _ = "\12""8" # fix should be "\128"
+92 92 | _ = "\12""foo" # fix should be "\12foo"
+93 93 | _ = "\12" ""  # fix should be "\12"
+
+ISC.py:91:5: ISC001 [*] Implicitly concatenated string literals on one line
+   |
+89 | _ = "\12 and more""0" # fix should be "\12 and more0"
+90 | _ = "\8""0" # fix should be "\80"
+91 | _ = "\12""8" # fix should be "\128"
+   |     ^^^^^^^^ ISC001
+92 | _ = "\12""foo" # fix should be "\12foo"
+93 | _ = "\12" ""  # fix should be "\12"
+   |
+   = help: Combine string literals
+
+ℹ Safe fix
+88 88 | _ = r"\12"r"0" # fix should be r"\120"
+89 89 | _ = "\12 and more""0" # fix should be "\12 and more0"
+90 90 | _ = "\8""0" # fix should be "\80"
+91    |-_ = "\12""8" # fix should be "\128"
+   91 |+_ = "\128" # fix should be "\128"
+92 92 | _ = "\12""foo" # fix should be "\12foo"
+93 93 | _ = "\12" ""  # fix should be "\12"
+
+ISC.py:92:5: ISC001 [*] Implicitly concatenated string literals on one line
+   |
+90 | _ = "\8""0" # fix should be "\80"
+91 | _ = "\12""8" # fix should be "\128"
+92 | _ = "\12""foo" # fix should be "\12foo"
+   |     ^^^^^^^^^^ ISC001
+93 | _ = "\12" ""  # fix should be "\12"
+   |
+   = help: Combine string literals
+
+ℹ Safe fix
+89 89 | _ = "\12 and more""0" # fix should be "\12 and more0"
+90 90 | _ = "\8""0" # fix should be "\80"
+91 91 | _ = "\12""8" # fix should be "\128"
+92    |-_ = "\12""foo" # fix should be "\12foo"
+   92 |+_ = "\12foo" # fix should be "\12foo"
+93 93 | _ = "\12" ""  # fix should be "\12"
+
+ISC.py:93:5: ISC001 [*] Implicitly concatenated string literals on one line
+   |
+91 | _ = "\12""8" # fix should be "\128"
+92 | _ = "\12""foo" # fix should be "\12foo"
+93 | _ = "\12" ""  # fix should be "\12"
+   |     ^^^^^^^^ ISC001
+   |
+   = help: Combine string literals
+
+ℹ Safe fix
+90 90 | _ = "\8""0" # fix should be "\80"
+91 91 | _ = "\12""8" # fix should be "\128"
+92 92 | _ = "\12""foo" # fix should be "\12foo"
+93    |-_ = "\12" ""  # fix should be "\12"
+   93 |+_ = "\12"  # fix should be "\12"

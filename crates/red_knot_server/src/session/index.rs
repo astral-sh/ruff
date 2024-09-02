@@ -278,18 +278,6 @@ impl DocumentQuery {
         }
     }
 
-    /// Generate a source kind used by the linter.
-    pub(crate) fn make_source_kind(&self) -> ruff_linter::source_kind::SourceKind {
-        match self {
-            Self::Text { document, .. } => {
-                ruff_linter::source_kind::SourceKind::Python(document.contents().to_string())
-            }
-            Self::Notebook { notebook, .. } => {
-                ruff_linter::source_kind::SourceKind::IpyNotebook(notebook.make_ruff_notebook())
-            }
-        }
-    }
-
     /// Attempts to access the underlying notebook document that this query is selecting.
     pub fn as_notebook(&self) -> Option<&NotebookDocument> {
         match self {

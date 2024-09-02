@@ -6,16 +6,14 @@ import { useState } from "react";
 export type Theme = "dark" | "light";
 
 export function useTheme(): [Theme, (theme: Theme) => void] {
-  const [localTheme, setLocalTheme] = useState<Theme>(() =>
-    detectInitialTheme(),
-  );
+  const [localTheme, setLocalTheme] = useState<Theme>(() => {
+    const theme = detectInitialTheme();
+    toggleTheme(theme);
+    return theme;
+  });
 
   const setTheme = (mode: Theme) => {
-    if (mode === "dark") {
-      document.body.classList.add("dark");
-    } else {
-      document.body.classList.remove("dark");
-    }
+    toggleTheme(mode);
     localStorage.setItem("theme", mode);
     setLocalTheme(mode);
   };
@@ -33,5 +31,13 @@ function detectInitialTheme(): Theme {
     return "dark";
   } else {
     return "light";
+  }
+}
+
+function toggleTheme(theme: Theme) {
+  if (theme === "dark") {
+    document.body.classList.add("dark");
+  } else {
+    document.body.classList.remove("dark");
   }
 }

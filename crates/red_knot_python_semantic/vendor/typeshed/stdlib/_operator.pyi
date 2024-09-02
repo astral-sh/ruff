@@ -2,7 +2,7 @@ import sys
 from _typeshed import SupportsGetItem
 from collections.abc import Callable, Container, Iterable, MutableMapping, MutableSequence, Sequence
 from typing import Any, AnyStr, Generic, Protocol, SupportsAbs, SupportsIndex, TypeVar, final, overload
-from typing_extensions import ParamSpec, TypeAlias, TypeVarTuple, Unpack
+from typing_extensions import ParamSpec, TypeAlias, TypeIs, TypeVarTuple, Unpack
 
 _R = TypeVar("_R")
 _T = TypeVar("_T")
@@ -145,3 +145,7 @@ if sys.version_info >= (3, 11):
     def call(obj: Callable[_P, _R], /, *args: _P.args, **kwargs: _P.kwargs) -> _R: ...
 
 def _compare_digest(a: AnyStr, b: AnyStr, /) -> bool: ...
+
+if sys.version_info >= (3, 14):
+    def is_none(a: object, /) -> TypeIs[None]: ...
+    def is_not_none(a: _T | None, /) -> TypeIs[_T]: ...

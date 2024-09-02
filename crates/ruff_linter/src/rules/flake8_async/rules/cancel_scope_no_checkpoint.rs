@@ -1,15 +1,17 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::AwaitVisitor;
+use ruff_python_ast::helpers::{any_over_body, AwaitVisitor};
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{StmtWith, WithItem};
+use ruff_python_ast::{Expr, StmtWith, WithItem};
 
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_async::helpers::{AsyncModule, MethodName};
-use crate::settings::types::PreviewMode;
+use crate::rules::flake8_async::helpers::MethodName;
 
 /// ## What it does
 /// Checks for timeout context managers which do not contain a checkpoint.
+///
+/// For the purposes of this check, `yield` is considered a checkpoint,
+/// since checkpoints may occur in the caller to which we yield.
 ///
 /// ## Why is this bad?
 /// Some asynchronous context managers, such as `asyncio.timeout` and
@@ -20,14 +22,14 @@ use crate::settings::types::PreviewMode;
 /// ## Example
 /// ```python
 /// async def func():
-///     with asyncio.timeout(2):
+///     async with asyncio.timeout(2):
 ///         do_something()
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// async def func():
-///     with asyncio.timeout(2):
+///     async with asyncio.timeout(2):
 ///         do_something()
 ///         await awaitable()
 /// ```
@@ -81,6 +83,14 @@ pub(crate) fn cancel_scope_no_checkpoint(
         return;
     }
 
+    // Treat yields as checkpoints, since checkpoints can happen
+    // in the caller yielded to.
+    // See: https://flake8-async.readthedocs.io/en/latest/rules.html#async100
+    // See: https://github.com/astral-sh/ruff/issues/12873
+    if any_over_body(&with_stmt.body, &Expr::is_yield_expr) {
+        return;
+    }
+
     // If the body contains an `await` statement, the context manager is used correctly.
     let mut visitor = AwaitVisitor::default();
     visitor.visit_body(&with_stmt.body);
@@ -88,17 +98,8 @@ pub(crate) fn cancel_scope_no_checkpoint(
         return;
     }
 
-    if matches!(checker.settings.preview, PreviewMode::Disabled) {
-        if matches!(method_name.module(), AsyncModule::Trio) {
-            checker.diagnostics.push(Diagnostic::new(
-                CancelScopeNoCheckpoint { method_name },
-                with_stmt.range,
-            ));
-        }
-    } else {
-        checker.diagnostics.push(Diagnostic::new(
-            CancelScopeNoCheckpoint { method_name },
-            with_stmt.range,
-        ));
-    }
+    checker.diagnostics.push(Diagnostic::new(
+        CancelScopeNoCheckpoint { method_name },
+        with_stmt.range,
+    ));
 }

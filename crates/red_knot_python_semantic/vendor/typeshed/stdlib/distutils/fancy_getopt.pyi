@@ -1,15 +1,15 @@
 from collections.abc import Iterable, Mapping
 from re import Pattern
-from typing import Any, overload
+from typing import Any, Final, overload
 from typing_extensions import TypeAlias
 
 _Option: TypeAlias = tuple[str, str | None, str]
 _GR: TypeAlias = tuple[list[str], OptionDummy]
 
-longopt_pat: str
-longopt_re: Pattern[str]
-neg_alias_re: Pattern[str]
-longopt_xlate: dict[int, int]
+longopt_pat: Final = r"[a-zA-Z](?:[a-zA-Z0-9-]*)"
+longopt_re: Final[Pattern[str]]
+neg_alias_re: Final[Pattern[str]]
+longopt_xlate: Final[dict[int, int]]
 
 class FancyGetopt:
     def __init__(self, option_table: list[_Option] | None = None) -> None: ...
@@ -25,7 +25,7 @@ def fancy_getopt(
     options: list[_Option], negative_opt: Mapping[_Option, _Option], object: Any, args: list[str] | None
 ) -> list[str] | _GR: ...
 
-WS_TRANS: dict[int, str]
+WS_TRANS: Final[dict[int, str]]
 
 def wrap_text(text: str, width: int) -> list[str]: ...
 def translate_longopt(opt: str) -> str: ...

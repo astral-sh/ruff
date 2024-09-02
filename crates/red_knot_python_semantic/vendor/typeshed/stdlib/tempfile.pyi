@@ -463,7 +463,7 @@ class TemporaryDirectory(Generic[AnyStr]):
 
 # The overloads overlap, but they should still work fine.
 @overload
-def mkstemp(  # type: ignore[overload-overlap]
+def mkstemp(
     suffix: str | None = None, prefix: str | None = None, dir: StrPath | None = None, text: bool = False
 ) -> tuple[int, str]: ...
 @overload
@@ -473,7 +473,7 @@ def mkstemp(
 
 # The overloads overlap, but they should still work fine.
 @overload
-def mkdtemp(suffix: str | None = None, prefix: str | None = None, dir: StrPath | None = None) -> str: ...  # type: ignore[overload-overlap]
+def mkdtemp(suffix: str | None = None, prefix: str | None = None, dir: StrPath | None = None) -> str: ...
 @overload
 def mkdtemp(suffix: bytes | None = None, prefix: bytes | None = None, dir: BytesPath | None = None) -> bytes: ...
 def mktemp(suffix: str = "", prefix: str = "tmp", dir: StrPath | None = None) -> str: ...

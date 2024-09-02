@@ -30,7 +30,7 @@ use crate::importer::ImportRequest;
 /// Use instead:
 ///
 /// ```python
-/// from functools import singledispatchmethod
+/// from functools import singledispatch
 ///
 ///
 /// @singledispatch

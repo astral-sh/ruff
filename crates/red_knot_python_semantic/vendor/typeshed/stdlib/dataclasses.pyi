@@ -5,7 +5,7 @@ from _typeshed import DataclassInstance
 from builtins import type as Type  # alias to avoid name clashes with fields named "type"
 from collections.abc import Callable, Iterable, Mapping
 from typing import Any, Generic, Literal, Protocol, TypeVar, overload
-from typing_extensions import TypeAlias, TypeIs
+from typing_extensions import Never, TypeAlias, TypeIs
 
 if sys.version_info >= (3, 9):
     from types import GenericAlias
@@ -213,6 +213,10 @@ else:
     ) -> Any: ...
 
 def fields(class_or_instance: DataclassInstance | type[DataclassInstance]) -> tuple[Field[Any], ...]: ...
+
+# HACK: `obj: Never` typing matches if object argument is using `Any` type.
+@overload
+def is_dataclass(obj: Never) -> TypeIs[DataclassInstance | type[DataclassInstance]]: ...  # type: ignore[narrowed-type-not-subtype]  # pyright: ignore[reportGeneralTypeIssues]
 @overload
 def is_dataclass(obj: type) -> TypeIs[type[DataclassInstance]]: ...
 @overload
@@ -225,18 +229,17 @@ if sys.version_info >= (3, 9):
 else:
     class _InitVarMeta(type):
         # Not used, instead `InitVar.__class_getitem__` is called.
-        # pyright ignore is needed because pyright (not unreasonably) thinks this
-        # is an invalid use of InitVar.
-        def __getitem__(self, params: Any) -> InitVar[Any]: ...  # pyright: ignore
+        # pyright (not unreasonably) thinks this is an invalid use of InitVar.
+        def __getitem__(self, params: Any) -> InitVar[Any]: ...  # pyright: ignore[reportInvalidTypeForm]
 
 class InitVar(Generic[_T], metaclass=_InitVarMeta):
     type: Type[_T]
     def __init__(self, type: Type[_T]) -> None: ...
     if sys.version_info >= (3, 9):
         @overload
-        def __class_getitem__(cls, type: Type[_T]) -> InitVar[_T]: ...  # pyright: ignore
+        def __class_getitem__(cls, type: Type[_T]) -> InitVar[_T]: ...  # pyright: ignore[reportInvalidTypeForm]
         @overload
-        def __class_getitem__(cls, type: Any) -> InitVar[Any]: ...  # pyright: ignore
+        def __class_getitem__(cls, type: Any) -> InitVar[Any]: ...  # pyright: ignore[reportInvalidTypeForm]
 
 if sys.version_info >= (3, 12):
     def make_dataclass(

@@ -20,13 +20,13 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 ///
-/// ```python
+/// ```pyi
 /// def foo(arg: int = 693568516352839939918568862861217771399698285293568) -> None: ...
 /// ```
 ///
 /// Use instead:
 ///
-/// ```python
+/// ```pyi
 /// def foo(arg: int = ...) -> None: ...
 /// ```
 #[violation]

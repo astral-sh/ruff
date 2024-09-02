@@ -33,14 +33,14 @@ impl fmt::Display for VarKind {
 /// internal to the stub.
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// from typing import TypeVar
 ///
 /// T = TypeVar("T")
 /// ```
 ///
 /// Use instead:
-/// ```python
+/// ```pyi
 /// from typing import TypeVar
 ///
 /// _T = TypeVar("_T")

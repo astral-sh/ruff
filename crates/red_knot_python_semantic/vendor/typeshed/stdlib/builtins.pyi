@@ -33,7 +33,8 @@ from collections.abc import Awaitable, Callable, Iterable, Iterator, MutableSet,
 from io import BufferedRandom, BufferedReader, BufferedWriter, FileIO, TextIOWrapper
 from types import CellType, CodeType, TracebackType
 
-# mypy crashes if any of {ByteString, Sequence, MutableSequence, Mapping, MutableMapping} are imported from collections.abc in builtins.pyi
+# mypy crashes if any of {ByteString, Sequence, MutableSequence, Mapping, MutableMapping}
+# are imported from collections.abc in builtins.pyi
 from typing import (  # noqa: Y022
     IO,
     Any,
@@ -967,7 +968,9 @@ class tuple(Sequence[_T_co]):
     if sys.version_info >= (3, 9):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
 
-# Doesn't exist at runtime, but deleting this breaks mypy. See #2999
+# Doesn't exist at runtime, but deleting this breaks mypy and pyright. See:
+# https://github.com/python/typeshed/issues/7580
+# https://github.com/python/mypy/issues/8240
 @final
 @type_check_only
 class function:
@@ -1084,7 +1087,8 @@ class dict(MutableMapping[_KT, _VT]):
     def keys(self) -> dict_keys[_KT, _VT]: ...
     def values(self) -> dict_values[_KT, _VT]: ...
     def items(self) -> dict_items[_KT, _VT]: ...
-    # Signature of `dict.fromkeys` should be kept identical to `fromkeys` methods of `OrderedDict`/`ChainMap`/`UserDict` in `collections`
+    # Signature of `dict.fromkeys` should be kept identical to
+    # `fromkeys` methods of `OrderedDict`/`ChainMap`/`UserDict` in `collections`
     # TODO: the true signature of `dict.fromkeys` is not expressible in the current type system.
     # See #3800 & https://github.com/python/typing/issues/548#issuecomment-683336963.
     @classmethod
@@ -1744,7 +1748,7 @@ _SupportsSumNoDefaultT = TypeVar("_SupportsSumNoDefaultT", bound=_SupportsSumWit
 # without creating many false-positive errors (see #7578).
 # Instead, we special-case the most common examples of this: bool and literal integers.
 @overload
-def sum(iterable: Iterable[bool | _LiteralInteger], /, start: int = 0) -> int: ...  # type: ignore[overload-overlap]
+def sum(iterable: Iterable[bool | _LiteralInteger], /, start: int = 0) -> int: ...
 @overload
 def sum(iterable: Iterable[_SupportsSumNoDefaultT], /) -> _SupportsSumNoDefaultT | Literal[0]: ...
 @overload
@@ -1752,9 +1756,8 @@ def sum(iterable: Iterable[_AddableT1], /, start: _AddableT2) -> _AddableT1 | _A
 
 # The argument to `vars()` has to have a `__dict__` attribute, so the second overload can't be annotated with `object`
 # (A "SupportsDunderDict" protocol doesn't work)
-# Use a type: ignore to make complaints about overlapping overloads go away
 @overload
-def vars(object: type, /) -> types.MappingProxyType[str, Any]: ...  # type: ignore[overload-overlap]
+def vars(object: type, /) -> types.MappingProxyType[str, Any]: ...
 @overload
 def vars(object: Any = ..., /) -> dict[str, Any]: ...
 

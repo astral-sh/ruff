@@ -121,9 +121,9 @@ mod tests {
 
         db.write_virtual_file(path, "x = 10");
 
-        let file = db.files().add_virtual_file(&db, path).unwrap();
+        let virtual_file = db.files().virtual_file(&db, path);
 
-        let parsed = parsed_module(&db, file);
+        let parsed = parsed_module(&db, virtual_file.file());
 
         assert!(parsed.is_valid());
 
@@ -137,9 +137,9 @@ mod tests {
 
         db.write_virtual_file(path, "%timeit a = b");
 
-        let file = db.files().add_virtual_file(&db, path).unwrap();
+        let virtual_file = db.files().virtual_file(&db, path);
 
-        let parsed = parsed_module(&db, file);
+        let parsed = parsed_module(&db, virtual_file.file());
 
         assert!(parsed.is_valid());
 

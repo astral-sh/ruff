@@ -423,7 +423,7 @@ class TarInfo:
     name: str
     path: str
     size: int
-    mtime: int
+    mtime: int | float
     chksum: int
     devmajor: int
     devminor: int

@@ -1,6 +1,10 @@
+use std::cmp::Ordering;
+
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_semantic::{Definition, SemanticModel};
-use ruff_source_file::UniversalNewlines;
+use ruff_python_trivia::Cursor;
+use ruff_source_file::{Line, UniversalNewlines};
+use ruff_text_size::{TextRange, TextSize};
 
 use crate::docstrings::sections::{SectionContexts, SectionKind};
 use crate::docstrings::styles::SectionStyle;
@@ -112,12 +116,68 @@ pub(crate) fn get_section_contexts<'a>(
                 return google_sections;
             }
 
-            // Otherwise, use whichever convention matched more sections.
-            if google_sections.len() > numpy_sections.len() {
-                google_sections
-            } else {
-                numpy_sections
+            // Otherwise, If one convention matched more sections, return that...
+            match google_sections.len().cmp(&numpy_sections.len()) {
+                Ordering::Greater => return google_sections,
+                Ordering::Less => return numpy_sections,
+                Ordering::Equal => {}
+            };
+
+            // 0 sections of either convention? Default to numpy
+            if google_sections.len() == 0 {
+                return numpy_sections;
             }
+
+            for section in &google_sections {
+                // If any section has something that could be an underline
+                // on the following line, assume Numpy.
+                // If it *doesn't* have an underline and it *does* have a colon
+                // at the end of a section name, assume Google.
+                if let Some(following_line) = section.following_lines().next() {
+                    if find_underline(&following_line, '-').is_some() {
+                        return numpy_sections;
+                    }
+                }
+                if section.summary_after_section_name().starts_with(':') {
+                    return google_sections;
+                }
+            }
+
+            // If all else fails, default to numpy
+            numpy_sections
         }
     }
+}
+
+/// Returns the [`TextRange`] of the underline, if a line consists of only dashes.
+pub(super) fn find_underline(line: &Line, dash: char) -> Option<TextRange> {
+    let mut cursor = Cursor::new(line.as_str());
+
+    // Eat leading whitespace.
+    cursor.eat_while(char::is_whitespace);
+
+    // Determine the start of the dashes.
+    let offset = cursor.token_len();
+
+    // Consume the dashes.
+    cursor.start_token();
+    cursor.eat_while(|c| c == dash);
+
+    // Determine the end of the dashes.
+    let len = cursor.token_len();
+
+    // If there are no dashes, return None.
+    if len == TextSize::new(0) {
+        return None;
+    }
+
+    // Eat trailing whitespace.
+    cursor.eat_while(char::is_whitespace);
+
+    // If there are any characters after the dashes, return None.
+    if !cursor.is_eof() {
+        return None;
+    }
+
+    Some(TextRange::at(offset, len) + line.start())
 }

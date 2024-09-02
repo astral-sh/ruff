@@ -27,3 +27,70 @@ DOC201_numpy.py:87:9: DOC201 `return` is not documented in docstring
    |         ^^^^^^^^^^^ DOC201
    |
    = help: Add a "Returns" section to the docstring
+
+DOC201_numpy.py:160:9: DOC201 `return` is not documented in docstring
+    |
+158 |     """
+159 |     if x < 0:
+160 |         return None
+    |         ^^^^^^^^^^^ DOC201
+161 |     else:
+162 |         return x
+    |
+    = help: Add a "Returns" section to the docstring
+
+DOC201_numpy.py:175:9: DOC201 `return` is not documented in docstring
+    |
+173 |     """
+174 |     if x < 0:
+175 |         return None
+    |         ^^^^^^^^^^^ DOC201
+176 |     else:
+177 |         return x
+    |
+    = help: Add a "Returns" section to the docstring
+
+DOC201_numpy.py:189:5: DOC201 `return` is not documented in docstring
+    |
+187 |         A string.
+188 |     """
+189 |     return None
+    |     ^^^^^^^^^^^ DOC201
+    |
+    = help: Add a "Returns" section to the docstring
+
+DOC201_numpy.py:195:5: DOC201 `return` is not documented in docstring
+    |
+193 | def bar() -> int | None:
+194 |     """Bar-y method"""
+195 |     return
+    |     ^^^^^^ DOC201
+    |
+    = help: Add a "Returns" section to the docstring
+
+DOC201_numpy.py:222:5: DOC201 `return` is not documented in docstring
+    |
+220 |     """Generate some strings"""
+221 |     yield from "abc"
+222 |     return
+    |     ^^^^^^ DOC201
+    |
+    = help: Add a "Returns" section to the docstring
+
+DOC201_numpy.py:230:5: DOC201 `return` is not documented in docstring
+    |
+228 |     """Generate some strings"""
+229 |     yield from "abc"
+230 |     return 42
+    |     ^^^^^^^^^ DOC201
+    |
+    = help: Add a "Returns" section to the docstring
+
+DOC201_numpy.py:236:5: DOC201 `return` is not documented in docstring
+    |
+234 | def not_a_generator() -> Iterator[int]:
+235 |     """"No returns documented here, oh no"""
+236 |     return (x for x in range(42))
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DOC201
+    |
+    = help: Add a "Returns" section to the docstring

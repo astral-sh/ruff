@@ -2152,7 +2152,7 @@ impl BytesLiteralValue {
     }
 
     /// Returns an iterator over the bytes of the concatenated bytes.
-    fn bytes(&self) -> impl Iterator<Item = u8> + '_ {
+    pub fn bytes(&self) -> impl Iterator<Item = u8> + '_ {
         self.iter().flat_map(|part| part.as_slice().iter().copied())
     }
 }

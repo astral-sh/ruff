@@ -67,5 +67,6 @@ class POP3_SSL(POP3):
             timeout: float = ...,
             context: ssl.SSLContext | None = None,
         ) -> None: ...
-        # "context" is actually the last argument, but that breaks LSP and it doesn't really matter because all the arguments are ignored
+        # "context" is actually the last argument,
+        # but that breaks LSP and it doesn't really matter because all the arguments are ignored
         def stls(self, context: Any = None, keyfile: Any = None, certfile: Any = None) -> NoReturn: ...

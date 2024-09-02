@@ -25,8 +25,12 @@
 //!   * No type in an intersection can be a supertype of any other type in the intersection (just
 //!     eliminate the supertype from the intersection).
 //!   * An intersection containing two non-overlapping types should simplify to [`Type::Never`].
+
 use crate::types::{IntersectionType, Type, UnionType};
 use crate::{Db, FxOrderSet};
+use ordermap::set::MutableValues;
+
+use super::builtins_symbol_ty_by_name;
 
 pub(crate) struct UnionBuilder<'db> {
     elements: FxOrderSet<Type<'db>>,
@@ -56,16 +60,40 @@ impl<'db> UnionBuilder<'db> {
         self
     }
 
-    pub(crate) fn build(self) -> Type<'db> {
+    /// Performs the following normalizations:
+    ///     - Replaces `Literal[True,False]` with `bool`.
+    ///     - TODO For enums `E` with members `X1`,...,`Xn`, replaces
+    ///     `Literal[E.X1,...,E.Xn]` with `E`.
+    fn simplify(&mut self) {
+        if let Some(true_index) = self.elements.get_index_of(&Type::BooleanLiteral(true)) {
+            if self.elements.contains(&Type::BooleanLiteral(false)) {
+                *self.elements.get_index_mut2(true_index).unwrap() =
+                    builtins_symbol_ty_by_name(self.db, "bool");
+                self.elements.remove(&Type::BooleanLiteral(false));
+            }
+        }
+    }
+
+    pub(crate) fn build(mut self) -> Type<'db> {
         match self.elements.len() {
             0 => Type::Never,
             1 => self.elements[0],
-            _ => Type::Union(UnionType::new(self.db, self.elements)),
+            _ => {
+                self.simplify();
+
+                match self.elements.len() {
+                    0 => Type::Never,
+                    1 => self.elements[0],
+                    _ => {
+                        self.elements.shrink_to_fit();
+                        Type::Union(UnionType::new(self.db, self.elements))
+                    }
+                }
+            }
         }
     }
 }
 
-#[allow(unused)]
 #[derive(Clone)]
 pub(crate) struct IntersectionBuilder<'db> {
     // Really this builds a union-of-intersections, because we always keep our set-theoretic types
@@ -78,8 +106,7 @@ pub(crate) struct IntersectionBuilder<'db> {
 }
 
 impl<'db> IntersectionBuilder<'db> {
-    #[allow(dead_code)]
-    fn new(db: &'db dyn Db) -> Self {
+    pub(crate) fn new(db: &'db dyn Db) -> Self {
         Self {
             db,
             intersections: vec![InnerIntersectionBuilder::new()],
@@ -93,8 +120,7 @@ impl<'db> IntersectionBuilder<'db> {
         }
     }
 
-    #[allow(dead_code)]
-    fn add_positive(mut self, ty: Type<'db>) -> Self {
+    pub(crate) fn add_positive(mut self, ty: Type<'db>) -> Self {
         if let Type::Union(union) = ty {
             // Distribute ourself over this union: for each union element, clone ourself and
             // intersect with that union element, then create a new union-of-intersections with all
@@ -122,8 +148,7 @@ impl<'db> IntersectionBuilder<'db> {
         }
     }
 
-    #[allow(dead_code)]
-    fn add_negative(mut self, ty: Type<'db>) -> Self {
+    pub(crate) fn add_negative(mut self, ty: Type<'db>) -> Self {
         // See comments above in `add_positive`; this is just the negated version.
         if let Type::Union(union) = ty {
             union
@@ -142,8 +167,7 @@ impl<'db> IntersectionBuilder<'db> {
         }
     }
 
-    #[allow(dead_code)]
-    fn build(mut self) -> Type<'db> {
+    pub(crate) fn build(mut self) -> Type<'db> {
         // Avoid allocating the UnionBuilder unnecessarily if we have just one intersection:
         if self.intersections.len() == 1 {
             self.intersections.pop().unwrap().build(self.db)
@@ -157,7 +181,6 @@ impl<'db> IntersectionBuilder<'db> {
     }
 }
 
-#[allow(unused)]
 #[derive(Debug, Clone, Default)]
 struct InnerIntersectionBuilder<'db> {
     positive: FxOrderSet<Type<'db>>,
@@ -201,6 +224,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 self.negative.retain(|elem| !pos.contains(elem));
             }
             Type::Never => {}
+            Type::Unbound => {}
             _ => {
                 if !self.positive.remove(&ty) {
                     self.negative.insert(ty);
@@ -214,9 +238,23 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
         // Never is a subtype of all types
         if self.positive.contains(&Type::Never) {
-            self.positive.clear();
+            self.positive.retain(Type::is_never);
             self.negative.clear();
-            self.positive.insert(Type::Never);
+        }
+
+        if self.positive.contains(&Type::Unbound) {
+            self.positive.retain(Type::is_unbound);
+            self.negative.clear();
+        }
+
+        // None intersects only with object
+        for pos in &self.positive {
+            if let Type::Instance(_) = pos {
+                // could be `object` type
+            } else {
+                self.negative.remove(&Type::None);
+                break;
+            }
         }
     }
 
@@ -238,15 +276,36 @@ impl<'db> InnerIntersectionBuilder<'db> {
 mod tests {
     use super::{IntersectionBuilder, IntersectionType, Type, UnionBuilder, UnionType};
     use crate::db::tests::TestDb;
-
-    fn setup_db() -> TestDb {
-        TestDb::new()
-    }
+    use crate::program::{Program, SearchPathSettings};
+    use crate::python_version::PythonVersion;
+    use crate::types::builtins_symbol_ty_by_name;
+    use crate::ProgramSettings;
+    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
     impl<'db> UnionType<'db> {
         fn elements_vec(self, db: &'db TestDb) -> Vec<Type<'db>> {
             self.elements(db).into_iter().collect()
         }
+    }
+
+    fn setup_db() -> TestDb {
+        let db = TestDb::new();
+
+        let src_root = SystemPathBuf::from("/src");
+        db.memory_file_system()
+            .create_directory_all(&src_root)
+            .unwrap();
+
+        Program::from_settings(
+            &db,
+            &ProgramSettings {
+                target_version: PythonVersion::default(),
+                search_paths: SearchPathSettings::new(src_root),
+            },
+        )
+        .expect("Valid search path settings");
+
+        db
     }
 
     #[test]
@@ -285,6 +344,33 @@ mod tests {
         let ty = UnionBuilder::new(&db).add(t0).add(Type::Never).build();
 
         assert_eq!(ty, t0);
+    }
+
+    #[test]
+    fn build_union_bool() {
+        let db = setup_db();
+        let bool_ty = builtins_symbol_ty_by_name(&db, "bool");
+
+        let t0 = Type::BooleanLiteral(true);
+        let t1 = Type::BooleanLiteral(true);
+        let t2 = Type::BooleanLiteral(false);
+        let t3 = Type::IntLiteral(17);
+
+        let Type::Union(union) = UnionBuilder::new(&db).add(t0).add(t1).add(t3).build() else {
+            panic!("expected a union");
+        };
+        assert_eq!(union.elements_vec(&db), &[t0, t3]);
+        let Type::Union(union) = UnionBuilder::new(&db)
+            .add(t0)
+            .add(t1)
+            .add(t2)
+            .add(t3)
+            .build()
+        else {
+            panic!("expected a union");
+        };
+
+        assert_eq!(union.elements_vec(&db), &[bool_ty, t3]);
     }
 
     #[test]
@@ -425,5 +511,38 @@ mod tests {
             .build();
 
         assert_eq!(ty, Type::Never);
+    }
+
+    #[test]
+    fn build_intersection_simplify_positive_unbound() {
+        let db = setup_db();
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(Type::Unbound)
+            .add_positive(Type::IntLiteral(1))
+            .build();
+
+        assert_eq!(ty, Type::Unbound);
+    }
+
+    #[test]
+    fn build_intersection_simplify_negative_unbound() {
+        let db = setup_db();
+        let ty = IntersectionBuilder::new(&db)
+            .add_negative(Type::Unbound)
+            .add_positive(Type::IntLiteral(1))
+            .build();
+
+        assert_eq!(ty, Type::IntLiteral(1));
+    }
+
+    #[test]
+    fn build_intersection_simplify_negative_none() {
+        let db = setup_db();
+        let ty = IntersectionBuilder::new(&db)
+            .add_negative(Type::None)
+            .add_positive(Type::IntLiteral(1))
+            .build();
+
+        assert_eq!(ty, Type::IntLiteral(1));
     }
 }

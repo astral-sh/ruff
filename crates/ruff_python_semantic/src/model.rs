@@ -992,7 +992,7 @@ impl<'a> SemanticModel<'a> {
         self.current_scopes()
             .enumerate()
             .find_map(|(scope_index, scope)| {
-                scope.bindings().find_map(|(name, binding_id)| {
+                let mut imported_names = scope.bindings().filter_map(|(name, binding_id)| {
                     let binding = &self.bindings[binding_id];
                     match &binding.kind {
                         // Ex) Given `module="sys"` and `object="exit"`:
@@ -1072,7 +1072,22 @@ impl<'a> SemanticModel<'a> {
                         _ => {}
                     }
                     None
-                })
+                });
+
+                let first = imported_names.next()?;
+                if let Some(second) = imported_names.next() {
+                    // Multiple candidates. We need to sort them because `scope.bindings()` is a HashMap
+                    // which doesn't have a stable iteration order.
+
+                    let mut imports: Vec<_> =
+                        [first, second].into_iter().chain(imported_names).collect();
+                    imports.sort_unstable_by_key(|import| import.range.start());
+
+                    // Return the binding that was imported last.
+                    imports.pop()
+                } else {
+                    Some(first)
+                }
             })
     }
 
@@ -1157,7 +1172,7 @@ impl<'a> SemanticModel<'a> {
         let id = self.node_id.expect("No current node");
         self.nodes
             .ancestor_ids(id)
-            .filter_map(move |id| self.nodes[id].as_expression())
+            .map_while(move |id| self.nodes[id].as_expression())
     }
 
     /// Return the current [`Expr`].
@@ -1269,18 +1284,16 @@ impl<'a> SemanticModel<'a> {
     /// Given a [`NodeId`], return its parent, if any.
     #[inline]
     pub fn parent_expression(&self, node_id: NodeId) -> Option<&'a Expr> {
-        self.nodes
-            .ancestor_ids(node_id)
-            .filter_map(|id| self.nodes[id].as_expression())
-            .nth(1)
+        let parent_node_id = self.nodes.ancestor_ids(node_id).nth(1)?;
+        self.nodes[parent_node_id].as_expression()
     }
 
     /// Given a [`NodeId`], return the [`NodeId`] of the parent expression, if any.
     pub fn parent_expression_id(&self, node_id: NodeId) -> Option<NodeId> {
-        self.nodes
-            .ancestor_ids(node_id)
-            .filter(|id| self.nodes[*id].is_expression())
-            .nth(1)
+        let parent_node_id = self.nodes.ancestor_ids(node_id).nth(1)?;
+        self.nodes[parent_node_id]
+            .is_expression()
+            .then_some(parent_node_id)
     }
 
     /// Return the [`Stmt`] corresponding to the given [`NodeId`].
@@ -1320,9 +1333,7 @@ impl<'a> SemanticModel<'a> {
     /// Return the [`Expr`] corresponding to the given [`NodeId`].
     #[inline]
     pub fn expression(&self, node_id: NodeId) -> Option<&'a Expr> {
-        self.nodes
-            .ancestor_ids(node_id)
-            .find_map(|id| self.nodes[id].as_expression())
+        self.nodes[node_id].as_expression()
     }
 
     /// Returns an [`Iterator`] over the expressions, starting from the given [`NodeId`].
@@ -1330,7 +1341,7 @@ impl<'a> SemanticModel<'a> {
     pub fn expressions(&self, node_id: NodeId) -> impl Iterator<Item = &'a Expr> + '_ {
         self.nodes
             .ancestor_ids(node_id)
-            .filter_map(move |id| self.nodes[id].as_expression())
+            .map_while(move |id| self.nodes[id].as_expression())
     }
 
     /// Mark a Python module as "seen" by the semantic model. Future callers can quickly discount
@@ -2182,7 +2193,7 @@ bitflags! {
         /// `__future__`-style type annotations are enabled in this model.
         /// That could be because it's a stub file,
         /// or it could be because it's a non-stub file that has `from __future__ import annotations`
-        /// a the top of the module.
+        /// at the top of the module.
         const FUTURE_ANNOTATIONS_OR_STUB = Self::FUTURE_ANNOTATIONS.bits() | Self::STUB_FILE.bits();
 
         /// The model has traversed past the module docstring.

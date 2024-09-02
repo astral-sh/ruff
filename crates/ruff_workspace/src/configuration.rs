@@ -23,7 +23,7 @@ use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::registry::RuleNamespace;
 use ruff_linter::registry::{Rule, RuleSet, INCOMPATIBLE_CODES};
 use ruff_linter::rule_selector::{PreviewOptions, Specificity};
-use ruff_linter::rules::{flake8_pytest_style, pycodestyle};
+use ruff_linter::rules::pycodestyle;
 use ruff_linter::settings::fix_safety_table::FixSafetyTable;
 use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::settings::types::{
@@ -230,15 +230,9 @@ impl Configuration {
                 extend_exclude: FilePatternSet::try_from_iter(self.extend_exclude)?,
                 extend_include: FilePatternSet::try_from_iter(self.extend_include)?,
                 force_exclude: self.force_exclude.unwrap_or(false),
-                include: FilePatternSet::try_from_iter(self.include.unwrap_or_else(|| {
-                    let mut include = INCLUDE.to_vec();
-
-                    if global_preview.is_enabled() {
-                        include.push(FilePattern::Builtin("*.ipynb"));
-                    }
-
-                    include
-                }))?,
+                include: FilePatternSet::try_from_iter(
+                    self.include.unwrap_or_else(|| INCLUDE.to_vec()),
+                )?,
                 respect_gitignore: self.respect_gitignore.unwrap_or(true),
                 project_root: project_root.to_path_buf(),
             },
@@ -271,7 +265,6 @@ impl Configuration {
                         .chain(lint.extend_per_file_ignores)
                         .collect(),
                 )?,
-
                 fix_safety: FixSafetyTable::from_rule_selectors(
                     &lint.extend_safe_fixes,
                     &lint.extend_unsafe_fixes,
@@ -280,8 +273,9 @@ impl Configuration {
                         require_explicit: false,
                     },
                 ),
-
-                src: self.src.unwrap_or_else(|| vec![project_root.to_path_buf()]),
+                src: self
+                    .src
+                    .unwrap_or_else(|| vec![project_root.to_path_buf(), project_root.join("src")]),
                 explicit_preview_rules: lint.explicit_preview_rules.unwrap_or_default(),
 
                 task_tags: lint
@@ -337,9 +331,7 @@ impl Configuration {
                         Flake8PytestStyleOptions::try_into_settings(options, lint_preview)
                     })
                     .transpose()?
-                    .unwrap_or_else(|| {
-                        flake8_pytest_style::settings::Settings::resolve_default(lint_preview)
-                    }),
+                    .unwrap_or_default(),
                 flake8_quotes: lint
                     .flake8_quotes
                     .map(Flake8QuotesOptions::into_settings)

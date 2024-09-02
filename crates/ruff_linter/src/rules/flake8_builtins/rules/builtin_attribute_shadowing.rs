@@ -98,8 +98,9 @@ pub(crate) fn builtin_attribute_shadowing(
 
         if shadows_builtin(
             name,
-            &checker.settings.flake8_builtins.builtins_ignorelist,
             checker.source_type,
+            &checker.settings.flake8_builtins.builtins_ignorelist,
+            checker.settings.target_version,
         ) {
             // Ignore explicit overrides.
             if class_def.decorator_list.iter().any(|decorator| {

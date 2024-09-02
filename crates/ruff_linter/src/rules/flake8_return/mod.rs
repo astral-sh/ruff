@@ -36,10 +36,6 @@ mod tests {
     }
 
     #[test_case(Rule::ImplicitReturn, Path::new("RET503.py"))]
-    #[test_case(Rule::SuperfluousElseReturn, Path::new("RET505.py"))]
-    #[test_case(Rule::SuperfluousElseRaise, Path::new("RET506.py"))]
-    #[test_case(Rule::SuperfluousElseContinue, Path::new("RET507.py"))]
-    #[test_case(Rule::SuperfluousElseBreak, Path::new("RET508.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

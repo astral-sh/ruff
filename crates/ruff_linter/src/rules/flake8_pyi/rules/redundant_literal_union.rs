@@ -24,14 +24,14 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// supertypes of `"A"` and `1` respectively.
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// from typing import Literal
 ///
 /// x: Literal["A", b"B"] | str
 /// ```
 ///
 /// Use instead:
-/// ```python
+/// ```pyi
 /// from typing import Literal
 ///
 /// x: Literal[b"B"] | str

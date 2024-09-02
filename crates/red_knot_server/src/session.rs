@@ -6,16 +6,16 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::anyhow;
-use lsp_types::{ClientCapabilities, Url};
+use lsp_types::{ClientCapabilities, TextDocumentContentChangeEvent, Url};
 
-use red_knot_python_semantic::{ProgramSettings, PythonVersion, SearchPathSettings};
 use red_knot_workspace::db::RootDatabase;
 use red_knot_workspace::workspace::WorkspaceMetadata;
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::system::SystemPath;
+use ruff_db::Db;
 
-use crate::edit::{DocumentKey, NotebookDocument};
-use crate::system::{url_to_system_path, LSPSystem};
+use crate::edit::{DocumentKey, DocumentVersion, NotebookDocument};
+use crate::system::{url_to_any_system_path, AnySystemPath, LSPSystem};
 use crate::{PositionEncoding, TextDocument};
 
 pub(crate) use self::capabilities::ResolvedClientCapabilities;
@@ -67,19 +67,10 @@ impl Session {
                 .ok_or_else(|| anyhow!("Workspace path is not a valid UTF-8 path: {:?}", path))?;
             let system = LSPSystem::new(index.clone());
 
-            let metadata = WorkspaceMetadata::from_path(system_path, &system)?;
             // TODO(dhruvmanila): Get the values from the client settings
-            let program_settings = ProgramSettings {
-                target_version: PythonVersion::default(),
-                search_paths: SearchPathSettings {
-                    extra_paths: vec![],
-                    src_root: system_path.to_path_buf(),
-                    site_packages: vec![],
-                    custom_typeshed: None,
-                },
-            };
+            let metadata = WorkspaceMetadata::from_path(system_path, &system, None)?;
             // TODO(micha): Handle the case where the program settings are incorrect more gracefully.
-            workspaces.insert(path, RootDatabase::new(metadata, program_settings, system)?);
+            workspaces.insert(path, RootDatabase::new(metadata, system)?);
         }
 
         Ok(Self {
@@ -92,6 +83,12 @@ impl Session {
         })
     }
 
+    // TODO(dhruvmanila): Ideally, we should have a single method for `workspace_db_for_path_mut`
+    // and `default_workspace_db_mut` but the borrow checker doesn't allow that.
+    // https://github.com/astral-sh/ruff/pull/13041#discussion_r1726725437
+
+    /// Returns a reference to the workspace [`RootDatabase`] corresponding to the given path, if
+    /// any.
     pub(crate) fn workspace_db_for_path(&self, path: impl AsRef<Path>) -> Option<&RootDatabase> {
         self.workspaces
             .range(..=path.as_ref().to_path_buf())
@@ -99,6 +96,8 @@ impl Session {
             .map(|(_, db)| db)
     }
 
+    /// Returns a mutable reference to the workspace [`RootDatabase`] corresponding to the given
+    /// path, if any.
     pub(crate) fn workspace_db_for_path_mut(
         &mut self,
         path: impl AsRef<Path>,
@@ -107,6 +106,19 @@ impl Session {
             .range_mut(..=path.as_ref().to_path_buf())
             .next_back()
             .map(|(_, db)| db)
+    }
+
+    /// Returns a reference to the default workspace [`RootDatabase`]. The default workspace is the
+    /// minimum root path in the workspace map.
+    pub(crate) fn default_workspace_db(&self) -> &RootDatabase {
+        // SAFETY: Currently, red knot only support a single workspace.
+        self.workspaces.values().next().unwrap()
+    }
+
+    /// Returns a mutable reference to the default workspace [`RootDatabase`].
+    pub(crate) fn default_workspace_db_mut(&mut self) -> &mut RootDatabase {
+        // SAFETY: Currently, red knot only support a single workspace.
+        self.workspaces.values_mut().next().unwrap()
     }
 
     pub fn key_from_url(&self, url: Url) -> DocumentKey {
@@ -133,6 +145,20 @@ impl Session {
     /// If a document is already open here, it will be overwritten.
     pub(crate) fn open_text_document(&mut self, url: Url, document: TextDocument) {
         self.index_mut().open_text_document(url, document);
+    }
+
+    /// Updates a text document at the associated `key`.
+    ///
+    /// The document key must point to a text document, or this will throw an error.
+    pub(crate) fn update_text_document(
+        &mut self,
+        key: &DocumentKey,
+        content_changes: Vec<TextDocumentContentChangeEvent>,
+        new_version: DocumentVersion,
+    ) -> crate::Result<()> {
+        let position_encoding = self.position_encoding;
+        self.index_mut()
+            .update_text_document(key, content_changes, new_version, position_encoding)
     }
 
     /// De-registers a document, specified by its key.
@@ -221,6 +247,7 @@ impl Drop for MutIndexGuard<'_> {
 
 /// An immutable snapshot of `Session` that references
 /// a specific document.
+#[derive(Debug)]
 pub struct DocumentSnapshot {
     resolved_client_capabilities: Arc<ResolvedClientCapabilities>,
     document_ref: index::DocumentQuery,
@@ -241,7 +268,12 @@ impl DocumentSnapshot {
     }
 
     pub(crate) fn file(&self, db: &RootDatabase) -> Option<File> {
-        let path = url_to_system_path(self.document_ref.file_url()).ok()?;
-        system_path_to_file(db, path).ok()
+        match url_to_any_system_path(self.document_ref.file_url()).ok()? {
+            AnySystemPath::System(path) => system_path_to_file(db, path).ok(),
+            AnySystemPath::SystemVirtual(virtual_path) => db
+                .files()
+                .try_virtual_file(&virtual_path)
+                .map(|virtual_file| virtual_file.file()),
+        }
     }
 }

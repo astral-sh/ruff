@@ -2,7 +2,7 @@ use std::iter::FusedIterator;
 
 pub(crate) use module::Module;
 pub use resolver::resolve_module;
-pub(crate) use resolver::SearchPaths;
+pub(crate) use resolver::{file_to_module, SearchPaths};
 use ruff_db::system::SystemPath;
 pub use typeshed::vendored_typeshed_stubs;
 
@@ -13,7 +13,6 @@ use resolver::SearchPathIterator;
 mod module;
 mod path;
 mod resolver;
-mod state;
 mod typeshed;
 
 #[cfg(test)]

@@ -14,7 +14,7 @@ use crate::fix::snippet::SourceCodeSnippet;
 ///
 /// ## Why is this bad?
 /// An `if` statement that selects the lesser or greater of two sub-expressions
-/// can be replaced with a `min()` or `max()` call respectively. When possible,
+/// can be replaced with a `min()` or `max()` call respectively. Where possible,
 /// prefer `min()` and `max()`, as they're more concise and readable than the
 /// equivalent `if` statements.
 ///
@@ -194,7 +194,7 @@ enum MinMax {
 }
 
 impl MinMax {
-    fn as_str(self) -> &'static str {
+    const fn as_str(self) -> &'static str {
         match self {
             Self::Min => "min",
             Self::Max => "max",

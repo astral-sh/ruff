@@ -55,3 +55,14 @@ max({x.id for x in bar})
 
 # should not be linted...
 sum({x.id for x in bar})
+
+
+# https://github.com/astral-sh/ruff/issues/12891
+from collections.abc import AsyncGenerator
+
+
+async def test() -> None:
+    async def async_gen() -> AsyncGenerator[bool, None]:
+        yield True
+
+    assert all([v async for v in async_gen()])  # OK

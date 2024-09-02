@@ -57,7 +57,9 @@ impl Violation for OutdatedVersionBlock {
     fn message(&self) -> String {
         let OutdatedVersionBlock { reason } = self;
         match reason {
-            Reason::Outdated => format!("Version block is outdated for minimum Python version"),
+            Reason::AlwaysFalse | Reason::AlwaysTrue => {
+                format!("Version block is outdated for minimum Python version")
+            }
             Reason::Invalid => format!("Version specifier is invalid"),
         }
     }
@@ -65,7 +67,9 @@ impl Violation for OutdatedVersionBlock {
     fn fix_title(&self) -> Option<String> {
         let OutdatedVersionBlock { reason } = self;
         match reason {
-            Reason::Outdated => Some("Remove outdated version block".to_string()),
+            Reason::AlwaysFalse | Reason::AlwaysTrue => {
+                Some("Remove outdated version block".to_string())
+            }
             Reason::Invalid => None,
         }
     }
@@ -73,7 +77,8 @@ impl Violation for OutdatedVersionBlock {
 
 #[derive(Debug, PartialEq, Eq)]
 enum Reason {
-    Outdated,
+    AlwaysTrue,
+    AlwaysFalse,
     Invalid,
 }
 
@@ -123,7 +128,11 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
                         Ok(true) => {
                             let mut diagnostic = Diagnostic::new(
                                 OutdatedVersionBlock {
-                                    reason: Reason::Outdated,
+                                    reason: if op.is_lt() || op.is_lt_e() {
+                                        Reason::AlwaysFalse
+                                    } else {
+                                        Reason::AlwaysTrue
+                                    },
                                 },
                                 branch.test.range(),
                             );
@@ -152,41 +161,46 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
                 value: ast::Number::Int(int),
                 ..
             }) => {
-                if op == &CmpOp::Eq {
-                    match int.as_u8() {
-                        Some(2) => {
-                            let mut diagnostic = Diagnostic::new(
-                                OutdatedVersionBlock {
-                                    reason: Reason::Outdated,
-                                },
-                                branch.test.range(),
-                            );
-                            if let Some(fix) = fix_always_false_branch(checker, stmt_if, &branch) {
-                                diagnostic.set_fix(fix);
-                            }
-                            checker.diagnostics.push(diagnostic);
+                let reason = match (int.as_u8(), op) {
+                    (Some(2), CmpOp::Eq) => Reason::AlwaysFalse,
+                    (Some(3), CmpOp::Eq) => Reason::AlwaysTrue,
+                    (Some(2), CmpOp::NotEq) => Reason::AlwaysTrue,
+                    (Some(3), CmpOp::NotEq) => Reason::AlwaysFalse,
+                    (Some(2), CmpOp::Lt) => Reason::AlwaysFalse,
+                    (Some(3), CmpOp::Lt) => Reason::AlwaysFalse,
+                    (Some(2), CmpOp::LtE) => Reason::AlwaysFalse,
+                    (Some(3), CmpOp::LtE) => Reason::AlwaysTrue,
+                    (Some(2), CmpOp::Gt) => Reason::AlwaysTrue,
+                    (Some(3), CmpOp::Gt) => Reason::AlwaysFalse,
+                    (Some(2), CmpOp::GtE) => Reason::AlwaysTrue,
+                    (Some(3), CmpOp::GtE) => Reason::AlwaysTrue,
+                    (None, _) => Reason::Invalid,
+                    _ => return,
+                };
+                match reason {
+                    Reason::AlwaysTrue => {
+                        let mut diagnostic =
+                            Diagnostic::new(OutdatedVersionBlock { reason }, branch.test.range());
+                        if let Some(fix) = fix_always_true_branch(checker, stmt_if, &branch) {
+                            diagnostic.set_fix(fix);
                         }
-                        Some(3) => {
-                            let mut diagnostic = Diagnostic::new(
-                                OutdatedVersionBlock {
-                                    reason: Reason::Outdated,
-                                },
-                                branch.test.range(),
-                            );
-                            if let Some(fix) = fix_always_true_branch(checker, stmt_if, &branch) {
-                                diagnostic.set_fix(fix);
-                            }
-                            checker.diagnostics.push(diagnostic);
+                        checker.diagnostics.push(diagnostic);
+                    }
+                    Reason::AlwaysFalse => {
+                        let mut diagnostic =
+                            Diagnostic::new(OutdatedVersionBlock { reason }, branch.test.range());
+                        if let Some(fix) = fix_always_false_branch(checker, stmt_if, &branch) {
+                            diagnostic.set_fix(fix);
                         }
-                        None => {
-                            checker.diagnostics.push(Diagnostic::new(
-                                OutdatedVersionBlock {
-                                    reason: Reason::Invalid,
-                                },
-                                comparison.range(),
-                            ));
-                        }
-                        _ => {}
+                        checker.diagnostics.push(diagnostic);
+                    }
+                    Reason::Invalid => {
+                        checker.diagnostics.push(Diagnostic::new(
+                            OutdatedVersionBlock {
+                                reason: Reason::Invalid,
+                            },
+                            comparison.range(),
+                        ));
                     }
                 }
             }

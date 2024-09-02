@@ -7,15 +7,15 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
-use super::helpers::get_mark_decorators;
+use super::helpers::{get_mark_decorators, Parentheses};
 
 /// ## What it does
 /// Checks for argument-free `@pytest.mark.<marker>()` decorators with or
 /// without parentheses, depending on the [`lint.flake8-pytest-style.mark-parentheses`]
 /// setting.
 ///
-/// In [preview], this rule defaults to removing unnecessary parentheses, to match
-/// the behavior of official pytest projects.
+/// The rule defaults to removing unnecessary parentheses,
+/// to match the documentation of the official pytest projects.
 ///
 /// ## Why is this bad?
 /// If a `@pytest.mark.<marker>()` doesn't take any arguments, the parentheses are
@@ -49,13 +49,11 @@ use super::helpers::get_mark_decorators;
 ///
 /// ## References
 /// - [`pytest` documentation: Marks](https://docs.pytest.org/en/latest/reference/reference.html#marks)
-///
-/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct PytestIncorrectMarkParenthesesStyle {
     mark_name: String,
-    expected_parens: String,
-    actual_parens: String,
+    expected_parens: Parentheses,
+    actual_parens: Parentheses,
 }
 
 impl AlwaysFixableViolation for PytestIncorrectMarkParenthesesStyle {
@@ -73,7 +71,10 @@ impl AlwaysFixableViolation for PytestIncorrectMarkParenthesesStyle {
     }
 
     fn fix_title(&self) -> String {
-        "Add/remove parentheses".to_string()
+        match &self.expected_parens {
+            Parentheses::None => "Remove parentheses".to_string(),
+            Parentheses::Empty => "Add parentheses".to_string(),
+        }
     }
 }
 
@@ -123,14 +124,14 @@ fn pytest_mark_parentheses(
     decorator: &Decorator,
     marker: &str,
     fix: Fix,
-    preferred: &str,
-    actual: &str,
+    preferred: Parentheses,
+    actual: Parentheses,
 ) {
     let mut diagnostic = Diagnostic::new(
         PytestIncorrectMarkParenthesesStyle {
             mark_name: marker.to_string(),
-            expected_parens: preferred.to_string(),
-            actual_parens: actual.to_string(),
+            expected_parens: preferred,
+            actual_parens: actual,
         },
         decorator.range(),
     );
@@ -155,13 +156,30 @@ fn check_mark_parentheses(checker: &mut Checker, decorator: &Decorator, marker: 
                 && keywords.is_empty()
             {
                 let fix = Fix::safe_edit(Edit::deletion(func.end(), decorator.end()));
-                pytest_mark_parentheses(checker, decorator, marker, fix, "", "()");
+                pytest_mark_parentheses(
+                    checker,
+                    decorator,
+                    marker,
+                    fix,
+                    Parentheses::None,
+                    Parentheses::Empty,
+                );
             }
         }
         _ => {
             if checker.settings.flake8_pytest_style.mark_parentheses {
-                let fix = Fix::safe_edit(Edit::insertion("()".to_string(), decorator.end()));
-                pytest_mark_parentheses(checker, decorator, marker, fix, "()", "");
+                let fix = Fix::safe_edit(Edit::insertion(
+                    Parentheses::Empty.to_string(),
+                    decorator.end(),
+                ));
+                pytest_mark_parentheses(
+                    checker,
+                    decorator,
+                    marker,
+                    fix,
+                    Parentheses::Empty,
+                    Parentheses::None,
+                );
             }
         }
     }

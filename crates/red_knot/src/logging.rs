@@ -5,8 +5,8 @@ use colored::Colorize;
 use std::fmt;
 use std::fs::File;
 use std::io::BufWriter;
-use tracing::log::LevelFilter;
 use tracing::{Event, Subscriber};
+use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::fmt::format::Writer;
 use tracing_subscriber::fmt::{FmtContext, FormatEvent, FormatFields};
 use tracing_subscriber::registry::LookupSpan;
@@ -60,10 +60,10 @@ pub(crate) enum VerbosityLevel {
 impl VerbosityLevel {
     const fn level_filter(self) -> LevelFilter {
         match self {
-            VerbosityLevel::Default => LevelFilter::Warn,
-            VerbosityLevel::Verbose => LevelFilter::Info,
-            VerbosityLevel::ExtraVerbose => LevelFilter::Debug,
-            VerbosityLevel::Trace => LevelFilter::Trace,
+            VerbosityLevel::Default => LevelFilter::WARN,
+            VerbosityLevel::Verbose => LevelFilter::INFO,
+            VerbosityLevel::ExtraVerbose => LevelFilter::DEBUG,
+            VerbosityLevel::Trace => LevelFilter::TRACE,
         }
     }
 
@@ -88,7 +88,7 @@ pub(crate) fn setup_tracing(level: VerbosityLevel) -> anyhow::Result<TracingGuar
         match level {
             VerbosityLevel::Default => {
                 // Show warning traces
-                EnvFilter::default().add_directive(tracing::level_filters::LevelFilter::WARN.into())
+                EnvFilter::default().add_directive(LevelFilter::WARN.into())
             }
             level => {
                 let level_filter = level.level_filter();

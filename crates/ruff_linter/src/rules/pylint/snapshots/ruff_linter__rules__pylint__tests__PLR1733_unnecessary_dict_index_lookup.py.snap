@@ -121,4 +121,41 @@ unnecessary_dict_index_lookup.py:11:16: PLR1733 [*] Unnecessary lookup of dictio
 13 13 | 
 14 14 | def dont_fix_these():
 
+unnecessary_dict_index_lookup.py:50:51: PLR1733 [*] Unnecessary lookup of dictionary value by key
+   |
+48 |         if mapped_label in mapped_arrays:
+49 |             for i in range(len(array)):
+50 |                 mapped_arrays[mapped_label][i] += value_arrays[label][i]  # PLR1733
+   |                                                   ^^^^^^^^^^^^^^^^^^^ PLR1733
+51 |         else:
+52 |             mapped_arrays[mapped_label] = [value_arrays[label][i] for i in range(len(array))]  # PLR1733
+   |
+   = help: Use existing variable
 
+ℹ Safe fix
+47 47 |         mapped_label = client_label_map(label)
+48 48 |         if mapped_label in mapped_arrays:
+49 49 |             for i in range(len(array)):
+50    |-                mapped_arrays[mapped_label][i] += value_arrays[label][i]  # PLR1733
+   50 |+                mapped_arrays[mapped_label][i] += array[i]  # PLR1733
+51 51 |         else:
+52 52 |             mapped_arrays[mapped_label] = [value_arrays[label][i] for i in range(len(array))]  # PLR1733
+53 53 |     return mapped_arrays
+
+unnecessary_dict_index_lookup.py:52:44: PLR1733 [*] Unnecessary lookup of dictionary value by key
+   |
+50 |                 mapped_arrays[mapped_label][i] += value_arrays[label][i]  # PLR1733
+51 |         else:
+52 |             mapped_arrays[mapped_label] = [value_arrays[label][i] for i in range(len(array))]  # PLR1733
+   |                                            ^^^^^^^^^^^^^^^^^^^ PLR1733
+53 |     return mapped_arrays
+   |
+   = help: Use existing variable
+
+ℹ Safe fix
+49 49 |             for i in range(len(array)):
+50 50 |                 mapped_arrays[mapped_label][i] += value_arrays[label][i]  # PLR1733
+51 51 |         else:
+52    |-            mapped_arrays[mapped_label] = [value_arrays[label][i] for i in range(len(array))]  # PLR1733
+   52 |+            mapped_arrays[mapped_label] = [array[i] for i in range(len(array))]  # PLR1733
+53 53 |     return mapped_arrays

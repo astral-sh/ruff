@@ -38,3 +38,21 @@ DOC402_google.py:67:5: DOC402 `yield` is not documented in docstring
    |     ^^^^^^^^^^^^^^^^^^^^ DOC402
    |
    = help: Add a "Yields" section to the docstring
+
+DOC402_google.py:100:5: DOC402 `yield` is not documented in docstring
+    |
+ 98 |     Do something
+ 99 |     """
+100 |     yield
+    |     ^^^^^ DOC402
+    |
+    = help: Add a "Yields" section to the docstring
+
+DOC402_google.py:108:5: DOC402 `yield` is not documented in docstring
+    |
+106 |     Do something
+107 |     """
+108 |     yield
+    |     ^^^^^ DOC402
+    |
+    = help: Add a "Yields" section to the docstring
