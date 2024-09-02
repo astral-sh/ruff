@@ -1920,7 +1920,6 @@ dependencies = [
  "countme",
  "hashbrown",
  "insta",
- "is-macro",
  "once_cell",
  "ordermap",
  "path-slash",

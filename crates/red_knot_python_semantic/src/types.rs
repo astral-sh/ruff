@@ -171,7 +171,7 @@ pub(crate) fn definitions_ty<'db>(
 }
 
 /// Unique ID for a type.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, is_macro::Is)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Type<'db> {
     /// the dynamic type: a statically-unknown set of values
     Any,
@@ -223,6 +223,49 @@ impl<'db> Type<'db> {
                 | Type::Class(_)
                 | Type::Function(_)
         )
+    }
+
+    pub const fn is_unbound(&self) -> bool {
+        matches!(self, Type::Unbound)
+    }
+
+    pub const fn is_never(&self) -> bool {
+        matches!(self, Type::Never)
+    }
+
+    pub const fn expect_class(self) -> ClassType<'db> {
+        let Type::Class(class_type) = self else {
+            panic!("Expected a class!")
+        };
+        class_type
+    }
+
+    pub const fn expect_module(self) -> File {
+        let Type::Module(file) = self else {
+            panic!("Expected a module!")
+        };
+        file
+    }
+
+    pub const fn expect_union(self) -> UnionType<'db> {
+        let Type::Union(union_type) = self else {
+            panic!("Expected a union!")
+        };
+        union_type
+    }
+
+    pub const fn expect_intersection(self) -> IntersectionType<'db> {
+        let Type::Intersection(intersection_type) = self else {
+            panic!("Expected an intersection!")
+        };
+        intersection_type
+    }
+
+    pub const fn expect_function(self) -> FunctionType<'db> {
+        let Type::Function(function) = self else {
+            panic!("Expected a function!")
+        };
+        function
     }
 
     pub fn may_be_unbound(&self, db: &'db dyn Db) -> bool {
