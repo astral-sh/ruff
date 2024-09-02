@@ -462,6 +462,6 @@ impl From<&ast::ParameterWithDefault> for DefinitionNodeKey {
 
 impl From<&ast::Identifier> for DefinitionNodeKey {
     fn from(identifier: &ast::Identifier) -> Self {
-        Self(NodeKey::from_identifier(identifier))
+        Self(NodeKey::from_node(identifier))
     }
 }
