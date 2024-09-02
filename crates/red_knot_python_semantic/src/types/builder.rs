@@ -80,12 +80,14 @@ impl<'db> UnionBuilder<'db> {
             1 => self.elements[0],
             _ => {
                 self.simplify();
-                self.elements.shrink_to_fit();
 
                 match self.elements.len() {
                     0 => Type::Never,
                     1 => self.elements[0],
-                    _ => Type::Union(UnionType::new(self.db, self.elements)),
+                    _ => {
+                        self.elements.shrink_to_fit();
+                        Type::Union(UnionType::new(self.db, self.elements))
+                    }
                 }
             }
         }
