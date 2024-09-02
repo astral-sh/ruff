@@ -119,3 +119,10 @@ def func():
 def func():
     with suppress(AttributeError):
         raise AttributeError("This is an exception")  # OK
+
+
+import builtins
+
+builtins.TypeError("still an exception even though it's an Attribute")
+
+PythonFinalizationError("Added in Python 3.13")
