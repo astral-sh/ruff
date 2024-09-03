@@ -96,7 +96,7 @@ ALL = [
     Project(
         name="black",
         repository="https://github.com/psf/black",
-        revision="c20423249e9d8dfb8581eebbfc67a13984ee45e9",
+        revision="ac28187bf4a4ac159651c73d3a50fe6d0f653eac",
         include=["src"],
         dependencies=[
             "aiohttp",
