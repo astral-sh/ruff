@@ -5,11 +5,10 @@ use ruff_python_ast as ast;
 use ruff_python_ast::comparable::ComparableExpr;
 
 /// ## What it does
-/// Checks for conditional expressions (ternary operators) where both the true
-/// and false branches return the same value.
+/// Checks for useless if-else conditions with identical arms.
 ///
 /// ## Why is this bad?
-/// Redundant conditional expressions add unnecessary complexity to the code without
+/// Useless if-else conditions add unnecessary complexity to the code without
 /// providing any logical benefit.
 ///
 /// Assigning the value directly is clearer and more explicit, and
@@ -27,17 +26,17 @@ use ruff_python_ast::comparable::ComparableExpr;
 /// foo = x
 /// ```
 #[violation]
-pub struct RedundantTernary;
+pub struct UselessIfElse;
 
-impl Violation for RedundantTernary {
+impl Violation for UselessIfElse {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Redundant conditional expression")
+        format!("Useless if-else condition")
     }
 }
 
 /// RUF031
-pub(crate) fn redundant_ternary(checker: &mut Checker, if_expr: &ast::ExprIf) {
+pub(crate) fn useless_if_else(checker: &mut Checker, if_expr: &ast::ExprIf) {
     let ast::ExprIf {
         body,
         orelse,
@@ -52,5 +51,5 @@ pub(crate) fn redundant_ternary(checker: &mut Checker, if_expr: &ast::ExprIf) {
 
     checker
         .diagnostics
-        .push(Diagnostic::new(RedundantTernary, *range));
+        .push(Diagnostic::new(UselessIfElse, *range));
 }

@@ -20,7 +20,6 @@ pub(crate) use never_union::*;
 pub(crate) use parenthesize_logical_operators::*;
 pub(crate) use quadratic_list_summation::*;
 pub(crate) use redirected_noqa::*;
-pub(crate) use redundant_ternary::*;
 pub(crate) use sort_dunder_all::*;
 pub(crate) use sort_dunder_slots::*;
 pub(crate) use static_key_dict_comprehension::*;
@@ -30,6 +29,7 @@ pub(crate) use unnecessary_iterable_allocation_for_first_element::*;
 pub(crate) use unnecessary_key_check::*;
 pub(crate) use unused_async::*;
 pub(crate) use unused_noqa::*;
+pub(crate) use useless_if_else::*;
 pub(crate) use zip_instead_of_pairwise::*;
 
 mod ambiguous_unicode_character;
@@ -56,7 +56,6 @@ mod never_union;
 mod parenthesize_logical_operators;
 mod quadratic_list_summation;
 mod redirected_noqa;
-mod redundant_ternary;
 mod sequence_sorting;
 mod sort_dunder_all;
 mod sort_dunder_slots;
@@ -68,6 +67,7 @@ mod unnecessary_iterable_allocation_for_first_element;
 mod unnecessary_key_check;
 mod unused_async;
 mod unused_noqa;
+mod useless_if_else;
 mod zip_instead_of_pairwise;
 
 #[derive(Clone, Copy)]
