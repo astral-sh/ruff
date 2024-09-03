@@ -311,23 +311,23 @@ pub(super) fn dunder_method_kind(method: &str) -> Option<DunderMethodKind> {
             | "_ignore_"
             | "_order_"
             | "_generate_next_value_" => Some(DunderMethodKind::Known),
-        "__unicode__"
-            | "__div__"
-            | "__rdiv__"
-            | "__idiv__"
-            | "__nonzero__"
-            | "__metaclass__"
             | "__cmp__"
-            | "__getslice__"
-            | "__setslice__"
-            | "__delslice__"
-            | "__oct__"
-            | "__hex__"
-            | "__members__"
-            | "__method__"
             | "__coerce__"
+            | "__delslice__"
+            | "__div__"
+            | "__getslice__"
+            | "__hex__"
+            | "__idiv__"
             | "__long__"
-            | "__rcmp__" => Some(DunderMethodKind::Removed),
+            | "__members__"
+            | "__metaclass__"
+            | "__method__"
+            | "__nonzero__"
+            | "__oct__"
+            | "__rcmp__"
+            | "__rdiv__"
+            | "__setslice__"
+            | "__unicode__"=> Some(DunderMethodKind::Removed),
             _ => None,
         }
 }
