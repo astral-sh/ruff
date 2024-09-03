@@ -21,19 +21,27 @@ fn setup_db(workspace_root: &SystemPath) -> anyhow::Result<RootDatabase> {
 #[test]
 #[allow(clippy::print_stdout)]
 fn corpus_no_panic() -> anyhow::Result<()> {
-    let corpus = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/test/corpus");
-    let system_corpus =
-        SystemPathBuf::from_path_buf(corpus.clone()).expect("corpus path to be UTF8");
-    let db = setup_db(&system_corpus)?;
+    let root = SystemPathBuf::from_path_buf(tempfile::TempDir::new()?.into_path()).unwrap();
+    let db = setup_db(&root)?;
 
-    for path in fs::read_dir(&corpus).expect("corpus to be a directory") {
-        let path = path.expect("path to not be an error").path();
-        println!("checking {path:?}");
-        let path = SystemPathBuf::from_path_buf(path.clone()).expect("path to be UTF-8");
+    let corpus = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/test/corpus");
+
+    for path in fs::read_dir(&corpus)? {
+        let source = path?.path();
+        println!("checking {source:?}");
+        let source_fn = source.file_name().unwrap().to_str().unwrap();
+        let py_dest = root.join(source_fn);
+        fs::copy(&source, py_dest.as_std_path())?;
         // this test is only asserting that we can pull every expression type without a panic
         // (and some non-expressions that clearly define a single type)
-        let file = system_path_to_file(&db, path).expect("file to exist");
+        let file = system_path_to_file(&db, py_dest).unwrap();
+        pull_types(&db, file);
 
+        // try the file as a stub also
+        println!("re-checking as .pyi");
+        let pyi_dest = root.join(format!("{source_fn}i"));
+        std::fs::copy(source, pyi_dest.as_std_path())?;
+        let file = system_path_to_file(&db, pyi_dest).unwrap();
         pull_types(&db, file);
     }
     Ok(())
