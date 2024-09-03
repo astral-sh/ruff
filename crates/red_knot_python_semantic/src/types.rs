@@ -152,9 +152,9 @@ pub(crate) fn definitions_ty<'db>(
     );
     let mut all_types = unbound_ty.into_iter().chain(def_types);
 
-    let Some(first) = all_types.next() else {
-        panic!("definitions_ty should never be called with zero definitions and no unbound_ty.")
-    };
+    let first = all_types
+        .next()
+        .expect("definitions_ty should never be called with zero definitions and no unbound_ty.");
 
     if let Some(second) = all_types.next() {
         let mut builder = UnionBuilder::new(db);
@@ -171,7 +171,7 @@ pub(crate) fn definitions_ty<'db>(
 }
 
 /// Unique ID for a type.
-#[derive(Copy, Clone, Debug, PartialOrd, Ord, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Type<'db> {
     /// the dynamic type: a statically-unknown set of values
     Any,
@@ -216,10 +216,6 @@ impl<'db> Type<'db> {
         matches!(self, Type::Unbound)
     }
 
-    pub const fn is_unknown(&self) -> bool {
-        matches!(self, Type::Unknown)
-    }
-
     pub const fn is_never(&self) -> bool {
         matches!(self, Type::Never)
     }
@@ -235,6 +231,78 @@ impl<'db> Type<'db> {
                 | Type::Class(_)
                 | Type::Function(_)
         )
+    }
+
+    pub const fn into_class_type(self) -> Option<ClassType<'db>> {
+        match self {
+            Type::Class(class_type) => Some(class_type),
+            _ => None,
+        }
+    }
+
+    pub fn expect_class(self) -> ClassType<'db> {
+        self.into_class_type()
+            .expect("Expected a Type::Class variant")
+    }
+
+    pub const fn into_module_type(self) -> Option<File> {
+        match self {
+            Type::Module(file) => Some(file),
+            _ => None,
+        }
+    }
+
+    pub fn expect_module(self) -> File {
+        self.into_module_type()
+            .expect("Expected a Type::Module variant")
+    }
+
+    pub const fn into_union_type(self) -> Option<UnionType<'db>> {
+        match self {
+            Type::Union(union_type) => Some(union_type),
+            _ => None,
+        }
+    }
+
+    pub fn expect_union(self) -> UnionType<'db> {
+        self.into_union_type()
+            .expect("Expected a Type::Union variant")
+    }
+
+    pub const fn into_intersection_type(self) -> Option<IntersectionType<'db>> {
+        match self {
+            Type::Intersection(intersection_type) => Some(intersection_type),
+            _ => None,
+        }
+    }
+
+    pub fn expect_intersection(self) -> IntersectionType<'db> {
+        self.into_intersection_type()
+            .expect("Expected a Type::Intersection variant")
+    }
+
+    pub const fn into_function_type(self) -> Option<FunctionType<'db>> {
+        match self {
+            Type::Function(function_type) => Some(function_type),
+            _ => None,
+        }
+    }
+
+    pub fn expect_function(self) -> FunctionType<'db> {
+        self.into_function_type()
+            .expect("Expected a Type::Function variant")
+    }
+
+    pub const fn into_int_literal_type(self) -> Option<i64> {
+        match self {
+            Type::IntLiteral(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    pub fn expect_int_literal(self) -> i64 {
+        self.into_int_literal_type()
+            .expect("Expected a Type::IntLiteral variant")
     }
 
     pub fn may_be_unbound(&self, db: &'db dyn Db) -> bool {
@@ -361,7 +429,7 @@ impl<'db> Type<'db> {
     }
 
     #[must_use]
-    pub fn instance(&self) -> Type<'db> {
+    pub fn to_instance(&self) -> Type<'db> {
         match self {
             Type::Any => Type::Any,
             Type::Unknown => Type::Unknown,

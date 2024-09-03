@@ -125,10 +125,7 @@ impl Display for DisplayUnionType<'_> {
                 f.write_str("Literal[")?;
 
                 if literal_kind == LiteralTypeKind::IntLiteral {
-                    literals.sort_unstable_by_key(|ty| match ty {
-                        Type::IntLiteral(n) => *n,
-                        _ => panic!("Expected only int literals when kind is IntLiteral"),
-                    });
+                    literals.sort_unstable_by_key(|ty| ty.expect_int_literal());
                 }
 
                 for (i, literal_ty) in literals.iter().enumerate() {
@@ -294,9 +291,7 @@ mod tests {
         let builder = vec.iter().fold(UnionBuilder::new(&db), |builder, literal| {
             builder.add(*literal)
         });
-        let Type::Union(union) = builder.build() else {
-            panic!("expected a union");
-        };
+        let union = builder.build().expect_union();
         let display = format!("{}", union.display(&db));
         assert_eq!(
             display,
