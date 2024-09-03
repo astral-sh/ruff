@@ -7,7 +7,7 @@ use ruff_db::parsed::ParsedModule;
 use ruff_index::IndexVec;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
-use ruff_python_ast::visitor::{walk_expr, walk_match_case, walk_pattern, walk_stmt, Visitor};
+use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
 use ruff_python_ast::AnyParameterRef;
 
 use crate::ast_node_ref::AstNodeRef;
@@ -36,7 +36,8 @@ pub(super) struct SemanticIndexBuilder<'db> {
     scope_stack: Vec<FileScopeId>,
     /// The assignment we're currently visiting.
     current_assignment: Option<CurrentAssignment<'db>>,
-    pattern_state: Option<MatchPatternState<'db>>,
+    /// The match case we're currently visiting.
+    current_match_case: Option<CurrentMatchCase<'db>>,
     /// Flow states at each `break` in the current loop.
     loop_break_states: Vec<FlowSnapshot>,
 
@@ -60,7 +61,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             module: parsed,
             scope_stack: Vec::new(),
             current_assignment: None,
-            pattern_state: None,
+            current_match_case: None,
             loop_break_states: vec![],
 
             scopes: IndexVec::new(),
@@ -816,9 +817,15 @@ where
     }
 
     fn visit_match_case(&mut self, match_case: &'ast ast::MatchCase) {
-        self.pattern_state = Some(MatchPatternState::new(&match_case.pattern));
-        walk_match_case(self, match_case);
-        self.pattern_state = None;
+        debug_assert!(self.current_match_case.is_none());
+        self.current_match_case = Some(CurrentMatchCase::new(&match_case.pattern));
+        self.visit_pattern(&match_case.pattern);
+        self.current_match_case = None;
+
+        if let Some(expr) = &match_case.guard {
+            self.visit_expr(expr);
+        }
+        self.visit_body(&match_case.body);
     }
 
     fn visit_pattern(&mut self, pattern: &'ast ast::Pattern) {
@@ -828,7 +835,7 @@ where
         }) = pattern
         {
             let symbol = self.add_or_update_symbol(name.id().clone(), SymbolFlags::IS_DEFINED);
-            let state = self.pattern_state.as_ref().unwrap();
+            let state = self.current_match_case.as_ref().unwrap();
             self.add_definition(
                 symbol,
                 MatchPatternDefinitionNodeRef {
@@ -849,7 +856,7 @@ where
         }) = pattern
         {
             let symbol = self.add_or_update_symbol(name.id().clone(), SymbolFlags::IS_DEFINED);
-            let state = self.pattern_state.as_ref().unwrap();
+            let state = self.current_match_case.as_ref().unwrap();
             self.add_definition(
                 symbol,
                 MatchPatternDefinitionNodeRef {
@@ -860,7 +867,7 @@ where
             );
         }
 
-        self.pattern_state.as_mut().unwrap().index += 1;
+        self.current_match_case.as_mut().unwrap().index += 1;
     }
 }
 
@@ -914,12 +921,25 @@ impl<'a> From<&'a ast::WithItem> for CurrentAssignment<'a> {
     }
 }
 
-struct MatchPatternState<'a> {
+struct CurrentMatchCase<'a> {
+    /// The pattern that's part of the current match case.
     pattern: &'a ast::Pattern,
+
+    /// The index of the sub-pattern that's being currently visited within the pattern.
+    ///
+    /// For example:
+    /// ```py
+    /// match subject:
+    ///     case a as b: ...
+    ///     case [a, b]: ...
+    ///     case a | b: ...
+    /// ```
+    ///
+    /// In all of the above cases, the index would be 0 for `a` and 1 for `b`.
     index: u32,
 }
 
-impl<'a> MatchPatternState<'a> {
+impl<'a> CurrentMatchCase<'a> {
     fn new(pattern: &'a ast::Pattern) -> Self {
         Self { pattern, index: 0 }
     }

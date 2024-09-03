@@ -1125,6 +1125,38 @@ match subject:
     }
 
     #[test]
+    fn nested_match_case() {
+        let TestCase { db, file } = test_case(
+            "
+match 1:
+    case first:
+        match 2:
+            case second:
+                pass
+",
+        );
+
+        let global_scope_id = global_scope(&db, file);
+        let global_table = symbol_table(&db, global_scope_id);
+
+        assert_eq!(names(&global_table), vec!["first", "second"]);
+
+        let use_def = use_def_map(&db, global_scope_id);
+        for (name, expected_index) in [("first", 0), ("second", 0)] {
+            let definition = use_def
+                .first_public_definition(
+                    global_table.symbol_id_by_name(name).expect("symbol exists"),
+                )
+                .expect("Expected with item definition for {name}");
+            if let DefinitionKind::MatchPattern(pattern) = definition.node(&db) {
+                assert_eq!(pattern.index(), expected_index);
+            } else {
+                panic!("Expected match pattern definition for {name}");
+            }
+        }
+    }
+
+    #[test]
     fn for_loops_single_assignment() {
         let TestCase { db, file } = test_case("for x in a: pass");
         let scope = global_scope(&db, file);
