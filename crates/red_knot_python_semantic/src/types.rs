@@ -233,39 +233,59 @@ impl<'db> Type<'db> {
         matches!(self, Type::Never)
     }
 
-    pub const fn expect_class(self) -> ClassType<'db> {
-        let Type::Class(class_type) = self else {
-            panic!("Expected a class!")
-        };
-        class_type
+    pub const fn into_class_type(self) -> Option<ClassType<'db>> {
+        match self {
+            Type::Class(class_type) => Some(class_type),
+            _ => None,
+        }
     }
 
-    pub const fn expect_module(self) -> File {
-        let Type::Module(file) = self else {
-            panic!("Expected a module!")
-        };
-        file
+    pub fn expect_class(self) -> ClassType<'db> {
+        self.into_class_type().expect("Expected a Type::Class variant")
     }
 
-    pub const fn expect_union(self) -> UnionType<'db> {
-        let Type::Union(union_type) = self else {
-            panic!("Expected a union!")
-        };
-        union_type
+    pub const fn into_module_type(self) -> Option<File> {
+        match self {
+            Type::Module(file) => Some(file),
+            _ => None,
+        }
     }
 
-    pub const fn expect_intersection(self) -> IntersectionType<'db> {
-        let Type::Intersection(intersection_type) = self else {
-            panic!("Expected an intersection!")
-        };
-        intersection_type
+    pub fn expect_module(self) -> File {
+        self.into_module_type().expect("Expected a Type::Module variant")
     }
 
-    pub const fn expect_function(self) -> FunctionType<'db> {
-        let Type::Function(function) = self else {
-            panic!("Expected a function!")
-        };
-        function
+    pub const fn into_union_type(self) -> Option<UnionType<'db>> {
+        match self {
+            Type::Union(union_type) => Some(union_type),
+            _ => None,
+        }
+    }
+
+    pub fn expect_union(self) -> UnionType<'db> {
+        self.into_union_type().expect("Expected a Type::Union variant")
+    }
+
+    pub const fn into_intersection_type(self) -> Option<IntersectionType<'db>> {
+        match self {
+            Type::Intersection(intersection_type) => Some(intersection_type),
+            _ => None,
+        }
+    }
+
+    pub fn expect_intersection(self) -> IntersectionType<'db> {
+        self.into_intersection_type().expect("Expected a Type::Intersection variant")
+    }
+
+    pub const fn into_function_type(self) -> Option<FunctionType<'db>> {
+        match self {
+            Type::Function(function_type) => Some(function_type),
+            _ => None,
+        }
+    }
+
+    pub fn expect_function(self) -> FunctionType<'db> {
+        self.into_function_type().expect("Expected a Type::Function variant")
     }
 
     pub fn may_be_unbound(&self, db: &'db dyn Db) -> bool {
