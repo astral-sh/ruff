@@ -133,8 +133,8 @@ class Pyright(Tool):
     def cold_command(self, project: Project, venv: Venv) -> Command:
         command = [
             str(self.path),
-            "--venvpath",
             "--threads",
+            "--venvpath",
             str(
                 venv.path.parent
             ),  # This is not the path to the venv folder, but the folder that contains the venv...
@@ -201,6 +201,8 @@ class Venv:
             "uv",
             "pip",
             "install",
+            "--python",
+            self.python,
             "--quiet",
             *dependencies,
         ]
