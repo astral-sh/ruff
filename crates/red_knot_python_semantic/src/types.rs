@@ -220,19 +220,6 @@ impl<'db> Type<'db> {
         matches!(self, Type::Never)
     }
 
-    /// Returns `true` if this type should be displayed as a literal value.
-    pub const fn is_literal(&self) -> bool {
-        matches!(
-            self,
-            Type::IntLiteral(_)
-                | Type::BooleanLiteral(_)
-                | Type::StringLiteral(_)
-                | Type::BytesLiteral(_)
-                | Type::Class(_)
-                | Type::Function(_)
-        )
-    }
-
     pub const fn into_class_type(self) -> Option<ClassType<'db>> {
         match self {
             Type::Class(class_type) => Some(class_type),

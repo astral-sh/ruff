@@ -27,7 +27,15 @@ pub struct DisplayType<'db> {
 impl Display for DisplayType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let representation = self.ty.representation(self.db);
-        if self.ty.is_literal() {
+        if matches!(
+            self.ty,
+            Type::IntLiteral(_)
+                | Type::BooleanLiteral(_)
+                | Type::StringLiteral(_)
+                | Type::BytesLiteral(_)
+                | Type::Class(_)
+                | Type::Function(_)
+        ) {
             write!(f, "Literal[{representation}]",)
         } else {
             representation.fmt(f)
