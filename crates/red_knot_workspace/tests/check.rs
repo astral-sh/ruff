@@ -28,19 +28,19 @@ fn corpus_no_panic() -> anyhow::Result<()> {
 
     for path in fs::read_dir(&corpus)? {
         let source = path?.path();
+        println!("checking {source:?}");
         let source_fn = source.file_name().unwrap().to_str().unwrap();
         let py_dest = root.join(source_fn);
         fs::copy(&source, py_dest.as_std_path())?;
-        println!("checking {py_dest:?}");
         // this test is only asserting that we can pull every expression type without a panic
         // (and some non-expressions that clearly define a single type)
         let file = system_path_to_file(&db, py_dest).unwrap();
         pull_types(&db, file);
 
         // try the file as a stub also
+        println!("re-checking as .pyi");
         let pyi_dest = root.join(format!("{source_fn}i"));
         std::fs::copy(source, pyi_dest.as_std_path())?;
-        println!("checking {pyi_dest:?}");
         let file = system_path_to_file(&db, pyi_dest).unwrap();
         pull_types(&db, file);
     }
