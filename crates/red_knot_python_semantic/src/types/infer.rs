@@ -48,8 +48,8 @@ use crate::semantic_index::SemanticIndex;
 use crate::stdlib::builtins_module_scope;
 use crate::types::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 use crate::types::{
-    builtins_symbol_ty, definitions_ty, global_symbol_ty, symbol_ty, symbol_ty_by_id,
-    BytesLiteralType, ClassType, FunctionType, StringLiteralType, Type, UnionBuilder,
+    builtins_symbol_ty, definitions_ty, global_symbol_ty, symbol_ty, BytesLiteralType, ClassType,
+    FunctionType, StringLiteralType, Type, UnionBuilder,
 };
 use crate::Db;
 
@@ -1865,15 +1865,17 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// Look up a name reference that isn't bound in the local scope.
     fn lookup_name(&self, name: &ast::name::Name) -> Type<'db> {
         let file_scope_id = self.scope.file_scope_id(self.db);
-        let symbols = self.index.symbol_table(file_scope_id);
-        let symbol = symbols
+        let is_defined = self
+            .index
+            .symbol_table(file_scope_id)
             .symbol_by_name(name)
-            .expect("Expected the symbol table to create a symbol for every Name node");
+            .expect("Expected the symbol table to create a symbol for every Name node")
+            .is_defined();
 
         // In function-like scopes, any local variable (symbol that is defined in this
         // scope) can only have a definition in this scope, or be undefined; it never references
         // another scope. (At runtime, it would use the `LOAD_FAST` opcode.)
-        if !symbol.is_defined() || !self.scope.is_function_like(self.db) {
+        if !is_defined || !self.scope.is_function_like(self.db) {
             // Walk up parent scopes looking for a possible enclosing scope that may have a
             // definition of this name visible to us (would be `LOAD_DEREF` at runtime.)
             for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id) {
@@ -1921,20 +1923,27 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ast::ExprName { range: _, id, ctx } = name;
         let file_scope_id = self.scope.file_scope_id(self.db);
 
-        // if we're inferring types of deferred expressions, always treat them as public symbols
-        if self.is_deferred() {
-            let symbols = self.index.symbol_table(file_scope_id);
-            let symbol = symbols
-                .symbol_id_by_name(id)
-                .expect("Expected the symbol table to create a symbol for every Name node");
-            return symbol_ty_by_id(self.db, self.scope, symbol);
-        }
-
         match ctx {
             ExprContext::Load => {
                 let use_def = self.index.use_def_map(file_scope_id);
-                let use_id = name.scoped_use_id(self.db, self.scope);
-                let may_be_unbound = use_def.use_may_be_unbound(use_id);
+                let symbol = self
+                    .index
+                    .symbol_table(file_scope_id)
+                    .symbol_id_by_name(id)
+                    .expect("Expected the symbol table to create a symbol for every Name node");
+                // if we're inferring types of deferred expressions, always treat them as public symbols
+                let (definitions, may_be_unbound) = if self.is_deferred() {
+                    (
+                        use_def.public_definitions(symbol),
+                        use_def.public_may_be_unbound(symbol),
+                    )
+                } else {
+                    let use_id = name.scoped_use_id(self.db, self.scope);
+                    (
+                        use_def.use_definitions(use_id),
+                        use_def.use_may_be_unbound(use_id),
+                    )
+                };
 
                 let unbound_ty = if may_be_unbound {
                     Some(self.lookup_name(id))
@@ -1942,7 +1951,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     None
                 };
 
-                definitions_ty(self.db, use_def.use_definitions(use_id), unbound_ty)
+                definitions_ty(self.db, definitions, unbound_ty)
             }
             ExprContext::Store | ExprContext::Del => Type::None,
             ExprContext::Invalid => Type::Unknown,
@@ -3683,6 +3692,22 @@ mod tests {
         let mut db = setup_db();
         db.write_file("/src/a.py", "x = str")?;
         assert_public_ty(&db, "/src/a.py", "x", "Literal[str]");
+        Ok(())
+    }
+
+    #[test]
+    fn deferred_annotation_builtin() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_file("/src/a.pyi", "class C(object): pass")?;
+        let file = system_path_to_file(&db, "/src/a.pyi").unwrap();
+        let ty = global_symbol_ty(&db, file, "C");
+
+        let Some(base) = ty.expect_class().bases(&db).next() else {
+            panic!("expected at least one base");
+        };
+
+        assert_eq!(base.display(&db).to_string(), "Literal[object]");
+
         Ok(())
     }
 
