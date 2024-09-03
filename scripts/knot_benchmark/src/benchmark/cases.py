@@ -134,6 +134,7 @@ class Pyright(Tool):
         command = [
             str(self.path),
             "--venvpath",
+            "--threads",
             str(
                 venv.path.parent
             ),  # This is not the path to the venv folder, but the folder that contains the venv...
