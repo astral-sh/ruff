@@ -23,3 +23,4 @@ pub(crate) mod site_packages;
 pub mod types;
 
 type FxOrderSet<V> = ordermap::set::OrderSet<V, BuildHasherDefault<FxHasher>>;
+type FxOrderMap<K, V> = ordermap::map::OrderMap<K, V, BuildHasherDefault<FxHasher>>;

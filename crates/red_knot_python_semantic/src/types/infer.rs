@@ -3093,7 +3093,7 @@ mod tests {
             ",
         )?;
 
-        assert_public_ty(&db, "src/a.py", "x", "Literal[3] | Unbound");
+        assert_public_ty(&db, "src/a.py", "x", "Unbound | Literal[3]");
         Ok(())
     }
 
@@ -3119,8 +3119,8 @@ mod tests {
         )?;
 
         assert_public_ty(&db, "src/a.py", "x", "Literal[3, 4, 5]");
-        assert_public_ty(&db, "src/a.py", "r", "Literal[2] | Unbound");
-        assert_public_ty(&db, "src/a.py", "s", "Literal[5] | Unbound");
+        assert_public_ty(&db, "src/a.py", "r", "Unbound | Literal[2]");
+        assert_public_ty(&db, "src/a.py", "s", "Unbound | Literal[5]");
         Ok(())
     }
 
@@ -3356,7 +3356,7 @@ mod tests {
 
         assert_eq!(
             y_ty.display(&db).to_string(),
-            "Literal[1] | Literal[copyright]"
+            "Literal[copyright] | Literal[1]"
         );
 
         Ok(())
@@ -3389,7 +3389,7 @@ mod tests {
         let y_ty = symbol_ty_by_name(&db, class_scope, "y");
         let x_ty = symbol_ty_by_name(&db, class_scope, "x");
 
-        assert_eq!(x_ty.display(&db).to_string(), "Literal[2] | Unbound");
+        assert_eq!(x_ty.display(&db).to_string(), "Unbound | Literal[2]");
         assert_eq!(y_ty.display(&db).to_string(), "Literal[1]");
 
         Ok(())
@@ -3522,7 +3522,7 @@ mod tests {
             ",
         )?;
 
-        assert_public_ty(&db, "/src/a.py", "x", "Literal[1] | None");
+        assert_public_ty(&db, "/src/a.py", "x", "None | Literal[1]");
         assert_public_ty(&db, "/src/a.py", "y", "Literal[0, 1]");
 
         Ok(())
