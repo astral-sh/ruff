@@ -288,6 +288,17 @@ impl<'db> Type<'db> {
         self.into_function_type().expect("Expected a Type::Function variant")
     }
 
+    pub const fn into_int_literal_type(self) -> Option<i64> {
+        match self {
+            Type::IntLiteral(value) => Some(value),
+            _ => None
+        }
+    }
+
+    pub fn expect_int_literal(self) -> i64 {
+        self.into_int_literal_type().expect("Expected a Type::IntLiteral variant")
+    }
+
     pub fn may_be_unbound(&self, db: &'db dyn Db) -> bool {
         match self {
             Type::Unbound => true,

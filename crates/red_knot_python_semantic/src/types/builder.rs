@@ -358,19 +358,20 @@ mod tests {
         let t2 = Type::BooleanLiteral(false);
         let t3 = Type::IntLiteral(17);
 
-        let Type::Union(union) = UnionBuilder::new(&db).add(t0).add(t1).add(t3).build() else {
-            panic!("expected a union");
-        };
+        let union = UnionBuilder::new(&db)
+            .add(t0)
+            .add(t1)
+            .add(t3)
+            .build()
+            .expect_union();
         assert_eq!(union.elements_vec(&db), &[t0, t3]);
-        let Type::Union(union) = UnionBuilder::new(&db)
+        let union = UnionBuilder::new(&db)
             .add(t0)
             .add(t1)
             .add(t2)
             .add(t3)
             .build()
-        else {
-            panic!("expected a union");
-        };
+            .expect_union();
 
         assert_eq!(union.elements_vec(&db), &[bool_ty, t3]);
     }
