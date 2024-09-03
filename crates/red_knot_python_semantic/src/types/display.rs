@@ -105,7 +105,7 @@ impl Display for DisplayUnionType<'_> {
                 grouped_literals
                     .entry(literal_kind)
                     .or_insert_with(Vec::new)
-                    .push(element);
+                    .push(*element);
             }
         }
 
@@ -114,7 +114,7 @@ impl Display for DisplayUnionType<'_> {
         // Print all types, but write all literals together (while preserving their position).
         for ty in elements {
             if let Ok(literal_kind) = LiteralTypeKind::try_from(*ty) {
-                let Some(literals) = grouped_literals.remove(&literal_kind) else {
+                let Some(mut literals) = grouped_literals.remove(&literal_kind) else {
                     continue;
                 };
 
@@ -123,6 +123,14 @@ impl Display for DisplayUnionType<'_> {
                 };
 
                 f.write_str("Literal[")?;
+
+                if literal_kind == LiteralTypeKind::IntLiteral {
+                    literals.sort_unstable_by_key(|ty| match ty {
+                        Type::IntLiteral(n) => *n,
+                        _ => panic!("Expected only int literals when kind is IntLiteral"),
+                    });
+                }
+
                 for (i, literal_ty) in literals.iter().enumerate() {
                     if i > 0 {
                         f.write_str(", ")?;
@@ -135,7 +143,7 @@ impl Display for DisplayUnionType<'_> {
                     f.write_str(" | ")?;
                 };
 
-                self.ty.display(self.db).fmt(f)?;
+                ty.display(self.db).fmt(f)?;
             }
 
             first = false;
