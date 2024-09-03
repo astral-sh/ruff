@@ -33,7 +33,7 @@ impl Display for DisplayType<'_> {
             }
             // TODO functions and classes should display using a fully qualified name
             Type::Class(class) => write!(f, "Literal[{}]", class.name(self.db)),
-            Type::Instance(class) => f.write_str(&class.name(self.db)),
+            Type::Instance(class) => f.write_str(class.name(self.db)),
             Type::Function(function) => write!(f, "Literal[{}]", function.name(self.db)),
             Type::Union(union) => union.display(self.db).fmt(f),
             Type::Intersection(intersection) => intersection.display(self.db).fmt(f),

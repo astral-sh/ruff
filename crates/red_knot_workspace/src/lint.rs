@@ -164,7 +164,7 @@ fn lint_bad_override(context: &SemanticLintContext, class: &ast::StmtClassDef) {
         if ty.has_decorator(db, override_ty) {
             let method_name = ty.name(db);
             if class_ty
-                .inherited_class_member(db, &method_name)
+                .inherited_class_member(db, method_name)
                 .is_unbound()
             {
                 // TODO should have a qualname() method to support nested classes

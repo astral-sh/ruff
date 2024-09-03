@@ -361,6 +361,7 @@ impl<'db> Type<'db> {
 #[salsa::interned]
 pub struct FunctionType<'db> {
     /// name of the function at definition
+    #[return_ref]
     pub name: ast::name::Name,
 
     definition: Definition<'db>,
@@ -408,6 +409,7 @@ impl<'db> FunctionType<'db> {
 #[salsa::interned]
 pub struct ClassType<'db> {
     /// Name of the class at definition
+    #[return_ref]
     pub name: ast::name::Name,
 
     definition: Definition<'db>,
@@ -464,6 +466,7 @@ impl<'db> ClassType<'db> {
 #[salsa::interned]
 pub struct UnionType<'db> {
     /// The union type includes values in any of these types.
+    #[return_ref]
     elements: FxOrderSet<Type<'db>>,
 }
 
@@ -476,6 +479,7 @@ impl<'db> UnionType<'db> {
 #[salsa::interned]
 pub struct IntersectionType<'db> {
     /// The intersection type includes only values in all of these types.
+    #[return_ref]
     positive: FxOrderSet<Type<'db>>,
 
     /// The intersection type does not include any value in any of these types.
@@ -483,6 +487,7 @@ pub struct IntersectionType<'db> {
     /// Negation types aren't expressible in annotations, and are most likely to arise from type
     /// narrowing along with intersections (e.g. `if not isinstance(...)`), so we represent them
     /// directly in intersections rather than as a separate type.
+    #[return_ref]
     negative: FxOrderSet<Type<'db>>,
 }
 
