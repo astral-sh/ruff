@@ -49,7 +49,7 @@ impl<'db> UnionBuilder<'db> {
     pub(crate) fn add(mut self, ty: Type<'db>) -> Self {
         match ty {
             Type::Union(union) => {
-                self.elements.extend(&union.elements(self.db));
+                self.elements.extend(union.elements(self.db));
             }
             Type::Never => {}
             _ => {
@@ -284,7 +284,7 @@ mod tests {
 
     impl<'db> UnionType<'db> {
         fn elements_vec(self, db: &'db TestDb) -> Vec<Type<'db>> {
-            self.elements(db).into_iter().collect()
+            self.elements(db).into_iter().copied().collect()
         }
     }
 
@@ -389,11 +389,11 @@ mod tests {
 
     impl<'db> IntersectionType<'db> {
         fn pos_vec(self, db: &'db TestDb) -> Vec<Type<'db>> {
-            self.positive(db).into_iter().collect()
+            self.positive(db).into_iter().copied().collect()
         }
 
         fn neg_vec(self, db: &'db TestDb) -> Vec<Type<'db>> {
-            self.negative(db).into_iter().collect()
+            self.negative(db).into_iter().copied().collect()
         }
     }
 

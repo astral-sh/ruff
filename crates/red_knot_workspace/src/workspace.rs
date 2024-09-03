@@ -297,7 +297,6 @@ impl Workspace {
     }
 }
 
-#[salsa::tracked]
 impl Package {
     pub fn root(self, db: &dyn Db) -> &SystemPath {
         self.root_buf(db)
