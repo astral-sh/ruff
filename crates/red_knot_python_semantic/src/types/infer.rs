@@ -44,7 +44,7 @@ use crate::semantic_index::ast_ids::{HasScopedAstId, HasScopedUseId, ScopedExpre
 use crate::semantic_index::definition::{Definition, DefinitionKind, DefinitionNodeKey};
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::semantic_index;
-use crate::semantic_index::symbol::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId};
+use crate::semantic_index::symbol::{NodeWithScopeKind, NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
 use crate::types::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 use crate::types::{
@@ -1863,7 +1863,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             // No nonlocal binding, check module globals. Avoid infinite recursion if `self.scope`
             // already is module globals.
-            let ty = if file_scope_id == FileScopeId::global() {
+            let ty = if file_scope_id.is_global() {
                 Type::Unbound
             } else {
                 global_symbol_ty_by_name(self.db, self.file, name)

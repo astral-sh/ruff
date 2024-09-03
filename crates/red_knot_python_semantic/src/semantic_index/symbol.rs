@@ -149,6 +149,10 @@ impl FileScopeId {
         FileScopeId::from_u32(0)
     }
 
+    pub fn is_global(self) -> bool {
+        self == FileScopeId::global()
+    }
+
     pub fn to_scope_id(self, db: &dyn Db, file: File) -> ScopeId<'_> {
         let index = semantic_index(db, file);
         index.scope_ids_by_scope[self]
