@@ -201,6 +201,8 @@ class Venv:
             "uv",
             "pip",
             "install",
+            "--python",
+            self.python,
             "--quiet",
             *dependencies,
         ]
