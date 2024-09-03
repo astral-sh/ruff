@@ -26,7 +26,7 @@ pub const MAGIC_GLOBALS: &[&str] = &[
 /// Return the list of builtins for the given Python minor version.
 ///
 /// Intended to be kept in sync with [`is_python_builtin`].
-pub fn python_builtins(minor_version: u8, include_ipython_builtins: bool) -> Vec<&'static str> {
+pub fn python_builtins(minor_version: u8, is_notebook: bool) -> Vec<&'static str> {
     let mut builtins = vec![
         "ArithmeticError",
         "AssertionError",
@@ -194,7 +194,7 @@ pub fn python_builtins(minor_version: u8, include_ipython_builtins: bool) -> Vec
         builtins.push("PythonFinalizationError");
     }
 
-    if include_ipython_builtins {
+    if is_notebook {
         builtins.extend(IPYTHON_BUILTINS);
     }
 
@@ -204,8 +204,8 @@ pub fn python_builtins(minor_version: u8, include_ipython_builtins: bool) -> Vec
 /// Returns `true` if the given name is that of a Python builtin.
 ///
 /// Intended to be kept in sync with [`python_builtins`].
-pub fn is_python_builtin(name: &str, minor_version: u8, include_ipython_builtins: bool) -> bool {
-    if include_ipython_builtins && is_ipython_builtin(name) {
+pub fn is_python_builtin(name: &str, minor_version: u8, is_notebook: bool) -> bool {
+    if is_notebook && is_ipython_builtin(name) {
         return true;
     }
     matches!(
