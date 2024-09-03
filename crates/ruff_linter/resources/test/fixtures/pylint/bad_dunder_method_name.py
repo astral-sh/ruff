@@ -94,7 +94,7 @@ class Apples:
     def __mro_entries__(self, bases):
         pass
 
-    # Deprecated in Python 3
+    # Removed with Python 3
     def __unicode__(self):
         pass
 

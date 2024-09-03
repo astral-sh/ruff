@@ -60,7 +60,7 @@ bad_dunder_method_name.py:23:9: PLW3201 Bad or misspelled dunder method name `__
 
 bad_dunder_method_name.py:98:9: PLW3201 Python 2 or older only dunder method name `__unicode__`
    |
-97 |     # Deprecated in Python 3
+97 |     # Removed with Python 3
 98 |     def __unicode__(self):
    |         ^^^^^^^^^^^ PLW3201
 99 |         pass
