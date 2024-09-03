@@ -44,12 +44,13 @@ use crate::semantic_index::ast_ids::{HasScopedAstId, HasScopedUseId, ScopedExpre
 use crate::semantic_index::definition::{Definition, DefinitionKind, DefinitionNodeKey};
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::semantic_index;
-use crate::semantic_index::symbol::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId};
+use crate::semantic_index::symbol::{NodeWithScopeKind, NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
 use crate::types::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 use crate::types::{
     builtins_symbol_ty_by_name, definitions_ty, global_symbol_ty_by_name, symbol_ty,
-    BytesLiteralType, ClassType, FunctionType, StringLiteralType, Type, UnionBuilder,
+    symbol_ty_by_name, BytesLiteralType, ClassType, FunctionType, StringLiteralType, Type,
+    UnionBuilder,
 };
 use crate::Db;
 
@@ -301,7 +302,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.file.is_stub(self.db.upcast())
     }
 
-    /// Are we currently inferred deferred types?
+    /// Are we currently inferring deferred types?
     fn is_deferred(&self) -> bool {
         matches!(self.region, InferenceRegion::Deferred(_))
     }
@@ -1823,6 +1824,61 @@ impl<'db> TypeInferenceBuilder<'db> {
         Type::Unknown
     }
 
+    /// Look up a name reference that isn't bound in the local scope.
+    fn lookup_name(&self, name: &ast::name::Name) -> Type<'db> {
+        let file_scope_id = self.scope.file_scope_id(self.db);
+        let symbols = self.index.symbol_table(file_scope_id);
+        let symbol = symbols
+            .symbol_by_name(name)
+            .expect("Expected the symbol table to create a symbol for every Name node");
+
+        // In function-like scopes, any local variable (symbol that is defined in this
+        // scope) can only have a definition in this scope, or be undefined; it never references
+        // another scope. (At runtime, it would use the `LOAD_FAST` opcode.)
+        if !symbol.is_defined() || !self.scope.is_function_like(self.db) {
+            // Walk up parent scopes looking for a possible enclosing scope that may have a
+            // definition of this name visible to us (would be `LOAD_DEREF` at runtime.)
+            for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id) {
+                // Class scopes are not visible to nested scopes, and we need to handle global
+                // scope differently (because an unbound name there falls back to builtins), so
+                // check only function-like scopes.
+                let enclosing_scope_id = enclosing_scope_file_id.to_scope_id(self.db, self.file);
+                if !enclosing_scope_id.is_function_like(self.db) {
+                    continue;
+                }
+                let enclosing_symbol_table = self.index.symbol_table(enclosing_scope_file_id);
+                let Some(enclosing_symbol) = enclosing_symbol_table.symbol_by_name(name) else {
+                    continue;
+                };
+                // TODO a "definition" that is just an annotated-assignment with no RHS should not
+                // count as "is_defined" here.
+                if enclosing_symbol.is_defined() {
+                    // We can return early here, because the nearest function-like scope that
+                    // defines a name must be the only source for the nonlocal reference (at
+                    // runtime, it is the scope that creates the cell for our closure.) If the name
+                    // isn't bound in that scope, we should get an unbound name, not continue
+                    // falling back to other scopes / globals / builtins.
+                    return symbol_ty_by_name(self.db, enclosing_scope_id, name);
+                }
+            }
+            // No nonlocal binding, check module globals. Avoid infinite recursion if `self.scope`
+            // already is module globals.
+            let ty = if file_scope_id.is_global() {
+                Type::Unbound
+            } else {
+                global_symbol_ty_by_name(self.db, self.file, name)
+            };
+            // Fallback to builtins (without infinite recursion if we're already in builtins.)
+            if ty.may_be_unbound(self.db) && Some(self.scope) != builtins_scope(self.db) {
+                ty.replace_unbound_with(self.db, builtins_symbol_ty_by_name(self.db, name))
+            } else {
+                ty
+            }
+        } else {
+            Type::Unbound
+        }
+    }
+
     fn infer_name_expression(&mut self, name: &ast::ExprName) -> Type<'db> {
         let ast::ExprName { range: _, id, ctx } = name;
         let file_scope_id = self.scope.file_scope_id(self.db);
@@ -1843,30 +1899,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let may_be_unbound = use_def.use_may_be_unbound(use_id);
 
                 let unbound_ty = if may_be_unbound {
-                    let symbols = self.index.symbol_table(file_scope_id);
-                    // SAFETY: the symbol table always creates a symbol for every Name node.
-                    let symbol = symbols.symbol_by_name(id).unwrap();
-                    if !symbol.is_defined() || !self.scope.is_function_like(self.db) {
-                        // implicit global
-                        let unbound_ty = if file_scope_id == FileScopeId::global() {
-                            Type::Unbound
-                        } else {
-                            global_symbol_ty_by_name(self.db, self.file, id)
-                        };
-                        // fallback to builtins
-                        if unbound_ty.may_be_unbound(self.db)
-                            && Some(self.scope) != builtins_scope(self.db)
-                        {
-                            Some(unbound_ty.replace_unbound_with(
-                                self.db,
-                                builtins_symbol_ty_by_name(self.db, id),
-                            ))
-                        } else {
-                            Some(unbound_ty)
-                        }
-                    } else {
-                        Some(Type::Unbound)
-                    }
+                    Some(self.lookup_name(id))
                 } else {
                     None
                 };
@@ -2382,6 +2415,31 @@ mod tests {
         let file = system_path_to_file(db, file_name).expect("Expected file to exist.");
 
         let ty = global_symbol_ty_by_name(db, file, symbol_name);
+        assert_eq!(ty.display(db).to_string(), expected);
+    }
+
+    fn assert_scope_ty(
+        db: &TestDb,
+        file_name: &str,
+        scopes: &[&str],
+        symbol_name: &str,
+        expected: &str,
+    ) {
+        let file = system_path_to_file(db, file_name).expect("Expected file to exist.");
+        let index = semantic_index(db, file);
+        let mut file_scope_id = FileScopeId::global();
+        let mut scope = file_scope_id.to_scope_id(db, file);
+        for expected_scope_name in scopes {
+            file_scope_id = index
+                .child_scopes(file_scope_id)
+                .next()
+                .unwrap_or_else(|| panic!("scope of {expected_scope_name}"))
+                .0;
+            scope = file_scope_id.to_scope_id(db, file);
+            assert_eq!(scope.name(db), *expected_scope_name);
+        }
+
+        let ty = symbol_ty_by_name(db, scope, symbol_name);
         assert_eq!(ty.display(db).to_string(), expected);
     }
 
@@ -3601,15 +3659,6 @@ mod tests {
         Ok(())
     }
 
-    fn first_public_def<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {
-        let scope = global_scope(db, file);
-        use_def_map(db, scope)
-            .public_definitions(symbol_table(db, scope).symbol_id_by_name(name).unwrap())
-            .next()
-            .unwrap()
-            .definition
-    }
-
     #[test]
     fn big_int() -> anyhow::Result<()> {
         let mut db = setup_db();
@@ -3692,6 +3741,77 @@ mod tests {
         assert_public_ty(&db, "/src/a.py", "x", "dict");
 
         Ok(())
+    }
+
+    #[test]
+    fn nonlocal_name_reference() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            def f():
+                x = 1
+                def g():
+                    y = x
+            ",
+        )?;
+
+        assert_scope_ty(&db, "/src/a.py", &["f", "g"], "y", "Literal[1]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn nonlocal_name_reference_multi_level() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            def f():
+                x = 1
+                def g():
+                    def h():
+                        y = x
+            ",
+        )?;
+
+        assert_scope_ty(&db, "/src/a.py", &["f", "g", "h"], "y", "Literal[1]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn nonlocal_name_reference_skips_class_scope() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            def f():
+                x = 1
+                class C:
+                    x = 2
+                    def g():
+                        y = x
+            ",
+        )?;
+
+        assert_scope_ty(&db, "/src/a.py", &["f", "C", "g"], "y", "Literal[1]");
+
+        Ok(())
+    }
+
+    // Incremental inference tests
+
+    fn first_public_def<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {
+        let scope = global_scope(db, file);
+        use_def_map(db, scope)
+            .public_definitions(symbol_table(db, scope).symbol_id_by_name(name).unwrap())
+            .next()
+            .unwrap()
+            .definition
     }
 
     #[test]
