@@ -212,6 +212,14 @@ pub enum Type<'db> {
 }
 
 impl<'db> Type<'db> {
+    pub const fn is_unbound(&self) -> bool {
+        matches!(self, Type::Unbound)
+    }
+
+    pub const fn is_never(&self) -> bool {
+        matches!(self, Type::Never)
+    }
+
     /// Returns `true` if this type should be displayed as a literal value.
     pub const fn is_literal(&self) -> bool {
         matches!(
@@ -223,14 +231,6 @@ impl<'db> Type<'db> {
                 | Type::Class(_)
                 | Type::Function(_)
         )
-    }
-
-    pub const fn is_unbound(&self) -> bool {
-        matches!(self, Type::Unbound)
-    }
-
-    pub const fn is_never(&self) -> bool {
-        matches!(self, Type::Never)
     }
 
     pub const fn into_class_type(self) -> Option<ClassType<'db>> {
