@@ -36,7 +36,7 @@ impl Violation for RedundantTernary {
     }
 }
 
-/// RUF102
+/// RUF031
 pub(crate) fn redundant_ternary(checker: &mut Checker, if_expr: &ast::ExprIf) {
     let ast::ExprIf {
         body,
