@@ -5,16 +5,10 @@ use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility;
 
 use crate::checkers::ast::Checker;
-use crate::rules::pylint::helpers::{dunder_method_kind, DunderMethodKind};
-
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-enum Kind {
-    Misspelled,
-    RemovedInPython3,
-}
+use crate::rules::pylint::helpers::is_known_dunder_method;
 
 /// ## What it does
-/// Checks for misspelled, unknown and no longer supported dunder names in method definitions.
+/// Checks for dunder methods that have no special meaning in Python 3.
 ///
 /// ## Why is this bad?
 /// Misspelled or no longer supported dunder name methods may cause your code to not function
@@ -51,19 +45,13 @@ enum Kind {
 #[violation]
 pub struct BadDunderMethodName {
     name: String,
-    kind: Kind,
 }
 
 impl Violation for BadDunderMethodName {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BadDunderMethodName { name, kind } = self;
-        match kind {
-            Kind::Misspelled => format!("Bad or misspelled dunder method name `{name}`"),
-            Kind::RemovedInPython3 => {
-                format!("Python 2 or older only dunder method name `{name}`")
-            }
-        }
+        let BadDunderMethodName { name } = self;
+        format!("Dunder method `{name}` has no special meaning in Python 3")
     }
 }
 
@@ -75,11 +63,12 @@ pub(crate) fn bad_dunder_method_name(checker: &mut Checker, method: &ast::StmtFu
     }
 
     // If the name is explicitly allowed, skip it.
-    if checker
-        .settings
-        .pylint
-        .allow_dunder_method_names
-        .contains(method.name.as_str())
+    if is_known_dunder_method(&method.name)
+        || checker
+            .settings
+            .pylint
+            .allow_dunder_method_names
+            .contains(method.name.as_str())
         || matches!(method.name.as_str(), "_")
     {
         return;
@@ -89,17 +78,9 @@ pub(crate) fn bad_dunder_method_name(checker: &mut Checker, method: &ast::StmtFu
         return;
     }
 
-    // If the method is known, skip it.
-    let kind = match dunder_method_kind(&method.name) {
-        Some(DunderMethodKind::Known) => return,
-        Some(DunderMethodKind::Removed) => Kind::RemovedInPython3,
-        None => Kind::Misspelled,
-    };
-
     checker.diagnostics.push(Diagnostic::new(
         BadDunderMethodName {
             name: method.name.to_string(),
-            kind,
         },
         method.identifier(),
     ));

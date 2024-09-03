@@ -168,16 +168,10 @@ impl<'a> Visitor<'_> for SequenceIndexVisitor<'a> {
     }
 }
 
-/// The kind of dunder method.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub(super) enum DunderMethodKind {
-    Known,
-    Removed,
-}
-
-/// Returns the kind of dunder method.
-pub(super) fn dunder_method_kind(method: &str) -> Option<DunderMethodKind> {
-    match method {
+/// Returns `true` if a method is a known dunder method.
+pub(super) fn is_known_dunder_method(method: &str) -> bool {
+    matches!(
+        method,
         "__abs__"
             | "__add__"
             | "__aenter__"
@@ -310,29 +304,6 @@ pub(super) fn dunder_method_kind(method: &str) -> Option<DunderMethodKind> {
             | "_missing_"
             | "_ignore_"
             | "_order_"
-            | "_generate_next_value_" => Some(DunderMethodKind::Known),
-            | "__cmp__"
-            | "__coerce__"
-            | "__delslice__"
-            | "__div__"
-            | "__getslice__"
-            | "__hex__"
-            | "__idiv__"
-            | "__long__"
-            | "__members__"
-            | "__metaclass__"
-            | "__method__"
-            | "__nonzero__"
-            | "__oct__"
-            | "__rcmp__"
-            | "__rdiv__"
-            | "__setslice__"
-            | "__unicode__"=> Some(DunderMethodKind::Removed),
-            _ => None,
-        }
-}
-
-/// Returns `true` if a method is a known dunder method.
-pub(super) fn is_known_dunder_method(method: &str) -> bool {
-    dunder_method_kind(method) == Some(DunderMethodKind::Known)
+            | "_generate_next_value_"
+    )
 }
