@@ -569,23 +569,18 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, File, Mod
 
                 package_path.push(module_name);
 
-                // Must be a `__init__.pyi` or `__init__.py` or it isn't a package.
-                let kind = if package_path.is_directory(&resolver_state) {
-                    package_path.push("__init__");
-                    ModuleKind::Package
-                } else {
-                    ModuleKind::Module
-                };
+                // Try to resolve a stub/module with the current name
+                let module = package_path.resolve_pure_module(&resolver_state);
 
-                // TODO Implement full https://peps.python.org/pep-0561/#type-checker-module-resolution-order resolution
-                if let Some(stub) = package_path.with_pyi_extension().to_file(&resolver_state) {
-                    return Some((search_path.clone(), stub, kind));
+                // Then check if a regular package exists with the same name (it takes
+                // precedence)
+                package_path.push("__init__");
+                if let Some((module, kind)) = package_path.resolve_pure_module(&resolver_state) {
+                    return Some((search_path.clone(), module, kind));
                 }
 
-                if let Some(module) = package_path
-                    .with_py_extension()
-                    .and_then(|path| path.to_file(&resolver_state))
-                {
+                // If we found a module (but no package), return it
+                if let Some((module, kind)) = module {
                     return Some((search_path.clone(), module, kind));
                 }
 
@@ -633,7 +628,10 @@ where
 
         if is_regular_package {
             in_namespace_package = false;
-        } else if package_path.is_directory(resolver_state) {
+        } else if package_path.is_directory(resolver_state)
+            // Pure modules hide namespace packages with the same name
+            && package_path.resolve_pure_module(resolver_state).is_none()
+        {
             // A directory without an `__init__.py` is a namespace package, continue with the next folder.
             in_namespace_package = true;
         } else if in_namespace_package {
@@ -1089,6 +1087,25 @@ mod tests {
             None,
             path_to_module(&db, &FilePath::System(src.join("foo.py")))
         );
+    }
+
+    #[test]
+    fn single_file_takes_priority_over_namespace_package() {
+        //const SRC: &[FileSpec] = &[("foo.py", "x = 1")];
+        const SRC: &[FileSpec] = &[("foo.py", "x = 1"), ("foo/bar.py", "x = 2")];
+
+        let TestCase { db, src, .. } = TestCaseBuilder::new().with_src_files(SRC).build();
+
+        let foo_module_name = ModuleName::new_static("foo").unwrap();
+        let foo_bar_module_name = ModuleName::new_static("foo.bar").unwrap();
+
+        // `foo.py` takes priority over the `foo` namespace package
+        let foo_module = resolve_module(&db, foo_module_name.clone()).unwrap();
+        assert_eq!(foo_module.file().path(&db), &src.join("foo.py"));
+
+        // `foo.bar` isn't recognised as a module
+        let foo_bar_module = resolve_module(&db, foo_bar_module_name.clone());
+        assert_eq!(foo_bar_module, None);
     }
 
     #[test]
