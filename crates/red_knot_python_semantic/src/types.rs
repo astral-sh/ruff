@@ -241,7 +241,8 @@ impl<'db> Type<'db> {
     }
 
     pub fn expect_class(self) -> ClassType<'db> {
-        self.into_class_type().expect("Expected a Type::Class variant")
+        self.into_class_type()
+            .expect("Expected a Type::Class variant")
     }
 
     pub const fn into_module_type(self) -> Option<File> {
@@ -252,7 +253,8 @@ impl<'db> Type<'db> {
     }
 
     pub fn expect_module(self) -> File {
-        self.into_module_type().expect("Expected a Type::Module variant")
+        self.into_module_type()
+            .expect("Expected a Type::Module variant")
     }
 
     pub const fn into_union_type(self) -> Option<UnionType<'db>> {
@@ -263,7 +265,8 @@ impl<'db> Type<'db> {
     }
 
     pub fn expect_union(self) -> UnionType<'db> {
-        self.into_union_type().expect("Expected a Type::Union variant")
+        self.into_union_type()
+            .expect("Expected a Type::Union variant")
     }
 
     pub const fn into_intersection_type(self) -> Option<IntersectionType<'db>> {
@@ -274,7 +277,8 @@ impl<'db> Type<'db> {
     }
 
     pub fn expect_intersection(self) -> IntersectionType<'db> {
-        self.into_intersection_type().expect("Expected a Type::Intersection variant")
+        self.into_intersection_type()
+            .expect("Expected a Type::Intersection variant")
     }
 
     pub const fn into_function_type(self) -> Option<FunctionType<'db>> {
@@ -285,18 +289,20 @@ impl<'db> Type<'db> {
     }
 
     pub fn expect_function(self) -> FunctionType<'db> {
-        self.into_function_type().expect("Expected a Type::Function variant")
+        self.into_function_type()
+            .expect("Expected a Type::Function variant")
     }
 
     pub const fn into_int_literal_type(self) -> Option<i64> {
         match self {
             Type::IntLiteral(value) => Some(value),
-            _ => None
+            _ => None,
         }
     }
 
     pub fn expect_int_literal(self) -> i64 {
-        self.into_int_literal_type().expect("Expected a Type::IntLiteral variant")
+        self.into_int_literal_type()
+            .expect("Expected a Type::IntLiteral variant")
     }
 
     pub fn may_be_unbound(&self, db: &'db dyn Db) -> bool {
