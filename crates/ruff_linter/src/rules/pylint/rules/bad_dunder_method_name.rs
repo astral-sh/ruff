@@ -8,10 +8,10 @@ use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::is_known_dunder_method;
 
 /// ## What it does
-/// Checks for misspelled and unknown dunder names in method definitions.
+/// Checks for dunder methods that have no special meaning in Python 3.
 ///
 /// ## Why is this bad?
-/// Misspelled dunder name methods may cause your code to not function
+/// Misspelled or no longer supported dunder name methods may cause your code to not function
 /// as expected.
 ///
 /// Since dunder methods are associated with customizing the behavior
@@ -51,7 +51,7 @@ impl Violation for BadDunderMethodName {
     #[derive_message_formats]
     fn message(&self) -> String {
         let BadDunderMethodName { name } = self;
-        format!("Bad or misspelled dunder method name `{name}`")
+        format!("Dunder method `{name}` has no special meaning in Python 3")
     }
 }
 

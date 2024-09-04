@@ -94,6 +94,9 @@ class Apples:
     def __mro_entries__(self, bases):
         pass
 
+    # Removed with Python 3
+    def __unicode__(self):
+        pass
 
 def __foo_bar__():  # this is not checked by the [bad-dunder-name] rule
     ...
