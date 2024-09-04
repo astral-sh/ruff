@@ -2,76 +2,76 @@ use crate::module_name::ModuleName;
 use crate::module_resolver::resolve_module;
 use crate::semantic_index::global_scope;
 use crate::semantic_index::symbol::ScopeId;
-use crate::types::{symbol_ty_by_name, Type};
+use crate::types::{global_symbol_ty, Type};
 use crate::Db;
 
 /// Enumeration of various core stdlib modules, for which we have dedicated Salsa queries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum CoreStdlibModule {
+enum CoreStdlibModule {
     Builtins,
     Types,
     Typeshed,
 }
 
 impl CoreStdlibModule {
-    /// Retrieve the global scope of the given module.
-    ///
-    /// Returns `None` if the given module isn't available for some reason.
-    pub(crate) fn global_scope(self, db: &dyn Db) -> Option<ScopeId<'_>> {
-        match self {
-            Self::Builtins => builtins_scope(db),
-            Self::Types => types_scope(db),
-            Self::Typeshed => typeshed_scope(db),
-        }
-    }
-
-    /// Shorthand for `symbol_ty` that looks up a symbol in the scope of a given core module.
-    ///
-    /// Returns `Unbound` if the given module isn't available for some reason.
-    pub(crate) fn symbol_ty_by_name<'db>(self, db: &'db dyn Db, name: &str) -> Type<'db> {
-        self.global_scope(db)
-            .map(|globals| symbol_ty_by_name(db, globals, name))
-            .unwrap_or(Type::Unbound)
+    fn name(self) -> ModuleName {
+        let module_name = match self {
+            Self::Builtins => "builtins",
+            Self::Types => "types",
+            Self::Typeshed => "_typeshed",
+        };
+        ModuleName::new_static(module_name)
+            .unwrap_or_else(|| panic!("{module_name} should be a valid module name!"))
     }
 }
 
-/// Shorthand for `symbol_ty` that looks up a symbol in the `builtins` scope.
+/// Lookup the type of `symbol` in a given core module
+///
+/// Returns `Unbound` if the given core module cannot be resolved for some reason
+fn core_module_symbol_ty<'db>(
+    db: &'db dyn Db,
+    core_module: CoreStdlibModule,
+    symbol: &str,
+) -> Type<'db> {
+    resolve_module(db, core_module.name())
+        .map(|module| global_symbol_ty(db, module.file(), symbol))
+        .unwrap_or(Type::Unbound)
+}
+
+/// Lookup the type of `symbol` in the builtins namespace.
 ///
 /// Returns `Unbound` if the `builtins` module isn't available for some reason.
 #[inline]
-pub(crate) fn builtins_symbol_ty_by_name<'db>(db: &'db dyn Db, name: &str) -> Type<'db> {
-    CoreStdlibModule::Builtins.symbol_ty_by_name(db, name)
+pub(crate) fn builtins_symbol_ty<'db>(db: &'db dyn Db, symbol: &str) -> Type<'db> {
+    core_module_symbol_ty(db, CoreStdlibModule::Builtins, symbol)
 }
 
-/// Salsa query to get the builtins scope.
+/// Lookup the type of `symbol` in the `types` module namespace.
 ///
-/// Can return None if a custom typeshed is used that is missing `builtins.pyi`.
-#[salsa::tracked]
-pub(crate) fn builtins_scope(db: &dyn Db) -> Option<ScopeId<'_>> {
-    let builtins_name =
-        ModuleName::new_static("builtins").expect("Expected 'builtins' to be a valid module name");
-    let builtins_file = resolve_module(db, builtins_name)?.file();
-    Some(global_scope(db, builtins_file))
+/// Returns `Unbound` if the `types` module isn't available for some reason.
+#[inline]
+pub(crate) fn types_symbol_ty<'db>(db: &'db dyn Db, symbol: &str) -> Type<'db> {
+    core_module_symbol_ty(db, CoreStdlibModule::Types, symbol)
 }
 
-/// Salsa query to get the scope for the `types` module.
+/// Lookup the type of `symbol` in the `_typeshed` module namespace.
 ///
-/// Can return None if a custom typeshed is used that is missing `types.pyi`.
-#[salsa::tracked]
-pub(crate) fn types_scope(db: &dyn Db) -> Option<ScopeId<'_>> {
-    let types_module_name =
-        ModuleName::new_static("types").expect("Expected 'types' to be a valid module name");
-    let types_file = resolve_module(db, types_module_name)?.file();
-    Some(global_scope(db, types_file))
+/// Returns `Unbound` if the `_typeshed` module isn't available for some reason.
+#[inline]
+pub(crate) fn typeshed_symbol_ty<'db>(db: &'db dyn Db, symbol: &str) -> Type<'db> {
+    core_module_symbol_ty(db, CoreStdlibModule::Typeshed, symbol)
 }
 
-/// Salsa query to get the scope for the `_typeshed` module.
+/// Get the scope of a core stdlib module.
 ///
-/// Can return None if a custom typeshed is used that is missing a `_typeshed` directory.
-#[salsa::tracked]
-pub(crate) fn typeshed_scope(db: &dyn Db) -> Option<ScopeId<'_>> {
-    let typeshed_module_name = ModuleName::new_static("_typeshed")
-        .expect("Expected '_typeshed' to be a valid module name");
-    let typeshed_file = resolve_module(db, typeshed_module_name)?.file();
-    Some(global_scope(db, typeshed_file))
+/// Can return `None` if a custom typeshed is used that is missing the core module in question.
+fn core_module_scope(db: &dyn Db, core_module: CoreStdlibModule) -> Option<ScopeId<'_>> {
+    resolve_module(db, core_module.name()).map(|module| global_scope(db, module.file()))
+}
+
+/// Get the `builtins` module scope.
+///
+/// Can return `None` if a custom typeshed is used that is missing `builtins.pyi`.
+pub(crate) fn builtins_module_scope(db: &dyn Db) -> Option<ScopeId<'_>> {
+    core_module_scope(db, CoreStdlibModule::Builtins)
 }

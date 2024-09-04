@@ -25,7 +25,7 @@
 //!   * No type in an intersection can be a supertype of any other type in the intersection (just
 //!     eliminate the supertype from the intersection).
 //!   * An intersection containing two non-overlapping types should simplify to [`Type::Never`].
-use crate::types::{builtins_symbol_ty_by_name, IntersectionType, Type, UnionType};
+use crate::types::{builtins_symbol_ty, IntersectionType, Type, UnionType};
 use crate::{Db, FxOrderSet};
 use ordermap::set::MutableValues;
 
@@ -65,7 +65,7 @@ impl<'db> UnionBuilder<'db> {
         if let Some(true_index) = self.elements.get_index_of(&Type::BooleanLiteral(true)) {
             if self.elements.contains(&Type::BooleanLiteral(false)) {
                 *self.elements.get_index_mut2(true_index).unwrap() =
-                    builtins_symbol_ty_by_name(self.db, "bool");
+                    builtins_symbol_ty(self.db, "bool");
                 self.elements.remove(&Type::BooleanLiteral(false));
             }
         }
@@ -275,7 +275,7 @@ mod tests {
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
-    use crate::types::builtins_symbol_ty_by_name;
+    use crate::types::builtins_symbol_ty;
     use crate::ProgramSettings;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
@@ -348,7 +348,7 @@ mod tests {
     #[test]
     fn build_union_bool() {
         let db = setup_db();
-        let bool_ty = builtins_symbol_ty_by_name(&db, "bool");
+        let bool_ty = builtins_symbol_ty(&db, "bool");
 
         let t0 = Type::BooleanLiteral(true);
         let t1 = Type::BooleanLiteral(true);

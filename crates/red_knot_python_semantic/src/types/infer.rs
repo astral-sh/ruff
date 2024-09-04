@@ -45,12 +45,11 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::{NodeWithScopeKind, NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
-use crate::stdlib::builtins_scope;
+use crate::stdlib::builtins_module_scope;
 use crate::types::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 use crate::types::{
-    builtins_symbol_ty_by_name, definitions_ty, global_symbol_ty_by_name, symbol_ty,
-    symbol_ty_by_name, BytesLiteralType, ClassType, FunctionType, StringLiteralType, Type,
-    UnionBuilder,
+    builtins_symbol_ty, definitions_ty, global_symbol_ty, symbol_ty, symbol_ty_by_id,
+    BytesLiteralType, ClassType, FunctionType, StringLiteralType, Type, UnionBuilder,
 };
 use crate::Db;
 
@@ -1399,11 +1398,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Number::Int(n) => n
                 .as_i64()
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int").to_instance()),
-            ast::Number::Float(_) => builtins_symbol_ty_by_name(self.db, "float").to_instance(),
-            ast::Number::Complex { .. } => {
-                builtins_symbol_ty_by_name(self.db, "complex").to_instance()
-            }
+                .unwrap_or_else(|| builtins_symbol_ty(self.db, "int").to_instance()),
+            ast::Number::Float(_) => builtins_symbol_ty(self.db, "float").to_instance(),
+            ast::Number::Complex { .. } => builtins_symbol_ty(self.db, "complex").to_instance(),
         }
     }
 
@@ -1485,7 +1482,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         _literal: &ast::ExprEllipsisLiteral,
     ) -> Type<'db> {
-        builtins_symbol_ty_by_name(self.db, "Ellipsis")
+        builtins_symbol_ty(self.db, "Ellipsis")
     }
 
     fn infer_tuple_expression(&mut self, tuple: &ast::ExprTuple) -> Type<'db> {
@@ -1501,7 +1498,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // TODO generic
-        builtins_symbol_ty_by_name(self.db, "tuple").to_instance()
+        builtins_symbol_ty(self.db, "tuple").to_instance()
     }
 
     fn infer_list_expression(&mut self, list: &ast::ExprList) -> Type<'db> {
@@ -1516,7 +1513,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // TODO generic
-        builtins_symbol_ty_by_name(self.db, "list").to_instance()
+        builtins_symbol_ty(self.db, "list").to_instance()
     }
 
     fn infer_set_expression(&mut self, set: &ast::ExprSet) -> Type<'db> {
@@ -1527,7 +1524,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // TODO generic
-        builtins_symbol_ty_by_name(self.db, "set").to_instance()
+        builtins_symbol_ty(self.db, "set").to_instance()
     }
 
     fn infer_dict_expression(&mut self, dict: &ast::ExprDict) -> Type<'db> {
@@ -1539,7 +1536,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // TODO generic
-        builtins_symbol_ty_by_name(self.db, "dict").to_instance()
+        builtins_symbol_ty(self.db, "dict").to_instance()
     }
 
     /// Infer the type of the `iter` expression of the first comprehension.
@@ -1882,7 +1879,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     // runtime, it is the scope that creates the cell for our closure.) If the name
                     // isn't bound in that scope, we should get an unbound name, not continue
                     // falling back to other scopes / globals / builtins.
-                    return symbol_ty_by_name(self.db, enclosing_scope_id, name);
+                    return symbol_ty(self.db, enclosing_scope_id, name);
                 }
             }
             // No nonlocal binding, check module globals. Avoid infinite recursion if `self.scope`
@@ -1890,11 +1887,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             let ty = if file_scope_id.is_global() {
                 Type::Unbound
             } else {
-                global_symbol_ty_by_name(self.db, self.file, name)
+                global_symbol_ty(self.db, self.file, name)
             };
             // Fallback to builtins (without infinite recursion if we're already in builtins.)
-            if ty.may_be_unbound(self.db) && Some(self.scope) != builtins_scope(self.db) {
-                ty.replace_unbound_with(self.db, builtins_symbol_ty_by_name(self.db, name))
+            if ty.may_be_unbound(self.db) && Some(self.scope) != builtins_module_scope(self.db) {
+                ty.replace_unbound_with(self.db, builtins_symbol_ty(self.db, name))
             } else {
                 ty
             }
@@ -1913,7 +1910,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             let symbol = symbols
                 .symbol_id_by_name(id)
                 .expect("Expected the symbol table to create a symbol for every Name node");
-            return symbol_ty(self.db, self.scope, symbol);
+            return symbol_ty_by_id(self.db, self.scope, symbol);
         }
 
         match ctx {
@@ -1984,22 +1981,22 @@ impl<'db> TypeInferenceBuilder<'db> {
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Add) => n
                 .checked_add(m)
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int").to_instance()),
+                .unwrap_or_else(|| builtins_symbol_ty(self.db, "int").to_instance()),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Sub) => n
                 .checked_sub(m)
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int").to_instance()),
+                .unwrap_or_else(|| builtins_symbol_ty(self.db, "int").to_instance()),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Mult) => n
                 .checked_mul(m)
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int").to_instance()),
+                .unwrap_or_else(|| builtins_symbol_ty(self.db, "int").to_instance()),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Div) => n
                 .checked_div(m)
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| builtins_symbol_ty_by_name(self.db, "int").to_instance()),
+                .unwrap_or_else(|| builtins_symbol_ty(self.db, "int").to_instance()),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Mod) => n
                 .checked_rem(m)
@@ -2384,8 +2381,8 @@ mod tests {
     use crate::semantic_index::definition::Definition;
     use crate::semantic_index::symbol::FileScopeId;
     use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
-    use crate::stdlib::builtins_scope;
-    use crate::types::{global_symbol_ty_by_name, infer_definition_types, symbol_ty_by_name};
+    use crate::stdlib::builtins_module_scope;
+    use crate::types::{global_symbol_ty, infer_definition_types, symbol_ty};
     use crate::{HasTy, ProgramSettings, SemanticModel};
 
     use super::TypeInferenceBuilder;
@@ -2438,7 +2435,7 @@ mod tests {
     fn assert_public_ty(db: &TestDb, file_name: &str, symbol_name: &str, expected: &str) {
         let file = system_path_to_file(db, file_name).expect("Expected file to exist.");
 
-        let ty = global_symbol_ty_by_name(db, file, symbol_name);
+        let ty = global_symbol_ty(db, file, symbol_name);
         assert_eq!(ty.display(db).to_string(), expected);
     }
 
@@ -2463,7 +2460,7 @@ mod tests {
             assert_eq!(scope.name(db), *expected_scope_name);
         }
 
-        let ty = symbol_ty_by_name(db, scope, symbol_name);
+        let ty = symbol_ty(db, scope, symbol_name);
         assert_eq!(ty.display(db).to_string(), expected);
     }
 
@@ -2667,7 +2664,7 @@ mod tests {
         )?;
 
         let mod_file = system_path_to_file(&db, "src/mod.py").expect("Expected file to exist.");
-        let ty = global_symbol_ty_by_name(&db, mod_file, "Sub");
+        let ty = global_symbol_ty(&db, mod_file, "Sub");
 
         let class = ty.expect_class();
 
@@ -2694,7 +2691,7 @@ mod tests {
         )?;
 
         let mod_file = system_path_to_file(&db, "src/mod.py").unwrap();
-        let ty = global_symbol_ty_by_name(&db, mod_file, "C");
+        let ty = global_symbol_ty(&db, mod_file, "C");
         let class_id = ty.expect_class();
         let member_ty = class_id.class_member(&db, &Name::new_static("f"));
         let func = member_ty.expect_function();
@@ -2898,7 +2895,7 @@ mod tests {
         db.write_file("src/a.py", "def example() -> int: return 42")?;
 
         let mod_file = system_path_to_file(&db, "src/a.py").unwrap();
-        let function = global_symbol_ty_by_name(&db, mod_file, "example").expect_function();
+        let function = global_symbol_ty(&db, mod_file, "example").expect_function();
         let returns = function.return_type(&db);
         assert_eq!(returns.display(&db).to_string(), "int");
 
@@ -3361,7 +3358,7 @@ mod tests {
         )?;
 
         let a = system_path_to_file(&db, "src/a.py").expect("Expected file to exist.");
-        let c_ty = global_symbol_ty_by_name(&db, a, "C");
+        let c_ty = global_symbol_ty(&db, a, "C");
         let c_class = c_ty.expect_class();
         let mut c_bases = c_class.bases(&db);
         let b_ty = c_bases.next().unwrap();
@@ -3398,8 +3395,8 @@ mod tests {
             .unwrap()
             .0
             .to_scope_id(&db, file);
-        let y_ty = symbol_ty_by_name(&db, function_scope, "y");
-        let x_ty = symbol_ty_by_name(&db, function_scope, "x");
+        let y_ty = symbol_ty(&db, function_scope, "y");
+        let x_ty = symbol_ty(&db, function_scope, "x");
 
         assert_eq!(y_ty.display(&db).to_string(), "Unbound");
         assert_eq!(x_ty.display(&db).to_string(), "Literal[2]");
@@ -3429,8 +3426,8 @@ mod tests {
             .unwrap()
             .0
             .to_scope_id(&db, file);
-        let y_ty = symbol_ty_by_name(&db, function_scope, "y");
-        let x_ty = symbol_ty_by_name(&db, function_scope, "x");
+        let y_ty = symbol_ty(&db, function_scope, "y");
+        let x_ty = symbol_ty(&db, function_scope, "x");
 
         assert_eq!(x_ty.display(&db).to_string(), "Unbound");
         assert_eq!(y_ty.display(&db).to_string(), "Literal[1]");
@@ -3460,7 +3457,7 @@ mod tests {
             .unwrap()
             .0
             .to_scope_id(&db, file);
-        let y_ty = symbol_ty_by_name(&db, function_scope, "y");
+        let y_ty = symbol_ty(&db, function_scope, "y");
 
         assert_eq!(
             y_ty.display(&db).to_string(),
@@ -3494,8 +3491,8 @@ mod tests {
             .unwrap()
             .0
             .to_scope_id(&db, file);
-        let y_ty = symbol_ty_by_name(&db, class_scope, "y");
-        let x_ty = symbol_ty_by_name(&db, class_scope, "x");
+        let y_ty = symbol_ty(&db, class_scope, "y");
+        let x_ty = symbol_ty(&db, class_scope, "x");
 
         assert_eq!(x_ty.display(&db).to_string(), "Unbound | Literal[2]");
         assert_eq!(y_ty.display(&db).to_string(), "Literal[1]");
@@ -3588,9 +3585,11 @@ mod tests {
         assert_public_ty(&db, "/src/a.py", "x", "Literal[copyright]");
         // imported builtins module is the same file as the implicit builtins
         let file = system_path_to_file(&db, "/src/a.py").expect("Expected file to exist.");
-        let builtins_ty = global_symbol_ty_by_name(&db, file, "builtins");
+        let builtins_ty = global_symbol_ty(&db, file, "builtins");
         let builtins_file = builtins_ty.expect_module();
-        let implicit_builtins_file = builtins_scope(&db).expect("builtins to exist").file(&db);
+        let implicit_builtins_file = builtins_module_scope(&db)
+            .expect("builtins module should exist")
+            .file(&db);
         assert_eq!(builtins_file, implicit_builtins_file);
 
         Ok(())
@@ -3894,7 +3893,7 @@ mod tests {
         ])?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
-        let x_ty = global_symbol_ty_by_name(&db, a, "x");
+        let x_ty = global_symbol_ty(&db, a, "x");
 
         assert_eq!(x_ty.display(&db).to_string(), "Literal[10]");
 
@@ -3903,7 +3902,7 @@ mod tests {
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
 
-        let x_ty_2 = global_symbol_ty_by_name(&db, a, "x");
+        let x_ty_2 = global_symbol_ty(&db, a, "x");
 
         assert_eq!(x_ty_2.display(&db).to_string(), "Literal[20]");
 
@@ -3920,7 +3919,7 @@ mod tests {
         ])?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
-        let x_ty = global_symbol_ty_by_name(&db, a, "x");
+        let x_ty = global_symbol_ty(&db, a, "x");
 
         assert_eq!(x_ty.display(&db).to_string(), "Literal[10]");
 
@@ -3930,7 +3929,7 @@ mod tests {
 
         db.clear_salsa_events();
 
-        let x_ty_2 = global_symbol_ty_by_name(&db, a, "x");
+        let x_ty_2 = global_symbol_ty(&db, a, "x");
 
         assert_eq!(x_ty_2.display(&db).to_string(), "Literal[10]");
 
@@ -3956,7 +3955,7 @@ mod tests {
         ])?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
-        let x_ty = global_symbol_ty_by_name(&db, a, "x");
+        let x_ty = global_symbol_ty(&db, a, "x");
 
         assert_eq!(x_ty.display(&db).to_string(), "Literal[10]");
 
@@ -3966,7 +3965,7 @@ mod tests {
 
         db.clear_salsa_events();
 
-        let x_ty_2 = global_symbol_ty_by_name(&db, a, "x");
+        let x_ty_2 = global_symbol_ty(&db, a, "x");
 
         assert_eq!(x_ty_2.display(&db).to_string(), "Literal[10]");
 

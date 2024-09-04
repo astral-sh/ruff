@@ -8,7 +8,7 @@ use crate::semantic_index::{
     global_scope, semantic_index, symbol_table, use_def_map, DefinitionWithConstraints,
     DefinitionWithConstraintsIterator,
 };
-use crate::stdlib::{builtins_symbol_ty_by_name, CoreStdlibModule};
+use crate::stdlib::{builtins_symbol_ty, types_symbol_ty, typeshed_symbol_ty};
 use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet};
 
@@ -40,7 +40,7 @@ pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
 }
 
 /// Infer the public type of a symbol (its type as seen from outside its scope).
-pub(crate) fn symbol_ty<'db>(
+pub(crate) fn symbol_ty_by_id<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     symbol: ScopedSymbolId,
@@ -58,21 +58,17 @@ pub(crate) fn symbol_ty<'db>(
 }
 
 /// Shorthand for `symbol_ty` that takes a symbol name instead of an ID.
-pub(crate) fn symbol_ty_by_name<'db>(
-    db: &'db dyn Db,
-    scope: ScopeId<'db>,
-    name: &str,
-) -> Type<'db> {
+pub(crate) fn symbol_ty<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Type<'db> {
     let table = symbol_table(db, scope);
     table
         .symbol_id_by_name(name)
-        .map(|symbol| symbol_ty(db, scope, symbol))
+        .map(|symbol| symbol_ty_by_id(db, scope, symbol))
         .unwrap_or(Type::Unbound)
 }
 
 /// Shorthand for `symbol_ty` that looks up a module-global symbol by name in a file.
-pub(crate) fn global_symbol_ty_by_name<'db>(db: &'db dyn Db, file: File, name: &str) -> Type<'db> {
-    symbol_ty_by_name(db, global_scope(db, file), name)
+pub(crate) fn global_symbol_ty<'db>(db: &'db dyn Db, file: File, name: &str) -> Type<'db> {
+    symbol_ty(db, global_scope(db, file), name)
 }
 
 /// Infer the type of a [`Definition`].
@@ -335,7 +331,7 @@ impl<'db> Type<'db> {
                 // TODO: attribute lookup on function type
                 Type::Unknown
             }
-            Type::Module(file) => global_symbol_ty_by_name(db, *file, name),
+            Type::Module(file) => global_symbol_ty(db, *file, name),
             Type::Class(class) => class.class_member(db, name),
             Type::Instance(_) => {
                 // TODO MRO? get_own_instance_member, get_instance_member
@@ -409,12 +405,12 @@ impl<'db> Type<'db> {
     fn iterate(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         // `self` represents the type of the iterable;
         // `__iter__` and `__next__` are both looked up on the class of the iterable:
-        let type_of_class = self.to_type_of_class(db);
+        let type_of_class = self.to_meta_type(db);
 
         let dunder_iter_method = type_of_class.member(db, "__iter__");
         if !dunder_iter_method.is_unbound() {
             let iterator_ty = dunder_iter_method.call(db)?;
-            let dunder_next_method = iterator_ty.to_type_of_class(db).member(db, "__next__");
+            let dunder_next_method = iterator_ty.to_meta_type(db).member(db, "__next__");
             return dunder_next_method.call(db);
         }
 
@@ -441,22 +437,22 @@ impl<'db> Type<'db> {
     /// Given a type that is assumed to represent an instance of a class,
     /// return a type that represents that class itself.
     #[must_use]
-    pub fn to_type_of_class(&self, db: &'db dyn Db) -> Type<'db> {
+    pub fn to_meta_type(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Type::Unbound => Type::Unbound,
             Type::Never => Type::Never,
             Type::Instance(class) => Type::Class(*class),
-            Type::Union(union) => union.map(db, |ty| ty.to_type_of_class(db)),
-            Type::BooleanLiteral(_) => builtins_symbol_ty_by_name(db, "bool"),
-            Type::BytesLiteral(_) => builtins_symbol_ty_by_name(db, "bytes"),
-            Type::IntLiteral(_) => builtins_symbol_ty_by_name(db, "int"),
-            Type::Function(_) => CoreStdlibModule::Types.symbol_ty_by_name(db, "FunctionType"),
-            Type::Module(_) => CoreStdlibModule::Types.symbol_ty_by_name(db, "ModuleType"),
-            Type::None => CoreStdlibModule::Typeshed.symbol_ty_by_name(db, "NoneType"),
+            Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
+            Type::BooleanLiteral(_) => builtins_symbol_ty(db, "bool"),
+            Type::BytesLiteral(_) => builtins_symbol_ty(db, "bytes"),
+            Type::IntLiteral(_) => builtins_symbol_ty(db, "int"),
+            Type::Function(_) => types_symbol_ty(db, "FunctionType"),
+            Type::Module(_) => types_symbol_ty(db, "ModuleType"),
+            Type::None => typeshed_symbol_ty(db, "NoneType"),
             // TODO not accurate if there's a custom metaclass...
-            Type::Class(_) => builtins_symbol_ty_by_name(db, "type"),
+            Type::Class(_) => builtins_symbol_ty(db, "type"),
             // TODO can we do better here? `type[LiteralString]`?
-            Type::StringLiteral(_) | Type::LiteralString => builtins_symbol_ty_by_name(db, "str"),
+            Type::StringLiteral(_) | Type::LiteralString => builtins_symbol_ty(db, "str"),
             // TODO: `type[Any]`?
             Type::Any => Type::Any,
             // TODO: `type[Unknown]`?
@@ -557,7 +553,7 @@ impl<'db> ClassType<'db> {
     /// Returns the inferred type of the class member named `name`.
     pub fn own_class_member(self, db: &'db dyn Db, name: &str) -> Type<'db> {
         let scope = self.body_scope(db);
-        symbol_ty_by_name(db, scope, name)
+        symbol_ty(db, scope, name)
     }
 
     pub fn inherited_class_member(self, db: &'db dyn Db, name: &str) -> Type<'db> {
