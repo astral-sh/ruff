@@ -1,7 +1,6 @@
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 
-use crate::builtins::builtins_scope;
 use crate::semantic_index::ast_ids::HasScopedAstId;
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId};
@@ -9,6 +8,7 @@ use crate::semantic_index::{
     global_scope, semantic_index, symbol_table, use_def_map, DefinitionWithConstraints,
     DefinitionWithConstraintsIterator,
 };
+use crate::stdlib::{builtins_symbol_ty, types_symbol_ty, typeshed_symbol_ty};
 use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet};
 
@@ -40,7 +40,7 @@ pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
 }
 
 /// Infer the public type of a symbol (its type as seen from outside its scope).
-pub(crate) fn symbol_ty<'db>(
+pub(crate) fn symbol_ty_by_id<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     symbol: ScopedSymbolId,
@@ -58,30 +58,17 @@ pub(crate) fn symbol_ty<'db>(
 }
 
 /// Shorthand for `symbol_ty` that takes a symbol name instead of an ID.
-pub(crate) fn symbol_ty_by_name<'db>(
-    db: &'db dyn Db,
-    scope: ScopeId<'db>,
-    name: &str,
-) -> Type<'db> {
+pub(crate) fn symbol_ty<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Type<'db> {
     let table = symbol_table(db, scope);
     table
         .symbol_id_by_name(name)
-        .map(|symbol| symbol_ty(db, scope, symbol))
+        .map(|symbol| symbol_ty_by_id(db, scope, symbol))
         .unwrap_or(Type::Unbound)
 }
 
 /// Shorthand for `symbol_ty` that looks up a module-global symbol by name in a file.
-pub(crate) fn global_symbol_ty_by_name<'db>(db: &'db dyn Db, file: File, name: &str) -> Type<'db> {
-    symbol_ty_by_name(db, global_scope(db, file), name)
-}
-
-/// Shorthand for `symbol_ty` that looks up a symbol in the builtins.
-///
-/// Returns `Unbound` if the builtins module isn't available for some reason.
-pub(crate) fn builtins_symbol_ty_by_name<'db>(db: &'db dyn Db, name: &str) -> Type<'db> {
-    builtins_scope(db)
-        .map(|builtins| symbol_ty_by_name(db, builtins, name))
-        .unwrap_or(Type::Unbound)
+pub(crate) fn global_symbol_ty<'db>(db: &'db dyn Db, file: File, name: &str) -> Type<'db> {
+    symbol_ty(db, global_scope(db, file), name)
 }
 
 /// Infer the type of a [`Definition`].
@@ -306,13 +293,9 @@ impl<'db> Type<'db> {
     pub fn replace_unbound_with(&self, db: &'db dyn Db, replacement: Type<'db>) -> Type<'db> {
         match self {
             Type::Unbound => replacement,
-            Type::Union(union) => union
-                .elements(db)
-                .into_iter()
-                .fold(UnionBuilder::new(db), |builder, ty| {
-                    builder.add(ty.replace_unbound_with(db, replacement))
-                })
-                .build(),
+            Type::Union(union) => {
+                union.map(db, |element| element.replace_unbound_with(db, replacement))
+            }
             ty => *ty,
         }
     }
@@ -331,7 +314,7 @@ impl<'db> Type<'db> {
     /// us to explicitly consider whether to handle an error or propagate
     /// it up the call stack.
     #[must_use]
-    pub fn member(&self, db: &'db dyn Db, name: &ast::name::Name) -> Type<'db> {
+    pub fn member(&self, db: &'db dyn Db, name: &str) -> Type<'db> {
         match self {
             Type::Any => Type::Any,
             Type::Never => {
@@ -348,19 +331,13 @@ impl<'db> Type<'db> {
                 // TODO: attribute lookup on function type
                 Type::Unknown
             }
-            Type::Module(file) => global_symbol_ty_by_name(db, *file, name),
+            Type::Module(file) => global_symbol_ty(db, *file, name),
             Type::Class(class) => class.class_member(db, name),
             Type::Instance(_) => {
                 // TODO MRO? get_own_instance_member, get_instance_member
                 Type::Unknown
             }
-            Type::Union(union) => union
-                .elements(db)
-                .iter()
-                .fold(UnionBuilder::new(db), |builder, element_ty| {
-                    builder.add(element_ty.member(db, name))
-                })
-                .build(),
+            Type::Union(union) => union.map(db, |element| element.member(db, name)),
             Type::Intersection(_) => {
                 // TODO perform the get_member on each type in the intersection
                 // TODO return the intersection of those results
@@ -415,6 +392,38 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Given the type of an object that is iterated over in some way,
+    /// return the type of objects that are yielded by that iteration.
+    ///
+    /// E.g., for the following loop, given the type of `x`, infer the type of `y`:
+    /// ```python
+    /// for y in x:
+    ///     pass
+    /// ```
+    ///
+    /// Returns `None` if `self` represents a type that is not iterable.
+    fn iterate(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        // `self` represents the type of the iterable;
+        // `__iter__` and `__next__` are both looked up on the class of the iterable:
+        let type_of_class = self.to_meta_type(db);
+
+        let dunder_iter_method = type_of_class.member(db, "__iter__");
+        if !dunder_iter_method.is_unbound() {
+            let iterator_ty = dunder_iter_method.call(db)?;
+            let dunder_next_method = iterator_ty.to_meta_type(db).member(db, "__next__");
+            return dunder_next_method.call(db);
+        }
+
+        // Although it's not considered great practice,
+        // classes that define `__getitem__` are also iterable,
+        // even if they do not define `__iter__`.
+        //
+        // TODO this is only valid if the `__getitem__` method is annotated as
+        // accepting `int` or `SupportsIndex`
+        let dunder_get_item_method = type_of_class.member(db, "__getitem__");
+        dunder_get_item_method.call(db)
+    }
+
     #[must_use]
     pub fn to_instance(&self) -> Type<'db> {
         match self {
@@ -422,6 +431,34 @@ impl<'db> Type<'db> {
             Type::Unknown => Type::Unknown,
             Type::Class(class) => Type::Instance(*class),
             _ => Type::Unknown, // TODO type errors
+        }
+    }
+
+    /// Given a type that is assumed to represent an instance of a class,
+    /// return a type that represents that class itself.
+    #[must_use]
+    pub fn to_meta_type(&self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Type::Unbound => Type::Unbound,
+            Type::Never => Type::Never,
+            Type::Instance(class) => Type::Class(*class),
+            Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
+            Type::BooleanLiteral(_) => builtins_symbol_ty(db, "bool"),
+            Type::BytesLiteral(_) => builtins_symbol_ty(db, "bytes"),
+            Type::IntLiteral(_) => builtins_symbol_ty(db, "int"),
+            Type::Function(_) => types_symbol_ty(db, "FunctionType"),
+            Type::Module(_) => types_symbol_ty(db, "ModuleType"),
+            Type::None => typeshed_symbol_ty(db, "NoneType"),
+            // TODO not accurate if there's a custom metaclass...
+            Type::Class(_) => builtins_symbol_ty(db, "type"),
+            // TODO can we do better here? `type[LiteralString]`?
+            Type::StringLiteral(_) | Type::LiteralString => builtins_symbol_ty(db, "str"),
+            // TODO: `type[Any]`?
+            Type::Any => Type::Any,
+            // TODO: `type[Unknown]`?
+            Type::Unknown => Type::Unknown,
+            // TODO intersections
+            Type::Intersection(_) => Type::Unknown,
         }
     }
 }
@@ -504,7 +541,7 @@ impl<'db> ClassType<'db> {
     /// Returns the class member of this class named `name`.
     ///
     /// The member resolves to a member of the class itself or any of its bases.
-    pub fn class_member(self, db: &'db dyn Db, name: &ast::name::Name) -> Type<'db> {
+    pub fn class_member(self, db: &'db dyn Db, name: &str) -> Type<'db> {
         let member = self.own_class_member(db, name);
         if !member.is_unbound() {
             return member;
@@ -514,12 +551,12 @@ impl<'db> ClassType<'db> {
     }
 
     /// Returns the inferred type of the class member named `name`.
-    pub fn own_class_member(self, db: &'db dyn Db, name: &ast::name::Name) -> Type<'db> {
+    pub fn own_class_member(self, db: &'db dyn Db, name: &str) -> Type<'db> {
         let scope = self.body_scope(db);
-        symbol_ty_by_name(db, scope, name)
+        symbol_ty(db, scope, name)
     }
 
-    pub fn inherited_class_member(self, db: &'db dyn Db, name: &ast::name::Name) -> Type<'db> {
+    pub fn inherited_class_member(self, db: &'db dyn Db, name: &str) -> Type<'db> {
         for base in self.bases(db) {
             let member = base.member(db, name);
             if !member.is_unbound() {
@@ -541,6 +578,21 @@ pub struct UnionType<'db> {
 impl<'db> UnionType<'db> {
     pub fn contains(&self, db: &'db dyn Db, ty: Type<'db>) -> bool {
         self.elements(db).contains(&ty)
+    }
+
+    /// Apply a transformation function to all elements of the union,
+    /// and create a new union from the resulting set of types
+    pub fn map(
+        &self,
+        db: &'db dyn Db,
+        mut transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
+    ) -> Type<'db> {
+        self.elements(db)
+            .into_iter()
+            .fold(UnionBuilder::new(db), |builder, element| {
+                builder.add(transform_fn(element))
+            })
+            .build()
     }
 }
 
@@ -686,6 +738,55 @@ mod tests {
         assert_diagnostic_messages(
             &a_file_diagnostics,
             &["Object of type 'Literal[123]' is not callable"],
+        );
+    }
+
+    #[test]
+    fn invalid_iterable() {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            nonsense = 123
+            for x in nonsense:
+                pass
+            ",
+        )
+        .unwrap();
+
+        let a_file = system_path_to_file(&db, "/src/a.py").unwrap();
+        let a_file_diagnostics = super::check_types(&db, a_file);
+        assert_diagnostic_messages(
+            &a_file_diagnostics,
+            &["Object of type 'Literal[123]' is not iterable"],
+        );
+    }
+
+    #[test]
+    fn new_iteration_protocol_takes_precedence_over_old_style() {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            class NotIterable:
+                def __getitem__(self, key: int) -> int:
+                    return 42
+
+                __iter__ = None
+
+            for x in NotIterable():
+                pass
+            ",
+        )
+        .unwrap();
+
+        let a_file = system_path_to_file(&db, "/src/a.py").unwrap();
+        let a_file_diagnostics = super::check_types(&db, a_file);
+        assert_diagnostic_messages(
+            &a_file_diagnostics,
+            &["Object of type 'NotIterable' is not iterable"],
         );
     }
 }

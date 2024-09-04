@@ -236,9 +236,7 @@ mod tests {
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
     use crate::db::tests::TestDb;
-    use crate::types::{
-        global_symbol_ty_by_name, BytesLiteralType, StringLiteralType, Type, UnionBuilder,
-    };
+    use crate::types::{global_symbol_ty, BytesLiteralType, StringLiteralType, Type, UnionBuilder};
     use crate::{Program, ProgramSettings, PythonVersion, SearchPathSettings};
 
     fn setup_db() -> TestDb {
@@ -283,16 +281,16 @@ mod tests {
         let vec: Vec<Type<'_>> = vec![
             Type::Unknown,
             Type::IntLiteral(-1),
-            global_symbol_ty_by_name(&db, mod_file, "A"),
+            global_symbol_ty(&db, mod_file, "A"),
             Type::StringLiteral(StringLiteralType::new(&db, Box::from("A"))),
             Type::BytesLiteral(BytesLiteralType::new(&db, Box::from([0]))),
             Type::BytesLiteral(BytesLiteralType::new(&db, Box::from([7]))),
             Type::IntLiteral(0),
             Type::IntLiteral(1),
             Type::StringLiteral(StringLiteralType::new(&db, Box::from("B"))),
-            global_symbol_ty_by_name(&db, mod_file, "foo"),
-            global_symbol_ty_by_name(&db, mod_file, "bar"),
-            global_symbol_ty_by_name(&db, mod_file, "B"),
+            global_symbol_ty(&db, mod_file, "foo"),
+            global_symbol_ty(&db, mod_file, "bar"),
+            global_symbol_ty(&db, mod_file, "B"),
             Type::BooleanLiteral(true),
             Type::None,
         ];
