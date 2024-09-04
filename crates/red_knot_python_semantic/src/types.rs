@@ -1,6 +1,6 @@
 use infer::TypeInferenceBuilder;
 use ruff_db::files::File;
-use ruff_python_ast::{self as ast, AnyNodeRef};
+use ruff_python_ast as ast;
 
 use crate::semantic_index::ast_ids::HasScopedAstId;
 use crate::semantic_index::definition::{Definition, DefinitionKind};
@@ -487,7 +487,7 @@ enum IterationOutcome<'db> {
 impl<'db> IterationOutcome<'db> {
     fn unwrap_with_diagnostic(
         self,
-        iterable_node: AnyNodeRef,
+        iterable_node: ast::AnyNodeRef,
         inference_builder: &mut TypeInferenceBuilder<'db>,
     ) -> Type<'db> {
         match self {

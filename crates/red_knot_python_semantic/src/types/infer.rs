@@ -1842,7 +1842,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .iterate(self.db)
             .unwrap_with_diagnostic(value.as_ref().into(), self);
 
-        // TODO get type from `SendType` of generator/awaitable
+        // TODO get type from `ReturnType` of generator
         Type::Unknown
     }
 
