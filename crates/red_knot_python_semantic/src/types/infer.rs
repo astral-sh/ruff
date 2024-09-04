@@ -1816,7 +1816,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             ctx: _,
         } = starred;
 
-        self.infer_expression(value);
+        let iterable_ty = self.infer_expression(value);
+        iterable_ty.iterate(self.db, || {
+            self.not_iterable_diagnostic(value.as_ref().into(), iterable_ty);
+        });
 
         // TODO
         Type::Unknown
@@ -1834,9 +1837,12 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_yield_from_expression(&mut self, yield_from: &ast::ExprYieldFrom) -> Type<'db> {
         let ast::ExprYieldFrom { range: _, value } = yield_from;
 
-        self.infer_expression(value);
+        let iterable_ty = self.infer_expression(value);
+        iterable_ty.iterate(self.db, || {
+            self.not_iterable_diagnostic(value.as_ref().into(), iterable_ty);
+        });
 
-        // TODO get type from awaitable
+        // TODO get type from `SendType` of generator/awaitable
         Type::Unknown
     }
 

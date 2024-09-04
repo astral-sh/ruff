@@ -797,4 +797,65 @@ mod tests {
             &["Object of type 'NotIterable' is not iterable"],
         );
     }
+
+    #[test]
+    fn starred_expressions_must_be_iterable() {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            class NotIterable: pass
+
+            class Iterator:
+                def __next__(self) -> int:
+                    return 42
+
+            class Iterable:
+                def __iter__(self) -> Iterator:
+
+            x = [*NotIterable()]
+            y = [*Iterable()]
+            ",
+        )
+        .unwrap();
+
+        let a_file = system_path_to_file(&db, "/src/a.py").unwrap();
+        let a_file_diagnostics = super::check_types(&db, a_file);
+        assert_diagnostic_messages(
+            &a_file_diagnostics,
+            &["Object of type 'NotIterable' is not iterable"],
+        );
+    }
+
+    #[test]
+    fn yield_from_expression_must_be_iterable() {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            class NotIterable: pass
+
+            class Iterator:
+                def __next__(self) -> int:
+                    return 42
+
+            class Iterable:
+                def __iter__(self) -> Iterator:
+
+            def generator_function():
+                yield from Iterable()
+                yield from NotIterable()
+            ",
+        )
+        .unwrap();
+
+        let a_file = system_path_to_file(&db, "/src/a.py").unwrap();
+        let a_file_diagnostics = super::check_types(&db, a_file);
+        assert_diagnostic_messages(
+            &a_file_diagnostics,
+            &["Object of type 'NotIterable' is not iterable"],
+        );
+    }
 }
