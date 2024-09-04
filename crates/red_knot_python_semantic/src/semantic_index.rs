@@ -666,7 +666,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
     fn comprehension_scope() {
         let TestCase { db, file } = test_case(
             "
-[x for x in iter1]
+[x for x, y in iter1]
 ",
         );
 
@@ -690,7 +690,22 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
 
         let comprehension_symbol_table = index.symbol_table(comprehension_scope_id);
 
-        assert_eq!(names(&comprehension_symbol_table), vec!["x"]);
+        assert_eq!(names(&comprehension_symbol_table), vec!["x", "y"]);
+
+        let use_def = index.use_def_map(comprehension_scope_id);
+        for name in ["x", "y"] {
+            let definition = use_def
+                .first_public_definition(
+                    comprehension_symbol_table
+                        .symbol_id_by_name(name)
+                        .expect("symbol exists"),
+                )
+                .unwrap();
+            assert!(matches!(
+                definition.node(&db),
+                DefinitionKind::Comprehension(_)
+            ));
+        }
     }
 
     /// Test case to validate that the `x` variable used in the comprehension is referencing the
@@ -730,8 +745,8 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         let DefinitionKind::Comprehension(comprehension) = definition.node(&db) else {
             panic!("expected generator definition")
         };
-        let ast::Comprehension { target, .. } = comprehension.node();
-        let name = target.as_name_expr().unwrap().id().as_str();
+        let target = comprehension.target();
+        let name = target.id().as_str();
 
         assert_eq!(name, "x");
         assert_eq!(target.range(), TextRange::new(23.into(), 24.into()));

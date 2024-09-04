@@ -285,6 +285,7 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         // The `iter` of the first generator is evaluated in the outer scope, while all subsequent
         // nodes are evaluated in the inner scope.
+        self.add_standalone_expression(&generator.iter);
         self.visit_expr(&generator.iter);
         self.push_scope(scope);
 
@@ -300,6 +301,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         }
 
         for generator in generators_iter {
+            self.add_standalone_expression(&generator.iter);
             self.visit_expr(&generator.iter);
 
             self.current_assignment = Some(CurrentAssignment::Comprehension {
@@ -678,7 +680,11 @@ where
                         Some(CurrentAssignment::Comprehension { node, first }) => {
                             self.add_definition(
                                 symbol,
-                                ComprehensionDefinitionNodeRef { node, first },
+                                ComprehensionDefinitionNodeRef {
+                                    iterable: &node.iter,
+                                    target: name_node,
+                                    first,
+                                },
                             );
                         }
                         Some(CurrentAssignment::WithItem(with_item)) => {
