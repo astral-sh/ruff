@@ -1,5 +1,6 @@
+use infer::TypeInferenceBuilder;
 use ruff_db::files::File;
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, AnyNodeRef};
 
 use crate::semantic_index::ast_ids::HasScopedAstId;
 use crate::semantic_index::definition::{Definition, DefinitionKind};
@@ -402,7 +403,7 @@ impl<'db> Type<'db> {
     /// ```
     ///
     /// Emits a diagnostic and returns `Unknown` if `self` represents a type that is not iterable.
-    fn iterate(&self, db: &'db dyn Db, mut diagnostic_fn: impl FnMut()) -> Type<'db> {
+    fn iterate(&self, db: &'db dyn Db) -> IterableElementTypeResult<'db> {
         fn loop_var_from_iterable<'db>(
             db: &'db dyn Db,
             iterable_ty: &Type<'db>,
@@ -426,10 +427,10 @@ impl<'db> Type<'db> {
             let dunder_get_item_method = iterable_meta_type.member(db, "__getitem__");
             dunder_get_item_method.call(db)
         }
-        loop_var_from_iterable(db, self).unwrap_or_else(|| {
-            diagnostic_fn();
-            Type::Unknown
-        })
+        IterableElementTypeResult {
+            element_ty: loop_var_from_iterable(db, self),
+            iterable_ty: *self,
+        }
     }
 
     #[must_use]
@@ -468,6 +469,29 @@ impl<'db> Type<'db> {
             // TODO intersections
             Type::Intersection(_) => Type::Unknown,
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct IterableElementTypeResult<'db> {
+    element_ty: Option<Type<'db>>,
+    iterable_ty: Type<'db>,
+}
+
+impl<'db> IterableElementTypeResult<'db> {
+    fn unwrap_with_diagnostic(
+        self,
+        iterable_node: AnyNodeRef,
+        inference_builder: &mut TypeInferenceBuilder<'db>,
+    ) -> Type<'db> {
+        let IterableElementTypeResult {
+            element_ty,
+            iterable_ty,
+        } = self;
+        element_ty.unwrap_or_else(|| {
+            inference_builder.not_iterable_diagnostic(iterable_node, iterable_ty);
+            Type::Unknown
+        })
     }
 }
 

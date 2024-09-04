@@ -243,7 +243,7 @@ impl<'db> TypeInference<'db> {
 /// Similarly, when we encounter a standalone-inferable expression (right-hand side of an
 /// assignment, type narrowing guard), we use the [`infer_expression_types()`] query to ensure we
 /// don't infer its types more than once.
-struct TypeInferenceBuilder<'db> {
+pub(super) struct TypeInferenceBuilder<'db> {
     db: &'db dyn Db,
     index: &'db SemanticIndex<'db>,
     region: InferenceRegion<'db>,
@@ -1030,7 +1030,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     /// Emit a diagnostic declaring that the object represented by `node` is not iterable
-    fn not_iterable_diagnostic(&mut self, node: AnyNodeRef, iterable_ty: Type<'db>) {
+    pub(super) fn not_iterable_diagnostic(&mut self, node: AnyNodeRef, iterable_ty: Type<'db>) {
         self.add_diagnostic(
             node,
             "not-iterable",
@@ -1054,9 +1054,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             .types
             .expression_ty(iterable.scoped_ast_id(self.db, self.scope));
 
-        let loop_var_value_ty = iterable_ty.iterate(self.db, || {
-            self.not_iterable_diagnostic(iterable.into(), iterable_ty);
-        });
+        let loop_var_value_ty = iterable_ty
+            .iterate(self.db)
+            .unwrap_with_diagnostic(iterable.into(), self);
 
         self.types
             .expressions
@@ -1817,9 +1817,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = starred;
 
         let iterable_ty = self.infer_expression(value);
-        iterable_ty.iterate(self.db, || {
-            self.not_iterable_diagnostic(value.as_ref().into(), iterable_ty);
-        });
+        iterable_ty
+            .iterate(self.db)
+            .unwrap_with_diagnostic(value.as_ref().into(), self);
 
         // TODO
         Type::Unknown
@@ -1838,9 +1838,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ast::ExprYieldFrom { range: _, value } = yield_from;
 
         let iterable_ty = self.infer_expression(value);
-        iterable_ty.iterate(self.db, || {
-            self.not_iterable_diagnostic(value.as_ref().into(), iterable_ty);
-        });
+        iterable_ty
+            .iterate(self.db)
+            .unwrap_with_diagnostic(value.as_ref().into(), self);
 
         // TODO get type from `SendType` of generator/awaitable
         Type::Unknown
