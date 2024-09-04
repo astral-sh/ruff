@@ -1869,7 +1869,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .index
             .symbol_table(file_scope_id)
             .symbol_by_name(name)
-            .expect("Expected the symbol table to create a symbol for every Name node")
+            .expect("Symbol table should create a symbol for every Name node")
             .is_defined();
 
         // In function-like scopes, any local variable (symbol that is defined in this
@@ -3702,9 +3702,11 @@ mod tests {
         let file = system_path_to_file(&db, "/src/a.pyi").unwrap();
         let ty = global_symbol_ty(&db, file, "C");
 
-        let Some(base) = ty.expect_class().bases(&db).next() else {
-            panic!("expected at least one base");
-        };
+        let base = ty
+            .expect_class()
+            .bases(&db)
+            .next()
+            .expect("there should be at least one base");
 
         assert_eq!(base.display(&db).to_string(), "Literal[object]");
 
