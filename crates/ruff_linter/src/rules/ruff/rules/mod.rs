@@ -29,6 +29,7 @@ pub(crate) use unnecessary_iterable_allocation_for_first_element::*;
 pub(crate) use unnecessary_key_check::*;
 pub(crate) use unused_async::*;
 pub(crate) use unused_noqa::*;
+pub(crate) use useless_if_else::*;
 pub(crate) use zip_instead_of_pairwise::*;
 
 mod ambiguous_unicode_character;
@@ -66,6 +67,7 @@ mod unnecessary_iterable_allocation_for_first_element;
 mod unnecessary_key_check;
 mod unused_async;
 mod unused_noqa;
+mod useless_if_else;
 mod zip_instead_of_pairwise;
 
 #[derive(Clone, Copy)]
