@@ -152,6 +152,7 @@ pub(crate) struct WithItemDefinitionNodeRef<'a> {
 pub(crate) struct ForStmtDefinitionNodeRef<'a> {
     pub(crate) iterable: &'a ast::Expr,
     pub(crate) target: &'a ast::ExprName,
+    pub(crate) is_async: bool,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -206,12 +207,15 @@ impl DefinitionNodeRef<'_> {
             DefinitionNodeRef::AugmentedAssignment(augmented_assignment) => {
                 DefinitionKind::AugmentedAssignment(AstNodeRef::new(parsed, augmented_assignment))
             }
-            DefinitionNodeRef::For(ForStmtDefinitionNodeRef { iterable, target }) => {
-                DefinitionKind::For(ForStmtDefinitionKind {
-                    iterable: AstNodeRef::new(parsed.clone(), iterable),
-                    target: AstNodeRef::new(parsed, target),
-                })
-            }
+            DefinitionNodeRef::For(ForStmtDefinitionNodeRef {
+                iterable,
+                target,
+                is_async,
+            }) => DefinitionKind::For(ForStmtDefinitionKind {
+                iterable: AstNodeRef::new(parsed.clone(), iterable),
+                target: AstNodeRef::new(parsed, target),
+                is_async,
+            }),
             DefinitionNodeRef::Comprehension(ComprehensionDefinitionNodeRef {
                 iterable,
                 target,
@@ -265,6 +269,7 @@ impl DefinitionNodeRef<'_> {
             Self::For(ForStmtDefinitionNodeRef {
                 iterable: _,
                 target,
+                is_async: _,
             }) => target.into(),
             Self::Comprehension(ComprehensionDefinitionNodeRef { target, .. }) => target.into(),
             Self::Parameter(node) => match node {
@@ -388,6 +393,7 @@ impl WithItemDefinitionKind {
 pub struct ForStmtDefinitionKind {
     iterable: AstNodeRef<ast::Expr>,
     target: AstNodeRef<ast::ExprName>,
+    is_async: bool,
 }
 
 impl ForStmtDefinitionKind {
@@ -397,6 +403,10 @@ impl ForStmtDefinitionKind {
 
     pub(crate) fn target(&self) -> &ast::ExprName {
         self.target.node()
+    }
+
+    pub(crate) fn is_async(&self) -> bool {
+        self.is_async
     }
 }
 

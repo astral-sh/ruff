@@ -672,6 +672,7 @@ where
                                 ForStmtDefinitionNodeRef {
                                     iterable: &node.iter,
                                     target: name_node,
+                                    is_async: node.is_async,
                                 },
                             );
                         }

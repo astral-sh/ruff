@@ -394,6 +394,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_for_statement_definition(
                     for_statement_definition.target(),
                     for_statement_definition.iterable(),
+                    for_statement_definition.is_async(),
                     definition,
                 );
             }
@@ -1045,6 +1046,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         target: &ast::ExprName,
         iterable: &ast::Expr,
+        is_async: bool,
         definition: Definition<'db>,
     ) {
         let expression = self.index.expression(iterable);
@@ -1054,9 +1056,14 @@ impl<'db> TypeInferenceBuilder<'db> {
             .types
             .expression_ty(iterable.scoped_ast_id(self.db, self.scope));
 
-        let loop_var_value_ty = iterable_ty
-            .iterate(self.db)
-            .unwrap_with_diagnostic(iterable.into(), self);
+        let loop_var_value_ty = if is_async {
+            // TODO(Alex): async iterables/iterators!
+            Type::Unknown
+        } else {
+            iterable_ty
+                .iterate(self.db)
+                .unwrap_with_diagnostic(iterable.into(), self)
+        };
 
         self.types
             .expressions
@@ -3022,6 +3029,62 @@ mod tests {
         )?;
 
         assert_public_ty(&db, "src/a.py", "x", "int");
+
+        Ok(())
+    }
+
+    /// This tests that we understand that `async` for loops
+    /// do not work according to the synchronous iteration protocol
+    #[test]
+    fn invalid_async_for_loop() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            async def foo():
+                class Iterator:
+                    def __next__(self) -> int:
+                        return 42
+
+                class Iterable:
+                    def __iter__(self) -> Iterator:
+                        return Iterator()
+
+                async for x in Iterator():
+                    pass
+            ",
+        )?;
+
+        // TODO(Alex) async iterables/iterators!
+        assert_scope_ty(&db, "src/a.py", &["foo"], "x", "Unknown");
+
+        Ok(())
+    }
+
+    #[test]
+    fn basic_async_for_loop() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            async def foo():
+                class IntAsyncIterator:
+                    async def __anext__(self) -> int:
+                        return 42
+
+                class IntAsyncIterable:
+                    def __aiter__(self) -> IntAsyncIterator:
+                        return IntAsyncIterator()
+
+                async for x in IntAsyncIterable():
+                    pass
+            ",
+        )?;
+
+        // TODO(Alex) async iterables/iterators!
+        assert_scope_ty(&db, "src/a.py", &["foo"], "x", "Unknown");
 
         Ok(())
     }
