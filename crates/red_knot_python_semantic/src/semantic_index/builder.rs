@@ -193,8 +193,11 @@ impl<'db> SemanticIndexBuilder<'db> {
             countme::Count::default(),
         );
 
-        self.definitions_by_node
+        let existing_definition = self
+            .definitions_by_node
             .insert(definition_node.key(), definition);
+        debug_assert_eq!(existing_definition, None);
+
         self.current_use_def_map_mut()
             .record_definition(symbol, definition);
 
@@ -327,10 +330,11 @@ impl<'db> SemanticIndexBuilder<'db> {
             // Insert a mapping from the parameter to the same definition.
             // This ensures that calling `HasTy::ty` on the inner parameter returns
             // a valid type (and doesn't panic)
-            self.definitions_by_node.insert(
+            let existing_definition = self.definitions_by_node.insert(
                 DefinitionNodeRef::from(AnyParameterRef::Variadic(&with_default.parameter)).key(),
                 definition,
             );
+            debug_assert_eq!(existing_definition, None);
         }
     }
 
