@@ -243,7 +243,7 @@ impl<'db> TypeInference<'db> {
 /// Similarly, when we encounter a standalone-inferable expression (right-hand side of an
 /// assignment, type narrowing guard), we use the [`infer_expression_types()`] query to ensure we
 /// don't infer its types more than once.
-struct TypeInferenceBuilder<'db> {
+pub(super) struct TypeInferenceBuilder<'db> {
     db: &'db dyn Db,
     index: &'db SemanticIndex<'db>,
     region: InferenceRegion<'db>,
@@ -1029,6 +1029,18 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_body(orelse);
     }
 
+    /// Emit a diagnostic declaring that the object represented by `node` is not iterable
+    pub(super) fn not_iterable_diagnostic(&mut self, node: AnyNodeRef, not_iterable_ty: Type<'db>) {
+        self.add_diagnostic(
+            node,
+            "not-iterable",
+            format_args!(
+                "Object of type '{}' is not iterable",
+                not_iterable_ty.display(self.db)
+            ),
+        );
+    }
+
     fn infer_for_statement_definition(
         &mut self,
         target: &ast::ExprName,
@@ -1042,17 +1054,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             .types
             .expression_ty(iterable.scoped_ast_id(self.db, self.scope));
 
-        let loop_var_value_ty = iterable_ty.iterate(self.db).unwrap_or_else(|| {
-            self.add_diagnostic(
-                iterable.into(),
-                "not-iterable",
-                format_args!(
-                    "Object of type '{}' is not iterable",
-                    iterable_ty.display(self.db)
-                ),
-            );
-            Type::Unknown
-        });
+        let loop_var_value_ty = iterable_ty
+            .iterate(self.db)
+            .unwrap_with_diagnostic(iterable.into(), self);
 
         self.types
             .expressions
@@ -1812,7 +1816,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             ctx: _,
         } = starred;
 
-        self.infer_expression(value);
+        let iterable_ty = self.infer_expression(value);
+        iterable_ty
+            .iterate(self.db)
+            .unwrap_with_diagnostic(value.as_ref().into(), self);
 
         // TODO
         Type::Unknown
@@ -1830,9 +1837,12 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_yield_from_expression(&mut self, yield_from: &ast::ExprYieldFrom) -> Type<'db> {
         let ast::ExprYieldFrom { range: _, value } = yield_from;
 
-        self.infer_expression(value);
+        let iterable_ty = self.infer_expression(value);
+        iterable_ty
+            .iterate(self.db)
+            .unwrap_with_diagnostic(value.as_ref().into(), self);
 
-        // TODO get type from awaitable
+        // TODO get type from `ReturnType` of generator
         Type::Unknown
     }
 

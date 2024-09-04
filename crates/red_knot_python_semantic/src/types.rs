@@ -1,3 +1,4 @@
+use infer::TypeInferenceBuilder;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 
@@ -400,28 +401,42 @@ impl<'db> Type<'db> {
     /// for y in x:
     ///     pass
     /// ```
-    ///
-    /// Returns `None` if `self` represents a type that is not iterable.
-    fn iterate(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+    fn iterate(&self, db: &'db dyn Db) -> IterationOutcome<'db> {
         // `self` represents the type of the iterable;
         // `__iter__` and `__next__` are both looked up on the class of the iterable:
-        let type_of_class = self.to_meta_type(db);
+        let iterable_meta_type = self.to_meta_type(db);
 
-        let dunder_iter_method = type_of_class.member(db, "__iter__");
+        let dunder_iter_method = iterable_meta_type.member(db, "__iter__");
         if !dunder_iter_method.is_unbound() {
-            let iterator_ty = dunder_iter_method.call(db)?;
+            let Some(iterator_ty) = dunder_iter_method.call(db) else {
+                return IterationOutcome::NotIterable {
+                    not_iterable_ty: *self,
+                };
+            };
+
             let dunder_next_method = iterator_ty.to_meta_type(db).member(db, "__next__");
-            return dunder_next_method.call(db);
+            return dunder_next_method
+                .call(db)
+                .map(|element_ty| IterationOutcome::Iterable { element_ty })
+                .unwrap_or(IterationOutcome::NotIterable {
+                    not_iterable_ty: *self,
+                });
         }
 
         // Although it's not considered great practice,
         // classes that define `__getitem__` are also iterable,
         // even if they do not define `__iter__`.
         //
-        // TODO this is only valid if the `__getitem__` method is annotated as
+        // TODO(Alex) this is only valid if the `__getitem__` method is annotated as
         // accepting `int` or `SupportsIndex`
-        let dunder_get_item_method = type_of_class.member(db, "__getitem__");
-        dunder_get_item_method.call(db)
+        let dunder_get_item_method = iterable_meta_type.member(db, "__getitem__");
+
+        dunder_get_item_method
+            .call(db)
+            .map(|element_ty| IterationOutcome::Iterable { element_ty })
+            .unwrap_or(IterationOutcome::NotIterable {
+                not_iterable_ty: *self,
+            })
     }
 
     #[must_use]
@@ -459,6 +474,28 @@ impl<'db> Type<'db> {
             Type::Unknown => Type::Unknown,
             // TODO intersections
             Type::Intersection(_) => Type::Unknown,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum IterationOutcome<'db> {
+    Iterable { element_ty: Type<'db> },
+    NotIterable { not_iterable_ty: Type<'db> },
+}
+
+impl<'db> IterationOutcome<'db> {
+    fn unwrap_with_diagnostic(
+        self,
+        iterable_node: ast::AnyNodeRef,
+        inference_builder: &mut TypeInferenceBuilder<'db>,
+    ) -> Type<'db> {
+        match self {
+            Self::Iterable { element_ty } => element_ty,
+            Self::NotIterable { not_iterable_ty } => {
+                inference_builder.not_iterable_diagnostic(iterable_node, not_iterable_ty);
+                Type::Unknown
+            }
         }
     }
 }
@@ -778,6 +815,67 @@ mod tests {
 
             for x in NotIterable():
                 pass
+            ",
+        )
+        .unwrap();
+
+        let a_file = system_path_to_file(&db, "/src/a.py").unwrap();
+        let a_file_diagnostics = super::check_types(&db, a_file);
+        assert_diagnostic_messages(
+            &a_file_diagnostics,
+            &["Object of type 'NotIterable' is not iterable"],
+        );
+    }
+
+    #[test]
+    fn starred_expressions_must_be_iterable() {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            class NotIterable: pass
+
+            class Iterator:
+                def __next__(self) -> int:
+                    return 42
+
+            class Iterable:
+                def __iter__(self) -> Iterator:
+
+            x = [*NotIterable()]
+            y = [*Iterable()]
+            ",
+        )
+        .unwrap();
+
+        let a_file = system_path_to_file(&db, "/src/a.py").unwrap();
+        let a_file_diagnostics = super::check_types(&db, a_file);
+        assert_diagnostic_messages(
+            &a_file_diagnostics,
+            &["Object of type 'NotIterable' is not iterable"],
+        );
+    }
+
+    #[test]
+    fn yield_from_expression_must_be_iterable() {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            class NotIterable: pass
+
+            class Iterator:
+                def __next__(self) -> int:
+                    return 42
+
+            class Iterable:
+                def __iter__(self) -> Iterator:
+
+            def generator_function():
+                yield from Iterable()
+                yield from NotIterable()
             ",
         )
         .unwrap();
