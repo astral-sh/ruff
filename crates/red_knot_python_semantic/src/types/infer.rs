@@ -928,10 +928,11 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_annotated_assignment_statement(&mut self, assignment: &ast::StmtAnnAssign) {
-        if let ast::Expr::Name(_) = assignment.target.as_ref() {
+        // assignments to non-Names are not Definitions, and neither are annotated assignments
+        // without an RHS
+        if assignment.value.is_some() && matches!(*assignment.target, ast::Expr::Name(_)) {
             self.infer_definition(assignment);
         } else {
-            // currently we don't consider assignments to non-Names to be Definitions
             self.infer_annotated_assignment(assignment);
         }
     }
@@ -941,11 +942,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         assignment: &ast::StmtAnnAssign,
         definition: Definition<'db>,
     ) {
-        let ty = self.infer_annotated_assignment(assignment);
+        let ty = self
+            .infer_annotated_assignment(assignment)
+            .expect("Only annotated assignments with a RHS should create a Definition");
         self.types.definitions.insert(definition, ty);
     }
 
-    fn infer_annotated_assignment(&mut self, assignment: &ast::StmtAnnAssign) -> Type<'db> {
+    fn infer_annotated_assignment(&mut self, assignment: &ast::StmtAnnAssign) -> Option<Type<'db>> {
         let ast::StmtAnnAssign {
             range: _,
             target,
@@ -954,13 +957,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             simple: _,
         } = assignment;
 
-        self.infer_optional_expression(value.as_deref());
+        let value_ty = self.infer_optional_expression(value.as_deref());
 
-        let annotation_ty = self.infer_expression(annotation);
+        self.infer_expression(annotation);
 
         self.infer_expression(target);
 
-        annotation_ty
+        value_ty
     }
 
     fn infer_augmented_assignment_statement(&mut self, assignment: &ast::StmtAugAssign) {
@@ -1890,8 +1893,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let Some(enclosing_symbol) = enclosing_symbol_table.symbol_by_name(name) else {
                     continue;
                 };
-                // TODO a "definition" that is just an annotated-assignment with no RHS should not
-                // count as "is_defined" here.
                 if enclosing_symbol.is_defined() {
                     // We can return early here, because the nearest function-like scope that
                     // defines a name must be the only source for the nonlocal reference (at
@@ -2909,7 +2910,7 @@ mod tests {
 
         // TODO: update this once `infer_ellipsis_literal_expression` correctly
         // infers `types.EllipsisType`.
-        assert_public_ty(&db, "src/a.py", "x", "Unknown | Literal[EllipsisType]");
+        assert_public_ty(&db, "src/a.py", "x", "Unbound");
 
         Ok(())
     }
@@ -3968,6 +3969,47 @@ mod tests {
         )?;
 
         assert_scope_ty(&db, "/src/a.py", &["f", "C", "g"], "y", "Literal[1]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn nonlocal_name_reference_skips_annotation_only_assignment() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            def f():
+                x = 1
+                def g():
+                    // it's pretty weird to have an annotated assignment in a function where the
+                    // name is otherwise not defined; maybe should be an error?
+                    x: int
+                    def h():
+                        y = x
+            ",
+        )?;
+
+        assert_scope_ty(&db, "/src/a.py", &["f", "g", "h"], "y", "Literal[1]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn annotation_only_assignment_transparent_to_local_inference() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            x = 1
+            x: int
+            y = x
+            ",
+        )?;
+
+        assert_public_ty(&db, "/src/a.py", "y", "Literal[1]");
 
         Ok(())
     }

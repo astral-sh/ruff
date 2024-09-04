@@ -498,7 +498,6 @@ where
             }
             ast::Stmt::AnnAssign(node) => {
                 debug_assert!(self.current_assignment.is_none());
-                // TODO deferred annotation visiting
                 self.visit_expr(&node.annotation);
                 if let Some(value) = &node.value {
                     self.visit_expr(value);
@@ -647,6 +646,12 @@ where
                     // For augmented assignment, the target expression is also used, so we should
                     // record that as a use.
                     flags |= SymbolFlags::IS_USED;
+                }
+                if let Some(CurrentAssignment::AnnAssign(ann_assign)) = self.current_assignment {
+                    if ann_assign.value.is_none() {
+                        // An annotated assignment with no RHS is a declaration, not a Definition
+                        flags -= SymbolFlags::IS_DEFINED;
+                    }
                 }
                 let symbol = self.add_or_update_symbol(id.clone(), flags);
                 if flags.contains(SymbolFlags::IS_DEFINED) {
