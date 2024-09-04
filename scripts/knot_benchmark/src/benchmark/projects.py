@@ -15,7 +15,11 @@ class Project(typing.NamedTuple):
     revision: str
 
     dependencies: list[str]
-    """List of type checking dependencies"""
+    """List of type checking dependencies.
+
+    Dependencies are pinned using a `--exclude-newer` flag when installing them
+    into the virtual environment; see the `Venv.install()` method for details.
+    """
 
     include: list[str] = []
     """The directories and files to check. If empty, checks the current directory"""
@@ -96,7 +100,7 @@ ALL = [
     Project(
         name="black",
         repository="https://github.com/psf/black",
-        revision="c20423249e9d8dfb8581eebbfc67a13984ee45e9",
+        revision="ac28187bf4a4ac159651c73d3a50fe6d0f653eac",
         include=["src"],
         dependencies=[
             "aiohttp",

@@ -204,6 +204,11 @@ class Venv:
             "--python",
             self.python,
             "--quiet",
+            # We pass `--exclude-newer` to ensure that type-checking of one of
+            # our projects isn't unexpectedly broken by a change in the
+            # annotations of one of that project's dependencies
+            "--exclude-newer",
+            "2024-09-03T00:00:00Z",
             *dependencies,
         ]
 
