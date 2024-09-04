@@ -146,9 +146,10 @@ use self::symbol_state::{
 };
 use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::Definition;
-use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::ScopedSymbolId;
 use ruff_index::IndexVec;
+
+use super::constraint::Constraint;
 
 mod bitset;
 mod symbol_state;
@@ -159,8 +160,8 @@ pub(crate) struct UseDefMap<'db> {
     /// Array of [`Definition`] in this scope.
     all_definitions: IndexVec<ScopedDefinitionId, Definition<'db>>,
 
-    /// Array of constraints (as [`Expression`]) in this scope.
-    all_constraints: IndexVec<ScopedConstraintId, Expression<'db>>,
+    /// Array of [`Constraint`] in this scope.
+    all_constraints: IndexVec<ScopedConstraintId, Constraint<'db>>,
 
     /// [`SymbolState`] visible at a [`ScopedUseId`].
     definitions_by_use: IndexVec<ScopedUseId, SymbolState>,
@@ -204,7 +205,7 @@ impl<'db> UseDefMap<'db> {
 #[derive(Debug)]
 pub(crate) struct DefinitionWithConstraintsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, Definition<'db>>,
-    all_constraints: &'map IndexVec<ScopedConstraintId, Expression<'db>>,
+    all_constraints: &'map IndexVec<ScopedConstraintId, Constraint<'db>>,
     inner: DefinitionIdWithConstraintsIterator<'map>,
 }
 
@@ -232,12 +233,12 @@ pub(crate) struct DefinitionWithConstraints<'map, 'db> {
 }
 
 pub(crate) struct ConstraintsIterator<'map, 'db> {
-    all_constraints: &'map IndexVec<ScopedConstraintId, Expression<'db>>,
+    all_constraints: &'map IndexVec<ScopedConstraintId, Constraint<'db>>,
     constraint_ids: ConstraintIdIterator<'map>,
 }
 
 impl<'map, 'db> Iterator for ConstraintsIterator<'map, 'db> {
-    type Item = Expression<'db>;
+    type Item = Constraint<'db>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.constraint_ids
@@ -259,8 +260,8 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Append-only array of [`Definition`]; None is unbound.
     all_definitions: IndexVec<ScopedDefinitionId, Definition<'db>>,
 
-    /// Append-only array of constraints (as [`Expression`]).
-    all_constraints: IndexVec<ScopedConstraintId, Expression<'db>>,
+    /// Append-only array of [`Constraint`].
+    all_constraints: IndexVec<ScopedConstraintId, Constraint<'db>>,
 
     /// Visible definitions at each so-far-recorded use.
     definitions_by_use: IndexVec<ScopedUseId, SymbolState>,
@@ -290,7 +291,7 @@ impl<'db> UseDefMapBuilder<'db> {
         self.definitions_by_symbol[symbol] = SymbolState::with(def_id);
     }
 
-    pub(super) fn record_constraint(&mut self, constraint: Expression<'db>) {
+    pub(super) fn record_constraint(&mut self, constraint: Constraint<'db>) {
         let constraint_id = self.all_constraints.push(constraint);
         for definitions in &mut self.definitions_by_symbol {
             definitions.add_constraint(constraint_id);

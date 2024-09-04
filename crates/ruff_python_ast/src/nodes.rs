@@ -3124,6 +3124,27 @@ impl Pattern {
             _ => false,
         }
     }
+
+    /// Checks if the [`Pattern`] is a [wildcard pattern].
+    ///
+    /// The following are wildcard patterns:
+    /// ```python
+    /// match subject:
+    ///     case _ as x: ...
+    ///     case _ | _: ...
+    ///     case _: ...
+    /// ```
+    ///
+    /// [wildcard pattern]: https://docs.python.org/3/reference/compound_stmts.html#wildcard-patterns
+    pub fn is_wildcard(&self) -> bool {
+        match self {
+            Pattern::MatchAs(PatternMatchAs { pattern, .. }) => pattern.is_none(),
+            Pattern::MatchOr(PatternMatchOr { patterns, .. }) => {
+                patterns.iter().all(Pattern::is_wildcard)
+            }
+            _ => false,
+        }
+    }
 }
 
 /// See also [MatchValue](https://docs.python.org/3/library/ast.html#ast.MatchValue)

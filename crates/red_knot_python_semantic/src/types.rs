@@ -121,8 +121,8 @@ pub(crate) fn definitions_ty<'db>(
              definition,
              constraints,
          }| {
-            let mut constraint_tys =
-                constraints.filter_map(|test| narrowing_constraint(db, test, definition));
+            let mut constraint_tys = constraints
+                .filter_map(|constraint| narrowing_constraint(db, constraint, definition));
             let definition_ty = definition_ty(db, definition);
             if let Some(first_constraint_ty) = constraint_tys.next() {
                 let mut builder = IntersectionBuilder::new(db);
