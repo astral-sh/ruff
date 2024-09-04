@@ -1030,13 +1030,13 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     /// Emit a diagnostic declaring that the object represented by `node` is not iterable
-    pub(super) fn not_iterable_diagnostic(&mut self, node: AnyNodeRef, iterable_ty: Type<'db>) {
+    pub(super) fn not_iterable_diagnostic(&mut self, node: AnyNodeRef, not_iterable_ty: Type<'db>) {
         self.add_diagnostic(
             node,
             "not-iterable",
             format_args!(
                 "Object of type '{}' is not iterable",
-                iterable_ty.display(self.db)
+                not_iterable_ty.display(self.db)
             ),
         );
     }

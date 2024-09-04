@@ -401,36 +401,42 @@ impl<'db> Type<'db> {
     /// for y in x:
     ///     pass
     /// ```
-    ///
-    /// Emits a diagnostic and returns `Unknown` if `self` represents a type that is not iterable.
-    fn iterate(&self, db: &'db dyn Db) -> IterableElementTypeResult<'db> {
-        fn loop_var_from_iterable<'db>(
-            db: &'db dyn Db,
-            iterable_ty: &Type<'db>,
-        ) -> Option<Type<'db>> {
-            // `__iter__` and `__next__` are both looked up on the class of the iterable:
-            let iterable_meta_type = iterable_ty.to_meta_type(db);
+    fn iterate(&self, db: &'db dyn Db) -> IterationOutcome<'db> {
+        // `self` represents the type of the iterable;
+        // `__iter__` and `__next__` are both looked up on the class of the iterable:
+        let iterable_meta_type = self.to_meta_type(db);
 
-            let dunder_iter_method = iterable_meta_type.member(db, "__iter__");
-            if !dunder_iter_method.is_unbound() {
-                let iterator_ty = dunder_iter_method.call(db)?;
-                let dunder_next_method = iterator_ty.to_meta_type(db).member(db, "__next__");
-                return dunder_next_method.call(db);
-            }
+        let dunder_iter_method = iterable_meta_type.member(db, "__iter__");
+        if !dunder_iter_method.is_unbound() {
+            let Some(iterator_ty) = dunder_iter_method.call(db) else {
+                return IterationOutcome::NotIterable {
+                    not_iterable_ty: *self,
+                };
+            };
 
-            // Although it's not considered great practice,
-            // classes that define `__getitem__` are also iterable,
-            // even if they do not define `__iter__`.
-            //
-            // TODO this is only valid if the `__getitem__` method is annotated as
-            // accepting `int` or `SupportsIndex`
-            let dunder_get_item_method = iterable_meta_type.member(db, "__getitem__");
-            dunder_get_item_method.call(db)
+            let dunder_next_method = iterator_ty.to_meta_type(db).member(db, "__next__");
+            return dunder_next_method
+                .call(db)
+                .map(|element_ty| IterationOutcome::Iterable { element_ty })
+                .unwrap_or(IterationOutcome::NotIterable {
+                    not_iterable_ty: *self,
+                });
         }
-        IterableElementTypeResult {
-            element_ty: loop_var_from_iterable(db, self),
-            iterable_ty: *self,
-        }
+
+        // Although it's not considered great practice,
+        // classes that define `__getitem__` are also iterable,
+        // even if they do not define `__iter__`.
+        //
+        // TODO(Alex) this is only valid if the `__getitem__` method is annotated as
+        // accepting `int` or `SupportsIndex`
+        let dunder_get_item_method = iterable_meta_type.member(db, "__getitem__");
+
+        dunder_get_item_method
+            .call(db)
+            .map(|element_ty| IterationOutcome::Iterable { element_ty })
+            .unwrap_or(IterationOutcome::NotIterable {
+                not_iterable_ty: *self,
+            })
     }
 
     #[must_use]
@@ -473,25 +479,24 @@ impl<'db> Type<'db> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct IterableElementTypeResult<'db> {
-    element_ty: Option<Type<'db>>,
-    iterable_ty: Type<'db>,
+enum IterationOutcome<'db> {
+    Iterable { element_ty: Type<'db> },
+    NotIterable { not_iterable_ty: Type<'db> },
 }
 
-impl<'db> IterableElementTypeResult<'db> {
+impl<'db> IterationOutcome<'db> {
     fn unwrap_with_diagnostic(
         self,
         iterable_node: AnyNodeRef,
         inference_builder: &mut TypeInferenceBuilder<'db>,
     ) -> Type<'db> {
-        let IterableElementTypeResult {
-            element_ty,
-            iterable_ty,
-        } = self;
-        element_ty.unwrap_or_else(|| {
-            inference_builder.not_iterable_diagnostic(iterable_node, iterable_ty);
-            Type::Unknown
-        })
+        match self {
+            Self::Iterable { element_ty } => element_ty,
+            Self::NotIterable { not_iterable_ty } => {
+                inference_builder.not_iterable_diagnostic(iterable_node, not_iterable_ty);
+                Type::Unknown
+            }
+        }
     }
 }
 
