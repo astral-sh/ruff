@@ -1029,6 +1029,18 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_body(orelse);
     }
 
+    /// Emit a diagnostic declaring that the object represented by `node` is not iterable
+    fn not_iterable_diagnostic(&mut self, node: AnyNodeRef, iterable_ty: Type<'db>) {
+        self.add_diagnostic(
+            node,
+            "not-iterable",
+            format_args!(
+                "Object of type '{}' is not iterable",
+                iterable_ty.display(self.db)
+            ),
+        );
+    }
+
     fn infer_for_statement_definition(
         &mut self,
         target: &ast::ExprName,
@@ -1042,16 +1054,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             .types
             .expression_ty(iterable.scoped_ast_id(self.db, self.scope));
 
-        let loop_var_value_ty = iterable_ty.iterate(self.db).unwrap_or_else(|| {
-            self.add_diagnostic(
-                iterable.into(),
-                "not-iterable",
-                format_args!(
-                    "Object of type '{}' is not iterable",
-                    iterable_ty.display(self.db)
-                ),
-            );
-            Type::Unknown
+        let loop_var_value_ty = iterable_ty.iterate(self.db, || {
+            self.not_iterable_diagnostic(iterable.into(), iterable_ty);
         });
 
         self.types

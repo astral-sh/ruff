@@ -401,27 +401,35 @@ impl<'db> Type<'db> {
     ///     pass
     /// ```
     ///
-    /// Returns `None` if `self` represents a type that is not iterable.
-    fn iterate(&self, db: &'db dyn Db) -> Option<Type<'db>> {
-        // `self` represents the type of the iterable;
-        // `__iter__` and `__next__` are both looked up on the class of the iterable:
-        let type_of_class = self.to_meta_type(db);
+    /// Emits a diagnostic and returns `Unknown` if `self` represents a type that is not iterable.
+    fn iterate(&self, db: &'db dyn Db, mut diagnostic_fn: impl FnMut()) -> Type<'db> {
+        fn loop_var_from_iterable<'db>(
+            db: &'db dyn Db,
+            iterable_ty: &Type<'db>,
+        ) -> Option<Type<'db>> {
+            // `__iter__` and `__next__` are both looked up on the class of the iterable:
+            let iterable_meta_type = iterable_ty.to_meta_type(db);
 
-        let dunder_iter_method = type_of_class.member(db, "__iter__");
-        if !dunder_iter_method.is_unbound() {
-            let iterator_ty = dunder_iter_method.call(db)?;
-            let dunder_next_method = iterator_ty.to_meta_type(db).member(db, "__next__");
-            return dunder_next_method.call(db);
+            let dunder_iter_method = iterable_meta_type.member(db, "__iter__");
+            if !dunder_iter_method.is_unbound() {
+                let iterator_ty = dunder_iter_method.call(db)?;
+                let dunder_next_method = iterator_ty.to_meta_type(db).member(db, "__next__");
+                return dunder_next_method.call(db);
+            }
+
+            // Although it's not considered great practice,
+            // classes that define `__getitem__` are also iterable,
+            // even if they do not define `__iter__`.
+            //
+            // TODO this is only valid if the `__getitem__` method is annotated as
+            // accepting `int` or `SupportsIndex`
+            let dunder_get_item_method = iterable_meta_type.member(db, "__getitem__");
+            dunder_get_item_method.call(db)
         }
-
-        // Although it's not considered great practice,
-        // classes that define `__getitem__` are also iterable,
-        // even if they do not define `__iter__`.
-        //
-        // TODO this is only valid if the `__getitem__` method is annotated as
-        // accepting `int` or `SupportsIndex`
-        let dunder_get_item_method = type_of_class.member(db, "__getitem__");
-        dunder_get_item_method.call(db)
+        loop_var_from_iterable(db, self).unwrap_or_else(|| {
+            diagnostic_fn();
+            Type::Unknown
+        })
     }
 
     #[must_use]
