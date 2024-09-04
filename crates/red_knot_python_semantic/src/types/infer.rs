@@ -1615,7 +1615,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = generator;
 
         self.infer_expression(elt);
-        self.infer_comprehensions_scope(generators);
+        self.infer_comprehensions(generators);
     }
 
     fn infer_list_comprehension_expression_scope(&mut self, listcomp: &ast::ExprListComp) {
@@ -1626,7 +1626,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = listcomp;
 
         self.infer_expression(elt);
-        self.infer_comprehensions_scope(generators);
+        self.infer_comprehensions(generators);
     }
 
     fn infer_dict_comprehension_expression_scope(&mut self, dictcomp: &ast::ExprDictComp) {
@@ -1639,7 +1639,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         self.infer_expression(key);
         self.infer_expression(value);
-        self.infer_comprehensions_scope(generators);
+        self.infer_comprehensions(generators);
     }
 
     fn infer_set_comprehension_expression_scope(&mut self, setcomp: &ast::ExprSetComp) {
@@ -1650,21 +1650,21 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = setcomp;
 
         self.infer_expression(elt);
-        self.infer_comprehensions_scope(generators);
+        self.infer_comprehensions(generators);
     }
 
-    fn infer_comprehensions_scope(&mut self, comprehensions: &[ast::Comprehension]) {
-        let mut generators_iter = comprehensions.iter();
-        let Some(first_generator) = generators_iter.next() else {
+    fn infer_comprehensions(&mut self, comprehensions: &[ast::Comprehension]) {
+        let mut comprehensions_iter = comprehensions.iter();
+        let Some(first_comprehension) = comprehensions_iter.next() else {
             unreachable!("Comprehension must contain at least one generator");
         };
-        self.infer_comprehension_scope(first_generator, true);
-        for generator in generators_iter {
-            self.infer_comprehension_scope(generator, false);
+        self.infer_comprehension(first_comprehension, true);
+        for comprehension in comprehensions_iter {
+            self.infer_comprehension(comprehension, false);
         }
     }
 
-    fn infer_comprehension_scope(&mut self, comprehension: &ast::Comprehension, is_first: bool) {
+    fn infer_comprehension(&mut self, comprehension: &ast::Comprehension, is_first: bool) {
         let ast::Comprehension {
             range: _,
             target,
