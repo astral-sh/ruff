@@ -2409,7 +2409,9 @@ mod tests {
     use crate::semantic_index::symbol::FileScopeId;
     use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
     use crate::stdlib::builtins_module_scope;
-    use crate::types::{global_symbol_ty, infer_definition_types, symbol_ty};
+    use crate::types::{
+        check_types, global_symbol_ty, infer_definition_types, symbol_ty, TypeCheckDiagnostics,
+    };
     use crate::{HasTy, ProgramSettings, SemanticModel};
 
     use super::TypeInferenceBuilder;
@@ -2489,6 +2491,21 @@ mod tests {
 
         let ty = symbol_ty(db, scope, symbol_name);
         assert_eq!(ty.display(db).to_string(), expected);
+    }
+
+    fn assert_diagnostic_messages(diagnostics: &TypeCheckDiagnostics, expected: &[&str]) {
+        let messages: Vec<&str> = diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.message())
+            .collect();
+        assert_eq!(&messages, expected);
+    }
+
+    fn assert_file_diagnostics(db: &TestDb, filename: &str, expected: &[&str]) {
+        let file = system_path_to_file(db, filename).unwrap();
+        let diagnostics = check_types(db, file);
+
+        assert_diagnostic_messages(&diagnostics, expected);
     }
 
     #[test]
@@ -2998,108 +3015,6 @@ mod tests {
     }
 
     #[test]
-    fn basic_for_loop() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            class IntIterator:
-                def __next__(self) -> int:
-                    return 42
-
-            class IntIterable:
-                def __iter__(self) -> IntIterator:
-                    return IntIterator()
-
-            for x in IntIterable():
-                pass
-            ",
-        )?;
-
-        assert_public_ty(&db, "src/a.py", "x", "int");
-
-        Ok(())
-    }
-
-    #[test]
-    fn for_loop_with_old_style_iteration_protocol() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            class OldStyleIterable:
-                def __getitem__(self, key: int) -> int:
-                    return 42
-
-            for x in OldStyleIterable():
-                pass
-            ",
-        )?;
-
-        assert_public_ty(&db, "src/a.py", "x", "int");
-
-        Ok(())
-    }
-
-    /// This tests that we understand that `async` for loops
-    /// do not work according to the synchronous iteration protocol
-    #[test]
-    fn invalid_async_for_loop() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            async def foo():
-                class Iterator:
-                    def __next__(self) -> int:
-                        return 42
-
-                class Iterable:
-                    def __iter__(self) -> Iterator:
-                        return Iterator()
-
-                async for x in Iterator():
-                    pass
-            ",
-        )?;
-
-        // TODO(Alex) async iterables/iterators!
-        assert_scope_ty(&db, "src/a.py", &["foo"], "x", "Unknown");
-
-        Ok(())
-    }
-
-    #[test]
-    fn basic_async_for_loop() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            async def foo():
-                class IntAsyncIterator:
-                    async def __anext__(self) -> int:
-                        return 42
-
-                class IntAsyncIterable:
-                    def __aiter__(self) -> IntAsyncIterator:
-                        return IntAsyncIterator()
-
-                async for x in IntAsyncIterable():
-                    pass
-            ",
-        )?;
-
-        // TODO(Alex) async iterables/iterators!
-        assert_scope_ty(&db, "src/a.py", &["foo"], "x", "Unknown");
-
-        Ok(())
-    }
-
-    #[test]
     fn class_constructor_call_expression() -> anyhow::Result<()> {
         let mut db = setup_db();
 
@@ -3115,6 +3030,26 @@ mod tests {
         assert_public_ty(&db, "src/a.py", "x", "Foo");
 
         Ok(())
+    }
+
+    #[test]
+    fn invalid_callable() {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            nonsense = 123
+            x = nonsense()
+            ",
+        )
+        .unwrap();
+
+        assert_file_diagnostics(
+            &db,
+            "/src/a.py",
+            &["Object of type 'Literal[123]' is not callable"],
+        );
     }
 
     #[test]
@@ -4012,6 +3947,259 @@ mod tests {
         assert_public_ty(&db, "/src/a.py", "y", "Literal[1]");
 
         Ok(())
+    }
+
+    #[test]
+    fn unresolved_import_statement() {
+        let mut db = setup_db();
+
+        db.write_file("src/foo.py", "import bar\n").unwrap();
+
+        assert_file_diagnostics(&db, "src/foo.py", &["Cannot resolve import 'bar'."]);
+    }
+
+    #[test]
+    fn unresolved_import_from_statement() {
+        let mut db = setup_db();
+
+        db.write_file("src/foo.py", "from bar import baz\n")
+            .unwrap();
+        assert_file_diagnostics(&db, "/src/foo.py", &["Cannot resolve import 'bar'."]);
+    }
+
+    #[test]
+    fn unresolved_import_from_resolved_module() {
+        let mut db = setup_db();
+
+        db.write_files([("/src/a.py", ""), ("/src/b.py", "from a import thing")])
+            .unwrap();
+
+        assert_file_diagnostics(&db, "/src/b.py", &["Module 'a' has no member 'thing'"]);
+    }
+
+    #[test]
+    fn resolved_import_of_symbol_from_unresolved_import() {
+        let mut db = setup_db();
+
+        db.write_files([
+            ("/src/a.py", "import foo as foo"),
+            ("/src/b.py", "from a import foo"),
+        ])
+        .unwrap();
+
+        assert_file_diagnostics(&db, "/src/a.py", &["Cannot resolve import 'foo'."]);
+
+        // Importing the unresolved import into a second first-party file should not trigger
+        // an additional "unresolved import" violation
+        assert_file_diagnostics(&db, "/src/b.py", &[]);
+    }
+
+    #[test]
+    fn basic_for_loop() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            class IntIterator:
+                def __next__(self) -> int:
+                    return 42
+
+            class IntIterable:
+                def __iter__(self) -> IntIterator:
+                    return IntIterator()
+
+            for x in IntIterable():
+                pass
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "x", "int");
+
+        Ok(())
+    }
+
+    #[test]
+    fn for_loop_with_old_style_iteration_protocol() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            class OldStyleIterable:
+                def __getitem__(self, key: int) -> int:
+                    return 42
+
+            for x in OldStyleIterable():
+                pass
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "x", "int");
+
+        Ok(())
+    }
+
+    /// This tests that we understand that `async` for loops
+    /// do not work according to the synchronous iteration protocol
+    #[test]
+    fn invalid_async_for_loop() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            async def foo():
+                class Iterator:
+                    def __next__(self) -> int:
+                        return 42
+
+                class Iterable:
+                    def __iter__(self) -> Iterator:
+                        return Iterator()
+
+                async for x in Iterator():
+                    pass
+            ",
+        )?;
+
+        // TODO(Alex) async iterables/iterators!
+        assert_scope_ty(&db, "src/a.py", &["foo"], "x", "Unknown");
+
+        Ok(())
+    }
+
+    #[test]
+    fn basic_async_for_loop() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            async def foo():
+                class IntAsyncIterator:
+                    async def __anext__(self) -> int:
+                        return 42
+
+                class IntAsyncIterable:
+                    def __aiter__(self) -> IntAsyncIterator:
+                        return IntAsyncIterator()
+
+                async for x in IntAsyncIterable():
+                    pass
+            ",
+        )?;
+
+        // TODO(Alex) async iterables/iterators!
+        assert_scope_ty(&db, "src/a.py", &["foo"], "x", "Unknown");
+
+        Ok(())
+    }
+
+    #[test]
+    fn invalid_iterable() {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            nonsense = 123
+            for x in nonsense:
+                pass
+            ",
+        )
+        .unwrap();
+
+        assert_file_diagnostics(
+            &db,
+            "/src/a.py",
+            &["Object of type 'Literal[123]' is not iterable"],
+        );
+    }
+
+    #[test]
+    fn new_iteration_protocol_takes_precedence_over_old_style() {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            class NotIterable:
+                def __getitem__(self, key: int) -> int:
+                    return 42
+
+                __iter__ = None
+
+            for x in NotIterable():
+                pass
+            ",
+        )
+        .unwrap();
+
+        assert_file_diagnostics(
+            &db,
+            "/src/a.py",
+            &["Object of type 'NotIterable' is not iterable"],
+        );
+    }
+
+    #[test]
+    fn starred_expressions_must_be_iterable() {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            class NotIterable: pass
+
+            class Iterator:
+                def __next__(self) -> int:
+                    return 42
+
+            class Iterable:
+                def __iter__(self) -> Iterator:
+
+            x = [*NotIterable()]
+            y = [*Iterable()]
+            ",
+        )
+        .unwrap();
+
+        assert_file_diagnostics(
+            &db,
+            "/src/a.py",
+            &["Object of type 'NotIterable' is not iterable"],
+        );
+    }
+
+    #[test]
+    fn yield_from_expression_must_be_iterable() {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            class NotIterable: pass
+
+            class Iterator:
+                def __next__(self) -> int:
+                    return 42
+
+            class Iterable:
+                def __iter__(self) -> Iterator:
+
+            def generator_function():
+                yield from Iterable()
+                yield from NotIterable()
+            ",
+        )
+        .unwrap();
+
+        assert_file_diagnostics(
+            &db,
+            "/src/a.py",
+            &["Object of type 'NotIterable' is not iterable"],
+        );
     }
 
     // Incremental inference tests
