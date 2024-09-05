@@ -379,26 +379,28 @@ flowchart TD
   block2["raise Exception()\n"]
   block3[["Loop continue"]]
   block4["break\n"]
-  block5["assert i is not None\n"]
-  block6["if i == 2:
+  block5[["Exception raised"]]
+  block6["assert i is not None\n"]
+  block7["if i == 2:
             assert i is not None
             break\n"]
-  block7["for i in range(3):
+  block8["for i in range(3):
         if i == 2:
             assert i is not None
             break
     else:
         raise Exception()\n"]
 
-  start --> block7
-  block7 -- "range(3)" --> block6
-  block7 -- "else" --> block2
-  block6 -- "i == 2" --> block5
-  block6 -- "else" --> block3
-  block5 -- "i is not None" --> block4
-  block5 -- "else" --> block1
+  start --> block8
+  block8 -- "range(3)" --> block7
+  block8 -- "else" --> block2
+  block7 -- "i == 2" --> block6
+  block7 -- "else" --> block3
+  block6 -- "i is not None" --> block4
+  block6 -- "else" --> block5
+  block5 --> return
   block4 --> block0
-  block3 --> block7
+  block3 --> block8
   block2 --> block1
   block1 --> return
   block0 --> return
