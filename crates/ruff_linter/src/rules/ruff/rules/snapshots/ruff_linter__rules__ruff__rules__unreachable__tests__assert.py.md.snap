@@ -112,14 +112,18 @@ flowchart TD
   block0[["`*(empty)*`"]]
   block1[["Exception raised"]]
   block2["assert y < 3\n"]
-  block3["assert y > 1\n"]
-  block4["y = 2\nassert y == 2\n"]
+  block3[["Exception raised"]]
+  block4["assert y > 1\n"]
+  block5[["Exception raised"]]
+  block6["y = 2\nassert y == 2\n"]
 
-  start --> block4
-  block4 -- "y == 2" --> block3
-  block4 -- "else" --> block1
-  block3 -- "y > 1" --> block2
-  block3 -- "else" --> block1
+  start --> block6
+  block6 -- "y == 2" --> block4
+  block6 -- "else" --> block5
+  block5 --> return
+  block4 -- "y > 1" --> block2
+  block4 -- "else" --> block3
+  block3 --> return
   block2 -- "y < 3" --> block0
   block2 -- "else" --> block1
   block1 --> return

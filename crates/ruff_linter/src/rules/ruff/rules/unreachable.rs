@@ -340,7 +340,7 @@ fn loop_block<'stmt>(
     let after_block = blocks.maybe_next_block_index(after, || true);
     let last_orelse_statement = blocks.append_blocks_if_not_empty(orelse, after_block);
 
-    let loop_continue_index = blocks.blocks.push(BasicBlock::LOOP_CONTINUE.clone());
+    let loop_continue_index = blocks.create_loop_continue_block();
     // NOTE: a while loop's body must not be empty, so we can safely
     // create at least one block from it.
     let last_statement_index = blocks.append_blocks(body, Some(loop_continue_index));
@@ -455,8 +455,13 @@ fn try_block<'stmt>(
         Some(finally_block)
     };
 
-    // If an exception is raised and not caught then terminate with exception
-    let mut next_branch = blocks.fake_exception_block_index();
+    // If an exception is raised and not caught then terminate with exception.
+    let mut next_branch = blocks.create_exception_block();
+
+    // If there is a finally block, then re-route to finally
+    if let Some(finally_index) = finally_index {
+        blocks.blocks[next_branch].next = NextBlock::Always(finally_index);
+    }
 
     for handler in handlers.iter().rev() {
         let ast::ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
@@ -675,14 +680,12 @@ fn is_wildcard(pattern: &MatchCase) -> bool {
 #[derive(Debug, Default)]
 struct BasicBlocksBuilder<'stmt> {
     blocks: IndexVec<BlockIndex, BasicBlock<'stmt>>,
-    exception_block_index: Option<BlockIndex>,
 }
 
 impl<'stmt> BasicBlocksBuilder<'stmt> {
     fn with_capacity(capacity: usize) -> Self {
         Self {
             blocks: IndexVec::with_capacity(capacity),
-            exception_block_index: None,
         }
     }
 
@@ -810,12 +813,12 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                 }
                 Stmt::Raise(_) => {
                     // NOTE: This may be modified in post_process_try.
-                    NextBlock::Always(self.fake_exception_block_index())
+                    NextBlock::Always(self.create_exception_block())
                 }
                 Stmt::Assert(stmt) => {
                     // NOTE: This may be modified in post_process_try.
                     let next = self.maybe_next_block_index(after, || true);
-                    let orelse = self.fake_exception_block_index();
+                    let orelse = self.create_exception_block();
                     NextBlock::If {
                         condition: Condition::Test(&stmt.test),
                         next,
@@ -944,15 +947,14 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
         }
     }
 
-    /// Returns a block index for a fake exception block in `blocks`.
-    fn fake_exception_block_index(&mut self) -> BlockIndex {
-        if let Some(index) = self.exception_block_index {
-            index
-        } else {
-            let index = self.blocks.push(BasicBlock::EXCEPTION);
-            self.exception_block_index = Some(index);
-            index
-        }
+    /// Returns a block index for an exception block in `blocks`.
+    fn create_exception_block(&mut self) -> BlockIndex {
+        self.blocks.push(BasicBlock::EXCEPTION.clone())
+    }
+
+    /// Returns a block index for an loop_continue block in `blocks`.
+    fn create_loop_continue_block(&mut self) -> BlockIndex {
+        self.blocks.push(BasicBlock::LOOP_CONTINUE.clone())
     }
 
     /// Change the next basic block for the block, or chain of blocks, in index

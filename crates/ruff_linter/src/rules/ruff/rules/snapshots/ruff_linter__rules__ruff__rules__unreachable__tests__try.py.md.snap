@@ -70,7 +70,7 @@ flowchart TD
   block6 -- "OtherException" --> block5
   block6 -- "else" --> block4
   block5 --> block1
-  block4 --> return
+  block4 --> block1
   block3 --> block2
   block2 --> block1
   block1 --> block0
@@ -304,7 +304,7 @@ flowchart TD
   start --> block4
   block4 -- "Exception raised" --> block3
   block4 -- "else" --> block2
-  block3 --> return
+  block3 --> block1
   block2 --> block1
   block1 --> block0
   block0 --> return
@@ -343,7 +343,7 @@ flowchart TD
   block5 -- "Exception raised" --> block4
   block5 -- "else" --> block2
   block4 --> block1
-  block3 --> return
+  block3 --> block1
   block2 --> block1
   block1 --> return
   block0 --> return
@@ -367,17 +367,19 @@ flowchart TD
   block0[["`*(empty)*`"]]
   block1[["Exception raised"]]
   block2["raise Exception()\n"]
-  block3["print(#quot;reached#quot;)\n"]
-  block4["try:
+  block3[["Exception raised"]]
+  block4["print(#quot;reached#quot;)\n"]
+  block5["try:
         raise Exception()
     except:
         print(#quot;reached#quot;)\n"]
 
-  start --> block4
-  block4 -- "Exception raised" --> block3
-  block4 -- "else" --> block2
-  block3 --> block0
-  block2 --> block3
+  start --> block5
+  block5 -- "Exception raised" --> block4
+  block5 -- "else" --> block2
+  block4 --> block0
+  block3 --> return
+  block2 --> block4
   block1 --> return
   block0 --> return
 ```
@@ -402,19 +404,21 @@ flowchart TD
   block1["print(#quot;unreachable#quot;)\n"]
   block2[["Exception raised"]]
   block3["assert False\n"]
-  block4["print(#quot;reached#quot;)\n"]
-  block5["try:
+  block4[["Exception raised"]]
+  block5["print(#quot;reached#quot;)\n"]
+  block6["try:
         assert False
         print(#quot;unreachable#quot;)
     except:
         print(#quot;reached#quot;)\n"]
 
-  start --> block5
-  block5 -- "Exception raised" --> block4
-  block5 -- "else" --> block3
-  block4 --> block0
+  start --> block6
+  block6 -- "Exception raised" --> block5
+  block6 -- "else" --> block3
+  block5 --> block0
+  block4 --> return
   block3 -- "False" --> block1
-  block3 -- "else" --> block4
+  block3 -- "else" --> block5
   block2 --> return
   block1 --> block0
   block0 --> return
@@ -440,15 +444,17 @@ flowchart TD
   block1["print('reached')\nreturn 2\n"]
   block2[["Exception raised"]]
   block3["raise Exception()\n"]
-  block4["try:
+  block4[["Exception raised"]]
+  block5["try:
         raise Exception()
     finally:
         print('reached')
         return 2\n"]
 
-  start --> block4
-  block4 -- "Exception raised" --> block2
-  block4 -- "else" --> block3
+  start --> block5
+  block5 -- "Exception raised" --> block4
+  block5 -- "else" --> block3
+  block4 --> block1
   block3 --> block1
   block2 --> return
   block1 --> return
@@ -476,15 +482,17 @@ flowchart TD
   block2["print(#quot;unreachable#quot;)\n"]
   block3[["Exception raised"]]
   block4["assert False\n"]
-  block5["try:
+  block5[["Exception raised"]]
+  block6["try:
         assert False
         print(#quot;unreachable#quot;)
     finally:
         print(#quot;reached#quot;)\n"]
 
-  start --> block5
-  block5 -- "Exception raised" --> block3
-  block5 -- "else" --> block4
+  start --> block6
+  block6 -- "Exception raised" --> block5
+  block6 -- "else" --> block4
+  block5 --> block1
   block4 -- "False" --> block2
   block4 -- "else" --> block1
   block3 --> return
@@ -538,47 +546,51 @@ flowchart TD
         except PySparkParseException:
             x = 7\n"]
   block6["x = 4\n"]
-  block7["x = 5\n"]
-  block8["try:
-                x = 4
-            except PySparkParseException:
-                x = 5\n"]
+  block7[["Exception raised"]]
+  block8["x = 5\n"]
   block9["try:
                 x = 4
             except PySparkParseException:
                 x = 5\n"]
-  block10["if catalog is not None:
+  block10["try:
+                x = 4
+            except PySparkParseException:
+                x = 5\n"]
+  block11["if catalog is not None:
             try:
                 x = 4
             except PySparkParseException:
                 x = 5\n"]
-  block11["x = 8\n"]
-  block12["x = 2\n"]
-  block13["x = 3\n"]
-  block14["try:
+  block12["x = 8\n"]
+  block13["x = 2\n"]
+  block14[["Exception raised"]]
+  block15["x = 3\n"]
+  block16["try:
             x = 2
         except PySparkParseException:
             x = 3\n"]
-  block15["try:
+  block17["try:
             x = 2
         except PySparkParseException:
             x = 3\n"]
-  block16["x = 0\n"]
-  block17["x = 1\n"]
-  block18["try:
+  block18["x = 0\n"]
+  block19[["Exception raised"]]
+  block20["x = 1\n"]
+  block21["try:
                 x = 0
             except PySparkParseException:
                 x = 1\n"]
-  block19["try:
+  block22["try:
                 x = 0
             except PySparkParseException:
                 x = 1\n"]
-  block20["if catalog is not None:
+  block23["if catalog is not None:
             try:
                 x = 0
             except PySparkParseException:
                 x = 1\n"]
-  block21["try:
+  block24[["Exception raised"]]
+  block25["try:
         if catalog is not None:
             try:
                 x = 0
@@ -600,38 +612,42 @@ flowchart TD
         except PySparkParseException:
             x = 7\n"]
 
-  start --> block21
-  block21 -- "Exception raised" --> block2
-  block21 -- "else" --> block20
-  block20 -- "catalog is not None" --> block19
-  block20 -- "else" --> block15
-  block19 -- "Exception raised" --> block18
-  block19 -- "else" --> block16
-  block18 -- "PySparkParseException" --> block17
-  block18 -- "else" --> block2
-  block17 --> block15
-  block16 --> block15
-  block15 -- "Exception raised" --> block14
-  block15 -- "else" --> block12
-  block14 -- "PySparkParseException" --> block13
-  block14 -- "else" --> block2
-  block13 --> block11
+  start --> block25
+  block25 -- "Exception raised" --> block24
+  block25 -- "else" --> block23
+  block24 --> block11
+  block23 -- "catalog is not None" --> block22
+  block23 -- "else" --> block17
+  block22 -- "Exception raised" --> block21
+  block22 -- "else" --> block18
+  block21 -- "PySparkParseException" --> block20
+  block21 -- "else" --> block19
+  block20 --> block17
+  block19 --> block11
+  block18 --> block17
+  block17 -- "Exception raised" --> block16
+  block17 -- "else" --> block13
+  block16 -- "PySparkParseException" --> block15
+  block16 -- "else" --> block14
+  block15 --> block12
+  block14 --> block11
+  block13 --> block12
   block12 --> block11
-  block11 --> block10
-  block10 -- "catalog is not None" --> block9
-  block10 -- "else" --> block5
-  block9 -- "Exception raised" --> block8
-  block9 -- "else" --> block6
-  block8 -- "PySparkParseException" --> block7
-  block8 -- "else" --> block2
-  block7 --> block5
+  block11 -- "catalog is not None" --> block10
+  block11 -- "else" --> block5
+  block10 -- "Exception raised" --> block9
+  block10 -- "else" --> block6
+  block9 -- "PySparkParseException" --> block8
+  block9 -- "else" --> block7
+  block8 --> block5
+  block7 --> return
   block6 --> block5
   block5 -- "Exception raised" --> block4
   block5 -- "else" --> block1
   block4 -- "PySparkParseException" --> block3
   block4 -- "else" --> block2
   block3 --> block0
-  block2 --> block10
+  block2 --> return
   block1 --> block0
   block0 --> return
 ```
