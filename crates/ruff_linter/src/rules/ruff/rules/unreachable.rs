@@ -54,7 +54,7 @@ pub(crate) fn in_function(name: &Identifier, body: &[Stmt]) -> Vec<Diagnostic> {
 
     // Combine sequential unreachable blocks
     let mut blocks = basic_blocks.blocks.raw;
-    blocks.sort_by(|a, b| a.start().to_u32().cmp(&b.start().to_u32()));
+    blocks.sort_by_key(|a| a.start().to_u32());
     let mut start = None;
     let mut end = None;
     for block in blocks {
