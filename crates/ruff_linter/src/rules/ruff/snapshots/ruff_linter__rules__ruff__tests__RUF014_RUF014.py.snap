@@ -183,21 +183,14 @@ RUF014.py:116:9: RUF014 Unreachable code in `while_true_else`
 
 RUF014.py:122:9: RUF014 Unreachable code in `while_true_else_return`
     |
-120 |         return "reachable"
-121 |     else:
-122 |         return "unreachable"
-    |         ^^^^^^^^^^^^^^^^^^^^ RUF014
-123 |     return "also unreachable"
-    |
-
-RUF014.py:123:5: RUF014 Unreachable code in `while_true_else_return`
-    |
-121 |     else:
-122 |         return "unreachable"
-123 |     return "also unreachable"
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF014
-124 | 
-125 | def while_false_var_i():
+120 |           return "reachable"
+121 |       else:
+122 |           return "unreachable"
+    |  _________^
+123 | |     return "also unreachable"
+    | |_____________________________^ RUF014
+124 |   
+125 |   def while_false_var_i():
     |
 
 RUF014.py:128:9: RUF014 Unreachable code in `while_false_var_i`
@@ -261,12 +254,14 @@ RUF014.py:248:5: RUF014 Unreachable code in `after_return`
     | |________________________^ RUF014
     |
 
-RUF014.py:259:9: RUF014 Unreachable code in `check_if_url_exists`
+RUF014.py:257:5: RUF014 Unreachable code in `check_if_url_exists`
     |
+255 |   def check_if_url_exists(url: str) -> bool:  # type: ignore[return]
+256 |       return True  # uncomment to check URLs
 257 |       response = requests.head(url, allow_redirects=True)
-258 |       if response.status_code == 200:
-259 |           return True
-    |  _________^
+    |  _____^
+258 | |     if response.status_code == 200:
+259 | |         return True
 260 | |     if response.status_code == 404:
 261 | |         return False
 262 | |     console.print(f"[red]Unexpected error received: {response.status_code}[/]")
