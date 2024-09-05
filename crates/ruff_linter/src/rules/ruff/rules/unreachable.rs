@@ -540,7 +540,7 @@ fn try_block<'stmt>(
 }
 
 /// Step through the try in the forward direction so that `assert`
-/// and `raise` can be correctly directed now that the try and except
+/// and `raise` can be correctly directed now that the `try` and `except`
 /// blocks have been established.
 fn post_process_try(
     blocks: &mut BasicBlocksBuilder<'_>,
