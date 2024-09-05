@@ -42,21 +42,14 @@ RUF014.py:16:9: RUF014 Unreachable code in `if_always_false`
 
 RUF014.py:21:9: RUF014 Unreachable code in `if_elif_always_false`
    |
-19 | def if_elif_always_false():
-20 |     if False:
-21 |         return "unreachable"
-   |         ^^^^^^^^^^^^^^^^^^^^ RUF014
-22 |     elif False:
-23 |         return "also unreachable"
-   |
-
-RUF014.py:23:9: RUF014 Unreachable code in `if_elif_always_false`
-   |
-21 |         return "unreachable"
-22 |     elif False:
-23 |         return "also unreachable"
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF014
-24 |     return "reachable"
+19 |   def if_elif_always_false():
+20 |       if False:
+21 |           return "unreachable"
+   |  _________^
+22 | |     elif False:
+23 | |         return "also unreachable"
+   | |_________________________________^ RUF014
+24 |       return "reachable"
    |
 
 RUF014.py:28:9: RUF014 Unreachable code in `if_elif_always_true`
@@ -266,4 +259,17 @@ RUF014.py:248:5: RUF014 Unreachable code in `after_return`
 251 | |     print("unreachable")
 252 | |     print("unreachable")
     | |________________________^ RUF014
+    |
+
+RUF014.py:259:9: RUF014 Unreachable code in `check_if_url_exists`
+    |
+257 |       response = requests.head(url, allow_redirects=True)
+258 |       if response.status_code == 200:
+259 |           return True
+    |  _________^
+260 | |     if response.status_code == 404:
+261 | |         return False
+262 | |     console.print(f"[red]Unexpected error received: {response.status_code}[/]")
+263 | |     response.raise_for_status()
+    | |_______________________________^ RUF014
     |
