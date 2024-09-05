@@ -62,14 +62,10 @@ pub(crate) fn in_function(name: &Identifier, body: &[Stmt]) -> Vec<Diagnostic> {
             continue;
         }
 
-        if !block.reachable {
-            if let Some(end_index) = end {
-                end = Some(cmp::max(block.end(), end_index));
-            } else {
-                start = Some(block.start());
-                end = Some(block.end());
-            }
-        } else {
+        if block.reachable {
+            // At each reachable block, create a violation for all the
+            // unreachable blocks encountered since the last reachable
+            // block.
             if let Some(start_index) = start {
                 if let Some(end_index) = end {
                     // TODO: add more information to the diagnostic.
@@ -86,6 +82,13 @@ pub(crate) fn in_function(name: &Identifier, body: &[Stmt]) -> Vec<Diagnostic> {
                     start = None;
                     end = None;
                 }
+            }
+        } else {
+            if let Some(end_index) = end {
+                end = Some(cmp::max(block.end(), end_index));
+            } else {
+                start = Some(block.start());
+                end = Some(block.end());
             }
         }
     }
