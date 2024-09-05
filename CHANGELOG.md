@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.6.4
+
+### Preview features
+
+- \[`flake8-builtins`\] Use dynamic builtins list based on Python version ([#13172](https://github.com/astral-sh/ruff/pull/13172))
+- \[`pydoclint`\] Permit yielding `None` in `DOC402` and `DOC403` ([#13148](https://github.com/astral-sh/ruff/pull/13148))
+- \[`pylint`\] Update diagnostic message for `PLW3201` ([#13194](https://github.com/astral-sh/ruff/pull/13194))
+- \[`ruff`\] Implement `post-init-default` (`RUF033`) ([#13192](https://github.com/astral-sh/ruff/pull/13192))
+- \[`ruff`\] Implement useless if-else (`RUF034`) ([#13218](https://github.com/astral-sh/ruff/pull/13218))
+
+### Rule changes
+
+- \[`flake8-pyi`\] Respect `pep8_naming.classmethod-decorators` settings when determining if a method is a classmethod in `custom-type-var-return-type` (`PYI019`) ([#13162](https://github.com/astral-sh/ruff/pull/13162))
+- \[`flake8-pyi`\] Teach various rules that annotations might be stringized ([#12951](https://github.com/astral-sh/ruff/pull/12951))
+- \[`pylint`\] Avoid `no-self-use` for `attrs`-style validators ([#13166](https://github.com/astral-sh/ruff/pull/13166))
+- \[`pylint`\] Recurse into subscript subexpressions when searching for list/dict lookups (`PLR1733`, `PLR1736`) ([#13186](https://github.com/astral-sh/ruff/pull/13186))
+- \[`pyupgrade`\] Detect `aiofiles.open` calls in `UP015` ([#13173](https://github.com/astral-sh/ruff/pull/13173))
+- \[`pyupgrade`\] Mark `sys.version_info[0] < 3` and similar comparisons as outdated (`UP036`) ([#13175](https://github.com/astral-sh/ruff/pull/13175))
+
+### CLI
+
+- Enrich messages of SARIF results ([#13180](https://github.com/astral-sh/ruff/pull/13180))
+- Handle singular case for incompatible rules warning in `ruff format` output ([#13212](https://github.com/astral-sh/ruff/pull/13212))
+
+### Bug fixes
+
+- \[`pydocstyle`\] Improve heuristics for detecting Google-style docstrings ([#13142](https://github.com/astral-sh/ruff/pull/13142))
+- \[`refurb`\] Treat `sep` arguments with effects as unsafe removals (`FURB105`) ([#13165](https://github.com/astral-sh/ruff/pull/13165))
+
 ## 0.6.3
 
 ### Preview features
