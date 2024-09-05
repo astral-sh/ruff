@@ -146,9 +146,9 @@ struct BasicBlocks<'stmt> {
     /// order, but it gets fussy around control flow statements (e.g. `while`
     /// statements).
     ///
-    /// For loop blocks, and similar recurring control flows, the end of the
-    /// body will point to the loop block again (to create the loop). However an
-    /// oddity here is that this block might contain statements before the loop
+    /// For loop blocks (e.g. `while` and `for`), the end of the body will
+    /// point to the loop block again (to create the loop). However an oddity
+    /// here is that this block might contain statements before the loop
     /// itself which, of course, won't be executed again.
     ///
     /// For example:
@@ -212,6 +212,25 @@ enum NextBlock<'stmt> {
         /// Next block if `condition` is false.
         orelse: BlockIndex,
         /// Exit block. None indicates Terminate.
+        /// The purpose of the `exit` block is to facilitate post_processing
+        /// steps. When iterating over `if` or `try` bodies it is necessary
+        /// to know when we have exited the body. To avoid reprocessing blocks.
+        ///
+        /// For example:
+        /// ```python
+        /// while True:    # block 0
+        ///     if True:   # block 1
+        ///         x = 2  # block 2
+        ///     y = 2      # block 3
+        ///     z = 2      # block 4
+        /// ```
+        ///
+        /// Recursive processing will proceed as follows:
+        /// block 0 -> block 1 -> block 2 -> block 3 -> block 4 -> Terminate
+        ///                    -> block 3 -> block 4 -> Terminate
+        ///
+        /// To avoid repeated work we remember that the `if` body exits on
+        /// block 3, so the recursion can be terminated.
         exit: Option<BlockIndex>,
     },
     /// The end.
@@ -234,9 +253,16 @@ enum Condition<'stmt> {
         /// `case $case`, include pattern, guard, etc.
         case: &'stmt MatchCase,
     },
-    // Exception was raised and caught by `except` clause
+    /// Exception was raised and caught by `except` clause.
+    /// If the raised `Exception` matches the one caught by the `except`
+    /// then execute the `except` body, otherwise go to the next `except`.
+    ///
+    /// The `stmt` is the exception caught by the `except`.
     Except(&'stmt Expr),
-    // Exception was raised in a `try` block
+    /// Exception was raised in a `try` block.
+    /// This condition cannot be evaluated since it's impossible to know
+    /// (in most cases) if an exception will be raised. So both paths
+    /// (raise and not-raise) are assumed to be taken.
     MaybeRaised,
 }
 
@@ -641,7 +667,7 @@ fn match_case<'stmt>(
             condition: Condition::Match { subject, case },
             next: next_block_index,
             orelse: orelse_after_block,
-            exit: Some(orelse_after_block),
+            exit: Some(next_after_block),
         }
     };
     BasicBlock::new(stmts, next)
