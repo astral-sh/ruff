@@ -337,7 +337,7 @@ fn loop_block<'stmt>(
     orelse: &'stmt [Stmt],
     after: Option<BlockIndex>,
 ) -> NextBlock<'stmt> {
-    let after_block = blocks.maybe_next_block_index(after, || true);
+    let after_block = blocks.find_next_block_index(after);
     let last_orelse_statement = blocks.append_blocks_if_not_empty(orelse, after_block);
 
     let loop_continue_index = blocks.create_loop_continue_block();
@@ -444,7 +444,7 @@ fn try_block<'stmt>(
         panic!("Should only be called with StmtTry.");
     };
 
-    let after_block = blocks.maybe_next_block_index(after, || true);
+    let after_block = blocks.find_next_block_index(after);
     let finally_block = blocks.append_blocks_if_not_empty(finalbody, after_block);
     let else_block = blocks.append_blocks_if_not_empty(orelse, finally_block);
     let try_block = blocks.append_blocks_if_not_empty(body, else_block);
@@ -632,16 +632,7 @@ fn match_case<'stmt>(
     // but that is type `MatchCase`, not `Stmt`. For now we'll point to the
     // entire match statement.
     let stmts = std::slice::from_ref(match_stmt);
-    let next_block_index = if case.body.is_empty() {
-        next_after_block
-    } else {
-        let from = blocks.last_index();
-        let last_statement_index = blocks.append_blocks(&case.body, Some(next_after_block));
-        if let Some(from) = from {
-            blocks.change_next_block(last_statement_index, from, next_after_block, |_| true);
-        }
-        last_statement_index
-    };
+    let next_block_index = blocks.append_blocks_if_not_empty(&case.body, next_after_block);
     let next = if is_wildcard(case) {
         // Wildcard case is always taken.
         NextBlock::Always(next_block_index)
@@ -721,7 +712,7 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                 // Statements that (can) divert the control flow.
                 Stmt::If(stmt_if) => {
                     // Always get an after_block to avoid having to get one for each branch that needs it.
-                    let after_block = self.maybe_next_block_index(after, || true);
+                    let after_block = self.find_next_block_index(after);
                     let consequent = self.append_blocks_if_not_empty(&stmt_if.body, after_block);
 
                     // Block ID of the next elif or else clause.
@@ -765,7 +756,7 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                 }) => loop_block(self, Condition::Iterator(condition), body, orelse, after),
                 Stmt::Try(_) => try_block(self, stmt, after),
                 Stmt::With(StmtWith { body, .. }) => {
-                    let after_block = self.maybe_next_block_index(after, || true);
+                    let after_block = self.find_next_block_index(after);
                     let with_block = self.append_blocks(body, after);
 
                     // The with statement is equivalent to a try statement with an except and finally block
@@ -779,27 +770,11 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                     }
                 }
                 Stmt::Match(StmtMatch { subject, cases, .. }) => {
-                    let next_after_block = self.maybe_next_block_index(after, || {
-                        // We don't need need a next block if all cases don't need a
-                        // next block, i.e. if no cases need a next block, and we
-                        // have a wildcard case (to ensure one of the block is
-                        // always taken).
-                        // NOTE: match statement require at least one case, so we
-                        // don't have to worry about empty `cases`.
-                        // TODO: support exhaustive cases without a wildcard.
-                        cases.iter().any(|case| needs_next_block(&case.body))
-                            || !cases.iter().any(is_wildcard)
-                    });
-                    let mut orelse_after_block = next_after_block;
+                    let after_block = self.find_next_block_index(after);
+                    let mut orelse_after_block = after_block;
                     for case in cases.iter().rev() {
-                        let block = match_case(
-                            self,
-                            stmt,
-                            subject,
-                            case,
-                            next_after_block,
-                            orelse_after_block,
-                        );
+                        let block =
+                            match_case(self, stmt, subject, case, after_block, orelse_after_block);
                         // For the case above this use the just added case as the
                         // `orelse` branch, this convert the match statement to
                         // (essentially) a bunch of if statements.
@@ -817,7 +792,7 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                 }
                 Stmt::Assert(stmt) => {
                     // NOTE: This may be modified in post_process_try.
-                    let next = self.maybe_next_block_index(after, || true);
+                    let next = self.find_next_block_index(after);
                     let orelse = self.create_exception_block();
                     NextBlock::If {
                         condition: Condition::Test(&stmt.test),
@@ -920,14 +895,9 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
             .map_or(NextBlock::Terminate, NextBlock::Always)
     }
 
-    /// Select the next block index from `blocks`. If there is no next block it will
-    /// add a fake/empty block if `condition` returns true. If `condition` returns
-    /// false the returned index may not be used.
-    fn maybe_next_block_index(
-        &mut self,
-        after: Option<BlockIndex>,
-        condition: impl FnOnce() -> bool,
-    ) -> BlockIndex {
+    /// Select the next block index from `blocks`.
+    /// If there is no next block it will add a fake/empty block.
+    fn find_next_block_index(&mut self, after: Option<BlockIndex>) -> BlockIndex {
         if let Some(after) = after {
             // Next block is already determined.
             after
@@ -935,15 +905,9 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
             // Otherwise we either continue with the next block (that is the last
             // block in `blocks`).
             idx
-        } else if condition() {
-            // Or if there are no blocks, but need one based on `condition` then we
-            // add a fake end block.
-            self.blocks.push(BasicBlock::EMPTY)
         } else {
-            // NOTE: invalid, but because `condition` returned false this shouldn't
-            // be used. This is only used as an optimisation to avoid adding fake end
-            // blocks.
-            BlockIndex::MAX
+            // Or if there are no blocks, add a fake end block.
+            self.blocks.push(BasicBlock::EMPTY)
         }
     }
 
@@ -955,93 +919,6 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
     /// Returns a block index for an `LOOP_CONTINUE` block in `blocks`.
     fn create_loop_continue_block(&mut self) -> BlockIndex {
         self.blocks.push(BasicBlock::LOOP_CONTINUE.clone())
-    }
-
-    /// Change the next basic block for the block, or chain of blocks, in index
-    /// `fixup_index` from `from` to `to`.
-    ///
-    /// This doesn't change the target if it's `NextBlock::Terminate`.
-    fn change_next_block(
-        &mut self,
-        mut fixup_index: BlockIndex,
-        from: BlockIndex,
-        to: BlockIndex,
-        check_condition: impl Fn(&BasicBlock) -> bool + Copy,
-    ) {
-        /// Check if we found our target and if `check_condition` is met.
-        fn is_target(
-            block: &BasicBlock<'_>,
-            got: BlockIndex,
-            expected: BlockIndex,
-            check_condition: impl Fn(&BasicBlock) -> bool,
-        ) -> bool {
-            got == expected && check_condition(block)
-        }
-
-        loop {
-            match self.blocks.get(fixup_index).map(|b| &b.next) {
-                Some(NextBlock::Always(next)) => {
-                    let next = *next;
-                    if is_target(&self.blocks[fixup_index], next, from, check_condition) {
-                        // Found our target, change it.
-                        self.blocks[fixup_index].next = NextBlock::Always(to);
-                    }
-                    return;
-                }
-                Some(NextBlock::If {
-                    condition,
-                    next,
-                    orelse,
-                    exit,
-                }) => {
-                    let idx = fixup_index;
-                    let condition = condition.clone();
-                    let next = *next;
-                    let orelse = *orelse;
-                    let exit = *exit;
-                    let new_next = if is_target(&self.blocks[idx], next, from, check_condition) {
-                        // Found our target in the next branch, change it (below).
-                        Some(to)
-                    } else {
-                        // Follow the chain.
-                        fixup_index = next;
-                        None
-                    };
-
-                    let new_orelse = if is_target(&self.blocks[idx], orelse, from, check_condition)
-                    {
-                        // Found our target in the else branch, change it (below).
-                        Some(to)
-                    } else if new_next.is_none() {
-                        // If we done with the next branch we only continue with the
-                        // else branch.
-                        fixup_index = orelse;
-                        None
-                    } else {
-                        // If we're not done with the next and else branches we need
-                        // to deal with the else branch before deal with the next
-                        // branch (in the next iteration).
-                        self.change_next_block(orelse, from, to, check_condition);
-                        None
-                    };
-
-                    let (next, orelse) = match (new_next, new_orelse) {
-                        (Some(new_next), Some(new_orelse)) => (new_next, new_orelse),
-                        (Some(new_next), None) => (new_next, orelse),
-                        (None, Some(new_orelse)) => (next, new_orelse),
-                        (None, None) => continue, // Not changing anything.
-                    };
-
-                    self.blocks[idx].next = NextBlock::If {
-                        condition,
-                        next,
-                        orelse,
-                        exit,
-                    };
-                }
-                Some(NextBlock::Terminate) | None => return,
-            }
-        }
     }
 
     fn finish(mut self) -> BasicBlocks<'stmt> {
@@ -1066,42 +943,6 @@ impl<'stmt> std::ops::Deref for BasicBlocksBuilder<'stmt> {
 impl<'stmt> std::ops::DerefMut for BasicBlocksBuilder<'stmt> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.blocks
-    }
-}
-
-/// Returns true if `stmts` need a next block, false otherwise.
-fn needs_next_block(stmts: &[Stmt]) -> bool {
-    // No statements, we automatically continue with the next block.
-    let Some(last) = stmts.last() else {
-        return true;
-    };
-
-    match last {
-        Stmt::Return(_) | Stmt::Raise(_) => false,
-        Stmt::If(stmt) => needs_next_block(&stmt.body) || stmt.elif_else_clauses.last().map_or(true, |clause| needs_next_block(&clause.body)),
-        Stmt::FunctionDef(_)
-        | Stmt::Import(_)
-        | Stmt::ImportFrom(_)
-        | Stmt::ClassDef(_)
-        | Stmt::Global(_)
-        | Stmt::Nonlocal(_)
-        | Stmt::Delete(_)
-        | Stmt::Assign(_)
-        | Stmt::AugAssign(_)
-        | Stmt::AnnAssign(_)
-        | Stmt::Expr(_)
-        | Stmt::Pass(_)
-        | Stmt::TypeAlias(_)
-        | Stmt::IpyEscapeCommand(_)
-        // TODO: check below.
-        | Stmt::Break(_)
-        | Stmt::Continue(_)
-        | Stmt::For(_)
-        | Stmt::While(_)
-        | Stmt::With(_)
-        | Stmt::Match(_)
-        | Stmt::Try(_)
-        | Stmt::Assert(_) => true,
     }
 }
 
