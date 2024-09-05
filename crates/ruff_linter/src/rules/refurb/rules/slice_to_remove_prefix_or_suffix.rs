@@ -6,13 +6,13 @@ use ruff_python_codegen::Generator;
 use ruff_text_size::{Ranged, TextRange};
 
 /// ## What it does
-/// Checks for removal of prefix or suffix from a string by assigning a slice
-/// after checking `startswith` or `endswith`, respectively.
+/// Checks for the removal of a prefix or suffix from a string by assigning
+/// the string to a slice after checking `startswith` or `endswith`, respectively.
 ///
 /// ## Why is this bad?
-/// Starting in Python 3.9, the methods `removeprefix` and `removesuffix`
-/// were introduced, which have the same behavior and are more
-/// readable and efficient.
+/// The methods `removeprefix` and `removesuffix`,
+/// introduced in Python 3.9, have the same behavior
+/// and are more readable and efficient.
 ///
 /// ## Example
 /// ```python
