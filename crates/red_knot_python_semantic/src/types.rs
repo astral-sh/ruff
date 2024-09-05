@@ -1,3 +1,5 @@
+use std::fmt;
+
 use infer::TypeInferenceBuilder;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
@@ -158,6 +160,35 @@ pub(crate) fn definitions_ty<'db>(
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy, PartialOrd, Ord, Hash)]
+pub enum SupportedVersion {
+    Py38,
+    Py39,
+    Py310,
+    Py311,
+    Py312,
+    Py313,
+}
+
+impl SupportedVersion {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Py38 => "3.8",
+            Self::Py39 => "3.9",
+            Self::Py310 => "3.10",
+            Self::Py311 => "3.11",
+            Self::Py312 => "3.12",
+            Self::Py313 => "3.13",
+        }
+    }
+}
+
+impl fmt::Display for SupportedVersion {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 /// Unique ID for a type.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Type<'db> {
@@ -196,6 +227,9 @@ pub enum Type<'db> {
     LiteralString,
     /// A bytes literal
     BytesLiteral(BytesLiteralType<'db>),
+    /// The set of objects that exist on a given Python version; used for version-conditional definitions.
+    /// Equivalent to Never if the given version is not supported, or 'object' otherwise.
+    ExistsOnVersion(SupportedVersion),
     // TODO protocols, callable types, overloads, generics, type vars
 }
 
@@ -363,6 +397,10 @@ impl<'db> Type<'db> {
                 // TODO defer to Type::Instance(<bytes from typeshed>).member
                 Type::Unknown
             }
+            // If the ExistsOnVersion type hasn't already been narrowed away,
+            // it means we might be running on that Python version,
+            // so `ExistsOnVersion` is equivalent to `object`.
+            Type::ExistsOnVersion(_) => builtins_symbol_ty(db, "object").to_instance(),
         }
     }
 
@@ -464,6 +502,8 @@ impl<'db> Type<'db> {
             Type::Function(_) => types_symbol_ty(db, "FunctionType"),
             Type::Module(_) => types_symbol_ty(db, "ModuleType"),
             Type::None => typeshed_symbol_ty(db, "NoneType"),
+            // `ExistsOnVersion` is equivalent to `object`, and the type of `object` is `type`
+            Type::ExistsOnVersion(_) => builtins_symbol_ty(db, "type"),
             // TODO not accurate if there's a custom metaclass...
             Type::Class(_) => builtins_symbol_ty(db, "type"),
             // TODO can we do better here? `type[LiteralString]`?
