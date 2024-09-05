@@ -28,8 +28,16 @@ class Section(NamedTuple):
 
 SECTIONS: list[Section] = [
     Section("Overview", "index.md", generated=True),
-    Section("Tutorial", "tutorial.md", generated=False),
-    Section("Installing Ruff", "installation.md", generated=False),
+    Section(
+        "Getting Started",
+        "",
+        generated=False,
+        subsections=[
+            Section("Tutorial", "tutorial.md", generated=False),
+            Section("Installation", "installation.md", generated=False),
+            Section("Configuration", "configuration.md", generated=False),
+        ],
+    ),
     Section("The Ruff Linter", "linter.md", generated=False),
     Section("The Ruff Formatter", "formatter.md", generated=False),
     Section(
@@ -44,11 +52,17 @@ SECTIONS: list[Section] = [
             Section("Migrating from ruff-lsp", "editors/migration.md", generated=False),
         ],
     ),
-    Section("Configuring Ruff", "configuration.md", generated=False),
-    Section("Preview", "preview.md", generated=False),
-    Section("Rules", "rules.md", generated=True),
-    Section("Settings", "settings.md", generated=True),
-    Section("Versioning", "versioning.md", generated=False),
+    Section(
+        "Reference",
+        "",
+        generated=False,
+        subsections=[
+            Section("Preview", "preview.md", generated=False),
+            Section("Rules", "rules.md", generated=True),
+            Section("Settings", "settings.md", generated=True),
+            Section("Versioning", "versioning.md", generated=False),
+        ],
+    ),
     Section("Integrations", "integrations.md", generated=False),
     Section("FAQ", "faq.md", generated=False),
     Section("Contributing", "contributing.md", generated=True),
@@ -125,8 +139,14 @@ def main() -> None:
 
     Path("docs").mkdir(parents=True, exist_ok=True)
 
+    section_queue = SECTIONS.copy()
+
     # Split the README.md into sections.
-    for title, filename, generated, _ in SECTIONS:
+    while section_queue:
+        title, filename, generated, sub_sections = section_queue.pop(0)
+        if sub_sections is not None:
+            section_queue.extend(sub_sections)
+
         if not generated:
             continue
 

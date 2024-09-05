@@ -4,16 +4,16 @@ theme:
   logo: assets/bolt.svg
   favicon: assets/favicon.ico
   features:
-    - navigation.instant
-    - navigation.instant.prefetch
-    - navigation.tracking
     - content.code.annotate
-    - toc.integrate
-    - toc.follow
-    - navigation.path
-    - navigation.top
     - content.code.copy
     - content.tabs.link
+    - navigation.footer
+    - navigation.instant
+    - navigation.instant.prefetch
+    - navigation.path
+    - navigation.top
+    - navigation.tracking
+    - toc.follow
   palette:
     # Note: Using the system theme works with the insiders version
     # https://squidfunk.github.io/mkdocs-material/setup/changing-the-colors/#automatic-light-dark-mode
@@ -71,6 +71,15 @@ not_in_nav: |
 extra:
   analytics:
     provider: fathom
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/astral-sh/ruff
+    - icon: fontawesome/brands/discord
+      link: https://discord.com/invite/astral-sh
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/ruff/
+    - icon: fontawesome/brands/x-twitter
+      link: https://x.com/astral_sh
 validation:
   omitted_files: warn
   absolute_links: warn
