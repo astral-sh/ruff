@@ -212,7 +212,7 @@ enum NextBlock<'stmt> {
         /// Next block if `condition` is false.
         orelse: BlockIndex,
         /// Exit block. None indicates Terminate.
-        /// The purpose of the `exit` block is to facilitate post_processing
+        /// The purpose of the `exit` block is to facilitate post processing
         /// steps. When iterating over `if` or `try` bodies it is necessary
         /// to know when we have exited the body. To avoid reprocessing blocks.
         ///
