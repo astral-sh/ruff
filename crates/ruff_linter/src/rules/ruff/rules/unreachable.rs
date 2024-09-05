@@ -117,8 +117,8 @@ fn taken(condition: &Condition) -> Option<bool> {
         },
         Condition::Iterator(_) => None,
         Condition::Match { .. } => None,
-        Condition::ExceptionCaught(_) => None,
-        Condition::ExceptionRaised => None,
+        Condition::Except(_) => None,
+        Condition::MaybeRaised => None,
     }
 }
 
@@ -235,17 +235,17 @@ enum Condition<'stmt> {
         case: &'stmt MatchCase,
     },
     // Exception was raised and caught by `except` clause
-    ExceptionCaught(&'stmt Expr),
+    Except(&'stmt Expr),
     // Exception was raised in a `try` block
-    ExceptionRaised,
+    MaybeRaised,
 }
 
 impl<'stmt> Ranged for Condition<'stmt> {
     fn range(&self) -> TextRange {
         match self {
-            Condition::Test(expr)
-            | Condition::Iterator(expr)
-            | Condition::ExceptionCaught(expr) => expr.range(),
+            Condition::Test(expr) | Condition::Iterator(expr) | Condition::Except(expr) => {
+                expr.range()
+            }
             // The case of the match statement, without the body.
             Condition::Match { subject: _, case } => TextRange::new(
                 case.start(),
@@ -253,7 +253,7 @@ impl<'stmt> Ranged for Condition<'stmt> {
                     .as_ref()
                     .map_or(case.pattern.end(), |guard| guard.end()),
             ),
-            Condition::ExceptionRaised => TextRange::new(TextSize::new(0), TextSize::new(0)),
+            Condition::MaybeRaised => TextRange::new(TextSize::new(0), TextSize::new(0)),
         }
     }
 }
@@ -479,7 +479,7 @@ fn try_block<'stmt>(
 
         if let Some(type_) = type_ {
             let next = NextBlock::If {
-                condition: Condition::ExceptionCaught(type_.as_ref()),
+                condition: Condition::Except(type_.as_ref()),
                 next: except_block,
                 orelse: next_branch,
                 exit: after,
@@ -508,7 +508,7 @@ fn try_block<'stmt>(
     // We cannot know if the try block will raise an exception (apart from explicit raise statements)
     // We therefore assume that both paths may execute
     NextBlock::If {
-        condition: Condition::ExceptionRaised,
+        condition: Condition::MaybeRaised,
         next: next_branch, // If exception raised go to except -> except -> ... -> finally
         orelse: try_block, // Otherwise try -> else -> finally
         exit: after,
@@ -763,7 +763,7 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                     // However, we do not have access to the except and finally.
                     // We therefore assume that execution may fall through on error.
                     NextBlock::If {
-                        condition: Condition::ExceptionRaised,
+                        condition: Condition::MaybeRaised,
                         next: after_block,  // If exception raised fall through
                         orelse: with_block, // Otherwise execute the with statement
                         exit: after,
@@ -1116,7 +1116,7 @@ mod tests {
                         ..
                     } => {
                         let condition_code = match condition {
-                            Condition::ExceptionRaised => "Exception raised",
+                            Condition::MaybeRaised => "Exception raised",
                             _ => self.source[condition.range()].trim(),
                         };
                         writeln!(
