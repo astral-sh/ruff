@@ -72,15 +72,12 @@ impl ModulePath {
         };
 
         // Stubs have precedence over source files
-        if let Some(stub) = self.with_pyi_extension().to_file(&resolver) {
+        if let Some(stub) = self.with_pyi_extension().to_file(resolver) {
             Some((stub, kind))
-        } else if let Some(module) = self
-            .with_py_extension()
-            .and_then(|path| path.to_file(&resolver))
-        {
-            Some((module, kind))
         } else {
-            None
+            self.with_py_extension()
+                .and_then(|path| path.to_file(resolver))
+                .map(|module| (module, kind))
         }
     }
 
