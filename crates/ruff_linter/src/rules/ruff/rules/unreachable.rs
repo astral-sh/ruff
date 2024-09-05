@@ -367,9 +367,7 @@ fn loop_block<'stmt>(
     let last_orelse_statement = blocks.append_blocks_if_not_empty(orelse, after_block);
 
     let loop_continue_index = blocks.create_loop_continue_block();
-    // NOTE: a while loop's body must not be empty, so we can safely
-    // create at least one block from it.
-    let last_statement_index = blocks.append_blocks(body, Some(loop_continue_index));
+    let last_statement_index = blocks.append_blocks_if_not_empty(body, loop_continue_index);
     blocks.blocks[loop_continue_index].next = NextBlock::Always(blocks.blocks.next_index());
 
     post_process_loop(
@@ -542,8 +540,8 @@ fn try_block<'stmt>(
 }
 
 /// Step through the try in the forward direction so that `assert`
-/// and `raise` can be correctly directed now that the try blocks
-/// been established.
+/// and `raise` can be correctly directed now that the try and except
+/// blocks have been established.
 fn post_process_try(
     blocks: &mut BasicBlocksBuilder<'_>,
     start_index: BlockIndex,
