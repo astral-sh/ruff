@@ -301,17 +301,17 @@ impl<'stmt> BasicBlock<'stmt> {
         self.is_empty() || self.is_exception() || self.is_loop_continue()
     }
 
-    /// Returns true if `self` is an empty block.
+    /// Returns true if `self` is an `EMPTY` block.
     fn is_empty(&self) -> bool {
         matches!(self.kind, BasicBlockKind::Empty)
     }
 
-    /// Returns true if `self` is an exception block.
+    /// Returns true if `self` is an `EXCEPTION` block.
     fn is_exception(&self) -> bool {
         matches!(self.kind, BasicBlockKind::Exception)
     }
 
-    /// Returns true if `self` is a loop_continue block.
+    /// Returns true if `self` is a `LOOP_CONTINUE` block.
     fn is_loop_continue(&self) -> bool {
         matches!(self.kind, BasicBlockKind::LoopContinue)
     }
@@ -947,12 +947,12 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
         }
     }
 
-    /// Returns a block index for an exception block in `blocks`.
+    /// Returns a block index for an `EXCEPTION` block in `blocks`.
     fn create_exception_block(&mut self) -> BlockIndex {
         self.blocks.push(BasicBlock::EXCEPTION.clone())
     }
 
-    /// Returns a block index for an loop_continue block in `blocks`.
+    /// Returns a block index for an `LOOP_CONTINUE` block in `blocks`.
     fn create_loop_continue_block(&mut self) -> BlockIndex {
         self.blocks.push(BasicBlock::LOOP_CONTINUE.clone())
     }
