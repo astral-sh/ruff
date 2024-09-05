@@ -106,3 +106,13 @@ def func():
             x = 6
         except PySparkParseException:
             x = 7
+
+
+def func():
+    try:
+        assert False
+    except ex:
+        raise ex
+
+    finally:
+        raise Exception("other")

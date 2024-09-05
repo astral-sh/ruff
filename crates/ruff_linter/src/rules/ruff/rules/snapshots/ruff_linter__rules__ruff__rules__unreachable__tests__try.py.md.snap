@@ -651,3 +651,60 @@ flowchart TD
   block1 --> block0
   block0 --> return
 ```
+
+## Function 12
+### Source
+```python
+def func():
+    try:
+        assert False
+    except ex:
+        raise ex
+
+    finally:
+        raise Exception("other")
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+  start(("Start"))
+  return(("End"))
+  block0[["`*(empty)*`"]]
+  block1[["Exception raised"]]
+  block2["raise Exception(#quot;other#quot;)\n"]
+  block3[["Exception raised"]]
+  block4["assert False\n"]
+  block5[["Exception raised"]]
+  block6[["Exception raised"]]
+  block7["raise ex\n"]
+  block8["try:
+        assert False
+    except ex:
+        raise ex
+
+    finally:
+        raise Exception(#quot;other#quot;)\n"]
+  block9["try:
+        assert False
+    except ex:
+        raise ex
+
+    finally:
+        raise Exception(#quot;other#quot;)\n"]
+
+  start --> block9
+  block9 -- "Exception raised" --> block8
+  block9 -- "else" --> block4
+  block8 -- "ex" --> block7
+  block8 -- "else" --> block5
+  block7 --> block2
+  block6 --> return
+  block5 --> block2
+  block4 -- "False" --> block2
+  block4 -- "else" --> block8
+  block3 --> return
+  block2 --> block1
+  block1 --> return
+  block0 --> return
+```
