@@ -73,24 +73,26 @@ def func(status):
 flowchart TD
   start(("Start"))
   return(("End"))
-  block0["return 0\n"]
-  block1["match status:
+  block0[["`*(empty)*`"]]
+  block1["return 0\n"]
+  block2["match status:
         case 1:
             return 1
         case _:
             return 0\n"]
-  block2["return 1\n"]
-  block3["match status:
+  block3["return 1\n"]
+  block4["match status:
         case 1:
             return 1
         case _:
             return 0\n"]
 
-  start --> block3
-  block3 -- "case 1" --> block2
-  block3 -- "else" --> block1
-  block2 --> return
-  block1 --> block0
+  start --> block4
+  block4 -- "case 1" --> block3
+  block4 -- "else" --> block2
+  block3 --> return
+  block2 --> block1
+  block1 --> return
   block0 --> return
 ```
 
@@ -182,8 +184,9 @@ def func(status):
 flowchart TD
   start(("Start"))
   return(("End"))
-  block0["return 3\n"]
-  block1["match status:
+  block0[["`*(empty)*`"]]
+  block1["return 3\n"]
+  block2["match status:
         case 0:
             return 0
         case 1:
@@ -192,8 +195,8 @@ flowchart TD
             return #quot;1 again#quot;
         case _:
             return 3\n"]
-  block2["return #quot;1 again#quot;\n"]
-  block3["match status:
+  block3["return #quot;1 again#quot;\n"]
+  block4["match status:
         case 0:
             return 0
         case 1:
@@ -202,8 +205,8 @@ flowchart TD
             return #quot;1 again#quot;
         case _:
             return 3\n"]
-  block4["return 1\n"]
-  block5["match status:
+  block5["return 1\n"]
+  block6["match status:
         case 0:
             return 0
         case 1:
@@ -212,8 +215,8 @@ flowchart TD
             return #quot;1 again#quot;
         case _:
             return 3\n"]
-  block6["return 0\n"]
-  block7["match status:
+  block7["return 0\n"]
+  block8["match status:
         case 0:
             return 0
         case 1:
@@ -223,17 +226,18 @@ flowchart TD
         case _:
             return 3\n"]
 
-  start --> block7
-  block7 -- "case 0" --> block6
-  block7 -- "else" --> block5
-  block6 --> return
-  block5 -- "case 1" --> block4
-  block5 -- "else" --> block3
-  block4 --> return
-  block3 -- "case 1" --> block2
-  block3 -- "else" --> block1
-  block2 --> return
-  block1 --> block0
+  start --> block8
+  block8 -- "case 0" --> block7
+  block8 -- "else" --> block6
+  block7 --> return
+  block6 -- "case 1" --> block5
+  block6 -- "else" --> block4
+  block5 --> return
+  block4 -- "case 1" --> block3
+  block4 -- "else" --> block2
+  block3 --> return
+  block2 --> block1
+  block1 --> return
   block0 --> return
 ```
 
