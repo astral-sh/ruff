@@ -527,7 +527,7 @@ flowchart TD
   return(("End"))
   block0[["`*(empty)*`"]]
   block1["x = 6\n"]
-  block2["\n"]
+  block2[["Exception raised"]]
   block3["x = 7\n"]
   block4["try:
             x = 6

@@ -127,6 +127,14 @@ fn taken(condition: &Condition) -> Option<bool> {
 #[derive(PartialOrd, Ord)]
 struct BlockIndex;
 
+#[derive(Debug, PartialEq, Clone)]
+enum BasicBlockKind {
+    Generic,
+    Empty,
+    Exception,
+    LoopContinue,
+}
+
 /// Collection of basic block.
 #[derive(Debug, PartialEq)]
 struct BasicBlocks<'stmt> {
@@ -186,6 +194,7 @@ struct BasicBlock<'stmt> {
     stmts: &'stmt [Stmt],
     next: NextBlock<'stmt>,
     reachable: bool,
+    kind: BasicBlockKind,
 }
 
 /// Edge between basic blocks (in the control-flow graph).
@@ -255,6 +264,7 @@ impl<'stmt> BasicBlock<'stmt> {
             stmts,
             next,
             reachable: false,
+            kind: BasicBlockKind::Generic,
         }
     }
 
@@ -263,6 +273,7 @@ impl<'stmt> BasicBlock<'stmt> {
         stmts: &[],
         next: NextBlock::Terminate,
         reachable: false,
+        kind: BasicBlockKind::Empty,
     };
 
     /// A sentinel block indicating an exception was raised.
@@ -273,6 +284,7 @@ impl<'stmt> BasicBlock<'stmt> {
         })],
         next: NextBlock::Terminate,
         reachable: false,
+        kind: BasicBlockKind::Exception,
     };
 
     const LOOP_CONTINUE: BasicBlock<'static> = BasicBlock {
@@ -281,6 +293,7 @@ impl<'stmt> BasicBlock<'stmt> {
         })],
         next: NextBlock::Terminate, // This must be updated dynamically
         reachable: false,
+        kind: BasicBlockKind::LoopContinue,
     };
 
     /// Return true if the block is a sentinel or fake block.
@@ -288,19 +301,19 @@ impl<'stmt> BasicBlock<'stmt> {
         self.is_empty() || self.is_exception() || self.is_loop_continue()
     }
 
-    /// Returns true if `self` is an empty block that terminates.
+    /// Returns true if `self` is an empty block.
     fn is_empty(&self) -> bool {
-        matches!(self.next, NextBlock::Terminate) && self.stmts.is_empty()
+        matches!(self.kind, BasicBlockKind::Empty)
     }
 
-    /// Returns true if `self` is a [`BasicBlock::EXCEPTION`].
+    /// Returns true if `self` is an exception block.
     fn is_exception(&self) -> bool {
-        matches!(self.next, NextBlock::Terminate) && BasicBlock::EXCEPTION.stmts == self.stmts
+        matches!(self.kind, BasicBlockKind::Exception)
     }
 
-    /// Returns true if `self` is a [`BasicBlock::LOOP_CONTINUE`].
+    /// Returns true if `self` is a loop_continue block.
     fn is_loop_continue(&self) -> bool {
-        self.stmts == BasicBlock::LOOP_CONTINUE.stmts
+        matches!(self.kind, BasicBlockKind::LoopContinue)
     }
 }
 
