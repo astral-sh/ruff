@@ -632,27 +632,22 @@ where
 
         match expr {
             ast::Expr::Name(name_node @ ast::ExprName { id, ctx, .. }) => {
-                let mut flags = match ctx {
-                    ast::ExprContext::Load => SymbolFlags::IS_USED,
-                    ast::ExprContext::Store => SymbolFlags::IS_DEFINED,
-                    ast::ExprContext::Del => SymbolFlags::IS_DEFINED,
-                    ast::ExprContext::Invalid => SymbolFlags::empty(),
-                };
-                if matches!(
-                    self.current_assignment,
-                    Some(CurrentAssignment::AugAssign(_))
-                ) && !ctx.is_invalid()
-                {
-                    // For augmented assignment, the target expression is also used, so we should
-                    // record that as a use.
-                    flags |= SymbolFlags::IS_USED;
-                }
-                if let Some(CurrentAssignment::AnnAssign(ann_assign)) = self.current_assignment {
-                    if ann_assign.value.is_none() {
-                        // An annotated assignment with no RHS is a declaration, not a Definition
-                        flags -= SymbolFlags::IS_DEFINED;
+                let flags = match (ctx, self.current_assignment) {
+                    (ast::ExprContext::Store, Some(CurrentAssignment::AugAssign(_))) => {
+                        // For augmented assignment, the target expression is also used.
+                        SymbolFlags::IS_DEFINED | SymbolFlags::IS_USED
                     }
-                }
+                    (ast::ExprContext::Store, Some(CurrentAssignment::AnnAssign(ann_assign)))
+                        if ann_assign.value.is_none() =>
+                    {
+                        // An annotated assignment that doesn't assign a value is not a Definition
+                        SymbolFlags::empty()
+                    }
+                    (ast::ExprContext::Load, _) => SymbolFlags::IS_USED,
+                    (ast::ExprContext::Store, _) => SymbolFlags::IS_DEFINED,
+                    (ast::ExprContext::Del, _) => SymbolFlags::IS_DEFINED,
+                    (ast::ExprContext::Invalid, _) => SymbolFlags::empty(),
+                };
                 let symbol = self.add_or_update_symbol(id.clone(), flags);
                 if flags.contains(SymbolFlags::IS_DEFINED) {
                     match self.current_assignment {
