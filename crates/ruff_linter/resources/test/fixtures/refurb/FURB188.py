@@ -1,0 +1,133 @@
+# Test suite from Refurb
+# See https://github.com/dosisod/refurb/blob/db02242b142285e615a664a8d3324470bb711306/test/data/err_188.py
+
+# these should match
+
+def remove_extension_via_slice(filename: str) -> str:
+    if filename.endswith(".txt"):
+        filename = filename[:-4]
+
+    return filename
+
+
+def remove_extension_via_slice_len(filename: str, extension: str) -> str:
+    if filename.endswith(extension):
+        filename = filename[:-len(extension)]
+
+    return filename
+
+
+def remove_extension_via_ternary(filename: str) -> str:
+    return filename[:-4] if filename.endswith(".txt") else filename
+
+
+def remove_extension_via_ternary_with_len(filename: str, extension: str) -> str:
+    return filename[:-len(extension)] if filename.endswith(extension) else filename
+
+
+def remove_prefix(filename: str) -> str:
+    return filename[4:] if filename.startswith("abc-") else filename
+
+
+def remove_prefix_via_len(filename: str, prefix: str) -> str:
+    return filename[len(prefix):] if filename.startswith(prefix) else filename
+
+
+# these should not
+
+def remove_extension_with_mismatched_len(filename: str) -> str:
+    if filename.endswith(".txt"):
+        filename = filename[:3]
+
+    return filename
+
+
+def remove_extension_assign_to_different_var(filename: str) -> str:
+    if filename.endswith(".txt"):
+        other_var = filename[:-4]
+
+    return filename
+
+
+def remove_extension_with_multiple_stmts(filename: str) -> str:
+    if filename.endswith(".txt"):
+        print("do some work")
+
+        filename = filename[:-4]
+
+    if filename.endswith(".txt"):
+        filename = filename[:-4]
+
+        print("do some work")
+
+    return filename
+
+
+def remove_extension_from_unrelated_var(filename: str) -> str:
+    xyz = "abc.txt"
+
+    if filename.endswith(".txt"):
+        filename = xyz[:-4]
+
+    return filename
+
+
+def remove_extension_in_elif(filename: str) -> str:
+    if filename:
+        pass
+
+    elif filename.endswith(".txt"):
+        filename = filename[:-4]
+
+    return filename
+
+
+def remove_extension_in_multiple_elif(filename: str) -> str:
+    if filename:
+        pass
+
+    elif filename:
+        pass
+
+    elif filename.endswith(".txt"):
+        filename = filename[:-4]
+
+    return filename
+
+
+def remove_extension_in_if_with_else(filename: str) -> str:
+    if filename.endswith(".txt"):
+        filename = filename[:-4]
+
+    else:
+        pass
+
+    return filename
+
+
+def remove_extension_ternary_name_mismatch(filename: str):
+    xyz = ""
+
+    _ = xyz[:-4] if filename.endswith(".txt") else filename
+    _ = filename[:-4] if xyz.endswith(".txt") else filename
+    _ = filename[:-4] if filename.endswith(".txt") else xyz
+
+
+def remove_extension_slice_amount_mismatch(filename: str) -> None:
+    extension = ".txt"
+
+    _ = filename[:-1] if filename.endswith(".txt") else filename
+    _ = filename[:-1] if filename.endswith(extension) else filename
+    _ = filename[:-len("")] if filename.endswith(extension) else filename
+
+
+def remove_prefix_size_mismatch(filename: str) -> str:
+    return filename[3:] if filename.startswith("abc-") else filename
+
+
+def remove_prefix_name_mismatch(filename: str) -> None:
+    xyz = ""
+
+    _ = xyz[4:] if filename.startswith("abc-") else filename
+    _ = filename[4:] if xyz.startswith("abc-") else filename
+    _ = filename[4:] if filename.startswith("abc-") else xyz
