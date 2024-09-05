@@ -303,6 +303,7 @@ impl<'stmt> BasicBlock<'stmt> {
     };
 
     /// A sentinel block indicating an exception was raised.
+    /// This is useful for redirecting flow within `try` blocks.
     const EXCEPTION: BasicBlock<'static> = BasicBlock {
         stmts: &[Stmt::Return(StmtReturn {
             range: TextRange::new(TextSize::new(0), TextSize::new(0)),
@@ -313,6 +314,9 @@ impl<'stmt> BasicBlock<'stmt> {
         kind: BasicBlockKind::Exception,
     };
 
+    /// A sentinel block indicating a loop will restart.
+    /// This is useful for redirecting flow within `while` and
+    /// `for` blocks.
     const LOOP_CONTINUE: BasicBlock<'static> = BasicBlock {
         stmts: &[Stmt::Continue(StmtContinue {
             range: TextRange::new(TextSize::new(0), TextSize::new(0)),
