@@ -842,27 +842,17 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .types
                 .expression_ty(node.scoped_ast_id(self.db, self.scope));
 
-            let exception_ty = node_ty.to_instance();
-
-            match exception_ty {
+            match node_ty {
+                Type::Any | Type::Unknown => ExceptHandlerType::Valid {
+                    exception_ty: node_ty,
+                },
                 // TODO: we should check whether `exception_class`
                 // is actually a subclass of `builtins.BaseException` --Alex
-                Type::Instance(_) | Type::Any | Type::Unknown => {
-                    ExceptHandlerType::Valid { exception_ty }
-                }
-                // TODO: this branch is untested because `.to_instance()` will
-                // currently never create a `Type::Union` --Alex
-                Type::Union(union)
-                    if union.elements(self.db).iter().all(|element| {
-                        matches!(element, Type::Instance(_) | Type::Any | Type::Unknown)
-                    }) =>
-                {
-                    ExceptHandlerType::Valid { exception_ty }
-                }
-                invalid_ty => ExceptHandlerType::Invalid {
-                    node,
-                    node_ty: invalid_ty,
+                Type::Class(class_ty) => ExceptHandlerType::Valid {
+                    exception_ty: Type::Instance(class_ty),
                 },
+                // TODO: unions should also be valid --Alex
+                _ => ExceptHandlerType::Invalid { node, node_ty },
             }
         })
     }
