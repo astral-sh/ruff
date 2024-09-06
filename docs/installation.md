@@ -48,6 +48,12 @@ on the `pkgx` registry:
 $ pkgx install ruff
 ```
 
+For **Linux** users, Ruff is also available as [`ruff`](https://snapcraft.io/ruff) on the snap store:
+
+```console
+$ snap install ruff
+```
+
 For **Arch Linux** users, Ruff is also available as [`ruff`](https://archlinux.org/packages/extra/x86_64/ruff/)
 on the official repositories:
 
