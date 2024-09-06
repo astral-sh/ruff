@@ -9,7 +9,6 @@ use ruff_db::files::{system_path_to_file, vendored_path_to_file, File, FileError
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::{VendoredPath, VendoredPathBuf};
 
-use super::module::ModuleKind;
 use super::typeshed::{typeshed_versions, TypeshedVersionsParseError, TypeshedVersionsQueryResult};
 use crate::db::Db;
 use crate::module_name::ModuleName;
@@ -61,24 +60,12 @@ impl ModulePath {
     }
 
     #[must_use]
-    pub(super) fn resolve_pure_module(
-        &self,
-        resolver: &ResolverContext,
-    ) -> Option<(File, ModuleKind)> {
-        let kind = if self.relative_path.ends_with("__init__") {
-            ModuleKind::Package
-        } else {
-            ModuleKind::Module
-        };
-
-        // Stubs have precedence over source files
-        if let Some(stub) = self.with_pyi_extension().to_file(resolver) {
-            Some((stub, kind))
-        } else {
-            self.with_py_extension()
+    pub(super) fn is_file_module(&self, resolver: &ResolverContext) -> bool {
+        self.with_pyi_extension().to_file(resolver).is_some()
+            || self
+                .with_py_extension()
                 .and_then(|path| path.to_file(resolver))
-                .map(|module| (module, kind))
-        }
+                .is_some()
     }
 
     #[must_use]

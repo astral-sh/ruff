@@ -570,18 +570,18 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, File, Mod
                 package_path.push(module_name);
 
                 // Try to resolve a stub/module with the current name
-                let module = package_path.resolve_pure_module(&resolver_state);
+                let file_module = resolve_file_module(&package_path, &resolver_state);
 
                 // Then check if a regular package exists with the same name (it takes
                 // precedence)
                 package_path.push("__init__");
-                if let Some((module, kind)) = package_path.resolve_pure_module(&resolver_state) {
-                    return Some((search_path.clone(), module, kind));
+                if let Some(regular_package) = resolve_file_module(&package_path, &resolver_state) {
+                    return Some((search_path.clone(), regular_package, ModuleKind::Package));
                 }
 
                 // If we found a module (but no package), return it
-                if let Some((module, kind)) = module {
-                    return Some((search_path.clone(), module, kind));
+                if let Some(module) = file_module {
+                    return Some((search_path.clone(), module, ModuleKind::Module));
                 }
 
                 // For regular packages, don't search the next search path. All files of that
@@ -600,6 +600,18 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, File, Mod
     }
 
     None
+}
+
+fn resolve_file_module(module: &ModulePath, resolver_state: &ResolverContext) -> Option<File> {
+    // Stubs have precedence over source files
+    module
+        .with_pyi_extension()
+        .to_file(resolver_state)
+        .or_else(|| {
+            module
+                .with_py_extension()
+                .and_then(|path| path.to_file(resolver_state))
+        })
 }
 
 fn resolve_package<'a, 'db, I>(
@@ -630,7 +642,7 @@ where
             in_namespace_package = false;
         } else if package_path.is_directory(resolver_state)
             // Pure modules hide namespace packages with the same name
-            && package_path.resolve_pure_module(resolver_state).is_none()
+            && !package_path.is_file_module(resolver_state)
         {
             // A directory without an `__init__.py` is a namespace package, continue with the next folder.
             in_namespace_package = true;
