@@ -60,15 +60,6 @@ impl ModulePath {
     }
 
     #[must_use]
-    pub(super) fn is_file_module(&self, resolver: &ResolverContext) -> bool {
-        self.with_pyi_extension().to_file(resolver).is_some()
-            || self
-                .with_py_extension()
-                .and_then(|path| path.to_file(resolver))
-                .is_some()
-    }
-
-    #[must_use]
     pub(super) fn is_directory(&self, resolver: &ResolverContext) -> bool {
         let ModulePath {
             search_path,

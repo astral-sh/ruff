@@ -642,7 +642,7 @@ where
             in_namespace_package = false;
         } else if package_path.is_directory(resolver_state)
             // Pure modules hide namespace packages with the same name
-            && !package_path.is_file_module(resolver_state)
+            && resolve_file_module(&package_path, resolver_state).is_none()
         {
             // A directory without an `__init__.py` is a namespace package, continue with the next folder.
             in_namespace_package = true;
