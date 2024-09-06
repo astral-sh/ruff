@@ -144,15 +144,6 @@ impl HasScopedAstId for ast::ExpressionRef<'_> {
     }
 }
 
-impl HasScopedAstId for &ast::Identifier {
-    type Id = ScopedExpressionId;
-
-    fn scoped_ast_id(&self, db: &dyn Db, scope: ScopeId) -> Self::Id {
-        let ast_ids = ast_ids(db, scope);
-        ast_ids.expression_id(*self)
-    }
-}
-
 #[derive(Debug)]
 pub(super) struct AstIdsBuilder {
     expressions_map: FxHashMap<ExpressionNodeKey, ScopedExpressionId>,
@@ -168,10 +159,7 @@ impl AstIdsBuilder {
     }
 
     /// Adds `expr` to the expression ids map and returns its id.
-    pub(super) fn record_expression(
-        &mut self,
-        expr: impl Into<ExpressionNodeKey>,
-    ) -> ScopedExpressionId {
+    pub(super) fn record_expression(&mut self, expr: &ast::Expr) -> ScopedExpressionId {
         let expression_id = self.expressions_map.len().into();
 
         self.expressions_map.insert(expr.into(), expression_id);
@@ -216,12 +204,6 @@ pub(crate) mod node_key {
 
     impl From<&ast::Expr> for ExpressionNodeKey {
         fn from(value: &ast::Expr) -> Self {
-            Self(NodeKey::from_node(value))
-        }
-    }
-
-    impl From<&ast::Identifier> for ExpressionNodeKey {
-        fn from(value: &ast::Identifier) -> Self {
             Self(NodeKey::from_node(value))
         }
     }

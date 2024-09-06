@@ -890,18 +890,16 @@ where
             range: _,
         }) = except_handler;
         if let Some(type_) = type_ {
-            if let Some(name) = name {
-                self.scopes_by_expression
-                    .insert(name.into(), self.current_scope());
-                self.current_ast_ids().record_expression(name);
+            if let Some(symbol_name) = name {
                 self.add_standalone_expression(type_);
                 self.visit_expr(type_);
                 debug_assert!(self.current_assignment.is_none());
-                let symbol = self.add_or_update_symbol(name.id.clone(), SymbolFlags::IS_DEFINED);
+                let symbol =
+                    self.add_or_update_symbol(symbol_name.id.clone(), SymbolFlags::IS_DEFINED);
                 self.add_definition(
                     symbol,
                     ExceptHandlerDefinitionNodeRef {
-                        symbol_name: name,
+                        symbol_name,
                         handled_exceptions: type_,
                     },
                 );

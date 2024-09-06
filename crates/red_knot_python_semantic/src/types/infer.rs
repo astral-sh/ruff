@@ -427,7 +427,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             DefinitionKind::ExceptHandler(except_handler_definition) => {
                 self.infer_except_handler_definition(
-                    except_handler_definition.symbol_name(),
                     except_handler_definition.handled_exceptions(),
                     definition,
                 );
@@ -859,7 +858,6 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_except_handler_definition(
         &mut self,
-        symbol_name: &ast::Identifier,
         handled_exceptions: &'db ast::Expr,
         definition: Definition<'db>,
     ) {
@@ -874,9 +872,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             })
             .build();
 
-        self.types
-            .expressions
-            .insert(symbol_name.scoped_ast_id(self.db, self.scope), symbol_ty);
         self.types.definitions.insert(definition, symbol_ty);
     }
 

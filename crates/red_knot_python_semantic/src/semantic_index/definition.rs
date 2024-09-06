@@ -262,10 +262,9 @@ impl DefinitionNodeRef<'_> {
                 index,
             }),
             DefinitionNodeRef::ExceptHandler(ExceptHandlerDefinitionNodeRef {
-                symbol_name,
                 handled_exceptions,
+                ..
             }) => DefinitionKind::ExceptHandler(ExceptHandlerDefinitionKind {
-                symbol_name: AstNodeRef::new(parsed.clone(), symbol_name),
                 handled_exceptions: AstNodeRef::new(parsed, handled_exceptions),
             }),
         }
@@ -328,15 +327,10 @@ pub enum DefinitionKind {
 
 #[derive(Clone, Debug)]
 pub struct ExceptHandlerDefinitionKind {
-    symbol_name: AstNodeRef<ast::Identifier>,
     handled_exceptions: AstNodeRef<ast::Expr>,
 }
 
 impl ExceptHandlerDefinitionKind {
-    pub(crate) fn symbol_name(&self) -> &ast::Identifier {
-        self.symbol_name.node()
-    }
-
     pub(crate) fn handled_exceptions(&self) -> &ast::Expr {
         self.handled_exceptions.node()
     }
