@@ -602,6 +602,11 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, File, Mod
     None
 }
 
+/// If `module` exists on disk with either a `.pyi` or `.py` extension,
+/// return the [`File`] corresponding to that path.
+///
+/// `.pyi` files take priority, as they always have priority when
+/// resolving modules.
 fn resolve_file_module(module: &ModulePath, resolver_state: &ResolverContext) -> Option<File> {
     // Stubs have precedence over source files
     module
