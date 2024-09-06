@@ -764,7 +764,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
                     })
                     .collect();
-                for (node, ty) in invalid_exceptions.iter().copied() {
+                for (node, ty) in invalid_exceptions {
                     self.add_diagnostic(
                         node.into(),
                         "invalid-except",
@@ -828,26 +828,49 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     /// Infer the types of exceptions caught by an exception handler
-    fn infer_handled_exception_types<'a, 'b>(
-        &'b self,
-        handled_exceptions: &'a ast::Expr,
-    ) -> ExceptionHandlerTypeIterator<'a, 'b, 'db> {
-        match handled_exceptions {
-            ast::Expr::Tuple(multiple_exceptions) => ExceptionHandlerTypeIterator::Multiple {
-                exceptions: multiple_exceptions.into_iter(),
-                inference_builder: self,
-            },
-            single_exception => ExceptionHandlerTypeIterator::Single {
-                exception: Some(single_exception),
-                inference_builder: self,
-            },
-        }
+    fn infer_handled_exception_types(
+        &self,
+        handled_exceptions: &'db ast::Expr,
+    ) -> impl Iterator<Item = ExceptHandlerType<'db>> + '_ {
+        let exception_nodes = match handled_exceptions {
+            ast::Expr::Tuple(multiple_exceptions) => multiple_exceptions.elts.as_slice(),
+            single_exception => std::slice::from_ref(single_exception),
+        };
+
+        exception_nodes.iter().map(|node| {
+            let node_ty = self
+                .types
+                .expression_ty(node.scoped_ast_id(self.db, self.scope));
+
+            let exception_ty = node_ty.to_instance();
+
+            match exception_ty {
+                // TODO: we should check whether `exception_class`
+                // is actually a subclass of `builtins.BaseException` --Alex
+                Type::Instance(_) | Type::Any | Type::Unknown => {
+                    ExceptHandlerType::Valid { exception_ty }
+                }
+                // TODO: this branch is untested because `.to_instance()` will
+                // currently never create a `Type::Union` --Alex
+                Type::Union(union)
+                    if union.elements(self.db).iter().all(|element| {
+                        matches!(element, Type::Instance(_) | Type::Any | Type::Unknown)
+                    }) =>
+                {
+                    ExceptHandlerType::Valid { exception_ty }
+                }
+                invalid_ty => ExceptHandlerType::Invalid {
+                    node,
+                    node_ty: invalid_ty,
+                },
+            }
+        })
     }
 
     fn infer_except_handler_definition(
         &mut self,
         symbol_name: &ast::Identifier,
-        handled_exceptions: &ast::Expr,
+        handled_exceptions: &'db ast::Expr,
         definition: Definition<'db>,
     ) {
         let expression = self.index.expression(handled_exceptions);
@@ -2481,17 +2504,17 @@ enum ModuleNameResolutionError {
     TooManyDots,
 }
 
-enum ExceptHandlerType<'ast, 'db> {
+enum ExceptHandlerType<'db> {
     Valid {
         exception_ty: Type<'db>,
     },
     Invalid {
-        node: &'ast ast::Expr,
+        node: &'db ast::Expr,
         node_ty: Type<'db>,
     },
 }
 
-impl<'ast, 'db> ExceptHandlerType<'ast, 'db> {
+impl<'db> ExceptHandlerType<'db> {
     fn into_type(self) -> Type<'db> {
         match self {
             Self::Valid { exception_ty } => exception_ty,
@@ -2499,57 +2522,6 @@ impl<'ast, 'db> ExceptHandlerType<'ast, 'db> {
         }
     }
 }
-
-enum ExceptionHandlerTypeIterator<'ast, 'b, 'db> {
-    Single {
-        exception: Option<&'ast ast::Expr>,
-        inference_builder: &'b TypeInferenceBuilder<'db>,
-    },
-    Multiple {
-        exceptions: std::slice::Iter<'ast, ast::Expr>,
-        inference_builder: &'b TypeInferenceBuilder<'db>,
-    },
-}
-
-impl<'ast, 'b, 'db> Iterator for ExceptionHandlerTypeIterator<'ast, 'b, 'db> {
-    type Item = ExceptHandlerType<'ast, 'db>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let (exception, builder) = match self {
-            Self::Single {
-                exception,
-                inference_builder,
-            } => (exception.take()?, inference_builder),
-            Self::Multiple {
-                exceptions,
-                inference_builder,
-            } => (exceptions.next()?, inference_builder),
-        };
-
-        let node_ty = builder
-            .types
-            .expression_ty(exception.scoped_ast_id(builder.db, builder.scope));
-
-        let ty = match node_ty {
-            // TODO: we should check whether `exception_class`
-            // is actually a subclass of `builtins.BaseException` --Alex
-            Type::Class(exception_class) => ExceptHandlerType::Valid {
-                exception_ty: Type::Instance(exception_class),
-            },
-            Type::Any | Type::Unknown => ExceptHandlerType::Valid {
-                exception_ty: node_ty,
-            },
-            invalid_ty => ExceptHandlerType::Invalid {
-                node: exception,
-                node_ty: invalid_ty,
-            },
-        };
-
-        Some(ty)
-    }
-}
-
-impl std::iter::FusedIterator for ExceptionHandlerTypeIterator<'_, '_, '_> {}
 
 #[cfg(test)]
 mod tests {
