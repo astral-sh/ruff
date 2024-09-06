@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::io::Write;
 
 use anyhow::Result;
@@ -27,6 +28,13 @@ impl Emitter for SarifEmitter {
             .map(SarifResult::from_message)
             .collect::<Result<Vec<_>>>()?;
 
+        let mut rule_ids = HashSet::new();
+        for result in results.iter() {
+            if let Some(rule) = result.rule {
+                rule_ids.insert(rule.noqa_code().to_string());
+            }
+        }
+
         let output = json!({
             "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
             "version": "2.1.0",
@@ -35,7 +43,10 @@ impl Emitter for SarifEmitter {
                     "driver": {
                         "name": "ruff",
                         "informationUri": "https://github.com/astral-sh/ruff",
-                        "rules": Rule::iter().map(SarifRule::from).collect::<Vec<_>>(),
+                        "rules": Rule::iter()
+                            .filter(|rule| rule_ids.contains(&rule.noqa_code().to_string()))
+                            .map(SarifRule::from)
+                            .collect::<Vec<_>>(),
                         "version": VERSION.to_string(),
                     }
                 },
@@ -216,9 +227,23 @@ mod tests {
         let results = sarif["runs"][0]["results"].as_array().unwrap();
         assert_eq!(results.len(), 3);
         assert_eq!(
-            results[0]["message"]["text"].as_str().unwrap(),
-            "`os` imported but unused"
+            results
+                .iter()
+                .map(|r| r["message"]["text"].as_str().unwrap())
+                .collect::<Vec<_>>(),
+            vec![
+                "`os` imported but unused",
+                "Local variable `x` is assigned to but never used",
+                "Undefined name `a`",
+            ]
         );
-        assert!(rules.len() > 3);
+        assert_eq!(rules.len(), 3);
+        assert_eq!(
+            rules
+                .iter()
+                .map(|r| r["id"].as_str().unwrap())
+                .collect::<Vec<_>>(),
+            vec!["F401", "F821", "F841"],
+        );
     }
 }
