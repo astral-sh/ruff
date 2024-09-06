@@ -569,19 +569,16 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, File, Mod
 
                 package_path.push(module_name);
 
-                // Try to resolve a stub/module with the current name
-                let file_module = resolve_file_module(&package_path, &resolver_state);
-
-                // Then check if a regular package exists with the same name (it takes
-                // precedence)
+                // Check for a regular package first (highest priority)
                 package_path.push("__init__");
                 if let Some(regular_package) = resolve_file_module(&package_path, &resolver_state) {
                     return Some((search_path.clone(), regular_package, ModuleKind::Package));
                 }
 
-                // If we found a module (but no package), return it
-                if let Some(module) = file_module {
-                    return Some((search_path.clone(), module, ModuleKind::Module));
+                // Check for a file module next
+                package_path.pop();
+                if let Some(file_module) = resolve_file_module(&package_path, &resolver_state) {
+                    return Some((search_path.clone(), file_module, ModuleKind::Module));
                 }
 
                 // For regular packages, don't search the next search path. All files of that
