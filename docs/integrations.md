@@ -131,3 +131,28 @@ When running without `--fix`, Ruff's formatter hook can be placed before or afte
 [mdformat](https://mdformat.readthedocs.io/en/stable/users/plugins.html#code-formatter-plugins) is
 capable of formatting code blocks within Markdown. The [`mdformat-ruff`](https://github.com/Freed-Wu/mdformat-ruff)
 plugin enables mdformat to format Python code blocks with Ruff.
+
+
+## Docker
+
+Ruff provides a distroless Docker image including the `ruff` binary. The following tags are published:
+
+- `ruff:latest`
+- `ruff:{major}.{minor}.{patch}`, e.g., `ruff:0.6.6`
+- `ruff:{major}.{minor}`, e.g., `ruff:0.6` (the latest patch version)
+
+In addition, ruff publishes the following images:
+
+<!-- prettier-ignore -->
+- Based on `alpine:3.20`:
+  - `ruff:alpine`
+  - `ruff:alpine3.20`
+- Based on `debian:bookworm-slim`:
+  - `ruff:debian-slim`
+  - `ruff:bookworm-slim`
+- Based on `buildpack-deps:bookworm`:
+  - `ruff:debian`
+  - `ruff:bookworm`
+
+As with the distroless image, each image is published with ruff version tags as
+`ruff:{major}.{minor}.{patch}-{base}` and `ruff:{major}.{minor}-{base}`, e.g., `ruff:0.6.6-alpine`.
