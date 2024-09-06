@@ -29,7 +29,7 @@ impl Emitter for SarifEmitter {
             .collect::<Result<Vec<_>>>()?;
 
         let mut rule_ids = HashSet::new();
-        for result in results.iter() {
+        for result in &results {
             if let Some(rule) = result.rule {
                 rule_ids.insert(rule.noqa_code().to_string());
             }
