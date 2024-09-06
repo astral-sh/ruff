@@ -16,21 +16,7 @@ def foo():
     if bad4: # [consider-using-assignment-expr]
         pass
 
-bad5 = 'example'
-if bad5: # [consider-using-assignment-expr]
-    print(bad5)
-
-
-bad6_1 = 0
-bad6_2 = 0
-if True:
-    pass
-elif bad6_1: # [consider-using-assignment-expr]
-    pass
-elif bad6_2: # [consider-using-assignment-expr]
-    pass
-
-bad7 = (
+bad5 = (
     'example',
     'example',
     'example',
@@ -42,21 +28,32 @@ bad7 = (
     'example',
     'example',
 )
-if bad7: # [consider-using-assignment-expr]
+if bad5: # [consider-using-assignment-expr]
     pass
 
-bad8 = 'example'
-if bad8 is not None: # [consider-using-assignment-expr]
+bad6 = 'example'
+if bad6 is not None: # [consider-using-assignment-expr]
     pass
 
 good1_1 = 'example'
-good1_2 = good1_1
-if good1_1:  # correct, walrus cannot be used because expression is already used before if 
+good1_2 = 'example'
+if good1_1: # correct, assignment is not the previous statement
     pass
 
-if good2 := 'example': # correct
+good2_1 = 'example'
+good2_2 = good2_1
+if good2_1: # correct, assignment is not the previous statement
     pass
 
-def test(good3: str | None = None):
-    if good3 is None:
-        good3 = 'test'
+if good3 := 'example': # correct, used like it is intented
+    pass
+
+def test(good4: str | None = None):
+    if good4 is None:
+        good4 = 'test'
+
+def bar():
+    good4_5 = 'example'
+    good4_2 = good4_5
+    if good4_5: # assignment is not the previous statement
+        pass
