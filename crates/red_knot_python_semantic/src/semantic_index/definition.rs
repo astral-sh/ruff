@@ -50,6 +50,7 @@ pub(crate) enum DefinitionNodeRef<'a> {
     Parameter(ast::AnyParameterRef<'a>),
     WithItem(WithItemDefinitionNodeRef<'a>),
     MatchPattern(MatchPatternDefinitionNodeRef<'a>),
+    ExceptHandler(ExceptHandlerDefinitionNodeRef<'a>),
 }
 
 impl<'a> From<&'a ast::StmtFunctionDef> for DefinitionNodeRef<'a> {
@@ -130,6 +131,12 @@ impl<'a> From<MatchPatternDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
     }
 }
 
+impl<'a> From<ExceptHandlerDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
+    fn from(node: ExceptHandlerDefinitionNodeRef<'a>) -> Self {
+        Self::ExceptHandler(node)
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ImportFromDefinitionNodeRef<'a> {
     pub(crate) node: &'a ast::StmtImportFrom,
@@ -160,6 +167,12 @@ pub(crate) struct ComprehensionDefinitionNodeRef<'a> {
     pub(crate) iterable: &'a ast::Expr,
     pub(crate) target: &'a ast::ExprName,
     pub(crate) first: bool,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct ExceptHandlerDefinitionNodeRef<'a> {
+    pub(crate) symbol_name: &'a ast::Identifier,
+    pub(crate) handled_exceptions: &'a ast::Expr,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -248,6 +261,13 @@ impl DefinitionNodeRef<'_> {
                 identifier: AstNodeRef::new(parsed, identifier),
                 index,
             }),
+            DefinitionNodeRef::ExceptHandler(ExceptHandlerDefinitionNodeRef {
+                symbol_name,
+                handled_exceptions,
+            }) => DefinitionKind::ExceptHandler(ExceptHandlerDefinitionKind {
+                symbol_name: AstNodeRef::new(parsed.clone(), symbol_name),
+                handled_exceptions: AstNodeRef::new(parsed, handled_exceptions),
+            }),
         }
     }
 
@@ -280,6 +300,9 @@ impl DefinitionNodeRef<'_> {
             Self::MatchPattern(MatchPatternDefinitionNodeRef { identifier, .. }) => {
                 identifier.into()
             }
+            Self::ExceptHandler(ExceptHandlerDefinitionNodeRef { symbol_name, .. }) => {
+                symbol_name.into()
+            }
         }
     }
 }
@@ -300,6 +323,23 @@ pub enum DefinitionKind {
     ParameterWithDefault(AstNodeRef<ast::ParameterWithDefault>),
     WithItem(WithItemDefinitionKind),
     MatchPattern(MatchPatternDefinitionKind),
+    ExceptHandler(ExceptHandlerDefinitionKind),
+}
+
+#[derive(Clone, Debug)]
+pub struct ExceptHandlerDefinitionKind {
+    symbol_name: AstNodeRef<ast::Identifier>,
+    handled_exceptions: AstNodeRef<ast::Expr>,
+}
+
+impl ExceptHandlerDefinitionKind {
+    pub(crate) fn symbol_name(&self) -> &ast::Identifier {
+        self.symbol_name.node()
+    }
+
+    pub(crate) fn handled_exceptions(&self) -> &ast::Expr {
+        self.handled_exceptions.node()
+    }
 }
 
 #[derive(Clone, Debug)]

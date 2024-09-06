@@ -15,7 +15,8 @@ use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
 use crate::semantic_index::definition::{
     AssignmentDefinitionNodeRef, ComprehensionDefinitionNodeRef, Definition, DefinitionNodeKey,
-    DefinitionNodeRef, ForStmtDefinitionNodeRef, ImportFromDefinitionNodeRef,
+    DefinitionNodeRef, ExceptHandlerDefinitionNodeRef, ForStmtDefinitionNodeRef,
+    ImportFromDefinitionNodeRef,
 };
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{
@@ -879,6 +880,36 @@ where
         }
 
         self.current_match_case.as_mut().unwrap().index += 1;
+    }
+
+    fn visit_except_handler(&mut self, except_handler: &'ast ast::ExceptHandler) {
+        let ast::ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+            name,
+            type_,
+            body,
+            range: _,
+        }) = except_handler;
+        if let Some(type_) = type_ {
+            if let Some(name) = name {
+                self.scopes_by_expression
+                    .insert(name.into(), self.current_scope());
+                self.current_ast_ids().record_expression(name);
+                self.add_standalone_expression(type_);
+                self.visit_expr(type_);
+                debug_assert!(self.current_assignment.is_none());
+                let symbol = self.add_or_update_symbol(name.id.clone(), SymbolFlags::IS_DEFINED);
+                self.add_definition(
+                    symbol,
+                    ExceptHandlerDefinitionNodeRef {
+                        symbol_name: name,
+                        handled_exceptions: type_,
+                    },
+                );
+            } else {
+                self.visit_expr(type_);
+            }
+        }
+        self.visit_body(body);
     }
 }
 

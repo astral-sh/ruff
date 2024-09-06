@@ -425,6 +425,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                     definition,
                 );
             }
+            DefinitionKind::ExceptHandler(except_handler_definition) => {
+                self.infer_except_handler_definition(
+                    except_handler_definition.symbol_name(),
+                    except_handler_definition.handled_exceptions(),
+                    definition,
+                );
+            }
         }
     }
 
@@ -745,7 +752,30 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_body(body);
         for handler in handlers {
             let ast::ExceptHandler::ExceptHandler(handler) = handler;
-            self.infer_optional_expression(handler.type_.as_deref());
+            if let Some(handled_exceptions) = handler.type_.as_deref() {
+                self.infer_expression(handled_exceptions);
+                let invalid_exceptions: Vec<(&ast::Expr, Type)> = self
+                    .infer_handled_exception_types(handled_exceptions)
+                    .filter_map(|exception| {
+                        if let ExceptHandlerType::Invalid { node, node_ty } = exception {
+                            Some((node, node_ty))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                for (node, ty) in invalid_exceptions.iter().copied() {
+                    self.add_diagnostic(
+                        node.into(),
+                        "invalid-except",
+                        format_args!(
+                            "Can only catch a `BaseException` subclass or a tuple of `BaseException` subclasses, \
+                            not an object of type '{}'",
+                            ty.display(self.db)
+                        )
+                    );
+                }
+            }
             self.infer_body(&handler.body);
         }
         self.infer_body(orelse);
@@ -795,6 +825,46 @@ impl<'db> TypeInferenceBuilder<'db> {
             .expressions
             .insert(target.scoped_ast_id(self.db, self.scope), context_expr_ty);
         self.types.definitions.insert(definition, context_expr_ty);
+    }
+
+    /// Infer the types of exceptions caught by an exception handler
+    fn infer_handled_exception_types<'a, 'b>(
+        &'b self,
+        handled_exceptions: &'a ast::Expr,
+    ) -> ExceptionHandlerTypeIterator<'a, 'b, 'db> {
+        match handled_exceptions {
+            ast::Expr::Tuple(multiple_exceptions) => ExceptionHandlerTypeIterator::Multiple {
+                exceptions: multiple_exceptions.into_iter(),
+                inference_builder: self,
+            },
+            single_exception => ExceptionHandlerTypeIterator::Single {
+                exception: Some(single_exception),
+                inference_builder: self,
+            },
+        }
+    }
+
+    fn infer_except_handler_definition(
+        &mut self,
+        symbol_name: &ast::Identifier,
+        handled_exceptions: &ast::Expr,
+        definition: Definition<'db>,
+    ) {
+        let expression = self.index.expression(handled_exceptions);
+        let result = infer_expression_types(self.db, expression);
+        self.extend(result);
+
+        let symbol_ty = self
+            .infer_handled_exception_types(handled_exceptions)
+            .fold(UnionBuilder::new(self.db), |union, exception_ty| {
+                union.add(exception_ty.into_type())
+            })
+            .build();
+
+        self.types
+            .expressions
+            .insert(symbol_name.scoped_ast_id(self.db, self.scope), symbol_ty);
+        self.types.definitions.insert(definition, symbol_ty);
     }
 
     fn infer_match_statement(&mut self, match_statement: &ast::StmtMatch) {
@@ -2410,6 +2480,76 @@ enum ModuleNameResolutionError {
     /// is `from ....baz import spam`)
     TooManyDots,
 }
+
+enum ExceptHandlerType<'ast, 'db> {
+    Valid {
+        exception_ty: Type<'db>,
+    },
+    Invalid {
+        node: &'ast ast::Expr,
+        node_ty: Type<'db>,
+    },
+}
+
+impl<'ast, 'db> ExceptHandlerType<'ast, 'db> {
+    fn into_type(self) -> Type<'db> {
+        match self {
+            Self::Valid { exception_ty } => exception_ty,
+            Self::Invalid { .. } => Type::Unknown,
+        }
+    }
+}
+
+enum ExceptionHandlerTypeIterator<'ast, 'b, 'db> {
+    Single {
+        exception: Option<&'ast ast::Expr>,
+        inference_builder: &'b TypeInferenceBuilder<'db>,
+    },
+    Multiple {
+        exceptions: std::slice::Iter<'ast, ast::Expr>,
+        inference_builder: &'b TypeInferenceBuilder<'db>,
+    },
+}
+
+impl<'ast, 'b, 'db> Iterator for ExceptionHandlerTypeIterator<'ast, 'b, 'db> {
+    type Item = ExceptHandlerType<'ast, 'db>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let (exception, builder) = match self {
+            Self::Single {
+                exception,
+                inference_builder,
+            } => (exception.take()?, inference_builder),
+            Self::Multiple {
+                exceptions,
+                inference_builder,
+            } => (exceptions.next()?, inference_builder),
+        };
+
+        let node_ty = builder
+            .types
+            .expression_ty(exception.scoped_ast_id(builder.db, builder.scope));
+
+        let ty = match node_ty {
+            // TODO: we should check whether `exception_class`
+            // is actually a subclass of `builtins.BaseException` --Alex
+            Type::Class(exception_class) => ExceptHandlerType::Valid {
+                exception_ty: Type::Instance(exception_class),
+            },
+            Type::Any | Type::Unknown => ExceptHandlerType::Valid {
+                exception_ty: node_ty,
+            },
+            invalid_ty => ExceptHandlerType::Invalid {
+                node: exception,
+                node_ty: invalid_ty,
+            },
+        };
+
+        Some(ty)
+    }
+}
+
+impl std::iter::FusedIterator for ExceptionHandlerTypeIterator<'_, '_, '_> {}
 
 #[cfg(test)]
 mod tests {
@@ -4176,6 +4316,93 @@ mod tests {
 
         // TODO(Alex) async iterables/iterators!
         assert_scope_ty(&db, "src/a.py", &["foo"], "x", "Unknown");
+
+        Ok(())
+    }
+
+    #[test]
+    fn except_handler() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            import builtins
+
+            try:
+                x
+            except NameError as e:
+                pass
+            except (TypeError, builtins.AttributeError) as f:
+                pass
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "e", "NameError");
+        assert_public_ty(&db, "src/a.py", "f", "TypeError | AttributeError");
+        assert_file_diagnostics(&db, "src/a.py", &[]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn invalid_except_handler() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            try:
+                x
+            except NameError() as e:
+                pass
+            except (TypeError, AttributeError()) as f:
+                pass
+            ",
+        )?;
+
+        assert_file_diagnostics(
+            &db,
+            "src/a.py",
+            &[
+                "Can only catch a `BaseException` subclass or a tuple of `BaseException` subclasses, not an object of type 'NameError'",
+                "Can only catch a `BaseException` subclass or a tuple of `BaseException` subclasses, not an object of type 'AttributeError'"
+            ]
+        );
+        assert_public_ty(&db, "src/a.py", "e", "Unknown");
+        assert_public_ty(&db, "src/a.py", "f", "TypeError | Unknown");
+
+        Ok(())
+    }
+
+    #[test]
+    fn unknown_type_in_except_handler_does_not_cause_spurious_diagnostic() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            from nonexistent_module import foo
+
+            try:
+                x
+            except NameError():
+                pass
+            except foo as e:
+                pass
+            ",
+        )?;
+
+        assert_file_diagnostics(
+            &db,
+            "src/a.py",
+            &[
+                "Cannot resolve import 'nonexistent_module'.",
+                "Can only catch a `BaseException` subclass or a tuple of `BaseException` subclasses, not an object of type 'NameError'",
+            ]
+        );
+        assert_public_ty(&db, "src/a.py", "foo", "Unknown");
+        assert_public_ty(&db, "src/a.py", "e", "Unknown");
 
         Ok(())
     }
