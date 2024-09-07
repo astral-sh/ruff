@@ -315,10 +315,8 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, checker: &mut Checker) -> b
                 value: string_val,
             }),
         ) => num.as_int().is_some_and(|x| {
-            let length = u32::try_from(string_val.len())
-                // Only support prefix removal for size at most `u32::MAX`.
-                .unwrap_or(u32::MAX);
-            x == &ast::Int::from(length)
+            // Only support prefix removal for size at most `u32::MAX`
+            u32::try_from(string_val.len()).is_ok_and(|length| x == &ast::Int::from(length))
         }),
         (
             AffixKind::StartsWith,
@@ -351,10 +349,8 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, checker: &mut Checker) -> b
         ) => operand.as_number_literal_expr().is_some_and(
             |ast::ExprNumberLiteral { value, .. }| {
                 value.as_int().is_some_and(|x| {
-                    let length = u32::try_from(string_val.len())
-                        // Only support suffix removal for size at most `u32::MAX`.
-                        .unwrap_or(u32::MAX);
-                    x == &ast::Int::from(length)
+                    // Only support prefix removal for size at most `u32::MAX`
+                    u32::try_from(string_val.len()).is_ok_and(|length| x == &ast::Int::from(length))
                 })
             },
         ),
