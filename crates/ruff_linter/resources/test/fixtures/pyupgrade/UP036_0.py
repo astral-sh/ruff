@@ -225,3 +225,33 @@ if sys.version_info > (3,0):
 
     "this is\
     allowed too"
+
+if sys.version_info[0] == 3:
+    print("py3")
+
+if sys.version_info[0] <= 3:
+    print("py3")
+
+if sys.version_info[0] < 3:
+    print("py3")
+
+if sys.version_info[0] >= 3:
+    print("py3")
+
+if sys.version_info[0] > 3:
+    print("py3")
+
+if sys.version_info[0] == 2:
+    print("py3")
+
+if sys.version_info[0] <= 2:
+    print("py3")
+
+if sys.version_info[0] < 2:
+    print("py3")
+
+if sys.version_info[0] >= 2:
+    print("py3")
+
+if sys.version_info[0] > 2:
+    print("py3")

@@ -1,15 +1,15 @@
-use std::panic::{AssertUnwindSafe, RefUnwindSafe};
+use std::panic::RefUnwindSafe;
+use std::sync::Arc;
 
-use red_knot_module_resolver::{vendored_typeshed_stubs, Db as ResolverDb};
-use red_knot_python_semantic::Db as SemanticDb;
+use salsa::plumbing::ZalsaDatabase;
+use salsa::{Cancelled, Event};
+
+use red_knot_python_semantic::{vendored_typeshed_stubs, Db as SemanticDb, Program};
 use ruff_db::files::{File, Files};
-use ruff_db::program::{Program, ProgramSettings};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Upcast};
-use salsa::Cancelled;
 
-use crate::lint::Diagnostics;
 use crate::workspace::{check_file, Workspace, WorkspaceMetadata};
 
 mod changes;
@@ -22,11 +22,11 @@ pub struct RootDatabase {
     workspace: Option<Workspace>,
     storage: salsa::Storage<RootDatabase>,
     files: Files,
-    system: Box<dyn System + Send + Sync + RefUnwindSafe>,
+    system: Arc<dyn System + Send + Sync + RefUnwindSafe>,
 }
 
 impl RootDatabase {
-    pub fn new<S>(workspace: WorkspaceMetadata, settings: ProgramSettings, system: S) -> Self
+    pub fn new<S>(workspace: WorkspaceMetadata, system: S) -> anyhow::Result<Self>
     where
         S: System + 'static + Send + Sync + RefUnwindSafe,
     {
@@ -34,15 +34,15 @@ impl RootDatabase {
             workspace: None,
             storage: salsa::Storage::default(),
             files: Files::default(),
-            system: Box::new(system),
+            system: Arc::new(system),
         };
 
-        let workspace = Workspace::from_metadata(&db, workspace);
         // Initialize the `Program` singleton
-        Program::from_settings(&db, settings);
+        Program::from_settings(&db, workspace.settings().program())?;
 
-        db.workspace = Some(workspace);
-        db
+        db.workspace = Some(Workspace::from_metadata(&db, workspace));
+
+        Ok(db)
     }
 
     pub fn workspace(&self) -> Workspace {
@@ -55,35 +55,38 @@ impl RootDatabase {
         self.with_db(|db| db.workspace().check(db))
     }
 
-    pub fn check_file(&self, file: File) -> Result<Diagnostics, Cancelled> {
+    pub fn check_file(&self, file: File) -> Result<Vec<String>, Cancelled> {
+        let _span = tracing::debug_span!("check_file", file=%file.path(self)).entered();
+
         self.with_db(|db| check_file(db, file))
+    }
+
+    /// Returns a mutable reference to the system.
+    ///
+    /// WARNING: Triggers a new revision, canceling other database handles. This can lead to deadlock.
+    pub fn system_mut(&mut self) -> &mut dyn System {
+        // TODO: Use a more official method to cancel other queries.
+        // https://salsa.zulipchat.com/#narrow/stream/333573-salsa-3.2E0/topic/Expose.20an.20API.20to.20cancel.20other.20queries
+        let _ = self.zalsa_mut();
+
+        Arc::get_mut(&mut self.system).unwrap()
     }
 
     pub(crate) fn with_db<F, T>(&self, f: F) -> Result<T, Cancelled>
     where
         F: FnOnce(&RootDatabase) -> T + std::panic::UnwindSafe,
     {
-        // The `AssertUnwindSafe` here looks scary, but is a consequence of Salsa's design.
-        // Salsa uses panics to implement cancellation and to recover from cycles. However, the Salsa
-        // storage isn't `UnwindSafe` or `RefUnwindSafe` because its dependencies `DashMap` and `parking_lot::*` aren't
-        // unwind safe.
-        //
-        // Having to use `AssertUnwindSafe` isn't as big as a deal as it might seem because
-        // the `UnwindSafe` and `RefUnwindSafe` traits are designed to catch logical bugs.
-        // They don't protect against [UB](https://internals.rust-lang.org/t/pre-rfc-deprecating-unwindsafe/15974).
-        // On top of that, `Cancelled` only catches specific Salsa-panics and propagates all other panics.
-        //
-        // That still leaves us with possible logical bugs in two sources:
-        // * In Salsa itself: This must be considered a bug in Salsa and needs fixing upstream.
-        //   Reviewing Salsa code specifically around unwind safety seems doable.
-        // * Our code: This is the main concern. Luckily, it only involves code that uses internal mutability
-        //     and calls into Salsa queries when mutating the internal state. Using `AssertUnwindSafe`
-        //     certainly makes it harder to catch these issues in our user code.
-        //
-        // For now, this is the only solution at hand unless Salsa decides to change its design.
-        // [Zulip support thread](https://salsa.zulipchat.com/#narrow/stream/145099-general/topic/How.20to.20use.20.60Cancelled.3A.3Acatch.60)
-        let db = &AssertUnwindSafe(self);
-        Cancelled::catch(|| f(db))
+        Cancelled::catch(|| f(self))
+    }
+
+    #[must_use]
+    pub fn snapshot(&self) -> Self {
+        Self {
+            workspace: self.workspace,
+            storage: self.storage.clone(),
+            files: self.files.snapshot(),
+            system: Arc::clone(&self.system),
+        }
     }
 }
 
@@ -107,20 +110,16 @@ impl Upcast<dyn SourceDb> for RootDatabase {
     }
 }
 
-impl Upcast<dyn ResolverDb> for RootDatabase {
-    fn upcast(&self) -> &(dyn ResolverDb + 'static) {
-        self
-    }
-    fn upcast_mut(&mut self) -> &mut (dyn ResolverDb + 'static) {
-        self
+#[salsa::db]
+impl SemanticDb for RootDatabase {
+    fn is_file_open(&self, file: File) -> bool {
+        let Some(workspace) = &self.workspace else {
+            return false;
+        };
+
+        workspace.is_file_open(self, file)
     }
 }
-
-#[salsa::db]
-impl ResolverDb for RootDatabase {}
-
-#[salsa::db]
-impl SemanticDb for RootDatabase {}
 
 #[salsa::db]
 impl SourceDb for RootDatabase {
@@ -138,24 +137,42 @@ impl SourceDb for RootDatabase {
 }
 
 #[salsa::db]
-impl salsa::Database for RootDatabase {}
+impl salsa::Database for RootDatabase {
+    fn salsa_event(&self, event: &dyn Fn() -> Event) {
+        if !tracing::enabled!(tracing::Level::TRACE) {
+            return;
+        }
+
+        let event = event();
+        if matches!(event.kind, salsa::EventKind::WillCheckCancellation { .. }) {
+            return;
+        }
+
+        tracing::trace!("Salsa event: {event:?}");
+    }
+}
 
 #[salsa::db]
 impl Db for RootDatabase {}
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use crate::db::Db;
-    use red_knot_module_resolver::{vendored_typeshed_stubs, Db as ResolverDb};
-    use red_knot_python_semantic::Db as SemanticDb;
+    use std::sync::Arc;
+
+    use salsa::Event;
+
+    use red_knot_python_semantic::{vendored_typeshed_stubs, Db as SemanticDb};
     use ruff_db::files::Files;
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
     use ruff_db::{Db as SourceDb, Upcast};
 
+    use crate::db::Db;
+
     #[salsa::db]
     pub(crate) struct TestDb {
         storage: salsa::Storage<Self>,
+        events: std::sync::Arc<std::sync::Mutex<Vec<salsa::Event>>>,
         files: Files,
         system: TestSystem,
         vendored: VendoredFileSystem,
@@ -168,7 +185,21 @@ pub(crate) mod tests {
                 system: TestSystem::default(),
                 vendored: vendored_typeshed_stubs().clone(),
                 files: Files::default(),
+                events: Arc::default(),
             }
+        }
+    }
+
+    impl TestDb {
+        /// Takes the salsa events.
+        ///
+        /// ## Panics
+        /// If there are any pending salsa snapshots.
+        pub(crate) fn take_salsa_events(&mut self) -> Vec<salsa::Event> {
+            let inner = Arc::get_mut(&mut self.events).expect("no pending salsa snapshots");
+
+            let events = inner.get_mut().unwrap();
+            std::mem::take(&mut *events)
         }
     }
 
@@ -215,22 +246,21 @@ pub(crate) mod tests {
         }
     }
 
-    impl Upcast<dyn ResolverDb> for TestDb {
-        fn upcast(&self) -> &(dyn ResolverDb + 'static) {
-            self
-        }
-        fn upcast_mut(&mut self) -> &mut (dyn ResolverDb + 'static) {
-            self
+    #[salsa::db]
+    impl red_knot_python_semantic::Db for TestDb {
+        fn is_file_open(&self, file: ruff_db::files::File) -> bool {
+            !file.path(self).is_vendored_path()
         }
     }
 
     #[salsa::db]
-    impl red_knot_module_resolver::Db for TestDb {}
-    #[salsa::db]
-    impl red_knot_python_semantic::Db for TestDb {}
-    #[salsa::db]
     impl Db for TestDb {}
 
     #[salsa::db]
-    impl salsa::Database for TestDb {}
+    impl salsa::Database for TestDb {
+        fn salsa_event(&self, event: &dyn Fn() -> Event) {
+            let mut events = self.events.lock().unwrap();
+            events.push(event());
+        }
+    }
 }

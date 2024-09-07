@@ -59,3 +59,29 @@ class C:
             x
         """
         raise NotImplementedError
+
+
+import abc
+
+
+class A(metaclass=abc.abcmeta):
+    @abc.abstractmethod
+    def f(self):
+        """Lorem ipsum
+
+        Returns:
+            dict: The values
+        """
+        return
+
+
+# DOC202 -- never explicitly returns anything, just short-circuits
+def foo(s: str, condition: bool):
+    """Fooey things.
+
+    Returns:
+        None
+    """
+    if not condition:
+        return
+    print(s)

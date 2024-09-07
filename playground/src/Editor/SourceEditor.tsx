@@ -83,7 +83,10 @@ export default function SourceEditor({
                   }
                 : undefined,
             }));
-          return { actions, dispose: () => {} };
+          return {
+            actions,
+            dispose: () => {},
+          };
         },
       },
     );

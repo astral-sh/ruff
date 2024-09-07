@@ -63,9 +63,6 @@ pub trait System: Debug {
     /// representation fall-back to deserializing the notebook from a string.
     fn read_to_notebook(&self, path: &SystemPath) -> std::result::Result<Notebook, NotebookError>;
 
-    /// Reads the metadata of the virtual file at `path`.
-    fn virtual_path_metadata(&self, path: &SystemVirtualPath) -> Result<Metadata>;
-
     /// Reads the content of the virtual file at `path` into a [`String`].
     fn read_virtual_path_to_string(&self, path: &SystemVirtualPath) -> Result<String>;
 
@@ -130,6 +127,8 @@ pub trait System: Debug {
     fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder;
 
     fn as_any(&self) -> &dyn std::any::Any;
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -140,6 +139,14 @@ pub struct Metadata {
 }
 
 impl Metadata {
+    pub fn new(revision: FileRevision, permissions: Option<u32>, file_type: FileType) -> Self {
+        Self {
+            revision,
+            permissions,
+            file_type,
+        }
+    }
+
     pub fn revision(&self) -> FileRevision {
         self.revision
     }

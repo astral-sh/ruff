@@ -136,22 +136,6 @@ impl MemoryFileSystem {
         ruff_notebook::Notebook::from_source_code(&content)
     }
 
-    pub(crate) fn virtual_path_metadata(
-        &self,
-        path: impl AsRef<SystemVirtualPath>,
-    ) -> Result<Metadata> {
-        let virtual_files = self.inner.virtual_files.read().unwrap();
-        let file = virtual_files
-            .get(&path.as_ref().to_path_buf())
-            .ok_or_else(not_found)?;
-
-        Ok(Metadata {
-            revision: file.last_modified.into(),
-            permissions: Some(MemoryFileSystem::PERMISSION),
-            file_type: FileType::File,
-        })
-    }
-
     pub(crate) fn read_virtual_path_to_string(
         &self,
         path: impl AsRef<SystemVirtualPath>,
@@ -213,7 +197,7 @@ impl MemoryFileSystem {
 
         let file = get_or_create_file(&mut by_path, &normalized)?;
         file.content = content.to_string();
-        file.last_modified = FileTime::now();
+        file.last_modified = now();
 
         Ok(())
     }
@@ -229,7 +213,7 @@ impl MemoryFileSystem {
             std::collections::hash_map::Entry::Vacant(entry) => {
                 entry.insert(File {
                     content: content.to_string(),
-                    last_modified: FileTime::now(),
+                    last_modified: now(),
                 });
             }
             std::collections::hash_map::Entry::Occupied(mut entry) => {
@@ -284,7 +268,7 @@ impl MemoryFileSystem {
         let mut by_path = self.inner.by_path.write().unwrap();
         let normalized = self.normalize_path(path.as_ref());
 
-        get_or_create_file(&mut by_path, &normalized)?.last_modified = FileTime::now();
+        get_or_create_file(&mut by_path, &normalized)?.last_modified = now();
 
         Ok(())
     }
@@ -449,7 +433,7 @@ fn create_dir_all(
         path.push(component);
         let entry = paths.entry(path.clone()).or_insert_with(|| {
             Entry::Directory(Directory {
-                last_modified: FileTime::now(),
+                last_modified: now(),
             })
         });
 
@@ -472,7 +456,7 @@ fn get_or_create_file<'a>(
     let entry = paths.entry(normalized.to_path_buf()).or_insert_with(|| {
         Entry::File(File {
             content: String::new(),
-            last_modified: FileTime::now(),
+            last_modified: now(),
         })
     });
 
@@ -652,6 +636,30 @@ enum WalkerState {
 
     /// Traverse into the directory with the given path at the given depth.
     Nested { path: SystemPathBuf, depth: usize },
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn now() -> FileTime {
+    FileTime::now()
+}
+
+#[cfg(target_arch = "wasm32")]
+fn now() -> FileTime {
+    // Copied from FileTime::from_system_time()
+    let time = web_time::SystemTime::now();
+
+    time.duration_since(web_time::UNIX_EPOCH)
+        .map(|d| FileTime::from_unix_time(d.as_secs() as i64, d.subsec_nanos()))
+        .unwrap_or_else(|e| {
+            let until_epoch = e.duration();
+            let (sec_offset, nanos) = if until_epoch.subsec_nanos() == 0 {
+                (0, 0)
+            } else {
+                (-1, 1_000_000_000 - until_epoch.subsec_nanos())
+            };
+
+            FileTime::from_unix_time(-(until_epoch.as_secs() as i64) + sec_offset, nanos)
+        })
 }
 
 #[cfg(test)]

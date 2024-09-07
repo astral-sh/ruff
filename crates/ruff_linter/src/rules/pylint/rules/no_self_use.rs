@@ -87,6 +87,7 @@ pub(crate) fn no_self_use(
         || visibility::is_override(decorator_list, semantic)
         || visibility::is_overload(decorator_list, semantic)
         || visibility::is_property(decorator_list, extra_property_decorators, semantic)
+        || visibility::is_validator(decorator_list, semantic)
     {
         return;
     }
@@ -123,7 +124,7 @@ pub(crate) fn no_self_use(
     if scope
         .get("self")
         .map(|binding_id| semantic.binding(binding_id))
-        .is_some_and(|binding| binding.kind.is_argument() && !binding.is_used())
+        .is_some_and(|binding| binding.kind.is_argument() && binding.is_unused())
     {
         diagnostics.push(Diagnostic::new(
             NoSelfUse {

@@ -19,15 +19,15 @@ use crate::checkers::ast::Checker;
 /// ellipses (`...`) instead.
 ///
 /// ## Example
-/// ```python
-/// def foo(arg: int = 693568516352839939918568862861217771399698285293568) -> None:
-///     ...
+///
+/// ```pyi
+/// def foo(arg: int = 693568516352839939918568862861217771399698285293568) -> None: ...
 /// ```
 ///
 /// Use instead:
-/// ```python
-/// def foo(arg: int = ...) -> None:
-///     ...
+///
+/// ```pyi
+/// def foo(arg: int = ...) -> None: ...
 /// ```
 #[violation]
 pub struct NumericLiteralTooLong;

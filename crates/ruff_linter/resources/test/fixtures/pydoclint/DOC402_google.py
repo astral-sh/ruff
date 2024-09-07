@@ -66,3 +66,43 @@ def test():
     """Do something."""
     yield from range(10)
 
+
+# OK
+def f():
+    """Yields 1."""
+    yield 1
+
+
+# OK
+def f():
+    """Yield 1."""
+    yield 1
+
+
+# OK
+def f(num: int):
+    """Yields 1.
+
+    Args:
+        num (int): A number
+    """
+    yield 1
+
+
+import collections.abc
+
+
+# DOC402
+def foo() -> collections.abc.Generator[int | None, None, None]:
+    """
+    Do something
+    """
+    yield
+
+
+# DOC402
+def bar() -> collections.abc.Iterator[int | None]:
+    """
+    Do something
+    """
+    yield

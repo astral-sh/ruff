@@ -856,6 +856,27 @@ impl ExprDict {
     pub fn value(&self, n: usize) -> &Expr {
         self.items[n].value()
     }
+
+    pub fn iter(&self) -> std::slice::Iter<'_, DictItem> {
+        self.items.iter()
+    }
+
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+}
+
+impl<'a> IntoIterator for &'a ExprDict {
+    type IntoIter = std::slice::Iter<'a, DictItem>;
+    type Item = &'a DictItem;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
 }
 
 impl From<ExprDict> for Expr {
@@ -953,6 +974,29 @@ impl<'a> ExactSizeIterator for DictValueIterator<'a> {}
 pub struct ExprSet {
     pub range: TextRange,
     pub elts: Vec<Expr>,
+}
+
+impl ExprSet {
+    pub fn iter(&self) -> std::slice::Iter<'_, Expr> {
+        self.elts.iter()
+    }
+
+    pub fn len(&self) -> usize {
+        self.elts.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.elts.is_empty()
+    }
+}
+
+impl<'a> IntoIterator for &'a ExprSet {
+    type IntoIter = std::slice::Iter<'a, Expr>;
+    type Item = &'a Expr;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
 }
 
 impl From<ExprSet> for Expr {
@@ -2108,7 +2152,7 @@ impl BytesLiteralValue {
     }
 
     /// Returns an iterator over the bytes of the concatenated bytes.
-    fn bytes(&self) -> impl Iterator<Item = u8> + '_ {
+    pub fn bytes(&self) -> impl Iterator<Item = u8> + '_ {
         self.iter().flat_map(|part| part.as_slice().iter().copied())
     }
 }
@@ -2759,6 +2803,29 @@ pub struct ExprList {
     pub ctx: ExprContext,
 }
 
+impl ExprList {
+    pub fn iter(&self) -> std::slice::Iter<'_, Expr> {
+        self.elts.iter()
+    }
+
+    pub fn len(&self) -> usize {
+        self.elts.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.elts.is_empty()
+    }
+}
+
+impl<'a> IntoIterator for &'a ExprList {
+    type IntoIter = std::slice::Iter<'a, Expr>;
+    type Item = &'a Expr;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 impl From<ExprList> for Expr {
     fn from(payload: ExprList) -> Self {
         Expr::List(payload)
@@ -2774,6 +2841,29 @@ pub struct ExprTuple {
 
     /// Whether the tuple is parenthesized in the source code.
     pub parenthesized: bool,
+}
+
+impl ExprTuple {
+    pub fn iter(&self) -> std::slice::Iter<'_, Expr> {
+        self.elts.iter()
+    }
+
+    pub fn len(&self) -> usize {
+        self.elts.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.elts.is_empty()
+    }
+}
+
+impl<'a> IntoIterator for &'a ExprTuple {
+    type IntoIter = std::slice::Iter<'a, Expr>;
+    type Item = &'a Expr;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
 }
 
 impl From<ExprTuple> for Expr {

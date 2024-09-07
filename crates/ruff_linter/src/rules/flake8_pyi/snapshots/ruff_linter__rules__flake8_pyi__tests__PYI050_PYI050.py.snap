@@ -31,4 +31,9 @@ PYI050.py:27:47: PYI050 Prefer `typing.Never` over `NoReturn` for argument annot
 28 |     ...
    |
 
-
+PYI050.py:35:21: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+   |
+35 | def stringized(arg: "NoReturn"):
+   |                     ^^^^^^^^^^ PYI050
+36 |     ...
+   |

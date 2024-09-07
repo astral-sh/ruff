@@ -13,12 +13,12 @@ use crate::checkers::ast::Checker;
 /// to distinguish them from other variables.
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// type_alias_name: TypeAlias = int
 /// ```
 ///
 /// Use instead:
-/// ```python
+/// ```pyi
 /// TypeAliasName: TypeAlias = int
 /// ```
 #[violation]
@@ -45,14 +45,14 @@ impl Violation for SnakeCaseTypeAlias {
 /// be avoided.
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// from typing import TypeAlias
 ///
 /// _MyTypeT: TypeAlias = int
 /// ```
 ///
 /// Use instead:
-/// ```python
+/// ```pyi
 /// from typing import TypeAlias
 ///
 /// _MyType: TypeAlias = int

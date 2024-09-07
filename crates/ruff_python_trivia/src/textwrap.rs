@@ -137,7 +137,7 @@ pub fn dedent(text: &str) -> Cow<'_, str> {
 ///
 /// # Panics
 /// If the first line is indented by less than the provided indent.
-pub fn dedent_to(text: &str, indent: &str) -> String {
+pub fn dedent_to(text: &str, indent: &str) -> Option<String> {
     // Look at the indentation of the first non-empty line, to determine the "baseline" indentation.
     let existing_indent_len = text
         .universal_newlines()
@@ -150,6 +150,10 @@ pub fn dedent_to(text: &str, indent: &str) -> String {
             }
         })
         .unwrap_or_default();
+
+    if existing_indent_len < indent.len() {
+        return None;
+    }
 
     // Determine the amount of indentation to remove.
     let dedent_len = existing_indent_len - indent.len();
@@ -173,7 +177,7 @@ pub fn dedent_to(text: &str, indent: &str) -> String {
             }
         }
     }
-    result
+    Some(result)
 }
 
 #[cfg(test)]
@@ -414,7 +418,7 @@ mod tests {
             "",
             "  baz"
         ].join("\n");
-        assert_eq!(dedent_to(&x, "  "), y);
+        assert_eq!(dedent_to(&x, "  "), Some(y));
 
         let x = [
             "    foo",
@@ -426,6 +430,6 @@ mod tests {
             "    bar",
             "baz"
         ].join("\n");
-        assert_eq!(dedent_to(&x, ""), y);
+        assert_eq!(dedent_to(&x, ""), Some(y));
     }
 }

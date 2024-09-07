@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -39,8 +39,8 @@ impl Violation for AssertTuple {
 
 /// F631
 pub(crate) fn assert_tuple(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
-    if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &test {
-        if !elts.is_empty() {
+    if let Expr::Tuple(tuple) = &test {
+        if !tuple.is_empty() {
             checker
                 .diagnostics
                 .push(Diagnostic::new(AssertTuple, stmt.range()));

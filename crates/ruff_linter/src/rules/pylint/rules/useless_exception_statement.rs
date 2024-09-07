@@ -6,6 +6,7 @@ use ruff_python_stdlib::builtins;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::settings::types::PythonVersion;
 
 /// ## What it does
 /// Checks for an exception that is not raised.
@@ -54,7 +55,7 @@ pub(crate) fn useless_exception_statement(checker: &mut Checker, expr: &ast::Stm
         return;
     };
 
-    if is_builtin_exception(func, checker.semantic()) {
+    if is_builtin_exception(func, checker.semantic(), checker.settings.target_version) {
         let mut diagnostic = Diagnostic::new(UselessExceptionStatement, expr.range());
         diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
             "raise ".to_string(),
@@ -65,8 +66,15 @@ pub(crate) fn useless_exception_statement(checker: &mut Checker, expr: &ast::Stm
 }
 
 /// Returns `true` if the given expression is a builtin exception.
-fn is_builtin_exception(expr: &Expr, semantic: &SemanticModel) -> bool {
+fn is_builtin_exception(
+    expr: &Expr,
+    semantic: &SemanticModel,
+    target_version: PythonVersion,
+) -> bool {
     semantic
         .resolve_qualified_name(expr)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["", name] if builtins::is_exception(name)))
+        .is_some_and(|qualified_name| {
+            matches!(qualified_name.segments(), ["" | "builtins", name]
+            if builtins::is_exception(name, target_version.minor()))
+        })
 }

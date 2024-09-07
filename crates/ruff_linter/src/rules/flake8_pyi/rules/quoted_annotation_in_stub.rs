@@ -15,15 +15,15 @@ use crate::checkers::ast::Checker;
 /// annotations in stub files, and should be omitted.
 ///
 /// ## Example
-/// ```python
-/// def function() -> "int":
-///     ...
+///
+/// ```pyi
+/// def function() -> "int": ...
 /// ```
 ///
 /// Use instead:
-/// ```python
-/// def function() -> int:
-///     ...
+///
+/// ```pyi
+/// def function() -> int: ...
 /// ```
 ///
 /// ## References

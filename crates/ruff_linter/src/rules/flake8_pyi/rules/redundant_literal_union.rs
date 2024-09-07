@@ -24,14 +24,14 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// supertypes of `"A"` and `1` respectively.
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// from typing import Literal
 ///
 /// x: Literal["A", b"B"] | str
 /// ```
 ///
 /// Use instead:
-/// ```python
+/// ```pyi
 /// from typing import Literal
 ///
 /// x: Literal[b"B"] | str
@@ -67,8 +67,8 @@ pub(crate) fn redundant_literal_union<'a>(checker: &mut Checker, union: &'a Expr
     let mut func = |expr: &'a Expr, _parent: &'a Expr| {
         if let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr {
             if checker.semantic().match_typing_expr(value, "Literal") {
-                if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
-                    typing_literal_exprs.extend(elts.iter());
+                if let Expr::Tuple(tuple) = &**slice {
+                    typing_literal_exprs.extend(tuple);
                 } else {
                     typing_literal_exprs.push(slice);
                 }

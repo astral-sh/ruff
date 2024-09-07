@@ -9,9 +9,9 @@ use crate::vendored::VendoredFileSystem;
 pub mod file_revision;
 pub mod files;
 pub mod parsed;
-pub mod program;
 pub mod source;
 pub mod system;
+#[cfg(feature = "testing")]
 pub mod testing;
 pub mod vendored;
 
@@ -120,12 +120,11 @@ mod tests {
 
     #[salsa::db]
     impl salsa::Database for TestDb {
-        fn salsa_event(&self, event: salsa::Event) {
-            salsa::Database::attach(self, |_| {
-                tracing::trace!("event: {:?}", event);
-                let mut events = self.events.lock().unwrap();
-                events.push(event);
-            });
+        fn salsa_event(&self, event: &dyn Fn() -> salsa::Event) {
+            let event = event();
+            tracing::trace!("event: {:?}", event);
+            let mut events = self.events.lock().unwrap();
+            events.push(event);
         }
     }
 }

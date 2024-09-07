@@ -162,12 +162,11 @@ pub(crate) fn bad_generator_return_type(
     // - if not, don't emit the diagnostic
     let yield_type_info = match returns {
         ast::Expr::Subscript(ast::ExprSubscript { slice, .. }) => match slice.as_ref() {
-            ast::Expr::Tuple(slice_tuple @ ast::ExprTuple { .. }) => {
+            ast::Expr::Tuple(slice_tuple) => {
                 if !slice_tuple
-                    .elts
                     .iter()
                     .skip(1)
-                    .all(|elt| is_any_or_none(elt, semantic))
+                    .all(|element| is_any_or_none(element, semantic))
                 {
                     return;
                 }

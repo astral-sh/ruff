@@ -1,0 +1,158 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF033.py:19:35: RUF033 `__post_init__` method with argument defaults
+   |
+17 |     baz: InitVar[int] = 1
+18 | 
+19 |     def __post_init__(self, bar = 11, baz = 11) -> None: ...
+   |                                   ^^ RUF033
+   |
+   = help: Use `dataclasses.InitVar` instead
+
+RUF033.py:19:45: RUF033 `__post_init__` method with argument defaults
+   |
+17 |     baz: InitVar[int] = 1
+18 | 
+19 |     def __post_init__(self, bar = 11, baz = 11) -> None: ...
+   |                                             ^^ RUF033
+   |
+   = help: Use `dataclasses.InitVar` instead
+
+RUF033.py:25:35: RUF033 [*] `__post_init__` method with argument defaults
+   |
+23 | @dataclass
+24 | class Foo:
+25 |     def __post_init__(self, bar = 11, baz = 11) -> None: ...
+   |                                   ^^ RUF033
+   |
+   = help: Use `dataclasses.InitVar` instead
+
+ℹ Unsafe fix
+22 22 | # RUF033
+23 23 | @dataclass
+24 24 | class Foo:
+25    |-    def __post_init__(self, bar = 11, baz = 11) -> None: ...
+   25 |+    bar: InitVar = 11
+   26 |+    def __post_init__(self, bar, baz = 11) -> None: ...
+26 27 | 
+27 28 | 
+28 29 | # OK
+
+RUF033.py:25:45: RUF033 [*] `__post_init__` method with argument defaults
+   |
+23 | @dataclass
+24 | class Foo:
+25 |     def __post_init__(self, bar = 11, baz = 11) -> None: ...
+   |                                             ^^ RUF033
+   |
+   = help: Use `dataclasses.InitVar` instead
+
+ℹ Unsafe fix
+22 22 | # RUF033
+23 23 | @dataclass
+24 24 | class Foo:
+25    |-    def __post_init__(self, bar = 11, baz = 11) -> None: ...
+   25 |+    baz: InitVar = 11
+   26 |+    def __post_init__(self, bar = 11, baz) -> None: ...
+26 27 | 
+27 28 | 
+28 29 | # OK
+
+RUF033.py:46:40: RUF033 [*] `__post_init__` method with argument defaults
+   |
+44 | @dataclass
+45 | class Foo:
+46 |     def __post_init__(self, bar: int = 11, baz: Something[Whatever | None] = 11) -> None: ...
+   |                                        ^^ RUF033
+   |
+   = help: Use `dataclasses.InitVar` instead
+
+ℹ Unsafe fix
+43 43 | # RUF033
+44 44 | @dataclass
+45 45 | class Foo:
+46    |-    def __post_init__(self, bar: int = 11, baz: Something[Whatever | None] = 11) -> None: ...
+   46 |+    bar: InitVar[int] = 11
+   47 |+    def __post_init__(self, bar: int, baz: Something[Whatever | None] = 11) -> None: ...
+47 48 | 
+48 49 | 
+49 50 | # RUF033
+
+RUF033.py:46:78: RUF033 [*] `__post_init__` method with argument defaults
+   |
+44 | @dataclass
+45 | class Foo:
+46 |     def __post_init__(self, bar: int = 11, baz: Something[Whatever | None] = 11) -> None: ...
+   |                                                                              ^^ RUF033
+   |
+   = help: Use `dataclasses.InitVar` instead
+
+ℹ Unsafe fix
+43 43 | # RUF033
+44 44 | @dataclass
+45 45 | class Foo:
+46    |-    def __post_init__(self, bar: int = 11, baz: Something[Whatever | None] = 11) -> None: ...
+   46 |+    baz: InitVar[Something[Whatever | None]] = 11
+   47 |+    def __post_init__(self, bar: int = 11, baz: Something[Whatever | None]) -> None: ...
+47 48 | 
+48 49 | 
+49 50 | # RUF033
+
+RUF033.py:59:40: RUF033 [*] `__post_init__` method with argument defaults
+   |
+57 |     ping = "pong"
+58 | 
+59 |     def __post_init__(self, bar: int = 11, baz: int = 12) -> None: ...
+   |                                        ^^ RUF033
+   |
+   = help: Use `dataclasses.InitVar` instead
+
+ℹ Unsafe fix
+56 56 | 
+57 57 |     ping = "pong"
+58 58 | 
+59    |-    def __post_init__(self, bar: int = 11, baz: int = 12) -> None: ...
+   59 |+    bar: InitVar[int] = 11
+   60 |+    def __post_init__(self, bar: int, baz: int = 12) -> None: ...
+60 61 | 
+61 62 | 
+62 63 | # RUF033
+
+RUF033.py:59:55: RUF033 [*] `__post_init__` method with argument defaults
+   |
+57 |     ping = "pong"
+58 | 
+59 |     def __post_init__(self, bar: int = 11, baz: int = 12) -> None: ...
+   |                                                       ^^ RUF033
+   |
+   = help: Use `dataclasses.InitVar` instead
+
+ℹ Unsafe fix
+56 56 | 
+57 57 |     ping = "pong"
+58 58 | 
+59    |-    def __post_init__(self, bar: int = 11, baz: int = 12) -> None: ...
+   59 |+    baz: InitVar[int] = 12
+   60 |+    def __post_init__(self, bar: int = 11, baz: int) -> None: ...
+60 61 | 
+61 62 | 
+62 63 | # RUF033
+
+RUF033.py:67:40: RUF033 `__post_init__` method with argument defaults
+   |
+65 |     bar = "should've used attrs"
+66 | 
+67 |     def __post_init__(self, bar: str = "ahhh", baz: str = "hmm") -> None: ...
+   |                                        ^^^^^^ RUF033
+   |
+   = help: Use `dataclasses.InitVar` instead
+
+RUF033.py:67:59: RUF033 `__post_init__` method with argument defaults
+   |
+65 |     bar = "should've used attrs"
+66 | 
+67 |     def __post_init__(self, bar: str = "ahhh", baz: str = "hmm") -> None: ...
+   |                                                           ^^^^^ RUF033
+   |
+   = help: Use `dataclasses.InitVar` instead

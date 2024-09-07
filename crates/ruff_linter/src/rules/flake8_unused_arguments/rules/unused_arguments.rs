@@ -298,7 +298,7 @@ fn call<'a>(
             .get(arg.name.as_str())
             .map(|binding_id| semantic.binding(binding_id))?;
         if binding.kind.is_argument()
-            && !binding.is_used()
+            && binding.is_unused()
             && !dummy_variable_rgx.is_match(arg.name.as_str())
         {
             Some(Diagnostic::new(
@@ -344,6 +344,7 @@ pub(crate) fn unused_arguments(
             ) {
                 function_type::FunctionType::Function => {
                     if checker.enabled(Argumentable::Function.rule_code())
+                        && !function_type::is_stub(function_def, checker.semantic())
                         && !visibility::is_overload(decorator_list, checker.semantic())
                     {
                         function(

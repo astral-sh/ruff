@@ -34,10 +34,10 @@ jobs:
       - name: "Set docs version"
         run: |
           version="${{ (inputs.plan != '' && fromJson(inputs.plan).announcement_tag) || inputs.ref }}"
-          # if version is missing, exit with error
-          if [[ -z "$version" ]]; then
-          echo "Can't build docs without a version."
-          exit 1
+          # if version is missing, use 'latest'
+          if [ -z "$version" ]; then
+            echo "Using 'latest' as version"
+            version="latest"
           fi
 
           # Use version as display name for now
@@ -145,6 +145,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.ASTRAL_DOCS_PAT }}
         run: |
           branch_name="${{ env.branch_name }}"
+
           # auto-merge the PR if the build was triggered by a release. Manual builds should be reviewed by a human.
           # give the PR a few seconds to be created before trying to auto-merge it
           sleep 10

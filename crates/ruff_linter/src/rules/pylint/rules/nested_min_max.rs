@@ -101,18 +101,18 @@ fn collect_nested_args(min_max: MinMax, args: &[Expr], semantic: &SemanticModel)
                 range: _,
             }) = arg
             {
-                if let [arg] = &**args {
-                    if arg.as_starred_expr().is_none() {
-                        let new_arg = Expr::Starred(ast::ExprStarred {
-                            value: Box::new(arg.clone()),
-                            ctx: ast::ExprContext::Load,
-                            range: TextRange::default(),
-                        });
-                        new_args.push(new_arg);
-                        continue;
-                    }
-                }
                 if MinMax::try_from_call(func, keywords, semantic) == Some(min_max) {
+                    if let [arg] = &**args {
+                        if arg.as_starred_expr().is_none() {
+                            let new_arg = Expr::Starred(ast::ExprStarred {
+                                value: Box::new(arg.clone()),
+                                ctx: ast::ExprContext::Load,
+                                range: TextRange::default(),
+                            });
+                            new_args.push(new_arg);
+                            continue;
+                        }
+                    }
                     inner(min_max, args, semantic, new_args);
                     continue;
                 }

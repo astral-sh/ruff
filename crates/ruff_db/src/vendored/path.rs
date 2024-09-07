@@ -1,4 +1,5 @@
 use std::borrow::Borrow;
+use std::fmt::Formatter;
 use std::ops::Deref;
 use std::path;
 
@@ -195,5 +196,17 @@ impl TryFrom<path::PathBuf> for VendoredPathBuf {
 
     fn try_from(value: path::PathBuf) -> Result<Self, Self::Error> {
         Ok(VendoredPathBuf(camino::Utf8PathBuf::try_from(value)?))
+    }
+}
+
+impl std::fmt::Display for VendoredPath {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "vendored://{}", &self.0)
+    }
+}
+
+impl std::fmt::Display for VendoredPathBuf {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self.as_path(), f)
     }
 }

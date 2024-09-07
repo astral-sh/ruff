@@ -16,12 +16,12 @@ use ruff_macros::{derive_message_formats, violation};
 /// stub files are not executed at runtime. The one exception is `# type: ignore`.
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// x = 1  # type: int
 /// ```
 ///
 /// Use instead:
-/// ```python
+/// ```pyi
 /// x: int = 1
 /// ```
 #[violation]

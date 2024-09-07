@@ -300,7 +300,7 @@ pub(crate) fn typing_only_runtime_import(
             // Categorize the import, using coarse-grained categorization.
             let import_type = match categorize(
                 &qualified_name.to_string(),
-                0,
+                qualified_name.is_unresolved_import(),
                 &checker.settings.src,
                 checker.package(),
                 checker.settings.isort.detect_same_package,

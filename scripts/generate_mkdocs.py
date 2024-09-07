@@ -58,14 +58,17 @@ SECTIONS: list[Section] = [
 LINK_REWRITES: dict[str, str] = {
     "https://docs.astral.sh/ruff/": "index.md",
     "https://docs.astral.sh/ruff/configuration/": "configuration.md",
-    "https://docs.astral.sh/ruff/configuration/#pyprojecttoml-discovery": (
-        "configuration.md#pyprojecttoml-discovery"
+    "https://docs.astral.sh/ruff/configuration/#config-file-discovery": (
+        "configuration.md#config-file-discovery"
     ),
     "https://docs.astral.sh/ruff/contributing/": "contributing.md",
     "https://docs.astral.sh/ruff/editors/setup": "editors/setup.md",
     "https://docs.astral.sh/ruff/integrations/": "integrations.md",
-    "https://docs.astral.sh/ruff/faq/#how-does-ruff-compare-to-flake8": (
-        "faq.md#how-does-ruff-compare-to-flake8"
+    "https://docs.astral.sh/ruff/faq/#how-does-ruffs-linter-compare-to-flake8": (
+        "faq.md#how-does-ruffs-linter-compare-to-flake8"
+    ),
+    "https://docs.astral.sh/ruff/faq/#how-does-ruffs-formatter-compare-to-black": (
+        "faq.md#how-does-ruffs-formatter-compare-to-black"
     ),
     "https://docs.astral.sh/ruff/installation/": "installation.md",
     "https://docs.astral.sh/ruff/rules/": "rules.md",
@@ -162,7 +165,7 @@ def main() -> None:
     # Format rules docs
     add_no_escape_text_plugin()
     for rule_doc in Path("docs/rules").glob("*.md"):
-        mdformat.file(rule_doc, extensions=["mkdocs", "admonition", "no-escape-text"])
+        mdformat.file(rule_doc, extensions=["mkdocs", "admon", "no-escape-text"])
 
     with Path("mkdocs.template.yml").open(encoding="utf8") as fp:
         config = yaml.safe_load(fp)

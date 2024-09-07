@@ -77,10 +77,6 @@ impl System for OsSystem {
         Notebook::from_path(path.as_std_path())
     }
 
-    fn virtual_path_metadata(&self, _path: &SystemVirtualPath) -> Result<Metadata> {
-        Err(not_found())
-    }
-
     fn read_virtual_path_to_string(&self, _path: &SystemVirtualPath) -> Result<String> {
         Err(not_found())
     }
@@ -109,6 +105,10 @@ impl System for OsSystem {
     }
 
     fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
 

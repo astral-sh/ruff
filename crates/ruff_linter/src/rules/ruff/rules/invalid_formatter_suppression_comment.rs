@@ -336,6 +336,7 @@ const fn is_valid_enclosing_node(node: AnyNodeRef) -> bool {
         | AnyNodeRef::TypeParamParamSpec(_)
         | AnyNodeRef::FString(_)
         | AnyNodeRef::StringLiteral(_)
-        | AnyNodeRef::BytesLiteral(_) => false,
+        | AnyNodeRef::BytesLiteral(_)
+        | AnyNodeRef::Identifier(_) => false,
     }
 }

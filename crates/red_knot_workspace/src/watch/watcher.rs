@@ -109,6 +109,8 @@ struct WatcherInner {
 impl Watcher {
     /// Sets up file watching for `path`.
     pub fn watch(&mut self, path: &SystemPath) -> notify::Result<()> {
+        tracing::debug!("Watching path: '{path}'.");
+
         self.inner_mut()
             .watcher
             .watch(path.as_std_path(), RecursiveMode::Recursive)
@@ -116,6 +118,8 @@ impl Watcher {
 
     /// Stops file watching for `path`.
     pub fn unwatch(&mut self, path: &SystemPath) -> notify::Result<()> {
+        tracing::debug!("Unwatching path: '{path}'.");
+
         self.inner_mut().watcher.unwatch(path.as_std_path())
     }
 
@@ -125,6 +129,7 @@ impl Watcher {
     ///
     /// The call blocks until the watcher has stopped.
     pub fn stop(mut self) {
+        tracing::debug!("Stop file watcher");
         self.set_stop();
     }
 
@@ -173,8 +178,8 @@ struct Debouncer {
 }
 
 impl Debouncer {
-    #[tracing::instrument(level = "trace", skip(self))]
     fn add_result(&mut self, result: notify::Result<notify::Event>) {
+        tracing::trace!("Handling file watcher event: {result:?}.");
         match result {
             Ok(event) => self.add_event(event),
             Err(error) => self.add_error(error),
@@ -346,7 +351,7 @@ impl Debouncer {
             }
 
             EventKind::Any => {
-                tracing::debug!("Skip any FS event for {path}.");
+                tracing::debug!("Skipping any FS event for '{path}'.");
                 return;
             }
         };

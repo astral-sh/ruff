@@ -14,6 +14,9 @@ MD041: false
 # MD013/line-length
 MD013: false
 
+# MD014/commands-show-output
+MD014: false
+
 # MD024/no-duplicate-heading
 MD024:
   # Allow when nested under different parents e.g. CHANGELOG.md

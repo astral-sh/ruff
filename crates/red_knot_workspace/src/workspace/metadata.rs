@@ -1,3 +1,4 @@
+use crate::workspace::settings::{Configuration, WorkspaceSettings};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_python_ast::name::Name;
 
@@ -7,6 +8,8 @@ pub struct WorkspaceMetadata {
 
     /// The (first-party) packages in this workspace.
     pub(super) packages: Vec<PackageMetadata>,
+
+    pub(super) settings: WorkspaceSettings,
 }
 
 /// A first-party package in a workspace.
@@ -21,16 +24,18 @@ pub struct PackageMetadata {
 
 impl WorkspaceMetadata {
     /// Discovers the closest workspace at `path` and returns its metadata.
-    pub fn from_path(path: &SystemPath, system: &dyn System) -> anyhow::Result<WorkspaceMetadata> {
-        let root = if system.is_file(path) {
-            path.parent().unwrap().to_path_buf()
-        } else {
-            path.to_path_buf()
-        };
+    pub fn from_path(
+        path: &SystemPath,
+        system: &dyn System,
+        base_configuration: Option<Configuration>,
+    ) -> anyhow::Result<WorkspaceMetadata> {
+        assert!(
+            system.is_directory(path),
+            "Workspace root path must be a directory"
+        );
+        tracing::debug!("Searching for workspace in '{path}'");
 
-        if !system.is_directory(&root) {
-            anyhow::bail!("no workspace found at {:?}", root);
-        }
+        let root = path.to_path_buf();
 
         // TODO: Discover package name from `pyproject.toml`.
         let package_name: Name = path.file_name().unwrap_or("<root>").into();
@@ -40,9 +45,20 @@ impl WorkspaceMetadata {
             root: root.clone(),
         };
 
+        // TODO: Load the configuration from disk.
+        let mut configuration = Configuration::default();
+
+        if let Some(base_configuration) = base_configuration {
+            configuration.extend(base_configuration);
+        }
+
+        // TODO: Respect the package configurations when resolving settings (e.g. for the target version).
+        let settings = configuration.into_workspace_settings(&root);
+
         let workspace = WorkspaceMetadata {
             root,
             packages: vec![package],
+            settings,
         };
 
         Ok(workspace)
@@ -54,6 +70,10 @@ impl WorkspaceMetadata {
 
     pub fn packages(&self) -> &[PackageMetadata] {
         &self.packages
+    }
+
+    pub fn settings(&self) -> &WorkspaceSettings {
+        &self.settings
     }
 }
 

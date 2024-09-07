@@ -50,7 +50,7 @@ file_resolver.exclude = [
 	"venv",
 ]
 file_resolver.extend_exclude = [
-	"crates/red_knot_module_resolver/vendor/",
+	"crates/red_knot_python_semantic/vendor/",
 	"crates/ruff/resources/",
 	"crates/ruff_linter/resources/",
 	"crates/ruff_python_formatter/resources/",
@@ -60,6 +60,7 @@ file_resolver.force_exclude = false
 file_resolver.include = [
 	"*.py",
 	"*.pyi",
+	"*.ipynb",
 	"**/pyproject.toml",
 ]
 file_resolver.extend_include = []
@@ -209,6 +210,7 @@ linter.logger_objects = []
 linter.namespace_packages = []
 linter.src = [
 	"[BASEPATH]",
+	"[BASEPATH]/src",
 ]
 linter.tab_size = 4
 linter.line_length = 88
@@ -260,10 +262,11 @@ linter.flake8_import_conventions.aliases = {
 	seaborn = sns,
 	tensorflow = tf,
 	tkinter = tk,
+	xml.etree.ElementTree = ET,
 }
 linter.flake8_import_conventions.banned_aliases = {}
 linter.flake8_import_conventions.banned_from = []
-linter.flake8_pytest_style.fixture_parentheses = true
+linter.flake8_pytest_style.fixture_parentheses = false
 linter.flake8_pytest_style.parametrize_names_type = tuple
 linter.flake8_pytest_style.parametrize_values_type = list
 linter.flake8_pytest_style.parametrize_values_row_type = tuple
@@ -277,7 +280,7 @@ linter.flake8_pytest_style.raises_require_match_for = [
 	socket.error,
 ]
 linter.flake8_pytest_style.raises_extend_require_match_for = []
-linter.flake8_pytest_style.mark_parentheses = true
+linter.flake8_pytest_style.mark_parentheses = false
 linter.flake8_quotes.inline_quotes = double
 linter.flake8_quotes.multiline_quotes = double
 linter.flake8_quotes.docstring_quotes = double
@@ -370,6 +373,7 @@ linter.pylint.max_statements = 50
 linter.pylint.max_public_methods = 20
 linter.pylint.max_locals = 15
 linter.pyupgrade.keep_runtime_typing = false
+linter.ruff.parenthesize_tuple_in_subscript = false
 
 # Formatter Settings
 formatter.exclude = []

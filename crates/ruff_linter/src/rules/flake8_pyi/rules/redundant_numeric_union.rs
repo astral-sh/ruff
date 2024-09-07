@@ -26,15 +26,15 @@ use crate::checkers::ast::Checker;
 /// redundant elements.
 ///
 /// ## Example
-/// ```python
-/// def foo(x: float | int | str) -> None:
-///     ...
+///
+/// ```pyi
+/// def foo(x: float | int | str) -> None: ...
 /// ```
 ///
 /// Use instead:
-/// ```python
-/// def foo(x: float | str) -> None:
-///     ...
+///
+/// ```pyi
+/// def foo(x: float | str) -> None: ...
 /// ```
 ///
 /// ## References

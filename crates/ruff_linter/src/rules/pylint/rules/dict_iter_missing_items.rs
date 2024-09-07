@@ -1,4 +1,4 @@
-use ruff_python_ast::{Expr, ExprTuple};
+use ruff_python_ast::{Expr, Stmt};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -49,15 +49,15 @@ impl AlwaysFixableViolation for DictIterMissingItems {
 }
 
 pub(crate) fn dict_iter_missing_items(checker: &mut Checker, target: &Expr, iter: &Expr) {
-    let Expr::Tuple(ExprTuple { elts, .. }) = target else {
+    let Expr::Tuple(tuple) = target else {
         return;
     };
 
-    if elts.len() != 2 {
+    if tuple.len() != 2 {
         return;
     };
 
-    let Some(name) = iter.as_name_expr() else {
+    let Expr::Name(name) = iter else {
         return;
     };
 
@@ -91,20 +91,15 @@ fn is_dict_key_tuple_with_two_elements(binding: &Binding, semantic: &SemanticMod
         return false;
     };
 
-    let Some(assign_stmt) = statement.as_assign_stmt() else {
+    let Stmt::Assign(assign_stmt) = statement else {
         return false;
     };
 
-    let Some(dict_expr) = assign_stmt.value.as_dict_expr() else {
+    let Expr::Dict(dict_expr) = &*assign_stmt.value else {
         return false;
     };
 
-    dict_expr.iter_keys().all(|elt| {
-        elt.is_some_and(|x| {
-            if let Expr::Tuple(ExprTuple { elts, .. }) = x {
-                return elts.len() == 2;
-            }
-            false
-        })
-    })
+    dict_expr
+        .iter_keys()
+        .all(|key| matches!(key, Some(Expr::Tuple(tuple)) if tuple.len() == 2))
 }

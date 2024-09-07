@@ -339,23 +339,9 @@ For example, `ruff check /path/to/excluded/file.py` will always lint `file.py`.
 
 ### Default inclusions
 
-By default, Ruff will discover files matching `*.py`, `*.ipy`, or `pyproject.toml`.
+By default, Ruff will discover files matching `*.py`, `*.pyi`, `*.ipynb`, or `pyproject.toml`.
 
 To lint or format files with additional file extensions, use the [`extend-include`](settings.md#extend-include) setting.
-
-=== "pyproject.toml"
-
-    ```toml
-    [tool.ruff]
-    extend-include = ["*.ipynb"]
-    ```
-
-=== "ruff.toml"
-
-    ```toml
-    extend-include = ["*.ipynb"]
-    ```
-
 You can also change the default selection using the [`include`](settings.md#include) setting.
 
 
@@ -378,41 +364,16 @@ You can also change the default selection using the [`include`](settings.md#incl
 
 ## Jupyter Notebook discovery
 
-Ruff has built-in support for [Jupyter Notebooks](https://jupyter.org/).
-
-!!! info
-    Notebooks are linted and formatted by default when using [preview mode](preview).
-    You can opt-out of notebook linting and formatting by adding `*.ipynb` to [`extend-exclude`](settings.md#extend-exclude).
-
-To opt in to linting and formatting Jupyter Notebook (`.ipynb`) files, add the `*.ipynb` pattern to
-your [`extend-include`](settings.md#extend-include) setting, like so:
-
-=== "pyproject.toml"
-
-    ```toml
-    [tool.ruff]
-    extend-include = ["*.ipynb"]
-    ```
-
-=== "ruff.toml"
-
-    ```toml
-    extend-include = ["*.ipynb"]
-    ```
-
-This will prompt Ruff to discover Jupyter Notebook (`.ipynb`) files in any specified
-directories, then lint and format them accordingly.
+Ruff has built-in support for linting and formatting [Jupyter Notebooks](https://jupyter.org/),
+which are linted and formatted by default on version `0.6.0` and higher.
 
 If you'd prefer to either only lint or only format Jupyter Notebook files, you can use the
-section specific `exclude` option to do so. For example, the following would only lint Jupyter
+section-specific `exclude` option to do so. For example, the following would only lint Jupyter
 Notebook files and not format them:
 
 === "pyproject.toml"
 
     ```toml
-    [tool.ruff]
-    extend-include = ["*.ipynb"]
-
     [tool.ruff.format]
     exclude = ["*.ipynb"]
     ```
@@ -420,8 +381,6 @@ Notebook files and not format them:
 === "ruff.toml"
 
     ```toml
-    extend-include = ["*.ipynb"]
-
     [format]
     exclude = ["*.ipynb"]
     ```
@@ -431,9 +390,6 @@ And, conversely, the following would only format Jupyter Notebook files and not 
 === "pyproject.toml"
 
     ```toml
-    [tool.ruff]
-    extend-include = ["*.ipynb"]
-
     [tool.ruff.lint]
     exclude = ["*.ipynb"]
     ```
@@ -441,15 +397,49 @@ And, conversely, the following would only format Jupyter Notebook files and not 
 === "ruff.toml"
 
     ```toml
-    extend-include = ["*.ipynb"]
-
     [lint]
     exclude = ["*.ipynb"]
     ```
 
-Alternatively, pass the notebook file(s) to `ruff` on the command-line directly. For example,
-`ruff check /path/to/notebook.ipynb` will always lint `notebook.ipynb`. Similarly,
-`ruff format /path/to/notebook.ipynb` will always format `notebook.ipynb`.
+You can completely disable Jupyter Notebook support by updating the
+[`extend-exclude`](settings.md#extend-exclude) setting:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff]
+    extend-exclude = ["*.ipynb"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    extend-exclude = ["*.ipynb"]
+    ```
+
+If you'd like to ignore certain rules specifically for Jupyter Notebook files, you can do so by
+using the [`per-file-ignores`](settings.md#per-file-ignores) setting:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff.lint.per-file-ignores]
+    "*.ipynb" = ["T20"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    [lint.per-file-ignores]
+    "*.ipynb" = ["T20"]
+    ```
+
+Some rules have different behavior when applied to Jupyter Notebook files. For
+example, when applied to `.py` files the
+[`module-import-not-at-top-of-file` (`E402`)](rules/module-import-not-at-top-of-file.md)
+rule detect imports at the top of a file, but for notebooks it detects imports at the top of a
+**cell**. For a given rule, the rule's documentation will always specify if it has different
+behavior when applied to Jupyter Notebook files.
 
 ## Command-line interface
 
@@ -457,8 +447,8 @@ Some configuration options can be provided or overridden via dedicated flags on 
 This includes those related to rule enablement and disablement,
 file discovery, logging level, and more:
 
-```shell
-ruff check path/to/code/ --select F401 --select F403 --quiet
+```console
+$ ruff check path/to/code/ --select F401 --select F403 --quiet
 ```
 
 All other configuration options can be set via the command line
@@ -469,8 +459,8 @@ using the `--config` flag, detailed below.
 The `--config` flag has two uses. It is most often used to point to the
 configuration file that you would like Ruff to use, for example:
 
-```shell
-ruff check path/to/directory --config path/to/ruff.toml
+```console
+$ ruff check path/to/directory --config path/to/ruff.toml
 ```
 
 However, the `--config` flag can also be used to provide arbitrary
@@ -484,8 +474,8 @@ since this setting has no dedicated CLI flag. The `per-file-ignores` setting
 could also have been overridden via the `--per-file-ignores` dedicated flag,
 but using `--config` to override the setting is also fine:
 
-```shell
-ruff check path/to/file --config path/to/ruff.toml --config "lint.dummy-variable-rgx = '__.*'" --config "lint.per-file-ignores = {'some_file.py' = ['F841']}"
+```console
+$ ruff check path/to/file --config path/to/ruff.toml --config "lint.dummy-variable-rgx = '__.*'" --config "lint.per-file-ignores = {'some_file.py' = ['F841']}"
 ```
 
 Configuration options passed to `--config` are parsed in the same way
@@ -500,8 +490,8 @@ a dedicated flag and by the `--config` flag, the dedicated flag
 takes priority. In this example, the maximum permitted line length
 will be set to 90, not 100:
 
-```shell
-ruff format path/to/file --line-length=90 --config "line-length=100"
+```console
+$ ruff format path/to/file --line-length=90 --config "line-length=100"
 ```
 
 Specifying `--config "line-length=90"` will override the `line-length`

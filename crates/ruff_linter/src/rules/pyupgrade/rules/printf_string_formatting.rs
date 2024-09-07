@@ -28,21 +28,29 @@ use crate::rules::pyupgrade::helpers::curly_escape;
 /// formatting.
 ///
 /// ## Example
+///
 /// ```python
 /// "%s, %s" % ("Hello", "World")  # "Hello, World"
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// "{}, {}".format("Hello", "World")  # "Hello, World"
 /// ```
 ///
+/// ```python
+/// f"{'Hello'}, {'World'}"  # "Hello, World"
+/// ```
+///
 /// ## Fix safety
+///
 /// In cases where the format string contains a single generic format specifier
 /// (e.g. `%s`), and the right-hand side is an ambiguous expression,
 /// we cannot offer a safe fix.
 ///
 /// For example, given:
+///
 /// ```python
 /// "%s" % val
 /// ```
@@ -198,8 +206,8 @@ fn percent_to_format(format_string: &CFormatString) -> String {
 
 /// If a tuple has one argument, remove the comma; otherwise, return it as-is.
 fn clean_params_tuple<'a>(right: &Expr, locator: &Locator<'a>) -> Cow<'a, str> {
-    if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &right {
-        if elts.len() == 1 {
+    if let Expr::Tuple(tuple) = &right {
+        if tuple.len() == 1 {
             if !locator.contains_line_break(right.range()) {
                 let mut contents = locator.slice(right).to_string();
                 for (i, character) in contents.chars().rev().enumerate() {
@@ -379,6 +387,11 @@ pub(crate) fn printf_string_formatting(
             return;
         };
         if !convertible(&format_string, right) {
+            if checker.settings.preview.is_enabled() {
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(PrintfStringFormatting, string_expr.range()));
+            }
             return;
         }
 
@@ -437,6 +450,11 @@ pub(crate) fn printf_string_formatting(
             let Some(params_string) =
                 clean_params_dictionary(right, checker.locator(), checker.stylist())
             else {
+                if checker.settings.preview.is_enabled() {
+                    checker
+                        .diagnostics
+                        .push(Diagnostic::new(PrintfStringFormatting, string_expr.range()));
+                }
                 return;
             };
             Cow::Owned(params_string)

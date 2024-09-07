@@ -44,7 +44,7 @@ C409.py:3:6: C409 [*] Unnecessary `tuple` literal passed to `tuple()` (remove th
 4 | t4 = tuple([
 5 |     1,
   |
-  = help: Remove outer `tuple` call
+  = help: Remove the outer call to `tuple()`
 
 ℹ Unsafe fix
 1 1 | t1 = tuple([])
@@ -96,7 +96,7 @@ C409.py:8:6: C409 [*] Unnecessary `tuple` literal passed to `tuple()` (remove th
 11 |   
 12 |   tuple(  # comment
    |
-   = help: Remove outer `tuple` call
+   = help: Remove the outer call to `tuple()`
 
 ℹ Unsafe fix
 5  5  |     1,
@@ -172,7 +172,7 @@ C409.py:20:1: C409 [*] Unnecessary `tuple` literal passed to `tuple()` (remove t
 23 |   
 24 |   t6 = tuple([1])
    |
-   = help: Remove outer `tuple` call
+   = help: Remove the outer call to `tuple()`
 
 ℹ Unsafe fix
 17 17 |     1, 2
@@ -206,6 +206,7 @@ C409.py:24:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite a
    24 |+t6 = (1,)
 25 25 | t7 = tuple((1,))
 26 26 | t8 = tuple([1,])
+27 27 | 
 
 C409.py:25:6: C409 [*] Unnecessary `tuple` literal passed to `tuple()` (remove the outer call to `tuple()`)
    |
@@ -214,7 +215,7 @@ C409.py:25:6: C409 [*] Unnecessary `tuple` literal passed to `tuple()` (remove t
    |      ^^^^^^^^^^^ C409
 26 | t8 = tuple([1,])
    |
-   = help: Remove outer `tuple` call
+   = help: Remove the outer call to `tuple()`
 
 ℹ Unsafe fix
 22 22 | ))
@@ -223,6 +224,8 @@ C409.py:25:6: C409 [*] Unnecessary `tuple` literal passed to `tuple()` (remove t
 25    |-t7 = tuple((1,))
    25 |+t7 = (1,)
 26 26 | t8 = tuple([1,])
+27 27 | 
+28 28 | tuple([x for x in range(5)])
 
 C409.py:26:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite as a `tuple` literal)
    |
@@ -230,6 +233,8 @@ C409.py:26:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite a
 25 | t7 = tuple((1,))
 26 | t8 = tuple([1,])
    |      ^^^^^^^^^^^ C409
+27 | 
+28 | tuple([x for x in range(5)])
    |
    = help: Rewrite as a `tuple` literal
 
@@ -239,3 +244,6 @@ C409.py:26:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite a
 25 25 | t7 = tuple((1,))
 26    |-t8 = tuple([1,])
    26 |+t8 = (1,)
+27 27 | 
+28 28 | tuple([x for x in range(5)])
+29 29 | tuple({x for x in range(10)})

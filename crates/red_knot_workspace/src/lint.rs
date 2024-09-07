@@ -1,17 +1,16 @@
 use std::cell::RefCell;
-use std::ops::Deref;
 use std::time::Duration;
 
-use tracing::trace_span;
+use tracing::debug_span;
 
-use red_knot_module_resolver::ModuleName;
 use red_knot_python_semantic::types::Type;
-use red_knot_python_semantic::{HasTy, SemanticModel};
+use red_knot_python_semantic::{HasTy, ModuleName, SemanticModel};
 use ruff_db::files::File;
 use ruff_db::parsed::{parsed_module, ParsedModule};
 use ruff_db::source::{source_text, SourceText};
 use ruff_python_ast as ast;
 use ruff_python_ast::visitor::{walk_expr, walk_stmt, Visitor};
+use ruff_text_size::{Ranged, TextSize};
 
 use crate::db::Db;
 
@@ -22,7 +21,7 @@ use crate::db::Db;
 pub(crate) fn unwind_if_cancelled(db: &dyn Db) {}
 
 #[salsa::tracked(return_ref)]
-pub(crate) fn lint_syntax(db: &dyn Db, file_id: File) -> Diagnostics {
+pub(crate) fn lint_syntax(db: &dyn Db, file_id: File) -> Vec<String> {
     #[allow(clippy::print_stdout)]
     if std::env::var("RED_KNOT_SLOW_LINT").is_ok() {
         for i in 0..10 {
@@ -49,11 +48,9 @@ pub(crate) fn lint_syntax(db: &dyn Db, file_id: File) -> Diagnostics {
         };
         visitor.visit_body(&ast.body);
         diagnostics = visitor.diagnostics;
-    } else {
-        diagnostics.extend(parsed.errors().iter().map(ToString::to_string));
     }
 
-    Diagnostics::from(diagnostics)
+    diagnostics
 }
 
 fn lint_lines(source: &str, diagnostics: &mut Vec<String>) {
@@ -75,15 +72,15 @@ fn lint_lines(source: &str, diagnostics: &mut Vec<String>) {
 
 #[allow(unreachable_pub)]
 #[salsa::tracked(return_ref)]
-pub fn lint_semantic(db: &dyn Db, file_id: File) -> Diagnostics {
-    let _span = trace_span!("lint_semantic", file=?file_id.path(db)).entered();
+pub fn lint_semantic(db: &dyn Db, file_id: File) -> Vec<String> {
+    let _span = debug_span!("lint_semantic", file=%file_id.path(db)).entered();
 
     let source = source_text(db.upcast(), file_id);
     let parsed = parsed_module(db.upcast(), file_id);
     let semantic = SemanticModel::new(db.upcast(), file_id);
 
     if !parsed.is_valid() {
-        return Diagnostics::Empty;
+        return vec![];
     }
 
     let context = SemanticLintContext {
@@ -95,30 +92,21 @@ pub fn lint_semantic(db: &dyn Db, file_id: File) -> Diagnostics {
 
     SemanticVisitor { context: &context }.visit_body(parsed.suite());
 
-    Diagnostics::from(context.diagnostics.take())
+    context.diagnostics.take()
 }
 
-fn lint_unresolved_imports(context: &SemanticLintContext, import: AnyImportRef) {
-    match import {
-        AnyImportRef::Import(import) => {
-            for alias in &import.names {
-                let ty = alias.ty(&context.semantic);
-
-                if ty.is_unbound() {
-                    context.push_diagnostic(format!("Unresolved import '{}'", &alias.name));
-                }
-            }
-        }
-        AnyImportRef::ImportFrom(import) => {
-            for alias in &import.names {
-                let ty = alias.ty(&context.semantic);
-
-                if ty.is_unbound() {
-                    context.push_diagnostic(format!("Unresolved import '{}'", &alias.name));
-                }
-            }
-        }
-    }
+fn format_diagnostic(context: &SemanticLintContext, message: &str, start: TextSize) -> String {
+    let source_location = context
+        .semantic
+        .line_index()
+        .source_location(start, context.source_text());
+    format!(
+        "{}:{}:{}: {}",
+        context.semantic.file_path(),
+        source_location.row,
+        source_location.column,
+        message,
+    )
 }
 
 fn lint_maybe_undefined(context: &SemanticLintContext, name: &ast::ExprName) {
@@ -128,12 +116,17 @@ fn lint_maybe_undefined(context: &SemanticLintContext, name: &ast::ExprName) {
     let semantic = &context.semantic;
     match name.ty(semantic) {
         Type::Unbound => {
-            context.push_diagnostic(format!("Name '{}' used when not defined.", &name.id));
+            context.push_diagnostic(format_diagnostic(
+                context,
+                &format!("Name '{}' used when not defined.", &name.id),
+                name.start(),
+            ));
         }
         Type::Union(union) if union.contains(semantic.db(), Type::Unbound) => {
-            context.push_diagnostic(format!(
-                "Name '{}' used when possibly not defined.",
-                &name.id
+            context.push_diagnostic(format_diagnostic(
+                context,
+                &format!("Name '{}' used when possibly not defined.", &name.id),
+                name.start(),
             ));
         }
         _ => {}
@@ -171,7 +164,7 @@ fn lint_bad_override(context: &SemanticLintContext, class: &ast::StmtClassDef) {
         if ty.has_decorator(db, override_ty) {
             let method_name = ty.name(db);
             if class_ty
-                .inherited_class_member(db, &method_name)
+                .inherited_class_member(db, method_name)
                 .is_unbound()
             {
                 // TODO should have a qualname() method to support nested classes
@@ -238,17 +231,8 @@ struct SemanticVisitor<'a> {
 
 impl Visitor<'_> for SemanticVisitor<'_> {
     fn visit_stmt(&mut self, stmt: &ast::Stmt) {
-        match stmt {
-            ast::Stmt::ClassDef(class) => {
-                lint_bad_override(self.context, class);
-            }
-            ast::Stmt::Import(import) => {
-                lint_unresolved_imports(self.context, AnyImportRef::Import(import));
-            }
-            ast::Stmt::ImportFrom(import) => {
-                lint_unresolved_imports(self.context, AnyImportRef::ImportFrom(import));
-            }
-            _ => {}
+        if let ast::Stmt::ClassDef(class) = stmt {
+            lint_bad_override(self.context, class);
         }
 
         walk_stmt(self, stmt);
@@ -266,70 +250,35 @@ impl Visitor<'_> for SemanticVisitor<'_> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Diagnostics {
-    Empty,
-    List(Vec<String>),
-}
-
-impl Diagnostics {
-    pub fn as_slice(&self) -> &[String] {
-        match self {
-            Diagnostics::Empty => &[],
-            Diagnostics::List(list) => list.as_slice(),
-        }
-    }
-}
-
-impl Deref for Diagnostics {
-    type Target = [String];
-    fn deref(&self) -> &Self::Target {
-        self.as_slice()
-    }
-}
-
-impl From<Vec<String>> for Diagnostics {
-    fn from(value: Vec<String>) -> Self {
-        if value.is_empty() {
-            Diagnostics::Empty
-        } else {
-            Diagnostics::List(value)
-        }
-    }
-}
-
-#[derive(Copy, Clone, Debug)]
-enum AnyImportRef<'a> {
-    Import(&'a ast::StmtImport),
-    ImportFrom(&'a ast::StmtImportFrom),
-}
-
 #[cfg(test)]
 mod tests {
+    use red_knot_python_semantic::{Program, ProgramSettings, PythonVersion, SearchPathSettings};
     use ruff_db::files::system_path_to_file;
-    use ruff_db::program::{Program, SearchPathSettings, TargetVersion};
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
-    use super::{lint_semantic, Diagnostics};
     use crate::db::tests::TestDb;
+
+    use super::lint_semantic;
 
     fn setup_db() -> TestDb {
         setup_db_with_root(SystemPathBuf::from("/src"))
     }
 
-    fn setup_db_with_root(workspace_root: SystemPathBuf) -> TestDb {
+    fn setup_db_with_root(src_root: SystemPathBuf) -> TestDb {
         let db = TestDb::new();
 
-        Program::new(
+        db.memory_file_system()
+            .create_directory_all(&src_root)
+            .unwrap();
+
+        Program::from_settings(
             &db,
-            TargetVersion::Py38,
-            SearchPathSettings {
-                extra_paths: Vec::new(),
-                workspace_root,
-                site_packages: vec![],
-                custom_typeshed: None,
+            &ProgramSettings {
+                target_version: PythonVersion::default(),
+                search_paths: SearchPathSettings::new(src_root),
             },
-        );
+        )
+        .expect("Valid program settings");
 
         db
     }
@@ -350,16 +299,23 @@ mod tests {
         .unwrap();
 
         let file = system_path_to_file(&db, "/src/a.py").expect("file to exist");
-        let Diagnostics::List(messages) = lint_semantic(&db, file) else {
-            panic!("expected some diagnostics");
-        };
+        let messages = lint_semantic(&db, file);
+
+        assert_ne!(messages, &[] as &[String], "expected some diagnostics");
 
         assert_eq!(
             *messages,
-            vec![
-                "Name 'flag' used when not defined.",
-                "Name 'y' used when possibly not defined."
-            ]
+            if cfg!(windows) {
+                vec![
+                    "\\src\\a.py:3:4: Name 'flag' used when not defined.",
+                    "\\src\\a.py:5:1: Name 'y' used when possibly not defined.",
+                ]
+            } else {
+                vec![
+                    "/src/a.py:3:4: Name 'flag' used when not defined.",
+                    "/src/a.py:5:1: Name 'y' used when possibly not defined.",
+                ]
+            }
         );
     }
 }

@@ -238,3 +238,17 @@ def indent(x, y, w, z):
   # comment
         c = 3
         return z
+
+def f():
+	if True:
+	 return True
+	else:
+	 return False
+
+
+def has_untracted_files():
+    if b'Untracked files' in result.stdout:
+        return True
+    else:
+\
+        return False

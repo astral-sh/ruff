@@ -66,8 +66,9 @@ impl Violation for BuiltinArgumentShadowing {
 pub(crate) fn builtin_argument_shadowing(checker: &mut Checker, parameter: &Parameter) {
     if shadows_builtin(
         parameter.name.as_str(),
-        &checker.settings.flake8_builtins.builtins_ignorelist,
         checker.source_type,
+        &checker.settings.flake8_builtins.builtins_ignorelist,
+        checker.settings.target_version,
     ) {
         // Ignore `@override` and `@overload` decorated functions.
         if checker

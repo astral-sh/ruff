@@ -37,7 +37,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: tj-actions/changed-files@v44
+      - uses: tj-actions/changed-files@v45
         id: changed
         with:
           files_yaml: |
@@ -111,7 +111,7 @@ jobs:
       - name: "Clippy"
         run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - name: "Clippy (wasm)"
-        run: cargo clippy -p ruff_wasm --target wasm32-unknown-unknown --all-features --locked -- -D warnings
+        run: cargo clippy -p ruff_wasm -p red_knot_wasm --target wasm32-unknown-unknown --all-features --locked -- -D warnings
 
   cargo-test-linux:
     name: "cargo test (linux)"
@@ -142,6 +142,13 @@ jobs:
 
       # Check for broken links in the documentation.
       - run: cargo doc --all --no-deps
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+      # Use --document-private-items so that all our doc comments are kept in
+      # sync, not just public items. Eventually we should do this for all
+      # crates; for now add crates here as they are warning-clean to prevent
+      # regression.
+      - run: cargo doc --no-deps -p red_knot_python_semantic -p red_knot -p ruff_db --document-private-items
         env:
           # Setting RUSTDOCFLAGS because `cargo doc --check` isn't yet implemented (https://github.com/rust-lang/cargo/issues/10025).
           RUSTDOCFLAGS: "-D warnings"
@@ -191,9 +198,13 @@ jobs:
           cache-dependency-path: playground/package-lock.json
       - uses: jetli/wasm-pack-action@v0.4.0
       - uses: Swatinem/rust-cache@v2
-      - name: "Run wasm-pack"
+      - name: "Test ruff_wasm"
         run: |
           cd crates/ruff_wasm
+          wasm-pack test --node
+      - name: "Test red_knot_wasm"
+        run: |
+          cd crates/red_knot_wasm
           wasm-pack test --node
 
   cargo-build-release:
@@ -616,7 +627,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: "Build benchmarks"
-        run: cargo codspeed build -p ruff_benchmark
+        run: cargo codspeed build --features codspeed -p ruff_benchmark
 
       - name: "Run benchmarks"
         uses: CodSpeedHQ/action@v3
