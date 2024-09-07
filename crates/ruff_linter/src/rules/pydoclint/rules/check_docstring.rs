@@ -519,7 +519,7 @@ impl<'a> RaisesSection<'a> {
     /// a "Raises" section.
     fn from_section(section: &SectionContext<'a>, style: Option<SectionStyle>) -> Self {
         Self {
-            raised_exceptions: parse_entries(section.following_lines_str(), style),
+            raised_exceptions: parse_raises(section.following_lines_str(), style),
             range: section.range(),
         }
     }
@@ -528,7 +528,7 @@ impl<'a> RaisesSection<'a> {
 /// An "Args" or "Parameters" section in a docstring.
 #[derive(Debug)]
 struct ParametersSection<'a> {
-    parameters: Vec<QualifiedName<'a>>,
+    parameters: Vec<&'a str>,
     range: TextRange,
 }
 
@@ -543,7 +543,7 @@ impl<'a> ParametersSection<'a> {
     /// an "Args" or "Parameters" section.
     fn from_section(section: &SectionContext<'a>, style: Option<SectionStyle>) -> Self {
         Self {
-            parameters: parse_entries(section.following_lines_str(), style),
+            parameters: parse_parameters(section.following_lines_str(), style),
             range: section.range(),
         }
     }
@@ -582,18 +582,18 @@ impl<'a> DocstringSections<'a> {
     }
 }
 
-/// Parse the entries in a "Raises" section of a docstring.
+/// Parse the entries in a "Parameters" section of a docstring.
 ///
 /// Attempts to parse using the specified [`SectionStyle`], falling back to the other style if no
 /// entries are found.
-fn parse_entries(content: &str, style: Option<SectionStyle>) -> Vec<QualifiedName> {
+fn parse_parameters(content: &str, style: Option<SectionStyle>) -> Vec<&str> {
     match style {
-        Some(SectionStyle::Google) => parse_entries_google(content),
-        Some(SectionStyle::Numpy) => parse_entries_numpy(content),
+        Some(SectionStyle::Google) => parse_parameters_google(content),
+        Some(SectionStyle::Numpy) => parse_parameters_numpy(content),
         None => {
-            let entries = parse_entries_google(content);
+            let entries = parse_parameters_google(content);
             if entries.is_empty() {
-                parse_entries_numpy(content)
+                parse_parameters_numpy(content)
             } else {
                 entries
             }
@@ -601,14 +601,84 @@ fn parse_entries(content: &str, style: Option<SectionStyle>) -> Vec<QualifiedNam
     }
 }
 
-/// Parses Google-style docstring sections of the form:
+/// Parses Google-style "Args" sections of the form:
+///
+/// ```python
+/// Args:
+///     a (int): The first number to add.
+///     b (int): The second number to add.
+/// ```
+fn parse_parameters_google(content: &str) -> Vec<&str> {
+    let mut entries: Vec<&str> = Vec::new();
+    for potential in content.lines() {
+        let Some(colon_idx) = potential.find(':') else {
+            continue;
+        };
+        if let Some(param) = potential[..colon_idx].split_whitespace().next() {
+            entries.push(param);
+        }
+    }
+    entries
+}
+
+/// Parses NumPy-style "Parameters" sections of the form:
+///
+/// ```python
+/// Parameters
+/// ----------
+/// a : int
+///     The first number to add.
+/// b : int
+///     The second number to add.
+/// ```
+fn parse_parameters_numpy(content: &str) -> Vec<&str> {
+    let mut entries: Vec<&str> = Vec::new();
+    let mut lines = content.lines();
+    let Some(dashes) = lines.next() else {
+        return entries;
+    };
+    let indentation = &dashes[..dashes.len() - dashes.trim_start().len()];
+    for potential in lines {
+        if let Some(entry) = potential.strip_prefix(indentation) {
+            if let Some(first_char) = entry.chars().next() {
+                if !first_char.is_whitespace() {
+                    if let Some(param) = entry.split(':').next() {
+                        entries.push(param.trim_end());
+                    }
+                }
+            }
+        }
+    }
+    entries
+}
+
+/// Parse the entries in a "Raises" section of a docstring.
+///
+/// Attempts to parse using the specified [`SectionStyle`], falling back to the other style if no
+/// entries are found.
+fn parse_raises(content: &str, style: Option<SectionStyle>) -> Vec<QualifiedName> {
+    match style {
+        Some(SectionStyle::Google) => parse_raises_google(content),
+        Some(SectionStyle::Numpy) => parse_raises_numpy(content),
+        None => {
+            let entries = parse_raises_google(content);
+            if entries.is_empty() {
+                parse_raises_numpy(content)
+            } else {
+                entries
+            }
+        }
+    }
+}
+
+/// Parses Google-style "Raises" section of the form:
 ///
 /// ```python
 /// Raises:
 ///     FasterThanLightError: If speed is greater than the speed of light.
 ///     DivisionByZero: If attempting to divide by zero.
 /// ```
-fn parse_entries_google(content: &str) -> Vec<QualifiedName> {
+fn parse_raises_google(content: &str) -> Vec<QualifiedName> {
     let mut entries: Vec<QualifiedName> = Vec::new();
     for potential in content.lines() {
         let Some(colon_idx) = potential.find(':') else {
@@ -620,7 +690,7 @@ fn parse_entries_google(content: &str) -> Vec<QualifiedName> {
     entries
 }
 
-/// Parses NumPy-style docstring sections of the form:
+/// Parses NumPy-style "Raises" section of the form:
 ///
 /// ```python
 /// Raises
@@ -630,7 +700,7 @@ fn parse_entries_google(content: &str) -> Vec<QualifiedName> {
 /// DivisionByZero
 ///     If attempting to divide by zero.
 /// ```
-fn parse_entries_numpy(content: &str) -> Vec<QualifiedName> {
+fn parse_raises_numpy(content: &str) -> Vec<QualifiedName> {
     let mut entries: Vec<QualifiedName> = Vec::new();
     let mut lines = content.lines();
     let Some(dashes) = lines.next() else {
