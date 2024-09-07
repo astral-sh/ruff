@@ -2053,6 +2053,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
 
+            (
+                Type::StringLiteral(_) | Type::LiteralString,
+                Type::LiteralString,
+                ast::Operator::Add,
+            )
+            | (Type::LiteralString, Type::StringLiteral(_), ast::Operator::Add) => {
+                Type::LiteralString
+            }
+
             (Type::StringLiteral(s), Type::IntLiteral(n), ast::Operator::Mult)
             | (Type::IntLiteral(n), Type::StringLiteral(s), ast::Operator::Mult) => {
                 if n < 1 {
@@ -2066,6 +2075,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                     } else {
                         Type::LiteralString
                     }
+                } else {
+                    Type::LiteralString
+                }
+            }
+
+            (Type::LiteralString, Type::IntLiteral(n), ast::Operator::Mult)
+            | (Type::IntLiteral(n), Type::LiteralString, ast::Operator::Mult) => {
+                if n < 1 {
+                    Type::StringLiteral(StringLiteralType::new(self.db, Box::default()))
                 } else {
                     Type::LiteralString
                 }
