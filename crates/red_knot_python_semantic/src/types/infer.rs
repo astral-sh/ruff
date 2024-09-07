@@ -1426,13 +1426,14 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_string_literal_expression(&mut self, literal: &ast::ExprStringLiteral) -> Type<'db> {
-        let value = if literal.value.len() <= Self::MAX_STRING_LITERAL_SIZE {
-            literal.value.to_str().into()
+        if literal.value.len() <= Self::MAX_STRING_LITERAL_SIZE {
+            Type::StringLiteral(StringLiteralType::new(
+                self.db,
+                literal.value.to_str().into(),
+            ))
         } else {
-            Box::default()
-        };
-
-        Type::StringLiteral(StringLiteralType::new(self.db, value))
+            Type::LiteralString
+        }
     }
 
     fn infer_bytes_literal_expression(&mut self, literal: &ast::ExprBytesLiteral) -> Type<'db> {
@@ -2041,11 +2042,15 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             (Type::StringLiteral(lhs), Type::StringLiteral(rhs), ast::Operator::Add) => {
-                Type::StringLiteral(StringLiteralType::new(self.db, {
-                    let lhs_value = lhs.value(self.db).to_string();
-                    let rhs_value = rhs.value(self.db).as_ref();
-                    (lhs_value + rhs_value).into()
-                }))
+                let lhs_value = lhs.value(self.db).to_string();
+                let rhs_value = rhs.value(self.db).as_ref();
+                if lhs_value.len() + rhs_value.len() <= Self::MAX_STRING_LITERAL_SIZE {
+                    Type::StringLiteral(StringLiteralType::new(self.db, {
+                        (lhs_value + rhs_value).into()
+                    }))
+                } else {
+                    Type::LiteralString
+                }
             }
 
             (Type::StringLiteral(s), Type::IntLiteral(n), ast::Operator::Mult)
