@@ -152,7 +152,7 @@ class Calculator:
         self.value = value
 
     # OK
-    def add(self, number, number2):
+    def add(self, number):
         """
         Adds a number to the current value.
 

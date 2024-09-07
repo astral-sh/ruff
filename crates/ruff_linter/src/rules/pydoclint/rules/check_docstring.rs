@@ -7,6 +7,8 @@ use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, visitor, Expr, Stmt};
+use ruff_python_ast::{AnyParameterRef, Parameter, ParameterWithDefault};
+use ruff_python_semantic::analyze::visibility::is_staticmethod;
 use ruff_python_semantic::analyze::{function_type, visibility};
 use ruff_python_semantic::{Definition, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
@@ -615,7 +617,7 @@ fn parse_parameters_google(content: &str) -> Vec<&str> {
             continue;
         };
         if let Some(param) = potential[..colon_idx].split_whitespace().next() {
-            entries.push(param);
+            entries.push(param.trim_start_matches('*'));
         }
     }
     entries
@@ -643,7 +645,7 @@ fn parse_parameters_numpy(content: &str) -> Vec<&str> {
             if let Some(first_char) = entry.chars().next() {
                 if !first_char.is_whitespace() {
                     if let Some(param) = entry.split(':').next() {
-                        entries.push(param.trim_end());
+                        entries.push(param.trim_end().trim_start_matches('*'));
                     }
                 }
             }
@@ -1049,6 +1051,56 @@ fn is_generator_function_annotated_as_returning_none(
         .is_some_and(GeneratorOrIteratorArguments::indicates_none_returned)
 }
 
+/// An individual parameter from a function's signature.
+#[derive(Debug)]
+struct SignatureParameter<'a> {
+    name: &'a str,
+    range: TextRange,
+}
+
+impl Ranged for SignatureParameter<'_> {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+fn parameters_from_signature<'a>(
+    docstring: &'a Docstring,
+    semantic: &'a SemanticModel,
+) -> Vec<SignatureParameter<'a>> {
+    let mut parameters = Vec::new();
+    let Some(function) = docstring.definition.as_function_def() else {
+        return parameters;
+    };
+    for param in function.parameters.iter().skip(usize::from(
+        docstring.definition.is_method() && !is_staticmethod(&function.decorator_list, semantic),
+    )) {
+        match param {
+            AnyParameterRef::Variadic(Parameter { name, range, .. }) => {
+                let name = name.as_str();
+                if !name.starts_with('_') {
+                    parameters.push(SignatureParameter {
+                        name,
+                        range: *range,
+                    });
+                }
+            }
+            AnyParameterRef::NonVariadic(ParameterWithDefault {
+                parameter, range, ..
+            }) => {
+                let name = parameter.name.as_str();
+                if !name.starts_with('_') {
+                    parameters.push(SignatureParameter {
+                        name,
+                        range: *range,
+                    });
+                }
+            }
+        }
+    }
+    parameters
+}
+
 /// DOC201, DOC202, DOC402, DOC403, DOC501, DOC502
 pub(crate) fn check_docstring(
     checker: &mut Checker,
@@ -1087,6 +1139,32 @@ pub(crate) fn check_docstring(
         visitor.visit_body(&function_def.body);
         visitor.finish()
     };
+
+    let signature_parameters = parameters_from_signature(docstring, semantic);
+
+    // DOC101
+    if checker.enabled(Rule::DocstringMissingParameter) {
+        for signature_param in &signature_parameters {
+            if !docstring_sections
+                .parameters
+                .as_ref()
+                .is_some_and(|section| {
+                    section
+                        .parameters
+                        .iter()
+                        .any(|param| *param == signature_param.name)
+                })
+            {
+                let diagnostic = Diagnostic::new(
+                    DocstringMissingParameter {
+                        id: (*signature_param.name).to_string(),
+                    },
+                    signature_param.range(),
+                );
+                diagnostics.push(diagnostic);
+            }
+        }
+    }
 
     // DOC201
     if checker.enabled(Rule::DocstringMissingReturns) {
@@ -1185,6 +1263,30 @@ pub(crate) fn check_docstring(
     // Avoid applying "extraneous" rules to abstract methods. An abstract method's docstring _could_
     // document that it raises an exception without including the exception in the implementation.
     if !visibility::is_abstract(&function_def.decorator_list, semantic) {
+        // DOC102
+        if checker.enabled(Rule::DocstringExtraneousParameter) {
+            if let Some(docstring_params) = docstring_sections.parameters {
+                let mut extraneous_parameters = Vec::new();
+                for docstring_param in &docstring_params.parameters {
+                    if !signature_parameters
+                        .iter()
+                        .any(|param| param.name == *docstring_param)
+                    {
+                        extraneous_parameters.push(docstring_param.to_string());
+                    }
+                }
+                if !extraneous_parameters.is_empty() {
+                    let diagnostic = Diagnostic::new(
+                        DocstringExtraneousParameter {
+                            ids: extraneous_parameters,
+                        },
+                        docstring_params.range(),
+                    );
+                    diagnostics.push(diagnostic);
+                }
+            }
+        }
+
         // DOC202
         if checker.enabled(Rule::DocstringExtraneousReturns) {
             if let Some(ref docstring_returns) = docstring_sections.returns {

@@ -1,0 +1,164 @@
+---
+source: crates/ruff_linter/src/rules/pydoclint/mod.rs
+---
+DOC101_google.py:199:20: DOC101 Parameter `b` missing from docstring
+    |
+198 | # DOC101
+199 | def add_numbers(a, b):
+    |                    ^ DOC101
+200 |     """
+201 |     Adds two numbers and returns the result.
+    |
+    = help: Add `b` to the docstring
+
+DOC101_google.py:213:33: DOC101 Parameter `multiplier` missing from docstring
+    |
+212 | # DOC101
+213 | def multiply_list_elements(lst, multiplier):
+    |                                 ^^^^^^^^^^ DOC101
+214 |     """
+215 |     Multiplies each element in a list by a given multiplier.
+    |
+    = help: Add `multiplier` to the docstring
+
+DOC101_google.py:227:20: DOC101 Parameter `numbers` missing from docstring
+    |
+226 | # DOC101
+227 | def find_max_value(numbers):
+    |                    ^^^^^^^ DOC101
+228 |     """
+229 |     Finds the maximum value in a list of numbers.
+    |
+    = help: Add `numbers` to the docstring
+
+DOC101_google.py:238:25: DOC101 Parameter `name` missing from docstring
+    |
+237 | # DOC101
+238 | def create_user_profile(name, age, email, location="here"):
+    |                         ^^^^ DOC101
+239 |     """
+240 |     Creates a user profile with basic information.
+    |
+    = help: Add `name` to the docstring
+
+DOC101_google.py:238:31: DOC101 Parameter `age` missing from docstring
+    |
+237 | # DOC101
+238 | def create_user_profile(name, age, email, location="here"):
+    |                               ^^^ DOC101
+239 |     """
+240 |     Creates a user profile with basic information.
+    |
+    = help: Add `age` to the docstring
+
+DOC101_google.py:258:40: DOC101 Parameter `tax_rate` missing from docstring
+    |
+257 | # DOC101
+258 | def calculate_total_price(item_prices, tax_rate, discount):
+    |                                        ^^^^^^^^ DOC101
+259 |     """
+260 |     Calculates the total price after applying tax and a discount.
+    |
+    = help: Add `tax_rate` to the docstring
+
+DOC101_google.py:258:50: DOC101 Parameter `discount` missing from docstring
+    |
+257 | # DOC101
+258 | def calculate_total_price(item_prices, tax_rate, discount):
+    |                                                  ^^^^^^^^ DOC101
+259 |     """
+260 |     Calculates the total price after applying tax and a discount.
+    |
+    = help: Add `discount` to the docstring
+
+DOC101_google.py:275:43: DOC101 Parameter `cc_address` missing from docstring
+    |
+274 | # DOC101
+275 | def send_email(subject, body, to_address, cc_address=None, bcc_address=None):
+    |                                           ^^^^^^^^^^^^^^^ DOC101
+276 |     """
+277 |     Sends an email to the specified recipients.
+    |
+    = help: Add `cc_address` to the docstring
+
+DOC101_google.py:275:60: DOC101 Parameter `bcc_address` missing from docstring
+    |
+274 | # DOC101
+275 | def send_email(subject, body, to_address, cc_address=None, bcc_address=None):
+    |                                                            ^^^^^^^^^^^^^^^^ DOC101
+276 |     """
+277 |     Sends an email to the specified recipients.
+    |
+    = help: Add `bcc_address` to the docstring
+
+DOC101_google.py:291:36: DOC101 Parameter `args` missing from docstring
+    |
+290 | # DOC101
+291 | def concatenate_strings(separator, *args):
+    |                                    ^^^^^ DOC101
+292 |     """
+293 |     Concatenates multiple strings with a specified separator.
+    |
+    = help: Add `args` to the docstring
+
+DOC101_google.py:305:29: DOC101 Parameter `items` missing from docstring
+    |
+304 | # DOC101
+305 | def process_order(order_id, *items, **details):
+    |                             ^^^^^^ DOC101
+306 |     """
+307 |     Processes an order with a list of items and optional order details.
+    |
+    = help: Add `items` to the docstring
+
+DOC101_google.py:305:37: DOC101 Parameter `details` missing from docstring
+    |
+304 | # DOC101
+305 | def process_order(order_id, *items, **details):
+    |                                     ^^^^^^^^^ DOC101
+306 |     """
+307 |     Processes an order with a list of items and optional order details.
+    |
+    = help: Add `details` to the docstring
+
+DOC101_google.py:328:24: DOC101 Parameter `value` missing from docstring
+    |
+327 |     # DOC101
+328 |     def __init__(self, value=0):
+    |                        ^^^^^^^ DOC101
+329 |         """
+330 |         Initializes the calculator with an initial value.
+    |
+    = help: Add `value` to the docstring
+
+DOC101_google.py:338:27: DOC101 Parameter `number2` missing from docstring
+    |
+337 |     # DOC101
+338 |     def add(self, number, number2):
+    |                           ^^^^^^^ DOC101
+339 |         """
+340 |         Adds a number to the current value.
+    |
+    = help: Add `number2` to the docstring
+
+DOC101_google.py:353:26: DOC101 Parameter `value_str` missing from docstring
+    |
+351 |     # DOC101
+352 |     @classmethod
+353 |     def from_string(cls, value_str):
+    |                          ^^^^^^^^^ DOC101
+354 |         """
+355 |         Creates a Calculator instance from a string representation of a number.
+    |
+    = help: Add `value_str` to the docstring
+
+DOC101_google.py:365:25: DOC101 Parameter `number` missing from docstring
+    |
+363 |     # DOC101
+364 |     @staticmethod
+365 |     def is_valid_number(number):
+    |                         ^^^^^^ DOC101
+366 |         """
+367 |         Checks if a given number is valid (int or float).
+    |
+    = help: Add `number` to the docstring
