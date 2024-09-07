@@ -2920,6 +2920,8 @@ mod tests {
         v = "{y}"
         w = 10*"{y}"
         x = "{y}"*10
+        z = 0*"{y}"
+        u = (-100)*"{y}"
         "#,
             y = "a".repeat(TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE + 1),
         );
@@ -2928,7 +2930,8 @@ mod tests {
         assert_public_ty(&db, "src/a.py", "v", "LiteralString");
         assert_public_ty(&db, "src/a.py", "w", "LiteralString");
         assert_public_ty(&db, "src/a.py", "x", "LiteralString");
-
+        assert_public_ty(&db, "src/a.py", "z", r#"Literal[""]"#);
+        assert_public_ty(&db, "src/a.py", "u", r#"Literal[""]"#);
         Ok(())
     }
 
