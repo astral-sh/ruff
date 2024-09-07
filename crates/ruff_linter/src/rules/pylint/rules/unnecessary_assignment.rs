@@ -10,7 +10,7 @@ use ruff_text_size::Ranged;
 use crate::{checkers::ast::Checker, fix::edits::delete_stmt, settings::types::PythonVersion};
 
 /// ## What it does
-/// Check for cases where an assignment is directly followed by an if statement, these can be combined into a single statement using the `:=` operator.
+/// Check for cases where an variable assignment is directly followed by an if statement, these can be combined into a single statement using the `:=` operator.
 ///
 /// ## Why is this bad?
 /// The code can written more concise, often improving readability.
@@ -61,7 +61,7 @@ impl Violation for UnnecessaryAssignment {
 
     fn fix_title(&self) -> Option<String> {
         Some(format!(
-            "Move assignment into if statement using walrus operator `{}`.",
+            "Move variable assignment into if statement using walrus operator `{}`.",
             self.get_fix()
         ))
     }
