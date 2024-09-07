@@ -2898,6 +2898,25 @@ mod tests {
     }
 
     #[test]
+    fn truncated_string_literals_become_literal_string() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        let content = format!(
+            r#"
+        w = "{y}"
+        x = "a" + "{z}"
+        "#,
+            y = "a".repeat(TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE + 1),
+            z = "a".repeat(TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE),
+        );
+        db.write_dedented("src/a.py", &content)?;
+
+        assert_public_ty(&db, "src/a.py", "w", "LiteralString");
+        assert_public_ty(&db, "src/a.py", "x", "LiteralString");
+
+        Ok(())
+    }
+
+    #[test]
     fn bytes_type() -> anyhow::Result<()> {
         let mut db = setup_db();
 
