@@ -2055,12 +2055,9 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             (
                 Type::StringLiteral(_) | Type::LiteralString,
-                Type::LiteralString,
+                Type::StringLiteral(_) | Type::LiteralString,
                 ast::Operator::Add,
-            )
-            | (Type::LiteralString, Type::StringLiteral(_), ast::Operator::Add) => {
-                Type::LiteralString
-            }
+            ) => Type::LiteralString,
 
             (Type::StringLiteral(s), Type::IntLiteral(n), ast::Operator::Mult)
             | (Type::IntLiteral(n), Type::StringLiteral(s), ast::Operator::Mult) => {
