@@ -265,29 +265,22 @@ fn affix_removal_data_core_logic<'a>(
     }
 
     let affix = &func_args[0];
-    match (body_name, test_name, else_or_target_name, slice, func_name) {
-        (text, a, b, _, "startswith") if text == a && a == b && slice.upper.is_none() => {
-            Some(RemoveAffixData {
-                text,
-                bound: slice.lower.as_ref()?,
-                affix_query: AffixQuery {
-                    kind: AffixKind::StartsWith,
-                    affix,
-                },
-            })
-        }
-        (text, a, b, _, "endswith") if text == a && a == b && slice.lower.is_none() => {
-            Some(RemoveAffixData {
-                text,
-                bound: slice.upper.as_ref()?,
-                affix_query: AffixQuery {
-                    kind: AffixKind::EndsWith,
-                    affix,
-                },
-            })
-        }
-        _ => None,
+    if body_name != test_name || test_name != else_or_target_name {
+        return None;
     }
+    let (affix_kind, bound) = match func_name {
+        "startswith" if slice.upper.is_none() => (AffixKind::StartsWith, slice.lower.as_ref()?),
+        "endswith" if slice.lower.is_none() => (AffixKind::EndsWith, slice.upper.as_ref()?),
+        _ => return None,
+    };
+    Some(RemoveAffixData {
+        text: body_name,
+        bound,
+        affix_query: AffixQuery {
+            kind: affix_kind,
+            affix,
+        },
+    })
 }
 
 /// Tests whether the slice of the given string actually removes the
