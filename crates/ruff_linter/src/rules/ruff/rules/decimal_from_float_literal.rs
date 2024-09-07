@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast};
+use ruff_python_ast::{self as ast, UnaryOp};
 use ruff_python_codegen::Stylist;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -49,33 +49,69 @@ pub(crate) fn decimal_from_float_literal_syntax(checker: &mut Checker, call: &as
         return;
     };
 
-    if !is_arg_float_literal(arg) {
-        return;
-    }
+    let mut float_extractor = FloatExtractor::default();
 
-    if checker
-        .semantic()
-        .resolve_qualified_name(call.func.as_ref())
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["decimal", "Decimal"]))
-    {
-        let diagnostic =
-            Diagnostic::new(DecimalFromFloatLiteral, arg.range()).with_fix(fix_float_literal(
-                arg.range(),
-                &checker.generator().expr(arg),
-                checker.stylist(),
-            ));
-        checker.diagnostics.push(diagnostic);
+    if let Some(float_expr) = float_extractor.extract_float_literal(arg) {
+        if checker
+            .semantic()
+            .resolve_qualified_name(call.func.as_ref())
+            .is_some_and(|qualified_name| {
+                matches!(qualified_name.segments(), ["decimal", "Decimal"])
+            })
+        {
+            let diagnostic =
+                Diagnostic::new(DecimalFromFloatLiteral, arg.range()).with_fix(fix_float_literal(
+                    arg.range(),
+                    &checker.generator().expr(&float_expr),
+                    checker.stylist(),
+                ));
+            checker.diagnostics.push(diagnostic);
+        }
     }
 }
 
-fn is_arg_float_literal(arg: &ast::Expr) -> bool {
-    match arg {
-        ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-            value: ast::Number::Float(_),
-            ..
-        }) => true,
-        ast::Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => is_arg_float_literal(operand),
-        _ => false,
+#[derive(Debug)]
+struct FloatExtractor {
+    positive: bool,
+}
+
+impl Default for FloatExtractor {
+    fn default() -> Self {
+        Self { positive: true }
+    }
+}
+
+impl FloatExtractor {
+    fn extract_float_literal(&mut self, arg: &ast::Expr) -> Option<ast::Expr> {
+        match arg {
+            ast::Expr::NumberLiteral(number_literal_expr)
+                if number_literal_expr.value.is_float() =>
+            {
+                if self.positive {
+                    Some(arg.clone())
+                } else {
+                    Some(ast::Expr::UnaryOp(ast::ExprUnaryOp {
+                        operand: Box::new(arg.clone()),
+                        op: UnaryOp::USub,
+                        range: TextRange::default(),
+                    }))
+                }
+            }
+            ast::Expr::UnaryOp(ast::ExprUnaryOp {
+                operand,
+                op: UnaryOp::UAdd,
+                ..
+            }) => self.extract_float_literal(operand),
+            ast::Expr::UnaryOp(ast::ExprUnaryOp {
+                operand,
+                op: UnaryOp::USub,
+                ..
+            }) => {
+                self.positive = !self.positive;
+                self.extract_float_literal(operand)
+            }
+            _ => None,
+        }
     }
 }
 
