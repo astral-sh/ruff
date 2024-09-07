@@ -20,10 +20,10 @@ use crate::rules::pydocstyle::settings::Convention;
 
 /// ## What it does
 /// Checks for function docstrings that do not include documentation for all
-/// arguments.
+/// parameters.
 ///
 /// ## Why is this bad?
-/// If a function accepts an argument without documenting it in its docstring,
+/// If a function accepts a parameter without documenting it in its docstring,
 /// it can be misleading to users and/or a sign of incomplete documentation or
 /// refactors.
 ///
@@ -57,29 +57,29 @@ use crate::rules::pydocstyle::settings::Convention;
 /// ``` raise FasterThanLightError from exc
 /// ```
 #[violation]
-pub struct DocstringMissingArgument {
+pub struct DocstringMissingParameter {
     id: String,
 }
 
-impl Violation for DocstringMissingArgument {
+impl Violation for DocstringMissingParameter {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DocstringMissingArgument { id } = self;
-        format!("Argument `{id}` missing from docstring")
+        let DocstringMissingParameter { id } = self;
+        format!("Parameter `{id}` missing from docstring")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let DocstringMissingArgument { id } = self;
+        let DocstringMissingParameter { id } = self;
         Some(format!("Add `{id}` to the docstring"))
     }
 }
 
 /// ## What it does
-/// Checks for function docstrings that include arguments which are not
+/// Checks for function docstrings that include parameters which are not
 /// in the function signature.
 ///
 /// ## Why is this bad?
-/// If a docstring documents an argument which is not in the function signature,
+/// If a docstring documents a parameter which is not in the function signature,
 /// it can be misleading to users and/or a sign of incomplete documentation or
 /// refactors.
 ///
@@ -113,27 +113,27 @@ impl Violation for DocstringMissingArgument {
 ///     return distance / time
 /// ```
 #[violation]
-pub struct DocstringExtraneousArgument {
+pub struct DocstringExtraneousParameter {
     ids: Vec<String>,
 }
 
-impl Violation for DocstringExtraneousArgument {
+impl Violation for DocstringExtraneousParameter {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DocstringExtraneousArgument { ids } = self;
+        let DocstringExtraneousParameter { ids } = self;
 
         if let [id] = ids.as_slice() {
             format!("`{id}` is not in the function's signature")
         } else {
             format!(
-                "These arguments are not in the function's signature: {}",
+                "These parameters are not in the function's signature: {}",
                 ids.iter().map(|id| format!("`{id}`")).join(", ")
             )
         }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let DocstringExtraneousArgument { ids } = self;
+        let DocstringExtraneousParameter { ids } = self;
         Some(format!(
             "Remove {} from the docstring",
             ids.iter().map(|id| format!("`{id}`")).join(", ")
@@ -525,11 +525,36 @@ impl<'a> RaisesSection<'a> {
     }
 }
 
+/// An "Args" or "Parameters" section in a docstring.
+#[derive(Debug)]
+struct ParametersSection<'a> {
+    parameters: Vec<QualifiedName<'a>>,
+    range: TextRange,
+}
+
+impl Ranged for ParametersSection<'_> {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+impl<'a> ParametersSection<'a> {
+    /// Return the parameters for the docstring, or `None` if the docstring does not contain
+    /// an "Args" or "Parameters" section.
+    fn from_section(section: &SectionContext<'a>, style: Option<SectionStyle>) -> Self {
+        Self {
+            parameters: parse_entries(section.following_lines_str(), style),
+            range: section.range(),
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 struct DocstringSections<'a> {
     returns: Option<GenericSection>,
     yields: Option<GenericSection>,
     raises: Option<RaisesSection<'a>>,
+    parameters: Option<ParametersSection<'a>>,
 }
 
 impl<'a> DocstringSections<'a> {
@@ -537,13 +562,17 @@ impl<'a> DocstringSections<'a> {
         let mut docstring_sections = Self::default();
         for section in sections {
             match section.kind() {
+                SectionKind::Args | SectionKind::Arguments | SectionKind::Parameters => {
+                    docstring_sections.parameters =
+                        Some(ParametersSection::from_section(&section, style));
+                }
                 SectionKind::Raises => {
                     docstring_sections.raises = Some(RaisesSection::from_section(&section, style));
                 }
-                SectionKind::Returns => {
+                SectionKind::Returns | SectionKind::Return => {
                     docstring_sections.returns = Some(GenericSection::from_section(&section));
                 }
-                SectionKind::Yields => {
+                SectionKind::Yields | SectionKind::Yield => {
                     docstring_sections.yields = Some(GenericSection::from_section(&section));
                 }
                 _ => continue,

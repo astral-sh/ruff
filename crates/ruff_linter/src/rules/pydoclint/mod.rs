@@ -26,8 +26,8 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::DocstringMissingArgument, Path::new("DOC101_google.py"))]
-    #[test_case(Rule::DocstringExtraneousArgument, Path::new("DOC102_google.py"))]
+    #[test_case(Rule::DocstringMissingParameter, Path::new("DOC101_google.py"))]
+    #[test_case(Rule::DocstringExtraneousParameter, Path::new("DOC102_google.py"))]
     #[test_case(Rule::DocstringMissingReturns, Path::new("DOC201_google.py"))]
     #[test_case(Rule::DocstringExtraneousReturns, Path::new("DOC202_google.py"))]
     #[test_case(Rule::DocstringMissingYields, Path::new("DOC402_google.py"))]
@@ -47,8 +47,8 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::DocstringMissingArgument, Path::new("DOC101_numpy.py"))]
-    #[test_case(Rule::DocstringExtraneousArgument, Path::new("DOC102_numpy.py"))]
+    #[test_case(Rule::DocstringMissingParameter, Path::new("DOC101_numpy.py"))]
+    #[test_case(Rule::DocstringExtraneousParameter, Path::new("DOC102_numpy.py"))]
     #[test_case(Rule::DocstringMissingReturns, Path::new("DOC201_numpy.py"))]
     #[test_case(Rule::DocstringExtraneousReturns, Path::new("DOC202_numpy.py"))]
     #[test_case(Rule::DocstringMissingYields, Path::new("DOC402_numpy.py"))]
