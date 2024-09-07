@@ -1,7 +1,10 @@
+use std::fmt;
+
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, UnaryOp};
+use ruff_python_ast as ast;
 use ruff_python_codegen::Stylist;
+use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -49,9 +52,7 @@ pub(crate) fn decimal_from_float_literal_syntax(checker: &mut Checker, call: &as
         return;
     };
 
-    let mut float_extractor = FloatExtractor::default();
-
-    if let Some(float_expr) = float_extractor.extract_float_literal(arg) {
+    if let Some(float) = extract_float_literal(arg, Sign::Positive) {
         if checker
             .semantic()
             .resolve_qualified_name(call.func.as_ref())
@@ -59,63 +60,82 @@ pub(crate) fn decimal_from_float_literal_syntax(checker: &mut Checker, call: &as
                 matches!(qualified_name.segments(), ["decimal", "Decimal"])
             })
         {
-            let diagnostic =
-                Diagnostic::new(DecimalFromFloatLiteral, arg.range()).with_fix(fix_float_literal(
-                    arg.range(),
-                    &checker.generator().expr(&float_expr),
-                    checker.stylist(),
-                ));
+            let diagnostic = Diagnostic::new(DecimalFromFloatLiteral, arg.range()).with_fix(
+                fix_float_literal(arg.range(), float, checker.locator(), checker.stylist()),
+            );
             checker.diagnostics.push(diagnostic);
         }
     }
 }
 
-#[derive(Debug)]
-struct FloatExtractor {
-    positive: bool,
+#[derive(Debug, Clone, Copy)]
+enum Sign {
+    Positive,
+    Negative,
 }
 
-impl Default for FloatExtractor {
-    fn default() -> Self {
-        Self { positive: true }
+impl Sign {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Positive => "",
+            Self::Negative => "-",
+        }
     }
-}
 
-impl FloatExtractor {
-    fn extract_float_literal(&mut self, arg: &ast::Expr) -> Option<ast::Expr> {
-        match arg {
-            ast::Expr::NumberLiteral(number_literal_expr)
-                if number_literal_expr.value.is_float() =>
-            {
-                if self.positive {
-                    Some(arg.clone())
-                } else {
-                    Some(ast::Expr::UnaryOp(ast::ExprUnaryOp {
-                        operand: Box::new(arg.clone()),
-                        op: UnaryOp::USub,
-                        range: TextRange::default(),
-                    }))
-                }
-            }
-            ast::Expr::UnaryOp(ast::ExprUnaryOp {
-                operand,
-                op: UnaryOp::UAdd,
-                ..
-            }) => self.extract_float_literal(operand),
-            ast::Expr::UnaryOp(ast::ExprUnaryOp {
-                operand,
-                op: UnaryOp::USub,
-                ..
-            }) => {
-                self.positive = !self.positive;
-                self.extract_float_literal(operand)
-            }
-            _ => None,
+    const fn flip(self) -> Self {
+        match self {
+            Self::Negative => Self::Positive,
+            Self::Positive => Self::Negative,
         }
     }
 }
 
-fn fix_float_literal(range: TextRange, float_literal: &str, stylist: &Stylist) -> Fix {
-    let content = format!("{quote}{float_literal}{quote}", quote = stylist.quote());
-    Fix::unsafe_edit(Edit::range_replacement(content, range))
+impl fmt::Display for Sign {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+struct Float {
+    /// The range of the float excluding the sign.
+    /// E.g. for `+--+-+-4.3`, this will be the range of `4.3`
+    value_range: TextRange,
+    /// The resolved sign of the float (either `-` or `+`)
+    sign: Sign,
+}
+
+fn extract_float_literal(arg: &ast::Expr, sign: Sign) -> Option<Float> {
+    match arg {
+        ast::Expr::NumberLiteral(number_literal_expr) if number_literal_expr.value.is_float() => {
+            Some(Float {
+                value_range: arg.range(),
+                sign,
+            })
+        }
+        ast::Expr::UnaryOp(ast::ExprUnaryOp {
+            operand,
+            op: ast::UnaryOp::UAdd,
+            ..
+        }) => extract_float_literal(operand, sign),
+        ast::Expr::UnaryOp(ast::ExprUnaryOp {
+            operand,
+            op: ast::UnaryOp::USub,
+            ..
+        }) => extract_float_literal(operand, sign.flip()),
+        _ => None,
+    }
+}
+
+fn fix_float_literal(
+    original_range: TextRange,
+    float: Float,
+    locator: &Locator,
+    stylist: &Stylist,
+) -> Fix {
+    let quote = stylist.quote();
+    let Float { value_range, sign } = float;
+    let float_value = locator.slice(value_range);
+    let content = format!("{quote}{sign}{float_value}{quote}");
+    Fix::unsafe_edit(Edit::range_replacement(content, original_range))
 }
