@@ -7,7 +7,7 @@ use ruff_python_semantic::SemanticModel;
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
-use crate::{checkers::ast::Checker, fix::edits::delete_stmt};
+use crate::{checkers::ast::Checker, fix::edits::delete_stmt, settings::types::PythonVersion};
 
 /// ## What it does
 /// Check for cases where an assignment is directly followed by an if statement, these can be combined into a single statement using the `:=` operator.
@@ -71,6 +71,10 @@ type AssignmentBeforeIfStmt<'a> = (Expr, ExprName, StmtAssign);
 
 /// PLR6103
 pub(crate) fn unnecessary_assignment(checker: &mut Checker, stmt: &StmtIf) {
+    if checker.settings.target_version < PythonVersion::Py38 {
+        return;
+    }
+
     let if_test = *stmt.test.clone();
     let semantic = checker.semantic();
     let mut errors: Vec<AssignmentBeforeIfStmt> = Vec::new();
