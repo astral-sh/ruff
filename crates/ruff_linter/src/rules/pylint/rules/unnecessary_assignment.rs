@@ -1,18 +1,16 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{name::Name, AstNode, Expr, ExprName, Stmt, StmtAssign, StmtIf};
+use ruff_python_ast::{name::Name, Expr, ExprName, Stmt, StmtAssign, StmtIf};
 use ruff_python_codegen::Generator;
 use ruff_python_index::Indexer;
-use ruff_python_semantic::{
-    Binding, BindingKind, NodeId, NodeRef, ResolvedReferenceId, Scope, SemanticModel,
-};
+use ruff_python_semantic::SemanticModel;
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 use crate::{checkers::ast::Checker, fix::edits::delete_stmt};
 
 /// ## What it does
-/// Check for cases where an assignment expression could be used.
+/// Check for cases where an assignment is directly followed by an if statement, these can be combined into a single statement using the `:=` operator.
 ///
 /// ## Why is this bad?
 /// The code can written more concise, often improving readability.
@@ -22,21 +20,35 @@ use crate::{checkers::ast::Checker, fix::edits::delete_stmt};
 /// ```python
 /// test1 = "example"
 /// if test1:
-///     print("example!")
+///     print(test1)
 /// ```
 ///
 /// Use instead:
 ///
 /// ```python
 /// if test1 := "example":
-///     print("example!")
-/// ``
+///     print(test1)
+/// ```
 #[violation]
 pub struct UnnecessaryAssignment {
-    check: bool,
     name: Name,
     assignment: String,
     parentheses: bool,
+}
+
+impl UnnecessaryAssignment {
+    fn get_fix(&self) -> String {
+        let UnnecessaryAssignment {
+            name,
+            assignment,
+            parentheses,
+        } = self;
+        if *parentheses {
+            format!("({name} := {assignment})")
+        } else {
+            format!("{name} := {assignment}")
+        }
+    }
 }
 
 impl Violation for UnnecessaryAssignment {
@@ -44,70 +56,46 @@ impl Violation for UnnecessaryAssignment {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryAssignment {
-            check,
-            name,
-            assignment,
-            parentheses,
-        } = self;
-        if !check {
-            return format!("Unnecessary assignment");
-        }
-        if *parentheses {
-            format!("Use walrus operator `({name} := {assignment})`.")
-        } else {
-            format!("Use walrus operator `{name} := {assignment}`.")
-        }
+        format!("Use walrus operator `{}`.", self.get_fix())
     }
 
     fn fix_title(&self) -> Option<String> {
-        let UnnecessaryAssignment {
-            name,
-            assignment,
-            parentheses,
-            ..
-        } = self;
-        if *parentheses {
-            Some(format!(
-                "Moves assignment into check using walrus operator (`{name} := {assignment}`)."
-            ))
-        } else {
-            Some(format!(
-                "Moves assignment into check using walrus operator `{name} := {assignment}`."
-            ))
-        }
+        Some(format!(
+            "Move assignment into if statement using walrus operator `{}`.",
+            self.get_fix()
+        ))
     }
 }
 
-type AssignmentBeforeIf<'a> = (Expr, ExprName, StmtAssign);
+type AssignmentBeforeIfStmt<'a> = (Expr, ExprName, StmtAssign);
 
 /// PLR6103
 pub(crate) fn unnecessary_assignment(checker: &mut Checker, stmt: &StmtIf) {
-    let if_check = *stmt.test.clone();
+    let if_test = *stmt.test.clone();
     let semantic = checker.semantic();
-    let mut errors: Vec<AssignmentBeforeIf> = Vec::new();
+    let mut errors: Vec<AssignmentBeforeIfStmt> = Vec::new();
 
     // case - if check (`if test1:`)
-    if let Some(unreferenced_binding) =
-        find_assignment_before_if(&if_check, checker.semantic(), &if_check)
+    if let Some(unreferenced_binding) = find_assignment_before_if_stmt(semantic, &if_test, &if_test)
     {
         errors.push(unreferenced_binding);
     };
 
     // case - bool operations (`if test1 and test2:`)
-    if let Expr::BoolOp(expr) = if_check.clone() {
+    if let Expr::BoolOp(expr) = if_test.clone() {
         errors.extend(
             expr.values
                 .iter()
-                .filter_map(|value| find_assignment_before_if(&if_check, semantic, value))
-                .collect::<Vec<AssignmentBeforeIf>>(),
+                .filter_map(|bool_test| {
+                    find_assignment_before_if_stmt(semantic, &if_test, bool_test)
+                })
+                .collect::<Vec<AssignmentBeforeIfStmt>>(),
         );
     }
 
     // case - compare (`if test1 is not None:`)
-    if let Expr::Compare(compare) = if_check.clone() {
-        if let Some(error) = find_assignment_before_if(&if_check, checker.semantic(), &compare.left)
-        {
+    if let Expr::Compare(compare) = if_test.clone() {
+        if let Some(error) = find_assignment_before_if_stmt(semantic, &if_test, &compare.left) {
             errors.push(error);
         };
     }
@@ -120,9 +108,9 @@ pub(crate) fn unnecessary_assignment(checker: &mut Checker, stmt: &StmtIf) {
             .filter(|elif_else_clause| elif_else_clause.test.is_some())
             .filter_map(|elif_else_clause| {
                 let elif_check = elif_else_clause.test.clone().unwrap();
-                find_assignment_before_if(&elif_check, semantic, &elif_check)
+                find_assignment_before_if_stmt(semantic, &elif_check, &elif_check)
             })
-            .collect::<Vec<AssignmentBeforeIf>>(),
+            .collect::<Vec<AssignmentBeforeIfStmt>>(),
     );
 
     // add found diagnostics
@@ -141,13 +129,17 @@ pub(crate) fn unnecessary_assignment(checker: &mut Checker, stmt: &StmtIf) {
     );
 }
 
-fn find_assignment_before_if<'a>(
-    origin: &Expr,
+/// Find possible assignment before if statement
+///
+/// * `if_test` - the complete if test (`if test1 and test2`)
+/// * `if_test_part` - part of the if test (`test1`)
+fn find_assignment_before_if_stmt<'a>(
     semantic: &'a SemanticModel,
-    check: &Expr,
-) -> Option<AssignmentBeforeIf<'a>> {
-    // only care about variable expressions, like `if test1:`
-    let Expr::Name(check_variable) = check.clone() else {
+    if_test: &Expr,
+    if_test_part: &Expr,
+) -> Option<AssignmentBeforeIfStmt<'a>> {
+    // early exit when the test part is not a variable
+    let Expr::Name(test_variable) = if_test_part.clone() else {
         return None;
     };
 
@@ -157,42 +149,41 @@ fn find_assignment_before_if<'a>(
         .as_assign_stmt()?;
 
     // only care about single assignment target like `x = 'example'`
-    let [target] = &previous_statement.targets[..] else {
+    let [assigned_variable] = &previous_statement.targets[..] else {
         return None;
     };
 
     // check whether the check variable is the assignment variable
-    if check_variable.id != target.as_name_expr()?.id {
+    if test_variable.id != assigned_variable.as_name_expr()?.id {
         return None;
     }
 
-    Some((origin.clone(), check_variable, previous_statement.clone()))
+    Some((if_test.clone(), test_variable, previous_statement.clone()))
 }
 
 fn create_diagnostic(
     locator: &Locator,
     indexer: &Indexer,
     generator: Generator,
-    error: AssignmentBeforeIf,
+    error: AssignmentBeforeIfStmt,
 ) -> Diagnostic {
     let (origin, expr_name, assignment) = error;
-    let value_expr = generator.expr(&assignment.value.clone());
+    let assignment_expr = generator.expr(&assignment.value.clone());
     let use_parentheses = origin.is_bool_op_expr() || !assignment.value.is_name_expr();
 
     let mut diagnostic = Diagnostic::new(
         UnnecessaryAssignment {
-            check: true,
             name: expr_name.clone().id,
-            assignment: value_expr.clone(),
+            assignment: assignment_expr.clone(),
             parentheses: use_parentheses,
         },
         expr_name.clone().range(),
     );
 
     let format = if use_parentheses {
-        format!("({} := {})", expr_name.clone().id, value_expr.clone())
+        format!("({} := {})", expr_name.clone().id, assignment_expr.clone())
     } else {
-        format!("{} := {}", expr_name.clone().id, value_expr.clone())
+        format!("{} := {}", expr_name.clone().id, assignment_expr.clone())
     };
 
     let delete_assignment_edit = delete_stmt(&Stmt::from(assignment), None, locator, indexer);

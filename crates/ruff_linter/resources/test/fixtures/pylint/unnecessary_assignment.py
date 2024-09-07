@@ -35,6 +35,13 @@ bad6 = 'example'
 if bad6 is not None: # [consider-using-assignment-expr]
     pass
 
+bad7 = 'example'
+if bad7 == 'something': # [consider-using-assignment-expr]
+    pass
+elif bad7 == 'something else':
+    pass
+
+
 good1_1 = 'example'
 good1_2 = 'example'
 if good1_1: # correct, assignment is not the previous statement
@@ -53,7 +60,11 @@ def test(good4: str | None = None):
         good4 = 'test'
 
 def bar():
-    good4_5 = 'example'
-    good4_2 = good4_5
-    if good4_5: # assignment is not the previous statement
+    good5_5 = 'example'
+    good5_2 = good5_5
+    if good5_5: # correct, assignment is not the previous statement
+        pass
+
+for good6 in [1, 2, 3]:
+    if good6: # correct, used like it is intented
         pass
