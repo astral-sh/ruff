@@ -1,7 +1,7 @@
 use crate::{checkers::ast::Checker, settings::types::PythonVersion};
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast};
+use ruff_python_ast as ast;
 use ruff_python_codegen::Generator;
 use ruff_text_size::{Ranged, TextRange};
 
