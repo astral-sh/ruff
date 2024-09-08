@@ -29,6 +29,10 @@ use crate::{checkers::ast::Checker, fix::edits::delete_stmt, settings::types::Py
 /// if test1 := "example":
 ///     print(test1)
 /// ```
+///
+/// ## References
+/// - [PEP 572 – Assignment Expressions](https://peps.python.org/pep-0572/)
+/// - [What’s New In Python 3.8 - Assignment Expressions](https://docs.python.org/3/whatsnew/3.8.html#assignment-expressions)
 #[violation]
 pub struct UnnecessaryAssignment {
     name: Name,
