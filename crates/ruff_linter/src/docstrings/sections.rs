@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Formatter};
 use std::iter::FusedIterator;
 
-use ruff_python_ast::docstrings::{leading_space, leading_words};
+use ruff_python_ast::docstrings::{leading_space, leading_words, sphinx_title};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use strum_macros::EnumIter;
 
@@ -31,17 +31,20 @@ pub(crate) enum SectionKind {
     Notes,
     OtherArgs,
     OtherArguments,
-    OtherParams,
     OtherParameters,
+    OtherParams,
+    Param,
     Parameters,
     Raises,
     References,
     Return,
     Returns,
+    RType,
     SeeAlso,
     ShortSummary,
     Tip,
     Todo,
+    Type,
     Warning,
     Warnings,
     Warns,
@@ -71,17 +74,20 @@ impl SectionKind {
             "notes" => Some(Self::Notes),
             "other args" => Some(Self::OtherArgs),
             "other arguments" => Some(Self::OtherArguments),
-            "other params" => Some(Self::OtherParams),
             "other parameters" => Some(Self::OtherParameters),
+            "other params" => Some(Self::OtherParams),
+            "param" => Some(Self::Param),
             "parameters" => Some(Self::Parameters),
             "raises" => Some(Self::Raises),
             "references" => Some(Self::References),
             "return" => Some(Self::Return),
             "returns" => Some(Self::Returns),
+            "rtype" => Some(Self::RType),
             "see also" => Some(Self::SeeAlso),
             "short summary" => Some(Self::ShortSummary),
             "tip" => Some(Self::Tip),
             "todo" => Some(Self::Todo),
+            "type" => Some(Self::Type),
             "warning" => Some(Self::Warning),
             "warnings" => Some(Self::Warnings),
             "warns" => Some(Self::Warns),
@@ -112,17 +118,20 @@ impl SectionKind {
             Self::Notes => "Notes",
             Self::OtherArgs => "Other Args",
             Self::OtherArguments => "Other Arguments",
-            Self::OtherParams => "Other Params",
             Self::OtherParameters => "Other Parameters",
+            Self::OtherParams => "Other Params",
+            Self::Param => "Param",
             Self::Parameters => "Parameters",
             Self::Raises => "Raises",
             Self::References => "References",
             Self::Return => "Return",
             Self::Returns => "Returns",
+            Self::RType => "RType",
             Self::SeeAlso => "See Also",
             Self::ShortSummary => "Short Summary",
             Self::Tip => "Tip",
             Self::Todo => "Todo",
+            Self::Type => "Type",
             Self::Warning => "Warning",
             Self::Warnings => "Warnings",
             Self::Warns => "Warns",
@@ -187,15 +196,18 @@ impl<'a> SectionContexts<'a> {
                 let section_name = leading_words(&line);
                 let section_name_size = section_name.text_len();
 
-                if is_docstring_section(
-                    &line,
-                    indent_size,
-                    section_name_size,
-                    section_kind,
-                    last.as_ref(),
-                    previous_line.as_ref(),
-                    lines.peek(),
-                ) {
+                // Suspected sphinx matches are always correct
+                if matches!(style, SectionStyle::Sphinx)
+                    || is_docstring_section(
+                        &line,
+                        indent_size,
+                        section_name_size,
+                        section_kind,
+                        last.as_ref(),
+                        previous_line.as_ref(),
+                        lines.peek(),
+                    )
+                {
                     if let Some(mut last) = last.take() {
                         last.range = TextRange::new(last.start(), line.start());
                         contexts.push(last);
@@ -435,7 +447,13 @@ impl Debug for SectionContext<'_> {
 }
 
 fn suspected_as_section(line: &str, style: SectionStyle) -> Option<SectionKind> {
-    if let Some(kind) = SectionKind::from_str(leading_words(line)) {
+    if matches!(style, SectionStyle::Sphinx) {
+        if let Some(kind) = SectionKind::from_str(sphinx_title(line)) {
+            if style.sections().contains(&kind) {
+                return Some(kind);
+            }
+        }
+    } else if let Some(kind) = SectionKind::from_str(leading_words(line)) {
         if style.sections().contains(&kind) {
             return Some(kind);
         }

@@ -1330,9 +1330,11 @@ pub(crate) fn sections(
     match convention {
         Some(Convention::Google) => parse_google_sections(checker, docstring, section_contexts),
         Some(Convention::Numpy) => parse_numpy_sections(checker, docstring, section_contexts),
+        Some(Convention::Sphinx) => parse_sphinx_sections(checker, docstring, section_contexts),
         Some(Convention::Pep257) | None => match section_contexts.style() {
             SectionStyle::Google => parse_google_sections(checker, docstring, section_contexts),
             SectionStyle::Numpy => parse_numpy_sections(checker, docstring, section_contexts),
+            SectionStyle::Sphinx => parse_sphinx_sections(checker, docstring, section_contexts),
         },
     }
 }
@@ -2002,6 +2004,23 @@ fn google_section(
             )));
             checker.diagnostics.push(diagnostic);
         }
+    }
+}
+
+fn parse_sphinx_sections(
+    checker: &mut Checker,
+    docstring: &Docstring,
+    section_contexts: &SectionContexts,
+) {
+    let mut iterator = section_contexts.iter().peekable();
+    while let Some(context) = iterator.next() {
+        common_section(
+            checker,
+            docstring,
+            &context,
+            iterator.peek(),
+            SectionStyle::Sphinx,
+        );
     }
 }
 

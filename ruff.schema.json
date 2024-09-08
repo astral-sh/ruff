@@ -792,6 +792,13 @@
           ]
         },
         {
+          "description": "Use Sphinx-style docstrings.",
+          "type": "string",
+          "enum": [
+            "sphinx"
+          ]
+        },
+        {
           "description": "Use PEP257-style docstrings.",
           "type": "string",
           "enum": [

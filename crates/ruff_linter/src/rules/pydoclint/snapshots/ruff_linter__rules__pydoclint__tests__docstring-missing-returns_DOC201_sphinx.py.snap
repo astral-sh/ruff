@@ -1,0 +1,20 @@
+---
+source: crates/ruff_linter/src/rules/pydoclint/mod.rs
+---
+DOC201_sphinx.py:9:5: DOC201 `return` is not documented in docstring
+  |
+7 |     :type num: int
+8 |     """
+9 |     return 'test'
+  |     ^^^^^^^^^^^^^ DOC201
+  |
+  = help: Add a "Returns" section to the docstring
+
+DOC201_sphinx.py:48:9: DOC201 `return` is not documented in docstring
+   |
+46 |         :type num: int
+47 |         """
+48 |         return 'test'
+   |         ^^^^^^^^^^^^^ DOC201
+   |
+   = help: Add a "Returns" section to the docstring
