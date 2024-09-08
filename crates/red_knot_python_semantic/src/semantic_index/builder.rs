@@ -15,8 +15,7 @@ use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
 use crate::semantic_index::definition::{
     AssignmentDefinitionNodeRef, ComprehensionDefinitionNodeRef, Definition, DefinitionNodeKey,
-    DefinitionNodeRef, ExceptHandlerDefinitionNodeRef, ForStmtDefinitionNodeRef,
-    ImportFromDefinitionNodeRef,
+    DefinitionNodeRef, ForStmtDefinitionNodeRef, ImportFromDefinitionNodeRef,
 };
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{
@@ -883,26 +882,26 @@ where
     }
 
     fn visit_except_handler(&mut self, except_handler: &'ast ast::ExceptHandler) {
-        let ast::ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
-            name,
-            type_,
+        let ast::ExceptHandler::ExceptHandler(except_handler) = except_handler;
+        let ast::ExceptHandlerExceptHandler {
+            name: symbol_name,
+            type_: handled_exceptions,
             body,
             range: _,
-        }) = except_handler;
-        if let Some(handled_exceptions) = type_ {
+        } = except_handler;
+
+        if let Some(handled_exceptions) = handled_exceptions {
             self.visit_expr(handled_exceptions);
-            if let Some(symbol_name) = name {
-                let symbol =
-                    self.add_or_update_symbol(symbol_name.id.clone(), SymbolFlags::IS_DEFINED);
-                self.add_definition(
-                    symbol,
-                    ExceptHandlerDefinitionNodeRef {
-                        symbol_name,
-                        handled_exceptions,
-                    },
-                );
-            }
         }
+
+        // If `handled_exceptions` above was `None`, it's something like `except as e:`,
+        // which is invalid syntax. However, it's still pretty obvious here that the user
+        // *wanted* `e` to be bound, so we should still create a definition here nonetheless.
+        if let Some(symbol_name) = symbol_name {
+            let symbol = self.add_or_update_symbol(symbol_name.id.clone(), SymbolFlags::IS_DEFINED);
+            self.add_definition(symbol, except_handler);
+        }
+
         self.visit_body(body);
     }
 }

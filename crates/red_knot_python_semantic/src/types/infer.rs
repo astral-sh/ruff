@@ -425,11 +425,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                     definition,
                 );
             }
-            DefinitionKind::ExceptHandler(except_handler_definition) => {
-                self.infer_except_handler_definition(
-                    except_handler_definition.handled_exceptions(),
-                    definition,
-                );
+            DefinitionKind::ExceptHandler(handler) => {
+                self.infer_except_handler_definition(handler, definition);
             }
         }
     }
@@ -749,11 +746,29 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = try_statement;
 
         self.infer_body(body);
+
         for handler in handlers {
             let ast::ExceptHandler::ExceptHandler(handler) = handler;
-            self.infer_optional_expression(handler.type_.as_deref());
-            self.infer_body(&handler.body);
+            let ast::ExceptHandlerExceptHandler {
+                type_: handled_exceptions,
+                name: symbol_name,
+                body,
+                range: _,
+            } = handler;
+
+            // If `symbol_name` is `Some()` and `handled_exceptions` is `None`,
+            // it's invalid syntax (something like `except as e:`).
+            // However, it's obvious that the user *wanted* `e` to be bound here,
+            // so we'll have created a definition in the semantic-index stage anyway.
+            if symbol_name.is_some() {
+                self.infer_definition(handler);
+            } else {
+                self.infer_optional_expression(handled_exceptions.as_deref());
+            }
+
+            self.infer_body(body);
         }
+
         self.infer_body(orelse);
         self.infer_body(finalbody);
     }
@@ -805,10 +820,14 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_except_handler_definition(
         &mut self,
-        handled_exceptions: &'db ast::Expr,
+        handler: &'db ast::ExceptHandlerExceptHandler,
         definition: Definition<'db>,
     ) {
-        let node_ty = self.infer_expression(handled_exceptions);
+        let node_ty = handler
+            .type_
+            .as_deref()
+            .map(|ty| self.infer_expression(ty))
+            .unwrap_or(Type::Unknown);
 
         // TODO: anything that's a consistent subtype of
         // `type[BaseException] | tuple[type[BaseException], ...]` should be valid;
@@ -4278,6 +4297,26 @@ mod tests {
         assert_file_diagnostics(&db, "src/a.py", &[]);
 
         // TODO: Should be `AttributeError | TypeError` --Alex
+        assert_public_ty(&db, "src/a.py", "e", "Unknown");
+
+        Ok(())
+    }
+
+    #[test]
+    fn exception_handler_with_invalid_syntax() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            try:
+                x
+            except as e:
+                pass
+            ",
+        )?;
+
+        assert_file_diagnostics(&db, "src/a.py", &[]);
         assert_public_ty(&db, "src/a.py", "e", "Unknown");
 
         Ok(())
