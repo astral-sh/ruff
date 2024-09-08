@@ -57,7 +57,18 @@ dictionary = {
 # ]
 # ///
 
-# Script tag without a closing tag (OK)
+# Script tag with multiple closing tags (OK)
+# /// script
+# [tool.uv]
+# extra-index-url = ["https://pypi.org/simple", """\
+# https://example.com/
+# ///
+# """
+# ]
+# ///
+print(1)
+
+# Script tag without a closing tag (Error)
 
 # /// script
 # requires-python = ">=3.11"
