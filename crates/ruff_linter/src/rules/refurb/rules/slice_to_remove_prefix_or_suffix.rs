@@ -472,15 +472,26 @@ enum AffixKind {
     StartsWith,
     EndsWith,
 }
+
+/// Components of `startswith(prefix)` or `endswith(suffix)`.
 #[derive(Debug)]
 struct AffixQuery<'a> {
+    /// Whether the method called is `startswith` or `endswith`.
     kind: AffixKind,
+    /// The prefix or suffix being passed to the string method.
     affix: &'a ast::Expr,
 }
 
+/// Ingredients for a statement or expression
+/// which potentially removes a prefix or suffix from a string.
+///
+/// Specifically
 #[derive(Debug)]
 struct RemoveAffixData<'a> {
+    /// The string whose prefix or suffix we want to remove
     text: &'a str,
+    /// Bound used to slice the string
     bound: &'a ast::Expr,
+    /// Contains the prefix or suffix used in `text.startswith(prefix)` or `text.endswith(suffix)`
     affix_query: AffixQuery<'a>,
 }
