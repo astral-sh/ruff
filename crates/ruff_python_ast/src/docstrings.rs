@@ -23,7 +23,7 @@ pub fn clean_space(indentation: &str) -> String {
 
 /// Sphinx section title.
 pub fn sphinx_title(line: &str) -> &str {
-    let line = line.trim_start_matches(|c| c == ' ' || c == ':');
+    let line = line.trim_start_matches([' ', ':']);
     line.find(|char: char| !char.is_alphanumeric())
         .map_or(line, |index| &line[..index])
 }
