@@ -41,10 +41,10 @@ pub(crate) fn type_comment_in_stub(
     comment_ranges: &CommentRanges,
 ) {
     for range in comment_ranges {
-        let comment = locator.slice(*range);
+        let comment = locator.slice(range);
 
         if TYPE_COMMENT_REGEX.is_match(comment) && !TYPE_IGNORE_REGEX.is_match(comment) {
-            diagnostics.push(Diagnostic::new(TypeCommentInStub, *range));
+            diagnostics.push(Diagnostic::new(TypeCommentInStub, range));
         }
     }
 }

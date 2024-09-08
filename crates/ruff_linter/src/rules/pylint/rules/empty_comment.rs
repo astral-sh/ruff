@@ -56,7 +56,7 @@ pub(crate) fn empty_comments(
         }
 
         // If the line contains an empty comment, add a diagnostic.
-        if let Some(diagnostic) = empty_comment(*range, locator) {
+        if let Some(diagnostic) = empty_comment(range, locator) {
             diagnostics.push(diagnostic);
         }
     }
