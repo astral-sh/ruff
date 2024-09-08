@@ -103,6 +103,7 @@ impl Violation for DocstringMissingParameter {
 ///
 /// Use instead:
 /// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
 ///     """Calculate speed as distance divided by time.
 ///
 ///     Args:
@@ -1272,7 +1273,7 @@ pub(crate) fn check_docstring(
                         .iter()
                         .any(|param| param.name == *docstring_param)
                     {
-                        extraneous_parameters.push(docstring_param.to_string());
+                        extraneous_parameters.push((*docstring_param).to_string());
                     }
                 }
                 if !extraneous_parameters.is_empty() {
