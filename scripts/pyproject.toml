@@ -1,8 +1,6 @@
-[project]
-name = "scripts"
-version = "0.0.1"
-dependencies = ["stdlibs"]
-requires-python = ">=3.8"
+# This `pyproject.toml` file provides linting configuration for our Python scripts
+# It doesn't list dev dependencies requried by those scripts;
+# those are listed in the `pyproject.toml` file in the project root.
 
 [tool.black]
 line-length = 88

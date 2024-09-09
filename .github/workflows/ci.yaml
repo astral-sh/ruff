@@ -294,8 +294,6 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install uv
         run: curl -LsSf https://astral.sh/uv/install.sh | sh
-      - name: Install Python requirements
-        run: uv pip install -r scripts/fuzz-parser/requirements.txt --system
       - uses: actions/download-artifact@v4
         name: Download Ruff binary to test
         id: download-cached-binary
@@ -307,7 +305,7 @@ jobs:
           # Make executable, since artifact download doesn't preserve this
           chmod +x ${{ steps.download-cached-binary.outputs.download-path }}/ruff
 
-          python scripts/fuzz-parser/fuzz.py 0-500 --test-executable ${{ steps.download-cached-binary.outputs.download-path }}/ruff
+          uv run scripts/fuzz-parser.py 0-500 --test-executable ${{ steps.download-cached-binary.outputs.download-path }}/ruff
 
   scripts:
     name: "test scripts"

@@ -1,19 +1,18 @@
 """
 Run the parser on randomly generated (but syntactically valid) Python source-code files.
 
-To install all dependencies for this script into an environment using `uv`, run:
-    uv pip install -r scripts/fuzz-parser/requirements.txt
-
-Example invocations of the script:
+Example invocations of the script using `uv` from the project root
+(which will automatically run the script in an environment
+with all dependencies installed):
 - Run the fuzzer using seeds 0, 1, 2, 78 and 93 to generate the code:
-  `python scripts/fuzz-parser/fuzz.py 0-2 78 93`
+  `uv run scripts/fuzz-parser.py 0-2 78 93`
 - Run the fuzzer concurrently using seeds in range 0-10 inclusive,
   but only reporting bugs that are new on your branch:
-  `python scripts/fuzz-parser/fuzz.py 0-10 --new-bugs-only`
+  `uv run scripts/fuzz-parser.py 0-10 --new-bugs-only`
 - Run the fuzzer concurrently on 10,000 different Python source-code files,
   using a random selection of seeds, and only print a summary at the end
   (the `shuf` command is Unix-specific):
-  `python scripts/fuzz-parser/fuzz.py $(shuf -i 0-1000000 -n 10000) --quiet
+  `uv run scripts/fuzz-parser.py $(shuf -i 0-1000000 -n 10000) --quiet
 """
 
 from __future__ import annotations

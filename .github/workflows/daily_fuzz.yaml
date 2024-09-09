@@ -37,8 +37,6 @@ jobs:
           python-version: "3.12"
       - name: Install uv
         run: curl -LsSf https://astral.sh/uv/install.sh | sh
-      - name: Install Python requirements
-        run: uv pip install -r scripts/fuzz-parser/requirements.txt --system
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"
@@ -49,7 +47,7 @@ jobs:
         # but this is outweighed by the fact that a release build takes *much* longer to compile in CI
         run: cargo build --locked
       - name: Fuzz
-        run: python scripts/fuzz-parser/fuzz.py $(shuf -i 0-9999999999999999999 -n 1000) --test-executable target/debug/ruff
+        run: uv run scripts/fuzz-parser.py $(shuf -i 0-9999999999999999999 -n 1000) --test-executable target/debug/ruff
 
   create-issue-on-failure:
     name: Create an issue if the daily fuzz surfaced any bugs
