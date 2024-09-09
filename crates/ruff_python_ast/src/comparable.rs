@@ -1645,4 +1645,38 @@ mod tests {
             ComparableExpr::from(&string_expr)
         );
     }
+
+    #[test]
+    fn compare_concatenated_bytes_to_value() {
+        let concatenated_string_expr: ast::Expr = ast::ExprBytesLiteral {
+            range: TextRange::default(),
+            value: ast::BytesLiteralValue::concatenated(vec![
+                ast::BytesLiteral {
+                    range: TextRange::default(),
+                    value: vec![b'a'].into(),
+                    flags: BytesLiteralFlags::default(),
+                },
+                ast::BytesLiteral {
+                    range: TextRange::default(),
+                    value: vec![b'b'].into(),
+                    flags: BytesLiteralFlags::default(),
+                },
+            ]),
+        }
+        .into();
+        let string_expr: ast::Expr = ast::ExprBytesLiteral {
+            range: TextRange::default(),
+            value: ast::BytesLiteralValue::single(ast::BytesLiteral {
+                range: TextRange::default(),
+                value: vec![b'a', b'b'].into(),
+                flags: BytesLiteralFlags::default(),
+            }),
+        }
+        .into();
+
+        assert_eq!(
+            ComparableExpr::from(&concatenated_string_expr),
+            ComparableExpr::from(&string_expr)
+        );
+    }
 }
