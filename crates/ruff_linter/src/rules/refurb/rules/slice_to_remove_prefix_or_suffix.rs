@@ -8,10 +8,10 @@ use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for the removal of a prefix or suffix from a string by assigning
-/// the string to a slice after checking `startswith` or `endswith`, respectively.
+/// the string to a slice after checking `.startswith()` or `.endswith()`, respectively.
 ///
 /// ## Why is this bad?
-/// The methods `removeprefix` and `removesuffix`,
+/// The methods [`str.removeprefix`] and [`str.removesuffix`],
 /// introduced in Python 3.9, have the same behavior
 /// and are more readable and efficient.
 ///
@@ -33,6 +33,9 @@ use ruff_text_size::Ranged;
 /// ```python
 /// text = text.removeprefix("pre")
 /// ```
+///
+/// [`str.removeprefix`]: https://docs.python.org/3/library/stdtypes.html#str.removeprefix
+/// [`str.removesuffix`]: https://docs.python.org/3/library/stdtypes.html#str.removesuffix
 #[violation]
 pub struct SliceToRemovePrefixOrSuffix {
     string: String,
@@ -54,15 +57,13 @@ impl AlwaysFixableViolation for SliceToRemovePrefixOrSuffix {
     }
 
     fn fix_title(&self) -> String {
-        let (to_replace, replacement) = match self.affix_kind {
-            AffixKind::StartsWith => ("`startswith`", "`removeprefix`"),
-            AffixKind::EndsWith => ("`endswith`", "`removesuffix`"),
-        };
+        let method_name = self.affix_kind.as_str();
+        let replacement = self.affix_kind.replacement();
         let context = match self.stmt_or_expression {
             StmtOrExpr::Statement => "assignment",
             StmtOrExpr::Expression => "ternary expression",
         };
-        format!("Use {replacement} instead of {context} conditional upon {to_replace}.")
+        format!("Use {replacement} instead of {context} conditional upon {method_name}.")
     }
 }
 
@@ -225,12 +226,12 @@ fn affix_removal_data_stmt(if_stmt: &ast::StmtIf) -> Option<RemoveAffixData> {
 /// value[slice] if test else else_or_target_name
 /// ```
 /// This function verifies that
-///     - `value` and `else_or_target_name`
-/// are equal to a common name `text`
-///     - `test` is of the form `text.startswith(prefix)`
-/// or `text.endswith(suffix)`
-///     - `slice` has no upper bound in the case of a prefix,
-/// and no lower bound in the case of a suffix
+///   - `value` and `else_or_target_name`
+///     are equal to a common name `text`
+///   - `test` is of the form `text.startswith(prefix)`
+///     or `text.endswith(suffix)`
+///   - `slice` has no upper bound in the case of a prefix,
+///     and no lower bound in the case of a suffix
 ///
 /// If these conditions are satisfied, the function
 /// returns the corresponding `RemoveAffixData` object;
@@ -290,9 +291,9 @@ fn affix_removal_data<'a>(
 ///  text[:bound] if text.endswith(suffix) else text
 /// ```
 ///
-/// this function verifies that `bound == -len(suffix)` in two cases:
-///     - `suffix` is a string literal and `bound` is a number literal
-///     - `suffix` is an expression and `bound` is
+/// This function verifies that `bound == -len(suffix)` in two cases:
+///   - `suffix` is a string literal and `bound` is a number literal
+///   - `suffix` is an expression and `bound` is
 ///     exactly `-len(suffix)` (as AST nodes, prior to evaluation.)
 fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -> bool {
     let RemoveAffixData {
@@ -438,12 +439,28 @@ enum AffixKind {
     EndsWith,
 }
 
+impl AffixKind {
+    const fn as_str(&self) -> &'static str {
+        match self {
+            Self::StartsWith => "startswith",
+            Self::EndsWith => "endswith",
+        }
+    }
+
+    const fn replacement(&self) -> &'static str {
+        match self {
+            Self::StartsWith => "removeprefix",
+            Self::EndsWith => "removesuffix",
+        }
+    }
+}
+
 /// Components of `startswith(prefix)` or `endswith(suffix)`.
 #[derive(Debug)]
 struct AffixQuery<'a> {
     /// Whether the method called is `startswith` or `endswith`.
     kind: AffixKind,
-    /// The prefix or suffix being passed to the string method.
+    /// Node representing the prefix or suffix being passed to the string method.
     affix: &'a ast::Expr,
 }
 
@@ -453,9 +470,9 @@ struct AffixQuery<'a> {
 /// Specifically
 #[derive(Debug)]
 struct RemoveAffixData<'a> {
-    /// The string whose prefix or suffix we want to remove
+    /// Node representing the string whose prefix or suffix we want to remove
     text: &'a ast::Expr,
-    /// Bound used to slice the string
+    /// Node representing the bound used to slice the string
     bound: &'a ast::Expr,
     /// Contains the prefix or suffix used in `text.startswith(prefix)` or `text.endswith(suffix)`
     affix_query: AffixQuery<'a>,
