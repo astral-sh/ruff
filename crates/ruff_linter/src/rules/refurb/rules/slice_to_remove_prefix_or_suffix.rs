@@ -2,8 +2,8 @@ use crate::{checkers::ast::Checker, settings::types::PythonVersion};
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
-use ruff_python_codegen::Generator;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for the removal of a prefix or suffix from a string by assigning
@@ -84,11 +84,8 @@ pub(crate) fn slice_to_remove_affix_expr(checker: &mut Checker, if_expr: &ast::E
                 },
                 if_expr.range,
             );
-            let replacement = generate_removeaffix_expr(
-                checker.locator().slice(text),
-                &removal_data.affix_query,
-                checker.generator(),
-            );
+            let replacement =
+                generate_removeaffix_expr(text, &removal_data.affix_query, checker.locator());
 
             diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
                 replacement,
@@ -120,9 +117,9 @@ pub(crate) fn slice_to_remove_affix_stmt(checker: &mut Checker, if_stmt: &ast::S
             );
 
             let replacement = generate_assignment_with_removeaffix(
-                checker.locator().slice(text),
+                text,
                 &removal_data.affix_query,
-                checker.generator(),
+                checker.locator(),
             );
 
             diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
@@ -392,20 +389,17 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, checker: &mut Checker) -> b
 /// ```
 /// as appropriate.
 fn generate_assignment_with_removeaffix(
-    text: &str,
+    text: &ast::Expr,
     affix_query: &AffixQuery,
-    generator: Generator,
+    locator: &Locator,
 ) -> String {
-    let remove_affix_expr = make_removeaffix_expr(text, affix_query);
-    generator.stmt(&ast::Stmt::Assign(ast::StmtAssign {
-        range: TextRange::default(),
-        targets: vec![ast::Expr::Name(ast::ExprName {
-            range: TextRange::default(),
-            id: ast::name::Name::from(text),
-            ctx: ast::ExprContext::Store,
-        })],
-        value: Box::new(remove_affix_expr),
-    }))
+    let text_str = locator.slice(text);
+    let affix_str = locator.slice(affix_query.affix);
+
+    match affix_query.kind {
+        AffixKind::StartsWith => format!("{text_str} = {text_str}.removeprefix({affix_str})"),
+        AffixKind::EndsWith => format!("{text_str} = {text_str}.removesuffix({affix_str})"),
+    }
 }
 
 /// Generates the source code string
@@ -418,47 +412,18 @@ fn generate_assignment_with_removeaffix(
 /// text.removesuffix(suffix)
 /// ```
 /// as appropriate.
-fn generate_removeaffix_expr(text: &str, affix_query: &AffixQuery, generator: Generator) -> String {
-    let remove_affix_expr = make_removeaffix_expr(text, affix_query);
-    generator.expr(&remove_affix_expr)
-}
+fn generate_removeaffix_expr(
+    text: &ast::Expr,
+    affix_query: &AffixQuery,
+    locator: &Locator,
+) -> String {
+    let text_str = locator.slice(text);
+    let affix_str = locator.slice(affix_query.affix);
 
-/// Creates the AST node corresponding to
-/// ```python
-/// text.removeprefix(prefix)
-/// ```
-/// or
-///
-/// ```python
-/// text.removesuffix(suffix)
-/// ```
-/// as appropriate.
-fn make_removeaffix_expr(text: &str, affix_query: &AffixQuery) -> ast::Expr {
-    let func_name = match affix_query.kind {
-        AffixKind::StartsWith => ast::name::Name::from("removeprefix"),
-        AffixKind::EndsWith => ast::name::Name::from("removesuffix"),
-    };
-    ast::Expr::Call(ast::ExprCall {
-        range: TextRange::default(),
-        func: Box::new(ast::Expr::Attribute(ast::ExprAttribute {
-            range: TextRange::default(),
-            value: Box::new(ast::Expr::Name(ast::ExprName {
-                range: TextRange::default(),
-                id: ast::name::Name::from(text),
-                ctx: ast::ExprContext::Store,
-            })),
-            attr: ast::Identifier {
-                id: func_name,
-                range: TextRange::default(),
-            },
-            ctx: ast::ExprContext::Load,
-        })),
-        arguments: ast::Arguments {
-            range: TextRange::default(),
-            args: Box::new([affix_query.affix.clone()]),
-            keywords: Box::new([]),
-        },
-    })
+    match affix_query.kind {
+        AffixKind::StartsWith => format!("{text_str}.removeprefix({affix_str})"),
+        AffixKind::EndsWith => format!("{text_str}.removesuffix({affix_str})"),
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
