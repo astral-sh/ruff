@@ -421,7 +421,7 @@ fn generate_removeaffix_expr(
     let affix_str = locator.slice(affix_query.affix);
 
     let replacement = affix_query.kind.replacement();
-    format!("{text_str} = {text_str}.{replacement}({affix_str})")
+    format!("{text_str}.{replacement}({affix_str})")
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
