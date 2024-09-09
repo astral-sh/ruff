@@ -15,6 +15,8 @@
 //! an implicit concatenation of string literals, as these expressions are considered to
 //! have the same shape in that they evaluate to the same value.
 
+use std::borrow::Cow;
+
 use crate as ast;
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
@@ -638,13 +640,13 @@ impl<'a> From<&'a ast::StringLiteral> for ComparableStringLiteral<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ComparableBytesLiteral<'a> {
-    value: &'a [u8],
+    value: Cow<'a, [u8]>,
 }
 
 impl<'a> From<&'a ast::BytesLiteral> for ComparableBytesLiteral<'a> {
     fn from(bytes_literal: &'a ast::BytesLiteral) -> Self {
         Self {
-            value: &bytes_literal.value,
+            value: Cow::Borrowed(&bytes_literal.value),
         }
     }
 }
@@ -785,7 +787,7 @@ pub struct ExprStringLiteral<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprBytesLiteral<'a> {
-    parts: Vec<ComparableBytesLiteral<'a>>,
+    value: ComparableBytesLiteral<'a>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -1031,7 +1033,9 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
             }
             ast::Expr::BytesLiteral(ast::ExprBytesLiteral { value, range: _ }) => {
                 Self::BytesLiteral(ExprBytesLiteral {
-                    parts: value.iter().map(Into::into).collect(),
+                    value: ComparableBytesLiteral {
+                        value: Cow::from(value),
+                    },
                 })
             }
             ast::Expr::NumberLiteral(ast::ExprNumberLiteral { value, range: _ }) => {
@@ -1611,7 +1615,7 @@ impl<'a> From<&'a ast::ModExpression> for ComparableModExpression<'a> {
 mod tests {
     use ruff_text_size::TextRange;
 
-    use crate::{self as ast, comparable::ComparableExpr, StringLiteralFlags};
+    use crate::{self as ast, comparable::ComparableExpr, BytesLiteralFlags, StringLiteralFlags};
     #[test]
     fn compare_concatenated_string_to_value() {
         let concatenated_string_expr: ast::Expr = ast::ExprStringLiteral {
