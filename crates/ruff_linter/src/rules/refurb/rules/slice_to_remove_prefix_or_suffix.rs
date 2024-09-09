@@ -155,7 +155,7 @@ fn affix_removal_data_expr(if_expr: &ast::ExprIf) -> Option<RemoveAffixData> {
     // ```python
     // value[slice] if test else else_or_target_name
     // ```
-    affix_removal_data_core_logic(value, test, else_or_target_name, slice)
+    affix_removal_data(value, test, else_or_target_name, slice)
 }
 
 /// Given a statement of the form:
@@ -193,7 +193,7 @@ fn affix_removal_data_stmt(if_stmt: &ast::StmtIf) -> Option<RemoveAffixData> {
     //     text = f"{prefix} something completely different"
     //     text = text[len(prefix):]
     // ```
-    if body.len() != 1 {
+    let [statement] = body.as_slice() else {
         return None;
     };
 
@@ -206,14 +206,14 @@ fn affix_removal_data_stmt(if_stmt: &ast::StmtIf) -> Option<RemoveAffixData> {
         value,
         targets,
         range: _,
-    } = body[0].as_assign_stmt()?;
-    if targets.len() != 1 {
+    } = statement.as_assign_stmt()?;
+    let [target] = targets.as_slice() else {
         return None;
     };
-    let else_or_target_name = &targets[0].as_name_expr()?.id;
+    let else_or_target_name = &target.as_name_expr()?.id;
     let ast::ExprSubscript { value, slice, .. } = value.as_subscript_expr()?;
 
-    affix_removal_data_core_logic(value, test, else_or_target_name, slice)
+    affix_removal_data(value, test, else_or_target_name, slice)
 }
 
 /// Suppose given a statement of the form:
@@ -236,7 +236,7 @@ fn affix_removal_data_stmt(if_stmt: &ast::StmtIf) -> Option<RemoveAffixData> {
 /// If these conditions are satisfied, the function
 /// returns the corresponding `RemoveAffixData` object;
 /// otherwise it returns `None`.
-fn affix_removal_data_core_logic<'a>(
+fn affix_removal_data<'a>(
     value: &'a ast::Expr,
     test: &'a ast::Expr,
     else_or_target_name: &'a ast::name::Name,
@@ -260,11 +260,10 @@ fn affix_removal_data_core_logic<'a>(
         .as_str();
 
     let func_args = &test.as_call_expr()?.arguments.args;
-    if func_args.len() != 1 {
-        return None;
-    }
 
-    let affix = &func_args[0];
+    let [affix] = func_args.as_ref() else {
+        return None;
+    };
     if body_name != test_name || test_name != else_or_target_name {
         return None;
     }
