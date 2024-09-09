@@ -479,7 +479,7 @@ impl<'db> Type<'db> {
             Type::Unknown => Type::Unknown,
             // TODO intersections
             Type::Intersection(_) => Type::Unknown,
-            Type::Tuple(_) => typeshed_symbol_ty(db, "tuple"),
+            Type::Tuple(_) => builtins_symbol_ty(db, "tuple"),
         }
     }
 }
