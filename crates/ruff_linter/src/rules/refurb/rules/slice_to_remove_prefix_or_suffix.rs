@@ -4,7 +4,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_semantic::SemanticModel;
 use ruff_source_file::Locator;
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextLen};
 
 /// ## What it does
 /// Checks for the removal of a prefix or suffix from a string by assigning
@@ -313,10 +313,10 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
                 range: _,
                 value: string_val,
             }),
-        ) => num.as_int().is_some_and(|x| {
-            // Only support prefix removal for size at most `u32::MAX`
-            u32::try_from(string_val.len()).is_ok_and(|length| x == &ast::Int::from(length))
-        }),
+        ) => num
+            .as_int()
+            .and_then(ast::Int::as_u32) // Only support prefix removal for size at most `u32::MAX`
+            .is_some_and(|x| x == string_val.to_str().text_len().to_u32()),
         (
             AffixKind::StartsWith,
             ast::Expr::Call(ast::ExprCall {
@@ -326,13 +326,13 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
             }),
             _,
         ) => {
-            semantic.match_builtin_expr(func, "len")
-                && arguments.len() == 1
+            arguments.len() == 1
                 && arguments.find_positional(0).is_some_and(|arg| {
                     let compr_affix = ast::comparable::ComparableExpr::from(affix);
                     let compr_arg = ast::comparable::ComparableExpr::from(arg);
                     compr_affix == compr_arg
                 })
+                && semantic.match_builtin_expr(func, "len")
         }
         (
             AffixKind::EndsWith,
@@ -347,10 +347,11 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
             }),
         ) => operand.as_number_literal_expr().is_some_and(
             |ast::ExprNumberLiteral { value, .. }| {
-                value.as_int().is_some_and(|x| {
-                    // Only support prefix removal for size at most `u32::MAX`
-                    u32::try_from(string_val.len()).is_ok_and(|length| x == &ast::Int::from(length))
-                })
+                // Only support prefix removal for size at most `u32::MAX`
+                value
+                    .as_int()
+                    .and_then(ast::Int::as_u32)
+                    .is_some_and(|x| x == string_val.to_str().text_len().to_u32())
             },
         ),
         (
@@ -367,13 +368,13 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
                  func,
                  arguments,
              }| {
-                semantic.match_builtin_expr(func, "len")
-                    && arguments.len() == 1
+                arguments.len() == 1
                     && arguments.find_positional(0).is_some_and(|arg| {
                         let compr_affix = ast::comparable::ComparableExpr::from(affix);
                         let compr_arg = ast::comparable::ComparableExpr::from(arg);
                         compr_affix == compr_arg
                     })
+                    && semantic.match_builtin_expr(func, "len")
             },
         ),
         _ => false,
@@ -397,10 +398,8 @@ fn generate_assignment_with_removeaffix(
     let text_str = locator.slice(text);
     let affix_str = locator.slice(affix_query.affix);
 
-    match affix_query.kind {
-        AffixKind::StartsWith => format!("{text_str} = {text_str}.removeprefix({affix_str})"),
-        AffixKind::EndsWith => format!("{text_str} = {text_str}.removesuffix({affix_str})"),
-    }
+    let replacement = affix_query.kind.replacement();
+    format!("{text_str} = {text_str}.{replacement}({affix_str})")
 }
 
 /// Generates the source code string
@@ -421,10 +420,8 @@ fn generate_removeaffix_expr(
     let text_str = locator.slice(text);
     let affix_str = locator.slice(affix_query.affix);
 
-    match affix_query.kind {
-        AffixKind::StartsWith => format!("{text_str}.removeprefix({affix_str})"),
-        AffixKind::EndsWith => format!("{text_str}.removesuffix({affix_str})"),
-    }
+    let replacement = affix_query.kind.replacement();
+    format!("{text_str} = {text_str}.{replacement}({affix_str})")
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
