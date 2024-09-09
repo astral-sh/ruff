@@ -17,7 +17,6 @@ pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
 pub(crate) use self::diagnostic::TypeCheckDiagnostics;
 pub(crate) use self::infer::{
     infer_deferred_types, infer_definition_types, infer_expression_types, infer_scope_types,
-    TypeInference,
 };
 
 mod builder;

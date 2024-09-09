@@ -4,7 +4,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, SymbolTable};
 use crate::semantic_index::symbol_table;
-use crate::types::{infer_expression_types, IntersectionBuilder, Type, TypeInference};
+use crate::types::{infer_expression_types, IntersectionBuilder, Type};
 use crate::Db;
 use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
