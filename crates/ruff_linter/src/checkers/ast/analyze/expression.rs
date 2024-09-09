@@ -1407,6 +1407,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::UselessIfElse) {
                 ruff::rules::useless_if_else(checker, if_exp);
             }
+            if checker.enabled(Rule::SliceToRemovePrefixOrSuffix) {
+                refurb::rules::slice_to_remove_affix_expr(checker, if_exp);
+            }
         }
         Expr::ListComp(
             comp @ ast::ExprListComp {

@@ -46,6 +46,7 @@ mod tests {
     #[test_case(Rule::WriteWholeFile, Path::new("FURB103.py"))]
     #[test_case(Rule::FStringNumberFormat, Path::new("FURB116.py"))]
     #[test_case(Rule::SortedMinMax, Path::new("FURB192.py"))]
+    #[test_case(Rule::SliceToRemovePrefixOrSuffix, Path::new("FURB188.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
