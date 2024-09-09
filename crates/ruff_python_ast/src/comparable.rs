@@ -1604,3 +1604,43 @@ impl<'a> From<&'a ast::ModExpression> for ComparableModExpression<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use ruff_text_size::TextRange;
+
+    use crate::{self as ast, comparable::ComparableExpr, StringLiteralFlags};
+    #[test]
+    fn compare_concatenated_string_to_value() {
+        let concatenated_string_expr: ast::Expr = ast::ExprStringLiteral {
+            range: TextRange::default(),
+            value: ast::StringLiteralValue::concatenated(vec![
+                ast::StringLiteral {
+                    range: TextRange::default(),
+                    value: "a".into(),
+                    flags: StringLiteralFlags::default(),
+                },
+                ast::StringLiteral {
+                    range: TextRange::default(),
+                    value: "b".into(),
+                    flags: StringLiteralFlags::default(),
+                },
+            ]),
+        }
+        .into();
+        let string_expr: ast::Expr = ast::ExprStringLiteral {
+            range: TextRange::default(),
+            value: ast::StringLiteralValue::single(ast::StringLiteral {
+                range: TextRange::default(),
+                value: "ab".into(),
+                flags: StringLiteralFlags::default(),
+            }),
+        }
+        .into();
+
+        assert_eq!(
+            ComparableExpr::from(&concatenated_string_expr),
+            ComparableExpr::from(&string_expr)
+        );
+    }
+}
