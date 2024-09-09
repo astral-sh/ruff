@@ -11,7 +11,7 @@ FURB188.py:7:5: FURB188 [*] Prefer `removesuffix` over conditionally replacing w
  9 |   
 10 |       return filename
    |
-   = help: Use `removesuffix` instead of assignment conditional upon `endswith`.
+   = help: Use removesuffix instead of assignment conditional upon endswith.
 
 ℹ Safe fix
 4 4 | # these should match
@@ -34,7 +34,7 @@ FURB188.py:14:5: FURB188 [*] Prefer `removesuffix` over conditionally replacing 
 16 |   
 17 |       return filename
    |
-   = help: Use `removesuffix` instead of assignment conditional upon `endswith`.
+   = help: Use removesuffix instead of assignment conditional upon endswith.
 
 ℹ Safe fix
 11 11 | 
@@ -53,7 +53,7 @@ FURB188.py:21:12: FURB188 [*] Prefer `removesuffix` over conditionally replacing
 21 |     return filename[:-4] if filename.endswith(".txt") else filename
    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB188
    |
-   = help: Use `removesuffix` instead of ternary expression conditional upon `endswith`.
+   = help: Use removesuffix instead of ternary expression conditional upon endswith.
 
 ℹ Safe fix
 18 18 | 
@@ -71,7 +71,7 @@ FURB188.py:25:12: FURB188 [*] Prefer `removesuffix` over conditionally replacing
 25 |     return filename[:-len(extension)] if filename.endswith(extension) else filename
    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB188
    |
-   = help: Use `removesuffix` instead of ternary expression conditional upon `endswith`.
+   = help: Use removesuffix instead of ternary expression conditional upon endswith.
 
 ℹ Safe fix
 22 22 | 
@@ -89,7 +89,7 @@ FURB188.py:29:12: FURB188 [*] Prefer `removeprefix` over conditionally replacing
 29 |     return filename[4:] if filename.startswith("abc-") else filename
    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB188
    |
-   = help: Use `removeprefix` instead of ternary expression conditional upon `startswith`.
+   = help: Use removeprefix instead of ternary expression conditional upon startswith.
 
 ℹ Safe fix
 26 26 | 
@@ -107,7 +107,7 @@ FURB188.py:33:12: FURB188 [*] Prefer `removeprefix` over conditionally replacing
 33 |     return filename[len(prefix):] if filename.startswith(prefix) else filename
    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB188
    |
-   = help: Use `removeprefix` instead of ternary expression conditional upon `startswith`.
+   = help: Use removeprefix instead of ternary expression conditional upon startswith.
 
 ℹ Safe fix
 30 30 | 
@@ -128,7 +128,7 @@ FURB188.py:146:9: FURB188 [*] Prefer `removesuffix` over conditionally replacing
 147 | 
 148 | def remove_prefix_comparable_literal_expr() -> None:
     |
-    = help: Use `removesuffix` instead of ternary expression conditional upon `endswith`.
+    = help: Use removesuffix instead of ternary expression conditional upon endswith.
 
 ℹ Safe fix
 143 143 | 
@@ -145,8 +145,10 @@ FURB188.py:149:12: FURB188 [*] Prefer `removeprefix` over conditionally replacin
 148 | def remove_prefix_comparable_literal_expr() -> None:
 149 |     return ("abc" "def")[3:] if ("abc" "def").startswith("abc") else "abc" "def"
     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB188
+150 | 
+151 | def shadow_builtins(filename: str, extension: str) -> None:
     |
-    = help: Use `removeprefix` instead of ternary expression conditional upon `startswith`.
+    = help: Use removeprefix instead of ternary expression conditional upon startswith.
 
 ℹ Safe fix
 146 146 |     x = foo.bar.baz[:-len(SUFFIX)] if foo.bar.baz.endswith(SUFFIX) else foo.bar.baz
@@ -154,3 +156,22 @@ FURB188.py:149:12: FURB188 [*] Prefer `removeprefix` over conditionally replacin
 148 148 | def remove_prefix_comparable_literal_expr() -> None:
 149     |-    return ("abc" "def")[3:] if ("abc" "def").startswith("abc") else "abc" "def"
     149 |+    return "abc" "def".removeprefix("abc")
+150 150 | 
+151 151 | def shadow_builtins(filename: str, extension: str) -> None:
+152 152 |     from builtins import len as builtins_len
+
+FURB188.py:154:12: FURB188 [*] Prefer `removesuffix` over conditionally replacing with slice.
+    |
+152 |     from builtins import len as builtins_len
+153 | 
+154 |     return filename[:-builtins_len(extension)] if filename.endswith(extension) else filename
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB188
+    |
+    = help: Use removesuffix instead of ternary expression conditional upon endswith.
+
+ℹ Safe fix
+151 151 | def shadow_builtins(filename: str, extension: str) -> None:
+152 152 |     from builtins import len as builtins_len
+153 153 | 
+154     |-    return filename[:-builtins_len(extension)] if filename.endswith(extension) else filename
+    154 |+    return filename.removesuffix(extension)
