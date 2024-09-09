@@ -645,8 +645,7 @@ where
 
                 let after_subject = self.flow_snapshot();
                 let Some((first, remaining)) = cases.split_first() else {
-                    // TODO: In case of error recovery, we should not panic here
-                    unreachable!("Match statement must have at least one case block");
+                    return;
                 };
                 self.add_pattern_constraint(subject, &first.pattern);
                 self.visit_match_case(first);
