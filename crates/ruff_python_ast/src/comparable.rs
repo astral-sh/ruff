@@ -780,7 +780,7 @@ pub struct ExprFString<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprStringLiteral<'a> {
-    parts: Vec<ComparableStringLiteral<'a>>,
+    value: ComparableStringLiteral<'a>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -1024,7 +1024,9 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
             }
             ast::Expr::StringLiteral(ast::ExprStringLiteral { value, range: _ }) => {
                 Self::StringLiteral(ExprStringLiteral {
-                    parts: value.iter().map(Into::into).collect(),
+                    value: ComparableStringLiteral {
+                        value: value.to_str(),
+                    },
                 })
             }
             ast::Expr::BytesLiteral(ast::ExprBytesLiteral { value, range: _ }) => {
