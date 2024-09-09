@@ -5,6 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "ruff-ecosystem"
 version = "0.0.0"
+requires-python = ">=3.11"
 dependencies = ["unidiff==0.7.5", "tomli_w==1.0.0", "tomli==2.0.1"]
 
 [project.scripts]
