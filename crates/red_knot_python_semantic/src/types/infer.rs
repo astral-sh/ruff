@@ -4414,15 +4414,10 @@ mod tests {
     }
 
     #[test]
-    fn comprehension_with_not_iterable_iter() -> anyhow::Result<()> {
+    fn comprehension_with_unbound_iter() -> anyhow::Result<()> {
         let mut db = setup_db();
 
-        db.write_dedented(
-            "src/a.py",
-            "
-            [z for z in x]
-            ",
-        )?;
+        db.write_dedented("src/a.py", "[z for z in x]")?;
 
         assert_scope_ty(&db, "src/a.py", &["<listcomp>"], "x", "Unbound");
 
@@ -4515,6 +4510,41 @@ mod tests {
         assert_scope_ty(&db, "src/a.py", &["foo", "<dictcomp>"], "x", "int");
         assert_file_diagnostics(&db, "src/a.py", &[]);
 
+        Ok(())
+    }
+
+    #[test]
+    fn comprehension_with_missing_in_keyword() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            def foo():
+                [z for z IntIterable()]
+
+            class IntIterator:
+                def __next__(self) -> int:
+                    return 42
+
+            class IntIterable:
+                def __iter__(self) -> IntIterator:
+                    return IntIterator()
+            ",
+        )?;
+
+        // We'll emit a diagnostic separately for invalid syntax,
+        // but it's reasonably clear here what they *meant* to write,
+        // so we'll still infer the correct type:
+        assert_scope_ty(&db, "src/a.py", &["foo", "<listcomp>"], "z", "int");
+        Ok(())
+    }
+
+    #[test]
+    fn comprehension_with_missing_in_keyword_and_missing_iter() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented("src/a.py", "[z for z]")?;
+        assert_scope_ty(&db, "src/a.py", &["<listcomp>"], "z", "Unknown");
         Ok(())
     }
 
