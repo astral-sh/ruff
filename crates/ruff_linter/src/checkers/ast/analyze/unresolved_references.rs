@@ -41,10 +41,7 @@ pub(crate) fn unresolved_references(checker: &mut Checker) {
                 checker.diagnostics.push(Diagnostic::new(
                     pyflakes::rules::UndefinedName {
                         name: symbol_name.to_string(),
-                        minor_version_builtin_added: version_builtin_was_added(
-                            symbol_name,
-                            checker.settings.target_version.minor(),
-                        ),
+                        minor_version_builtin_added: version_builtin_was_added(symbol_name),
                     },
                     reference.range(),
                 ));

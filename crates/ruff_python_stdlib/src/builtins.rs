@@ -371,23 +371,16 @@ pub fn is_python_builtin(name: &str, minor_version: u8, is_notebook: bool) -> bo
 }
 
 /// Return `Some(version)`, where `version` corresponds to the Python minor version
-/// in which the builtin was added, if `name` corresponds to a Python builtin that
-/// was added in a later Python version than the one which the user specified in
-/// their Ruff config. Otherwise, return `None`.
-///
-/// This is useful in some situations to give a better error message
-/// if the user didn't specify a target version at all (in which case we will default
-/// to Python 3.8).
-pub fn version_builtin_was_added(name: &str, minor_version: u8) -> Option<u8> {
-    if minor_version < 10 {
-        (PY310_PLUS_BUILTINS.contains(&name)
-            || PY311_PLUS_BUILTINS.contains(&name)
-            || PY313_PLUS_BUILTINS.contains(&name))
-        .then_some(10)
-    } else if minor_version < 11 {
-        (PY311_PLUS_BUILTINS.contains(&name) || PY313_PLUS_BUILTINS.contains(&name)).then_some(11)
-    } else if minor_version < 13 {
-        PY313_PLUS_BUILTINS.contains(&name).then_some(13)
+/// in which the builtin was added
+pub fn version_builtin_was_added(name: &str) -> Option<u8> {
+    if PY310_PLUS_BUILTINS.contains(&name) {
+        Some(10)
+    } else if PY311_PLUS_BUILTINS.contains(&name) {
+        Some(11)
+    } else if PY313_PLUS_BUILTINS.contains(&name) {
+        Some(13)
+    } else if ALWAYS_AVAILABLE_BUILTINS.contains(&name) {
+        Some(0)
     } else {
         None
     }
