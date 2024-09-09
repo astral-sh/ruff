@@ -1,4 +1,4 @@
-import Editor from "@monaco-editor/react";
+import MonacoEditor from "@monaco-editor/react";
 import { Theme } from "./theme";
 
 export enum SecondaryTool {
@@ -72,7 +72,7 @@ function Content({
         }
 
         return (
-          <Editor
+          <MonacoEditor
             options={{
               readOnly: true,
               minimap: { enabled: false },
