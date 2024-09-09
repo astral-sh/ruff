@@ -86,6 +86,23 @@ impl std::fmt::Display for DisplayRepresentation<'_> {
 
                 escape.bytes_repr().write(f)
             }
+            Type::Tuple(tuple) => {
+                f.write_str("tuple[")?;
+                let elements = tuple.elements(self.db);
+                if elements.is_empty() {
+                    f.write_str("()")?;
+                } else {
+                    let mut first = true;
+                    for element in tuple.elements(self.db) {
+                        if !first {
+                            f.write_str(", ")?;
+                        }
+                        first = false;
+                        element.display(self.db).fmt(f)?;
+                    }
+                }
+                f.write_str("]")
+            }
         }
     }
 }
