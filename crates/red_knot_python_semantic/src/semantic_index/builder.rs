@@ -689,6 +689,7 @@ where
                                     iterable: &node.iter,
                                     target: name_node,
                                     first,
+                                    is_async: node.is_async,
                                 },
                             );
                         }
