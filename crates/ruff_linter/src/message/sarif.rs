@@ -1,9 +1,9 @@
+use std::collections::HashSet;
 use std::io::Write;
 
 use anyhow::Result;
 use serde::{Serialize, Serializer};
 use serde_json::json;
-use strum::IntoEnumIterator;
 
 use ruff_source_file::OneIndexed;
 
@@ -27,6 +27,10 @@ impl Emitter for SarifEmitter {
             .map(SarifResult::from_message)
             .collect::<Result<Vec<_>>>()?;
 
+        let unique_rules: HashSet<_> = results.iter().filter_map(|result| result.rule).collect();
+        let mut rules: Vec<SarifRule> = unique_rules.into_iter().map(SarifRule::from).collect();
+        rules.sort_by(|a, b| a.code.cmp(&b.code));
+
         let output = json!({
             "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
             "version": "2.1.0",
@@ -35,7 +39,7 @@ impl Emitter for SarifEmitter {
                     "driver": {
                         "name": "ruff",
                         "informationUri": "https://github.com/astral-sh/ruff",
-                        "rules": Rule::iter().map(SarifRule::from).collect::<Vec<_>>(),
+                        "rules": rules,
                         "version": VERSION.to_string(),
                     }
                 },
@@ -216,9 +220,23 @@ mod tests {
         let results = sarif["runs"][0]["results"].as_array().unwrap();
         assert_eq!(results.len(), 3);
         assert_eq!(
-            results[0]["message"]["text"].as_str().unwrap(),
-            "`os` imported but unused"
+            results
+                .iter()
+                .map(|r| r["message"]["text"].as_str().unwrap())
+                .collect::<Vec<_>>(),
+            vec![
+                "`os` imported but unused",
+                "Local variable `x` is assigned to but never used",
+                "Undefined name `a`",
+            ]
         );
-        assert!(rules.len() > 3);
+        assert_eq!(rules.len(), 3);
+        assert_eq!(
+            rules
+                .iter()
+                .map(|r| r["id"].as_str().unwrap())
+                .collect::<Vec<_>>(),
+            vec!["F401", "F821", "F841"],
+        );
     }
 }
