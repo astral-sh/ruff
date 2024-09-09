@@ -26,6 +26,7 @@ use crate::semantic_index::use_def::{FlowSnapshot, UseDefMapBuilder};
 use crate::semantic_index::SemanticIndex;
 use crate::Db;
 
+use super::constraint::{Constraint, PatternConstraint};
 use super::definition::{MatchPatternDefinitionNodeRef, WithItemDefinitionNodeRef};
 
 pub(super) struct SemanticIndexBuilder<'db> {
@@ -204,11 +205,37 @@ impl<'db> SemanticIndexBuilder<'db> {
         definition
     }
 
-    fn add_constraint(&mut self, constraint_node: &ast::Expr) -> Expression<'db> {
+    fn add_expression_constraint(&mut self, constraint_node: &ast::Expr) -> Expression<'db> {
         let expression = self.add_standalone_expression(constraint_node);
-        self.current_use_def_map_mut().record_constraint(expression);
+        self.current_use_def_map_mut()
+            .record_constraint(Constraint::Expression(expression));
 
         expression
+    }
+
+    fn add_pattern_constraint(
+        &mut self,
+        subject: &ast::Expr,
+        pattern: &ast::Pattern,
+    ) -> PatternConstraint<'db> {
+        #[allow(unsafe_code)]
+        let (subject, pattern) = unsafe {
+            (
+                AstNodeRef::new(self.module.clone(), subject),
+                AstNodeRef::new(self.module.clone(), pattern),
+            )
+        };
+        let pattern_constraint = PatternConstraint::new(
+            self.db,
+            self.file,
+            self.current_scope(),
+            subject,
+            pattern,
+            countme::Count::default(),
+        );
+        self.current_use_def_map_mut()
+            .record_constraint(Constraint::Pattern(pattern_constraint));
+        pattern_constraint
     }
 
     /// Record an expression that needs to be a Salsa ingredient, because we need to infer its type
@@ -523,7 +550,7 @@ where
             ast::Stmt::If(node) => {
                 self.visit_expr(&node.test);
                 let pre_if = self.flow_snapshot();
-                self.add_constraint(&node.test);
+                self.add_expression_constraint(&node.test);
                 self.visit_body(&node.body);
                 let mut post_clauses: Vec<FlowSnapshot> = vec![];
                 for clause in &node.elif_else_clauses {
@@ -615,8 +642,29 @@ where
             }) => {
                 self.add_standalone_expression(subject);
                 self.visit_expr(subject);
-                for case in cases {
+
+                let after_subject = self.flow_snapshot();
+                let Some((first, remaining)) = cases.split_first() else {
+                    return;
+                };
+                self.add_pattern_constraint(subject, &first.pattern);
+                self.visit_match_case(first);
+
+                let mut post_case_snapshots = vec![];
+                for case in remaining {
+                    post_case_snapshots.push(self.flow_snapshot());
+                    self.flow_restore(after_subject.clone());
+                    self.add_pattern_constraint(subject, &case.pattern);
                     self.visit_match_case(case);
+                }
+                for post_clause_state in post_case_snapshots {
+                    self.flow_merge(post_clause_state);
+                }
+                if !cases
+                    .last()
+                    .is_some_and(|case| case.guard.is_none() && case.pattern.is_wildcard())
+                {
+                    self.flow_merge(after_subject);
                 }
             }
             _ => {

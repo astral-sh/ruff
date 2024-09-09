@@ -3501,6 +3501,65 @@ mod tests {
     }
 
     #[test]
+    fn match_with_wildcard() {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            match 0:
+                case 1:
+                    y = 2
+                case _:
+                    y = 3
+",
+        )
+        .unwrap();
+
+        assert_public_ty(&db, "src/a.py", "y", "Literal[2, 3]");
+    }
+
+    #[test]
+    fn match_without_wildcard() {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            match 0:
+                case 1:
+                    y = 2
+                case 2:
+                    y = 3
+",
+        )
+        .unwrap();
+
+        assert_public_ty(&db, "src/a.py", "y", "Unbound | Literal[2, 3]");
+    }
+
+    #[test]
+    fn match_stmt() {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            y = 1
+            y = 2
+            match 0:
+                case 1:
+                    y = 3
+                case 2:
+                    y = 4
+",
+        )
+        .unwrap();
+
+        assert_public_ty(&db, "src/a.py", "y", "Literal[2, 3, 4]");
+    }
+
+    #[test]
     fn import_cycle() -> anyhow::Result<()> {
         let mut db = setup_db();
 
@@ -3812,6 +3871,33 @@ mod tests {
         assert_public_ty(&db, "/src/a.py", "y", "Literal[0, 1]");
 
         Ok(())
+    }
+
+    #[test]
+    fn narrow_singleton_pattern() {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            x = None if flag else 1
+            y = 0
+            match x:
+                case None:
+                    y = x
+            ",
+        )
+        .unwrap();
+
+        // TODO: The correct inferred type should be `Literal[0] | None` but currently the
+        // simplification logic doesn't account for this. The final type with parenthesis:
+        // `Literal[0] | None | (Literal[1] & None)`
+        assert_public_ty(
+            &db,
+            "/src/a.py",
+            "y",
+            "Literal[0] | None | Literal[1] & None",
+        );
     }
 
     #[test]
