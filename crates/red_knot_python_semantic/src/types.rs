@@ -365,7 +365,7 @@ impl<'db> Type<'db> {
                 Type::Unknown
             }
             Type::Tuple(_) => {
-                // TODO: defer to `typing.Tuple` / `builtins.tuple` methods from typeshed's stubs
+                // TODO: defer to `builtins.tuple` methods from typeshed's stubs
                 Type::Unknown
             }
         }
