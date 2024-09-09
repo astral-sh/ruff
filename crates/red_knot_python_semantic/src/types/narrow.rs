@@ -184,8 +184,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                 ast::Singleton::True => Type::BooleanLiteral(true),
                 ast::Singleton::False => Type::BooleanLiteral(false),
             };
-            let constraint = IntersectionBuilder::new(self.db).add_positive(ty).build();
-            self.constraints.insert(symbol, constraint);
+            self.constraints.insert(symbol, ty);
         }
     }
 }

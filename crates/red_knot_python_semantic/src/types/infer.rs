@@ -3874,7 +3874,7 @@ mod tests {
 
         // TODO: The correct inferred type should be `Literal[0] | None` but currently the
         // simplification logic doesn't account for this. The final type with parenthesis:
-        // `Literal[0] | (None | Literal[1] & None)`
+        // `Literal[0] | None | (Literal[1] & None)`
         assert_public_ty(
             &db,
             "/src/a.py",
