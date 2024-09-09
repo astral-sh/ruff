@@ -25,23 +25,23 @@ pub(crate) fn from_tokens(
 ) {
     let mut has_any_shebang = false;
     for range in comment_ranges {
-        let comment = locator.slice(*range);
+        let comment = locator.slice(range);
         if let Some(shebang) = ShebangDirective::try_extract(comment) {
             has_any_shebang = true;
 
-            if let Some(diagnostic) = shebang_missing_python(*range, &shebang) {
+            if let Some(diagnostic) = shebang_missing_python(range, &shebang) {
                 diagnostics.push(diagnostic);
             }
 
-            if let Some(diagnostic) = shebang_not_executable(path, *range) {
+            if let Some(diagnostic) = shebang_not_executable(path, range) {
                 diagnostics.push(diagnostic);
             }
 
-            if let Some(diagnostic) = shebang_leading_whitespace(*range, locator) {
+            if let Some(diagnostic) = shebang_leading_whitespace(range, locator) {
                 diagnostics.push(diagnostic);
             }
 
-            if let Some(diagnostic) = shebang_not_first_line(*range, locator) {
+            if let Some(diagnostic) = shebang_not_first_line(range, locator) {
                 diagnostics.push(diagnostic);
             }
         }

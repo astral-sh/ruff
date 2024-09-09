@@ -2,7 +2,7 @@
  * Editor for the settings JSON.
  */
 
-import Editor, { useMonaco } from "@monaco-editor/react";
+import MonacoEditor, { useMonaco } from "@monaco-editor/react";
 import { useCallback, useEffect } from "react";
 import schema from "../../../ruff.schema.json";
 import { Theme } from "./theme";
@@ -39,7 +39,7 @@ export default function SettingsEditor({
     [onChange],
   );
   return (
-    <Editor
+    <MonacoEditor
       options={{
         readOnly: false,
         minimap: { enabled: false },

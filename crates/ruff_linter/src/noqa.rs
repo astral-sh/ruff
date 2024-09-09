@@ -361,7 +361,7 @@ impl<'a> FileNoqaDirectives<'a> {
         let mut lines = vec![];
 
         for range in comment_ranges {
-            match ParsedFileExemption::try_extract(&contents[*range]) {
+            match ParsedFileExemption::try_extract(&contents[range]) {
                 Err(err) => {
                     #[allow(deprecated)]
                     let line = locator.compute_line_index(range.start());
@@ -403,7 +403,7 @@ impl<'a> FileNoqaDirectives<'a> {
                     };
 
                     lines.push(FileNoqaDirectiveLine {
-                        range: *range,
+                        range,
                         parsed_file_exemption: exemption,
                         matches,
                     });
@@ -922,7 +922,7 @@ impl<'a> NoqaDirectives<'a> {
         let mut directives = Vec::new();
 
         for range in comment_ranges {
-            match Directive::try_extract(locator.slice(*range), range.start()) {
+            match Directive::try_extract(locator.slice(range), range.start()) {
                 Err(err) => {
                     #[allow(deprecated)]
                     let line = locator.compute_line_index(range.start());

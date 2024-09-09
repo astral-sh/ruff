@@ -50,6 +50,13 @@ a = 10.0
 
 val = Decimal(a)
 
+# See https://github.com/astral-sh/ruff/issues/13258
+val = Decimal(~4.0) # Skip
+
+val = Decimal(++4.0) # Suggest `Decimal("4.0")`
+
+val = Decimal(-+--++--4.0) # Suggest `Decimal("-4.0")` 
+
 
 # Tests with shadowed name
 class Decimal():

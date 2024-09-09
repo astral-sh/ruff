@@ -425,6 +425,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     definition,
                 );
             }
+            DefinitionKind::ExceptHandler(handler) => {
+                self.infer_except_handler_definition(handler, definition);
+            }
         }
     }
 
@@ -743,11 +746,29 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = try_statement;
 
         self.infer_body(body);
+
         for handler in handlers {
             let ast::ExceptHandler::ExceptHandler(handler) = handler;
-            self.infer_optional_expression(handler.type_.as_deref());
-            self.infer_body(&handler.body);
+            let ast::ExceptHandlerExceptHandler {
+                type_: handled_exceptions,
+                name: symbol_name,
+                body,
+                range: _,
+            } = handler;
+
+            // If `symbol_name` is `Some()` and `handled_exceptions` is `None`,
+            // it's invalid syntax (something like `except as e:`).
+            // However, it's obvious that the user *wanted* `e` to be bound here,
+            // so we'll have created a definition in the semantic-index stage anyway.
+            if symbol_name.is_some() {
+                self.infer_definition(handler);
+            } else {
+                self.infer_optional_expression(handled_exceptions.as_deref());
+            }
+
+            self.infer_body(body);
         }
+
         self.infer_body(orelse);
         self.infer_body(finalbody);
     }
@@ -795,6 +816,29 @@ impl<'db> TypeInferenceBuilder<'db> {
             .expressions
             .insert(target.scoped_ast_id(self.db, self.scope), context_expr_ty);
         self.types.definitions.insert(definition, context_expr_ty);
+    }
+
+    fn infer_except_handler_definition(
+        &mut self,
+        handler: &'db ast::ExceptHandlerExceptHandler,
+        definition: Definition<'db>,
+    ) {
+        let node_ty = handler
+            .type_
+            .as_deref()
+            .map(|ty| self.infer_expression(ty))
+            .unwrap_or(Type::Unknown);
+
+        // TODO: anything that's a consistent subtype of
+        // `type[BaseException] | tuple[type[BaseException], ...]` should be valid;
+        // anything else should be invalid --Alex
+        let symbol_ty = match node_ty {
+            Type::Any | Type::Unknown => node_ty,
+            Type::Class(class_ty) => Type::Instance(class_ty),
+            _ => Type::Unknown,
+        };
+
+        self.types.definitions.insert(definition, symbol_ty);
     }
 
     fn infer_match_statement(&mut self, match_statement: &ast::StmtMatch) {
@@ -1426,13 +1470,14 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_string_literal_expression(&mut self, literal: &ast::ExprStringLiteral) -> Type<'db> {
-        let value = if literal.value.len() <= Self::MAX_STRING_LITERAL_SIZE {
-            literal.value.to_str().into()
+        if literal.value.len() <= Self::MAX_STRING_LITERAL_SIZE {
+            Type::StringLiteral(StringLiteralType::new(
+                self.db,
+                literal.value.to_str().into(),
+            ))
         } else {
-            Box::default()
-        };
-
-        Type::StringLiteral(StringLiteralType::new(self.db, value))
+            Type::LiteralString
+        }
     }
 
     fn infer_bytes_literal_expression(&mut self, literal: &ast::ExprBytesLiteral) -> Type<'db> {
@@ -2041,12 +2086,22 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             (Type::StringLiteral(lhs), Type::StringLiteral(rhs), ast::Operator::Add) => {
-                Type::StringLiteral(StringLiteralType::new(self.db, {
-                    let lhs_value = lhs.value(self.db).to_string();
-                    let rhs_value = rhs.value(self.db).as_ref();
-                    (lhs_value + rhs_value).into()
-                }))
+                let lhs_value = lhs.value(self.db).to_string();
+                let rhs_value = rhs.value(self.db).as_ref();
+                if lhs_value.len() + rhs_value.len() <= Self::MAX_STRING_LITERAL_SIZE {
+                    Type::StringLiteral(StringLiteralType::new(self.db, {
+                        (lhs_value + rhs_value).into()
+                    }))
+                } else {
+                    Type::LiteralString
+                }
             }
+
+            (
+                Type::StringLiteral(_) | Type::LiteralString,
+                Type::StringLiteral(_) | Type::LiteralString,
+                ast::Operator::Add,
+            ) => Type::LiteralString,
 
             (Type::StringLiteral(s), Type::IntLiteral(n), ast::Operator::Mult)
             | (Type::IntLiteral(n), Type::StringLiteral(s), ast::Operator::Mult) => {
@@ -2061,6 +2116,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                     } else {
                         Type::LiteralString
                     }
+                } else {
+                    Type::LiteralString
+                }
+            }
+
+            (Type::LiteralString, Type::IntLiteral(n), ast::Operator::Mult)
+            | (Type::IntLiteral(n), Type::LiteralString, ast::Operator::Mult) => {
+                if n < 1 {
+                    Type::StringLiteral(StringLiteralType::new(self.db, Box::default()))
                 } else {
                     Type::LiteralString
                 }
@@ -2888,6 +2952,70 @@ mod tests {
         assert_public_ty(&db, "src/a.py", "z", "LiteralString");
         assert_public_ty(&db, "src/a.py", "a", r#"Literal[""]"#);
         assert_public_ty(&db, "src/a.py", "b", r#"Literal[""]"#);
+
+        Ok(())
+    }
+
+    #[test]
+    fn multiplied_literal_string() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        let content = format!(
+            r#"
+        v = "{y}"
+        w = 10*"{y}"
+        x = "{y}"*10
+        z = 0*"{y}"
+        u = (-100)*"{y}"
+        "#,
+            y = "a".repeat(TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE + 1),
+        );
+        db.write_dedented("src/a.py", &content)?;
+
+        assert_public_ty(&db, "src/a.py", "v", "LiteralString");
+        assert_public_ty(&db, "src/a.py", "w", "LiteralString");
+        assert_public_ty(&db, "src/a.py", "x", "LiteralString");
+        assert_public_ty(&db, "src/a.py", "z", r#"Literal[""]"#);
+        assert_public_ty(&db, "src/a.py", "u", r#"Literal[""]"#);
+        Ok(())
+    }
+
+    #[test]
+    fn truncated_string_literals_become_literal_string() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        let content = format!(
+            r#"
+        w = "{y}"
+        x = "a" + "{z}"
+        "#,
+            y = "a".repeat(TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE + 1),
+            z = "a".repeat(TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE),
+        );
+        db.write_dedented("src/a.py", &content)?;
+
+        assert_public_ty(&db, "src/a.py", "w", "LiteralString");
+        assert_public_ty(&db, "src/a.py", "x", "LiteralString");
+
+        Ok(())
+    }
+
+    #[test]
+    fn adding_string_literals_and_literal_string() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        let content = format!(
+            r#"
+        v = "{y}"
+        w = "{y}" + "a"
+        x = "a" + "{y}"
+        z = "{y}" + "{y}"
+        "#,
+            y = "a".repeat(TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE + 1),
+        );
+        db.write_dedented("src/a.py", &content)?;
+
+        assert_public_ty(&db, "src/a.py", "v", "LiteralString");
+        assert_public_ty(&db, "src/a.py", "w", "LiteralString");
+        assert_public_ty(&db, "src/a.py", "x", "LiteralString");
+        assert_public_ty(&db, "src/a.py", "z", "LiteralString");
 
         Ok(())
     }
@@ -4092,6 +4220,108 @@ mod tests {
 
         // TODO(Alex) async iterables/iterators!
         assert_scope_ty(&db, "src/a.py", &["foo"], "x", "Unknown");
+
+        Ok(())
+    }
+
+    #[test]
+    fn except_handler_single_exception() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            import re
+
+            try:
+                x
+            except NameError as e:
+                pass
+            except re.error as f:
+                pass
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "e", "NameError");
+        assert_public_ty(&db, "src/a.py", "f", "error");
+        assert_file_diagnostics(&db, "src/a.py", &[]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn unknown_type_in_except_handler_does_not_cause_spurious_diagnostic() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            from nonexistent_module import foo
+
+            try:
+                x
+            except foo as e:
+                pass
+            ",
+        )?;
+
+        assert_file_diagnostics(
+            &db,
+            "src/a.py",
+            &["Cannot resolve import 'nonexistent_module'."],
+        );
+        assert_public_ty(&db, "src/a.py", "foo", "Unknown");
+        assert_public_ty(&db, "src/a.py", "e", "Unknown");
+
+        Ok(())
+    }
+
+    #[test]
+    fn except_handler_multiple_exceptions() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            EXCEPTIONS = (AttributeError, TypeError)
+
+            try:
+                x
+            except (RuntimeError, OSError) as e:
+                pass
+            except EXCEPTIONS as f:
+                pass
+            ",
+        )?;
+
+        assert_file_diagnostics(&db, "src/a.py", &[]);
+
+        // For these TODOs we need support for `tuple` types:
+
+        // TODO: Should be `RuntimeError | OSError` --Alex
+        assert_public_ty(&db, "src/a.py", "e", "Unknown");
+        // TODO: Should be `AttributeError | TypeError` --Alex
+        assert_public_ty(&db, "src/a.py", "e", "Unknown");
+
+        Ok(())
+    }
+
+    #[test]
+    fn exception_handler_with_invalid_syntax() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            try:
+                x
+            except as e:
+                pass
+            ",
+        )?;
+
+        assert_file_diagnostics(&db, "src/a.py", &[]);
+        assert_public_ty(&db, "src/a.py", "e", "Unknown");
 
         Ok(())
     }

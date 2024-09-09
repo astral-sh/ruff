@@ -33,7 +33,6 @@ static EXPECTED_DIAGNOSTICS: &[&str] = &[
     "Use double quotes for strings",
     "Use double quotes for strings",
     "Use double quotes for strings",
-    "/src/tomllib/_parser.py:628:75: Name 'e' used when not defined.",
 ];
 
 fn get_test_file(name: &str) -> TestFile {

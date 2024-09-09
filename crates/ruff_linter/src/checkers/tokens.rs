@@ -63,7 +63,7 @@ pub(crate) fn check_tokens(
             ruff::rules::ambiguous_unicode_character_comment(
                 &mut diagnostics,
                 locator,
-                *range,
+                range,
                 settings,
             );
         }

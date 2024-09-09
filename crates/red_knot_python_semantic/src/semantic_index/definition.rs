@@ -50,6 +50,7 @@ pub(crate) enum DefinitionNodeRef<'a> {
     Parameter(ast::AnyParameterRef<'a>),
     WithItem(WithItemDefinitionNodeRef<'a>),
     MatchPattern(MatchPatternDefinitionNodeRef<'a>),
+    ExceptHandler(&'a ast::ExceptHandlerExceptHandler),
 }
 
 impl<'a> From<&'a ast::StmtFunctionDef> for DefinitionNodeRef<'a> {
@@ -127,6 +128,12 @@ impl<'a> From<ast::AnyParameterRef<'a>> for DefinitionNodeRef<'a> {
 impl<'a> From<MatchPatternDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
     fn from(node: MatchPatternDefinitionNodeRef<'a>) -> Self {
         Self::MatchPattern(node)
+    }
+}
+
+impl<'a> From<&'a ast::ExceptHandlerExceptHandler> for DefinitionNodeRef<'a> {
+    fn from(node: &'a ast::ExceptHandlerExceptHandler) -> Self {
+        Self::ExceptHandler(node)
     }
 }
 
@@ -248,6 +255,9 @@ impl DefinitionNodeRef<'_> {
                 identifier: AstNodeRef::new(parsed, identifier),
                 index,
             }),
+            DefinitionNodeRef::ExceptHandler(handler) => {
+                DefinitionKind::ExceptHandler(AstNodeRef::new(parsed, handler))
+            }
         }
     }
 
@@ -280,6 +290,7 @@ impl DefinitionNodeRef<'_> {
             Self::MatchPattern(MatchPatternDefinitionNodeRef { identifier, .. }) => {
                 identifier.into()
             }
+            Self::ExceptHandler(handler) => handler.into(),
         }
     }
 }
@@ -300,6 +311,7 @@ pub enum DefinitionKind {
     ParameterWithDefault(AstNodeRef<ast::ParameterWithDefault>),
     WithItem(WithItemDefinitionKind),
     MatchPattern(MatchPatternDefinitionKind),
+    ExceptHandler(AstNodeRef<ast::ExceptHandlerExceptHandler>),
 }
 
 #[derive(Clone, Debug)]
@@ -476,5 +488,11 @@ impl From<&ast::ParameterWithDefault> for DefinitionNodeKey {
 impl From<&ast::Identifier> for DefinitionNodeKey {
     fn from(identifier: &ast::Identifier) -> Self {
         Self(NodeKey::from_node(identifier))
+    }
+}
+
+impl From<&ast::ExceptHandlerExceptHandler> for DefinitionNodeKey {
+    fn from(handler: &ast::ExceptHandlerExceptHandler) -> Self {
+        Self(NodeKey::from_node(handler))
     }
 }

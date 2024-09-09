@@ -7,8 +7,9 @@ import json
 import re
 import shutil
 import subprocess
+from collections.abc import Sequence
 from pathlib import Path
-from typing import NamedTuple, Sequence
+from typing import NamedTuple
 
 import mdformat
 import yaml

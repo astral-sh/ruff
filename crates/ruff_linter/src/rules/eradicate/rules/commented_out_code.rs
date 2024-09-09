@@ -55,7 +55,7 @@ pub(crate) fn commented_out_code(
 
     // Iterate over all comments in the document.
     for range in comment_ranges {
-        let line = locator.lines(*range);
+        let line = locator.lines(range);
 
         // Detect `/// script` tags.
         if in_script_tag {
@@ -75,9 +75,9 @@ pub(crate) fn commented_out_code(
 
         // Verify that the comment is on its own line, and that it contains code.
         if is_own_line_comment(line) && comment_contains_code(line, &settings.task_tags[..]) {
-            let mut diagnostic = Diagnostic::new(CommentedOutCode, *range);
+            let mut diagnostic = Diagnostic::new(CommentedOutCode, range);
             diagnostic.set_fix(Fix::display_only_edit(Edit::range_deletion(
-                locator.full_lines_range(*range),
+                locator.full_lines_range(range),
             )));
             diagnostics.push(diagnostic);
         }

@@ -569,24 +569,16 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, File, Mod
 
                 package_path.push(module_name);
 
-                // Must be a `__init__.pyi` or `__init__.py` or it isn't a package.
-                let kind = if package_path.is_directory(&resolver_state) {
-                    package_path.push("__init__");
-                    ModuleKind::Package
-                } else {
-                    ModuleKind::Module
-                };
-
-                // TODO Implement full https://peps.python.org/pep-0561/#type-checker-module-resolution-order resolution
-                if let Some(stub) = package_path.with_pyi_extension().to_file(&resolver_state) {
-                    return Some((search_path.clone(), stub, kind));
+                // Check for a regular package first (highest priority)
+                package_path.push("__init__");
+                if let Some(regular_package) = resolve_file_module(&package_path, &resolver_state) {
+                    return Some((search_path.clone(), regular_package, ModuleKind::Package));
                 }
 
-                if let Some(module) = package_path
-                    .with_py_extension()
-                    .and_then(|path| path.to_file(&resolver_state))
-                {
-                    return Some((search_path.clone(), module, kind));
+                // Check for a file module next
+                package_path.pop();
+                if let Some(file_module) = resolve_file_module(&package_path, &resolver_state) {
+                    return Some((search_path.clone(), file_module, ModuleKind::Module));
                 }
 
                 // For regular packages, don't search the next search path. All files of that
@@ -605,6 +597,23 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, File, Mod
     }
 
     None
+}
+
+/// If `module` exists on disk with either a `.pyi` or `.py` extension,
+/// return the [`File`] corresponding to that path.
+///
+/// `.pyi` files take priority, as they always have priority when
+/// resolving modules.
+fn resolve_file_module(module: &ModulePath, resolver_state: &ResolverContext) -> Option<File> {
+    // Stubs have precedence over source files
+    module
+        .with_pyi_extension()
+        .to_file(resolver_state)
+        .or_else(|| {
+            module
+                .with_py_extension()
+                .and_then(|path| path.to_file(resolver_state))
+        })
 }
 
 fn resolve_package<'a, 'db, I>(
@@ -633,7 +642,10 @@ where
 
         if is_regular_package {
             in_namespace_package = false;
-        } else if package_path.is_directory(resolver_state) {
+        } else if package_path.is_directory(resolver_state)
+            // Pure modules hide namespace packages with the same name
+            && resolve_file_module(&package_path, resolver_state).is_none()
+        {
             // A directory without an `__init__.py` is a namespace package, continue with the next folder.
             in_namespace_package = true;
         } else if in_namespace_package {
@@ -1089,6 +1101,25 @@ mod tests {
             None,
             path_to_module(&db, &FilePath::System(src.join("foo.py")))
         );
+    }
+
+    #[test]
+    fn single_file_takes_priority_over_namespace_package() {
+        //const SRC: &[FileSpec] = &[("foo.py", "x = 1")];
+        const SRC: &[FileSpec] = &[("foo.py", "x = 1"), ("foo/bar.py", "x = 2")];
+
+        let TestCase { db, src, .. } = TestCaseBuilder::new().with_src_files(SRC).build();
+
+        let foo_module_name = ModuleName::new_static("foo").unwrap();
+        let foo_bar_module_name = ModuleName::new_static("foo.bar").unwrap();
+
+        // `foo.py` takes priority over the `foo` namespace package
+        let foo_module = resolve_module(&db, foo_module_name.clone()).unwrap();
+        assert_eq!(foo_module.file().path(&db), &src.join("foo.py"));
+
+        // `foo.bar` isn't recognised as a module
+        let foo_bar_module = resolve_module(&db, foo_bar_module_name.clone());
+        assert_eq!(foo_bar_module, None);
     }
 
     #[test]
