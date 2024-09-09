@@ -32,9 +32,11 @@ pub(crate) fn narrowing_constraint<'db>(
     definition: Definition<'db>,
 ) -> Option<Type<'db>> {
     match constraint {
-        Constraint::Expression(expression) => all_narrowing_constraints(db, expression)
-            .get(&definition.symbol(db))
-            .copied(),
+        Constraint::Expression(expression) => {
+            all_narrowing_constraints_for_expression(db, expression)
+                .get(&definition.symbol(db))
+                .copied()
+        }
         Constraint::Pattern(pattern) => all_narrowing_constraints_for_pattern(db, pattern)
             .get(&definition.symbol(db))
             .copied(),
@@ -50,7 +52,7 @@ fn all_narrowing_constraints_for_pattern<'db>(
 }
 
 #[salsa::tracked(return_ref)]
-fn all_narrowing_constraints<'db>(
+fn all_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
 ) -> NarrowingConstraints<'db> {
@@ -85,8 +87,8 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
     }
 
     fn evaluate_expression_constraint(&mut self, expression: Expression<'db>) {
-        let inference = infer_expression_types(self.db, expression);
         if let ast::Expr::Compare(expr_compare) = expression.node_ref(self.db).node() {
+            let inference = infer_expression_types(self.db, expression);
             self.add_expr_compare(expr_compare, inference);
         }
         // TODO other test expression kinds

@@ -3138,7 +3138,9 @@ impl Pattern {
     /// [wildcard pattern]: https://docs.python.org/3/reference/compound_stmts.html#wildcard-patterns
     pub fn is_wildcard(&self) -> bool {
         match self {
-            Pattern::MatchAs(PatternMatchAs { pattern, .. }) => pattern.is_none(),
+            Pattern::MatchAs(PatternMatchAs { pattern, .. }) => {
+                pattern.as_deref().map_or(true, Pattern::is_wildcard)
+            }
             Pattern::MatchOr(PatternMatchOr { patterns, .. }) => {
                 patterns.iter().all(Pattern::is_wildcard)
             }
