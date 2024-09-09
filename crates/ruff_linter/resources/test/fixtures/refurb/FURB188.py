@@ -143,7 +143,7 @@ def remove_suffix_multiple_attribute_expr() -> None:
 
     SUFFIX = "suffix"
 
-    x = foo.bar.baz[:len(SUFFIX)] if foo.bar.baz.endswith(SUFFIX) else foo.bar.baz
+    x = foo.bar.baz[:-len(SUFFIX)] if foo.bar.baz.endswith(SUFFIX) else foo.bar.baz
 
 def remove_prefix_comparable_literal_expr() -> None:
     return ("abc" "def")[3:] if ("abc" "def").startswith("abc") else "abc" "def"
