@@ -2196,7 +2196,7 @@ impl<'a> From<&'a BytesLiteralValue> for Cow<'a, [u8]> {
             BytesLiteralValueInner::Concatenated(bytes_literal_vec) => Cow::Owned(
                 bytes_literal_vec
                     .iter()
-                    .flat_map(|bytes_literal| bytes_literal.value.to_owned())
+                    .flat_map(|bytes_literal| bytes_literal.value.clone())
                     .collect::<Vec<u8>>(),
             ),
         }
