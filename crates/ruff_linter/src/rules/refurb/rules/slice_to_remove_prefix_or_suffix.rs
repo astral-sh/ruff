@@ -2,6 +2,7 @@ use crate::{checkers::ast::Checker, settings::types::PythonVersion};
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
+use ruff_python_semantic::SemanticModel;
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
@@ -72,7 +73,7 @@ pub(crate) fn slice_to_remove_affix_expr(checker: &mut Checker, if_expr: &ast::E
     }
 
     if let Some(removal_data) = affix_removal_data_expr(if_expr) {
-        if affix_matches_slice_bound(&removal_data, checker) {
+        if affix_matches_slice_bound(&removal_data, checker.semantic()) {
             let kind = removal_data.affix_query.kind;
             let text = removal_data.text;
 
@@ -103,7 +104,7 @@ pub(crate) fn slice_to_remove_affix_stmt(checker: &mut Checker, if_stmt: &ast::S
         return;
     }
     if let Some(removal_data) = affix_removal_data_stmt(if_stmt) {
-        if affix_matches_slice_bound(&removal_data, checker) {
+        if affix_matches_slice_bound(&removal_data, checker.semantic()) {
             let kind = removal_data.affix_query.kind;
             let text = removal_data.text;
 
@@ -293,7 +294,7 @@ fn affix_removal_data<'a>(
 ///     - `suffix` is a string literal and `bound` is a number literal
 ///     - `suffix` is an expression and `bound` is
 ///     exactly `-len(suffix)` (as AST nodes, prior to evaluation.)
-fn affix_matches_slice_bound(data: &RemoveAffixData, checker: &mut Checker) -> bool {
+fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -> bool {
     let RemoveAffixData {
         text: _,
         bound,
@@ -324,7 +325,7 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, checker: &mut Checker) -> b
             }),
             _,
         ) => {
-            checker.semantic().match_builtin_expr(func, "len")
+            semantic.match_builtin_expr(func, "len")
                 && arguments.len() == 1
                 && arguments.find_positional(0).is_some_and(|arg| {
                     let compr_affix = ast::comparable::ComparableExpr::from(affix);
@@ -365,8 +366,7 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, checker: &mut Checker) -> b
                  func,
                  arguments,
              }| {
-                func.as_name_expr()
-                    .is_some_and(|name| name.id == ast::name::Name::new("len"))
+                semantic.match_builtin_expr(func, "len")
                     && arguments.len() == 1
                     && arguments.find_positional(0).is_some_and(|arg| {
                         let compr_affix = ast::comparable::ComparableExpr::from(affix);
