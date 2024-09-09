@@ -147,3 +147,8 @@ def remove_suffix_multiple_attribute_expr() -> None:
 
 def remove_prefix_comparable_literal_expr() -> None:
     return ("abc" "def")[3:] if ("abc" "def").startswith("abc") else "abc" "def"
+
+def shadow_builtins(filename: str, extension: str) -> None:
+    from builtins import len as builtins_len
+
+    return filename[:-builtins_len(extension)] if filename.endswith(extension) else filename
