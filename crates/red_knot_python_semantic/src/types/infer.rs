@@ -1755,13 +1755,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         let result = infer_expression_types(self.db, expression);
 
         // Two things are different if it's the first comprehension:
-        // (1) We must lookup the type of the expression in the outer scope
-        //     (symbols defined in this scope are not available for definitions
-        //     created by the first comprehension)
+        // (1) We must lookup the `ScopedExpressionId` of the iterable expression in the outer scope,
+        //     because that's the scope we visit it in in the semantic index builder
         // (2) We must *not* call `self.extend()` on the result of the type inference,
-        //     or we'll doubly infer the type of relevant symbols
-        //     (any symbols referenced from the first comprehension will have already been
-        //     inferred when analysing outer scopes)
+        //     because `ScopedExpressionId` are only meaningful within their own scope, so
+        //     we'd add types for random wrong expressions in the current scope
         let iterable_ty = if is_first {
             let lookup_scope = self
                 .index
