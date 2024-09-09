@@ -88,8 +88,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
 
     fn evaluate_expression_constraint(&mut self, expression: Expression<'db>) {
         if let ast::Expr::Compare(expr_compare) = expression.node_ref(self.db).node() {
-            let inference = infer_expression_types(self.db, expression);
-            self.add_expr_compare(expr_compare, inference);
+            self.add_expr_compare(expr_compare, expression);
         }
         // TODO other test expression kinds
     }
@@ -136,11 +135,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         }
     }
 
-    fn add_expr_compare(
-        &mut self,
-        expr_compare: &ast::ExprCompare,
-        inference: &TypeInference<'db>,
-    ) {
+    fn add_expr_compare(&mut self, expr_compare: &ast::ExprCompare, expression: Expression<'db>) {
         let ast::ExprCompare {
             range: _,
             left,
@@ -157,6 +152,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             // SAFETY: we should always have a symbol for every Name node.
             let symbol = self.symbols().symbol_id_by_name(id).unwrap();
             let scope = self.scope();
+            let inference = infer_expression_types(self.db, expression);
             for (op, comparator) in std::iter::zip(&**ops, &**comparators) {
                 let comp_ty = inference.expression_ty(comparator.scoped_ast_id(self.db, scope));
                 if matches!(op, ast::CmpOp::IsNot) {
