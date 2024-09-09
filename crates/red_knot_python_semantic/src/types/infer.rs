@@ -1558,7 +1558,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             .map(|elt| self.infer_expression(elt))
             .collect::<Vec<_>>();
 
-        // TODO generic
+        // TODO: Currently, we support only tuple literals like `(1, 2)` or `(x, y)` but we still
+        // need to support generic tuple types like `tuple[int, str]` and `tuple[int, ...]`.
         Type::TupleLiteral(TupleLiteralType::new(self.db, element_types))
     }
 
