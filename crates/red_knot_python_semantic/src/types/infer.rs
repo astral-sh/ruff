@@ -1758,7 +1758,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         // (1) We must lookup the `ScopedExpressionId` of the iterable expression in the outer scope,
         //     because that's the scope we visit it in in the semantic index builder
         // (2) We must *not* call `self.extend()` on the result of the type inference,
-        //     because `ScopedExpressionId` are only meaningful within their own scope, so
+        //     because `ScopedExpressionId`s are only meaningful within their own scope, so
         //     we'd add types for random wrong expressions in the current scope
         let iterable_ty = if is_first {
             let lookup_scope = self
@@ -4412,6 +4412,48 @@ mod tests {
     }
 
     #[test]
+    fn inner_comprehension_referencing_outer_comprehension() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            def foo():
+                [[x for x in y] for y in z]
+
+            class IntIterator:
+                def __next__(self) -> int:
+                    return 42
+
+            class IntIterable:
+                def __iter__(self) -> IntIterator:
+                    return IntIterator()
+
+            class IteratorOfIterables:
+                def __next__(self) -> IntIterable:
+                    return IntIterable()
+
+            class IterableOfIterables:
+                def __iter__(self) -> IteratorOfIterables:
+                    return IteratorOfIterables()
+
+            z = IterableOfIterables()
+            ",
+        )?;
+
+        assert_scope_ty(
+            &db,
+            "src/a.py",
+            &["foo", "<listcomp>", "<listcomp>"],
+            "x",
+            "int",
+        );
+        assert_scope_ty(&db, "src/a.py", &["foo", "<listcomp>"], "y", "IntIterable");
+
+        Ok(())
+    }
+
+    #[test]
     fn comprehension_with_unbound_iter() -> anyhow::Result<()> {
         let mut db = setup_db();
 
@@ -4535,6 +4577,42 @@ mod tests {
         // but it's reasonably clear here what they *meant* to write,
         // so we'll still infer the correct type:
         assert_scope_ty(&db, "src/a.py", &["foo", "<listcomp>"], "z", "int");
+        Ok(())
+    }
+
+    #[test]
+    fn comprehension_with_missing_iter() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            def foo():
+                [z for in IntIterable()]
+
+            class IntIterator:
+                def __next__(self) -> int:
+                    return 42
+
+            class IntIterable:
+                def __iter__(self) -> IntIterator:
+                    return IntIterator()
+            ",
+        )?;
+
+        assert_scope_ty(&db, "src/a.py", &["foo", "<listcomp>"], "z", "Unbound");
+
+        // (There is a diagnostic for invalid syntax that's emitted, but it's not listed by `assert_file_diagnostics`)
+        assert_file_diagnostics(&db, "src/a.py", &[]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn comprehension_with_missing_for() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented("src/a.py", "[z for z in]")?;
+        assert_scope_ty(&db, "src/a.py", &["<listcomp>"], "z", "Unknown");
         Ok(())
     }
 
