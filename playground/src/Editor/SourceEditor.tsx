@@ -2,7 +2,7 @@
  * Editor for the Python source code.
  */
 
-import Editor, { Monaco, OnMount } from "@monaco-editor/react";
+import MonacoEditor, { Monaco, OnMount } from "@monaco-editor/react";
 import {
   editor,
   IDisposable,
@@ -91,7 +91,7 @@ export default function SourceEditor({
   );
 
   return (
-    <Editor
+    <MonacoEditor
       onMount={handleMount}
       options={{
         fixedOverflowWidgets: true,
