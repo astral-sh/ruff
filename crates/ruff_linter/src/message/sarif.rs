@@ -4,7 +4,6 @@ use std::io::Write;
 use anyhow::Result;
 use serde::{Serialize, Serializer};
 use serde_json::json;
-use strum::IntoEnumIterator;
 
 use ruff_source_file::OneIndexed;
 
@@ -28,12 +27,9 @@ impl Emitter for SarifEmitter {
             .map(SarifResult::from_message)
             .collect::<Result<Vec<_>>>()?;
 
-        let mut rule_ids = HashSet::new();
-        for result in &results {
-            if let Some(rule) = result.rule {
-                rule_ids.insert(rule.noqa_code().to_string());
-            }
-        }
+        let unique_rules: HashSet<_> = results.iter().filter_map(|result| result.rule).collect();
+        let mut rules: Vec<SarifRule> = unique_rules.into_iter().map(SarifRule::from).collect();
+        rules.sort_by(|a, b| a.code.cmp(&b.code));
 
         let output = json!({
             "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
@@ -43,10 +39,7 @@ impl Emitter for SarifEmitter {
                     "driver": {
                         "name": "ruff",
                         "informationUri": "https://github.com/astral-sh/ruff",
-                        "rules": Rule::iter()
-                            .filter(|rule| rule_ids.contains(&rule.noqa_code().to_string()))
-                            .map(SarifRule::from)
-                            .collect::<Vec<_>>(),
+                        "rules": rules,
                         "version": VERSION.to_string(),
                     }
                 },
