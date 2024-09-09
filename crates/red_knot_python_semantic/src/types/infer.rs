@@ -4225,28 +4225,26 @@ mod tests {
     }
 
     #[test]
-    fn except_handler() -> anyhow::Result<()> {
+    fn except_handler_single_exception() -> anyhow::Result<()> {
         let mut db = setup_db();
 
         db.write_dedented(
             "src/a.py",
             "
-            import builtins
+            import re
 
             try:
                 x
             except NameError as e:
                 pass
-            except (TypeError, builtins.AttributeError) as f:
+            except re.error as f:
                 pass
             ",
         )?;
 
         assert_public_ty(&db, "src/a.py", "e", "NameError");
+        assert_public_ty(&db, "src/a.py", "f", "error");
         assert_file_diagnostics(&db, "src/a.py", &[]);
-
-        // TODO should be `TypeError | AttributeError` (needs support for tuple types) --Alex
-        assert_public_ty(&db, "src/a.py", "f", "Unknown");
 
         Ok(())
     }
@@ -4279,7 +4277,7 @@ mod tests {
     }
 
     #[test]
-    fn dynamic_exception_handler() -> anyhow::Result<()> {
+    fn except_handler_multiple_exceptions() -> anyhow::Result<()> {
         let mut db = setup_db();
 
         db.write_dedented(
@@ -4289,13 +4287,19 @@ mod tests {
 
             try:
                 x
-            except EXCEPTIONS as e:
+            except (RuntimeError, OSError) as e:
+                pass
+            except EXCEPTIONS as f:
                 pass
             ",
         )?;
 
         assert_file_diagnostics(&db, "src/a.py", &[]);
 
+        // For these TODOs we need support for `tuple` types:
+
+        // TODO: Should be `RuntimeError | OSError` --Alex
+        assert_public_ty(&db, "src/a.py", "e", "Unknown");
         // TODO: Should be `AttributeError | TypeError` --Alex
         assert_public_ty(&db, "src/a.py", "e", "Unknown");
 
