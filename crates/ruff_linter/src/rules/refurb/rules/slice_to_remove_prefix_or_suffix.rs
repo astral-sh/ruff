@@ -440,14 +440,14 @@ enum AffixKind {
 }
 
 impl AffixKind {
-    const fn as_str(&self) -> &'static str {
+    const fn as_str(self) -> &'static str {
         match self {
             Self::StartsWith => "startswith",
             Self::EndsWith => "endswith",
         }
     }
 
-    const fn replacement(&self) -> &'static str {
+    const fn replacement(self) -> &'static str {
         match self {
             Self::StartsWith => "removeprefix",
             Self::EndsWith => "removesuffix",
