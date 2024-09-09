@@ -86,7 +86,7 @@ impl std::fmt::Display for DisplayRepresentation<'_> {
 
                 escape.bytes_repr().write(f)
             }
-            Type::Tuple(tuple) => {
+            Type::TupleLiteral(tuple) => {
                 f.write_str("tuple[")?;
                 let elements = tuple.elements(self.db);
                 if elements.is_empty() {

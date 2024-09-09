@@ -49,7 +49,7 @@ use crate::stdlib::builtins_module_scope;
 use crate::types::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 use crate::types::{
     builtins_symbol_ty, definitions_ty, global_symbol_ty, symbol_ty, BytesLiteralType, ClassType,
-    FunctionType, StringLiteralType, TupleType, Type, UnionBuilder,
+    FunctionType, StringLiteralType, TupleLiteralType, Type, UnionBuilder,
 };
 use crate::Db;
 
@@ -1559,7 +1559,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .collect::<Vec<_>>();
 
         // TODO generic
-        Type::Tuple(TupleType::new(self.db, element_types))
+        Type::TupleLiteral(TupleLiteralType::new(self.db, element_types))
     }
 
     fn infer_list_expression(&mut self, list: &ast::ExprList) -> Type<'db> {

@@ -196,7 +196,7 @@ pub enum Type<'db> {
     /// A bytes literal
     BytesLiteral(BytesLiteralType<'db>),
     /// A heterogeneous tuple type, with elements of the given types in source order.
-    Tuple(TupleType<'db>),
+    TupleLiteral(TupleLiteralType<'db>),
     // TODO protocols, callable types, overloads, generics, type vars
 }
 
@@ -364,7 +364,7 @@ impl<'db> Type<'db> {
                 // TODO defer to Type::Instance(<bytes from typeshed>).member
                 Type::Unknown
             }
-            Type::Tuple(_) => {
+            Type::TupleLiteral(_) => {
                 // TODO: defer to `builtins.tuple` methods from typeshed's stubs
                 Type::Unknown
             }
@@ -479,7 +479,7 @@ impl<'db> Type<'db> {
             Type::Unknown => Type::Unknown,
             // TODO intersections
             Type::Intersection(_) => Type::Unknown,
-            Type::Tuple(_) => builtins_symbol_ty(db, "tuple"),
+            Type::TupleLiteral(_) => builtins_symbol_ty(db, "tuple"),
         }
     }
 }
@@ -667,7 +667,7 @@ pub struct BytesLiteralType<'db> {
 }
 
 #[salsa::interned]
-pub struct TupleType<'db> {
+pub struct TupleLiteralType<'db> {
     #[return_ref]
     elements: Vec<Type<'db>>,
 }
