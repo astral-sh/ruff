@@ -1,5 +1,6 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
+use std::borrow::Cow;
 use std::fmt;
 use std::fmt::Debug;
 use std::iter::FusedIterator;
@@ -2183,6 +2184,22 @@ impl PartialEq<[u8]> for BytesLiteralValue {
         self.bytes()
             .zip(other.iter().copied())
             .all(|(b1, b2)| b1 == b2)
+    }
+}
+
+impl<'a> From<&'a BytesLiteralValue> for Cow<'a, [u8]> {
+    fn from(value: &'a BytesLiteralValue) -> Self {
+        match &value.inner {
+            BytesLiteralValueInner::Single(BytesLiteral {
+                value: bytes_value, ..
+            }) => Cow::from(bytes_value.as_ref()),
+            BytesLiteralValueInner::Concatenated(bytes_literal_vec) => Cow::Owned(
+                bytes_literal_vec
+                    .iter()
+                    .flat_map(|bytes_literal| bytes_literal.value.to_owned())
+                    .collect::<Vec<u8>>(),
+            ),
+        }
     }
 }
 
