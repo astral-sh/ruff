@@ -140,7 +140,7 @@ pub fn find_user_settings_toml() -> Option<PathBuf> {
 }
 
 /// Load `Options` from a `pyproject.toml` or `ruff.toml` file.
-pub fn load_options<P: AsRef<Path>>(path: P) -> Result<Options> {
+pub(super) fn load_options<P: AsRef<Path>>(path: P) -> Result<Options> {
     if path.as_ref().ends_with("pyproject.toml") {
         let pyproject = parse_pyproject_toml(&path)?;
         let mut ruff = pyproject
