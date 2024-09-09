@@ -1,0 +1,8 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+<filename>:1:1: F821 Undefined name `PythonFinalizationError`. Added as a builtin in Python 3.13; consider specifying a newer `target-version` in your Ruff config.
+  |
+1 | PythonFinalizationError
+  | ^^^^^^^^^^^^^^^^^^^^^^^ F821
+  |
