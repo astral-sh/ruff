@@ -397,7 +397,6 @@ fn generate_assignment_with_removeaffix(
 ) -> String {
     let text_str = locator.slice(text);
     let affix_str = locator.slice(affix_query.affix);
-
     let replacement = affix_query.kind.replacement();
     format!("{text_str} = {text_str}.{replacement}({affix_str})")
 }
@@ -419,7 +418,6 @@ fn generate_removeaffix_expr(
 ) -> String {
     let text_str = locator.slice(text);
     let affix_str = locator.slice(affix_query.affix);
-
     let replacement = affix_query.kind.replacement();
     format!("{text_str}.{replacement}({affix_str})")
 }
