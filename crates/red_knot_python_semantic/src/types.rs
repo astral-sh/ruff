@@ -2,12 +2,13 @@ use infer::TypeInferenceBuilder;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 
+use crate::module_resolver::file_to_module;
 use crate::semantic_index::ast_ids::HasScopedAstId;
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId};
 use crate::semantic_index::{
-    global_scope, semantic_index, symbol_table, use_def_map, DefinitionWithConstraints,
-    DefinitionWithConstraintsIterator,
+    global_scope, semantic_index, symbol_table, use_def_map, BindingWithConstraints,
+    BindingWithConstraintsIterator, DeclarationsIterator,
 };
 use crate::stdlib::{builtins_symbol_ty, types_symbol_ty, typeshed_symbol_ty};
 use crate::types::narrow::narrowing_constraint;
@@ -45,16 +46,21 @@ pub(crate) fn symbol_ty_by_id<'db>(
     scope: ScopeId<'db>,
     symbol: ScopedSymbolId,
 ) -> Type<'db> {
-    let _span = tracing::trace_span!("symbol_ty", ?symbol).entered();
+    let _span = tracing::trace_span!("symbol_ty_by_id", ?symbol).entered();
 
     let use_def = use_def_map(db, scope);
-    definitions_ty(
-        db,
-        use_def.public_definitions(symbol),
-        use_def
-            .public_may_be_unbound(symbol)
-            .then_some(Type::Unbound),
-    )
+
+    if use_def.has_public_declarations(symbol) {
+        declarations_ty(db, use_def.public_declarations(symbol))
+    } else {
+        bindings_ty(
+            db,
+            use_def.public_bindings(symbol),
+            use_def
+                .public_may_be_unbound(symbol)
+                .then_some(Type::Unbound),
+        )
+    }
 }
 
 /// Shorthand for `symbol_ty` that takes a symbol name instead of an ID.
@@ -71,10 +77,16 @@ pub(crate) fn global_symbol_ty<'db>(db: &'db dyn Db, file: File, name: &str) -> 
     symbol_ty(db, global_scope(db, file), name)
 }
 
-/// Infer the type of a [`Definition`].
-pub(crate) fn definition_ty<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Type<'db> {
+/// Infer the type of a binding.
+pub(crate) fn binding_ty<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Type<'db> {
     let inference = infer_definition_types(db, definition);
-    inference.definition_ty(definition)
+    inference.binding_ty(definition)
+}
+
+/// Infer the type of a declaration.
+pub(crate) fn declaration_ty<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Type<'db> {
+    let inference = infer_definition_types(db, definition);
+    inference.declaration_ty(definition)
 }
 
 /// Infer the type of a (possibly deferred) sub-expression of a [`Definition`].
@@ -110,30 +122,30 @@ pub(crate) fn definition_expression_ty<'db>(
 /// Will panic if called with zero definitions and no `unbound_ty`. This is a logic error,
 /// as any symbol with zero visible definitions clearly may be unbound, and the caller should
 /// provide an `unbound_ty`.
-pub(crate) fn definitions_ty<'db>(
+pub(crate) fn bindings_ty<'db>(
     db: &'db dyn Db,
-    definitions_with_constraints: DefinitionWithConstraintsIterator<'_, 'db>,
+    bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
     unbound_ty: Option<Type<'db>>,
 ) -> Type<'db> {
-    let def_types = definitions_with_constraints.map(
-        |DefinitionWithConstraints {
-             definition,
+    let def_types = bindings_with_constraints.map(
+        |BindingWithConstraints {
+             binding,
              constraints,
          }| {
-            let mut constraint_tys = constraints
-                .filter_map(|constraint| narrowing_constraint(db, constraint, definition));
-            let definition_ty = definition_ty(db, definition);
+            let mut constraint_tys =
+                constraints.filter_map(|constraint| narrowing_constraint(db, constraint, binding));
+            let binding_ty = binding_ty(db, binding);
             if let Some(first_constraint_ty) = constraint_tys.next() {
                 let mut builder = IntersectionBuilder::new(db);
                 builder = builder
-                    .add_positive(definition_ty)
+                    .add_positive(binding_ty)
                     .add_positive(first_constraint_ty);
                 for constraint_ty in constraint_tys {
                     builder = builder.add_positive(constraint_ty);
                 }
                 builder.build()
             } else {
-                definition_ty
+                binding_ty
             }
         },
     );
@@ -141,13 +153,21 @@ pub(crate) fn definitions_ty<'db>(
 
     let first = all_types
         .next()
-        .expect("definitions_ty should never be called with zero definitions and no unbound_ty.");
+        .expect("bindings_ty should never be called with zero definitions and no unbound_ty.");
 
     if let Some(second) = all_types.next() {
         UnionType::from_elements(db, [first, second].into_iter().chain(all_types))
     } else {
         first
     }
+}
+
+/// Union an iterable of declared types.
+pub(crate) fn declarations_ty<'db>(
+    db: &'db dyn Db,
+    declarations: DeclarationsIterator<'_, 'db>,
+) -> Type<'db> {
+    UnionType::from_elements(db, declarations.map(|decl| declaration_ty(db, decl)))
 }
 
 /// Unique ID for a type.
@@ -294,6 +314,40 @@ impl<'db> Type<'db> {
             }
             ty => *ty,
         }
+    }
+
+    /// Return true if this type is assignable to type `other`.
+    pub(crate) fn is_assignable_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
+        if self.is_equivalent_to(db, other) {
+            return true;
+        }
+        match (self, other) {
+            (Type::Unknown | Type::Any | Type::Never, _) => true,
+            (_, Type::Unknown | Type::Any) => true,
+            (Type::IntLiteral(_), Type::Instance(class)) if class.is_builtin_named(db, "int") => {
+                true
+            }
+            (Type::StringLiteral(_), Type::LiteralString) => true,
+            (Type::StringLiteral(_) | Type::LiteralString, Type::Instance(class))
+                if class.is_builtin_named(db, "str") =>
+            {
+                true
+            }
+            (Type::BytesLiteral(_), Type::Instance(class))
+                if class.is_builtin_named(db, "bytes") =>
+            {
+                true
+            }
+            // TODO
+            _ => false,
+        }
+    }
+
+    /// Return true if this type is equivalent to type `other`.
+    pub(crate) fn is_equivalent_to(self, _db: &'db dyn Db, other: Type<'db>) -> bool {
+        // TODO equivalent but not identical structural types, differently-ordered unions and
+        // intersections, other cases?
+        self == other
     }
 
     /// Resolve a member access of a type.
@@ -548,7 +602,7 @@ impl<'db> FunctionType<'db> {
     /// inferred return type for this function
     pub fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
         let definition = self.definition(db);
-        let DefinitionKind::Function(function_stmt_node) = definition.node(db) else {
+        let DefinitionKind::Function(function_stmt_node) = definition.kind(db) else {
             panic!("Function type definition must have `DefinitionKind::Function`")
         };
 
@@ -588,13 +642,21 @@ pub struct ClassType<'db> {
 }
 
 impl<'db> ClassType<'db> {
+    pub(crate) fn is_builtin_named(self, db: &'db dyn Db, name: &str) -> bool {
+        name == self.name(db).as_str()
+            && file_to_module(db, self.body_scope(db).file(db))
+                // Builtin module names are special-cased in the resolver, so there can't be a
+                // module named builtins other than the actual builtins.
+                .is_some_and(|module| module.name().as_str() == "builtins")
+    }
+
     /// Return an iterator over the types of this class's bases.
     ///
     /// # Panics:
     /// If `definition` is not a `DefinitionKind::Class`.
     pub fn bases(&self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
         let definition = self.definition(db);
-        let DefinitionKind::Class(class_stmt_node) = definition.node(db) else {
+        let DefinitionKind::Class(class_stmt_node) = definition.kind(db) else {
             panic!("Class type definition must have DefinitionKind::Class");
         };
         class_stmt_node
@@ -701,4 +763,105 @@ pub struct BytesLiteralType<'db> {
 pub struct TupleType<'db> {
     #[return_ref]
     elements: Box<[Type<'db>]>,
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::needless_pass_by_value)]
+
+    use super::{builtins_symbol_ty, BytesLiteralType, StringLiteralType, Type, UnionType};
+    use crate::db::tests::TestDb;
+    use crate::program::{Program, SearchPathSettings};
+    use crate::python_version::PythonVersion;
+    use crate::ProgramSettings;
+    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+    use test_case::test_case;
+
+    fn setup_db() -> TestDb {
+        let db = TestDb::new();
+
+        let src_root = SystemPathBuf::from("/src");
+        db.memory_file_system()
+            .create_directory_all(&src_root)
+            .unwrap();
+
+        Program::from_settings(
+            &db,
+            &ProgramSettings {
+                target_version: PythonVersion::default(),
+                search_paths: SearchPathSettings::new(src_root),
+            },
+        )
+        .expect("Valid search path settings");
+
+        db
+    }
+
+    /// A test representation of a type that can be transformed unambiguously into a real Type,
+    /// given a db.
+    #[derive(Debug)]
+    enum Ty {
+        Never,
+        Unknown,
+        Any,
+        IntLiteral(i64),
+        StringLiteral(&'static str),
+        LiteralString,
+        BytesLiteral(&'static str),
+        BuiltinInstance(&'static str),
+        Union(Box<[Ty]>),
+    }
+
+    impl Ty {
+        fn to_type<'db>(&self, db: &'db TestDb) -> Type<'db> {
+            match self {
+                Ty::Never => Type::Never,
+                Ty::Unknown => Type::Unknown,
+                Ty::Any => Type::Any,
+                Ty::IntLiteral(n) => Type::IntLiteral(*n),
+                Ty::StringLiteral(s) => {
+                    Type::StringLiteral(StringLiteralType::new(db, (*s).into()))
+                }
+                Ty::LiteralString => Type::LiteralString,
+                Ty::BytesLiteral(s) => {
+                    Type::BytesLiteral(BytesLiteralType::new(db, s.as_bytes().into()))
+                }
+                Ty::BuiltinInstance(s) => builtins_symbol_ty(db, s).to_instance(db),
+                Ty::Union(tys) => UnionType::from_elements(db, tys.iter().map(|ty| ty.to_type(db))),
+            }
+        }
+    }
+
+    #[test_case(Ty::Unknown, Ty::IntLiteral(1))]
+    #[test_case(Ty::Any, Ty::IntLiteral(1))]
+    #[test_case(Ty::Never, Ty::IntLiteral(1))]
+    #[test_case(Ty::IntLiteral(1), Ty::Unknown)]
+    #[test_case(Ty::IntLiteral(1), Ty::Any)]
+    #[test_case(Ty::IntLiteral(1), Ty::BuiltinInstance("int"))]
+    #[test_case(Ty::StringLiteral("foo"), Ty::BuiltinInstance("str"))]
+    #[test_case(Ty::StringLiteral("foo"), Ty::LiteralString)]
+    #[test_case(Ty::LiteralString, Ty::BuiltinInstance("str"))]
+    #[test_case(Ty::BytesLiteral("foo"), Ty::BuiltinInstance("bytes"))]
+    fn is_assignable_to(from: Ty, to: Ty) {
+        let db = setup_db();
+        assert!(from.to_type(&db).is_assignable_to(&db, to.to_type(&db)));
+    }
+
+    #[test_case(Ty::IntLiteral(1), Ty::BuiltinInstance("str"))]
+    #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str"))]
+    #[test_case(Ty::BuiltinInstance("int"), Ty::IntLiteral(1))]
+    fn is_not_assignable_to(from: Ty, to: Ty) {
+        let db = setup_db();
+        assert!(!from.to_type(&db).is_assignable_to(&db, to.to_type(&db)));
+    }
+
+    #[test_case(
+        Ty::Union(Box::new([Ty::IntLiteral(1), Ty::IntLiteral(2)])),
+        Ty::Union(Box::new([Ty::IntLiteral(1), Ty::IntLiteral(2)]))
+    )]
+    fn is_equivalent_to(from: Ty, to: Ty) {
+        let db = setup_db();
+
+        assert!(from.to_type(&db).is_equivalent_to(&db, to.to_type(&db)));
+    }
 }
