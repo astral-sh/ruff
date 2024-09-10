@@ -60,19 +60,30 @@ use crate::rules::pydocstyle::settings::Convention;
 /// ```
 #[violation]
 pub struct DocstringMissingParameter {
-    id: String,
+    ids: Vec<String>,
 }
 
 impl Violation for DocstringMissingParameter {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DocstringMissingParameter { id } = self;
-        format!("Parameter `{id}` missing from docstring")
+        let DocstringMissingParameter { ids } = self;
+
+        if let [id] = ids.as_slice() {
+            format!("Parameter `{id}` missing from the docstring")
+        } else {
+            format!(
+                "These parameters are missing from the docstring: {}",
+                ids.iter().map(|id| format!("`{id}`")).join(", ")
+            )
+        }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let DocstringMissingParameter { id } = self;
-        Some(format!("Add `{id}` to the docstring"))
+        let DocstringMissingParameter { ids } = self;
+        Some(format!(
+            "Add {} to the docstring",
+            ids.iter().map(|id| format!("`{id}`")).join(", ")
+        ))
     }
 }
 
@@ -1145,6 +1156,7 @@ pub(crate) fn check_docstring(
 
     // DOC101
     if checker.enabled(Rule::DocstringMissingParameter) {
+        let mut missing_parameters = Vec::new();
         for signature_param in &signature_parameters {
             if !docstring_sections
                 .parameters
@@ -1156,14 +1168,22 @@ pub(crate) fn check_docstring(
                         .any(|param| *param == signature_param.name)
                 })
             {
-                let diagnostic = Diagnostic::new(
-                    DocstringMissingParameter {
-                        id: (*signature_param.name).to_string(),
-                    },
-                    signature_param.range(),
-                );
-                diagnostics.push(diagnostic);
+                missing_parameters.push((*signature_param.name).to_string());
             }
+        }
+        if !missing_parameters.is_empty() {
+            let range = if let Some(ref docstring_params) = docstring_sections.parameters {
+                docstring_params.range()
+            } else {
+                docstring.range()
+            };
+            let diagnostic = Diagnostic::new(
+                DocstringMissingParameter {
+                    ids: missing_parameters,
+                },
+                range,
+            );
+            diagnostics.push(diagnostic);
         }
     }
 

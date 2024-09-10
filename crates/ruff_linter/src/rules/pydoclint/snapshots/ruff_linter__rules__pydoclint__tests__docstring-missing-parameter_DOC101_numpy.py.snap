@@ -1,164 +1,205 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
 ---
-DOC101_numpy.py:261:20: DOC101 Parameter `b` missing from docstring
+DOC101_numpy.py:265:1: DOC101 Parameter `b` missing from the docstring
     |
-260 | # DOC101
-261 | def add_numbers(a, b):
-    |                    ^ DOC101
-262 |     """
-263 |     Adds two numbers and returns the result.
+263 |       Adds two numbers and returns the result.
+264 |   
+265 | /     Parameters
+266 | |     ----------
+267 | |     a : int
+268 | |         The first number to add.
+269 | | 
+270 | |     Returns
+    | |_^ DOC101
+271 |       -------
+272 |       int
     |
     = help: Add `b` to the docstring
 
-DOC101_numpy.py:279:33: DOC101 Parameter `multiplier` missing from docstring
+DOC101_numpy.py:283:1: DOC101 Parameter `multiplier` missing from the docstring
     |
-278 | # DOC101
-279 | def multiply_list_elements(lst, multiplier):
-    |                                 ^^^^^^^^^^ DOC101
-280 |     """
-281 |     Multiplies each element in a list by a given multiplier.
+281 |       Multiplies each element in a list by a given multiplier.
+282 |   
+283 | /     Parameters
+284 | |     ----------
+285 | |     lst : list of int
+286 | |         A list of integers.
+287 | | 
+288 | |     Returns
+    | |_^ DOC101
+289 |       -------
+290 |       list of int
     |
     = help: Add `multiplier` to the docstring
 
-DOC101_numpy.py:297:20: DOC101 Parameter `numbers` missing from docstring
+DOC101_numpy.py:298:5: DOC101 Parameter `numbers` missing from the docstring
     |
-296 | # DOC101
-297 | def find_max_value(numbers):
-    |                    ^^^^^^^ DOC101
-298 |     """
-299 |     Finds the maximum value in a list of numbers.
+296 |   # DOC101
+297 |   def find_max_value(numbers):
+298 |       """
+    |  _____^
+299 | |     Finds the maximum value in a list of numbers.
+300 | | 
+301 | |     Returns
+302 | |     -------
+303 | |     int
+304 | |         The maximum value found in the list.
+305 | |     """
+    | |_______^ DOC101
+306 |       return max(numbers)
     |
     = help: Add `numbers` to the docstring
 
-DOC101_numpy.py:310:25: DOC101 Parameter `name` missing from docstring
+DOC101_numpy.py:314:1: DOC101 These parameters are missing from the docstring: `name`, `age`
     |
-309 | # DOC101
-310 | def create_user_profile(name, age, email, location="here"):
-    |                         ^^^^ DOC101
-311 |     """
-312 |     Creates a user profile with basic information.
+312 |       Creates a user profile with basic information.
+313 |   
+314 | /     Parameters
+315 | |     ----------
+316 | |     email : str
+317 | |         The user's email address.
+318 | |     location : str, optional
+319 | |         The location of the user, by default "here".
+320 | | 
+321 | |     Returns
+    | |_^ DOC101
+322 |       -------
+323 |       dict
     |
-    = help: Add `name` to the docstring
+    = help: Add `name`, `age` to the docstring
 
-DOC101_numpy.py:310:31: DOC101 Parameter `age` missing from docstring
+DOC101_numpy.py:339:1: DOC101 These parameters are missing from the docstring: `tax_rate`, `discount`
     |
-309 | # DOC101
-310 | def create_user_profile(name, age, email, location="here"):
-    |                               ^^^ DOC101
-311 |     """
-312 |     Creates a user profile with basic information.
+337 |       Calculates the total price after applying tax and a discount.
+338 |   
+339 | /     Parameters
+340 | |     ----------
+341 | |     item_prices : list of float
+342 | |         A list of prices for each item.
+343 | | 
+344 | |     Returns
+    | |_^ DOC101
+345 |       -------
+346 |       float
     |
-    = help: Add `age` to the docstring
+    = help: Add `tax_rate`, `discount` to the docstring
 
-DOC101_numpy.py:335:40: DOC101 Parameter `tax_rate` missing from docstring
+DOC101_numpy.py:360:1: DOC101 These parameters are missing from the docstring: `cc_address`, `bcc_address`
     |
-334 | # DOC101
-335 | def calculate_total_price(item_prices, tax_rate, discount):
-    |                                        ^^^^^^^^ DOC101
-336 |     """
-337 |     Calculates the total price after applying tax and a discount.
+358 |       Sends an email to the specified recipients.
+359 |   
+360 | /     Parameters
+361 | |     ----------
+362 | |     subject : str
+363 | |         The subject of the email.
+364 | |     body : str
+365 | |         The content of the email.
+366 | |     to_address : str
+367 | |         The recipient's email address.
+368 | | 
+369 | |     Returns
+    | |_^ DOC101
+370 |       -------
+371 |       bool
     |
-    = help: Add `tax_rate` to the docstring
+    = help: Add `cc_address`, `bcc_address` to the docstring
 
-DOC101_numpy.py:335:50: DOC101 Parameter `discount` missing from docstring
+DOC101_numpy.py:382:1: DOC101 Parameter `args` missing from the docstring
     |
-334 | # DOC101
-335 | def calculate_total_price(item_prices, tax_rate, discount):
-    |                                                  ^^^^^^^^ DOC101
-336 |     """
-337 |     Calculates the total price after applying tax and a discount.
-    |
-    = help: Add `discount` to the docstring
-
-DOC101_numpy.py:356:43: DOC101 Parameter `cc_address` missing from docstring
-    |
-355 | # DOC101
-356 | def send_email(subject, body, to_address, cc_address=None, bcc_address=None):
-    |                                           ^^^^^^^^^^^^^^^ DOC101
-357 |     """
-358 |     Sends an email to the specified recipients.
-    |
-    = help: Add `cc_address` to the docstring
-
-DOC101_numpy.py:356:60: DOC101 Parameter `bcc_address` missing from docstring
-    |
-355 | # DOC101
-356 | def send_email(subject, body, to_address, cc_address=None, bcc_address=None):
-    |                                                            ^^^^^^^^^^^^^^^^ DOC101
-357 |     """
-358 |     Sends an email to the specified recipients.
-    |
-    = help: Add `bcc_address` to the docstring
-
-DOC101_numpy.py:378:36: DOC101 Parameter `args` missing from docstring
-    |
-377 | # DOC101
-378 | def concatenate_strings(separator, *args):
-    |                                    ^^^^^ DOC101
-379 |     """
-380 |     Concatenates multiple strings with a specified separator.
+380 |       Concatenates multiple strings with a specified separator.
+381 |   
+382 | /     Parameters
+383 | |     ----------
+384 | |     separator : str
+385 | |         The separator to use between strings.
+386 | | 
+387 | |     Returns
+    | |_^ DOC101
+388 |       -------
+389 |       str
     |
     = help: Add `args` to the docstring
 
-DOC101_numpy.py:396:29: DOC101 Parameter `items` missing from docstring
+DOC101_numpy.py:400:1: DOC101 These parameters are missing from the docstring: `items`, `details`
     |
-395 | # DOC101
-396 | def process_order(order_id, *items, **details):
-    |                             ^^^^^^ DOC101
-397 |     """
-398 |     Processes an order with a list of items and optional order details.
+398 |       Processes an order with a list of items and optional order details.
+399 |   
+400 | /     Parameters
+401 | |     ----------
+402 | |     order_id : int
+403 | |         The unique identifier for the order.
+404 | | 
+405 | |     Returns
+    | |_^ DOC101
+406 |       -------
+407 |       dict
     |
-    = help: Add `items` to the docstring
+    = help: Add `items`, `details` to the docstring
 
-DOC101_numpy.py:396:37: DOC101 Parameter `details` missing from docstring
+DOC101_numpy.py:424:9: DOC101 Parameter `value` missing from the docstring
     |
-395 | # DOC101
-396 | def process_order(order_id, *items, **details):
-    |                                     ^^^^^^^^^ DOC101
-397 |     """
-398 |     Processes an order with a list of items and optional order details.
-    |
-    = help: Add `details` to the docstring
-
-DOC101_numpy.py:423:24: DOC101 Parameter `value` missing from docstring
-    |
-422 |     # DOC101
-423 |     def __init__(self, value=0):
-    |                        ^^^^^^^ DOC101
-424 |         """
-425 |         Initializes the calculator with an initial value.
+422 |       # DOC101
+423 |       def __init__(self, value=0):
+424 |           """
+    |  _________^
+425 | |         Initializes the calculator with an initial value.
+426 | | 
+427 | |         """
+    | |___________^ DOC101
+428 |           self.value = value
     |
     = help: Add `value` to the docstring
 
-DOC101_numpy.py:431:27: DOC101 Parameter `number2` missing from docstring
+DOC101_numpy.py:435:1: DOC101 Parameter `number2` missing from the docstring
     |
-430 |     # DOC101
-431 |     def add(self, number, number2):
-    |                           ^^^^^^^ DOC101
-432 |         """
-433 |         Adds two numbers to the current value.
+433 |           Adds two numbers to the current value.
+434 |   
+435 | /         Parameters
+436 | |         ----------
+437 | |         number : int or float
+438 | |             The first number to add.
+439 | | 
+440 | |         Returns
+    | |_^ DOC101
+441 |           -------
+442 |           int or float
     |
     = help: Add `number2` to the docstring
 
-DOC101_numpy.py:450:26: DOC101 Parameter `value_str` missing from docstring
+DOC101_numpy.py:451:9: DOC101 Parameter `value_str` missing from the docstring
     |
-448 |     # DOC101
-449 |     @classmethod
-450 |     def from_string(cls, value_str):
-    |                          ^^^^^^^^^ DOC101
-451 |         """
-452 |         Creates a Calculator instance from a string representation of a number.
+449 |       @classmethod
+450 |       def from_string(cls, value_str):
+451 |           """
+    |  _________^
+452 | |         Creates a Calculator instance from a string representation of a number.
+453 | | 
+454 | |         Returns
+455 | |         -------
+456 | |         Calculator
+457 | |             A new instance of Calculator initialized with the value from the string.
+458 | |         """
+    | |___________^ DOC101
+459 |           value = float(value_str)
+460 |           return cls(value)
     |
     = help: Add `value_str` to the docstring
 
-DOC101_numpy.py:464:25: DOC101 Parameter `number` missing from docstring
+DOC101_numpy.py:465:9: DOC101 Parameter `number` missing from the docstring
     |
-462 |     # DOC101
-463 |     @staticmethod
-464 |     def is_valid_number(number):
-    |                         ^^^^^^ DOC101
-465 |         """
-466 |         Checks if a given number is valid (int or float).
+463 |       @staticmethod
+464 |       def is_valid_number(number):
+465 |           """
+    |  _________^
+466 | |         Checks if a given number is valid (int or float).
+467 | | 
+468 | |         Returns
+469 | |         -------
+470 | |         bool
+471 | |             True if the number is valid, False otherwise.
+472 | |         """
+    | |___________^ DOC101
+473 |           return isinstance(number, (int, float))
     |
     = help: Add `number` to the docstring
