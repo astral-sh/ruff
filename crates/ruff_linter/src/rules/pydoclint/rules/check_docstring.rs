@@ -629,6 +629,7 @@ fn parse_parameters_google(content: &str) -> Vec<&str> {
             continue;
         };
         indentation = Some(&potential[..potential.len() - potential.trim_start().len()]);
+        break;
     }
     let Some(indentation) = indentation else {
         return entries;

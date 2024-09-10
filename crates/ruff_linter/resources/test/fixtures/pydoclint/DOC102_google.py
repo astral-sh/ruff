@@ -206,3 +206,20 @@ def foo(param1, param2, *args, **kwargs):
         **kwargs: Arbitrary keyword arguments.
     """
     return
+
+# OK
+def on_server_unloaded(self, server_context: ServerContext) -> None:
+    ''' Execute ``on_server_unloaded`` from ``server_lifecycle.py`` (if
+    it is defined) when the server cleanly exits. (Before stopping the
+    server's ``IOLoop``.)
+
+    Args:
+        server_context (ServerContext) :
+
+    .. warning::
+        In practice this code may not run, since servers are often killed
+        by a signal.
+
+
+    '''
+    return self._lifecycle_handler.on_server_unloaded(server_context)
