@@ -56,4 +56,43 @@ sections.py:227:5: D411 [*] Missing blank line before section ("Raises")
     227 |+
 227 228 |     Raises:
 228 229 |     My attention.
-229 230 |
+229 230 | 
+
+sections.py:629:6: D411 [*] Missing blank line before section ("param")
+    |
+628 |     :param dag_id: the dag_id of the DAG to delete
+629 |     :param keep_records_in_log: whether keep records of the given dag_id
+    |      ^^^^^ D411
+630 |         in the Log table in the backend database (for reasons like auditing).
+631 |         The default value is True.
+    |
+    = help: Add blank line before "param"
+
+ℹ Safe fix
+626 626 |     Delete a DAG by a dag_id.
+627 627 | 
+628 628 |     :param dag_id: the dag_id of the DAG to delete
+    629 |+
+629 630 |     :param keep_records_in_log: whether keep records of the given dag_id
+630 631 |         in the Log table in the backend database (for reasons like auditing).
+631 632 |         The default value is True.
+
+sections.py:632:6: D411 [*] Missing blank line before section ("return")
+    |
+630 |         in the Log table in the backend database (for reasons like auditing).
+631 |         The default value is True.
+632 |     :return count of deleted dags
+    |      ^^^^^^ D411
+633 |     """
+634 |     return 0
+    |
+    = help: Add blank line before "return"
+
+ℹ Safe fix
+629 629 |     :param keep_records_in_log: whether keep records of the given dag_id
+630 630 |         in the Log table in the backend database (for reasons like auditing).
+631 631 |         The default value is True.
+    632 |+
+632 633 |     :return count of deleted dags
+633 634 |     """
+634 635 |     return 0

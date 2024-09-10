@@ -21,8 +21,14 @@ pub fn clean_space(indentation: &str) -> String {
         .collect()
 }
 
-/// Sphinx section title.
-pub fn sphinx_title(line: &str) -> &str {
+/// Extract the leading whitespace and colon from a line of text within a Python docstring.
+pub fn leading_space_and_colon(line: &str) -> &str {
+    line.find(|char: char| !char.is_whitespace() && char != ':')
+        .map_or(line, |index| &line[..index])
+}
+
+/// Sphinx section section name.
+pub fn sphinx_section_name(line: &str) -> &str {
     let line = line.trim_start_matches([' ', ':']);
     line.find(|char: char| !char.is_alphanumeric())
         .map_or(line, |index| &line[..index])

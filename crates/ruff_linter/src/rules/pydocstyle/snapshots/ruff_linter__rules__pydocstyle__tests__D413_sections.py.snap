@@ -158,4 +158,23 @@ sections.py:590:5: D413 [*] Missing blank line after last section ("Parameters")
     596 |+
 596 597 |     """
 597 598 | 
-598 599 |
+598 599 | 
+
+sections.py:632:6: D413 [*] Missing blank line after last section ("return")
+    |
+630 |         in the Log table in the backend database (for reasons like auditing).
+631 |         The default value is True.
+632 |     :return count of deleted dags
+    |      ^^^^^^ D413
+633 |     """
+634 |     return 0
+    |
+    = help: Add blank line after "return"
+
+ℹ Safe fix
+630 630 |         in the Log table in the backend database (for reasons like auditing).
+631 631 |         The default value is True.
+632 632 |     :return count of deleted dags
+    633 |+
+633 634 |     """
+634 635 |     return 0

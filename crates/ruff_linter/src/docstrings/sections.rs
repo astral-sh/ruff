@@ -1,7 +1,9 @@
 use std::fmt::{Debug, Formatter};
 use std::iter::FusedIterator;
 
-use ruff_python_ast::docstrings::{leading_space, leading_words, sphinx_title};
+use ruff_python_ast::docstrings::{
+    leading_space, leading_space_and_colon, leading_words, sphinx_section_name,
+};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use strum_macros::EnumIter;
 
@@ -189,25 +191,47 @@ impl<'a> SectionContexts<'a> {
         let mut previous_line = lines.next();
 
         while let Some(line) = lines.next() {
-            if let Some(section_kind) = suspected_as_section(&line, style) {
+            if matches!(style, SectionStyle::Sphinx) {
+                let section_name = sphinx_section_name(&line);
+                if let Some(kind) = SectionKind::from_str(section_name) {
+                    if style.sections().contains(&kind) {
+                        let indent = leading_space_and_colon(&line);
+                        let indent_size = indent.text_len();
+                        let section_name_size = section_name.text_len();
+
+                        if let Some(mut last) = last.take() {
+                            last.range = TextRange::new(last.start(), line.start());
+                            contexts.push(last);
+                        }
+
+                        last = Some(SectionContextData {
+                            kind,
+                            indent_size: indent.text_len(),
+                            name_range: TextRange::at(
+                                line.start() + indent_size,
+                                section_name_size,
+                            ),
+                            range: TextRange::empty(line.start()),
+                            summary_full_end: line.full_end(),
+                        });
+                    }
+                }
+            } else if let Some(section_kind) = suspected_as_section(&line, style) {
                 let indent = leading_space(&line);
                 let indent_size = indent.text_len();
 
                 let section_name = leading_words(&line);
                 let section_name_size = section_name.text_len();
 
-                // Suspected sphinx matches are always correct
-                if matches!(style, SectionStyle::Sphinx)
-                    || is_docstring_section(
-                        &line,
-                        indent_size,
-                        section_name_size,
-                        section_kind,
-                        last.as_ref(),
-                        previous_line.as_ref(),
-                        lines.peek(),
-                    )
-                {
+                if is_docstring_section(
+                    &line,
+                    indent_size,
+                    section_name_size,
+                    section_kind,
+                    last.as_ref(),
+                    previous_line.as_ref(),
+                    lines.peek(),
+                ) {
                     if let Some(mut last) = last.take() {
                         last.range = TextRange::new(last.start(), line.start());
                         contexts.push(last);
@@ -447,13 +471,7 @@ impl Debug for SectionContext<'_> {
 }
 
 fn suspected_as_section(line: &str, style: SectionStyle) -> Option<SectionKind> {
-    if matches!(style, SectionStyle::Sphinx) {
-        if let Some(kind) = SectionKind::from_str(sphinx_title(line)) {
-            if style.sections().contains(&kind) {
-                return Some(kind);
-            }
-        }
-    } else if let Some(kind) = SectionKind::from_str(leading_words(line)) {
+    if let Some(kind) = SectionKind::from_str(leading_words(line)) {
         if style.sections().contains(&kind) {
             return Some(kind);
         }

@@ -1633,7 +1633,7 @@ fn blanks_and_section_underline(
 
             checker.diagnostics.push(diagnostic);
         }
-        if checker.enabled(Rule::EmptyDocstringSection) {
+        if !style.is_sphinx() && checker.enabled(Rule::EmptyDocstringSection) {
             checker.diagnostics.push(Diagnostic::new(
                 EmptyDocstringSection {
                     name: context.section_name().to_string(),
@@ -1651,7 +1651,7 @@ fn common_section(
     next: Option<&SectionContext>,
     style: SectionStyle,
 ) {
-    if checker.enabled(Rule::CapitalizeSectionName) {
+    if !style.is_sphinx() && checker.enabled(Rule::CapitalizeSectionName) {
         let capitalized_section_name = context.kind().as_str();
         if context.section_name() != capitalized_section_name {
             let section_range = context.section_name_range();
