@@ -184,21 +184,36 @@ static PY313_PLUS_BUILTINS: &[&str] = &["PythonFinalizationError"];
 /// Return the list of builtins for the given Python minor version.
 ///
 /// Intended to be kept in sync with [`is_python_builtin`].
-pub fn python_builtins(minor_version: u8, is_notebook: bool) -> Vec<&'static str> {
-    let mut builtins = ALWAYS_AVAILABLE_BUILTINS.to_vec();
-    if minor_version >= 10 {
-        builtins.extend(PY310_PLUS_BUILTINS);
-    }
-    if minor_version >= 11 {
-        builtins.extend(PY311_PLUS_BUILTINS);
-    }
-    if minor_version >= 13 {
-        builtins.extend(PY313_PLUS_BUILTINS);
-    }
-    if is_notebook {
-        builtins.extend(IPYTHON_BUILTINS);
-    }
-    builtins
+pub fn python_builtins(minor_version: u8, is_notebook: bool) -> impl Iterator<Item = &'static str> {
+    let py310_builtins = if minor_version >= 10 {
+        Some(PY310_PLUS_BUILTINS)
+    } else {
+        None
+    };
+    let py311_builtins = if minor_version >= 11 {
+        Some(PY311_PLUS_BUILTINS)
+    } else {
+        None
+    };
+    let py313_builtins = if minor_version >= 13 {
+        Some(PY313_PLUS_BUILTINS)
+    } else {
+        None
+    };
+    let ipython_builtins = if is_notebook {
+        Some(IPYTHON_BUILTINS)
+    } else {
+        None
+    };
+
+    py310_builtins
+        .into_iter()
+        .chain(py311_builtins)
+        .chain(py313_builtins)
+        .chain(ipython_builtins)
+        .flatten()
+        .chain(ALWAYS_AVAILABLE_BUILTINS)
+        .copied()
 }
 
 /// Returns `true` if the given name is that of a Python builtin.

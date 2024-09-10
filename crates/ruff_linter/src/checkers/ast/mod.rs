@@ -1951,20 +1951,25 @@ impl<'a> Checker<'a> {
     }
 
     fn bind_builtins(&mut self) {
-        let standard_builtins = python_builtins(
-            self.settings.target_version.minor(),
-            self.source_type.is_ipynb(),
-        );
-        for builtin in standard_builtins
-            .iter()
-            .chain(MAGIC_GLOBALS.iter())
-            .copied()
-            .chain(self.settings.builtins.iter().map(String::as_str))
-        {
+        let mut bind_builtin = |builtin| {
             // Add the builtin to the scope.
             let binding_id = self.semantic.push_builtin();
             let scope = self.semantic.global_scope_mut();
             scope.add(builtin, binding_id);
+        };
+
+        let standard_builtins = python_builtins(
+            self.settings.target_version.minor(),
+            self.source_type.is_ipynb(),
+        );
+        for builtin in standard_builtins {
+            bind_builtin(builtin);
+        }
+        for builtin in MAGIC_GLOBALS {
+            bind_builtin(builtin);
+        }
+        for builtin in &self.settings.builtins {
+            bind_builtin(builtin);
         }
     }
 
