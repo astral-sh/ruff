@@ -7,7 +7,6 @@ use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, visitor, Expr, Stmt};
-use ruff_python_ast::{AnyParameterRef, Parameter, ParameterWithDefault};
 use ruff_python_semantic::analyze::visibility::is_staticmethod;
 use ruff_python_semantic::analyze::{function_type, visibility};
 use ruff_python_semantic::{Definition, SemanticModel};
@@ -1078,23 +1077,10 @@ fn is_generator_function_annotated_as_returning_none(
         .is_some_and(GeneratorOrIteratorArguments::indicates_none_returned)
 }
 
-/// An individual parameter from a function's signature.
-#[derive(Debug)]
-struct SignatureParameter<'a> {
-    name: &'a str,
-    range: TextRange,
-}
-
-impl Ranged for SignatureParameter<'_> {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-
 fn parameters_from_signature<'a>(
     docstring: &'a Docstring,
     semantic: &'a SemanticModel,
-) -> Vec<SignatureParameter<'a>> {
+) -> Vec<&'a str> {
     let mut parameters = Vec::new();
     let Some(function) = docstring.definition.as_function_def() else {
         return parameters;
@@ -1102,28 +1088,7 @@ fn parameters_from_signature<'a>(
     for param in function.parameters.iter().skip(usize::from(
         docstring.definition.is_method() && !is_staticmethod(&function.decorator_list, semantic),
     )) {
-        match param {
-            AnyParameterRef::Variadic(Parameter { name, range, .. }) => {
-                let name = name.as_str();
-                if !name.starts_with('_') {
-                    parameters.push(SignatureParameter {
-                        name,
-                        range: *range,
-                    });
-                }
-            }
-            AnyParameterRef::NonVariadic(ParameterWithDefault {
-                parameter, range, ..
-            }) => {
-                let name = parameter.name.as_str();
-                if !name.starts_with('_') {
-                    parameters.push(SignatureParameter {
-                        name,
-                        range: *range,
-                    });
-                }
-            }
-        }
+        parameters.push(param.name());
     }
     parameters
 }
@@ -1180,10 +1145,10 @@ pub(crate) fn check_docstring(
                     section
                         .parameters
                         .iter()
-                        .any(|param| *param == signature_param.name)
+                        .any(|param| param == signature_param)
                 })
             {
-                missing_parameters.push((*signature_param.name).to_string());
+                missing_parameters.push((*signature_param).to_string());
             }
         }
         if !missing_parameters.is_empty() {
@@ -1306,7 +1271,7 @@ pub(crate) fn check_docstring(
                 for docstring_param in &docstring_params.parameters {
                     if !signature_parameters
                         .iter()
-                        .any(|param| param.name == *docstring_param)
+                        .any(|param| param == docstring_param)
                     {
                         extraneous_parameters.push((*docstring_param).to_string());
                     }
