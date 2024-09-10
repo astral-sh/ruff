@@ -93,7 +93,7 @@ impl std::fmt::Display for DisplayRepresentation<'_> {
                     f.write_str("()")?;
                 } else {
                     let mut first = true;
-                    for element in tuple.elements(self.db) {
+                    for element in &**elements {
                         if !first {
                             f.write_str(", ")?;
                         }
