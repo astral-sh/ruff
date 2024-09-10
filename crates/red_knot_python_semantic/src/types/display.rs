@@ -1,6 +1,6 @@
 //! Display implementations for types.
 
-use std::fmt::{Display, Formatter};
+use std::fmt::{Display, Formatter, Write};
 
 use ruff_python_ast::str::Quote;
 use ruff_python_literal::escape::AsciiEscape;
@@ -27,18 +27,15 @@ pub struct DisplayType<'db> {
 impl Display for DisplayType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let representation = self.ty.representation(self.db);
-        if matches!(
-            self.ty,
+        match self.ty {
             Type::IntLiteral(_)
-                | Type::BooleanLiteral(_)
-                | Type::StringLiteral(_)
-                | Type::BytesLiteral(_)
-                | Type::Class(_)
-                | Type::Function(_)
-        ) {
-            write!(f, "Literal[{representation}]",)
-        } else {
-            representation.fmt(f)
+            | Type::BooleanLiteral(_)
+            | Type::StringLiteral(_)
+            | Type::BytesLiteral(_)
+            | Type::Class(_)
+            | Type::Function(_) => write!(f, "Literal[{representation}]"),
+            Type::ExistsOnVersion(_) => write!(f, "ExistsOnVersion[{representation}]"),
+            _ => representation.fmt(f),
         }
     }
 }
@@ -86,6 +83,7 @@ impl std::fmt::Display for DisplayRepresentation<'_> {
 
                 escape.bytes_repr().write(f)
             }
+            Type::ExistsOnVersion(python_version) => f.write_str(python_version.as_str()),
         }
     }
 }
@@ -105,13 +103,13 @@ impl Display for DisplayUnionType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let elements = self.ty.elements(self.db);
 
-        // Group literal types by kind.
-        let mut grouped_literals = FxOrderMap::default();
+        // Group condensed-display types by kind.
+        let mut grouped_condensed_kinds = FxOrderMap::default();
 
         for element in elements {
-            if let Ok(literal_kind) = LiteralTypeKind::try_from(*element) {
-                grouped_literals
-                    .entry(literal_kind)
+            if let Ok(condensed_kind) = CondensedDisplayTypeKind::try_from(*element) {
+                grouped_condensed_kinds
+                    .entry(condensed_kind)
                     .or_insert_with(Vec::new)
                     .push(*element);
             }
@@ -119,10 +117,10 @@ impl Display for DisplayUnionType<'_> {
 
         let mut first = true;
 
-        // Print all types, but write all literals together (while preserving their position).
+        // Print all types, but write all condensed-display types together (while preserving their position).
         for ty in elements {
-            if let Ok(literal_kind) = LiteralTypeKind::try_from(*ty) {
-                let Some(mut literals) = grouped_literals.remove(&literal_kind) else {
+            if let Ok(condensed_kind) = CondensedDisplayTypeKind::try_from(*ty) {
+                let Some(mut literals) = grouped_condensed_kinds.remove(&condensed_kind) else {
                     continue;
                 };
 
@@ -130,9 +128,10 @@ impl Display for DisplayUnionType<'_> {
                     f.write_str(" | ")?;
                 };
 
-                f.write_str("Literal[")?;
+                f.write_str(condensed_kind.outer_name())?;
+                f.write_char('[')?;
 
-                if literal_kind == LiteralTypeKind::IntLiteral {
+                if condensed_kind == CondensedDisplayTypeKind::IntLiteral {
                     literals.sort_unstable_by_key(|ty| ty.expect_int_literal());
                 }
 
@@ -154,7 +153,7 @@ impl Display for DisplayUnionType<'_> {
             first = false;
         }
 
-        debug_assert!(grouped_literals.is_empty());
+        debug_assert!(grouped_condensed_kinds.is_empty());
 
         Ok(())
     }
@@ -167,15 +166,25 @@ impl std::fmt::Debug for DisplayUnionType<'_> {
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-enum LiteralTypeKind {
+enum CondensedDisplayTypeKind {
     Class,
     Function,
     IntLiteral,
     StringLiteral,
     BytesLiteral,
+    ExistsOnVersion,
 }
 
-impl TryFrom<Type<'_>> for LiteralTypeKind {
+impl CondensedDisplayTypeKind {
+    const fn outer_name(self) -> &'static str {
+        match self {
+            Self::ExistsOnVersion => "ExistsOnVersion",
+            _ => "Literal",
+        }
+    }
+}
+
+impl TryFrom<Type<'_>> for CondensedDisplayTypeKind {
     type Error = ();
 
     fn try_from(value: Type<'_>) -> Result<Self, Self::Error> {
@@ -185,6 +194,7 @@ impl TryFrom<Type<'_>> for LiteralTypeKind {
             Type::IntLiteral(_) => Ok(Self::IntLiteral),
             Type::StringLiteral(_) => Ok(Self::StringLiteral),
             Type::BytesLiteral(_) => Ok(Self::BytesLiteral),
+            Type::ExistsOnVersion(_) => Ok(Self::ExistsOnVersion),
             _ => Err(()),
         }
     }
@@ -236,7 +246,9 @@ mod tests {
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
     use crate::db::tests::TestDb;
-    use crate::types::{global_symbol_ty, BytesLiteralType, StringLiteralType, Type, UnionBuilder};
+    use crate::types::{
+        global_symbol_ty, BytesLiteralType, StringLiteralType, SupportedVersion, Type, UnionBuilder,
+    };
     use crate::{Program, ProgramSettings, PythonVersion, SearchPathSettings};
 
     fn setup_db() -> TestDb {
@@ -293,6 +305,8 @@ mod tests {
             global_symbol_ty(&db, mod_file, "B"),
             Type::BooleanLiteral(true),
             Type::None,
+            Type::ExistsOnVersion(SupportedVersion::Py310),
+            Type::ExistsOnVersion(SupportedVersion::Py311),
         ];
         let builder = vec.iter().fold(UnionBuilder::new(&db), |builder, literal| {
             builder.add(*literal)
@@ -309,7 +323,8 @@ mod tests {
                 "Literal[b\"\\x00\", b\"\\x07\"] | ",
                 "Literal[foo, bar] | ",
                 "Literal[True] | ",
-                "None"
+                "None | ",
+                "ExistsOnVersion[3.10, 3.11]",
             )
         );
         Ok(())
