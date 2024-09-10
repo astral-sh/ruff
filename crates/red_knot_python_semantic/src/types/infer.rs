@@ -4356,6 +4356,28 @@ mod tests {
     }
 
     #[test]
+    fn for_loop_with_heterogenous_tuple() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            for x in (1, 'a', b'foo'):
+                pass
+            ",
+        )?;
+
+        assert_public_ty(
+            &db,
+            "src/a.py",
+            "x",
+            r#"Literal[1] | Literal["a"] | Literal[b"foo"]"#,
+        );
+
+        Ok(())
+    }
+
+    #[test]
     fn except_handler_single_exception() -> anyhow::Result<()> {
         let mut db = setup_db();
 
