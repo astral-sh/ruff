@@ -449,14 +449,12 @@ impl<'db> Type<'db> {
         match self {
             Type::Any => Type::Any,
             Type::Unknown => Type::Unknown,
+            Type::Unbound => Type::Unknown,
             Type::Never => Type::Never,
             Type::Class(class) => Type::Instance(*class),
             Type::Union(union) => union.map(db, |element| element.to_instance(db)),
             // TODO: we can probably do better here: --Alex
             Type::Intersection(_) => Type::Unknown,
-            // TODO: converting to `Unknown` here is probably correct,
-            // but should result in a diagnostic reporting the use of an unbound name:
-            Type::Unbound => Type::Unknown,
             // TODO: calling `.to_instance()` on any of these should result in a diagnostic,
             // since they already indicate that the object is an instance of some kind:
             Type::BooleanLiteral(_)
