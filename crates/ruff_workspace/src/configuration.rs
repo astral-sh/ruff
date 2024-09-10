@@ -49,7 +49,7 @@ use crate::options::{
     Flake8QuotesOptions, Flake8SelfOptions, Flake8TidyImportsOptions, Flake8TypeCheckingOptions,
     Flake8UnusedArgumentsOptions, FormatOptions, IsortOptions, LintCommonOptions, LintOptions,
     McCabeOptions, Options, Pep8NamingOptions, PyUpgradeOptions, PycodestyleOptions,
-    PydocstyleOptions, PyflakesOptions, PylintOptions, RuffOptions,
+    PydoclintOptions, PydocstyleOptions, PyflakesOptions, PylintOptions, RuffOptions,
 };
 use crate::settings::{
     FileResolverSettings, FormatterSettings, LineEnding, Settings, EXCLUDE, INCLUDE,
@@ -404,6 +404,10 @@ impl Configuration {
                         ..pycodestyle::settings::Settings::default()
                     }
                 },
+                pydoclint: lint
+                    .pydoclint
+                    .map(PydoclintOptions::into_settings)
+                    .unwrap_or_default(),
                 pydocstyle: lint
                     .pydocstyle
                     .map(PydocstyleOptions::into_settings)
@@ -635,6 +639,7 @@ pub struct LintConfiguration {
     pub mccabe: Option<McCabeOptions>,
     pub pep8_naming: Option<Pep8NamingOptions>,
     pub pycodestyle: Option<PycodestyleOptions>,
+    pub pydoclint: Option<PydoclintOptions>,
     pub pydocstyle: Option<PydocstyleOptions>,
     pub pyflakes: Option<PyflakesOptions>,
     pub pylint: Option<PylintOptions>,
@@ -747,6 +752,7 @@ impl LintConfiguration {
             mccabe: options.common.mccabe,
             pep8_naming: options.common.pep8_naming,
             pycodestyle: options.common.pycodestyle,
+            pydoclint: options.common.pydoclint,
             pydocstyle: options.common.pydocstyle,
             pyflakes: options.common.pyflakes,
             pylint: options.common.pylint,
@@ -1141,6 +1147,7 @@ impl LintConfiguration {
             mccabe: self.mccabe.combine(config.mccabe),
             pep8_naming: self.pep8_naming.combine(config.pep8_naming),
             pycodestyle: self.pycodestyle.combine(config.pycodestyle),
+            pydoclint: self.pydoclint.combine(config.pydoclint),
             pydocstyle: self.pydocstyle.combine(config.pydocstyle),
             pyflakes: self.pyflakes.combine(config.pyflakes),
             pylint: self.pylint.combine(config.pylint),
@@ -1352,6 +1359,7 @@ fn warn_about_deprecated_top_level_lint_options(
         mccabe,
         pep8_naming,
         pycodestyle,
+        pydoclint,
         pydocstyle,
         pyflakes,
         pylint,
@@ -1515,6 +1523,10 @@ fn warn_about_deprecated_top_level_lint_options(
 
     if pycodestyle.is_some() {
         used_options.push("pycodestyle");
+    }
+
+    if pydoclint.is_some() {
+        used_options.push("pydoclint");
     }
 
     if pydocstyle.is_some() {

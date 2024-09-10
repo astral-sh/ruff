@@ -25,7 +25,7 @@ use ruff_linter::rules::{
     flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
     flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
-    pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
+    pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
 };
 use ruff_linter::settings::types::{
     IdentifierPattern, OutputFormat, PythonVersion, RequiredVersion,
@@ -886,6 +886,10 @@ pub struct LintCommonOptions {
     /// Options for the `pycodestyle` plugin.
     #[option_group]
     pub pycodestyle: Option<PycodestyleOptions>,
+
+    /// Options for the `pydoclint` plugin.
+    #[option_group]
+    pub pydoclint: Option<PydoclintOptions>,
 
     /// Options for the `pydocstyle` plugin.
     #[option_group]
@@ -2934,6 +2938,32 @@ impl PydocstyleOptions {
             ignore_decorators: BTreeSet::from_iter(ignore_decorators.unwrap_or_default()),
             property_decorators: BTreeSet::from_iter(property_decorators.unwrap_or_default()),
             ignore_var_parameters: ignore_variadics.unwrap_or_default(),
+        }
+    }
+}
+
+#[derive(
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct PydoclintOptions {
+    /// Skip docstrings which fit on a single line.
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+            # Skip docstrings which fit on a single line.
+            ignore-one-line-docstrings = true
+        "#
+    )]
+    pub ignore_one_line_docstrings: Option<bool>,
+}
+
+impl PydoclintOptions {
+    pub fn into_settings(self) -> pydoclint::settings::Settings {
+        pydoclint::settings::Settings {
+            ignore_one_line_docstrings: self.ignore_one_line_docstrings.unwrap_or_default(),
         }
     }
 }
