@@ -76,6 +76,6 @@ sections.py:629:6: D410 [*] Missing blank line after section ("param")
 630 630 |         in the Log table in the backend database (for reasons like auditing).
 631 631 |         The default value is True.
     632 |+
-632 633 |     :return count of deleted dags
+632 633 |     :return: count of deleted dags
 633 634 |     """
 634 635 |     return 0

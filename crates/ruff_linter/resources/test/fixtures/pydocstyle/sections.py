@@ -629,6 +629,6 @@ def foo(dag_id: str, keep_records_in_log: bool = True) -> int:
     :param keep_records_in_log: whether keep records of the given dag_id
         in the Log table in the backend database (for reasons like auditing).
         The default value is True.
-    :return count of deleted dags
+    :return: count of deleted dags
     """
     return 0

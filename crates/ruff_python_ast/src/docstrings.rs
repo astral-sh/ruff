@@ -28,8 +28,16 @@ pub fn leading_space_and_colon(line: &str) -> &str {
 }
 
 /// Sphinx section section name.
-pub fn sphinx_section_name(line: &str) -> &str {
-    let line = line.trim_start_matches([' ', ':']);
-    line.find(|char: char| !char.is_alphanumeric())
-        .map_or(line, |index| &line[..index])
+pub fn sphinx_section_name(line: &str) -> Option<&str> {
+    let mut spans = line.split(':');
+    let Some(_indentation) = spans.next() else {
+        return None;
+    };
+    let Some(header) = spans.next() else {
+        return None;
+    };
+    let Some(_after_header) = spans.next() else {
+        return None;
+    };
+    header.split(' ').next()
 }

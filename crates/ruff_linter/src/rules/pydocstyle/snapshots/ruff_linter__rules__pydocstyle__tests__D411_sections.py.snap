@@ -81,7 +81,7 @@ sections.py:632:6: D411 [*] Missing blank line before section ("return")
     |
 630 |         in the Log table in the backend database (for reasons like auditing).
 631 |         The default value is True.
-632 |     :return count of deleted dags
+632 |     :return: count of deleted dags
     |      ^^^^^^ D411
 633 |     """
 634 |     return 0
@@ -93,6 +93,6 @@ sections.py:632:6: D411 [*] Missing blank line before section ("return")
 630 630 |         in the Log table in the backend database (for reasons like auditing).
 631 631 |         The default value is True.
     632 |+
-632 633 |     :return count of deleted dags
+632 633 |     :return: count of deleted dags
 633 634 |     """
 634 635 |     return 0

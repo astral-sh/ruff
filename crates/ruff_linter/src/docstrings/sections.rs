@@ -192,28 +192,29 @@ impl<'a> SectionContexts<'a> {
 
         while let Some(line) = lines.next() {
             if matches!(style, SectionStyle::Sphinx) {
-                let section_name = sphinx_section_name(&line);
-                if let Some(kind) = SectionKind::from_str(section_name) {
-                    if style.sections().contains(&kind) {
-                        let indent = leading_space_and_colon(&line);
-                        let indent_size = indent.text_len();
-                        let section_name_size = section_name.text_len();
+                if let Some(section_name) = sphinx_section_name(&line) {
+                    if let Some(kind) = SectionKind::from_str(section_name) {
+                        if style.sections().contains(&kind) {
+                            let indent = leading_space_and_colon(&line);
+                            let indent_size = indent.text_len();
+                            let section_name_size = section_name.text_len();
 
-                        if let Some(mut last) = last.take() {
-                            last.range = TextRange::new(last.start(), line.start());
-                            contexts.push(last);
+                            if let Some(mut last) = last.take() {
+                                last.range = TextRange::new(last.start(), line.start());
+                                contexts.push(last);
+                            }
+
+                            last = Some(SectionContextData {
+                                kind,
+                                indent_size: indent.text_len(),
+                                name_range: TextRange::at(
+                                    line.start() + indent_size,
+                                    section_name_size,
+                                ),
+                                range: TextRange::empty(line.start()),
+                                summary_full_end: line.full_end(),
+                            });
                         }
-
-                        last = Some(SectionContextData {
-                            kind,
-                            indent_size: indent.text_len(),
-                            name_range: TextRange::at(
-                                line.start() + indent_size,
-                                section_name_size,
-                            ),
-                            range: TextRange::empty(line.start()),
-                            summary_full_end: line.full_end(),
-                        });
                     }
                 }
             } else if let Some(section_kind) = suspected_as_section(&line, style) {
