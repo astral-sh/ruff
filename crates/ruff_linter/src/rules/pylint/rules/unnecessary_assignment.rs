@@ -71,7 +71,7 @@ impl Violation for UnnecessaryAssignment {
     }
 }
 
-type AssignmentBeforeIfStmt<'a> = (Expr, ExprName, StmtAssign);
+type AssignmentBeforeIfStmt<'a> = (&'a Expr, &'a ExprName, &'a StmtAssign);
 
 /// PLR6103
 pub(crate) fn unnecessary_assignment(checker: &mut Checker, stmt: &StmtIf) {
@@ -79,44 +79,42 @@ pub(crate) fn unnecessary_assignment(checker: &mut Checker, stmt: &StmtIf) {
         return;
     }
 
-    let if_test = *stmt.test.clone();
+    let if_test = stmt.test.as_ref();
     let semantic = checker.semantic();
     let mut errors: Vec<AssignmentBeforeIfStmt> = Vec::new();
 
     // case - if check (`if test1:`)
-    if let Some(unreferenced_binding) = find_assignment_before_if_stmt(semantic, &if_test, &if_test)
-    {
+    if let Some(unreferenced_binding) = find_assignment_before_if_stmt(semantic, if_test, if_test) {
         errors.push(unreferenced_binding);
     };
 
     // case - bool operations (`if test1 and test2:`)
-    if let Expr::BoolOp(expr) = if_test.clone() {
+    if let Expr::BoolOp(expr) = if_test {
         errors.extend(
             expr.values
                 .iter()
                 .filter_map(|bool_test| {
-                    find_assignment_before_if_stmt(semantic, &if_test, bool_test)
+                    find_assignment_before_if_stmt(semantic, if_test, bool_test)
                 })
                 .collect::<Vec<AssignmentBeforeIfStmt>>(),
         );
     }
 
     // case - compare (`if test1 is not None:`)
-    if let Expr::Compare(compare) = if_test.clone() {
-        if let Some(error) = find_assignment_before_if_stmt(semantic, &if_test, &compare.left) {
+    if let Expr::Compare(compare) = if_test {
+        if let Some(error) = find_assignment_before_if_stmt(semantic, if_test, &compare.left) {
             errors.push(error);
         };
     }
 
     // case - elif else clauses (`elif test1:`)
-    let elif_else_clauses = stmt.elif_else_clauses.clone();
     errors.extend(
-        elif_else_clauses
+        stmt.elif_else_clauses
             .iter()
             .filter(|elif_else_clause| elif_else_clause.test.is_some())
             .filter_map(|elif_else_clause| {
-                let elif_check = elif_else_clause.test.clone().unwrap();
-                find_assignment_before_if_stmt(semantic, &elif_check, &elif_check)
+                let elif_check = elif_else_clause.test.as_ref().unwrap();
+                find_assignment_before_if_stmt(semantic, elif_check, elif_check)
             })
             .collect::<Vec<AssignmentBeforeIfStmt>>(),
     );
@@ -143,11 +141,11 @@ pub(crate) fn unnecessary_assignment(checker: &mut Checker, stmt: &StmtIf) {
 /// * `if_test_part` - part of the if test (`test1`)
 fn find_assignment_before_if_stmt<'a>(
     semantic: &'a SemanticModel,
-    if_test: &Expr,
-    if_test_part: &Expr,
+    if_test: &'a Expr,
+    if_test_part: &'a Expr,
 ) -> Option<AssignmentBeforeIfStmt<'a>> {
     // early exit when the test part is not a variable
-    let Expr::Name(test_variable) = if_test_part.clone() else {
+    let Expr::Name(test_variable) = if_test_part else {
         return None;
     };
 
@@ -166,7 +164,7 @@ fn find_assignment_before_if_stmt<'a>(
         return None;
     }
 
-    Some((if_test.clone(), test_variable, previous_statement.clone()))
+    Some((if_test, test_variable, previous_statement))
 }
 
 fn create_diagnostic(
@@ -176,25 +174,26 @@ fn create_diagnostic(
     error: AssignmentBeforeIfStmt,
 ) -> Diagnostic {
     let (origin, expr_name, assignment) = error;
-    let assignment_expr = generator.expr(&assignment.value.clone());
+    let assignment_expr = generator.expr(&assignment.value);
     let use_parentheses = origin.is_bool_op_expr() || !assignment.value.is_name_expr();
 
     let mut diagnostic = Diagnostic::new(
         UnnecessaryAssignment {
-            name: expr_name.clone().id,
+            name: expr_name.id.clone(),
             assignment: assignment_expr.clone(),
             parentheses: use_parentheses,
         },
-        expr_name.clone().range(),
+        expr_name.range(),
     );
 
     let format = if use_parentheses {
-        format!("({} := {})", expr_name.clone().id, assignment_expr.clone())
+        format!("({} := {})", expr_name.id, assignment_expr)
     } else {
-        format!("{} := {}", expr_name.clone().id, assignment_expr.clone())
+        format!("{} := {}", expr_name.id, assignment_expr)
     };
 
-    let delete_assignment_edit = delete_stmt(&Stmt::from(assignment), None, locator, indexer);
+    let delete_assignment_edit =
+        delete_stmt(&Stmt::from(assignment.clone()), None, locator, indexer);
     let use_walrus_edit = Edit::range_replacement(format, diagnostic.range());
 
     diagnostic.set_fix(Fix::unsafe_edits(delete_assignment_edit, [use_walrus_edit]));
