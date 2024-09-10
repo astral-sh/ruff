@@ -203,6 +203,28 @@ pub(crate) fn custom_type_var_instead_of_self(
                 })?
             }
         }
+        FunctionType::StaticMethod if matches!(function_def.name.as_str(), "__new__") => {
+            if checker.settings.preview.is_enabled() {
+                (
+                    Method::PreviewClass(PreviewClassMethod {
+                        cls_annotation: self_or_cls_annotation,
+                        type_params: function_def.type_params.as_deref(),
+                    }),
+                    TextRange::new(function_name.end(), function_header_end),
+                )
+            } else {
+                returns.as_deref().map(|returns| {
+                    (
+                        Method::DunderNew(DunderNewMethod {
+                            cls_annotation: self_or_cls_annotation,
+                            returns,
+                            type_params: function_def.type_params.as_deref(),
+                        }),
+                        returns.range(),
+                    )
+                })?
+            }
+        }
         FunctionType::Function | FunctionType::StaticMethod => return None,
     };
 
@@ -230,6 +252,7 @@ pub(crate) fn custom_type_var_instead_of_self(
 
 #[derive(Debug)]
 enum Method<'a> {
+    DunderNew(DunderNewMethod<'a>),
     Class(ClassMethod<'a>),
     PreviewClass(PreviewClassMethod<'a>),
     Instance(InstanceMethod<'a>),
@@ -247,6 +270,7 @@ impl Method<'_> {
             Self::PreviewClass(class_method) => class_method.custom_typevar(semantic, scope),
             Self::Instance(instance_method) => instance_method.custom_typevar(semantic),
             Self::PreviewInstance(instance_method) => instance_method.custom_typevar(semantic),
+            Self::DunderNew(dunder_new_method) => dunder_new_method.custom_typevar(semantic, scope),
         }
     }
 }
@@ -310,6 +334,11 @@ impl ClassMethod<'_> {
             .map(|binding_id| TypeVar(semantic.binding(binding_id)))
     }
 }
+
+// Dunder new methods (`__new__`, also known as magic methods) are technically static methods,
+// with `cls` as their first argument. However, for the purpose of this check, we treat them
+// as class methods.
+use ClassMethod as DunderNewMethod;
 
 /// Struct for implementing this rule as applied to classmethods in preview mode.
 ///

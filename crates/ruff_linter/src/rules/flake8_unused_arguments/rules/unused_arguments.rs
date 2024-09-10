@@ -458,6 +458,11 @@ pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
                         && !visibility::is_override(decorator_list, checker.semantic())
                         && !visibility::is_overload(decorator_list, checker.semantic())
                     {
+                        if visibility::is_new(name) {
+                            method(Argumentable::StaticMethod, parameters, scope, checker);
+                            return;
+                        }
+
                         function(Argumentable::StaticMethod, parameters, scope, checker);
                     }
                 }
