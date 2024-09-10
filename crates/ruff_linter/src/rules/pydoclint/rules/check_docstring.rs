@@ -636,14 +636,16 @@ fn parse_parameters_google(content: &str) -> Vec<&str> {
     };
     for potential in content.lines() {
         if let Some(entry) = potential.strip_prefix(indentation) {
-            if let Some(first_char) = entry.chars().next() {
-                if !first_char.is_whitespace() {
-                    let Some(colon_idx) = entry.find(':') else {
-                        continue;
-                    };
-                    if let Some(param) = entry[..colon_idx].split_whitespace().next() {
-                        entries.push(param.trim_start_matches('*'));
-                    }
+            if entry
+                .chars()
+                .next()
+                .is_some_and(|first_char| !first_char.is_whitespace())
+            {
+                let Some(colon_idx) = entry.find(':') else {
+                    continue;
+                };
+                if let Some(param) = entry[..colon_idx].split_whitespace().next() {
+                    entries.push(param.trim_start_matches('*'));
                 }
             }
         }
