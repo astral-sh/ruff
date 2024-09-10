@@ -625,15 +625,32 @@ where
                     orelse,
                 },
             ) => {
-                // TODO add control flow similar to `ast::Stmt::While` above
                 self.add_standalone_expression(iter);
                 self.visit_expr(iter);
+
+                let pre_loop = self.flow_snapshot();
+                let saved_break_states = std::mem::take(&mut self.loop_break_states);
+
                 debug_assert!(self.current_assignment.is_none());
                 self.current_assignment = Some(for_stmt.into());
                 self.visit_expr(target);
                 self.current_assignment = None;
+
                 self.visit_body(body);
+
+                let break_states =
+                    std::mem::replace(&mut self.loop_break_states, saved_break_states);
+
+                // We may execute the `else` clause without ever executing the body, so merge in
+                // the pre-loop state before visiting `else`.
+                self.flow_merge(pre_loop);
                 self.visit_body(orelse);
+
+                // Breaking out of a `for` loop bypasses the `else` clause, so merge in the break
+                // states after visiting `else`.
+                for break_state in break_states {
+                    self.flow_merge(break_state);
+                }
             }
             ast::Stmt::Match(ast::StmtMatch {
                 subject,
