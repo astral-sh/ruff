@@ -205,9 +205,8 @@ impl ClassMethod<'_> {
     }
 }
 
-// Dunder new methods (`__new__`, also known as magic methods) are technically static methods,
-// with `cls` as their first argument. However, for the purpose of this check, we treat them
-// as class methods.
+// Dunder new methods (`__new__`) are technically static methods with `cls` as their first argument.
+// For simplicity of implementation, we treat them as class methods.
 use ClassMethod as DunderNewMethod;
 
 #[derive(Debug)]

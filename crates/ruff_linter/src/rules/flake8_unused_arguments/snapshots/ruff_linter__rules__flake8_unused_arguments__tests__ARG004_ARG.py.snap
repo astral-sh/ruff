@@ -25,3 +25,12 @@ ARG.py:55:11: ARG004 Unused static method argument: `x`
    |           ^ ARG004
 56 |         print("Hello, world!")
    |
+
+ARG.py:192:22: ARG004 Unused static method argument: `x`
+    |
+190 | ###
+191 | class C:
+192 |     def __new__(cls, x):
+    |                      ^ ARG004
+193 |         print("Hello, world!")
+    |
