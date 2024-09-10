@@ -154,7 +154,13 @@ pub(crate) fn check_tokens(
         Rule::ShebangNotFirstLine,
         Rule::ShebangMissingPython,
     ]) {
-        flake8_executable::rules::from_tokens(&mut diagnostics, path, locator, comment_ranges);
+        flake8_executable::rules::from_tokens(
+            &mut diagnostics,
+            path,
+            locator,
+            comment_ranges,
+            settings,
+        );
     }
 
     if settings.rules.any_enabled(&[
