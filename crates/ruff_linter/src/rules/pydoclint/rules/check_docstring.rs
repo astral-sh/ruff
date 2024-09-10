@@ -741,6 +741,10 @@ fn returns_documented(
         || (matches!(convention, Some(Convention::Google)) && starts_with_returns(docstring))
 }
 
+fn should_document_returns(function_def: &ast::StmtFunctionDef) -> bool {
+    !matches!(function_def.name.as_str(), "__new__")
+}
+
 fn starts_with_yields(docstring: &Docstring) -> bool {
     if let Some(first_word) = docstring.body().as_str().split(' ').next() {
         return matches!(first_word, "Yield" | "Yields");
@@ -868,7 +872,9 @@ pub(crate) fn check_docstring(
 
     // DOC201
     if checker.enabled(Rule::DocstringMissingReturns) {
-        if !returns_documented(docstring, &docstring_sections, convention) {
+        if should_document_returns(function_def)
+            && !returns_documented(docstring, &docstring_sections, convention)
+        {
             let extra_property_decorators = checker.settings.pydocstyle.property_decorators();
             if !definition.is_property(extra_property_decorators, semantic) {
                 if let Some(body_return) = body_entries.returns.first() {
