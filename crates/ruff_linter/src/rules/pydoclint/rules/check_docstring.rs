@@ -80,10 +80,8 @@ impl Violation for DocstringMissingParameter {
 
     fn fix_title(&self) -> Option<String> {
         let DocstringMissingParameter { ids } = self;
-        Some(format!(
-            "Add {} to the docstring",
-            ids.iter().map(|id| format!("`{id}`")).join(", ")
-        ))
+        let s = if ids.len() == 1 { "" } else { "s" };
+        Some(format!("Add the missing parameter{s} to the docstring"))
     }
 }
 
@@ -148,9 +146,9 @@ impl Violation for DocstringExtraneousParameter {
 
     fn fix_title(&self) -> Option<String> {
         let DocstringExtraneousParameter { ids } = self;
+        let s = if ids.len() == 1 { "" } else { "s" };
         Some(format!(
-            "Remove {} from the docstring",
-            ids.iter().map(|id| format!("`{id}`")).join(", ")
+            "Remove the extraneous parameter{s} from the docstring"
         ))
     }
 }

@@ -14,7 +14,7 @@ DOC102_google.py:6:1: DOC102 `a` is not in the function's signature
 11 |           int: The sum of the two numbers.
 12 |       """
    |
-   = help: Remove `a` from the docstring
+   = help: Remove the extraneous parameter from the docstring
 
 DOC102_google.py:21:1: DOC102 `multiplier` is not in the function's signature
    |
@@ -29,7 +29,7 @@ DOC102_google.py:21:1: DOC102 `multiplier` is not in the function's signature
 26 |           list of int: A new list with each element multiplied.
 27 |       """
    |
-   = help: Remove `multiplier` from the docstring
+   = help: Remove the extraneous parameter from the docstring
 
 DOC102_google.py:36:1: DOC102 `numbers` is not in the function's signature
    |
@@ -43,7 +43,7 @@ DOC102_google.py:36:1: DOC102 `numbers` is not in the function's signature
 40 |           int: The maximum value found in the list.
 41 |       """
    |
-   = help: Remove `numbers` from the docstring
+   = help: Remove the extraneous parameter from the docstring
 
 DOC102_google.py:50:1: DOC102 These parameters are not in the function's signature: `name`, `age`, `email`
    |
@@ -60,7 +60,7 @@ DOC102_google.py:50:1: DOC102 These parameters are not in the function's signatu
 57 |           dict: A dictionary containing the user's profile.
 58 |       """
    |
-   = help: Remove `name`, `age`, `email` from the docstring
+   = help: Remove the extraneous parameters from the docstring
 
 DOC102_google.py:72:1: DOC102 `tax_rate` is not in the function's signature
    |
@@ -76,7 +76,7 @@ DOC102_google.py:72:1: DOC102 `tax_rate` is not in the function's signature
 78 |           float: The final total price after tax and discount.
 79 |       """
    |
-   = help: Remove `tax_rate` from the docstring
+   = help: Remove the extraneous parameter from the docstring
 
 DOC102_google.py:91:1: DOC102 These parameters are not in the function's signature: `to_address`, `cc_address`
     |
@@ -94,7 +94,7 @@ DOC102_google.py:91:1: DOC102 These parameters are not in the function's signatu
  99 |           bool: True if the email was sent successfully, False otherwise.
 100 |       """
     |
-    = help: Remove `to_address`, `cc_address` from the docstring
+    = help: Remove the extraneous parameters from the docstring
 
 DOC102_google.py:109:1: DOC102 `separator` is not in the function's signature
     |
@@ -109,7 +109,7 @@ DOC102_google.py:109:1: DOC102 `separator` is not in the function's signature
 114 |           str: A single concatenated string.
 115 |       """
     |
-    = help: Remove `separator` from the docstring
+    = help: Remove the extraneous parameter from the docstring
 
 DOC102_google.py:124:1: DOC102 These parameters are not in the function's signature: `items`, `details`
     |
@@ -125,7 +125,7 @@ DOC102_google.py:124:1: DOC102 These parameters are not in the function's signat
 130 |           dict: A dictionary containing the order summary.
 131 |       """
     |
-    = help: Remove `items`, `details` from the docstring
+    = help: Remove the extraneous parameters from the docstring
 
 DOC102_google.py:149:1: DOC102 `value` is not in the function's signature
     |
@@ -137,7 +137,7 @@ DOC102_google.py:149:1: DOC102 `value` is not in the function's signature
     | |________^ DOC102
 152 |           self.value = value
     |
-    = help: Remove `value` from the docstring
+    = help: Remove the extraneous parameter from the docstring
 
 DOC102_google.py:159:1: DOC102 `number` is not in the function's signature
     |
@@ -151,7 +151,7 @@ DOC102_google.py:159:1: DOC102 `number` is not in the function's signature
 163 |               int or float: The updated value after addition.
 164 |           """
     |
-    = help: Remove `number` from the docstring
+    = help: Remove the extraneous parameter from the docstring
 
 DOC102_google.py:174:1: DOC102 `value_str` is not in the function's signature
     |
@@ -165,7 +165,7 @@ DOC102_google.py:174:1: DOC102 `value_str` is not in the function's signature
 178 |               Calculator: A new instance of Calculator initialized with the value from the string.
 179 |           """
     |
-    = help: Remove `value_str` from the docstring
+    = help: Remove the extraneous parameter from the docstring
 
 DOC102_google.py:189:1: DOC102 `number` is not in the function's signature
     |
@@ -179,4 +179,4 @@ DOC102_google.py:189:1: DOC102 `number` is not in the function's signature
 193 |               bool: True if the number is valid, False otherwise.
 194 |           """
     |
-    = help: Remove `number` from the docstring
+    = help: Remove the extraneous parameter from the docstring

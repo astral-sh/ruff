@@ -17,7 +17,7 @@ DOC102_numpy.py:6:1: DOC102 `a` is not in the function's signature
 14 |       -------
 15 |       int
    |
-   = help: Remove `a` from the docstring
+   = help: Remove the extraneous parameter from the docstring
 
 DOC102_numpy.py:26:1: DOC102 `multiplier` is not in the function's signature
    |
@@ -35,7 +35,7 @@ DOC102_numpy.py:26:1: DOC102 `multiplier` is not in the function's signature
 34 |       -------
 35 |       list of int
    |
-   = help: Remove `multiplier` from the docstring
+   = help: Remove the extraneous parameter from the docstring
 
 DOC102_numpy.py:46:1: DOC102 `numbers` is not in the function's signature
    |
@@ -51,7 +51,7 @@ DOC102_numpy.py:46:1: DOC102 `numbers` is not in the function's signature
 52 |       -------
 53 |       int
    |
-   = help: Remove `numbers` from the docstring
+   = help: Remove the extraneous parameter from the docstring
 
 DOC102_numpy.py:64:1: DOC102 These parameters are not in the function's signature: `name`, `age`, `email`
    |
@@ -73,7 +73,7 @@ DOC102_numpy.py:64:1: DOC102 These parameters are not in the function's signatur
 76 |       -------
 77 |       dict
    |
-   = help: Remove `name`, `age`, `email` from the docstring
+   = help: Remove the extraneous parameters from the docstring
 
 DOC102_numpy.py:93:1: DOC102 `tax_rate` is not in the function's signature
     |
@@ -93,7 +93,7 @@ DOC102_numpy.py:93:1: DOC102 `tax_rate` is not in the function's signature
 103 |       -------
 104 |       float
     |
-    = help: Remove `tax_rate` from the docstring
+    = help: Remove the extraneous parameter from the docstring
 
 DOC102_numpy.py:118:1: DOC102 These parameters are not in the function's signature: `to_address`, `cc_address`
     |
@@ -117,7 +117,7 @@ DOC102_numpy.py:118:1: DOC102 These parameters are not in the function's signatu
 132 |       -------
 133 |       bool
     |
-    = help: Remove `to_address`, `cc_address` from the docstring
+    = help: Remove the extraneous parameters from the docstring
 
 DOC102_numpy.py:144:1: DOC102 `separator` is not in the function's signature
     |
@@ -135,7 +135,7 @@ DOC102_numpy.py:144:1: DOC102 `separator` is not in the function's signature
 152 |       -------
 153 |       str
     |
-    = help: Remove `separator` from the docstring
+    = help: Remove the extraneous parameter from the docstring
 
 DOC102_numpy.py:164:1: DOC102 These parameters are not in the function's signature: `items`, `details`
     |
@@ -155,7 +155,7 @@ DOC102_numpy.py:164:1: DOC102 These parameters are not in the function's signatu
 174 |       -------
 175 |       dict
     |
-    = help: Remove `items`, `details` from the docstring
+    = help: Remove the extraneous parameters from the docstring
 
 DOC102_numpy.py:195:1: DOC102 `value` is not in the function's signature
     |
@@ -169,7 +169,7 @@ DOC102_numpy.py:195:1: DOC102 `value` is not in the function's signature
     | |________^ DOC102
 200 |           self.value = value
     |
-    = help: Remove `value` from the docstring
+    = help: Remove the extraneous parameter from the docstring
 
 DOC102_numpy.py:207:1: DOC102 `number` is not in the function's signature
     |
@@ -187,7 +187,7 @@ DOC102_numpy.py:207:1: DOC102 `number` is not in the function's signature
 215 |           -------
 216 |           int or float
     |
-    = help: Remove `number` from the docstring
+    = help: Remove the extraneous parameter from the docstring
 
 DOC102_numpy.py:228:1: DOC102 `value_str` is not in the function's signature
     |
@@ -203,7 +203,7 @@ DOC102_numpy.py:228:1: DOC102 `value_str` is not in the function's signature
 234 |           -------
 235 |           Calculator
     |
-    = help: Remove `value_str` from the docstring
+    = help: Remove the extraneous parameter from the docstring
 
 DOC102_numpy.py:247:1: DOC102 `number` is not in the function's signature
     |
@@ -219,4 +219,4 @@ DOC102_numpy.py:247:1: DOC102 `number` is not in the function's signature
 253 |           -------
 254 |           bool
     |
-    = help: Remove `number` from the docstring
+    = help: Remove the extraneous parameter from the docstring

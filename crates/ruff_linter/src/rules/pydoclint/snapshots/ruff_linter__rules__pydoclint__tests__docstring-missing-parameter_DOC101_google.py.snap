@@ -13,7 +13,7 @@ DOC101_google.py:203:1: DOC101 Parameter `b` missing from the docstring
 207 |           int: The sum of the two numbers.
 208 |       """
     |
-    = help: Add `b` to the docstring
+    = help: Add the missing parameter to the docstring
 
 DOC101_google.py:217:1: DOC101 Parameter `multiplier` missing from the docstring
     |
@@ -27,7 +27,7 @@ DOC101_google.py:217:1: DOC101 Parameter `multiplier` missing from the docstring
 221 |           list of int: A new list with each element multiplied.
 222 |       """
     |
-    = help: Add `multiplier` to the docstring
+    = help: Add the missing parameter to the docstring
 
 DOC101_google.py:228:5: DOC101 Parameter `numbers` missing from the docstring
     |
@@ -43,7 +43,7 @@ DOC101_google.py:228:5: DOC101 Parameter `numbers` missing from the docstring
     | |_______^ DOC101
 234 |       return max(numbers)
     |
-    = help: Add `numbers` to the docstring
+    = help: Add the missing parameter to the docstring
 
 DOC101_google.py:242:1: DOC101 These parameters are missing from the docstring: `name`, `age`
     |
@@ -58,7 +58,7 @@ DOC101_google.py:242:1: DOC101 These parameters are missing from the docstring: 
 247 |           dict: A dictionary containing the user's profile.
 248 |       """
     |
-    = help: Add `name`, `age` to the docstring
+    = help: Add the missing parameters to the docstring
 
 DOC101_google.py:262:1: DOC101 These parameters are missing from the docstring: `tax_rate`, `discount`
     |
@@ -72,7 +72,7 @@ DOC101_google.py:262:1: DOC101 These parameters are missing from the docstring: 
 266 |           float: The final total price after tax and discount.
 267 |       """
     |
-    = help: Add `tax_rate`, `discount` to the docstring
+    = help: Add the missing parameters to the docstring
 
 DOC101_google.py:279:1: DOC101 These parameters are missing from the docstring: `cc_address`, `bcc_address`
     |
@@ -88,7 +88,7 @@ DOC101_google.py:279:1: DOC101 These parameters are missing from the docstring: 
 285 |           bool: True if the email was sent successfully, False otherwise.
 286 |       """
     |
-    = help: Add `cc_address`, `bcc_address` to the docstring
+    = help: Add the missing parameters to the docstring
 
 DOC101_google.py:295:1: DOC101 Parameter `args` missing from the docstring
     |
@@ -102,7 +102,7 @@ DOC101_google.py:295:1: DOC101 Parameter `args` missing from the docstring
 299 |           str: A single concatenated string.
 300 |       """
     |
-    = help: Add `args` to the docstring
+    = help: Add the missing parameter to the docstring
 
 DOC101_google.py:309:1: DOC101 These parameters are missing from the docstring: `items`, `details`
     |
@@ -116,7 +116,7 @@ DOC101_google.py:309:1: DOC101 These parameters are missing from the docstring: 
 313 |           dict: A dictionary containing the order summary.
 314 |       """
     |
-    = help: Add `items`, `details` to the docstring
+    = help: Add the missing parameters to the docstring
 
 DOC101_google.py:329:9: DOC101 Parameter `value` missing from the docstring
     |
@@ -132,7 +132,7 @@ DOC101_google.py:329:9: DOC101 Parameter `value` missing from the docstring
     | |___________^ DOC101
 335 |           self.value = value
     |
-    = help: Add `value` to the docstring
+    = help: Add the missing parameter to the docstring
 
 DOC101_google.py:342:1: DOC101 Parameter `number2` missing from the docstring
     |
@@ -146,7 +146,7 @@ DOC101_google.py:342:1: DOC101 Parameter `number2` missing from the docstring
 346 |               int or float: The updated value after addition.
 347 |           """
     |
-    = help: Add `number2` to the docstring
+    = help: Add the missing parameter to the docstring
 
 DOC101_google.py:354:9: DOC101 Parameter `value_str` missing from the docstring
     |
@@ -163,7 +163,7 @@ DOC101_google.py:354:9: DOC101 Parameter `value_str` missing from the docstring
 360 |           value = float(value_str)
 361 |           return cls(value)
     |
-    = help: Add `value_str` to the docstring
+    = help: Add the missing parameter to the docstring
 
 DOC101_google.py:366:9: DOC101 Parameter `number` missing from the docstring
     |
@@ -179,4 +179,4 @@ DOC101_google.py:366:9: DOC101 Parameter `number` missing from the docstring
     | |___________^ DOC101
 372 |           return isinstance(number, (int, float))
     |
-    = help: Add `number` to the docstring
+    = help: Add the missing parameter to the docstring

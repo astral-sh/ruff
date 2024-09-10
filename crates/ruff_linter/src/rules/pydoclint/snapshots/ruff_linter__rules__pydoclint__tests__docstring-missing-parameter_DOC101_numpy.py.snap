@@ -15,7 +15,7 @@ DOC101_numpy.py:265:1: DOC101 Parameter `b` missing from the docstring
 271 |       -------
 272 |       int
     |
-    = help: Add `b` to the docstring
+    = help: Add the missing parameter to the docstring
 
 DOC101_numpy.py:283:1: DOC101 Parameter `multiplier` missing from the docstring
     |
@@ -31,7 +31,7 @@ DOC101_numpy.py:283:1: DOC101 Parameter `multiplier` missing from the docstring
 289 |       -------
 290 |       list of int
     |
-    = help: Add `multiplier` to the docstring
+    = help: Add the missing parameter to the docstring
 
 DOC101_numpy.py:298:5: DOC101 Parameter `numbers` missing from the docstring
     |
@@ -49,7 +49,7 @@ DOC101_numpy.py:298:5: DOC101 Parameter `numbers` missing from the docstring
     | |_______^ DOC101
 306 |       return max(numbers)
     |
-    = help: Add `numbers` to the docstring
+    = help: Add the missing parameter to the docstring
 
 DOC101_numpy.py:314:1: DOC101 These parameters are missing from the docstring: `name`, `age`
     |
@@ -67,7 +67,7 @@ DOC101_numpy.py:314:1: DOC101 These parameters are missing from the docstring: `
 322 |       -------
 323 |       dict
     |
-    = help: Add `name`, `age` to the docstring
+    = help: Add the missing parameters to the docstring
 
 DOC101_numpy.py:339:1: DOC101 These parameters are missing from the docstring: `tax_rate`, `discount`
     |
@@ -83,7 +83,7 @@ DOC101_numpy.py:339:1: DOC101 These parameters are missing from the docstring: `
 345 |       -------
 346 |       float
     |
-    = help: Add `tax_rate`, `discount` to the docstring
+    = help: Add the missing parameters to the docstring
 
 DOC101_numpy.py:360:1: DOC101 These parameters are missing from the docstring: `cc_address`, `bcc_address`
     |
@@ -103,7 +103,7 @@ DOC101_numpy.py:360:1: DOC101 These parameters are missing from the docstring: `
 370 |       -------
 371 |       bool
     |
-    = help: Add `cc_address`, `bcc_address` to the docstring
+    = help: Add the missing parameters to the docstring
 
 DOC101_numpy.py:382:1: DOC101 Parameter `args` missing from the docstring
     |
@@ -119,7 +119,7 @@ DOC101_numpy.py:382:1: DOC101 Parameter `args` missing from the docstring
 388 |       -------
 389 |       str
     |
-    = help: Add `args` to the docstring
+    = help: Add the missing parameter to the docstring
 
 DOC101_numpy.py:400:1: DOC101 These parameters are missing from the docstring: `items`, `details`
     |
@@ -135,7 +135,7 @@ DOC101_numpy.py:400:1: DOC101 These parameters are missing from the docstring: `
 406 |       -------
 407 |       dict
     |
-    = help: Add `items`, `details` to the docstring
+    = help: Add the missing parameters to the docstring
 
 DOC101_numpy.py:424:9: DOC101 Parameter `value` missing from the docstring
     |
@@ -149,7 +149,7 @@ DOC101_numpy.py:424:9: DOC101 Parameter `value` missing from the docstring
     | |___________^ DOC101
 428 |           self.value = value
     |
-    = help: Add `value` to the docstring
+    = help: Add the missing parameter to the docstring
 
 DOC101_numpy.py:435:1: DOC101 Parameter `number2` missing from the docstring
     |
@@ -165,7 +165,7 @@ DOC101_numpy.py:435:1: DOC101 Parameter `number2` missing from the docstring
 441 |           -------
 442 |           int or float
     |
-    = help: Add `number2` to the docstring
+    = help: Add the missing parameter to the docstring
 
 DOC101_numpy.py:451:9: DOC101 Parameter `value_str` missing from the docstring
     |
@@ -184,7 +184,7 @@ DOC101_numpy.py:451:9: DOC101 Parameter `value_str` missing from the docstring
 459 |           value = float(value_str)
 460 |           return cls(value)
     |
-    = help: Add `value_str` to the docstring
+    = help: Add the missing parameter to the docstring
 
 DOC101_numpy.py:465:9: DOC101 Parameter `number` missing from the docstring
     |
@@ -202,4 +202,4 @@ DOC101_numpy.py:465:9: DOC101 Parameter `number` missing from the docstring
     | |___________^ DOC101
 473 |           return isinstance(number, (int, float))
     |
-    = help: Add `number` to the docstring
+    = help: Add the missing parameter to the docstring
