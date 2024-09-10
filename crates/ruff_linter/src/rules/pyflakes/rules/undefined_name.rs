@@ -40,8 +40,7 @@ impl Violation for UndefinedName {
         } = self;
         let tip = minor_version_builtin_added.map(|version_added| {
             format!(
-                "Added as a builtin in Python 3.{version_added}; \
-consider specifying a newer `target-version` in your Ruff config."
+                r#"Consider specifying `requires-python = ">= 3.{version_added}"` or `tool.ruff.target-version = "py3{version_added}"` in your `pyproject.toml` file."#
             )
         });
 
