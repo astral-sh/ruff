@@ -641,7 +641,7 @@ fn parse_parameters_google(content: &str) -> Vec<&str> {
                 .next()
                 .is_some_and(|first_char| !first_char.is_whitespace())
             {
-                let Some(before_colon) = entry.split_once(':') else {
+                let Some((before_colon, _)) = entry.split_once(':') else {
                     continue;
                 };
                 if let Some(param) = before_colon.split_whitespace().next() {
