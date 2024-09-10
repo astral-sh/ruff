@@ -144,14 +144,7 @@ pub(crate) fn definitions_ty<'db>(
         .expect("definitions_ty should never be called with zero definitions and no unbound_ty.");
 
     if let Some(second) = all_types.next() {
-        let mut builder = UnionBuilder::new(db);
-        builder = builder.add(first).add(second);
-
-        for variant in all_types {
-            builder = builder.add(variant);
-        }
-
-        builder.build()
+        UnionType::from_elements(db, [first, second].into_iter().chain(all_types))
     } else {
         first
     }
@@ -410,13 +403,10 @@ impl<'db> Type<'db> {
     fn iterate(&self, db: &'db dyn Db) -> IterationOutcome<'db> {
         if let Type::Tuple(tuple_type) = self {
             return IterationOutcome::Iterable {
-                element_ty: tuple_type
-                    .elements(db)
-                    .iter()
-                    .fold(UnionBuilder::new(db), |builder, element| {
-                        builder.add(*element)
-                    })
-                    .build(),
+                element_ty: UnionType::from_elements(
+                    db,
+                    tuple_type.elements(db).into_iter().copied(),
+                ),
             };
         }
 
@@ -636,19 +626,28 @@ impl<'db> UnionType<'db> {
         self.elements(db).contains(&ty)
     }
 
+    /// Create a union from a list of elements
+    /// (which may be eagerly simplified into a different variant of [`Type`] altogether)
+    pub fn from_elements(
+        db: &'db dyn Db,
+        elements: impl IntoIterator<Item = Type<'db>>,
+    ) -> Type<'db> {
+        elements
+            .into_iter()
+            .fold(UnionBuilder::new(db), |builder, element| {
+                builder.add(element)
+            })
+            .build()
+    }
+
     /// Apply a transformation function to all elements of the union,
     /// and create a new union from the resulting set of types
     pub fn map(
         &self,
         db: &'db dyn Db,
-        mut transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
+        transform_fn: impl Fn(&Type<'db>) -> Type<'db>,
     ) -> Type<'db> {
-        self.elements(db)
-            .into_iter()
-            .fold(UnionBuilder::new(db), |builder, element| {
-                builder.add(transform_fn(element))
-            })
-            .build()
+        Self::from_elements(db, self.elements(db).into_iter().map(transform_fn))
     }
 }
 

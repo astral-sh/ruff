@@ -49,7 +49,7 @@ use crate::stdlib::builtins_module_scope;
 use crate::types::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 use crate::types::{
     builtins_symbol_ty, definitions_ty, global_symbol_ty, symbol_ty, BytesLiteralType, ClassType,
-    FunctionType, StringLiteralType, TupleType, Type, UnionBuilder,
+    FunctionType, StringLiteralType, TupleType, Type, UnionType,
 };
 use crate::Db;
 
@@ -1827,10 +1827,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let body_ty = self.infer_expression(body);
         let orelse_ty = self.infer_expression(orelse);
 
-        UnionBuilder::new(self.db)
-            .add(body_ty)
-            .add(orelse_ty)
-            .build()
+        UnionType::from_elements(self.db, [body_ty, orelse_ty])
     }
 
     fn infer_lambda_body(&mut self, lambda_expression: &ast::ExprLambda) {
