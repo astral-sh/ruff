@@ -51,6 +51,7 @@ pub(crate) enum DefinitionNodeRef<'a> {
     WithItem(WithItemDefinitionNodeRef<'a>),
     MatchPattern(MatchPatternDefinitionNodeRef<'a>),
     ExceptHandler(&'a ast::ExceptHandlerExceptHandler),
+    ExceptStarHandler(&'a ast::ExceptHandlerExceptHandler),
 }
 
 impl<'a> From<&'a ast::StmtFunctionDef> for DefinitionNodeRef<'a> {
@@ -128,12 +129,6 @@ impl<'a> From<ast::AnyParameterRef<'a>> for DefinitionNodeRef<'a> {
 impl<'a> From<MatchPatternDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
     fn from(node: MatchPatternDefinitionNodeRef<'a>) -> Self {
         Self::MatchPattern(node)
-    }
-}
-
-impl<'a> From<&'a ast::ExceptHandlerExceptHandler> for DefinitionNodeRef<'a> {
-    fn from(node: &'a ast::ExceptHandlerExceptHandler) -> Self {
-        Self::ExceptHandler(node)
     }
 }
 
@@ -261,6 +256,9 @@ impl DefinitionNodeRef<'_> {
             DefinitionNodeRef::ExceptHandler(handler) => {
                 DefinitionKind::ExceptHandler(AstNodeRef::new(parsed, handler))
             }
+            DefinitionNodeRef::ExceptStarHandler(handler) => {
+                DefinitionKind::ExceptStarHandler(AstNodeRef::new(parsed, handler))
+            }
         }
     }
 
@@ -294,6 +292,7 @@ impl DefinitionNodeRef<'_> {
                 identifier.into()
             }
             Self::ExceptHandler(handler) => handler.into(),
+            Self::ExceptStarHandler(handler) => handler.into(),
         }
     }
 }
@@ -315,6 +314,7 @@ pub enum DefinitionKind {
     WithItem(WithItemDefinitionKind),
     MatchPattern(MatchPatternDefinitionKind),
     ExceptHandler(AstNodeRef<ast::ExceptHandlerExceptHandler>),
+    ExceptStarHandler(AstNodeRef<ast::ExceptHandlerExceptHandler>),
 }
 
 #[derive(Clone, Debug)]

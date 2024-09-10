@@ -427,7 +427,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 );
             }
             DefinitionKind::ExceptHandler(handler) => {
-                self.infer_except_handler_definition(handler, definition);
+                self.infer_except_handler_definition(handler, definition, false);
+            }
+            DefinitionKind::ExceptStarHandler(handler) => {
+                self.infer_except_handler_definition(handler, definition, true);
             }
         }
     }
@@ -823,6 +826,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         handler: &'db ast::ExceptHandlerExceptHandler,
         definition: Definition<'db>,
+        is_star: bool,
     ) {
         let node_ty = handler
             .type_
@@ -830,13 +834,21 @@ impl<'db> TypeInferenceBuilder<'db> {
             .map(|ty| self.infer_expression(ty))
             .unwrap_or(Type::Unknown);
 
-        // TODO: anything that's a consistent subtype of
-        // `type[BaseException] | tuple[type[BaseException], ...]` should be valid;
-        // anything else should be invalid --Alex
-        let symbol_ty = match node_ty {
-            Type::Any | Type::Unknown => node_ty,
-            Type::Class(class_ty) => Type::Instance(class_ty),
-            _ => Type::Unknown,
+        let symbol_ty = if is_star {
+            // TODO should be generic --Alex
+            //
+            // TODO should infer `ExceptionGroup` if all caught exceptions
+            // are subclasses of `Exception` --Alex
+            builtins_symbol_ty(self.db, "BaseExceptionGroup").to_instance(self.db)
+        } else {
+            // TODO: anything that's a consistent subtype of
+            // `type[BaseException] | tuple[type[BaseException], ...]` should be valid;
+            // anything else should be invalid --Alex
+            match node_ty {
+                Type::Any | Type::Unknown => node_ty,
+                Type::Class(class_ty) => Type::Instance(class_ty),
+                _ => Type::Unknown,
+            }
         };
 
         self.types.definitions.insert(definition, symbol_ty);
@@ -4559,6 +4571,82 @@ mod tests {
 
         assert_file_diagnostics(&db, "src/a.py", &[]);
         assert_public_ty(&db, "src/a.py", "e", "Unknown");
+
+        Ok(())
+    }
+
+    #[test]
+    fn except_star_handler_baseexception() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            try:
+                x
+            except* BaseException as e:
+                pass
+            ",
+        )?;
+
+        assert_file_diagnostics(&db, "src/a.py", &[]);
+
+        // TODO: once we support `sys.version_info` branches,
+        // we can set `--target-version=py311` in this test
+        // and the inferred type will just be `BaseExceptionGroup` --Alex
+        assert_public_ty(&db, "src/a.py", "e", "Unknown | BaseExceptionGroup");
+
+        Ok(())
+    }
+
+    #[test]
+    fn except_star_handler() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            try:
+                x
+            except* OSError as e:
+                pass
+            ",
+        )?;
+
+        assert_file_diagnostics(&db, "src/a.py", &[]);
+
+        // TODO: once we support `sys.version_info` branches,
+        // we can set `--target-version=py311` in this test
+        // and the inferred type will just be `BaseExceptionGroup` --Alex
+        //
+        // TODO more precise would be `ExceptionGroup[OSError]` --Alex
+        assert_public_ty(&db, "src/a.py", "e", "Unknown | BaseExceptionGroup");
+
+        Ok(())
+    }
+
+    #[test]
+    fn except_star_handler_multiple_types() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            try:
+                x
+            except* (TypeError, AttributeError) as e:
+                pass
+            ",
+        )?;
+
+        assert_file_diagnostics(&db, "src/a.py", &[]);
+
+        // TODO: once we support `sys.version_info` branches,
+        // we can set `--target-version=py311` in this test
+        // and the inferred type will just be `BaseExceptionGroup` --Alex
+        //
+        // TODO more precise would be `ExceptionGroup[TypeError | AttributeError]` --Alex
+        assert_public_ty(&db, "src/a.py", "e", "Unknown | BaseExceptionGroup");
 
         Ok(())
     }
