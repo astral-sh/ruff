@@ -49,7 +49,7 @@ use crate::stdlib::builtins_module_scope;
 use crate::types::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 use crate::types::{
     builtins_symbol_ty, definitions_ty, global_symbol_ty, symbol_ty, BytesLiteralType, ClassType,
-    FunctionType, StringLiteralType, Type, UnionBuilder,
+    FunctionType, StringLiteralType, TupleType, Type, UnionBuilder,
 };
 use crate::Db;
 
@@ -1553,12 +1553,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             parenthesized: _,
         } = tuple;
 
-        for elt in elts {
-            self.infer_expression(elt);
-        }
+        let element_types = elts
+            .iter()
+            .map(|elt| self.infer_expression(elt))
+            .collect::<Vec<_>>();
 
-        // TODO generic
-        builtins_symbol_ty(self.db, "tuple").to_instance()
+        Type::Tuple(TupleType::new(self.db, element_types.into_boxed_slice()))
     }
 
     fn infer_list_expression(&mut self, list: &ast::ExprList) -> Type<'db> {
@@ -4012,7 +4012,7 @@ mod tests {
     }
 
     #[test]
-    fn tuple_literal() -> anyhow::Result<()> {
+    fn empty_tuple_literal() -> anyhow::Result<()> {
         let mut db = setup_db();
 
         db.write_dedented(
@@ -4022,8 +4022,37 @@ mod tests {
             ",
         )?;
 
-        // TODO should be a generic type
-        assert_public_ty(&db, "/src/a.py", "x", "tuple");
+        assert_public_ty(&db, "/src/a.py", "x", "tuple[()]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn tuple_heterogeneous_literal() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            x = (1, 'a')
+            y = (1, (2, 3))
+            z = (x, 2)
+            ",
+        )?;
+
+        assert_public_ty(&db, "/src/a.py", "x", r#"tuple[Literal[1], Literal["a"]]"#);
+        assert_public_ty(
+            &db,
+            "/src/a.py",
+            "y",
+            "tuple[Literal[1], tuple[Literal[2], Literal[3]]]",
+        );
+        assert_public_ty(
+            &db,
+            "/src/a.py",
+            "z",
+            r#"tuple[tuple[Literal[1], Literal["a"]], Literal[2]]"#,
+        );
 
         Ok(())
     }
