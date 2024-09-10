@@ -4271,7 +4271,92 @@ mod tests {
             ",
         )?;
 
-        assert_public_ty(&db, "src/a.py", "x", "int");
+        assert_public_ty(&db, "src/a.py", "x", "Unbound | int");
+
+        Ok(())
+    }
+
+    #[test]
+    fn for_loop_with_previous_definition() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            class IntIterator:
+                def __next__(self) -> int:
+                    return 42
+
+            class IntIterable:
+                def __iter__(self) -> IntIterator:
+                    return IntIterator()
+
+            x = 'foo'
+
+            for x in IntIterable():
+                pass
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "x", r#"Literal["foo"] | int"#);
+
+        Ok(())
+    }
+
+    #[test]
+    fn for_loop_no_break() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            class IntIterator:
+                def __next__(self) -> int:
+                    return 42
+
+            class IntIterable:
+                def __iter__(self) -> IntIterator:
+                    return IntIterator()
+
+            for x in IntIterable():
+                pass
+            else:
+                x = 'foo'
+            ",
+        )?;
+
+        // The `for` loop can never break, so the `else` clause will always be executed,
+        // meaning that the visible definition by the end of the scope is solely determined
+        // by the `else` clause
+        assert_public_ty(&db, "src/a.py", "x", r#"Literal["foo"]"#);
+
+        Ok(())
+    }
+
+    #[test]
+    fn for_loop_may_break() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            class IntIterator:
+                def __next__(self) -> int:
+                    return 42
+
+            class IntIterable:
+                def __iter__(self) -> IntIterator:
+                    return IntIterator()
+
+            for x in IntIterable():
+                if x > 5:
+                    break
+            else:
+                x = 'foo'
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "x", r#"int | Literal["foo"]"#);
 
         Ok(())
     }
@@ -4292,7 +4377,7 @@ mod tests {
             ",
         )?;
 
-        assert_public_ty(&db, "src/a.py", "x", "int");
+        assert_public_ty(&db, "src/a.py", "x", "Unbound | int");
 
         Ok(())
     }
@@ -4320,7 +4405,7 @@ mod tests {
             ",
         )?;
 
-        assert_scope_ty(&db, "src/a.py", &["foo"], "x", "Unknown");
+        assert_scope_ty(&db, "src/a.py", &["foo"], "x", "Unbound | Unknown");
 
         Ok(())
     }
@@ -4347,7 +4432,7 @@ mod tests {
         )?;
 
         // TODO(Alex) async iterables/iterators!
-        assert_scope_ty(&db, "src/a.py", &["foo"], "x", "Unknown");
+        assert_scope_ty(&db, "src/a.py", &["foo"], "x", "Unbound | Unknown");
 
         Ok(())
     }
@@ -4368,7 +4453,7 @@ mod tests {
             &db,
             "src/a.py",
             "x",
-            r#"Literal[1] | Literal["a"] | Literal[b"foo"]"#,
+            r#"Unbound | Literal[1] | Literal["a"] | Literal[b"foo"]"#,
         );
 
         Ok(())

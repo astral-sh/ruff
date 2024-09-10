@@ -575,14 +575,23 @@ where
                     self.flow_merge(pre_if);
                 }
             }
-            ast::Stmt::While(node) => {
-                self.visit_expr(&node.test);
+            ast::Stmt::While(ast::StmtWhile {
+                test,
+                body,
+                orelse,
+                range: _,
+            }) => {
+                self.visit_expr(test);
 
                 let pre_loop = self.flow_snapshot();
 
                 // Save aside any break states from an outer loop
                 let saved_break_states = std::mem::take(&mut self.loop_break_states);
-                self.visit_body(&node.body);
+
+                // TODO: definitions created inside the body should be fully visible
+                // to other statements/expressions inside the body --Alex/Carl
+                self.visit_body(body);
+
                 // Get the break states from the body of this loop, and restore the saved outer
                 // ones.
                 let break_states =
@@ -591,7 +600,7 @@ where
                 // We may execute the `else` clause without ever executing the body, so merge in
                 // the pre-loop state before visiting `else`.
                 self.flow_merge(pre_loop);
-                self.visit_body(&node.orelse);
+                self.visit_body(orelse);
 
                 // Breaking out of a while loop bypasses the `else` clause, so merge in the break
                 // states after visiting `else`.
@@ -625,15 +634,35 @@ where
                     orelse,
                 },
             ) => {
-                // TODO add control flow similar to `ast::Stmt::While` above
                 self.add_standalone_expression(iter);
                 self.visit_expr(iter);
+
+                let pre_loop = self.flow_snapshot();
+                let saved_break_states = std::mem::take(&mut self.loop_break_states);
+
                 debug_assert!(self.current_assignment.is_none());
                 self.current_assignment = Some(for_stmt.into());
                 self.visit_expr(target);
                 self.current_assignment = None;
+
+                // TODO: Definitions created by loop variables
+                // (and definitions created inside the body)
+                // are fully visible to other statements/expressions inside the body --Alex/Carl
                 self.visit_body(body);
+
+                let break_states =
+                    std::mem::replace(&mut self.loop_break_states, saved_break_states);
+
+                // We may execute the `else` clause without ever executing the body, so merge in
+                // the pre-loop state before visiting `else`.
+                self.flow_merge(pre_loop);
                 self.visit_body(orelse);
+
+                // Breaking out of a `for` loop bypasses the `else` clause, so merge in the break
+                // states after visiting `else`.
+                for break_state in break_states {
+                    self.flow_merge(break_state);
+                }
             }
             ast::Stmt::Match(ast::StmtMatch {
                 subject,
