@@ -403,10 +403,7 @@ impl<'db> Type<'db> {
     fn iterate(&self, db: &'db dyn Db) -> IterationOutcome<'db> {
         if let Type::Tuple(tuple_type) = self {
             return IterationOutcome::Iterable {
-                element_ty: UnionType::from_elements(
-                    db,
-                    tuple_type.elements(db).into_iter().copied(),
-                ),
+                element_ty: UnionType::from_elements(db, &**tuple_type.elements(db)),
             };
         }
 
@@ -484,6 +481,12 @@ impl<'db> Type<'db> {
             Type::Intersection(_) => Type::Unknown,
             Type::Tuple(_) => builtins_symbol_ty(db, "tuple"),
         }
+    }
+}
+
+impl<'db> From<&Type<'db>> for Type<'db> {
+    fn from(value: &Type<'db>) -> Self {
+        *value
     }
 }
 
@@ -628,14 +631,14 @@ impl<'db> UnionType<'db> {
 
     /// Create a union from a list of elements
     /// (which may be eagerly simplified into a different variant of [`Type`] altogether)
-    pub fn from_elements(
+    pub fn from_elements<T: Into<Type<'db>>>(
         db: &'db dyn Db,
-        elements: impl IntoIterator<Item = Type<'db>>,
+        elements: impl IntoIterator<Item = T>,
     ) -> Type<'db> {
         elements
             .into_iter()
             .fold(UnionBuilder::new(db), |builder, element| {
-                builder.add(element)
+                builder.add(element.into())
             })
             .build()
     }

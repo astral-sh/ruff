@@ -276,7 +276,7 @@ mod tests {
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
-    use crate::types::builtins_symbol_ty;
+    use crate::types::{builtins_symbol_ty, UnionBuilder};
     use crate::ProgramSettings;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
@@ -327,7 +327,7 @@ mod tests {
     #[test]
     fn build_union_empty() {
         let db = setup_db();
-        let ty = UnionType::from_elements(&db, []);
+        let ty = UnionBuilder::new(&db).build();
         assert_eq!(ty, Type::Never);
     }
 

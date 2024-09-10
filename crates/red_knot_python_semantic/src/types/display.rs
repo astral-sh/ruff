@@ -311,7 +311,7 @@ mod tests {
             Type::BooleanLiteral(true),
             Type::None,
         ];
-        let union = UnionType::from_elements(&db, union_elements.iter().copied()).expect_union();
+        let union = UnionType::from_elements(&db, union_elements).expect_union();
         let display = format!("{}", union.display(&db));
         assert_eq!(
             display,
