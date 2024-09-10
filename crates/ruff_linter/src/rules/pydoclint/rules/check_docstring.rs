@@ -641,10 +641,10 @@ fn parse_parameters_google(content: &str) -> Vec<&str> {
                 .next()
                 .is_some_and(|first_char| !first_char.is_whitespace())
             {
-                let Some(colon_idx) = entry.find(':') else {
+                let Some(before_colon) = entry.split_once(':') else {
                     continue;
                 };
-                if let Some(param) = entry[..colon_idx].split_whitespace().next() {
+                if let Some(param) = before_colon.split_whitespace().next() {
                     entries.push(param.trim_start_matches('*'));
                 }
             }
