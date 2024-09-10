@@ -445,12 +445,30 @@ impl<'db> Type<'db> {
     }
 
     #[must_use]
-    pub fn to_instance(&self) -> Type<'db> {
+    pub fn to_instance(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Type::Any => Type::Any,
             Type::Unknown => Type::Unknown,
+            Type::Never => Type::Never,
             Type::Class(class) => Type::Instance(*class),
-            _ => Type::Unknown, // TODO type errors
+            Type::Union(union) => union.map(db, |element| element.to_instance(db)),
+            // TODO: we can probably do better here: --Alex
+            Type::Intersection(_) => Type::Unknown,
+            // TODO: converting to `Unknown` here is probably correct,
+            // but should result in a diagnostic reporting the use of an unbound name:
+            Type::Unbound => Type::Unknown,
+            // TODO: calling `.to_instance()` on any of these should result in a diagnostic,
+            // since they already indicate that the object is an instance of some kind:
+            Type::BooleanLiteral(_)
+            | Type::BytesLiteral(_)
+            | Type::Function(_)
+            | Type::Instance(_)
+            | Type::Module(_)
+            | Type::IntLiteral(_)
+            | Type::StringLiteral(_)
+            | Type::Tuple(_)
+            | Type::LiteralString
+            | Type::None => Type::Unknown,
         }
     }
 

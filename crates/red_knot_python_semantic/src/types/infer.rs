@@ -1457,9 +1457,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Number::Int(n) => n
                 .as_i64()
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| builtins_symbol_ty(self.db, "int").to_instance()),
-            ast::Number::Float(_) => builtins_symbol_ty(self.db, "float").to_instance(),
-            ast::Number::Complex { .. } => builtins_symbol_ty(self.db, "complex").to_instance(),
+                .unwrap_or_else(|| builtins_symbol_ty(self.db, "int").to_instance(self.db)),
+            ast::Number::Float(_) => builtins_symbol_ty(self.db, "float").to_instance(self.db),
+            ast::Number::Complex { .. } => {
+                builtins_symbol_ty(self.db, "complex").to_instance(self.db)
+            }
         }
     }
 
@@ -1573,7 +1575,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // TODO generic
-        builtins_symbol_ty(self.db, "list").to_instance()
+        builtins_symbol_ty(self.db, "list").to_instance(self.db)
     }
 
     fn infer_set_expression(&mut self, set: &ast::ExprSet) -> Type<'db> {
@@ -1584,7 +1586,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // TODO generic
-        builtins_symbol_ty(self.db, "set").to_instance()
+        builtins_symbol_ty(self.db, "set").to_instance(self.db)
     }
 
     fn infer_dict_expression(&mut self, dict: &ast::ExprDict) -> Type<'db> {
@@ -1596,7 +1598,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // TODO generic
-        builtins_symbol_ty(self.db, "dict").to_instance()
+        builtins_symbol_ty(self.db, "dict").to_instance(self.db)
     }
 
     /// Infer the type of the `iter` expression of the first comprehension.
@@ -2067,22 +2069,22 @@ impl<'db> TypeInferenceBuilder<'db> {
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Add) => n
                 .checked_add(m)
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| builtins_symbol_ty(self.db, "int").to_instance()),
+                .unwrap_or_else(|| builtins_symbol_ty(self.db, "int").to_instance(self.db)),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Sub) => n
                 .checked_sub(m)
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| builtins_symbol_ty(self.db, "int").to_instance()),
+                .unwrap_or_else(|| builtins_symbol_ty(self.db, "int").to_instance(self.db)),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Mult) => n
                 .checked_mul(m)
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| builtins_symbol_ty(self.db, "int").to_instance()),
+                .unwrap_or_else(|| builtins_symbol_ty(self.db, "int").to_instance(self.db)),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Div) => n
                 .checked_div(m)
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| builtins_symbol_ty(self.db, "int").to_instance()),
+                .unwrap_or_else(|| builtins_symbol_ty(self.db, "int").to_instance(self.db)),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Mod) => n
                 .checked_rem(m)
@@ -2311,7 +2313,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     name.ctx
                 );
 
-                self.infer_name_expression(name).to_instance()
+                self.infer_name_expression(name).to_instance(self.db)
             }
 
             ast::Expr::NoneLiteral(_literal) => Type::None,
