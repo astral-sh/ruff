@@ -30,14 +30,8 @@ pub fn leading_space_and_colon(line: &str) -> &str {
 /// Sphinx section section name.
 pub fn sphinx_section_name(line: &str) -> Option<&str> {
     let mut spans = line.split(':');
-    let Some(_indentation) = spans.next() else {
-        return None;
-    };
-    let Some(header) = spans.next() else {
-        return None;
-    };
-    let Some(_after_header) = spans.next() else {
-        return None;
-    };
+    let _indentation = spans.next()?;
+    let header = spans.next()?;
+    let _after_header = spans.next()?;
     header.split(' ').next()
 }
