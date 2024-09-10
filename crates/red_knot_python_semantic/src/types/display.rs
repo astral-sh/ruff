@@ -253,7 +253,7 @@ mod tests {
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
     use crate::db::tests::TestDb;
-    use crate::types::{global_symbol_ty, BytesLiteralType, StringLiteralType, Type, UnionBuilder};
+    use crate::types::{global_symbol_ty, BytesLiteralType, StringLiteralType, Type, UnionType};
     use crate::{Program, ProgramSettings, PythonVersion, SearchPathSettings};
 
     fn setup_db() -> TestDb {
@@ -295,7 +295,7 @@ mod tests {
         )?;
         let mod_file = system_path_to_file(&db, "src/main.py").expect("Expected file to exist.");
 
-        let vec: Vec<Type<'_>> = vec![
+        let union_elements = &[
             Type::Unknown,
             Type::IntLiteral(-1),
             global_symbol_ty(&db, mod_file, "A"),
@@ -311,10 +311,7 @@ mod tests {
             Type::BooleanLiteral(true),
             Type::None,
         ];
-        let builder = vec.iter().fold(UnionBuilder::new(&db), |builder, literal| {
-            builder.add(*literal)
-        });
-        let union = builder.build().expect_union();
+        let union = UnionType::from_elements(&db, union_elements).expect_union();
         let display = format!("{}", union.display(&db));
         assert_eq!(
             display,
