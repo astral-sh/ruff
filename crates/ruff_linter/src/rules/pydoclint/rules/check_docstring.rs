@@ -672,11 +672,13 @@ fn parse_parameters_numpy(content: &str) -> Vec<&str> {
     let indentation = &dashes[..dashes.len() - dashes.trim_start().len()];
     for potential in lines {
         if let Some(entry) = potential.strip_prefix(indentation) {
-            if let Some(first_char) = entry.chars().next() {
-                if !first_char.is_whitespace() {
-                    if let Some(param) = entry.split(':').next() {
-                        entries.push(param.trim_end().trim_start_matches('*'));
-                    }
+            if entry
+                .chars()
+                .next()
+                .is_some_and(|first_char| !first_char.is_whitespace())
+            {
+                if let Some(param) = entry.split(':').next() {
+                    entries.push(param.trim_end().trim_start_matches('*'));
                 }
             }
         }
