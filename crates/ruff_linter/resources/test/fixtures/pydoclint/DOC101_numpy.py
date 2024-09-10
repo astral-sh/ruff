@@ -471,3 +471,25 @@ class Calculator:
             True if the number is valid, False otherwise.
         """
         return isinstance(number, (int, float))
+
+# OK
+def function_with_pep484_type_annotations(param1: int, param2: str) -> bool:
+    """Example function with PEP 484 type annotations.
+
+    The return type must be duplicated in the docstring to comply
+    with the NumPy docstring style.
+
+    Parameters
+    ----------
+    param1
+        The first parameter.
+    param2
+        The second parameter.
+
+    Returns
+    -------
+    bool
+        True if successful, False otherwise.
+
+    """
+    return False
