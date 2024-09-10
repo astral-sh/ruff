@@ -586,6 +586,18 @@
         }
       ]
     },
+    "pydoclint": {
+      "description": "Options for the `pydoclint` plugin.",
+      "deprecated": true,
+      "anyOf": [
+        {
+          "$ref": "#/definitions/PydoclintOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "pydocstyle": {
       "description": "Options for the `pydocstyle` plugin.",
       "deprecated": true,
@@ -2201,6 +2213,17 @@
             }
           ]
         },
+        "pydoclint": {
+          "description": "Options for the `pydoclint` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PydoclintOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "pydocstyle": {
           "description": "Options for the `pydocstyle` plugin.",
           "anyOf": [
@@ -2456,6 +2479,19 @@
             {
               "type": "null"
             }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "PydoclintOptions": {
+      "type": "object",
+      "properties": {
+        "ignore-one-line-docstrings": {
+          "description": "Skip docstrings which fit on a single line.",
+          "type": [
+            "boolean",
+            "null"
           ]
         }
       },
