@@ -581,10 +581,10 @@ impl<'a> DocstringSections<'a> {
                 SectionKind::Raises => {
                     docstring_sections.raises = Some(RaisesSection::from_section(&section, style));
                 }
-                SectionKind::Returns | SectionKind::Return => {
+                SectionKind::Returns => {
                     docstring_sections.returns = Some(GenericSection::from_section(&section));
                 }
-                SectionKind::Yields | SectionKind::Yield => {
+                SectionKind::Yields => {
                     docstring_sections.yields = Some(GenericSection::from_section(&section));
                 }
                 _ => continue,
