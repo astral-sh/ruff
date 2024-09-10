@@ -263,7 +263,7 @@ pub trait ConfigurationTransformer {
 // configuration file extends another in the same path, we'll re-parse the same
 // file at least twice (possibly more than twice, since we'll also parse it when
 // resolving the "default" configuration).
-fn resolve_configuration(
+pub fn resolve_configuration(
     pyproject: &Path,
     relativity: Relativity,
     transformer: &dyn ConfigurationTransformer,

@@ -17,7 +17,6 @@ pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
 pub(crate) use self::diagnostic::TypeCheckDiagnostics;
 pub(crate) use self::infer::{
     infer_deferred_types, infer_definition_types, infer_expression_types, infer_scope_types,
-    TypeInference,
 };
 
 mod builder;
@@ -121,8 +120,8 @@ pub(crate) fn definitions_ty<'db>(
              definition,
              constraints,
          }| {
-            let mut constraint_tys =
-                constraints.filter_map(|test| narrowing_constraint(db, test, definition));
+            let mut constraint_tys = constraints
+                .filter_map(|constraint| narrowing_constraint(db, constraint, definition));
             let definition_ty = definition_ty(db, definition);
             if let Some(first_constraint_ty) = constraint_tys.next() {
                 let mut builder = IntersectionBuilder::new(db);

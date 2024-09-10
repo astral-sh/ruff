@@ -340,7 +340,7 @@ impl<'a> ConfigurationTransformer for EditorConfigurationTransformer<'a> {
 
         // Merge in the editor-specified configuration file, if it exists.
         let editor_configuration = if let Some(config_file_path) = configuration {
-            match open_configuration_file(&config_file_path, project_root) {
+            match open_configuration_file(&config_file_path) {
                 Ok(config_from_file) => editor_configuration.combine(config_from_file),
                 Err(err) => {
                     tracing::error!("Unable to find editor-specified configuration file: {err}");
@@ -363,11 +363,18 @@ impl<'a> ConfigurationTransformer for EditorConfigurationTransformer<'a> {
     }
 }
 
-fn open_configuration_file(
-    config_path: &Path,
-    project_root: &Path,
-) -> crate::Result<Configuration> {
-    let options = ruff_workspace::pyproject::load_options(config_path)?;
+fn open_configuration_file(config_path: &Path) -> crate::Result<Configuration> {
+    ruff_workspace::resolver::resolve_configuration(
+        config_path,
+        Relativity::Parent,
+        &IdentityTransformer,
+    )
+}
 
-    Configuration::from_options(options, Some(config_path), project_root)
+struct IdentityTransformer;
+
+impl ConfigurationTransformer for IdentityTransformer {
+    fn transform(&self, config: Configuration) -> Configuration {
+        config
+    }
 }

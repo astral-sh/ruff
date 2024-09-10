@@ -21,6 +21,7 @@ use crate::Db;
 
 pub mod ast_ids;
 mod builder;
+pub(crate) mod constraint;
 pub mod definition;
 pub mod expression;
 pub mod symbol;
