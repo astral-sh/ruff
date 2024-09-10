@@ -622,12 +622,29 @@ fn parse_parameters(content: &str, style: Option<SectionStyle>) -> Vec<&str> {
 /// ```
 fn parse_parameters_google(content: &str) -> Vec<&str> {
     let mut entries: Vec<&str> = Vec::new();
+    // Find first entry to determine indentation
+    let mut indentation = None;
     for potential in content.lines() {
-        let Some(colon_idx) = potential.find(':') else {
+        if potential.find(':').is_none() {
             continue;
         };
-        if let Some(param) = potential[..colon_idx].split_whitespace().next() {
-            entries.push(param.trim_start_matches('*'));
+        indentation = Some(&potential[..potential.len() - potential.trim_start().len()]);
+    }
+    let Some(indentation) = indentation else {
+        return entries;
+    };
+    for potential in content.lines() {
+        if let Some(entry) = potential.strip_prefix(indentation) {
+            if let Some(first_char) = entry.chars().next() {
+                if !first_char.is_whitespace() {
+                    let Some(colon_idx) = entry.find(':') else {
+                        continue;
+                    };
+                    if let Some(param) = entry[..colon_idx].split_whitespace().next() {
+                        entries.push(param.trim_start_matches('*'));
+                    }
+                }
+            }
         }
     }
     entries

@@ -193,3 +193,16 @@ class Calculator:
             bool: True if the number is valid, False otherwise.
         """
         return isinstance(number, (int, float))
+
+# OK
+def foo(param1, param2, *args, **kwargs):
+    """Foo.
+
+    Args:
+        param1 (int): The first parameter.
+        param2 (:obj:`str`, optional): The second parameter. Defaults to None.
+            Second line of description: should be indented.
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
+    """
+    return
