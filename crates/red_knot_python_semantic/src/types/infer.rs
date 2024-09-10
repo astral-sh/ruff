@@ -49,7 +49,7 @@ use crate::stdlib::builtins_module_scope;
 use crate::types::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 use crate::types::{
     builtins_symbol_ty, definitions_ty, global_symbol_ty, symbol_ty, BytesLiteralType, ClassType,
-    FunctionType, StringLiteralType, TupleLiteralType, Type, UnionBuilder,
+    FunctionType, StringLiteralType, TupleType, Type, UnionBuilder,
 };
 use crate::Db;
 
@@ -1558,9 +1558,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .map(|elt| self.infer_expression(elt))
             .collect::<Vec<_>>();
 
-        // TODO: Currently, we support only tuple literals like `(1, 2)` or `(x, y)` but we still
-        // need to support generic tuple types like `tuple[int, str]` and `tuple[int, ...]`.
-        Type::TupleLiteral(TupleLiteralType::new(self.db, element_types))
+        Type::Tuple(TupleType::new(self.db, element_types.into_boxed_slice()))
     }
 
     fn infer_list_expression(&mut self, list: &ast::ExprList) -> Type<'db> {
@@ -4024,7 +4022,6 @@ mod tests {
             ",
         )?;
 
-        // TODO should be a generic type
         assert_public_ty(&db, "/src/a.py", "x", "tuple[()]");
 
         Ok(())
