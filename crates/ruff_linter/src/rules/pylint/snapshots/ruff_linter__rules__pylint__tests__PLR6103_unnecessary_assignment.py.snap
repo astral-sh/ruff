@@ -151,3 +151,24 @@ unnecessary_assignment.py:39:4: PLR6103 [*] Use walrus operator `(bad7 := 'examp
 40 39 |     pass
 41 40 | elif bad7 == 'something else':
 42 41 |     pass
+
+unnecessary_assignment.py:45:4: PLR6103 [*] Use walrus operator `(bad8 := 'example')`.
+   |
+44 | bad8 = 'example'
+45 | if bad8: # [consider-using-assignment-expr]
+   |    ^^^^ PLR6103
+46 |     pass
+47 | print(bad8)
+   |
+   = help: Move variable assignment into if statement using walrus operator `(bad8 := 'example')`.
+
+ℹ Unsafe fix
+41 41 | elif bad7 == 'something else':
+42 42 |     pass
+43 43 | 
+44    |-bad8 = 'example'
+45    |-if bad8: # [consider-using-assignment-expr]
+   44 |+if (bad8 := 'example'): # [consider-using-assignment-expr]
+46 45 |     pass
+47 46 | print(bad8)
+48 47 |
