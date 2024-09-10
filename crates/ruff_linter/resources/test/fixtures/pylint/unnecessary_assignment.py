@@ -41,6 +41,10 @@ if bad7 == 'something': # [consider-using-assignment-expr]
 elif bad7 == 'something else':
     pass
 
+bad8 = 'example'
+if bad8: # [consider-using-assignment-expr]
+    pass
+print(bad8)
 
 good1_1 = 'example'
 good1_2 = 'example'
@@ -68,3 +72,7 @@ def bar():
 for good6 in [1, 2, 3]:
     if good6: # correct, used like it is intented
         pass
+
+if good7 := 'example': # [consider-using-assignment-expr]
+    pass
+print(good7)
