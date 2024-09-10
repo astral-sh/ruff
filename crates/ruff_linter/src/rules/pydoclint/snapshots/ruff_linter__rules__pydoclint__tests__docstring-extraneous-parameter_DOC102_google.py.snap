@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
 ---
-DOC102_google.py:6:1: DOC102 `a` is not in the function's signature
+DOC102_google.py:6:1: DOC102 Documented parameter `a` is not in the function's signature
    |
  4 |       Adds two numbers and returns the result.
  5 |   
@@ -16,7 +16,7 @@ DOC102_google.py:6:1: DOC102 `a` is not in the function's signature
    |
    = help: Remove the extraneous parameter from the docstring
 
-DOC102_google.py:21:1: DOC102 `multiplier` is not in the function's signature
+DOC102_google.py:21:1: DOC102 Documented parameter `multiplier` is not in the function's signature
    |
 19 |       Multiplies each element in a list by a given multiplier.
 20 |   
@@ -31,7 +31,7 @@ DOC102_google.py:21:1: DOC102 `multiplier` is not in the function's signature
    |
    = help: Remove the extraneous parameter from the docstring
 
-DOC102_google.py:36:1: DOC102 `numbers` is not in the function's signature
+DOC102_google.py:36:1: DOC102 Documented parameter `numbers` is not in the function's signature
    |
 34 |       Finds the maximum value in a list of numbers.
 35 |   
@@ -45,7 +45,7 @@ DOC102_google.py:36:1: DOC102 `numbers` is not in the function's signature
    |
    = help: Remove the extraneous parameter from the docstring
 
-DOC102_google.py:50:1: DOC102 These parameters are not in the function's signature: `name`, `age`, `email`
+DOC102_google.py:50:1: DOC102 These documented parameters are not in the function's signature: `name`, `age`, `email`
    |
 48 |       Creates a user profile with basic information.
 49 |   
@@ -62,7 +62,7 @@ DOC102_google.py:50:1: DOC102 These parameters are not in the function's signatu
    |
    = help: Remove the extraneous parameters from the docstring
 
-DOC102_google.py:72:1: DOC102 `tax_rate` is not in the function's signature
+DOC102_google.py:72:1: DOC102 Documented parameter `tax_rate` is not in the function's signature
    |
 70 |       Calculates the total price after applying tax and a discount.
 71 |   
@@ -78,7 +78,7 @@ DOC102_google.py:72:1: DOC102 `tax_rate` is not in the function's signature
    |
    = help: Remove the extraneous parameter from the docstring
 
-DOC102_google.py:91:1: DOC102 These parameters are not in the function's signature: `to_address`, `cc_address`
+DOC102_google.py:91:1: DOC102 These documented parameters are not in the function's signature: `to_address`, `cc_address`
     |
  89 |       Sends an email to the specified recipients.
  90 |   
@@ -96,7 +96,7 @@ DOC102_google.py:91:1: DOC102 These parameters are not in the function's signatu
     |
     = help: Remove the extraneous parameters from the docstring
 
-DOC102_google.py:109:1: DOC102 `separator` is not in the function's signature
+DOC102_google.py:109:1: DOC102 Documented parameter `separator` is not in the function's signature
     |
 107 |       Concatenates multiple strings with a specified separator.
 108 |   
@@ -111,7 +111,7 @@ DOC102_google.py:109:1: DOC102 `separator` is not in the function's signature
     |
     = help: Remove the extraneous parameter from the docstring
 
-DOC102_google.py:124:1: DOC102 These parameters are not in the function's signature: `items`, `details`
+DOC102_google.py:124:1: DOC102 These documented parameters are not in the function's signature: `items`, `details`
     |
 122 |       Processes an order with a list of items and optional order details.
 123 |   
@@ -127,7 +127,7 @@ DOC102_google.py:124:1: DOC102 These parameters are not in the function's signat
     |
     = help: Remove the extraneous parameters from the docstring
 
-DOC102_google.py:149:1: DOC102 `value` is not in the function's signature
+DOC102_google.py:149:1: DOC102 Documented parameter `value` is not in the function's signature
     |
 147 |           Initializes the calculator with an initial value.
 148 |   
@@ -139,7 +139,7 @@ DOC102_google.py:149:1: DOC102 `value` is not in the function's signature
     |
     = help: Remove the extraneous parameter from the docstring
 
-DOC102_google.py:159:1: DOC102 `number` is not in the function's signature
+DOC102_google.py:159:1: DOC102 Documented parameter `number` is not in the function's signature
     |
 157 |           Adds a number to the current value.
 158 |   
@@ -153,7 +153,7 @@ DOC102_google.py:159:1: DOC102 `number` is not in the function's signature
     |
     = help: Remove the extraneous parameter from the docstring
 
-DOC102_google.py:174:1: DOC102 `value_str` is not in the function's signature
+DOC102_google.py:174:1: DOC102 Documented parameter `value_str` is not in the function's signature
     |
 172 |           Creates a Calculator instance from a string representation of a number.
 173 |   
@@ -167,7 +167,7 @@ DOC102_google.py:174:1: DOC102 `value_str` is not in the function's signature
     |
     = help: Remove the extraneous parameter from the docstring
 
-DOC102_google.py:189:1: DOC102 `number` is not in the function's signature
+DOC102_google.py:189:1: DOC102 Documented parameter `number` is not in the function's signature
     |
 187 |           Checks if a given number is valid (int or float).
 188 |   

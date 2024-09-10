@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
 ---
-DOC102_numpy.py:6:1: DOC102 `a` is not in the function's signature
+DOC102_numpy.py:6:1: DOC102 Documented parameter `a` is not in the function's signature
    |
  4 |       Adds two numbers and returns the result.
  5 |   
@@ -19,7 +19,7 @@ DOC102_numpy.py:6:1: DOC102 `a` is not in the function's signature
    |
    = help: Remove the extraneous parameter from the docstring
 
-DOC102_numpy.py:26:1: DOC102 `multiplier` is not in the function's signature
+DOC102_numpy.py:26:1: DOC102 Documented parameter `multiplier` is not in the function's signature
    |
 24 |       Multiplies each element in a list by a given multiplier.
 25 |   
@@ -37,7 +37,7 @@ DOC102_numpy.py:26:1: DOC102 `multiplier` is not in the function's signature
    |
    = help: Remove the extraneous parameter from the docstring
 
-DOC102_numpy.py:46:1: DOC102 `numbers` is not in the function's signature
+DOC102_numpy.py:46:1: DOC102 Documented parameter `numbers` is not in the function's signature
    |
 44 |       Finds the maximum value in a list of numbers.
 45 |   
@@ -53,7 +53,7 @@ DOC102_numpy.py:46:1: DOC102 `numbers` is not in the function's signature
    |
    = help: Remove the extraneous parameter from the docstring
 
-DOC102_numpy.py:64:1: DOC102 These parameters are not in the function's signature: `name`, `age`, `email`
+DOC102_numpy.py:64:1: DOC102 These documented parameters are not in the function's signature: `name`, `age`, `email`
    |
 62 |       Creates a user profile with basic information.
 63 |   
@@ -75,7 +75,7 @@ DOC102_numpy.py:64:1: DOC102 These parameters are not in the function's signatur
    |
    = help: Remove the extraneous parameters from the docstring
 
-DOC102_numpy.py:93:1: DOC102 `tax_rate` is not in the function's signature
+DOC102_numpy.py:93:1: DOC102 Documented parameter `tax_rate` is not in the function's signature
     |
  91 |       Calculates the total price after applying tax and a discount.
  92 |   
@@ -95,7 +95,7 @@ DOC102_numpy.py:93:1: DOC102 `tax_rate` is not in the function's signature
     |
     = help: Remove the extraneous parameter from the docstring
 
-DOC102_numpy.py:118:1: DOC102 These parameters are not in the function's signature: `to_address`, `cc_address`
+DOC102_numpy.py:118:1: DOC102 These documented parameters are not in the function's signature: `to_address`, `cc_address`
     |
 116 |       Sends an email to the specified recipients.
 117 |   
@@ -119,7 +119,7 @@ DOC102_numpy.py:118:1: DOC102 These parameters are not in the function's signatu
     |
     = help: Remove the extraneous parameters from the docstring
 
-DOC102_numpy.py:144:1: DOC102 `separator` is not in the function's signature
+DOC102_numpy.py:144:1: DOC102 Documented parameter `separator` is not in the function's signature
     |
 142 |       Concatenates multiple strings with a specified separator.
 143 |   
@@ -137,7 +137,7 @@ DOC102_numpy.py:144:1: DOC102 `separator` is not in the function's signature
     |
     = help: Remove the extraneous parameter from the docstring
 
-DOC102_numpy.py:164:1: DOC102 These parameters are not in the function's signature: `items`, `details`
+DOC102_numpy.py:164:1: DOC102 These documented parameters are not in the function's signature: `items`, `details`
     |
 162 |       Processes an order with a list of items and optional order details.
 163 |   
@@ -157,7 +157,7 @@ DOC102_numpy.py:164:1: DOC102 These parameters are not in the function's signatu
     |
     = help: Remove the extraneous parameters from the docstring
 
-DOC102_numpy.py:195:1: DOC102 `value` is not in the function's signature
+DOC102_numpy.py:195:1: DOC102 Documented parameter `value` is not in the function's signature
     |
 193 |           Initializes the calculator with an initial value.
 194 |   
@@ -171,7 +171,7 @@ DOC102_numpy.py:195:1: DOC102 `value` is not in the function's signature
     |
     = help: Remove the extraneous parameter from the docstring
 
-DOC102_numpy.py:207:1: DOC102 `number` is not in the function's signature
+DOC102_numpy.py:207:1: DOC102 Documented parameter `number` is not in the function's signature
     |
 205 |           Adds two numbers to the current value.
 206 |   
@@ -189,7 +189,7 @@ DOC102_numpy.py:207:1: DOC102 `number` is not in the function's signature
     |
     = help: Remove the extraneous parameter from the docstring
 
-DOC102_numpy.py:228:1: DOC102 `value_str` is not in the function's signature
+DOC102_numpy.py:228:1: DOC102 Documented parameter `value_str` is not in the function's signature
     |
 226 |           Creates a Calculator instance from a string representation of a number.
 227 |   
@@ -205,7 +205,7 @@ DOC102_numpy.py:228:1: DOC102 `value_str` is not in the function's signature
     |
     = help: Remove the extraneous parameter from the docstring
 
-DOC102_numpy.py:247:1: DOC102 `number` is not in the function's signature
+DOC102_numpy.py:247:1: DOC102 Documented parameter `number` is not in the function's signature
     |
 245 |           Checks if a given number is valid (int or float).
 246 |   

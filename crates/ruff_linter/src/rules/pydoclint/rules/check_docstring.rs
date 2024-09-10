@@ -135,10 +135,10 @@ impl Violation for DocstringExtraneousParameter {
         let DocstringExtraneousParameter { ids } = self;
 
         if let [id] = ids.as_slice() {
-            format!("`{id}` is not in the function's signature")
+            format!("Documented parameter `{id}` is not in the function's signature")
         } else {
             format!(
-                "These parameters are not in the function's signature: {}",
+                "These documented parameters are not in the function's signature: {}",
                 ids.iter().map(|id| format!("`{id}`")).join(", ")
             )
         }
