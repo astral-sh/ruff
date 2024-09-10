@@ -408,6 +408,18 @@ impl<'db> Type<'db> {
     ///     pass
     /// ```
     fn iterate(&self, db: &'db dyn Db) -> IterationOutcome<'db> {
+        if let Type::Tuple(tuple_type) = self {
+            return IterationOutcome::Iterable {
+                element_ty: tuple_type
+                    .elements(db)
+                    .iter()
+                    .fold(UnionBuilder::new(db), |builder, element| {
+                        builder.add(*element)
+                    })
+                    .build(),
+            };
+        }
+
         // `self` represents the type of the iterable;
         // `__iter__` and `__next__` are both looked up on the class of the iterable:
         let iterable_meta_type = self.to_meta_type(db);
