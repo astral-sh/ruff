@@ -387,7 +387,7 @@ impl<'a> source_order::SourceOrderVisitor<'a> for QuoteAnnotation<'a> {
                         );
                         source
                     }
-                    None | Some(State::AnnotatedFirst) | Some(State::Other) => {
+                    None | Some(State::AnnotatedFirst | State::Other) => {
                         let mut source = generator.expr(expr);
                         source = source.replace(self.final_quote_type.as_char(), "");
                         source = source.replace(self.final_quote_type.opposite().as_char(), "");
