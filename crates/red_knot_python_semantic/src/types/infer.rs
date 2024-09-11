@@ -40,7 +40,9 @@ use ruff_text_size::Ranged;
 use crate::module_name::ModuleName;
 use crate::module_resolver::{file_to_module, resolve_module};
 use crate::semantic_index::ast_ids::{HasScopedAstId, HasScopedUseId, ScopedExpressionId};
-use crate::semantic_index::definition::{Definition, DefinitionKind, DefinitionNodeKey};
+use crate::semantic_index::definition::{
+    Definition, DefinitionKind, DefinitionNodeKey, ExceptHandlerDefinitionKind,
+};
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::{NodeWithScopeKind, NodeWithScopeRef, ScopeId};
@@ -426,11 +428,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                     definition,
                 );
             }
-            DefinitionKind::ExceptHandler(handler) => {
-                self.infer_except_handler_definition(handler, definition, false);
-            }
-            DefinitionKind::ExceptStarHandler(handler) => {
-                self.infer_except_handler_definition(handler, definition, true);
+            DefinitionKind::ExceptHandler(except_handler_definition) => {
+                self.infer_except_handler_definition(except_handler_definition, definition);
             }
         }
     }
@@ -824,17 +823,15 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_except_handler_definition(
         &mut self,
-        handler: &'db ast::ExceptHandlerExceptHandler,
+        except_handler_definition: &ExceptHandlerDefinitionKind,
         definition: Definition<'db>,
-        is_star: bool,
     ) {
-        let node_ty = handler
-            .type_
-            .as_deref()
+        let node_ty = except_handler_definition
+            .handled_exceptions()
             .map(|ty| self.infer_expression(ty))
             .unwrap_or(Type::Unknown);
 
-        let symbol_ty = if is_star {
+        let symbol_ty = if except_handler_definition.is_star() {
             // TODO should be generic --Alex
             //
             // TODO should infer `ExceptionGroup` if all caught exceptions

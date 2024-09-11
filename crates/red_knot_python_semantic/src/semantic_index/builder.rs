@@ -27,7 +27,9 @@ use crate::semantic_index::SemanticIndex;
 use crate::Db;
 
 use super::constraint::{Constraint, PatternConstraint};
-use super::definition::{MatchPatternDefinitionNodeRef, WithItemDefinitionNodeRef};
+use super::definition::{
+    ExceptHandlerDefinitionNodeRef, MatchPatternDefinitionNodeRef, WithItemDefinitionNodeRef,
+};
 
 pub(super) struct SemanticIndexBuilder<'db> {
     // Builder state
@@ -726,13 +728,13 @@ where
                         let symbol = self
                             .add_or_update_symbol(symbol_name.id.clone(), SymbolFlags::IS_DEFINED);
 
-                        self.add_definition(symbol, {
-                            if *is_star {
-                                DefinitionNodeRef::ExceptStarHandler(except_handler)
-                            } else {
-                                DefinitionNodeRef::ExceptHandler(except_handler)
-                            }
-                        });
+                        self.add_definition(
+                            symbol,
+                            DefinitionNodeRef::ExceptHandler(ExceptHandlerDefinitionNodeRef {
+                                handler: except_handler,
+                                is_star: *is_star,
+                            }),
+                        );
                     }
 
                     self.visit_body(handler_body);

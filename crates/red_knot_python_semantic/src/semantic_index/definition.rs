@@ -50,8 +50,7 @@ pub(crate) enum DefinitionNodeRef<'a> {
     Parameter(ast::AnyParameterRef<'a>),
     WithItem(WithItemDefinitionNodeRef<'a>),
     MatchPattern(MatchPatternDefinitionNodeRef<'a>),
-    ExceptHandler(&'a ast::ExceptHandlerExceptHandler),
-    ExceptStarHandler(&'a ast::ExceptHandlerExceptHandler),
+    ExceptHandler(ExceptHandlerDefinitionNodeRef<'a>),
 }
 
 impl<'a> From<&'a ast::StmtFunctionDef> for DefinitionNodeRef<'a> {
@@ -158,6 +157,12 @@ pub(crate) struct ForStmtDefinitionNodeRef<'a> {
 }
 
 #[derive(Copy, Clone, Debug)]
+pub(crate) struct ExceptHandlerDefinitionNodeRef<'a> {
+    pub(crate) handler: &'a ast::ExceptHandlerExceptHandler,
+    pub(crate) is_star: bool,
+}
+
+#[derive(Copy, Clone, Debug)]
 pub(crate) struct ComprehensionDefinitionNodeRef<'a> {
     pub(crate) iterable: &'a ast::Expr,
     pub(crate) target: &'a ast::ExprName,
@@ -253,12 +258,13 @@ impl DefinitionNodeRef<'_> {
                 identifier: AstNodeRef::new(parsed, identifier),
                 index,
             }),
-            DefinitionNodeRef::ExceptHandler(handler) => {
-                DefinitionKind::ExceptHandler(AstNodeRef::new(parsed, handler))
-            }
-            DefinitionNodeRef::ExceptStarHandler(handler) => {
-                DefinitionKind::ExceptStarHandler(AstNodeRef::new(parsed, handler))
-            }
+            DefinitionNodeRef::ExceptHandler(ExceptHandlerDefinitionNodeRef {
+                handler,
+                is_star,
+            }) => DefinitionKind::ExceptHandler(ExceptHandlerDefinitionKind {
+                handler: AstNodeRef::new(parsed.clone(), handler),
+                is_star,
+            }),
         }
     }
 
@@ -291,8 +297,7 @@ impl DefinitionNodeRef<'_> {
             Self::MatchPattern(MatchPatternDefinitionNodeRef { identifier, .. }) => {
                 identifier.into()
             }
-            Self::ExceptHandler(handler) => handler.into(),
-            Self::ExceptStarHandler(handler) => handler.into(),
+            Self::ExceptHandler(ExceptHandlerDefinitionNodeRef { handler, .. }) => handler.into(),
         }
     }
 }
@@ -313,8 +318,7 @@ pub enum DefinitionKind {
     ParameterWithDefault(AstNodeRef<ast::ParameterWithDefault>),
     WithItem(WithItemDefinitionKind),
     MatchPattern(MatchPatternDefinitionKind),
-    ExceptHandler(AstNodeRef<ast::ExceptHandlerExceptHandler>),
-    ExceptStarHandler(AstNodeRef<ast::ExceptHandlerExceptHandler>),
+    ExceptHandler(ExceptHandlerDefinitionKind),
 }
 
 #[derive(Clone, Debug)]
@@ -427,6 +431,22 @@ impl ForStmtDefinitionKind {
 
     pub(crate) fn is_async(&self) -> bool {
         self.is_async
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ExceptHandlerDefinitionKind {
+    handler: AstNodeRef<ast::ExceptHandlerExceptHandler>,
+    is_star: bool,
+}
+
+impl ExceptHandlerDefinitionKind {
+    pub(crate) fn handled_exceptions(&self) -> Option<&ast::Expr> {
+        self.handler.node().type_.as_deref()
+    }
+
+    pub(crate) fn is_star(&self) -> bool {
+        self.is_star
     }
 }
 
