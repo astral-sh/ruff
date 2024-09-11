@@ -361,7 +361,7 @@ impl<'a> source_order::SourceOrderVisitor<'a> for QuoteAnnotation<'a> {
                 left, op, right, ..
             }) => {
                 self.visit_expr(left);
-                self.annotation.push_str(&format!(" {op} "));
+                self.annotation.push_str(op.as_str());
                 self.visit_expr(right);
             }
             _ => {
