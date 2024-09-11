@@ -610,17 +610,31 @@ impl<'a> From<&'a ast::FString> for ComparableFString<'a> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub enum ComparableFStringPart<'a> {
-    Literal(ComparableStringLiteral<'a>),
-    FString(ComparableFString<'a>),
+impl<'a> From<&'a ast::StringLiteral> for ComparableFString<'a> {
+    fn from(string: &'a ast::StringLiteral) -> Self {
+        Self {
+            elements: vec![ComparableFStringElement::Literal(string.as_str())],
+        }
+    }
 }
 
-impl<'a> From<&'a ast::FStringPart> for ComparableFStringPart<'a> {
-    fn from(f_string_part: &'a ast::FStringPart) -> Self {
-        match f_string_part {
-            ast::FStringPart::Literal(string_literal) => Self::Literal(string_literal.into()),
-            ast::FStringPart::FString(f_string) => Self::FString(f_string.into()),
+impl<'a> From<&'a ast::FStringPart> for ComparableFString<'a> {
+    fn from(part: &'a ast::FStringPart) -> Self {
+        match part {
+            ast::FStringPart::Literal(literal) => literal.into(),
+            ast::FStringPart::FString(fstring) => fstring.into(),
+        }
+    }
+}
+
+impl<'a> From<&'a ast::FStringValue> for ComparableFString<'a> {
+    fn from(value: &'a ast::FStringValue) -> Self {
+        let comp_fstrings: Vec<ComparableFString<'a>> = value.iter().map(Into::into).collect();
+        Self {
+            elements: comp_fstrings
+                .into_iter()
+                .flat_map(|comp_fstring| comp_fstring.elements.into_iter())
+                .collect(),
         }
     }
 }
@@ -777,7 +791,7 @@ pub struct ExprFStringExpressionElement<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprFString<'a> {
-    parts: Vec<ComparableFStringPart<'a>>,
+    value: ComparableFString<'a>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -1021,7 +1035,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
             }),
             ast::Expr::FString(ast::ExprFString { value, range: _ }) => {
                 Self::FString(ExprFString {
-                    parts: value.iter().map(Into::into).collect(),
+                    value: value.into(),
                 })
             }
             ast::Expr::StringLiteral(ast::ExprStringLiteral { value, range: _ }) => {
