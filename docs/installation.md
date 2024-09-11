@@ -48,6 +48,11 @@ on the `pkgx` registry:
 $ pkgx install ruff
 ```
 
+For **x-cmd** users, Ruff is also available as [ruff](https://www.x-cmd.com/pkg/ruff) on the `x-cmd` registry:
+```console
+$ x env use ruff
+```
+
 For **Arch Linux** users, Ruff is also available as [`ruff`](https://archlinux.org/packages/extra/x86_64/ruff/)
 on the official repositories:
 
