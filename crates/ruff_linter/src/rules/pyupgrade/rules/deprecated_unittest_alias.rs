@@ -13,7 +13,7 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// The `unittest` module has deprecated aliases for some of its methods.
-/// The aliases may be removed in future versions of Python. Instead,
+/// The deprecated aliases were removed in Python 3.12. Instead of aliases,
 /// use their non-deprecated counterparts.
 ///
 /// ## Example
@@ -37,7 +37,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [Python documentation: Deprecated aliases](https://docs.python.org/3/library/unittest.html#deprecated-aliases)
+/// - [Python 3.11 documentation: Deprecated aliases](https://docs.python.org/3.11/library/unittest.html#deprecated-aliases)
 #[violation]
 pub struct DeprecatedUnittestAlias {
     alias: String,
