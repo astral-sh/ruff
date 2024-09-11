@@ -3,6 +3,7 @@
  */
 
 import { Monaco } from "@monaco-editor/react";
+import schema from "../../../ruff.schema.json";
 
 export const WHITE = "#ffffff";
 export const RADIATE = "#d7ff64";
@@ -31,6 +32,16 @@ export function setupMonaco(monaco: Monaco) {
   defineRustPythonTokensLanguage(monaco);
   defineRustPythonAstLanguage(monaco);
   defineCommentsLanguage(monaco);
+
+  monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
+    schemas: [
+      {
+        uri: "https://raw.githubusercontent.com/astral-sh/ruff/main/ruff.schema.json",
+        fileMatch: ["*"],
+        schema,
+      },
+    ],
+  });
 }
 
 function defineAyuThemes(monaco: Monaco) {
