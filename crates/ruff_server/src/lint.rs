@@ -77,6 +77,7 @@ pub(crate) fn check(
             file_resolver_settings,
             Some(linter_settings),
             None,
+            query.text_document_language_id(),
         ) {
             return DiagnosticsMap::default();
         }
