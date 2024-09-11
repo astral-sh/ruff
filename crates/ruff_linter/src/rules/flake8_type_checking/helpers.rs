@@ -332,7 +332,8 @@ impl<'a> source_order::SourceOrderVisitor<'a> for QuoteAnnotation<'a> {
             Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
                 if let Some(name) = value.as_name_expr() {
                     let value = generator.expr(value);
-                    self.annotation.push_str(&format!("{value}["));
+                    self.annotation.push_str(&value);
+                    self.annotation.push_str("[");
                     match name.id.as_str() {
                         "Literal" => self.state.push(State::Literal),
                         "Annotated" => self.state.push(State::Annotated),
