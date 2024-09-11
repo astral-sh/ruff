@@ -301,8 +301,8 @@ pub(crate) fn filter_contained(edits: Vec<Edit>) -> Vec<Edit> {
 #[derive(Copy, PartialEq, Clone)]
 enum State {
     Literal,
-    Annotated,
-    AnnotatedNonFirstElm,
+    AnnotatedFirst,
+    AnnotatedRest,
     Other,
 }
 
@@ -336,7 +336,7 @@ impl<'a> source_order::SourceOrderVisitor<'a> for QuoteAnnotation<'a> {
                     self.annotation.push_str("[");
                     match name.id.as_str() {
                         "Literal" => self.state.push(State::Literal),
-                        "Annotated" => self.state.push(State::Annotated),
+                        "Annotated" => self.state.push(State::AnnotatedFirst),
                         _ => self.state.push(State::Other),
                     }
 
@@ -346,10 +346,12 @@ impl<'a> source_order::SourceOrderVisitor<'a> for QuoteAnnotation<'a> {
                 }
             }
             Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                let first_elm = elts.first().unwrap();
+                let Some(first_elm) = elts.first() else {
+                    return;
+                };
                 self.visit_expr(first_elm);
-                if self.state.last().copied() == Some(State::Annotated) {
-                    self.state.push(State::AnnotatedNonFirstElm);
+                if self.state.last().copied() == Some(State::AnnotatedFirst) {
+                    self.state.push(State::AnnotatedRest);
                 }
                 for elm in elts.iter().skip(1) {
                     self.annotation.push_str(", ");
@@ -361,12 +363,23 @@ impl<'a> source_order::SourceOrderVisitor<'a> for QuoteAnnotation<'a> {
                 left, op, right, ..
             }) => {
                 self.visit_expr(left);
+                self.annotation.push_str(" ");
                 self.annotation.push_str(op.as_str());
+                self.annotation.push_str(" ");
                 self.visit_expr(right);
+            }
+            Expr::BoolOp(ast::ExprBoolOp { op, values, .. }) => {
+                for (i, value) in values.iter().enumerate() {
+                    if i > 0 {
+                        self.annotation.push_str(" ");
+                        self.annotation.push_str(op.as_str());
+                    }
+                    self.visit_expr(value);
+                }
             }
             _ => {
                 let source = match self.state.last().copied() {
-                    Some(State::Literal | State::Annotated) => {
+                    Some(State::Literal | State::AnnotatedRest) => {
                         let mut source = generator.expr(expr);
                         source = source.replace(
                             self.final_quote_type.as_char(),
@@ -374,7 +387,7 @@ impl<'a> source_order::SourceOrderVisitor<'a> for QuoteAnnotation<'a> {
                         );
                         source
                     }
-                    _ => {
+                    None | Some(State::AnnotatedFirst) | Some(State::Other) => {
                         let mut source = generator.expr(expr);
                         source = source.replace(self.final_quote_type.as_char(), "");
                         source = source.replace(self.final_quote_type.opposite().as_char(), "");

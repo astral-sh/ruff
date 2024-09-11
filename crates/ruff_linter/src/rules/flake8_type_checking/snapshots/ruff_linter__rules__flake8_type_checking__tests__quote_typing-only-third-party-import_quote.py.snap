@@ -496,7 +496,7 @@ quote.py:105:44: TCH002 [*] Move third-party import `django.contrib.auth.models.
 115 117 |         pass
 116 118 | 
 117     |-    def set_role(self, type1: AbstractBaseUser[Literal["user", "admin"], Annotated["int", "1", 2]]):
-    119 |+    def set_role(self, type1: "AbstractBaseUser[Literal['user', 'admin'], Annotated['int', 1, 2]]"):
+    119 |+    def set_role(self, type1: "AbstractBaseUser[Literal['user', 'admin'], Annotated[int, '1', 2]]"):
 118 120 |         pass
 119 121 | 
 120     |-    def test_role(self, type1: AbstractBaseUser["int" | Literal["int"]]):
