@@ -27,7 +27,9 @@ use crate::semantic_index::SemanticIndex;
 use crate::Db;
 
 use super::constraint::{Constraint, PatternConstraint};
-use super::definition::{MatchPatternDefinitionNodeRef, WithItemDefinitionNodeRef};
+use super::definition::{
+    ExceptHandlerDefinitionNodeRef, MatchPatternDefinitionNodeRef, WithItemDefinitionNodeRef,
+};
 
 pub(super) struct SemanticIndexBuilder<'db> {
     // Builder state
@@ -696,6 +698,51 @@ where
                     self.flow_merge(after_subject);
                 }
             }
+            ast::Stmt::Try(ast::StmtTry {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+                is_star,
+                range: _,
+            }) => {
+                self.visit_body(body);
+
+                for except_handler in handlers {
+                    let ast::ExceptHandler::ExceptHandler(except_handler) = except_handler;
+                    let ast::ExceptHandlerExceptHandler {
+                        name: symbol_name,
+                        type_: handled_exceptions,
+                        body: handler_body,
+                        range: _,
+                    } = except_handler;
+
+                    if let Some(handled_exceptions) = handled_exceptions {
+                        self.visit_expr(handled_exceptions);
+                    }
+
+                    // If `handled_exceptions` above was `None`, it's something like `except as e:`,
+                    // which is invalid syntax. However, it's still pretty obvious here that the user
+                    // *wanted* `e` to be bound, so we should still create a definition here nonetheless.
+                    if let Some(symbol_name) = symbol_name {
+                        let symbol = self
+                            .add_or_update_symbol(symbol_name.id.clone(), SymbolFlags::IS_DEFINED);
+
+                        self.add_definition(
+                            symbol,
+                            DefinitionNodeRef::ExceptHandler(ExceptHandlerDefinitionNodeRef {
+                                handler: except_handler,
+                                is_star: *is_star,
+                            }),
+                        );
+                    }
+
+                    self.visit_body(handler_body);
+                }
+
+                self.visit_body(orelse);
+                self.visit_body(finalbody);
+            }
             _ => {
                 walk_stmt(self, stmt);
             }
@@ -957,30 +1004,6 @@ where
         }
 
         self.current_match_case.as_mut().unwrap().index += 1;
-    }
-
-    fn visit_except_handler(&mut self, except_handler: &'ast ast::ExceptHandler) {
-        let ast::ExceptHandler::ExceptHandler(except_handler) = except_handler;
-        let ast::ExceptHandlerExceptHandler {
-            name: symbol_name,
-            type_: handled_exceptions,
-            body,
-            range: _,
-        } = except_handler;
-
-        if let Some(handled_exceptions) = handled_exceptions {
-            self.visit_expr(handled_exceptions);
-        }
-
-        // If `handled_exceptions` above was `None`, it's something like `except as e:`,
-        // which is invalid syntax. However, it's still pretty obvious here that the user
-        // *wanted* `e` to be bound, so we should still create a definition here nonetheless.
-        if let Some(symbol_name) = symbol_name {
-            let symbol = self.add_or_update_symbol(symbol_name.id.clone(), SymbolFlags::IS_DEFINED);
-            self.add_definition(symbol, except_handler);
-        }
-
-        self.visit_body(body);
     }
 }
 
