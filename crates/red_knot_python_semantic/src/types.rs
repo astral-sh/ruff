@@ -2,6 +2,7 @@ use infer::TypeInferenceBuilder;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 
+use crate::module_resolver::file_to_module;
 use crate::semantic_index::ast_ids::HasScopedAstId;
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId};
@@ -296,6 +297,46 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Return true if this type is [assignable to] type `target`.
+    ///
+    /// [assignable to]: https://typing.readthedocs.io/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
+    #[allow(unused)]
+    pub(crate) fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
+        if self.is_equivalent_to(db, target) {
+            return true;
+        }
+        match (self, target) {
+            (Type::Unknown | Type::Any | Type::Never, _) => true,
+            (_, Type::Unknown | Type::Any) => true,
+            (Type::IntLiteral(_), Type::Instance(class))
+                if class.is_stdlib_symbol(db, "builtins", "int") =>
+            {
+                true
+            }
+            (Type::StringLiteral(_), Type::LiteralString) => true,
+            (Type::StringLiteral(_) | Type::LiteralString, Type::Instance(class))
+                if class.is_stdlib_symbol(db, "builtins", "str") =>
+            {
+                true
+            }
+            (Type::BytesLiteral(_), Type::Instance(class))
+                if class.is_stdlib_symbol(db, "builtins", "bytes") =>
+            {
+                true
+            }
+            // TODO
+            _ => false,
+        }
+    }
+
+    /// Return true if this type is equivalent to type `other`.
+    #[allow(unused)]
+    pub(crate) fn is_equivalent_to(self, _db: &'db dyn Db, other: Type<'db>) -> bool {
+        // TODO equivalent but not identical structural types, differently-ordered unions and
+        // intersections, other cases?
+        self == other
+    }
+
     /// Resolve a member access of a type.
     ///
     /// For example, if `foo` is `Type::Instance(<Bar>)`,
@@ -588,6 +629,15 @@ pub struct ClassType<'db> {
 }
 
 impl<'db> ClassType<'db> {
+    /// Return true if this class is a standard library type with given module name and name.
+    #[allow(unused)]
+    pub(crate) fn is_stdlib_symbol(self, db: &'db dyn Db, module_name: &str, name: &str) -> bool {
+        name == self.name(db)
+            && file_to_module(db, self.body_scope(db).file(db)).is_some_and(|module| {
+                module.search_path().is_standard_library() && module.name() == module_name
+            })
+    }
+
     /// Return an iterator over the types of this class's bases.
     ///
     /// # Panics:
@@ -701,4 +751,105 @@ pub struct BytesLiteralType<'db> {
 pub struct TupleType<'db> {
     #[return_ref]
     elements: Box<[Type<'db>]>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{builtins_symbol_ty, BytesLiteralType, StringLiteralType, Type, UnionType};
+    use crate::db::tests::TestDb;
+    use crate::program::{Program, SearchPathSettings};
+    use crate::python_version::PythonVersion;
+    use crate::ProgramSettings;
+    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+    use test_case::test_case;
+
+    fn setup_db() -> TestDb {
+        let db = TestDb::new();
+
+        let src_root = SystemPathBuf::from("/src");
+        db.memory_file_system()
+            .create_directory_all(&src_root)
+            .unwrap();
+
+        Program::from_settings(
+            &db,
+            &ProgramSettings {
+                target_version: PythonVersion::default(),
+                search_paths: SearchPathSettings::new(src_root),
+            },
+        )
+        .expect("Valid search path settings");
+
+        db
+    }
+
+    /// A test representation of a type that can be transformed unambiguously into a real Type,
+    /// given a db.
+    #[derive(Debug)]
+    enum Ty {
+        Never,
+        Unknown,
+        Any,
+        IntLiteral(i64),
+        StringLiteral(&'static str),
+        LiteralString,
+        BytesLiteral(&'static str),
+        BuiltinInstance(&'static str),
+        Union(Vec<Ty>),
+    }
+
+    impl Ty {
+        fn into_type(self, db: &TestDb) -> Type<'_> {
+            match self {
+                Ty::Never => Type::Never,
+                Ty::Unknown => Type::Unknown,
+                Ty::Any => Type::Any,
+                Ty::IntLiteral(n) => Type::IntLiteral(n),
+                Ty::StringLiteral(s) => {
+                    Type::StringLiteral(StringLiteralType::new(db, (*s).into()))
+                }
+                Ty::LiteralString => Type::LiteralString,
+                Ty::BytesLiteral(s) => {
+                    Type::BytesLiteral(BytesLiteralType::new(db, s.as_bytes().into()))
+                }
+                Ty::BuiltinInstance(s) => builtins_symbol_ty(db, s).to_instance(db),
+                Ty::Union(tys) => {
+                    UnionType::from_elements(db, tys.into_iter().map(|ty| ty.into_type(db)))
+                }
+            }
+        }
+    }
+
+    #[test_case(Ty::Unknown, Ty::IntLiteral(1))]
+    #[test_case(Ty::Any, Ty::IntLiteral(1))]
+    #[test_case(Ty::Never, Ty::IntLiteral(1))]
+    #[test_case(Ty::IntLiteral(1), Ty::Unknown)]
+    #[test_case(Ty::IntLiteral(1), Ty::Any)]
+    #[test_case(Ty::IntLiteral(1), Ty::BuiltinInstance("int"))]
+    #[test_case(Ty::StringLiteral("foo"), Ty::BuiltinInstance("str"))]
+    #[test_case(Ty::StringLiteral("foo"), Ty::LiteralString)]
+    #[test_case(Ty::LiteralString, Ty::BuiltinInstance("str"))]
+    #[test_case(Ty::BytesLiteral("foo"), Ty::BuiltinInstance("bytes"))]
+    fn is_assignable_to(from: Ty, to: Ty) {
+        let db = setup_db();
+        assert!(from.into_type(&db).is_assignable_to(&db, to.into_type(&db)));
+    }
+
+    #[test_case(Ty::IntLiteral(1), Ty::BuiltinInstance("str"))]
+    #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str"))]
+    #[test_case(Ty::BuiltinInstance("int"), Ty::IntLiteral(1))]
+    fn is_not_assignable_to(from: Ty, to: Ty) {
+        let db = setup_db();
+        assert!(!from.into_type(&db).is_assignable_to(&db, to.into_type(&db)));
+    }
+
+    #[test_case(
+        Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]),
+        Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)])
+    )]
+    fn is_equivalent_to(from: Ty, to: Ty) {
+        let db = setup_db();
+
+        assert!(from.into_type(&db).is_equivalent_to(&db, to.into_type(&db)));
+    }
 }

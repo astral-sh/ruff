@@ -33,6 +33,7 @@ rustc-hash = { workspace = true }
 hashbrown = { workspace = true }
 smallvec = { workspace = true }
 static_assertions = { workspace = true }
+test-case = { workspace = true }
 
 [build-dependencies]
 path-slash = { workspace = true }
