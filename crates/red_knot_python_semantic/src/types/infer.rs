@@ -4817,6 +4817,11 @@ mod tests {
         )?;
 
         assert_file_diagnostics(&db, "src/a.py", &[]);
+
+        // TODO: What would be great in these assertions would be
+        // if we could assert the types of values *within* the `else` block.
+        // (Not possible with our current testing infrastructure, sadly.) --Alex
+
         assert_public_ty(&db, "src/a.py", "x", "Literal[11, 12, 13]");
 
         // `y` may be unbound if the `except NameError` branch is taken:

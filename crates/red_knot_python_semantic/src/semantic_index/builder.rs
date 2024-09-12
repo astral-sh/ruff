@@ -780,15 +780,16 @@ where
                     &mut self.try_block_definition_states,
                     saved_definition_states,
                 );
-                self.flow_restore(pre_try_block_state.clone());
+                self.flow_restore(pre_try_block_state);
                 for state in visiting_try_block_states {
                     self.flow_merge(state);
                 }
                 let pre_except_state = self.flow_snapshot();
                 let mut post_except_states = vec![];
+                let num_handlers = handlers.len();
 
                 // Visit the `except` blocks!
-                for except_handler in handlers {
+                for (i, except_handler) in handlers.iter().enumerate() {
                     let ast::ExceptHandler::ExceptHandler(except_handler) = except_handler;
                     let ast::ExceptHandlerExceptHandler {
                         name: symbol_name,
@@ -820,7 +821,13 @@ where
 
                     // Each `except` block is mutually exclusive with all other `except` blocks.
                     post_except_states.push(self.flow_snapshot());
-                    self.flow_restore(pre_except_state.clone());
+
+                    // It's unnecessary to do the `self.flow_restore()` call for the final except handler,
+                    // as we'll immediately call `self.flow_restore()` to a different state
+                    // as soon as this loop over the handlers terminates.
+                    if i < (num_handlers - 1) {
+                        self.flow_restore(pre_except_state.clone());
+                    }
                 }
 
                 // If we get to the `else` block, we know that 0 of the `except` blocks can have been executed,
