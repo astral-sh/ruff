@@ -4971,6 +4971,64 @@ mod tests {
     }
 
     #[test]
+    fn inner_try_blocks_inside_separate_scopes_not_tracked_by_outer_block() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            try:
+                x = 1
+
+                def foo():
+                    try:
+                        x = 2
+                        x = 3
+                    except:
+                        x = 4
+
+            except:
+                pass
+            ",
+        )?;
+
+        assert_file_diagnostics(&db, "src/a.py", &[]);
+        assert_public_ty(&db, "src/a.py", "x", "Unbound | Literal[1]");
+        assert_scope_ty(&db, "src/a.py", &["foo"], "x", "Literal[3, 4]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn inner_try_blocks_inside_class_scopes_not_tracked_by_outer_block() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            try:
+                x = 1
+
+                class Foo:
+                    try:
+                        x = 2
+                        x = 3
+                    except:
+                        x = 4
+
+            except:
+                pass
+            ",
+        )?;
+
+        assert_file_diagnostics(&db, "src/a.py", &[]);
+        assert_public_ty(&db, "src/a.py", "x", "Unbound | Literal[1]");
+        assert_scope_ty(&db, "src/a.py", &["Foo"], "x", "Literal[3, 4]");
+
+        Ok(())
+    }
+
+    #[test]
     fn basic_comprehension() -> anyhow::Result<()> {
         let mut db = setup_db();
 

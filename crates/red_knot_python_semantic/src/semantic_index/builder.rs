@@ -112,7 +112,11 @@ impl<'db> SemanticIndexBuilder<'db> {
             parent,
             kind: node.scope_kind(),
             descendents: children_start..children_start,
+            contained_inside_try_block: self.visiting_try_block,
         };
+
+        // All scopes start off as not visiting a `try` block
+        self.visiting_try_block = false;
 
         let file_scope_id = self.scopes.push(scope);
         self.symbol_tables.push(SymbolTableBuilder::new());
@@ -142,6 +146,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         let children_end = self.scopes.next_index();
         let scope = &mut self.scopes[id];
         scope.descendents = scope.descendents.start..children_end;
+        self.visiting_try_block = scope.contained_inside_try_block();
         id
     }
 

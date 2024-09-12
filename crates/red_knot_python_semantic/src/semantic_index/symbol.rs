@@ -164,6 +164,7 @@ pub struct Scope {
     pub(super) parent: Option<FileScopeId>,
     pub(super) kind: ScopeKind,
     pub(super) descendents: Range<FileScopeId>,
+    pub(super) contained_inside_try_block: bool,
 }
 
 impl Scope {
@@ -173,6 +174,11 @@ impl Scope {
 
     pub fn kind(&self) -> ScopeKind {
         self.kind
+    }
+
+    /// Whether this scope is a top-level expression/statement inside a `try` block
+    pub const fn contained_inside_try_block(&self) -> bool {
+        self.contained_inside_try_block
     }
 }
 
