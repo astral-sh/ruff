@@ -506,7 +506,6 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
                             reference.expression_id()?,
                             checker.semantic(),
                             checker.stylist(),
-                            checker.generator(),
                         ))
                     } else {
                         None

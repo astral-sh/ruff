@@ -224,7 +224,6 @@ pub(crate) fn quote_annotation(
     node_id: NodeId,
     semantic: &SemanticModel,
     stylist: &Stylist,
-    generator: Generator,
 ) -> Result<Edit> {
     let expr = semantic.expression(node_id).expect("Expression not found");
     if let Some(parent_id) = semantic.parent_expression_id(node_id) {
@@ -234,7 +233,7 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the value of a subscript, we need to quote the entire
                     // expression. For example, when quoting `DataFrame` in `DataFrame[int]`, we
                     // should generate `"DataFrame[int]"`.
-                    return quote_annotation(parent_id, semantic, stylist, generator);
+                    return quote_annotation(parent_id, semantic, stylist);
                 }
             }
             Some(Expr::Attribute(parent)) => {
@@ -242,7 +241,7 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the value of an attribute, we need to quote the entire
                     // expression. For example, when quoting `DataFrame` in `pd.DataFrame`, we
                     // should generate `"pd.DataFrame"`.
-                    return quote_annotation(parent_id, semantic, stylist, generator);
+                    return quote_annotation(parent_id, semantic, stylist);
                 }
             }
             Some(Expr::Call(parent)) => {
@@ -250,7 +249,7 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the function of a call, we need to quote the entire
                     // expression. For example, when quoting `DataFrame` in `DataFrame()`, we
                     // should generate `"DataFrame()"`.
-                    return quote_annotation(parent_id, semantic, stylist, generator);
+                    return quote_annotation(parent_id, semantic, stylist);
                 }
             }
             Some(Expr::BinOp(parent)) => {
@@ -258,7 +257,7 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the left or right side of a binary operation, we need to
                     // quote the entire expression. For example, when quoting `DataFrame` in
                     // `DataFrame | Series`, we should generate `"DataFrame | Series"`.
-                    return quote_annotation(parent_id, semantic, stylist, generator);
+                    return quote_annotation(parent_id, semantic, stylist);
                 }
             }
             _ => {}
@@ -267,11 +266,10 @@ pub(crate) fn quote_annotation(
 
     let quote = stylist.quote();
     let mut quote_annotation = QuoteAnnotation::new(stylist);
-    quote_annotation.visit_expr(&expr);
+    quote_annotation.visit_expr(expr);
 
     let annotation = quote_annotation.annotation;
 
-    dbg!(&annotation);
     Ok(Edit::range_replacement(
         format!("{quote}{annotation}{quote}"),
         expr.range(),
@@ -333,7 +331,7 @@ impl<'a> source_order::SourceOrderVisitor<'a> for QuoteAnnotation<'a> {
                 if let Some(name) = value.as_name_expr() {
                     let value = generator.expr(value);
                     self.annotation.push_str(&value);
-                    self.annotation.push_str("[");
+                    self.annotation.push('[');
                     match name.id.as_str() {
                         "Literal" => self.state.push(State::Literal),
                         "Annotated" => self.state.push(State::AnnotatedFirst),
@@ -342,7 +340,7 @@ impl<'a> source_order::SourceOrderVisitor<'a> for QuoteAnnotation<'a> {
 
                     self.visit_expr(slice);
                     self.state.pop();
-                    self.annotation.push_str(&format!("]"));
+                    self.annotation.push(']');
                 }
             }
             Expr::Tuple(ast::ExprTuple { elts, .. }) => {
@@ -363,15 +361,15 @@ impl<'a> source_order::SourceOrderVisitor<'a> for QuoteAnnotation<'a> {
                 left, op, right, ..
             }) => {
                 self.visit_expr(left);
-                self.annotation.push_str(" ");
+                self.annotation.push(' ');
                 self.annotation.push_str(op.as_str());
-                self.annotation.push_str(" ");
+                self.annotation.push(' ');
                 self.visit_expr(right);
             }
             Expr::BoolOp(ast::ExprBoolOp { op, values, .. }) => {
                 for (i, value) in values.iter().enumerate() {
                     if i > 0 {
-                        self.annotation.push_str(" ");
+                        self.annotation.push(' ');
                         self.annotation.push_str(op.as_str());
                     }
                     self.visit_expr(value);
