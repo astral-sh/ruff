@@ -297,10 +297,9 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Return true if this type is assignable to type `target`.
+    /// Return true if this type is [assignable to] type `target`.
     ///
-    /// Definition of assignability in the typing spec:
-    /// <https://typing.readthedocs.io/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation>
+    /// [assignable to]: https://typing.readthedocs.io/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
     #[allow(unused)]
     pub(crate) fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
         if self.is_equivalent_to(db, target) {
