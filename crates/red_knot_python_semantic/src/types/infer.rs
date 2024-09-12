@@ -4918,6 +4918,28 @@ mod tests {
     }
 
     #[test]
+    fn multiple_definitions_of_same_symbol_in_try_block() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            try:
+                x = 1
+                x = 2
+                x = 3
+            except:
+                pass
+            ",
+        )?;
+
+        assert_file_diagnostics(&db, "src/a.py", &[]);
+        assert_public_ty(&db, "src/a.py", "x", "Unbound | Literal[1, 2, 3]");
+
+        Ok(())
+    }
+
+    #[test]
     fn basic_comprehension() -> anyhow::Result<()> {
         let mut db = setup_db();
 
