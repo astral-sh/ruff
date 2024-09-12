@@ -308,17 +308,19 @@ impl<'db> Type<'db> {
         match (self, target) {
             (Type::Unknown | Type::Any | Type::Never, _) => true,
             (_, Type::Unknown | Type::Any) => true,
-            (Type::IntLiteral(_), Type::Instance(class)) if class.is_builtin_named(db, "int") => {
+            (Type::IntLiteral(_), Type::Instance(class))
+                if class.is_stdlib_symbol(db, "builtins", "int") =>
+            {
                 true
             }
             (Type::StringLiteral(_), Type::LiteralString) => true,
             (Type::StringLiteral(_) | Type::LiteralString, Type::Instance(class))
-                if class.is_builtin_named(db, "str") =>
+                if class.is_stdlib_symbol(db, "builtins", "str") =>
             {
                 true
             }
             (Type::BytesLiteral(_), Type::Instance(class))
-                if class.is_builtin_named(db, "bytes") =>
+                if class.is_stdlib_symbol(db, "builtins", "bytes") =>
             {
                 true
             }
@@ -627,14 +629,13 @@ pub struct ClassType<'db> {
 }
 
 impl<'db> ClassType<'db> {
-    /// Return true if this class is the builtin type with given name.
+    /// Return true if this class is a standard library type with given module name and name.
     #[allow(unused)]
-    pub(crate) fn is_builtin_named(self, db: &'db dyn Db, name: &str) -> bool {
-        name == self.name(db).as_str()
-            && file_to_module(db, self.body_scope(db).file(db))
-                // Builtin module names are special-cased in the resolver, so there can't be a
-                // module named builtins other than the actual builtins.
-                .is_some_and(|module| module.name() == "builtins")
+    pub(crate) fn is_stdlib_symbol(self, db: &'db dyn Db, module_name: &str, name: &str) -> bool {
+        name == self.name(db)
+            && file_to_module(db, self.body_scope(db).file(db)).is_some_and(|module| {
+                module.search_path().is_standard_library() && module.name() == module_name
+            })
     }
 
     /// Return an iterator over the types of this class's bases.
