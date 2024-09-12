@@ -4488,8 +4488,8 @@ mod tests {
             ",
         )?;
 
-        assert_public_ty(&db, "src/a.py", "e", "NameError");
-        assert_public_ty(&db, "src/a.py", "f", "error");
+        assert_public_ty(&db, "src/a.py", "e", "Unbound | NameError");
+        assert_public_ty(&db, "src/a.py", "f", "Unbound | error");
         assert_file_diagnostics(&db, "src/a.py", &[]);
 
         Ok(())
@@ -4517,7 +4517,7 @@ mod tests {
             &["Cannot resolve import 'nonexistent_module'."],
         );
         assert_public_ty(&db, "src/a.py", "foo", "Unknown");
-        assert_public_ty(&db, "src/a.py", "e", "Unknown");
+        assert_public_ty(&db, "src/a.py", "e", "Unbound | Unknown");
 
         Ok(())
     }
@@ -4544,10 +4544,10 @@ mod tests {
 
         // For these TODOs we need support for `tuple` types:
 
-        // TODO: Should be `RuntimeError | OSError` --Alex
-        assert_public_ty(&db, "src/a.py", "e", "Unknown");
-        // TODO: Should be `AttributeError | TypeError` --Alex
-        assert_public_ty(&db, "src/a.py", "e", "Unknown");
+        // TODO: Should be `Unbound | RuntimeError | OSError` --Alex
+        assert_public_ty(&db, "src/a.py", "e", "Unbound | Unknown");
+        // TODO: Should be `Unbound | AttributeError | TypeError` --Alex
+        assert_public_ty(&db, "src/a.py", "e", "Unbound | Unknown");
 
         Ok(())
     }
@@ -4567,7 +4567,7 @@ mod tests {
         )?;
 
         assert_file_diagnostics(&db, "src/a.py", &[]);
-        assert_public_ty(&db, "src/a.py", "e", "Unknown");
+        assert_public_ty(&db, "src/a.py", "e", "Unbound | Unknown");
 
         Ok(())
     }
@@ -4590,8 +4590,13 @@ mod tests {
 
         // TODO: once we support `sys.version_info` branches,
         // we can set `--target-version=py311` in this test
-        // and the inferred type will just be `BaseExceptionGroup` --Alex
-        assert_public_ty(&db, "src/a.py", "e", "Unknown | BaseExceptionGroup");
+        // and the inferred type will just be `Unbound | BaseExceptionGroup` --Alex
+        assert_public_ty(
+            &db,
+            "src/a.py",
+            "e",
+            "Unbound | Unknown | BaseExceptionGroup",
+        );
 
         Ok(())
     }
@@ -4614,10 +4619,15 @@ mod tests {
 
         // TODO: once we support `sys.version_info` branches,
         // we can set `--target-version=py311` in this test
-        // and the inferred type will just be `BaseExceptionGroup` --Alex
+        // and the inferred type will just be `Unbound | BaseExceptionGroup` --Alex
         //
-        // TODO more precise would be `ExceptionGroup[OSError]` --Alex
-        assert_public_ty(&db, "src/a.py", "e", "Unknown | BaseExceptionGroup");
+        // TODO more precise would be `Unbound | ExceptionGroup[OSError]` --Alex
+        assert_public_ty(
+            &db,
+            "src/a.py",
+            "e",
+            "Unbound | Unknown | BaseExceptionGroup",
+        );
 
         Ok(())
     }
@@ -4640,10 +4650,264 @@ mod tests {
 
         // TODO: once we support `sys.version_info` branches,
         // we can set `--target-version=py311` in this test
-        // and the inferred type will just be `BaseExceptionGroup` --Alex
+        // and the inferred type will just be `Unbound | BaseExceptionGroup` --Alex
         //
-        // TODO more precise would be `ExceptionGroup[TypeError | AttributeError]` --Alex
-        assert_public_ty(&db, "src/a.py", "e", "Unknown | BaseExceptionGroup");
+        // TODO more precise would be `Unbound | ExceptionGroup[TypeError | AttributeError]` --Alex
+        assert_public_ty(
+            &db,
+            "src/a.py",
+            "e",
+            "Unbound | Unknown | BaseExceptionGroup",
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn except_handler_definition_in_try_and_except_no_else() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            try:
+                x = 1
+            except:
+                x = 2
+            ",
+        )?;
+
+        assert_file_diagnostics(&db, "src/a.py", &[]);
+
+        // Either the `try` block ran to completion (an implicit empty `else` block),
+        // or the `except` block ran; either way, `x` is defined:
+        assert_public_ty(&db, "src/a.py", "x", "Literal[1, 2]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn except_handler_definition_in_try_and_multiple_excepts_no_else() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            try:
+                x = 1
+            except NameError:
+                x = 2
+            except TypeError:
+                pass
+            ",
+        )?;
+
+        assert_file_diagnostics(&db, "src/a.py", &[]);
+
+        // `x` may be unbound if the `except TypeError` branch is taken;
+        // it is bound if the the `try` block runs to completion or the `except NameError` branch is taken:
+        assert_public_ty(&db, "src/a.py", "x", "Unbound | Literal[1, 2]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn except_handler_definitions_with_pre_existing_definitions() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            e = 1
+            f = 2
+
+            try:
+                x
+            except NameError
+                e = 42
+            except TypeError:
+                f = 43
+            except RuntimeError:
+                f = 44
+            except OSError:
+                g = 45
+            ",
+        )?;
+
+        assert_file_diagnostics(&db, "src/a.py", &[]);
+        assert_public_ty(&db, "src/a.py", "e", "Literal[1, 42]");
+        assert_public_ty(&db, "src/a.py", "f", "Literal[2, 43, 44]");
+        assert_public_ty(&db, "src/a.py", "g", "Unbound | Literal[45]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn except_handler_definitions_with_finally_branch() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            try:
+                x
+            except NameError
+                e = 42
+            finally:
+                e = 44
+            ",
+        )?;
+
+        assert_file_diagnostics(&db, "src/a.py", &[]);
+
+        // The `finally` block is always executed:
+        assert_public_ty(&db, "src/a.py", "e", "Literal[44]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn except_handler_definitions_with_else_branch() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            try:
+                x = 42
+            except NameError
+                x = 43
+            except TypeError:
+                x = 44
+            else:
+                x = 45
+            ",
+        )?;
+
+        assert_file_diagnostics(&db, "src/a.py", &[]);
+
+        // Either one of the `except` branches or the `else` branch must have been taken;
+        // the `x` definition in the `try` block must have been overridden after completion
+        // of the entire `try`/`except` block:
+        assert_public_ty(&db, "src/a.py", "x", "Literal[43, 44, 45]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn except_handler_multiple_definitions_in_try_block() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            try:
+                x = 1
+                y = 2
+                z = 3
+            except NameError
+                x = 11
+            except TypeError:
+                x = 12
+                y = 22
+            else:
+                x = 13
+                y = 23
+            ",
+        )?;
+
+        assert_file_diagnostics(&db, "src/a.py", &[]);
+        assert_public_ty(&db, "src/a.py", "x", "Literal[11, 12, 13]");
+
+        // `y` may be unbound if the `except NameError` branch is taken:
+        assert_public_ty(&db, "src/a.py", "y", "Unbound | Literal[2, 22, 23]");
+
+        // `z` may be unbound if the `except NameError` or the `except TypeError` branch is taken:
+        assert_public_ty(&db, "src/a.py", "z", "Unbound | Literal[3]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn nested_try_except_definitions() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            try:
+                try:
+                    try:
+                        x = 1
+                    except TypeError:
+                        x = 2
+                    else:
+                        x = 3
+                except RuntimeError:
+                    x = 4
+                else:
+                    x = 5
+            except TypeError:
+                try:
+                    try:
+                        x = 6
+                    except RuntimeError:
+                        x = 7
+                    else:
+                        x = 8
+                except OSError:
+                    x = 9
+                else:
+                    x = 10
+            else:
+                try:
+                    try:
+                        x = 11
+                    except RuntimeError:
+                        x = 12
+                    else:
+                        x = 13
+                except OSError:
+                    x = 14
+                else:
+                    x = 15
+            ",
+        )?;
+
+        assert_file_diagnostics(&db, "src/a.py", &[]);
+
+        // Union the flows of the top-level `except TypeError` and `else` branches together.
+        // The first is `Literal[9, 10]` (union of that branch's inner `except` and `else` branches);
+        // the second is `Literal[14, 15]` (union of *that* branch's inner `except` and `else` branches).
+        assert_public_ty(&db, "src/a.py", "x", "Literal[9, 10, 14, 15]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn except_handler_multiple_definitions_in_nested_try_block() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            try:
+                try:
+                    x = 1
+                except:
+                    x = 2
+                y = 11
+            except TypeError:
+                x = 101
+                y = 111
+            except RuntimeError:
+                y = 211
+            ",
+        )?;
+
+        assert_file_diagnostics(&db, "src/a.py", &[]);
+        assert_public_ty(&db, "src/a.py", "x", "Unbound | Literal[1, 2, 101]");
+        assert_public_ty(&db, "src/a.py", "y", "Literal[11, 111, 211]");
 
         Ok(())
     }

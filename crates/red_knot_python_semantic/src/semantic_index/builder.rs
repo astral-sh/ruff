@@ -44,6 +44,12 @@ pub(super) struct SemanticIndexBuilder<'db> {
     current_match_case: Option<CurrentMatchCase<'db>>,
     /// Flow states at each `break` in the current loop.
     loop_break_states: Vec<FlowSnapshot>,
+    /// Flow states after each definition in the `try` branch
+    /// of the current `try`/`except` block.
+    try_block_definition_states: Vec<FlowSnapshot>,
+    /// Whether we are currently visiting a `try` branch
+    /// of a `try`/`except` block
+    visiting_try_block: bool,
 
     // Semantic Index fields
     scopes: IndexVec<FileScopeId, Scope>,
@@ -67,6 +73,8 @@ impl<'db> SemanticIndexBuilder<'db> {
             current_assignment: None,
             current_match_case: None,
             loop_break_states: vec![],
+            try_block_definition_states: vec![],
+            visiting_try_block: false,
 
             scopes: IndexVec::new(),
             symbol_tables: IndexVec::new(),
@@ -220,6 +228,10 @@ impl<'db> SemanticIndexBuilder<'db> {
             }
             DefinitionCategory::Declaration => use_def.record_declaration(symbol, definition),
             DefinitionCategory::Binding => use_def.record_binding(symbol, definition),
+        }
+
+        if self.visiting_try_block {
+            self.try_block_definition_states.push(self.flow_snapshot());
         }
 
         definition
@@ -738,8 +750,44 @@ where
                 is_star,
                 range: _,
             }) => {
-                self.visit_body(body);
+                // Save the state prior to visiting any of the `try` block.
+                //
+                // Potentially none of the `try` block could have been executed prior to executing
+                // the `except` block(s), so we will merge this state with all of the intermediate
+                // states during the `try` block before visiting the `except` blocks.
+                let pre_try_block_state = self.flow_snapshot();
+                let saved_definition_states = std::mem::take(&mut self.try_block_definition_states);
+                let visiting_nested_try_block = self.visiting_try_block;
 
+                // Visit the `try` block!
+                //
+                // If `visiting_try_block == true`, this informs `.add_definition()` to record the state
+                // in `self.try_block_definition_states` after each new definition is recorded.
+                self.visiting_try_block = true;
+                self.visit_body(body);
+                self.visiting_try_block = visiting_nested_try_block;
+
+                // Save the state immediately *after* visiting the `try` block
+                // but *before* we prepare for visiting the `except` block(s).
+                //
+                // We will revert to this state prior to visiting the the `else` block,
+                // as there necessarily must have been 0 `except` blocks executed
+                // if we hit the `else` block.
+                let post_try_block_state = self.flow_snapshot();
+
+                // Prepare for visiting the `except` block(s)
+                let visiting_try_block_states = std::mem::replace(
+                    &mut self.try_block_definition_states,
+                    saved_definition_states,
+                );
+                self.flow_restore(pre_try_block_state.clone());
+                for state in visiting_try_block_states {
+                    self.flow_merge(state);
+                }
+                let pre_except_state = self.flow_snapshot();
+                let mut post_except_states = vec![];
+
+                // Visit the `except` blocks!
                 for except_handler in handlers {
                     let ast::ExceptHandler::ExceptHandler(except_handler) = except_handler;
                     let ast::ExceptHandlerExceptHandler {
@@ -769,9 +817,31 @@ where
                     }
 
                     self.visit_body(handler_body);
+
+                    // Each `except` block is mutually exclusive with all other `except` blocks.
+                    post_except_states.push(self.flow_snapshot());
+                    self.flow_restore(pre_except_state.clone());
                 }
 
+                // If we get to the `else` block, we know that 0 of the `except` blocks can have been executed,
+                // and the entire `try` block must have been executed:
+                self.flow_restore(post_try_block_state);
                 self.visit_body(orelse);
+
+                // Visiting the `finally` block!
+                //
+                // The state here could be that we visited exactly one `except` block,
+                // or that we visited the `else` block.
+                //
+                // N.B. Not all `try`/`except` clauses have `else` and/or `finally`!
+                // (In fact, some of them have `finally` but not `except`!)
+                // That's actually an irrelevant detail for us here, though, because
+                // a nonexistent `else` or `finally` block is just represented
+                // as an empty `Vec` in our AST, and visiting an empty `Vec` will not
+                // change the flow state at all.
+                for state in post_except_states {
+                    self.flow_merge(state);
+                }
                 self.visit_body(finalbody);
             }
             _ => {
