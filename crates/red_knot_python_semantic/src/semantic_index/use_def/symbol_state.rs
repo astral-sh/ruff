@@ -106,14 +106,12 @@ impl SymbolDeclarations {
     }
 
     /// Return an iterator over live declarations for this symbol.
-    #[allow(unused)]
     pub(super) fn iter(&self) -> DeclarationIdIterator {
         DeclarationIdIterator {
             inner: self.live_declarations.iter(),
         }
     }
 
-    #[allow(unused)]
     pub(super) fn is_empty(&self) -> bool {
         self.live_declarations.is_empty()
     }
@@ -393,7 +391,6 @@ impl Iterator for ConstraintIdIterator<'_> {
 
 impl std::iter::FusedIterator for ConstraintIdIterator<'_> {}
 
-#[allow(unused)]
 #[derive(Debug)]
 pub(super) struct DeclarationIdIterator<'a> {
     inner: DeclarationsIterator<'a>,

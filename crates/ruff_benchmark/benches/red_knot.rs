@@ -23,7 +23,6 @@ const TOMLLIB_312_URL: &str = "https://raw.githubusercontent.com/python/cpython/
 
 // The failed import from 'collections.abc' is due to lack of support for 'import *'.
 static EXPECTED_DIAGNOSTICS: &[&str] = &[
-    "/src/tomllib/_parser.py:5:24: Module '__future__' has no member 'annotations'",
     "/src/tomllib/_parser.py:7:29: Module 'collections.abc' has no member 'Iterable'",
     "Line 69 is too long (89 characters)",
     "Use double quotes for strings",

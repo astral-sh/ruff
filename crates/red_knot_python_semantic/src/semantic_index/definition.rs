@@ -34,17 +34,14 @@ impl<'db> Definition<'db> {
         self.file_scope(db).to_scope_id(db, self.file(db))
     }
 
-    #[allow(unused)]
     pub(crate) fn category(self, db: &'db dyn Db) -> DefinitionCategory {
         self.kind(db).category()
     }
 
-    #[allow(unused)]
     pub(crate) fn is_declaration(self, db: &'db dyn Db) -> bool {
         self.kind(db).category().is_declaration()
     }
 
-    #[allow(unused)]
     pub(crate) fn is_binding(self, db: &'db dyn Db) -> bool {
         self.kind(db).category().is_binding()
     }

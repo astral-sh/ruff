@@ -50,8 +50,8 @@ use crate::semantic_index::SemanticIndex;
 use crate::stdlib::builtins_module_scope;
 use crate::types::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 use crate::types::{
-    builtins_symbol_ty, definitions_ty, global_symbol_ty, symbol_ty, BytesLiteralType, ClassType,
-    FunctionType, StringLiteralType, TupleType, Type, UnionType,
+    bindings_ty, builtins_symbol_ty, declaration_ty, global_symbol_ty, symbol_ty, BytesLiteralType,
+    ClassType, FunctionType, StringLiteralType, TupleType, Type, UnionType,
 };
 use crate::Db;
 
@@ -75,13 +75,21 @@ pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Ty
 /// Cycle recovery for [`infer_definition_types()`]: for now, just [`Type::Unknown`]
 /// TODO fixpoint iteration
 fn infer_definition_types_cycle_recovery<'db>(
-    _db: &'db dyn Db,
+    db: &'db dyn Db,
     _cycle: &salsa::Cycle,
     input: Definition<'db>,
 ) -> TypeInference<'db> {
     tracing::trace!("infer_definition_types_cycle_recovery");
     let mut inference = TypeInference::default();
-    inference.definitions.insert(input, Type::Unknown);
+    let category = input.category(db);
+    if category.is_declaration() {
+        inference.declarations.insert(input, Type::Unknown);
+    }
+    if category.is_binding() {
+        inference.bindings.insert(input, Type::Unknown);
+    }
+    // TODO we don't fill in expression types for the cycle-participant definitions, which can
+    // later cause a panic when looking up an expression type.
     inference
 }
 
@@ -165,8 +173,11 @@ pub(crate) struct TypeInference<'db> {
     /// The types of every expression in this region.
     expressions: FxHashMap<ScopedExpressionId, Type<'db>>,
 
-    /// The types of every definition in this region.
-    definitions: FxHashMap<Definition<'db>, Type<'db>>,
+    /// The types of every binding in this region.
+    bindings: FxHashMap<Definition<'db>, Type<'db>>,
+
+    /// The types of every declaration in this region.
+    declarations: FxHashMap<Definition<'db>, Type<'db>>,
 
     /// The diagnostics for this region.
     diagnostics: TypeCheckDiagnostics,
@@ -184,8 +195,12 @@ impl<'db> TypeInference<'db> {
         self.expressions.get(&expression).copied()
     }
 
-    pub(crate) fn definition_ty(&self, definition: Definition<'db>) -> Type<'db> {
-        self.definitions[&definition]
+    pub(crate) fn binding_ty(&self, definition: Definition<'db>) -> Type<'db> {
+        self.bindings[&definition]
+    }
+
+    pub(crate) fn declaration_ty(&self, definition: Definition<'db>) -> Type<'db> {
+        self.declarations[&definition]
     }
 
     pub(crate) fn diagnostics(&self) -> &[std::sync::Arc<TypeCheckDiagnostic>] {
@@ -194,7 +209,8 @@ impl<'db> TypeInference<'db> {
 
     fn shrink_to_fit(&mut self) {
         self.expressions.shrink_to_fit();
-        self.definitions.shrink_to_fit();
+        self.bindings.shrink_to_fit();
+        self.declarations.shrink_to_fit();
         self.diagnostics.shrink_to_fit();
     }
 }
@@ -292,7 +308,10 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn extend(&mut self, inference: &TypeInference<'db>) {
-        self.types.definitions.extend(inference.definitions.iter());
+        self.types.bindings.extend(inference.bindings.iter());
+        self.types
+            .declarations
+            .extend(inference.declarations.iter());
         self.types.expressions.extend(inference.expressions.iter());
         self.types.diagnostics.extend(&inference.diagnostics);
         self.types.has_deferred |= inference.has_deferred;
@@ -351,7 +370,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         if self.types.has_deferred {
             let mut deferred_expression_types: FxHashMap<ScopedExpressionId, Type<'db>> =
                 FxHashMap::default();
-            for definition in self.types.definitions.keys() {
+            // invariant: only annotations and base classes are deferred, and both of these only
+            // occur within a declaration (annotated assignment, function or class definition)
+            for definition in self.types.declarations.keys() {
                 if infer_definition_types(self.db, *definition).has_deferred {
                     let deferred = infer_deferred_types(self.db, *definition);
                     deferred_expression_types.extend(deferred.expressions.iter());
@@ -447,6 +468,116 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_region_expression(&mut self, expression: Expression<'db>) {
         self.infer_expression(expression.node_ref(self.db));
+    }
+
+    fn invalid_assignment_diagnostic(
+        &mut self,
+        node: AnyNodeRef,
+        declared_ty: Type<'db>,
+        assigned_ty: Type<'db>,
+    ) {
+        match declared_ty {
+            Type::Class(class) => {
+                self.add_diagnostic(node, "invalid-assignment", format_args!(
+                        "Implicit shadowing of class '{}'; annotate to make it explicit if this is intentional.",
+                        class.name(self.db)));
+            }
+            Type::Function(function) => {
+                self.add_diagnostic(node, "invalid-assignment", format_args!(
+                        "Implicit shadowing of function '{}'; annotate to make it explicit if this is intentional.",
+                        function.name(self.db)));
+            }
+            _ => {
+                self.add_diagnostic(
+                    node,
+                    "invalid-assignment",
+                    format_args!(
+                        "Object of type '{}' is not assignable to '{}'.",
+                        assigned_ty.display(self.db),
+                        declared_ty.display(self.db),
+                    ),
+                );
+            }
+        }
+    }
+
+    fn add_binding(&mut self, node: AnyNodeRef, binding: Definition<'db>, ty: Type<'db>) {
+        debug_assert!(binding.is_binding(self.db));
+        let use_def = self.index.use_def_map(binding.file_scope(self.db));
+        let mut declared_tys = use_def
+            .declarations_at_binding(binding)
+            .map(|declaration| declaration_ty(self.db, declaration));
+        let mut bound_ty = ty;
+        if let Some(declared_ty) = declared_tys.next() {
+            let mut check_compat = true;
+            for other_declared_ty in declared_tys {
+                if !declared_ty.is_equivalent_to(self.db, other_declared_ty) {
+                    // TODO point out the conflicting declarations in the diagnostic?
+                    let symbol_table = self.index.symbol_table(binding.file_scope(self.db));
+                    let symbol_name = symbol_table.symbol(binding.symbol(self.db)).name();
+                    self.add_diagnostic(
+                        node,
+                        "conflicting-declarations",
+                        format_args!(
+                            "Conflicting declared types for '{symbol_name}': '{}', '{}'.",
+                            declared_ty.display(self.db),
+                            other_declared_ty.display(self.db)
+                        ),
+                    );
+                    check_compat = false;
+                    break;
+                }
+            }
+            if check_compat && !bound_ty.is_assignable_to(self.db, declared_ty) {
+                self.invalid_assignment_diagnostic(node, declared_ty, bound_ty);
+                bound_ty = declared_ty;
+            }
+        };
+
+        self.types.bindings.insert(binding, bound_ty);
+    }
+
+    fn add_declaration(&mut self, node: AnyNodeRef, declaration: Definition<'db>, ty: Type<'db>) {
+        debug_assert!(declaration.is_declaration(self.db));
+        let use_def = self.index.use_def_map(declaration.file_scope(self.db));
+        let prior_bindings = use_def.bindings_at_declaration(declaration);
+        // unbound_ty is Never because for this check we don't care about unbound
+        let inferred_ty = bindings_ty(self.db, prior_bindings, Some(Type::Never));
+        let ty = if inferred_ty.is_assignable_to(self.db, ty) {
+            ty
+        } else {
+            self.add_diagnostic(
+                node,
+                "invalid-declaration",
+                format_args!(
+                    "Cannot declare type '{}' for inferred type '{}'.",
+                    ty.display(self.db),
+                    inferred_ty.display(self.db)
+                ),
+            );
+            Type::Unknown
+        };
+        self.types.declarations.insert(declaration, ty);
+    }
+
+    fn add_declaration_with_binding(
+        &mut self,
+        node: AnyNodeRef,
+        definition: Definition<'db>,
+        declared_ty: Type<'db>,
+        inferred_ty: Type<'db>,
+    ) {
+        debug_assert!(definition.is_binding(self.db));
+        debug_assert!(definition.is_declaration(self.db));
+        let inferred_ty = if inferred_ty.is_assignable_to(self.db, declared_ty) {
+            inferred_ty
+        } else {
+            self.invalid_assignment_diagnostic(node, declared_ty, inferred_ty);
+            // if the assignment is invalid, fall back to assuming the annotation is correct
+            declared_ty
+        };
+        self.types.declarations.insert(definition, declared_ty);
+        self.types.bindings.insert(definition, inferred_ty);
     }
 
     fn infer_module(&mut self, module: &ast::ModModule) {
@@ -586,7 +717,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             decorator_tys,
         ));
 
-        self.types.definitions.insert(definition, function_ty);
+        self.add_declaration_with_binding(function.into(), definition, function_ty, function_ty);
     }
 
     fn infer_parameters(&mut self, parameters: &ast::Parameters) {
@@ -636,21 +767,32 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_parameter_with_default_definition(
         &mut self,
-        _parameter_with_default: &ast::ParameterWithDefault,
+        parameter_with_default: &ast::ParameterWithDefault,
         definition: Definition<'db>,
     ) {
         // TODO(dhruvmanila): Infer types from annotation or default expression
-        self.types.definitions.insert(definition, Type::Unknown);
+        // TODO check that default is assignable to parameter type
+        self.infer_parameter_definition(&parameter_with_default.parameter, definition);
     }
 
     fn infer_parameter_definition(
         &mut self,
-        _parameter: &ast::Parameter,
+        parameter: &ast::Parameter,
         definition: Definition<'db>,
     ) {
         // TODO(dhruvmanila): Annotation expression is resolved at the enclosing scope, infer the
         // parameter type from there
-        self.types.definitions.insert(definition, Type::Unknown);
+        let annotated_ty = Type::Unknown;
+        if parameter.annotation.is_some() {
+            self.add_declaration_with_binding(
+                parameter.into(),
+                definition,
+                annotated_ty,
+                annotated_ty,
+            );
+        } else {
+            self.add_binding(parameter.into(), definition, annotated_ty);
+        }
     }
 
     fn infer_class_definition_statement(&mut self, class: &ast::StmtClassDef) {
@@ -683,7 +825,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             body_scope,
         ));
 
-        self.types.definitions.insert(definition, class_ty);
+        self.add_declaration_with_binding(class.into(), definition, class_ty, class_ty);
 
         for keyword in class.keywords() {
             self.infer_expression(&keyword.value);
@@ -818,7 +960,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.types
             .expressions
             .insert(target.scoped_ast_id(self.db, self.scope), context_expr_ty);
-        self.types.definitions.insert(definition, context_expr_ty);
+        self.add_binding(target.into(), definition, context_expr_ty);
     }
 
     fn infer_except_handler_definition(
@@ -848,7 +990,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         };
 
-        self.types.definitions.insert(definition, symbol_ty);
+        self.add_binding(
+            except_handler_definition.node().into(),
+            definition,
+            symbol_ty,
+        );
     }
 
     fn infer_match_statement(&mut self, match_statement: &ast::StmtMatch) {
@@ -877,7 +1023,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_match_pattern_definition(
         &mut self,
-        _pattern: &ast::Pattern,
+        pattern: &ast::Pattern,
         _index: u32,
         definition: Definition<'db>,
     ) {
@@ -885,7 +1031,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         // against the subject expression type (which we can query via `infer_expression_types`)
         // and extract the type at the `index` position if the pattern matches. This will be
         // similar to the logic in `self.infer_assignment_definition`.
-        self.types.definitions.insert(definition, Type::Unknown);
+        self.add_binding(pattern.into(), definition, Type::Unknown);
     }
 
     fn infer_match_pattern(&mut self, pattern: &ast::Pattern) {
@@ -975,19 +1121,27 @@ impl<'db> TypeInferenceBuilder<'db> {
         let value_ty = self
             .types
             .expression_ty(assignment.value.scoped_ast_id(self.db, self.scope));
+        self.add_binding(assignment.into(), definition, value_ty);
         self.types
             .expressions
             .insert(target.scoped_ast_id(self.db, self.scope), value_ty);
-        self.types.definitions.insert(definition, value_ty);
     }
 
     fn infer_annotated_assignment_statement(&mut self, assignment: &ast::StmtAnnAssign) {
-        // assignments to non-Names are not Definitions, and neither are annotated assignments
-        // without an RHS
-        if assignment.value.is_some() && matches!(*assignment.target, ast::Expr::Name(_)) {
+        // assignments to non-Names are not Definitions
+        if matches!(*assignment.target, ast::Expr::Name(_)) {
             self.infer_definition(assignment);
         } else {
-            self.infer_annotated_assignment(assignment);
+            let ast::StmtAnnAssign {
+                range: _,
+                annotation,
+                value,
+                target,
+                simple: _,
+            } = assignment;
+            self.infer_annotation_expression(annotation);
+            self.infer_optional_expression(value.as_deref());
+            self.infer_expression(target);
         }
     }
 
@@ -996,13 +1150,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         assignment: &ast::StmtAnnAssign,
         definition: Definition<'db>,
     ) {
-        let ty = self
-            .infer_annotated_assignment(assignment)
-            .expect("Only annotated assignments with a RHS should create a Definition");
-        self.types.definitions.insert(definition, ty);
-    }
-
-    fn infer_annotated_assignment(&mut self, assignment: &ast::StmtAnnAssign) -> Option<Type<'db>> {
         let ast::StmtAnnAssign {
             range: _,
             target,
@@ -1011,13 +1158,20 @@ impl<'db> TypeInferenceBuilder<'db> {
             simple: _,
         } = assignment;
 
-        let value_ty = self.infer_optional_expression(value.as_deref());
-
-        self.infer_expression(annotation);
+        let annotation_ty = self.infer_annotation_expression(annotation);
+        if let Some(value) = value {
+            let value_ty = self.infer_expression(value);
+            self.add_declaration_with_binding(
+                assignment.into(),
+                definition,
+                annotation_ty,
+                value_ty,
+            );
+        } else {
+            self.add_declaration(assignment.into(), definition, annotation_ty);
+        }
 
         self.infer_expression(target);
-
-        value_ty
     }
 
     fn infer_augmented_assignment_statement(&mut self, assignment: &ast::StmtAugAssign) {
@@ -1035,7 +1189,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         definition: Definition<'db>,
     ) {
         let target_ty = self.infer_augment_assignment(assignment);
-        self.types.definitions.insert(definition, target_ty);
+        self.add_binding(assignment.into(), definition, target_ty);
     }
 
     fn infer_augment_assignment(&mut self, assignment: &ast::StmtAugAssign) -> Type<'db> {
@@ -1125,7 +1279,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.types
             .expressions
             .insert(target.scoped_ast_id(self.db, self.scope), loop_var_value_ty);
-        self.types.definitions.insert(definition, loop_var_value_ty);
+        self.add_binding(target.into(), definition, loop_var_value_ty);
     }
 
     fn infer_while_statement(&mut self, while_statement: &ast::StmtWhile) {
@@ -1168,7 +1322,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             Type::Unknown
         };
 
-        self.types.definitions.insert(definition, module_ty);
+        self.add_binding(alias.into(), definition, module_ty);
     }
 
     fn infer_import_from_statement(&mut self, import: &ast::StmtImportFrom) {
@@ -1352,7 +1506,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         // the runtime error will occur immediately (rather than when the symbol is *used*,
         // as would be the case for a symbol with type `Unbound`), so it's appropriate to
         // think of the type of the imported symbol as `Unknown` rather than `Unbound`
-        self.types.definitions.insert(
+        self.add_binding(
+            alias.into(),
             definition,
             member_ty.replace_unbound_with(self.db, Type::Unknown),
         );
@@ -1795,14 +1950,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.types
             .expressions
             .insert(target.scoped_ast_id(self.db, self.scope), target_ty);
-        self.types.definitions.insert(definition, target_ty);
+        self.add_binding(target.into(), definition, target_ty);
     }
 
     fn infer_named_expression(&mut self, named: &ast::ExprNamed) -> Type<'db> {
         let definition = self.index.definition(named);
         let result = infer_definition_types(self.db, definition);
         self.extend(result);
-        result.definition_ty(definition)
+        result.binding_ty(definition)
     }
 
     fn infer_named_expression_definition(
@@ -1819,7 +1974,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let value_ty = self.infer_expression(value);
         self.infer_expression(target);
 
-        self.types.definitions.insert(definition, value_ty);
+        self.add_binding(named.into(), definition, value_ty);
 
         value_ty
     }
@@ -2022,7 +2177,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     None
                 };
 
-                definitions_ty(self.db, definitions, unbound_ty)
+                bindings_ty(self.db, definitions, unbound_ty)
             }
             ExprContext::Store | ExprContext::Del => Type::None,
             ExprContext::Invalid => Type::Unknown,
@@ -3078,9 +3233,8 @@ mod tests {
             ",
         )?;
 
-        // TODO: update this once `infer_ellipsis_literal_expression` correctly
-        // infers `types.EllipsisType`.
-        assert_public_ty(&db, "src/a.py", "x", "Unbound");
+        // TODO: sys.version_info, and need to understand @final and @type_check_only
+        assert_public_ty(&db, "src/a.py", "x", "EllipsisType | Unknown");
 
         Ok(())
     }
@@ -4217,6 +4371,54 @@ mod tests {
         Ok(())
     }
 
+    /// A declared-but-not-bound name can be imported from a stub file.
+    #[test]
+    fn import_from_stub_declaration_only() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            from b import x
+            y = x
+            ",
+        )?;
+        db.write_dedented(
+            "/src/b.pyi",
+            "
+            x: int
+            ",
+        )?;
+
+        assert_public_ty(&db, "/src/a.py", "y", "int");
+
+        Ok(())
+    }
+
+    /// Declarations take priority over definitions when importing from a non-stub file.
+    #[test]
+    fn import_from_non_stub_declared_and_bound() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            from b import x
+            y = x
+            ",
+        )?;
+        db.write_dedented(
+            "/src/b.py",
+            "
+            x: int = 1
+            ",
+        )?;
+
+        assert_public_ty(&db, "/src/a.py", "y", "int");
+
+        Ok(())
+    }
+
     #[test]
     fn unresolved_import_statement() {
         let mut db = setup_db();
@@ -4589,9 +4791,8 @@ mod tests {
         assert_file_diagnostics(&db, "src/a.py", &[]);
 
         // TODO: once we support `sys.version_info` branches,
-        // we can set `--target-version=py311` in this test
-        // and the inferred type will just be `BaseExceptionGroup` --Alex
-        assert_public_ty(&db, "src/a.py", "e", "Unknown | BaseExceptionGroup");
+        // we should set `--target-version=py311` in this test
+        assert_public_ty(&db, "src/a.py", "e", "BaseExceptionGroup");
 
         Ok(())
     }
@@ -4613,11 +4814,10 @@ mod tests {
         assert_file_diagnostics(&db, "src/a.py", &[]);
 
         // TODO: once we support `sys.version_info` branches,
-        // we can set `--target-version=py311` in this test
-        // and the inferred type will just be `BaseExceptionGroup` --Alex
+        // we should set `--target-version=py311` in this test
         //
         // TODO more precise would be `ExceptionGroup[OSError]` --Alex
-        assert_public_ty(&db, "src/a.py", "e", "Unknown | BaseExceptionGroup");
+        assert_public_ty(&db, "src/a.py", "e", "BaseExceptionGroup");
 
         Ok(())
     }
@@ -4639,11 +4839,10 @@ mod tests {
         assert_file_diagnostics(&db, "src/a.py", &[]);
 
         // TODO: once we support `sys.version_info` branches,
-        // we can set `--target-version=py311` in this test
-        // and the inferred type will just be `BaseExceptionGroup` --Alex
+        // we should set `--target-version=py311` in this test
         //
         // TODO more precise would be `ExceptionGroup[TypeError | AttributeError]` --Alex
-        assert_public_ty(&db, "src/a.py", "e", "Unknown | BaseExceptionGroup");
+        assert_public_ty(&db, "src/a.py", "e", "BaseExceptionGroup");
 
         Ok(())
     }
@@ -5083,6 +5282,211 @@ mod tests {
             "/src/a.py",
             &["Object of type 'NotIterable' is not iterable"],
         );
+    }
+
+    #[test]
+    fn assignment_violates_own_annotation() {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            x: int = 'foo'
+            ",
+        )
+        .unwrap();
+
+        assert_file_diagnostics(
+            &db,
+            "/src/a.py",
+            &[r#"Object of type 'Literal["foo"]' is not assignable to 'int'."#],
+        );
+    }
+
+    #[test]
+    fn assignment_violates_previous_annotation() {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            x: int
+            x = 'foo'
+            ",
+        )
+        .unwrap();
+
+        assert_file_diagnostics(
+            &db,
+            "/src/a.py",
+            &[r#"Object of type 'Literal["foo"]' is not assignable to 'int'."#],
+        );
+    }
+
+    #[test]
+    fn shadowing_is_ok() {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            x: str = 'foo'
+            x: int = 1
+            ",
+        )
+        .unwrap();
+
+        assert_file_diagnostics(&db, "/src/a.py", &[]);
+    }
+
+    #[test]
+    fn shadowing_parameter_is_ok() {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            def f(x: str):
+                x: int = int(x)
+            ",
+        )
+        .unwrap();
+
+        assert_file_diagnostics(&db, "/src/a.py", &[]);
+    }
+
+    #[test]
+    fn declaration_violates_previous_assignment() {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            x = 1
+            x: str
+            ",
+        )
+        .unwrap();
+
+        assert_file_diagnostics(
+            &db,
+            "/src/a.py",
+            &[r"Cannot declare type 'str' for inferred type 'Literal[1]'."],
+        );
+    }
+
+    #[test]
+    fn incompatible_declarations() {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            if flag:
+                x: str
+            else:
+                x: int
+            x = 1
+            ",
+        )
+        .unwrap();
+
+        assert_file_diagnostics(
+            &db,
+            "/src/a.py",
+            &[r"Conflicting declared types for 'x': 'str', 'int'."],
+        );
+    }
+
+    #[test]
+    fn shadow_after_incompatible_declarations_is_ok() {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            if flag:
+                x: str
+            else:
+                x: int
+            x: bytes = b'foo'
+            ",
+        )
+        .unwrap();
+
+        assert_file_diagnostics(&db, "/src/a.py", &[]);
+    }
+
+    #[test]
+    fn no_implicit_shadow_function() {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            def f(): pass
+            f = 1
+            ",
+        )
+        .unwrap();
+
+        assert_file_diagnostics(
+            &db,
+            "/src/a.py",
+            &["Implicit shadowing of function 'f'; annotate to make it explicit if this is intentional."],
+        );
+    }
+
+    #[test]
+    fn no_implicit_shadow_class() {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            class C: pass
+            C = 1
+            ",
+        )
+        .unwrap();
+
+        assert_file_diagnostics(
+            &db,
+            "/src/a.py",
+            &["Implicit shadowing of class 'C'; annotate to make it explicit if this is intentional."],
+        );
+    }
+
+    #[test]
+    fn explicit_shadow_function() {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            def f(): pass
+            f: int = 1
+            ",
+        )
+        .unwrap();
+
+        assert_file_diagnostics(&db, "/src/a.py", &[]);
+    }
+
+    #[test]
+    fn explicit_shadow_class() {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            class C(): pass
+            C: int = 1
+            ",
+        )
+        .unwrap();
+
+        assert_file_diagnostics(&db, "/src/a.py", &[]);
     }
 
     // Incremental inference tests
