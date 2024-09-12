@@ -1936,6 +1936,7 @@ dependencies = [
  "smallvec",
  "static_assertions",
  "tempfile",
+ "test-case",
  "thiserror",
  "tracing",
  "walkdir",
