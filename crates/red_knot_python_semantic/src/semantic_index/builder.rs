@@ -785,6 +785,14 @@ where
                     self.flow_merge(state);
                 }
                 let pre_except_state = self.flow_snapshot();
+
+                // Account for the fact that we could be visiting a nested `try` block,
+                // in which case the outer `try` block must be kept informed about all the possible
+                // between-definition states we could have encountered in the inner `try` block(!)
+                if self.visiting_try_block {
+                    self.try_block_definition_states.push(self.flow_snapshot());
+                }
+
                 let mut post_except_states = vec![];
                 let num_handlers = handlers.len();
 

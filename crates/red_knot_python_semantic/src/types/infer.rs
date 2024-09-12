@@ -4940,6 +4940,37 @@ mod tests {
     }
 
     #[test]
+    fn exception_raised_in_nested_try_block_caught_in_outer() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            try:
+                try:
+                    x = 1
+                    x = 2
+                except TypeError:
+                    x = 3
+                else:
+                    x = 4
+            except:
+                pass
+            ",
+        )?;
+
+        assert_file_diagnostics(&db, "src/a.py", &[]);
+
+        // We might have left the inner `try` or the inner `except TypeError`
+        // block due to another exception, in which case the assignments in the inner `try` block
+        // would not necessarily have been overridden by the otherwise-exhaustive
+        // `except`/`else` branches in the inner block.
+        assert_public_ty(&db, "src/a.py", "x", "Unbound | Literal[1, 2, 3, 4]");
+
+        Ok(())
+    }
+
+    #[test]
     fn basic_comprehension() -> anyhow::Result<()> {
         let mut db = setup_db();
 
