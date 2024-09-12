@@ -107,9 +107,8 @@ impl<const B: usize> BitSet<B> {
             max_len = other_len;
             self.resize_blocks(max_len);
         }
-        let other_blocks = other.blocks();
-        for (i, my_block) in self.blocks_mut().iter_mut().enumerate() {
-            *my_block |= other_blocks.get(i).unwrap_or(&0);
+        for (my_block, other_block) in self.blocks_mut().iter_mut().zip(other.blocks()) {
+            *my_block |= other_block;
         }
     }
 
