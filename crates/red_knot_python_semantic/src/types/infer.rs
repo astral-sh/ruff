@@ -4751,7 +4751,7 @@ mod tests {
             "
             try:
                 x
-            except NameError
+            except NameError:
                 e = 42
             finally:
                 e = 44
@@ -4775,7 +4775,7 @@ mod tests {
             "
             try:
                 x = 42
-            except NameError
+            except NameError:
                 x = 43
             except TypeError:
                 x = 44
@@ -4805,7 +4805,7 @@ mod tests {
                 x = 1
                 y = 2
                 z = 3
-            except NameError
+            except NameError:
                 x = 11
             except TypeError:
                 x = 12
