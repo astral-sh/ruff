@@ -4723,7 +4723,7 @@ mod tests {
 
             try:
                 x
-            except NameError
+            except NameError:
                 e = 42
             except TypeError:
                 f = 43

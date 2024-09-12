@@ -22,6 +22,9 @@ struct Case {
 const TOMLLIB_312_URL: &str = "https://raw.githubusercontent.com/python/cpython/8e8a4baf652f6e1cee7acde9d78c4b6154539748/Lib/tomllib";
 
 // The failed import from 'collections.abc' is due to lack of support for 'import *'.
+//
+// The "possibly not defined" errors in `tomllib/_parser.py` are because
+// we don't yet understand terminal statements (`return`/`raise`/etc.) in our control-flow analysis
 static EXPECTED_DIAGNOSTICS: &[&str] = &[
     "/src/tomllib/_parser.py:5:24: Module '__future__' has no member 'annotations'",
     "/src/tomllib/_parser.py:7:29: Module 'collections.abc' has no member 'Iterable'",
@@ -33,6 +36,24 @@ static EXPECTED_DIAGNOSTICS: &[&str] = &[
     "Use double quotes for strings",
     "Use double quotes for strings",
     "Use double quotes for strings",
+    "/src/tomllib/_parser.py:66:18: Name 's' used when possibly not defined.",
+    "/src/tomllib/_parser.py:98:12: Name 'char' used when possibly not defined.",
+    "/src/tomllib/_parser.py:101:12: Name 'char' used when possibly not defined.",
+    "/src/tomllib/_parser.py:104:14: Name 'char' used when possibly not defined.",
+    "/src/tomllib/_parser.py:104:14: Name 'char' used when possibly not defined.",
+    "/src/tomllib/_parser.py:115:14: Name 'char' used when possibly not defined.",
+    "/src/tomllib/_parser.py:115:14: Name 'char' used when possibly not defined.",
+    "/src/tomllib/_parser.py:126:12: Name 'char' used when possibly not defined.",
+    "/src/tomllib/_parser.py:348:20: Name 'nest' used when possibly not defined.",
+    "/src/tomllib/_parser.py:353:5: Name 'nest' used when possibly not defined.",
+    "/src/tomllib/_parser.py:453:24: Name 'nest' used when possibly not defined.",
+    "/src/tomllib/_parser.py:455:9: Name 'nest' used when possibly not defined.",
+    "/src/tomllib/_parser.py:482:16: Name 'char' used when possibly not defined.",
+    "/src/tomllib/_parser.py:566:12: Name 'char' used when possibly not defined.",
+    "/src/tomllib/_parser.py:573:12: Name 'char' used when possibly not defined.",
+    "/src/tomllib/_parser.py:579:12: Name 'char' used when possibly not defined.",
+    "/src/tomllib/_parser.py:580:63: Name 'char' used when possibly not defined.",
+    "/src/tomllib/_parser.py:629:38: Name 'datetime_obj' used when possibly not defined.",
 ];
 
 fn get_test_file(name: &str) -> TestFile {
