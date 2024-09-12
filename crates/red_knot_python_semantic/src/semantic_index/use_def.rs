@@ -1,6 +1,6 @@
 //! First, some terminology:
 //!
-//! * a "binding" gives a new value to a variable. This includes many different Python statements
+//! * A "binding" gives a new value to a variable. This includes many different Python statements
 //!   (assignment statements of course, but also imports, `def` and `class` statements, `as`
 //!   clauses in `with` and `except` statements, match patterns, and others) and even one
 //!   expression kind (named expressions). It notably does not include annotated assignment
@@ -8,7 +8,7 @@
 //!   variable. We consider function parameters to be bindings as well, since (from the perspective
 //!   of the function's internal scope), a function parameter begins the scope bound to a value.
 //!
-//! * a "declaration" establishes an upper bound type for the values that a variable may be
+//! * A "declaration" establishes an upper bound type for the values that a variable may be
 //!   permitted to take on. Annotated assignment statements (with or without an RHS value) are
 //!   declarations; annotated function parameters are also declarations. We consider `def` and
 //!   `class` statements to also be declarations, so as to prohibit accidentally shadowing them.
@@ -69,7 +69,7 @@
 //! declared type.
 //!
 //! To support type inference, we build a map from each use of a symbol to the bindings live at
-//! that use, and the type-narrowing constraints that apply to each binding.
+//! that use, and the type narrowing constraints that apply to each binding.
 //!
 //! Let's take this code sample:
 //!
@@ -104,7 +104,7 @@
 //! all uses (that means a `Name` node with `Load` context) so we have a `ScopedUseId` to
 //! efficiently represent each use.
 //!
-//! We also need to know, for a given definition of a symbol, what type-narrowing constraints apply
+//! We also need to know, for a given definition of a symbol, what type narrowing constraints apply
 //! to it. For instance, in this code sample:
 //!
 //! ```python
@@ -142,7 +142,7 @@
 //! via a global or nonlocal reference.) But modeling this fully accurately requires whole-program
 //! analysis that isn't tractable for an efficient analysis, since it means a given symbol could
 //! have a different type every place it's referenced throughout the program, depending on the
-//! shape of arbitrarily-sized call/import graphs. So we follow other Python type-checkers in
+//! shape of arbitrarily-sized call/import graphs. So we follow other Python type checkers in
 //! making the simplifying assumption that usually the scope will finish execution before its
 //! symbols are made visible to other scopes; for instance, most imports will import from a
 //! complete module, not a partially-executed module. (We may want to get a little smarter than
@@ -169,7 +169,7 @@
 //!
 //! The simplest way to model "unbound" would be as a "binding" itself: the initial "binding" for
 //! each symbol in a scope. But actually modeling it this way would unnecessarily increase the
-//! number of [`Definition`] that Salsa must track. Since "unbound" is special in that all symbols
+//! number of [`Definition`]s that Salsa must track. Since "unbound" is special in that all symbols
 //! share it, and it doesn't have any additional per-symbol state, and constraints are irrelevant
 //! to it, we can represent it more efficiently: we use the `may_be_unbound` boolean on the
 //! [`SymbolBindings`] struct. If this flag is `true` for a use of a symbol, it means the symbol

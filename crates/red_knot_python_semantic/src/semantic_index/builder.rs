@@ -28,7 +28,8 @@ use crate::Db;
 
 use super::constraint::{Constraint, PatternConstraint};
 use super::definition::{
-    ExceptHandlerDefinitionNodeRef, MatchPatternDefinitionNodeRef, WithItemDefinitionNodeRef,
+    DefinitionCategory, ExceptHandlerDefinitionNodeRef, MatchPatternDefinitionNodeRef,
+    WithItemDefinitionNodeRef,
 };
 
 pub(super) struct SemanticIndexBuilder<'db> {
@@ -191,8 +192,9 @@ impl<'db> SemanticIndexBuilder<'db> {
     ) -> Definition<'db> {
         let definition_node: DefinitionNodeRef<'_> = definition_node.into();
         #[allow(unsafe_code)]
+        // SAFETY: `definition_node` is guaranteed to be a child of `self.module`
         let kind = unsafe { definition_node.into_owned(self.module.clone()) };
-        let (is_declaration, is_binding) = (kind.is_declaration(), kind.is_binding());
+        let category = kind.category();
         let definition = Definition::new(
             self.db,
             self.file,
@@ -207,16 +209,17 @@ impl<'db> SemanticIndexBuilder<'db> {
             .insert(definition_node.key(), definition);
         debug_assert_eq!(existing_definition, None);
 
-        if is_binding {
+        if category.is_binding() {
             self.mark_symbol_bound(symbol);
         }
 
         let use_def = self.current_use_def_map_mut();
-        match (is_declaration, is_binding) {
-            (true, true) => use_def.record_declaration_and_binding(symbol, definition),
-            (true, false) => use_def.record_declaration(symbol, definition),
-            (false, true) => use_def.record_binding(symbol, definition),
-            (false, false) => unreachable!("definition must be declaration or binding or both"),
+        match category {
+            DefinitionCategory::DeclarationAndBinding => {
+                use_def.record_declaration_and_binding(symbol, definition)
+            }
+            DefinitionCategory::Declaration => use_def.record_declaration(symbol, definition),
+            DefinitionCategory::Binding => use_def.record_binding(symbol, definition),
         }
 
         definition

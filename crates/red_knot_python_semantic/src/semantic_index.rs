@@ -453,7 +453,7 @@ mod tests {
             global_table
                 .symbol_by_name("foo")
                 .is_some_and(|symbol| { !symbol.is_bound() && symbol.is_used() }),
-            "a symbol used but not defined in a scope should have only the used flag"
+            "a symbol used but not bound in a scope should have only the used flag"
         );
         let use_def = use_def_map(&db, scope);
         let binding = use_def
