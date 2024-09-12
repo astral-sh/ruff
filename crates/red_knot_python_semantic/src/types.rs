@@ -297,13 +297,16 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Return true if this type is assignable to type `other`.
+    /// Return true if this type is assignable to type `target`.
+    ///
+    /// Definition of assignability in the typing spec:
+    /// <https://typing.readthedocs.io/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation>
     #[allow(unused)]
-    pub(crate) fn is_assignable_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
-        if self.is_equivalent_to(db, other) {
+    pub(crate) fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
+        if self.is_equivalent_to(db, target) {
             return true;
         }
-        match (self, other) {
+        match (self, target) {
             (Type::Unknown | Type::Any | Type::Never, _) => true,
             (_, Type::Unknown | Type::Any) => true,
             (Type::IntLiteral(_), Type::Instance(class)) if class.is_builtin_named(db, "int") => {
@@ -632,7 +635,7 @@ impl<'db> ClassType<'db> {
             && file_to_module(db, self.body_scope(db).file(db))
                 // Builtin module names are special-cased in the resolver, so there can't be a
                 // module named builtins other than the actual builtins.
-                .is_some_and(|module| module.name().as_str() == "builtins")
+                .is_some_and(|module| module.name() == "builtins")
     }
 
     /// Return an iterator over the types of this class's bases.
@@ -752,8 +755,6 @@ pub struct TupleType<'db> {
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::needless_pass_by_value)]
-
     use super::{builtins_symbol_ty, BytesLiteralType, StringLiteralType, Type, UnionType};
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
@@ -794,16 +795,16 @@ mod tests {
         LiteralString,
         BytesLiteral(&'static str),
         BuiltinInstance(&'static str),
-        Union(Box<[Ty]>),
+        Union(Vec<Ty>),
     }
 
     impl Ty {
-        fn to_type<'db>(&self, db: &'db TestDb) -> Type<'db> {
+        fn into_type(self, db: &TestDb) -> Type<'_> {
             match self {
                 Ty::Never => Type::Never,
                 Ty::Unknown => Type::Unknown,
                 Ty::Any => Type::Any,
-                Ty::IntLiteral(n) => Type::IntLiteral(*n),
+                Ty::IntLiteral(n) => Type::IntLiteral(n),
                 Ty::StringLiteral(s) => {
                     Type::StringLiteral(StringLiteralType::new(db, (*s).into()))
                 }
@@ -812,7 +813,9 @@ mod tests {
                     Type::BytesLiteral(BytesLiteralType::new(db, s.as_bytes().into()))
                 }
                 Ty::BuiltinInstance(s) => builtins_symbol_ty(db, s).to_instance(db),
-                Ty::Union(tys) => UnionType::from_elements(db, tys.iter().map(|ty| ty.to_type(db))),
+                Ty::Union(tys) => {
+                    UnionType::from_elements(db, tys.into_iter().map(|ty| ty.into_type(db)))
+                }
             }
         }
     }
@@ -829,7 +832,7 @@ mod tests {
     #[test_case(Ty::BytesLiteral("foo"), Ty::BuiltinInstance("bytes"))]
     fn is_assignable_to(from: Ty, to: Ty) {
         let db = setup_db();
-        assert!(from.to_type(&db).is_assignable_to(&db, to.to_type(&db)));
+        assert!(from.into_type(&db).is_assignable_to(&db, to.into_type(&db)));
     }
 
     #[test_case(Ty::IntLiteral(1), Ty::BuiltinInstance("str"))]
@@ -837,16 +840,16 @@ mod tests {
     #[test_case(Ty::BuiltinInstance("int"), Ty::IntLiteral(1))]
     fn is_not_assignable_to(from: Ty, to: Ty) {
         let db = setup_db();
-        assert!(!from.to_type(&db).is_assignable_to(&db, to.to_type(&db)));
+        assert!(!from.into_type(&db).is_assignable_to(&db, to.into_type(&db)));
     }
 
     #[test_case(
-        Ty::Union(Box::new([Ty::IntLiteral(1), Ty::IntLiteral(2)])),
-        Ty::Union(Box::new([Ty::IntLiteral(1), Ty::IntLiteral(2)]))
+        Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]),
+        Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)])
     )]
     fn is_equivalent_to(from: Ty, to: Ty) {
         let db = setup_db();
 
-        assert!(from.to_type(&db).is_equivalent_to(&db, to.to_type(&db)));
+        assert!(from.into_type(&db).is_equivalent_to(&db, to.into_type(&db)));
     }
 }
