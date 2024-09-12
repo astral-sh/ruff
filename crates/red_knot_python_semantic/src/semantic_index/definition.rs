@@ -23,7 +23,7 @@ pub struct Definition<'db> {
 
     #[no_eq]
     #[return_ref]
-    pub(crate) node: DefinitionKind,
+    pub(crate) kind: DefinitionKind,
 
     #[no_eq]
     count: countme::Count<Definition<'static>>,
@@ -321,6 +321,38 @@ pub enum DefinitionKind {
     ExceptHandler(ExceptHandlerDefinitionKind),
 }
 
+impl DefinitionKind {
+    /// True if this definition establishes a "declared type" for the symbol.
+    ///
+    /// If so, any assignments reached by this definition are in error if they assign a value of a
+    /// type not assignable to the declared type.
+    ///
+    /// Annotations establish a declared type. So do function and class definition.
+    pub(crate) fn is_declaration(&self) -> bool {
+        match self {
+            DefinitionKind::Function(_) => true,
+            DefinitionKind::Class(_) => true,
+            DefinitionKind::Parameter(parameter) => parameter.annotation.is_some(),
+            DefinitionKind::ParameterWithDefault(parameter_with_default) => {
+                parameter_with_default.parameter.annotation.is_some()
+            }
+            DefinitionKind::AnnotatedAssignment(_) => true,
+            _ => false,
+        }
+    }
+
+    /// True if this definition assigns a value to the symbol.
+    ///
+    /// False only for annotated assignments without a RHS.
+    pub(crate) fn is_binding(&self) -> bool {
+        if let DefinitionKind::AnnotatedAssignment(ann_assign) = self {
+            ann_assign.value.is_some()
+        } else {
+            true
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 #[allow(dead_code)]
 pub struct MatchPatternDefinitionKind {
@@ -441,8 +473,12 @@ pub struct ExceptHandlerDefinitionKind {
 }
 
 impl ExceptHandlerDefinitionKind {
+    pub(crate) fn node(&self) -> &ast::ExceptHandlerExceptHandler {
+        self.handler.node()
+    }
+
     pub(crate) fn handled_exceptions(&self) -> Option<&ast::Expr> {
-        self.handler.node().type_.as_deref()
+        self.node().type_.as_deref()
     }
 
     pub(crate) fn is_star(&self) -> bool {

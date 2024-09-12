@@ -19,7 +19,7 @@ use crate::semantic_index::definition::{
 };
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{
-    FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopedSymbolId, SymbolFlags,
+    FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopedSymbolId,
     SymbolTableBuilder,
 };
 use crate::semantic_index::use_def::{FlowSnapshot, UseDefMapBuilder};
@@ -168,14 +168,20 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_use_def_map_mut().merge(state);
     }
 
-    fn add_or_update_symbol(&mut self, name: Name, flags: SymbolFlags) -> ScopedSymbolId {
-        let symbol_table = self.current_symbol_table();
-        let (symbol_id, added) = symbol_table.add_or_update_symbol(name, flags);
+    fn add_symbol(&mut self, name: Name) -> ScopedSymbolId {
+        let (symbol_id, added) = self.current_symbol_table().add_symbol(name);
         if added {
-            let use_def_map = self.current_use_def_map_mut();
-            use_def_map.add_symbol(symbol_id);
+            self.current_use_def_map_mut().add_symbol(symbol_id);
         }
         symbol_id
+    }
+
+    fn mark_symbol_bound(&mut self, id: ScopedSymbolId) {
+        self.current_symbol_table().mark_symbol_bound(id);
+    }
+
+    fn mark_symbol_used(&mut self, id: ScopedSymbolId) {
+        self.current_symbol_table().mark_symbol_used(id);
     }
 
     fn add_definition<'a>(
@@ -184,15 +190,15 @@ impl<'db> SemanticIndexBuilder<'db> {
         definition_node: impl Into<DefinitionNodeRef<'a>>,
     ) -> Definition<'db> {
         let definition_node: DefinitionNodeRef<'_> = definition_node.into();
+        #[allow(unsafe_code)]
+        let kind = unsafe { definition_node.into_owned(self.module.clone()) };
+        let (is_declaration, is_binding) = (kind.is_declaration(), kind.is_binding());
         let definition = Definition::new(
             self.db,
             self.file,
             self.current_scope(),
             symbol,
-            #[allow(unsafe_code)]
-            unsafe {
-                definition_node.into_owned(self.module.clone())
-            },
+            kind,
             countme::Count::default(),
         );
 
@@ -201,8 +207,17 @@ impl<'db> SemanticIndexBuilder<'db> {
             .insert(definition_node.key(), definition);
         debug_assert_eq!(existing_definition, None);
 
-        self.current_use_def_map_mut()
-            .record_definition(symbol, definition);
+        if is_binding {
+            self.mark_symbol_bound(symbol);
+        }
+
+        let use_def = self.current_use_def_map_mut();
+        match (is_declaration, is_binding) {
+            (true, true) => use_def.record_declaration_and_binding(symbol, definition),
+            (true, false) => use_def.record_declaration(symbol, definition),
+            (false, true) => use_def.record_binding(symbol, definition),
+            (false, false) => unreachable!("definition must be declaration or binding or both"),
+        }
 
         definition
     }
@@ -284,8 +299,9 @@ impl<'db> SemanticIndexBuilder<'db> {
                         ..
                     }) => (name, &None, default),
                 };
-                // TODO create Definition for typevars
-                self.add_or_update_symbol(name.id.clone(), SymbolFlags::IS_DEFINED);
+                let symbol = self.add_symbol(name.id.clone());
+                // TODO create Definition for PEP 695 typevars
+                self.mark_symbol_bound(symbol);
                 if let Some(bound) = bound {
                     self.visit_expr(bound);
                 }
@@ -350,8 +366,7 @@ impl<'db> SemanticIndexBuilder<'db> {
     }
 
     fn declare_parameter(&mut self, parameter: AnyParameterRef) {
-        let symbol =
-            self.add_or_update_symbol(parameter.name().id().clone(), SymbolFlags::IS_DEFINED);
+        let symbol = self.add_symbol(parameter.name().id().clone());
 
         let definition = self.add_definition(symbol, parameter);
 
@@ -462,8 +477,7 @@ where
                 // The symbol for the function name itself has to be evaluated
                 // at the end to match the runtime evaluation of parameter defaults
                 // and return-type annotations.
-                let symbol = self
-                    .add_or_update_symbol(function_def.name.id.clone(), SymbolFlags::IS_DEFINED);
+                let symbol = self.add_symbol(function_def.name.id.clone());
                 self.add_definition(symbol, function_def);
             }
             ast::Stmt::ClassDef(class) => {
@@ -471,8 +485,7 @@ where
                     self.visit_decorator(decorator);
                 }
 
-                let symbol =
-                    self.add_or_update_symbol(class.name.id.clone(), SymbolFlags::IS_DEFINED);
+                let symbol = self.add_symbol(class.name.id.clone());
                 self.add_definition(symbol, class);
 
                 self.with_type_params(
@@ -498,7 +511,7 @@ where
                         Name::new(alias.name.id.split('.').next().unwrap())
                     };
 
-                    let symbol = self.add_or_update_symbol(symbol_name, SymbolFlags::IS_DEFINED);
+                    let symbol = self.add_symbol(symbol_name);
                     self.add_definition(symbol, alias);
                 }
             }
@@ -510,8 +523,7 @@ where
                         &alias.name.id
                     };
 
-                    let symbol =
-                        self.add_or_update_symbol(symbol_name.clone(), SymbolFlags::IS_DEFINED);
+                    let symbol = self.add_symbol(symbol_name.clone());
                     self.add_definition(symbol, ImportFromDefinitionNodeRef { node, alias_index });
                 }
             }
@@ -725,8 +737,7 @@ where
                     // which is invalid syntax. However, it's still pretty obvious here that the user
                     // *wanted* `e` to be bound, so we should still create a definition here nonetheless.
                     if let Some(symbol_name) = symbol_name {
-                        let symbol = self
-                            .add_or_update_symbol(symbol_name.id.clone(), SymbolFlags::IS_DEFINED);
+                        let symbol = self.add_symbol(symbol_name.id.clone());
 
                         self.add_definition(
                             symbol,
@@ -756,24 +767,18 @@ where
 
         match expr {
             ast::Expr::Name(name_node @ ast::ExprName { id, ctx, .. }) => {
-                let flags = match (ctx, self.current_assignment) {
+                let (is_use, is_definition) = match (ctx, self.current_assignment) {
                     (ast::ExprContext::Store, Some(CurrentAssignment::AugAssign(_))) => {
                         // For augmented assignment, the target expression is also used.
-                        SymbolFlags::IS_DEFINED | SymbolFlags::IS_USED
+                        (true, true)
                     }
-                    (ast::ExprContext::Store, Some(CurrentAssignment::AnnAssign(ann_assign)))
-                        if ann_assign.value.is_none() =>
-                    {
-                        // An annotated assignment that doesn't assign a value is not a Definition
-                        SymbolFlags::empty()
-                    }
-                    (ast::ExprContext::Load, _) => SymbolFlags::IS_USED,
-                    (ast::ExprContext::Store, _) => SymbolFlags::IS_DEFINED,
-                    (ast::ExprContext::Del, _) => SymbolFlags::IS_DEFINED,
-                    (ast::ExprContext::Invalid, _) => SymbolFlags::empty(),
+                    (ast::ExprContext::Load, _) => (true, false),
+                    (ast::ExprContext::Store, _) => (false, true),
+                    (ast::ExprContext::Del, _) => (false, true),
+                    (ast::ExprContext::Invalid, _) => (false, false),
                 };
-                let symbol = self.add_or_update_symbol(id.clone(), flags);
-                if flags.contains(SymbolFlags::IS_DEFINED) {
+                let symbol = self.add_symbol(id.clone());
+                if is_definition {
                     match self.current_assignment {
                         Some(CurrentAssignment::Assign(assignment)) => {
                             self.add_definition(
@@ -830,7 +835,8 @@ where
                     }
                 }
 
-                if flags.contains(SymbolFlags::IS_USED) {
+                if is_use {
+                    self.mark_symbol_used(symbol);
                     let use_id = self.current_ast_ids().record_use(expr);
                     self.current_use_def_map_mut().record_use(symbol, use_id);
                 }
@@ -970,7 +976,7 @@ where
             range: _,
         }) = pattern
         {
-            let symbol = self.add_or_update_symbol(name.id().clone(), SymbolFlags::IS_DEFINED);
+            let symbol = self.add_symbol(name.id().clone());
             let state = self.current_match_case.as_ref().unwrap();
             self.add_definition(
                 symbol,
@@ -991,7 +997,7 @@ where
             rest: Some(name), ..
         }) = pattern
         {
-            let symbol = self.add_or_update_symbol(name.id().clone(), SymbolFlags::IS_DEFINED);
+            let symbol = self.add_symbol(name.id().clone());
             let state = self.current_match_case.as_ref().unwrap();
             self.add_definition(
                 symbol,

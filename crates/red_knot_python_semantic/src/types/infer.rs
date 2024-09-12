@@ -364,7 +364,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_region_definition(&mut self, definition: Definition<'db>) {
-        match definition.node(self.db) {
+        match definition.kind(self.db) {
             DefinitionKind::Function(function) => {
                 self.infer_function_definition(function.node(), definition);
             }
@@ -435,7 +435,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_region_deferred(&mut self, definition: Definition<'db>) {
-        match definition.node(self.db) {
+        match definition.kind(self.db) {
             DefinitionKind::Function(function) => self.infer_function_deferred(function.node()),
             DefinitionKind::Class(class) => self.infer_class_deferred(class.node()),
             DefinitionKind::AnnotatedAssignment(_annotated_assignment) => {
@@ -1938,17 +1938,17 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// Look up a name reference that isn't bound in the local scope.
     fn lookup_name(&self, name: &ast::name::Name) -> Type<'db> {
         let file_scope_id = self.scope.file_scope_id(self.db);
-        let is_defined = self
+        let is_bound = self
             .index
             .symbol_table(file_scope_id)
             .symbol_by_name(name)
             .expect("Symbol table should create a symbol for every Name node")
-            .is_defined();
+            .is_bound();
 
-        // In function-like scopes, any local variable (symbol that is defined in this
-        // scope) can only have a definition in this scope, or be undefined; it never references
-        // another scope. (At runtime, it would use the `LOAD_FAST` opcode.)
-        if !is_defined || !self.scope.is_function_like(self.db) {
+        // In function-like scopes, any local variable (symbol that is bound in this scope) can
+        // only have a definition in this scope, or error; it never references another scope.
+        // (At runtime, it would use the `LOAD_FAST` opcode.)
+        if !is_bound || !self.scope.is_function_like(self.db) {
             // Walk up parent scopes looking for a possible enclosing scope that may have a
             // definition of this name visible to us (would be `LOAD_DEREF` at runtime.)
             for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id) {
@@ -1963,7 +1963,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let Some(enclosing_symbol) = enclosing_symbol_table.symbol_by_name(name) else {
                     continue;
                 };
-                if enclosing_symbol.is_defined() {
+                if enclosing_symbol.is_bound() {
                     // We can return early here, because the nearest function-like scope that
                     // defines a name must be the only source for the nonlocal reference (at
                     // runtime, it is the scope that creates the cell for our closure.) If the name
@@ -2005,13 +2005,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // if we're inferring types of deferred expressions, always treat them as public symbols
                 let (definitions, may_be_unbound) = if self.is_deferred() {
                     (
-                        use_def.public_definitions(symbol),
+                        use_def.public_bindings(symbol),
                         use_def.public_may_be_unbound(symbol),
                     )
                 } else {
                     let use_id = name.scoped_use_id(self.db, self.scope);
                     (
-                        use_def.use_definitions(use_id),
+                        use_def.bindings_at_use(use_id),
                         use_def.use_may_be_unbound(use_id),
                     )
                 };
@@ -5087,13 +5087,13 @@ mod tests {
 
     // Incremental inference tests
 
-    fn first_public_def<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {
+    fn first_public_binding<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {
         let scope = global_scope(db, file);
         use_def_map(db, scope)
-            .public_definitions(symbol_table(db, scope).symbol_id_by_name(name).unwrap())
+            .public_bindings(symbol_table(db, scope).symbol_id_by_name(name).unwrap())
             .next()
             .unwrap()
-            .definition
+            .binding
     }
 
     #[test]
@@ -5151,7 +5151,7 @@ mod tests {
         assert_function_query_was_not_run(
             &db,
             infer_definition_types,
-            first_public_def(&db, a, "x"),
+            first_public_binding(&db, a, "x"),
             &events,
         );
 
@@ -5187,7 +5187,7 @@ mod tests {
         assert_function_query_was_not_run(
             &db,
             infer_definition_types,
-            first_public_def(&db, a, "x"),
+            first_public_binding(&db, a, "x"),
             &events,
         );
         Ok(())
