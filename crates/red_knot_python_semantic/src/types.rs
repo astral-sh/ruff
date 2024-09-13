@@ -7,8 +7,8 @@ use crate::semantic_index::ast_ids::HasScopedAstId;
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId};
 use crate::semantic_index::{
-    global_scope, semantic_index, symbol_table, use_def_map, DefinitionWithConstraints,
-    DefinitionWithConstraintsIterator,
+    global_scope, semantic_index, symbol_table, use_def_map, BindingWithConstraints,
+    BindingWithConstraintsIterator,
 };
 use crate::stdlib::{builtins_symbol_ty, types_symbol_ty, typeshed_symbol_ty};
 use crate::types::narrow::narrowing_constraint;
@@ -51,7 +51,7 @@ pub(crate) fn symbol_ty_by_id<'db>(
     let use_def = use_def_map(db, scope);
     definitions_ty(
         db,
-        use_def.public_definitions(symbol),
+        use_def.public_bindings(symbol),
         use_def
             .public_may_be_unbound(symbol)
             .then_some(Type::Unbound),
@@ -113,28 +113,28 @@ pub(crate) fn definition_expression_ty<'db>(
 /// provide an `unbound_ty`.
 pub(crate) fn definitions_ty<'db>(
     db: &'db dyn Db,
-    definitions_with_constraints: DefinitionWithConstraintsIterator<'_, 'db>,
+    bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
     unbound_ty: Option<Type<'db>>,
 ) -> Type<'db> {
-    let def_types = definitions_with_constraints.map(
-        |DefinitionWithConstraints {
-             definition,
+    let def_types = bindings_with_constraints.map(
+        |BindingWithConstraints {
+             binding,
              constraints,
          }| {
-            let mut constraint_tys = constraints
-                .filter_map(|constraint| narrowing_constraint(db, constraint, definition));
-            let definition_ty = definition_ty(db, definition);
+            let mut constraint_tys =
+                constraints.filter_map(|constraint| narrowing_constraint(db, constraint, binding));
+            let binding_ty = definition_ty(db, binding);
             if let Some(first_constraint_ty) = constraint_tys.next() {
                 let mut builder = IntersectionBuilder::new(db);
                 builder = builder
-                    .add_positive(definition_ty)
+                    .add_positive(binding_ty)
                     .add_positive(first_constraint_ty);
                 for constraint_ty in constraint_tys {
                     builder = builder.add_positive(constraint_ty);
                 }
                 builder.build()
             } else {
-                definition_ty
+                binding_ty
             }
         },
     );
@@ -589,7 +589,7 @@ impl<'db> FunctionType<'db> {
     /// inferred return type for this function
     pub fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
         let definition = self.definition(db);
-        let DefinitionKind::Function(function_stmt_node) = definition.node(db) else {
+        let DefinitionKind::Function(function_stmt_node) = definition.kind(db) else {
             panic!("Function type definition must have `DefinitionKind::Function`")
         };
 
@@ -644,7 +644,7 @@ impl<'db> ClassType<'db> {
     /// If `definition` is not a `DefinitionKind::Class`.
     pub fn bases(&self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
         let definition = self.definition(db);
-        let DefinitionKind::Class(class_stmt_node) = definition.node(db) else {
+        let DefinitionKind::Class(class_stmt_node) = definition.kind(db) else {
             panic!("Class type definition must have DefinitionKind::Class");
         };
         class_stmt_node
