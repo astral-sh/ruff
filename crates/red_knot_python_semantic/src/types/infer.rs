@@ -50,8 +50,9 @@ use crate::semantic_index::SemanticIndex;
 use crate::stdlib::builtins_module_scope;
 use crate::types::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 use crate::types::{
-    bindings_ty, builtins_symbol_ty, declaration_ty, global_symbol_ty, symbol_ty, BytesLiteralType,
-    ClassType, FunctionType, StringLiteralType, TupleType, Type, UnionType,
+    bindings_ty, builtins_symbol_ty, declarations_ty, global_symbol_ty, symbol_ty,
+    BytesLiteralType, ClassType, DeclaredType, FunctionType, StringLiteralType, TupleType, Type,
+    UnionType,
 };
 use crate::Db;
 
@@ -501,37 +502,39 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
+    /*
+    if !declared_ty.is_equivalent_to(self.db, other_declared_ty) {
+        check_compat = false;
+        break;
+    }
+    */
+
     fn add_binding(&mut self, node: AnyNodeRef, binding: Definition<'db>, ty: Type<'db>) {
         debug_assert!(binding.is_binding(self.db));
         let use_def = self.index.use_def_map(binding.file_scope(self.db));
-        let mut declared_tys = use_def
-            .declarations_at_binding(binding)
-            .map(|declaration| declaration_ty(self.db, declaration));
+        let declarations = use_def.declarations_at_binding(binding);
         let mut bound_ty = ty;
-        if let Some(declared_ty) = declared_tys.next() {
-            let mut check_compat = true;
-            for other_declared_ty in declared_tys {
-                if !declared_ty.is_equivalent_to(self.db, other_declared_ty) {
-                    // TODO point out the conflicting declarations in the diagnostic?
-                    let symbol_table = self.index.symbol_table(binding.file_scope(self.db));
-                    let symbol_name = symbol_table.symbol(binding.symbol(self.db)).name();
-                    self.add_diagnostic(
-                        node,
-                        "conflicting-declarations",
-                        format_args!(
-                            "Conflicting declared types for '{symbol_name}': '{}', '{}'.",
-                            declared_ty.display(self.db),
-                            other_declared_ty.display(self.db)
-                        ),
-                    );
-                    check_compat = false;
-                    break;
-                }
-            }
-            if check_compat && !bound_ty.is_assignable_to(self.db, declared_ty) {
-                self.invalid_assignment_diagnostic(node, declared_ty, bound_ty);
-                bound_ty = declared_ty;
-            }
+        let DeclaredType {
+            declared_ty,
+            conflicting,
+        } = declarations_ty(self.db, declarations);
+        if !conflicting.is_empty() {
+            // TODO point out the conflicting declarations in the diagnostic?
+            let symbol_table = self.index.symbol_table(binding.file_scope(self.db));
+            let symbol_name = symbol_table.symbol(binding.symbol(self.db)).name();
+            self.add_diagnostic(
+                node,
+                "conflicting-declarations",
+                format_args!(
+                    "Conflicting declared types for '{symbol_name}': {}.",
+                    conflicting.display(self.db)
+                ),
+            );
+        }
+        if !bound_ty.is_assignable_to(self.db, declared_ty) {
+            self.invalid_assignment_diagnostic(node, declared_ty, bound_ty);
+            // allow declarations to override inference in case of invalid assignment
+            bound_ty = declared_ty;
         };
 
         self.types.bindings.insert(binding, bound_ty);
@@ -3234,7 +3237,7 @@ mod tests {
         )?;
 
         // TODO: sys.version_info, and need to understand @final and @type_check_only
-        assert_public_ty(&db, "src/a.py", "x", "EllipsisType | Unknown");
+        assert_public_ty(&db, "src/a.py", "x", "Unknown | EllipsisType");
 
         Ok(())
     }
@@ -4791,8 +4794,9 @@ mod tests {
         assert_file_diagnostics(&db, "src/a.py", &[]);
 
         // TODO: once we support `sys.version_info` branches,
-        // we should set `--target-version=py311` in this test
-        assert_public_ty(&db, "src/a.py", "e", "BaseExceptionGroup");
+        // we can set `--target-version=py311` in this test
+        // and the inferred type will just be `BaseExceptionGroup` --Alex
+        assert_public_ty(&db, "src/a.py", "e", "Unknown | BaseExceptionGroup");
 
         Ok(())
     }
@@ -4814,10 +4818,11 @@ mod tests {
         assert_file_diagnostics(&db, "src/a.py", &[]);
 
         // TODO: once we support `sys.version_info` branches,
-        // we should set `--target-version=py311` in this test
+        // we can set `--target-version=py311` in this test
+        // and the inferred type will just be `BaseExceptionGroup` --Alex
         //
         // TODO more precise would be `ExceptionGroup[OSError]` --Alex
-        assert_public_ty(&db, "src/a.py", "e", "BaseExceptionGroup");
+        assert_public_ty(&db, "src/a.py", "e", "Unknown | BaseExceptionGroup");
 
         Ok(())
     }
@@ -4839,10 +4844,11 @@ mod tests {
         assert_file_diagnostics(&db, "src/a.py", &[]);
 
         // TODO: once we support `sys.version_info` branches,
-        // we should set `--target-version=py311` in this test
+        // we can set `--target-version=py311` in this test
+        // and the inferred type will just be `BaseExceptionGroup` --Alex
         //
         // TODO more precise would be `ExceptionGroup[TypeError | AttributeError]` --Alex
-        assert_public_ty(&db, "src/a.py", "e", "BaseExceptionGroup");
+        assert_public_ty(&db, "src/a.py", "e", "Unknown | BaseExceptionGroup");
 
         Ok(())
     }
@@ -5395,6 +5401,74 @@ mod tests {
             &db,
             "/src/a.py",
             &[r"Conflicting declared types for 'x': 'str', 'int'."],
+        );
+    }
+
+    #[test]
+    fn partial_declarations() {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            if flag:
+                x: int
+            x = 1
+            ",
+        )
+        .unwrap();
+
+        assert_file_diagnostics(
+            &db,
+            "/src/a.py",
+            &[r"Conflicting declared types for 'x': 'Unknown', 'int'."],
+        );
+    }
+
+    #[test]
+    fn incompatible_declarations_bad_assignment() {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            if flag:
+                x: str
+            else:
+                x: int
+            x = b'foo'
+            ",
+        )
+        .unwrap();
+
+        assert_file_diagnostics(
+            &db,
+            "/src/a.py",
+            &[
+                r"Conflicting declared types for 'x': 'str', 'int'.",
+                r#"Object of type 'Literal[b"foo"]' is not assignable to 'str | int'."#,
+            ],
+        );
+    }
+
+    #[test]
+    fn partial_declarations_questionable_assignment() {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            if flag:
+                x: int
+            x = 'foo'
+            ",
+        )
+        .unwrap();
+
+        assert_file_diagnostics(
+            &db,
+            "/src/a.py",
+            &[r"Conflicting declared types for 'x': 'Unknown', 'int'."],
         );
     }
 

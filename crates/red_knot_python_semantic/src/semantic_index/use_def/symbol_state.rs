@@ -105,6 +105,11 @@ impl SymbolDeclarations {
         self.may_be_undeclared = false;
     }
 
+    /// Add undeclared as a possibility for this symbol.
+    fn set_may_be_undeclared(&mut self) {
+        self.may_be_undeclared = true;
+    }
+
     /// Return an iterator over live declarations for this symbol.
     pub(super) fn iter(&self) -> DeclarationIdIterator {
         DeclarationIdIterator {
@@ -209,6 +214,11 @@ impl SymbolState {
     /// Add given constraint to all live bindings.
     pub(super) fn record_constraint(&mut self, constraint_id: ScopedConstraintId) {
         self.bindings.record_constraint(constraint_id);
+    }
+
+    /// Add undeclared as a possibility for this symbol.
+    pub(super) fn set_may_be_undeclared(&mut self) {
+        self.declarations.set_may_be_undeclared();
     }
 
     /// Record a newly-encountered declaration of this symbol.
@@ -327,11 +337,6 @@ impl SymbolState {
     pub(super) fn may_be_unbound(&self) -> bool {
         self.bindings.may_be_unbound()
     }
-
-    /// Could the symbol be undeclared?
-    pub(super) fn may_be_undeclared(&self) -> bool {
-        self.declarations.may_be_undeclared()
-    }
 }
 
 /// The default state of a symbol, if we've seen no definitions of it, is undefined (that is,
@@ -433,7 +438,7 @@ mod tests {
         }
 
         pub(crate) fn assert_declarations(&self, may_be_undeclared: bool, expected: &[u32]) {
-            assert_eq!(self.may_be_undeclared(), may_be_undeclared);
+            assert_eq!(self.declarations.may_be_undeclared(), may_be_undeclared);
             let actual = self
                 .declarations()
                 .iter()
@@ -568,5 +573,14 @@ mod tests {
         sym.merge(sym2);
 
         sym.assert_declarations(true, &[1]);
+    }
+
+    #[test]
+    fn set_may_be_undeclared() {
+        let mut sym = SymbolState::undefined();
+        sym.record_declaration(ScopedDefinitionId::from_u32(0));
+        sym.set_may_be_undeclared();
+
+        sym.assert_declarations(true, &[0]);
     }
 }

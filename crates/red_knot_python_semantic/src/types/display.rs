@@ -5,7 +5,7 @@ use std::fmt::{Display, Formatter};
 use ruff_python_ast::str::Quote;
 use ruff_python_literal::escape::AsciiEscape;
 
-use crate::types::{IntersectionType, Type, UnionType};
+use crate::types::{IntersectionType, Type, TypeList, UnionType};
 use crate::{Db, FxOrderMap};
 
 impl<'db> Type<'db> {
@@ -244,6 +244,31 @@ impl Display for DisplayIntersectionType<'_> {
 impl std::fmt::Debug for DisplayIntersectionType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         std::fmt::Display::fmt(self, f)
+    }
+}
+
+impl<'s, 'db> TypeList<'db> {
+    pub(crate) fn display(&'s self, db: &'db dyn Db) -> DisplayConflictingTypes<'s, 'db> {
+        DisplayConflictingTypes { types: self, db }
+    }
+}
+
+pub(crate) struct DisplayConflictingTypes<'l, 'db> {
+    types: &'l TypeList<'db>,
+    db: &'db dyn Db,
+}
+
+impl std::fmt::Display for DisplayConflictingTypes<'_, '_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut iter = self.types.0.iter();
+        if let Some(first) = iter.next() {
+            write!(f, "'{}'", first.display(self.db))?;
+            for other in iter {
+                f.write_str(", ")?;
+                write!(f, "'{}'", other.display(self.db))?;
+            }
+        }
+        Ok(())
     }
 }
 
