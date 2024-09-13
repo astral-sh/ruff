@@ -86,18 +86,23 @@ type ConstraintsIntoIterator = smallvec::IntoIter<InlineConstraintArray>;
 pub(super) struct SymbolDeclarations {
     /// [`BitSet`]: which declarations (as [`ScopedDefinitionId`]) can reach the current location?
     live_declarations: Declarations,
+
+    /// Could the symbol be un-declared at this point?
+    may_be_undeclared: bool,
 }
 
 impl SymbolDeclarations {
     fn undeclared() -> Self {
         Self {
             live_declarations: Declarations::default(),
+            may_be_undeclared: true,
         }
     }
 
     /// Record a newly-encountered declaration for this symbol.
     fn record_declaration(&mut self, declaration_id: ScopedDefinitionId) {
         self.live_declarations = Declarations::with(declaration_id.into());
+        self.may_be_undeclared = false;
     }
 
     /// Return an iterator over live declarations for this symbol.
@@ -111,6 +116,10 @@ impl SymbolDeclarations {
     #[allow(unused)]
     pub(super) fn is_empty(&self) -> bool {
         self.live_declarations.is_empty()
+    }
+
+    pub(super) fn may_be_undeclared(&self) -> bool {
+        self.may_be_undeclared
     }
 }
 
@@ -217,7 +226,11 @@ impl SymbolState {
                 constraints: Constraints::default(),
                 may_be_unbound: self.bindings.may_be_unbound || b.bindings.may_be_unbound,
             },
-            declarations: self.declarations.clone(),
+            declarations: SymbolDeclarations {
+                live_declarations: self.declarations.live_declarations.clone(),
+                may_be_undeclared: self.declarations.may_be_undeclared
+                    || b.declarations.may_be_undeclared,
+            },
         };
 
         std::mem::swap(&mut a, self);
@@ -315,6 +328,11 @@ impl SymbolState {
     /// Could the symbol be unbound?
     pub(super) fn may_be_unbound(&self) -> bool {
         self.bindings.may_be_unbound()
+    }
+
+    /// Could the symbol be undeclared?
+    pub(super) fn may_be_undeclared(&self) -> bool {
+        self.declarations.may_be_undeclared()
     }
 }
 
@@ -417,7 +435,8 @@ mod tests {
             assert_eq!(actual, expected);
         }
 
-        pub(crate) fn assert_declarations(&self, expected: &[u32]) {
+        pub(crate) fn assert_declarations(&self, may_be_undeclared: bool, expected: &[u32]) {
+            assert_eq!(self.may_be_undeclared(), may_be_undeclared);
             let actual = self
                 .declarations()
                 .iter()
@@ -506,11 +525,18 @@ mod tests {
     }
 
     #[test]
+    fn no_declaration() {
+        let sym = SymbolState::undefined();
+
+        sym.assert_declarations(true, &[]);
+    }
+
+    #[test]
     fn record_declaration() {
         let mut sym = SymbolState::undefined();
         sym.record_declaration(ScopedDefinitionId::from_u32(1));
 
-        sym.assert_declarations(&[1]);
+        sym.assert_declarations(false, &[1]);
     }
 
     #[test]
@@ -519,7 +545,7 @@ mod tests {
         sym.record_declaration(ScopedDefinitionId::from_u32(1));
         sym.record_declaration(ScopedDefinitionId::from_u32(2));
 
-        sym.assert_declarations(&[2]);
+        sym.assert_declarations(false, &[2]);
     }
 
     #[test]
@@ -532,6 +558,18 @@ mod tests {
 
         sym.merge(sym2);
 
-        sym.assert_declarations(&[1, 2]);
+        sym.assert_declarations(false, &[1, 2]);
+    }
+
+    #[test]
+    fn record_declaration_merge_partial_undeclared() {
+        let mut sym = SymbolState::undefined();
+        sym.record_declaration(ScopedDefinitionId::from_u32(1));
+
+        let sym2 = SymbolState::undefined();
+
+        sym.merge(sym2);
+
+        sym.assert_declarations(true, &[1]);
     }
 }

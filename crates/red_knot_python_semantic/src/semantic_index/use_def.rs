@@ -26,14 +26,12 @@
 //! type; that is, the declared type is always wider, and the inferred type may be more precise. If
 //! we see an invalid assignment, we emit a diagnostic and abandon our inferred type, deferring to
 //! the declared type (this allows an explicit annotation to override bad inference, without a
-//! cast), maintaining the invariant. The one case in which we must abandon this invariant is when
-//! we see conflicting live declarations; in this case we emit a diagnostic and effectively treat
-//! the declared type as Unknown.
+//! cast), maintaining the invariant.
 //!
 //! The **inferred type** represents the most precise type we believe encompasses all possible
-//! values for the variable at a given use. It is based on the bindings which can reach that use
-//! through some control flow path, and the narrowing constraints that control flow must have
-//! passed through between the binding and the use. For example, in this code:
+//! values for the variable at a given use. It is based on a union of the bindings which can reach
+//! that use through some control flow path, and the narrowing constraints that control flow must
+//! have passed through between the binding and the use. For example, in this code:
 //!
 //! ```python
 //! x = 1 if flag else None
@@ -69,9 +67,10 @@
 //! Path(path)`, with the explicit `: Path` annotation, is permitted.
 //!
 //! The general rule is that whatever declaration(s) can reach a given binding determine the
-//! validity of that binding. If multiple declarations can reach a binding, they must be
-//! equivalent declarations, or we issue a type error, since we can't reconcile to a single
-//! declared type.
+//! validity of that binding. If there is a path in which the symbol is not declared, that is a
+//! declaration of `Unknown`. If multiple declarations can reach a binding, we union them, but by
+//! default we also issue a type error, since this implicit union of declared types may hide an
+//! error.
 //!
 //! To support type inference, we build a map from each use of a symbol to the bindings live at
 //! that use, and the type narrowing constraints that apply to each binding.
@@ -328,6 +327,11 @@ impl<'db> UseDefMap<'db> {
     #[allow(unused)]
     pub(crate) fn has_public_declarations(&self, symbol: ScopedSymbolId) -> bool {
         !self.public_symbols[symbol].declarations().is_empty()
+    }
+
+    #[allow(unused)]
+    pub(crate) fn public_may_be_undeclared(&self, symbol: ScopedSymbolId) -> bool {
+        self.public_symbols[symbol].may_be_undeclared()
     }
 
     fn bindings_iterator<'a>(
