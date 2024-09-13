@@ -216,7 +216,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         let use_def = self.current_use_def_map_mut();
         match category {
             DefinitionCategory::DeclarationAndBinding => {
-                use_def.record_declaration_and_binding(symbol, definition)
+                use_def.record_declaration_and_binding(symbol, definition);
             }
             DefinitionCategory::Declaration => use_def.record_declaration(symbol, definition),
             DefinitionCategory::Binding => use_def.record_binding(symbol, definition),
