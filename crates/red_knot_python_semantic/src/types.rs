@@ -8,7 +8,7 @@ use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId};
 use crate::semantic_index::{
     global_scope, semantic_index, symbol_table, use_def_map, BindingWithConstraints,
-    BindingWithConstraintsIterator, DeclarationsIterator,
+    BindingWithConstraintsIterator,
 };
 use crate::stdlib::{builtins_symbol_ty, types_symbol_ty, typeshed_symbol_ty};
 use crate::types::narrow::narrowing_constraint;
@@ -51,7 +51,12 @@ pub(crate) fn symbol_ty_by_id<'db>(
     let use_def = use_def_map(db, scope);
 
     if use_def.has_public_declarations(symbol) {
-        declarations_ty(db, use_def.public_declarations(symbol))
+        UnionType::from_elements(
+            db,
+            use_def
+                .public_declarations(symbol)
+                .map(|decl| declaration_ty(db, decl)),
+        )
     } else {
         bindings_ty(
             db,
@@ -160,14 +165,6 @@ pub(crate) fn bindings_ty<'db>(
     } else {
         first
     }
-}
-
-/// Union an iterable of declared types.
-pub(crate) fn declarations_ty<'db>(
-    db: &'db dyn Db,
-    declarations: DeclarationsIterator<'_, 'db>,
-) -> Type<'db> {
-    UnionType::from_elements(db, declarations.map(|decl| declaration_ty(db, decl)))
 }
 
 /// Unique ID for a type.
