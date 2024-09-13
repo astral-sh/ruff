@@ -1,3 +1,4 @@
+use std::cell::{RefCell, RefMut};
 use std::sync::Arc;
 
 use rustc_hash::FxHashMap;
@@ -44,12 +45,9 @@ pub(super) struct SemanticIndexBuilder<'db> {
     current_match_case: Option<CurrentMatchCase<'db>>,
     /// Flow states at each `break` in the current loop.
     loop_break_states: Vec<FlowSnapshot>,
-    /// Flow states after each definition in the `try` branch
-    /// of the current `try`/`except` block.
-    try_block_definition_states: Vec<FlowSnapshot>,
     /// Whether we are currently visiting a `try` branch
     /// of a `try`/`except` block
-    try_block_context: TryBlockContext,
+    try_block_contexts: TryBlockContexts,
 
     // Semantic Index fields
     scopes: IndexVec<FileScopeId, Scope>,
@@ -73,8 +71,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             current_assignment: None,
             current_match_case: None,
             loop_break_states: vec![],
-            try_block_definition_states: vec![],
-            try_block_context: TryBlockContext::default(),
+            try_block_contexts: TryBlockContexts::default(),
 
             scopes: IndexVec::new(),
             symbol_tables: IndexVec::new(),
@@ -100,12 +97,17 @@ impl<'db> SemanticIndexBuilder<'db> {
             .expect("Always to have a root scope")
     }
 
-    fn push_scope(&mut self, node: NodeWithScopeRef) {
+    #[must_use]
+    fn push_scope(&mut self, node: NodeWithScopeRef) -> TryBlockContexts {
         let parent = self.current_scope();
-        self.push_scope_with_parent(node, Some(parent));
+        self.push_scope_with_parent(node, Some(parent))
     }
 
-    fn push_scope_with_parent(&mut self, node: NodeWithScopeRef, parent: Option<FileScopeId>) {
+    fn push_scope_with_parent(
+        &mut self,
+        node: NodeWithScopeRef,
+        parent: Option<FileScopeId>,
+    ) -> TryBlockContexts {
         let children_start = self.scopes.next_index() + 1;
 
         let scope = Scope {
@@ -114,8 +116,8 @@ impl<'db> SemanticIndexBuilder<'db> {
             descendents: children_start..children_start,
         };
 
-        // Reset the `try` block context before pushing a new scope
-        self.try_block_context = TryBlockContext::default();
+        // Reset the `try` block contexts before pushing a new scope
+        let prior_try_context = std::mem::take(&mut self.try_block_contexts);
 
         let file_scope_id = self.scopes.push(scope);
         self.symbol_tables.push(SymbolTableBuilder::new());
@@ -138,19 +140,17 @@ impl<'db> SemanticIndexBuilder<'db> {
         debug_assert_eq!(ast_id_scope, file_scope_id);
 
         self.scope_stack.push(file_scope_id);
+
+        prior_try_context
     }
 
-    fn pop_scope(&mut self, prior_try_block_context: TryBlockContext) -> FileScopeId {
+    fn pop_scope(&mut self, prior_try_block_contexts: TryBlockContexts) -> FileScopeId {
         let id = self.scope_stack.pop().expect("Root scope to be present");
         let children_end = self.scopes.next_index();
         let scope = &mut self.scopes[id];
         scope.descendents = scope.descendents.start..children_end;
-        self.try_block_context = prior_try_block_context;
+        self.try_block_contexts = prior_try_block_contexts;
         id
-    }
-
-    const fn visiting_try_block(&self) -> bool {
-        matches!(self.try_block_context, TryBlockContext::VisitingTryBlock)
     }
 
     fn current_symbol_table(&mut self) -> &mut SymbolTableBuilder {
@@ -238,8 +238,10 @@ impl<'db> SemanticIndexBuilder<'db> {
             DefinitionCategory::Binding => use_def.record_binding(symbol, definition),
         }
 
-        if self.visiting_try_block() {
-            self.try_block_definition_states.push(self.flow_snapshot());
+        if let Some(current_try_block) = self.try_block_contexts.borrow_mut().current_try_block() {
+            if !current_try_block.visiting_nested_try_stmt {
+                current_try_block.push_snapshot(self.flow_snapshot());
+            }
         }
 
         definition
@@ -306,8 +308,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             return nested(self);
         };
 
-        let try_block_context = self.try_block_context;
-        self.push_scope(with_scope);
+        let prior_try_block_contexts = self.push_scope(with_scope);
 
         for type_param in &type_params.type_params {
             let (name, bound, default) = match type_param {
@@ -338,9 +339,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         }
 
         let nested_scope = nested(self);
-
-        self.pop_scope(try_block_context);
-
+        self.pop_scope(prior_try_block_contexts);
         nested_scope
     }
 
@@ -371,7 +370,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         // nodes are evaluated in the inner scope.
         self.add_standalone_expression(&generator.iter);
         self.visit_expr(&generator.iter);
-        self.push_scope(scope);
+        let prior_try_block_contexts = self.push_scope(scope);
 
         self.current_assignment = Some(CurrentAssignment::Comprehension {
             node: generator,
@@ -426,7 +425,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.visit_body(module.suite());
 
         // Pop the root scope
-        self.pop_scope(TryBlockContext::default());
+        self.pop_scope(TryBlockContexts::default());
         assert!(self.scope_stack.is_empty());
 
         assert!(self.current_assignment.is_none());
@@ -493,9 +492,8 @@ where
                             builder.visit_annotation(expr);
                         }
 
-                        let prior_try_block_context = builder.try_block_context;
-
-                        builder.push_scope(NodeWithScopeRef::Function(function_def));
+                        let prior_try_block_contexts =
+                            builder.push_scope(NodeWithScopeRef::Function(function_def));
 
                         // Add symbols and definitions for the parameters to the function scope.
                         for parameter in &*function_def.parameters {
@@ -503,7 +501,7 @@ where
                         }
 
                         builder.visit_body(&function_def.body);
-                        builder.pop_scope(prior_try_block_context)
+                        builder.pop_scope(prior_try_block_contexts)
                     },
                 );
                 // The default value of the parameters needs to be evaluated in the
@@ -537,11 +535,10 @@ where
                             builder.visit_arguments(arguments);
                         }
 
-                        let prior_try_block_context = builder.try_block_context;
-                        builder.push_scope(NodeWithScopeRef::Class(class));
+                        let prior_try_block_contexts =
+                            builder.push_scope(NodeWithScopeRef::Class(class));
                         builder.visit_body(&class.body);
-
-                        builder.pop_scope(prior_try_block_context)
+                        builder.pop_scope(prior_try_block_contexts)
                     },
                 );
             }
@@ -766,16 +763,13 @@ where
                 // the `except` block(s), so we will merge this state with all of the intermediate
                 // states during the `try` block before visiting the `except` blocks.
                 let pre_try_block_state = self.flow_snapshot();
-                let saved_definition_states = std::mem::take(&mut self.try_block_definition_states);
-                let prior_try_block_context = self.try_block_context;
+                self.try_block_contexts.push_try_block();
 
                 // Visit the `try` block!
                 //
                 // If `visiting_try_block == true`, this informs `.add_definition()` to record the state
                 // in `self.try_block_definition_states` after each new definition is recorded.
-                self.try_block_context = TryBlockContext::VisitingTryBlock;
                 self.visit_body(body);
-                self.try_block_context = prior_try_block_context;
 
                 // Save the state immediately *after* visiting the `try` block
                 // but *before* we prepare for visiting the `except` block(s).
@@ -786,22 +780,26 @@ where
                 let post_try_block_state = self.flow_snapshot();
 
                 // Prepare for visiting the `except` block(s)
-                let visiting_try_block_states = std::mem::replace(
-                    &mut self.try_block_definition_states,
-                    saved_definition_states,
-                );
+
+                let visiting_try_block_states = self
+                    .try_block_contexts
+                    .pop_try_block()
+                    .expect("A `try` block should have been pushed to the stack prior to visiting the `body` field");
+                if let Some(parent_try_block) =
+                    self.try_block_contexts.borrow_mut().current_try_block()
+                {
+                    parent_try_block.visiting_nested_try_stmt = true;
+                }
                 self.flow_restore(pre_try_block_state);
-                for state in visiting_try_block_states {
-                    self.flow_merge(state);
+                for state in &visiting_try_block_states.snapshots {
+                    self.flow_merge(state.clone());
                 }
                 let pre_except_state = self.flow_snapshot();
 
-                // Account for the fact that we could be visiting a nested `try` block,
-                // in which case the outer `try` block must be kept informed about all the possible
-                // between-definition states we could have encountered in the inner `try` block(!)
-                if self.visiting_try_block() {
-                    self.try_block_definition_states.push(self.flow_snapshot());
-                }
+                // TODO: we currently detect a `try`/`except` with a bare `except:` branch as being exhaustive,
+                // but not a `try`/`except` with `except BaseException:`.
+                // They should be treated the same way. --Alex.
+                let mut exhaustive_except_branches = false;
 
                 let mut post_except_states = vec![];
                 let num_handlers = handlers.len();
@@ -818,6 +816,8 @@ where
 
                     if let Some(handled_exceptions) = handled_exceptions {
                         self.visit_expr(handled_exceptions);
+                    } else {
+                        exhaustive_except_branches = true;
                     }
 
                     // If `handled_exceptions` above was `None`, it's something like `except as e:`,
@@ -856,7 +856,11 @@ where
                 // Visiting the `finally` block!
                 //
                 // The state here could be that we visited exactly one `except` block,
-                // or that we visited the `else` block.
+                // or that we visited the `else` block, **or** (unless the `except` branches
+                // are exhaustive) that we visited none of them!
+                // (An exception **could** have been raised that wasn't handled by any
+                // of the except handlers! But it would still be caught by the `finally`,
+                // which **always** runs.)
                 //
                 // N.B. Not all `try`/`except` clauses have `else` and/or `finally`!
                 // (In fact, some of them have `finally` but not `except`!)
@@ -867,7 +871,23 @@ where
                 for state in post_except_states {
                     self.flow_merge(state);
                 }
+                if !exhaustive_except_branches {
+                    for state in visiting_try_block_states.snapshots {
+                        self.flow_merge(state);
+                    }
+                }
+
                 self.visit_body(finalbody);
+
+                // Account for the fact that we could be visiting a nested `try` block,
+                // in which case the outer `try` block must be kept informed about all the possible
+                // between-definition states we could have encountered in the inner `try` block(!)
+                if let Some(current_try_block) =
+                    self.try_block_contexts.borrow_mut().current_try_block()
+                {
+                    current_try_block.push_snapshot(self.flow_snapshot());
+                    current_try_block.visiting_nested_try_stmt = false;
+                }
             }
             _ => {
                 walk_stmt(self, stmt);
@@ -879,7 +899,6 @@ where
         self.scopes_by_expression
             .insert(expr.into(), self.current_scope());
         self.current_ast_ids().record_expression(expr);
-        let try_block_context = self.try_block_context;
 
         match expr {
             ast::Expr::Name(name_node @ ast::ExprName { id, ctx, .. }) => {
@@ -979,7 +998,7 @@ where
                     }
                     self.visit_parameters(parameters);
                 }
-                self.push_scope(NodeWithScopeRef::Lambda(lambda));
+                let prior_try_block_contexts = self.push_scope(NodeWithScopeRef::Lambda(lambda));
 
                 // Add symbols and definitions for the parameters to the lambda scope.
                 if let Some(parameters) = &lambda.parameters {
@@ -1124,19 +1143,42 @@ where
     }
 }
 
-/// Whether we are or aren't visiting the `try` block of a `try`/`except` statement.
-///
-/// Note that this flag is reset to `NotVisitingTryBlock` whenever we start visiting
-/// a nested scope inside a `try` block.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-enum TryBlockContext {
-    /// The [`SemanticIndexBuilder`] is visiting statements in the `try` block
-    /// of a `try`/`except` statement.
-    VisitingTryBlock,
-    /// The [`SemanticIndexBuilder`] is not visiting statements in the `try` block
-    /// of a `try`/`except` statement.
-    #[default]
-    NotVisitingTryBlock,
+#[derive(Debug, Default)]
+struct TryBlockContext {
+    snapshots: Vec<FlowSnapshot>,
+    visiting_nested_try_stmt: bool,
+}
+
+impl TryBlockContext {
+    fn push_snapshot(&mut self, snapshot: FlowSnapshot) {
+        self.snapshots.push(snapshot);
+    }
+}
+
+#[derive(Debug)]
+struct TryBlockContextsRefMut<'a>(RefMut<'a, Vec<TryBlockContext>>);
+
+impl<'a> TryBlockContextsRefMut<'a> {
+    fn current_try_block(&mut self) -> Option<&mut TryBlockContext> {
+        self.0.last_mut()
+    }
+}
+
+#[derive(Debug, Default)]
+struct TryBlockContexts(RefCell<Vec<TryBlockContext>>);
+
+impl TryBlockContexts {
+    fn push_try_block(&self) {
+        self.0.borrow_mut().push(TryBlockContext::default());
+    }
+
+    fn pop_try_block(&self) -> Option<TryBlockContext> {
+        self.0.borrow_mut().pop()
+    }
+
+    fn borrow_mut(&self) -> TryBlockContextsRefMut {
+        TryBlockContextsRefMut(self.0.borrow_mut())
+    }
 }
 
 #[derive(Copy, Clone, Debug)]

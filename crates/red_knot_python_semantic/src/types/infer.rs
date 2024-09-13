@@ -4697,7 +4697,7 @@ mod tests {
                 x = 1
             except NameError:
                 x = 2
-            except TypeError:
+            except:
                 pass
             ",
         )?;
@@ -4767,7 +4767,7 @@ mod tests {
     }
 
     #[test]
-    fn except_handler_definitions_with_else_branch() -> anyhow::Result<()> {
+    fn exhaustive_except_handler_definitions_with_else_branch() -> anyhow::Result<()> {
         let mut db = setup_db();
 
         db.write_dedented(
@@ -4777,7 +4777,7 @@ mod tests {
                 x = 42
             except NameError:
                 x = 43
-            except TypeError:
+            except:
                 x = 44
             else:
                 x = 45
@@ -4795,7 +4795,8 @@ mod tests {
     }
 
     #[test]
-    fn except_handler_multiple_definitions_in_try_block() -> anyhow::Result<()> {
+    fn except_handler_multiple_definitions_in_try_block_with_exhaustive_excepts(
+    ) -> anyhow::Result<()> {
         let mut db = setup_db();
 
         db.write_dedented(
@@ -4807,7 +4808,7 @@ mod tests {
                 z = 3
             except NameError:
                 x = 11
-            except TypeError:
+            except:
                 x = 12
                 y = 22
             else:
@@ -4880,17 +4881,18 @@ mod tests {
         )?;
 
         assert_file_diagnostics(&db, "src/a.py", &[]);
-
-        // Union the flows of the top-level `except TypeError` and `else` branches together.
-        // The first is `Literal[9, 10]` (union of that branch's inner `except` and `else` branches);
-        // the second is `Literal[14, 15]` (union of *that* branch's inner `except` and `else` branches).
-        assert_public_ty(&db, "src/a.py", "x", "Literal[9, 10, 14, 15]");
+        assert_public_ty(
+            &db,
+            "src/a.py",
+            "x",
+            "Literal[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]",
+        );
 
         Ok(())
     }
 
     #[test]
-    fn except_handler_multiple_definitions_in_nested_try_block() -> anyhow::Result<()> {
+    fn except_handler_multiple_definitions_in_exhaustive_nested_try_block() -> anyhow::Result<()> {
         let mut db = setup_db();
 
         db.write_dedented(
@@ -4905,7 +4907,7 @@ mod tests {
             except TypeError:
                 x = 101
                 y = 111
-            except RuntimeError:
+            except:
                 y = 211
             ",
         )?;
@@ -4966,6 +4968,37 @@ mod tests {
         // would not necessarily have been overridden by the otherwise-exhaustive
         // `except`/`else` branches in the inner block.
         assert_public_ty(&db, "src/a.py", "x", "Unbound | Literal[1, 2, 3, 4]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn exception_raised_in_nested_try_block_with_finally_clause_caught_in_outer(
+    ) -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            try:
+                try:
+                    try:
+                        x = 1
+                    except:
+                        x = 2
+                    else:
+                        x = 3
+                    finally:
+                        x = 4
+                except:
+                    x = 5
+            except:
+                pass
+            ",
+        )?;
+
+        assert_file_diagnostics(&db, "src/a.py", &[]);
+        assert_public_ty(&db, "src/a.py", "x", "Unbound | Literal[4, 5]");
 
         Ok(())
     }
