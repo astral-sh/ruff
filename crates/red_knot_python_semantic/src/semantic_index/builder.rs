@@ -304,9 +304,11 @@ impl<'db> SemanticIndexBuilder<'db> {
                 };
                 let symbol = self.add_symbol(name.id.clone());
                 // TODO create Definition for PEP 695 typevars
+                // note that the "bound" on the typevar is a totally different thing than whether
+                // or not a name is "bound" by a typevar declaration; the latter is always true.
                 self.mark_symbol_bound(symbol);
-                if let Some(bound) = bound {
-                    self.visit_expr(bound);
+                if let Some(bounds) = bound {
+                    self.visit_expr(bounds);
                 }
                 if let Some(default) = default {
                     self.visit_expr(default);

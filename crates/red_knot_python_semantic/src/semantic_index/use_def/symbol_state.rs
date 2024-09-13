@@ -1,13 +1,13 @@
-//! Track visible definitions of a symbol, and applicable constraints per definition.
+//! Track live bindings per symbol, applicable constraints per binding, and live declarations.
 //!
 //! These data structures operate entirely on scope-local newtype-indices for definitions and
 //! constraints, referring to their location in the `all_definitions` and `all_constraints`
 //! indexvecs in [`super::UseDefMapBuilder`].
 //!
-//! We need to track arbitrary associations between definitions and constraints, not just a single
-//! set of currently dominating constraints (where "dominating" means "control flow must have
-//! passed through it to reach this point"), because we can have dominating constraints that apply
-//! to some definitions but not others, as in this code:
+//! We need to track arbitrary associations between bindings and constraints, not just a single set
+//! of currently dominating constraints (where "dominating" means "control flow must have passed
+//! through it to reach this point"), because we can have dominating constraints that apply to some
+//! bindings but not others, as in this code:
 //!
 //! ```python
 //! x = 1 if flag else None
@@ -18,11 +18,11 @@
 //! ```
 //!
 //! The `x is not None` constraint dominates the final use of `x`, but it applies only to the first
-//! definition of `x`, not the second, so `None` is a possible value for `x`.
+//! binding of `x`, not the second, so `None` is a possible value for `x`.
 //!
-//! And we can't just track, for each definition, an index into a list of dominating constraints,
-//! either, because we can have definitions which are still visible, but subject to constraints
-//! that are no longer dominating, as in this code:
+//! And we can't just track, for each binding, an index into a list of dominating constraints,
+//! either, because we can have bindings which are still visible, but subject to constraints that
+//! are no longer dominating, as in this code:
 //!
 //! ```python
 //! x = 0
@@ -33,13 +33,16 @@
 //! ```
 //!
 //! From the point of view of the final use of `x`, the `x is not None` constraint no longer
-//! dominates, but it does dominate the `x = 1 if flag2 else None` definition, so we have to keep
+//! dominates, but it does dominate the `x = 1 if flag2 else None` binding, so we have to keep
 //! track of that.
 //!
 //! The data structures used here ([`BitSet`] and [`smallvec::SmallVec`]) optimize for keeping all
 //! data inline (avoiding lots of scattered allocations) in small-to-medium cases, and falling back
-//! to heap allocation to be able to scale to arbitrary numbers of definitions and constraints when
-//! needed.
+//! to heap allocation to be able to scale to arbitrary numbers of live bindings and constraints
+//! when needed.
+//!
+//! Tracking live declarations is simpler, since constraints are not involved, but otherwise very
+//! similar to tracking live bindings.
 use super::bitset::{BitSet, BitSetIterator};
 use ruff_index::newtype_index;
 use smallvec::SmallVec;
