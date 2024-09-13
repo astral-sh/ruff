@@ -51,7 +51,7 @@ impl Symbol {
 
 bitflags! {
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-    pub(super) struct SymbolFlags: u8 {
+    struct SymbolFlags: u8 {
         const IS_USED         = 1 << 0;
         const IS_BOUND      = 1 << 1;
         /// TODO: This flag is not yet set by anything

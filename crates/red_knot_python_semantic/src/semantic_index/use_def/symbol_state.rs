@@ -149,9 +149,8 @@ impl SymbolBindings {
         // The new binding replaces all previous live bindings in this path, and has no
         // constraints.
         self.live_bindings = Bindings::with(binding_id.into());
-        let mut constraints = Constraints::with_capacity(1);
-        constraints.push(BitSet::default());
-        self.constraints = constraints;
+        self.constraints = Constraints::with_capacity(1);
+        self.constraints.push(BitSet::default());
         self.may_be_unbound = false;
     }
 
@@ -389,6 +388,8 @@ impl<'a> Iterator for DeclarationIdIterator<'a> {
         self.inner.next().map(ScopedDefinitionId::from_u32)
     }
 }
+
+impl std::iter::FusedIterator for DeclarationIdIterator<'_> {}
 
 #[cfg(test)]
 mod tests {

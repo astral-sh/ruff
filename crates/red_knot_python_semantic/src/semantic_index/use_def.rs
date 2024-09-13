@@ -23,7 +23,12 @@
 //!
 //! At any given use of a variable, we can ask about both its "declared type" and its "inferred
 //! type". These may be different, but the inferred type must always be assignable to the declared
-//! type; that is, the declared type is always wider, and the inferred type may be more precise.
+//! type; that is, the declared type is always wider, and the inferred type may be more precise. If
+//! we see an invalid assignment, we emit a diagnostic and abandon our inferred type, deferring to
+//! the declared type (this allows an explicit annotation to override bad inference, without a
+//! cast), maintaining the invariant. The one case in which we must abandon this invariant is when
+//! we see conflicting live declarations; in this case we emit a diagnostic and effectively treat
+//! the declared type as Unknown.
 //!
 //! The **inferred type** represents the most precise type we believe encompasses all possible
 //! values for the variable at a given use. It is based on the bindings which can reach that use
