@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.6.5
+
+### Preview features
+
+- \[`pydoclint`\] Ignore `DOC201` when function name is "**new**" ([#13300](https://github.com/astral-sh/ruff/pull/13300))
+- \[`refurb`\] Implement `slice-to-remove-prefix-or-suffix` (`FURB188`) ([#13256](https://github.com/astral-sh/ruff/pull/13256))
+
+### Rule changes
+
+- \[`eradicate`\] Ignore script-comments with multiple end-tags (`ERA001`) ([#13283](https://github.com/astral-sh/ruff/pull/13283))
+- \[`pyflakes`\] Improve error message for `UndefinedName` when a builtin was added in a newer version than specified in Ruff config (`F821`) ([#13293](https://github.com/astral-sh/ruff/pull/13293))
+
+### Server
+
+- Add support for extensionless Python files for server ([#13326](https://github.com/astral-sh/ruff/pull/13326))
+- Fix configuration inheritance for configurations specified in the LSP settings ([#13285](https://github.com/astral-sh/ruff/pull/13285))
+
+### Bug fixes
+
+- \[`ruff`\] Handle unary operators in `decimal-from-float-literal` (`RUF032`) ([#13275](https://github.com/astral-sh/ruff/pull/13275))
+
+### CLI
+
+- Only include rules with diagnostics in SARIF metadata ([#13268](https://github.com/astral-sh/ruff/pull/13268))
+
+### Playground
+
+- Add "Copy as pyproject.toml/ruff.toml" and "Paste from TOML" ([#13328](https://github.com/astral-sh/ruff/pull/13328))
+- Fix errors not shown for restored snippet on page load ([#13262](https://github.com/astral-sh/ruff/pull/13262))
+
 ## 0.6.4
 
 ### Preview features
