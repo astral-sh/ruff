@@ -425,6 +425,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - Databricks ([MLflow](https://github.com/mlflow/mlflow))
 - [Dify](https://github.com/langgenius/dify)
 - [FastAPI](https://github.com/tiangolo/fastapi)
+- [GermanTechJobs](https://germantechjobs.de)
 - [Godot](https://github.com/godotengine/godot)
 - [Gradio](https://github.com/gradio-app/gradio)
 - [Great Expectations](https://github.com/great-expectations/great_expectations)
