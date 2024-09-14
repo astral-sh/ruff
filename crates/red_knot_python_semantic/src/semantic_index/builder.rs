@@ -45,9 +45,8 @@ pub(super) struct SemanticIndexBuilder<'db> {
     current_match_case: Option<CurrentMatchCase<'db>>,
     /// Flow states at each `break` in the current loop.
     loop_break_states: Vec<FlowSnapshot>,
-    /// Whether we are currently visiting a `try` branch
-    /// of a `try`/`except` block
-    try_block_contexts: TryBlockContexts,
+    /// Per-scope contexts regarding nested `try`/`except` statements
+    try_block_contexts_stack: TryBlockContextsStack,
 
     // Semantic Index fields
     scopes: IndexVec<FileScopeId, Scope>,
@@ -71,7 +70,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             current_assignment: None,
             current_match_case: None,
             loop_break_states: vec![],
-            try_block_contexts: TryBlockContexts::default(),
+            try_block_contexts_stack: TryBlockContextsStack::default(),
 
             scopes: IndexVec::new(),
             symbol_tables: IndexVec::new(),
@@ -97,17 +96,16 @@ impl<'db> SemanticIndexBuilder<'db> {
             .expect("Always to have a root scope")
     }
 
-    #[must_use]
-    fn push_scope(&mut self, node: NodeWithScopeRef) -> TryBlockContexts {
-        let parent = self.current_scope();
-        self.push_scope_with_parent(node, Some(parent))
+    fn try_block_contexts(&self) -> &TryBlockContexts {
+        self.try_block_contexts_stack.current_try_block_context()
     }
 
-    fn push_scope_with_parent(
-        &mut self,
-        node: NodeWithScopeRef,
-        parent: Option<FileScopeId>,
-    ) -> TryBlockContexts {
+    fn push_scope(&mut self, node: NodeWithScopeRef) {
+        let parent = self.current_scope();
+        self.push_scope_with_parent(node, Some(parent));
+    }
+
+    fn push_scope_with_parent(&mut self, node: NodeWithScopeRef, parent: Option<FileScopeId>) {
         let children_start = self.scopes.next_index() + 1;
 
         let scope = Scope {
@@ -115,9 +113,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             kind: node.scope_kind(),
             descendents: children_start..children_start,
         };
-
-        // Reset the `try` block contexts before pushing a new scope
-        let prior_try_context = std::mem::take(&mut self.try_block_contexts);
+        self.try_block_contexts_stack.push_context();
 
         let file_scope_id = self.scopes.push(scope);
         self.symbol_tables.push(SymbolTableBuilder::new());
@@ -140,16 +136,14 @@ impl<'db> SemanticIndexBuilder<'db> {
         debug_assert_eq!(ast_id_scope, file_scope_id);
 
         self.scope_stack.push(file_scope_id);
-
-        prior_try_context
     }
 
-    fn pop_scope(&mut self, prior_try_block_contexts: TryBlockContexts) -> FileScopeId {
+    fn pop_scope(&mut self) -> FileScopeId {
         let id = self.scope_stack.pop().expect("Root scope to be present");
         let children_end = self.scopes.next_index();
         let scope = &mut self.scopes[id];
         scope.descendents = scope.descendents.start..children_end;
-        self.try_block_contexts = prior_try_block_contexts;
+        self.try_block_contexts_stack.pop_context();
         id
     }
 
@@ -238,7 +232,8 @@ impl<'db> SemanticIndexBuilder<'db> {
             DefinitionCategory::Binding => use_def.record_binding(symbol, definition),
         }
 
-        if let Some(current_try_block) = self.try_block_contexts.borrow_mut().current_try_block() {
+        if let Some(current_try_block) = self.try_block_contexts().borrow_mut().current_try_block()
+        {
             if !current_try_block.visiting_nested_try_stmt {
                 current_try_block.push_snapshot(self.flow_snapshot());
             }
@@ -308,7 +303,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             return nested(self);
         };
 
-        let prior_try_block_contexts = self.push_scope(with_scope);
+        self.push_scope(with_scope);
 
         for type_param in &type_params.type_params {
             let (name, bound, default) = match type_param {
@@ -339,7 +334,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         }
 
         let nested_scope = nested(self);
-        self.pop_scope(prior_try_block_contexts);
+        self.pop_scope();
         nested_scope
     }
 
@@ -370,7 +365,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         // nodes are evaluated in the inner scope.
         self.add_standalone_expression(&generator.iter);
         self.visit_expr(&generator.iter);
-        let prior_try_block_contexts = self.push_scope(scope);
+        self.push_scope(scope);
 
         self.current_assignment = Some(CurrentAssignment::Comprehension {
             node: generator,
@@ -425,7 +420,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.visit_body(module.suite());
 
         // Pop the root scope
-        self.pop_scope(TryBlockContexts::default());
+        self.pop_scope();
         assert!(self.scope_stack.is_empty());
 
         assert!(self.current_assignment.is_none());
@@ -492,8 +487,7 @@ where
                             builder.visit_annotation(expr);
                         }
 
-                        let prior_try_block_contexts =
-                            builder.push_scope(NodeWithScopeRef::Function(function_def));
+                        builder.push_scope(NodeWithScopeRef::Function(function_def));
 
                         // Add symbols and definitions for the parameters to the function scope.
                         for parameter in &*function_def.parameters {
@@ -501,7 +495,7 @@ where
                         }
 
                         builder.visit_body(&function_def.body);
-                        builder.pop_scope(prior_try_block_contexts)
+                        builder.pop_scope()
                     },
                 );
                 // The default value of the parameters needs to be evaluated in the
@@ -535,10 +529,9 @@ where
                             builder.visit_arguments(arguments);
                         }
 
-                        let prior_try_block_contexts =
-                            builder.push_scope(NodeWithScopeRef::Class(class));
+                        builder.push_scope(NodeWithScopeRef::Class(class));
                         builder.visit_body(&class.body);
-                        builder.pop_scope(prior_try_block_contexts)
+                        builder.pop_scope()
                     },
                 );
             }
@@ -763,7 +756,7 @@ where
                 // the `except` block(s), so we will merge this state with all of the intermediate
                 // states during the `try` block before visiting the `except` blocks.
                 let pre_try_block_state = self.flow_snapshot();
-                self.try_block_contexts.push_try_block();
+                self.try_block_contexts().push_try_block();
 
                 // Visit the `try` block!
                 //
@@ -782,11 +775,11 @@ where
                 // Prepare for visiting the `except` block(s)
 
                 let visiting_try_block_states = self
-                    .try_block_contexts
+                    .try_block_contexts()
                     .pop_try_block()
                     .expect("A `try` block should have been pushed to the stack prior to visiting the `body` field");
                 if let Some(parent_try_block) =
-                    self.try_block_contexts.borrow_mut().current_try_block()
+                    self.try_block_contexts().borrow_mut().current_try_block()
                 {
                     parent_try_block.visiting_nested_try_stmt = true;
                 }
@@ -883,7 +876,7 @@ where
                 // in which case the outer `try` block must be kept informed about all the possible
                 // between-definition states we could have encountered in the inner `try` block(!)
                 if let Some(current_try_block) =
-                    self.try_block_contexts.borrow_mut().current_try_block()
+                    self.try_block_contexts().borrow_mut().current_try_block()
                 {
                     current_try_block.push_snapshot(self.flow_snapshot());
                     current_try_block.visiting_nested_try_stmt = false;
@@ -998,7 +991,7 @@ where
                     }
                     self.visit_parameters(parameters);
                 }
-                let prior_try_block_contexts = self.push_scope(NodeWithScopeRef::Lambda(lambda));
+                self.push_scope(NodeWithScopeRef::Lambda(lambda));
 
                 // Add symbols and definitions for the parameters to the lambda scope.
                 if let Some(parameters) = &lambda.parameters {
@@ -1140,6 +1133,25 @@ where
         }
 
         self.current_match_case.as_mut().unwrap().index += 1;
+    }
+}
+
+#[derive(Debug, Default)]
+struct TryBlockContextsStack(Vec<TryBlockContexts>);
+
+impl TryBlockContextsStack {
+    fn push_context(&mut self) {
+        self.0.push(TryBlockContexts::default());
+    }
+
+    fn current_try_block_context(&self) -> &TryBlockContexts {
+        self.0
+            .last()
+            .expect("There should always be at least one `TryBlockContexts` on the stack")
+    }
+
+    fn pop_context(&mut self) {
+        self.0.pop();
     }
 }
 
