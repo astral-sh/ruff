@@ -325,11 +325,23 @@ impl<'db> SemanticIndexBuilder<'db> {
         nested_scope
     }
 
-    /// Visit a list of [`Comprehension`] nodes, assumed to be the "generators" that compose a
-    /// comprehension (that is, the `for x in y` and `for y in z` parts of `x for x in y for y in z`.)
+    /// This method does several things:
+    /// - It pushes a new scope onto the stack for visiting
+    ///   a list/dict/set comprehension or generator expression
+    /// - Inside that scope, it visits a list of [`Comprehension`] nodes,
+    ///   assumed to be the "generators" that compose a comprehension
+    ///   (that is, the `for x in y` and `for y in z` parts of `x for x in y for y in z`).
+    /// - Inside that scope, it also calls a closure for visiting the outer `elt`
+    ///   of a list/dict/set comprehension or generator expression
+    /// - It then pops the new scope off the stack
     ///
     /// [`Comprehension`]: ast::Comprehension
-    fn visit_generators(&mut self, scope: NodeWithScopeRef, generators: &'db [ast::Comprehension]) {
+    fn with_generators_scope(
+        &mut self,
+        scope: NodeWithScopeRef,
+        generators: &'db [ast::Comprehension],
+        visit_outer_elt: impl FnOnce(&mut Self),
+    ) {
         let mut generators_iter = generators.iter();
 
         let Some(generator) = generators_iter.next() else {
@@ -368,6 +380,9 @@ impl<'db> SemanticIndexBuilder<'db> {
                 self.visit_expr(expr);
             }
         }
+
+        visit_outer_elt(self);
+        self.pop_scope();
     }
 
     fn declare_parameter(&mut self, parameter: AnyParameterRef) {
@@ -878,6 +893,7 @@ where
                 }
 
                 self.visit_expr(lambda.body.as_ref());
+                self.pop_scope();
             }
             ast::Expr::If(ast::ExprIf {
                 body, test, orelse, ..
@@ -898,30 +914,33 @@ where
                     elt, generators, ..
                 },
             ) => {
-                self.visit_generators(
+                self.with_generators_scope(
                     NodeWithScopeRef::ListComprehension(list_comprehension),
                     generators,
+                    |builder| builder.visit_expr(elt),
                 );
-                self.visit_expr(elt);
             }
             ast::Expr::SetComp(
                 set_comprehension @ ast::ExprSetComp {
                     elt, generators, ..
                 },
             ) => {
-                self.visit_generators(
+                self.with_generators_scope(
                     NodeWithScopeRef::SetComprehension(set_comprehension),
                     generators,
+                    |builder| builder.visit_expr(elt),
                 );
-                self.visit_expr(elt);
             }
             ast::Expr::Generator(
                 generator @ ast::ExprGenerator {
                     elt, generators, ..
                 },
             ) => {
-                self.visit_generators(NodeWithScopeRef::GeneratorExpression(generator), generators);
-                self.visit_expr(elt);
+                self.with_generators_scope(
+                    NodeWithScopeRef::GeneratorExpression(generator),
+                    generators,
+                    |builder| builder.visit_expr(elt),
+                );
             }
             ast::Expr::DictComp(
                 dict_comprehension @ ast::ExprDictComp {
@@ -931,27 +950,18 @@ where
                     ..
                 },
             ) => {
-                self.visit_generators(
+                self.with_generators_scope(
                     NodeWithScopeRef::DictComprehension(dict_comprehension),
                     generators,
+                    |builder| {
+                        builder.visit_expr(key);
+                        builder.visit_expr(value);
+                    },
                 );
-                self.visit_expr(key);
-                self.visit_expr(value);
             }
             _ => {
                 walk_expr(self, expr);
             }
-        }
-
-        if matches!(
-            expr,
-            ast::Expr::Lambda(_)
-                | ast::Expr::ListComp(_)
-                | ast::Expr::SetComp(_)
-                | ast::Expr::Generator(_)
-                | ast::Expr::DictComp(_)
-        ) {
-            self.pop_scope();
         }
     }
 
