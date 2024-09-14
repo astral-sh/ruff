@@ -1,4 +1,3 @@
-use std::cell::{RefCell, RefMut};
 use std::sync::Arc;
 
 use rustc_hash::FxHashMap;
@@ -32,6 +31,7 @@ use super::definition::{
     DefinitionCategory, ExceptHandlerDefinitionNodeRef, MatchPatternDefinitionNodeRef,
     WithItemDefinitionNodeRef,
 };
+use super::except_handlers::{TryBlockContexts, TryBlockContextsStack};
 
 pub(super) struct SemanticIndexBuilder<'db> {
     // Builder state
@@ -167,7 +167,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         &mut self.ast_ids[scope_id]
     }
 
-    fn flow_snapshot(&self) -> FlowSnapshot {
+    pub(super) fn flow_snapshot(&self) -> FlowSnapshot {
         self.current_use_def_map().snapshot()
     }
 
@@ -234,9 +234,7 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         if let Some(current_try_block) = self.try_block_contexts().borrow_mut().current_try_block()
         {
-            if !current_try_block.visiting_nested_try_stmt {
-                current_try_block.push_snapshot(self.flow_snapshot());
-            }
+            current_try_block.record_definition(self);
         }
 
         definition
@@ -299,42 +297,46 @@ impl<'db> SemanticIndexBuilder<'db> {
         type_params: Option<&'db ast::TypeParams>,
         nested: impl FnOnce(&mut Self) -> FileScopeId,
     ) -> FileScopeId {
-        let Some(type_params) = type_params else {
-            return nested(self);
-        };
+        if let Some(type_params) = type_params {
+            self.push_scope(with_scope);
 
-        self.push_scope(with_scope);
-
-        for type_param in &type_params.type_params {
-            let (name, bound, default) = match type_param {
-                ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
-                    range: _,
-                    name,
-                    bound,
-                    default,
-                }) => (name, bound, default),
-                ast::TypeParam::ParamSpec(ast::TypeParamParamSpec { name, default, .. }) => {
-                    (name, &None, default)
+            for type_param in &type_params.type_params {
+                let (name, bound, default) = match type_param {
+                    ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
+                        range: _,
+                        name,
+                        bound,
+                        default,
+                    }) => (name, bound, default),
+                    ast::TypeParam::ParamSpec(ast::TypeParamParamSpec {
+                        name, default, ..
+                    }) => (name, &None, default),
+                    ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple {
+                        name,
+                        default,
+                        ..
+                    }) => (name, &None, default),
+                };
+                let symbol = self.add_symbol(name.id.clone());
+                // TODO create Definition for PEP 695 typevars
+                // note that the "bound" on the typevar is a totally different thing than whether
+                // or not a name is "bound" by a typevar declaration; the latter is always true.
+                self.mark_symbol_bound(symbol);
+                if let Some(bounds) = bound {
+                    self.visit_expr(bounds);
                 }
-                ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple {
-                    name, default, ..
-                }) => (name, &None, default),
-            };
-            let symbol = self.add_symbol(name.id.clone());
-            // TODO create Definition for PEP 695 typevars
-            // note that the "bound" on the typevar is a totally different thing than whether
-            // or not a name is "bound" by a typevar declaration; the latter is always true.
-            self.mark_symbol_bound(symbol);
-            if let Some(bounds) = bound {
-                self.visit_expr(bounds);
-            }
-            if let Some(default) = default {
-                self.visit_expr(default);
+                if let Some(default) = default {
+                    self.visit_expr(default);
+                }
             }
         }
 
         let nested_scope = nested(self);
-        self.pop_scope();
+
+        if type_params.is_some() {
+            self.pop_scope();
+        }
+
         nested_scope
     }
 
@@ -781,10 +783,10 @@ where
                 if let Some(parent_try_block) =
                     self.try_block_contexts().borrow_mut().current_try_block()
                 {
-                    parent_try_block.visiting_nested_try_stmt = true;
+                    parent_try_block.record_visiting_nested_try_stmt();
                 }
                 self.flow_restore(pre_try_block_state);
-                for state in &visiting_try_block_states.snapshots {
+                for state in visiting_try_block_states.snapshots() {
                     self.flow_merge(state.clone());
                 }
                 let pre_except_state = self.flow_snapshot();
@@ -865,7 +867,7 @@ where
                     self.flow_merge(state);
                 }
                 if !exhaustive_except_branches {
-                    for state in visiting_try_block_states.snapshots {
+                    for state in visiting_try_block_states.into_snapshots() {
                         self.flow_merge(state);
                     }
                 }
@@ -878,8 +880,8 @@ where
                 if let Some(current_try_block) =
                     self.try_block_contexts().borrow_mut().current_try_block()
                 {
-                    current_try_block.push_snapshot(self.flow_snapshot());
-                    current_try_block.visiting_nested_try_stmt = false;
+                    current_try_block.record_exiting_nested_try_stmt();
+                    current_try_block.record_definition(self);
                 }
             }
             _ => {
@@ -1133,63 +1135,6 @@ where
         }
 
         self.current_match_case.as_mut().unwrap().index += 1;
-    }
-}
-
-#[derive(Debug, Default)]
-struct TryBlockContextsStack(Vec<TryBlockContexts>);
-
-impl TryBlockContextsStack {
-    fn push_context(&mut self) {
-        self.0.push(TryBlockContexts::default());
-    }
-
-    fn current_try_block_context(&self) -> &TryBlockContexts {
-        self.0
-            .last()
-            .expect("There should always be at least one `TryBlockContexts` on the stack")
-    }
-
-    fn pop_context(&mut self) {
-        self.0.pop();
-    }
-}
-
-#[derive(Debug, Default)]
-struct TryBlockContext {
-    snapshots: Vec<FlowSnapshot>,
-    visiting_nested_try_stmt: bool,
-}
-
-impl TryBlockContext {
-    fn push_snapshot(&mut self, snapshot: FlowSnapshot) {
-        self.snapshots.push(snapshot);
-    }
-}
-
-#[derive(Debug)]
-struct TryBlockContextsRefMut<'a>(RefMut<'a, Vec<TryBlockContext>>);
-
-impl<'a> TryBlockContextsRefMut<'a> {
-    fn current_try_block(&mut self) -> Option<&mut TryBlockContext> {
-        self.0.last_mut()
-    }
-}
-
-#[derive(Debug, Default)]
-struct TryBlockContexts(RefCell<Vec<TryBlockContext>>);
-
-impl TryBlockContexts {
-    fn push_try_block(&self) {
-        self.0.borrow_mut().push(TryBlockContext::default());
-    }
-
-    fn pop_try_block(&self) -> Option<TryBlockContext> {
-        self.0.borrow_mut().pop()
-    }
-
-    fn borrow_mut(&self) -> TryBlockContextsRefMut {
-        TryBlockContextsRefMut(self.0.borrow_mut())
     }
 }
 
