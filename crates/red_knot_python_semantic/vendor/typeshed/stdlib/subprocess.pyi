@@ -2582,6 +2582,11 @@ else:
 def list2cmdline(seq: Iterable[StrOrBytesPath]) -> str: ...  # undocumented
 
 if sys.platform == "win32":
+    if sys.version_info >= (3, 13):
+        from _winapi import STARTF_FORCEOFFFEEDBACK, STARTF_FORCEONFEEDBACK
+
+        __all__ += ["STARTF_FORCEOFFFEEDBACK", "STARTF_FORCEONFEEDBACK"]
+
     class STARTUPINFO:
         def __init__(
             self,

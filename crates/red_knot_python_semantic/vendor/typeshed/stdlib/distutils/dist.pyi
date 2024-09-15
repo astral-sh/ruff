@@ -270,7 +270,7 @@ class Distribution:
     def has_data_files(self) -> bool: ...
     def is_pure(self) -> bool: ...
 
-    # Getter methods generated in __init__
+    # Default getter methods generated in __init__ from self.metadata._METHOD_BASENAMES
     def get_name(self) -> str: ...
     def get_version(self) -> str: ...
     def get_fullname(self) -> str: ...
@@ -292,3 +292,26 @@ class Distribution:
     def get_requires(self) -> list[str]: ...
     def get_provides(self) -> list[str]: ...
     def get_obsoletes(self) -> list[str]: ...
+
+    # Default attributes generated in __init__ from self.display_option_names
+    help_commands: bool | Literal[0]
+    name: str | Literal[0]
+    version: str | Literal[0]
+    fullname: str | Literal[0]
+    author: str | Literal[0]
+    author_email: str | Literal[0]
+    maintainer: str | Literal[0]
+    maintainer_email: str | Literal[0]
+    contact: str | Literal[0]
+    contact_email: str | Literal[0]
+    url: str | Literal[0]
+    license: str | Literal[0]
+    licence: str | Literal[0]
+    description: str | Literal[0]
+    long_description: str | Literal[0]
+    platforms: str | list[str] | Literal[0]
+    classifiers: str | list[str] | Literal[0]
+    keywords: str | list[str] | Literal[0]
+    provides: list[str] | Literal[0]
+    requires: list[str] | Literal[0]
+    obsoletes: list[str] | Literal[0]

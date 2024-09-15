@@ -16,6 +16,10 @@ TOKEN_ENDS: Final[set[str]]
 ASPECIALS: Final[set[str]]
 ATTRIBUTE_ENDS: Final[set[str]]
 EXTENDED_ATTRIBUTE_ENDS: Final[set[str]]
+# Added in Python 3.8.20, 3.9.20, 3.10.15, 3.11.10, 3.12.5
+NLSET: Final[set[str]]
+# Added in Python 3.8.20, 3.9.20, 3.10.15, 3.11.10, 3.12.5
+SPECIALSNL: Final[set[str]]
 
 def quote_string(value: Any) -> str: ...
 
