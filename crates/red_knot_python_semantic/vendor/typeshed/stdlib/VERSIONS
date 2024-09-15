@@ -41,7 +41,7 @@ _json: 3.0-
 _locale: 3.0-
 _lsprof: 3.0-
 _markupbase: 3.0-
-_msi: 3.0-
+_msi: 3.0-3.12
 _operator: 3.4-
 _osx_support: 3.0-
 _posixsubprocess: 3.2-

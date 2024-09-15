@@ -3,12 +3,34 @@ from collections.abc import Callable
 from email.errors import MessageDefect
 from email.header import Header
 from email.message import Message
-from typing import Any
 from typing_extensions import Self
 
 class _PolicyBase:
-    def __add__(self, other: Any) -> Self: ...
-    def clone(self, **kw: Any) -> Self: ...
+    def __init__(
+        self,
+        *,
+        max_line_length: int | None = 78,
+        linesep: str = "\n",
+        cte_type: str = "8bit",
+        raise_on_defect: bool = False,
+        mangle_from_: bool = ...,  # default depends on sub-class
+        message_factory: Callable[[Policy], Message] | None = None,
+        # Added in Python 3.8.20, 3.9.20, 3.10.15, 3.11.10, 3.12.5
+        verify_generated_headers: bool = True,
+    ) -> None: ...
+    def clone(
+        self,
+        *,
+        max_line_length: int | None = ...,
+        linesep: str = ...,
+        cte_type: str = ...,
+        raise_on_defect: bool = ...,
+        mangle_from_: bool = ...,
+        message_factory: Callable[[Policy], Message] | None = ...,
+        # Added in Python 3.8.20, 3.9.20, 3.10.15, 3.11.10, 3.12.5
+        verify_generated_headers: bool = ...,
+    ) -> Self: ...
+    def __add__(self, other: Policy) -> Self: ...
 
 class Policy(_PolicyBase, metaclass=ABCMeta):
     max_line_length: int | None
@@ -17,16 +39,9 @@ class Policy(_PolicyBase, metaclass=ABCMeta):
     raise_on_defect: bool
     mangle_from_: bool
     message_factory: Callable[[Policy], Message] | None
-    def __init__(
-        self,
-        *,
-        max_line_length: int | None = 78,
-        linesep: str = "\n",
-        cte_type: str = "8bit",
-        raise_on_defect: bool = False,
-        mangle_from_: bool = False,
-        message_factory: Callable[[Policy], Message] | None = None,
-    ) -> None: ...
+    # Added in Python 3.8.20, 3.9.20, 3.10.15, 3.11.10, 3.12.5
+    verify_generated_headers: bool
+
     def handle_defect(self, obj: Message, defect: MessageDefect) -> None: ...
     def register_defect(self, obj: Message, defect: MessageDefect) -> None: ...
     def header_max_count(self, name: str) -> int | None: ...
