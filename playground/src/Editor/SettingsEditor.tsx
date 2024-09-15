@@ -125,7 +125,7 @@ function stripToolRuff(settings: object) {
   const { tool, ...nonToolSettings } = settings as any;
 
   // Flatten out `tool.ruff.x` to just `x`
-  if (typeof tool == "object" && !Array.isArray(tool)) {
+  if (typeof tool === "object" && !Array.isArray(tool)) {
     if (tool.ruff != null) {
       return { ...nonToolSettings, ...tool.ruff };
     }

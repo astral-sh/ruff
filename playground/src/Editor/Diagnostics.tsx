@@ -17,7 +17,7 @@ export default function Diagnostics({
   const diagnostics = useMemo(() => {
     const sorted = [...unsorted];
     sorted.sort((a, b) => {
-      if (a.location.row == b.location.row) {
+      if (a.location.row === b.location.row) {
         return a.location.column - b.location.column;
       }
 

@@ -63,6 +63,7 @@ export default function Editor({
       }
     },
   );
+  const [selection, setSelection] = useState<number | null>(null);
 
   // Ideally this would be retrieved right from the URL... but routing without a proper
   // router is hard (there's no location changed event) and pulling in a router
@@ -92,14 +93,40 @@ export default function Editor({
       return;
     }
 
-    const position = { lineNumber: line, column };
-    editor.revealPosition(position);
-    editor.setPosition(position);
+    const range = {
+      startLineNumber: line,
+      startColumn: column,
+      endLineNumber: line,
+      endColumn: column,
+    };
+    editor.revealRange(range);
+    editor.setSelection(range);
   }, []);
 
   const handleSourceEditorMount = useCallback(
     (editor: IStandaloneCodeEditor) => {
       editorRef.current = editor;
+
+      editor.addAction({
+        contextMenuGroupId: "navigation",
+        contextMenuOrder: 0,
+        id: "reveal-node",
+        label: "Reveal node",
+        precondition: "editorTextFocus",
+
+        run(editor: editor.ICodeEditor): void | Promise<void> {
+          const position = editor.getPosition();
+          if (position == null) {
+            return;
+          }
+
+          const offset = editor.getModel()!.getOffsetAt(position);
+
+          setSelection(
+            charOffsetToByteOffset(editor.getModel()!.getValue(), offset),
+          );
+        },
+      });
     },
     [],
   );
@@ -261,7 +288,8 @@ export default function Editor({
                 theme={theme}
                 tool={secondaryTool}
                 result={checkResult.secondary}
-                onSelectSourceByteRange={handleSelectByteRange}
+                selectionOffset={selection}
+                onSourceByteRangeClicked={handleSelectByteRange}
               />
             </Panel>
           </>
@@ -308,4 +336,12 @@ function byteOffsetToCharOffset(content: string, byteOffset: number): number {
   const decoder = new TextDecoder("utf-8");
   const decodedString = decoder.decode(slicedBytes);
   return decodedString.length;
+}
+
+function charOffsetToByteOffset(content: string, charOffset: number): number {
+  // Create a Uint8Array from the UTF-8 string
+  const encoder = new TextEncoder();
+  const utf8Bytes = encoder.encode(content.substring(0, charOffset));
+
+  return utf8Bytes.length;
 }

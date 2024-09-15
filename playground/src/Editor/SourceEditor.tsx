@@ -2,8 +2,6 @@
  * Editor for the Python source code.
  */
 
-// Array<{ offset: { start, end }, secondaryRange: Range }>
-
 import MonacoEditor, { Monaco, OnMount } from "@monaco-editor/react";
 import {
   editor,
@@ -107,7 +105,7 @@ export default function SourceEditor({
         fontSize: 14,
         roundedSelection: false,
         scrollBeyondLastLine: false,
-        contextmenu: false,
+        contextmenu: true,
       }}
       language={"python"}
       wrapperProps={visible ? {} : { style: { display: "none" } }}

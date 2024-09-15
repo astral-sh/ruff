@@ -1,9 +1,7 @@
 import { Theme } from "./theme";
 import { useCallback, useEffect, useState } from "react";
-import { editor } from "monaco-editor";
+import { editor, Range } from "monaco-editor";
 import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;
-import IModel = editor.IModel;
-import IModelDeltaDecoration = editor.IModelDeltaDecoration;
 import MonacoEditor from "@monaco-editor/react";
 
 export enum SecondaryTool {
@@ -23,14 +21,16 @@ export type SecondaryPanelProps = {
   tool: SecondaryTool;
   result: SecondaryPanelResult;
   theme: Theme;
-  onSelectSourceByteRange(start: number, end: number): void;
+  selectionOffset: number | null;
+  onSourceByteRangeClicked(start: number, end: number): void;
 };
 
 export default function SecondaryPanel({
   tool,
   result,
   theme,
-  onSelectSourceByteRange,
+  selectionOffset,
+  onSourceByteRangeClicked,
 }: SecondaryPanelProps) {
   return (
     <div className="flex flex-col h-full">
@@ -39,7 +39,8 @@ export default function SecondaryPanel({
           tool={tool}
           result={result}
           theme={theme}
-          onSelectSourceByteRange={onSelectSourceByteRange}
+          selectionOffset={selectionOffset}
+          onSourceByteRangeClicked={onSourceByteRangeClicked}
         />
       </div>
     </div>
@@ -50,14 +51,38 @@ function Content({
   tool,
   result,
   theme,
-  onSelectSourceByteRange,
+  selectionOffset,
+  onSourceByteRangeClicked,
 }: {
   tool: SecondaryTool;
   result: SecondaryPanelResult;
   theme: Theme;
-  onSelectSourceByteRange(start: number, end: number): void;
+  selectionOffset: number | null;
+  onSourceByteRangeClicked(start: number, end: number): void;
 }) {
   const [editor, setEditor] = useState<IStandaloneCodeEditor | null>(null);
+  const [prevSelection, setPrevSelection] = useState<number | null>(null);
+  const [ranges, setRanges] = useState<
+    Array<{ byteRange: { start: number; end: number }; textRange: Range }>
+  >([]);
+
+  if (
+    editor != null &&
+    selectionOffset != null &&
+    selectionOffset !== prevSelection
+  ) {
+    const range = ranges.findLast(
+      (range) =>
+        range.byteRange.start <= selectionOffset &&
+        range.byteRange.end >= selectionOffset,
+    );
+
+    if (range != null) {
+      editor.revealRange(range.textRange);
+      editor.setSelection(range.textRange);
+    }
+    setPrevSelection(selectionOffset);
+  }
 
   useEffect(() => {
     const model = editor?.getModel();
@@ -70,7 +95,7 @@ function Content({
         return;
       }
 
-      const byteRange = model
+      const range = model
         .getDecorationsInRange(
           event.target.range,
           undefined,
@@ -79,46 +104,78 @@ function Content({
           false,
         )
         .map((decoration) => {
-          const text = model.getValueInRange(decoration.range);
-          const match = text.match(/^(\d+)\.\.(\d+)$/);
+          const decorationRange = decoration.range;
+          return ranges.find((range) =>
+            Range.equalsRange(range.textRange, decorationRange),
+          );
+        })
+        .find((range) => range != null);
 
-          const startByteOffset = parseInt(match?.[1] ?? "", 10);
-          const endByteOffset = parseInt(match?.[2] ?? "", 10);
+      if (range == null) {
+        return;
+      }
+
+      onSourceByteRangeClicked(range.byteRange.start, range.byteRange.end);
+    });
+
+    return () => handler.dispose();
+  }, [editor, onSourceByteRangeClicked, ranges]);
+
+  const handleDidMount = useCallback((editor: IStandaloneCodeEditor) => {
+    setEditor(editor);
+
+    const model = editor.getModel();
+    const collection = editor.createDecorationsCollection([]);
+
+    function updateRanges() {
+      if (model == null) {
+        setRanges([]);
+        collection.set([]);
+        return;
+      }
+
+      const matches = model.findMatches(
+        String.raw`(\d+)\.\.(\d+)`,
+        false,
+        true,
+        false,
+        ",",
+        true,
+      );
+
+      const ranges = matches
+        .map((match) => {
+          const startByteOffset = parseInt(match.matches![1] ?? "", 10);
+          const endByteOffset = parseInt(match.matches![2] ?? "", 10);
 
           if (Number.isNaN(startByteOffset) || Number.isNaN(endByteOffset)) {
             return null;
           }
 
-          return { start: startByteOffset, end: endByteOffset };
+          return {
+            byteRange: { start: startByteOffset, end: endByteOffset },
+            textRange: match.range,
+          };
         })
-        .find((range) => range != null);
+        .filter((range) => range != null);
 
-      if (byteRange == null) {
-        return;
-      }
+      setRanges(ranges);
 
-      onSelectSourceByteRange(byteRange.start, byteRange.end);
-    });
+      const decorations = ranges.map((range) => {
+        return {
+          range: range.textRange,
+          options: {
+            inlineClassName:
+              "underline decoration-slate-600 decoration-1 cursor-pointer",
+          },
+        };
+      });
 
-    return () => handler.dispose();
-  }, [editor, onSelectSourceByteRange]);
-
-  const handleDidMount = useCallback((editor: IStandaloneCodeEditor) => {
-    setEditor(editor);
-
-    const model = editor?.getModel();
-
-    if (editor == null || model == null) {
-      return;
+      collection.set(decorations);
     }
 
-    const collection = editor.createDecorationsCollection(
-      createRangeDecorations(model),
-    );
-
-    const handler = model.onDidChangeContent(() => {
-      collection.set(createRangeDecorations(model));
-    });
+    updateRanges();
+    const handler = editor.onDidChangeModelContent(updateRanges);
 
     return () => handler.dispose();
   }, []);
@@ -171,25 +228,4 @@ function Content({
         return <code className="whitespace-pre-wrap">{result.error}</code>;
     }
   }
-}
-
-function createRangeDecorations(model: IModel): Array<IModelDeltaDecoration> {
-  const byteRanges = model.findMatches(
-    String.raw`(\d+)\.\.(\d+)`,
-    false,
-    true,
-    false,
-    ",",
-    false,
-  );
-
-  return byteRanges.map((match) => {
-    return {
-      range: match.range,
-      options: {
-        inlineClassName:
-          "underline decoration-slate-600 decoration-1 cursor-pointer",
-      },
-    };
-  });
 }
