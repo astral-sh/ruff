@@ -502,13 +502,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    /*
-    if !declared_ty.is_equivalent_to(self.db, other_declared_ty) {
-        check_compat = false;
-        break;
-    }
-    */
-
     fn add_binding(&mut self, node: AnyNodeRef, binding: Definition<'db>, ty: Type<'db>) {
         debug_assert!(binding.is_binding(self.db));
         let use_def = self.index.use_def_map(binding.file_scope(self.db));

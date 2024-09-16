@@ -308,7 +308,7 @@ impl<'db> UseDefMap<'db> {
         if let SymbolDefinitions::Declarations(declarations) =
             &self.definitions_by_definition[&binding]
         {
-            self.declarations_iterator(declarations, declarations.may_be_undeclared())
+            self.declarations_iterator(declarations)
         } else {
             unreachable!("Binding has non-Declarations in definitions_by_definition");
         }
@@ -319,7 +319,7 @@ impl<'db> UseDefMap<'db> {
         symbol: ScopedSymbolId,
     ) -> DeclarationsIterator<'_, 'db> {
         let declarations = self.public_symbols[symbol].declarations();
-        self.declarations_iterator(declarations, declarations.may_be_undeclared())
+        self.declarations_iterator(declarations)
     }
 
     pub(crate) fn has_public_declarations(&self, symbol: ScopedSymbolId) -> bool {
@@ -340,12 +340,11 @@ impl<'db> UseDefMap<'db> {
     fn declarations_iterator<'a>(
         &'a self,
         declarations: &'a SymbolDeclarations,
-        may_be_undeclared: bool,
     ) -> DeclarationsIterator<'a, 'db> {
         DeclarationsIterator {
             all_definitions: &self.all_definitions,
             inner: declarations.iter(),
-            may_be_undeclared,
+            may_be_undeclared: declarations.may_be_undeclared(),
         }
     }
 }

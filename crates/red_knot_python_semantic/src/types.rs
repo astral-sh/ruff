@@ -41,11 +41,7 @@ pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
 }
 
 /// Infer the public type of a symbol (its type as seen from outside its scope).
-pub(crate) fn symbol_ty_by_id<'db>(
-    db: &'db dyn Db,
-    scope: ScopeId<'db>,
-    symbol: ScopedSymbolId,
-) -> Type<'db> {
+fn symbol_ty_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymbolId) -> Type<'db> {
     let _span = tracing::trace_span!("symbol_ty_by_id", ?symbol).entered();
 
     let use_def = use_def_map(db, scope);
@@ -67,7 +63,7 @@ pub(crate) fn symbol_ty_by_id<'db>(
 }
 
 /// Shorthand for `symbol_ty` that takes a symbol name instead of an ID.
-pub(crate) fn symbol_ty<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Type<'db> {
+fn symbol_ty<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Type<'db> {
     let table = symbol_table(db, scope);
     table
         .symbol_id_by_name(name)
@@ -87,7 +83,7 @@ pub(crate) fn binding_ty<'db>(db: &'db dyn Db, definition: Definition<'db>) -> T
 }
 
 /// Infer the type of a declaration.
-pub(crate) fn declaration_ty<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Type<'db> {
+fn declaration_ty<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Type<'db> {
     let inference = infer_definition_types(db, definition);
     inference.declaration_ty(definition)
 }
@@ -96,7 +92,7 @@ pub(crate) fn declaration_ty<'db>(db: &'db dyn Db, definition: Definition<'db>) 
 ///
 /// ## Panics
 /// If the given expression is not a sub-expression of the given [`Definition`].
-pub(crate) fn definition_expression_ty<'db>(
+fn definition_expression_ty<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
     expression: &ast::Expr,
@@ -125,7 +121,7 @@ pub(crate) fn definition_expression_ty<'db>(
 /// Will panic if called with zero bindings and no `unbound_ty`. This is a logic error, as any
 /// symbol with zero visible bindings clearly may be unbound, and the caller should provide an
 /// `unbound_ty`.
-pub(crate) fn bindings_ty<'db>(
+fn bindings_ty<'db>(
     db: &'db dyn Db,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
     unbound_ty: Option<Type<'db>>,
@@ -174,7 +170,7 @@ pub(crate) fn bindings_ty<'db>(
 ///
 /// # Panics
 /// Will panic if there are no declarations and no possibility of undeclared. This is a logic
-/// error, as any symbol with zero live declarations clearly may (must!) be undeclared.
+/// error, as any symbol with zero live declarations clearly must be undeclared.
 fn declarations_ty<'db>(
     db: &'db dyn Db,
     declarations: DeclarationsIterator<'_, 'db>,
