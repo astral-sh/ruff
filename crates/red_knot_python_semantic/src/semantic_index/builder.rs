@@ -31,7 +31,9 @@ use super::definition::{
     DefinitionCategory, ExceptHandlerDefinitionNodeRef, MatchPatternDefinitionNodeRef,
     WithItemDefinitionNodeRef,
 };
-use super::except_handlers::{TryBlockContexts, TryBlockContextsStack};
+use except_handlers::{TryBlockContexts, TryBlockContextsRefMut, TryBlockContextsStack};
+
+mod except_handlers;
 
 pub(super) struct SemanticIndexBuilder<'db> {
     // Builder state
@@ -98,6 +100,12 @@ impl<'db> SemanticIndexBuilder<'db> {
 
     fn try_block_contexts(&self) -> &TryBlockContexts {
         self.try_block_contexts_stack.current_try_block_context()
+    }
+
+    fn try_block_contexts_mut(&self) -> TryBlockContextsRefMut {
+        self.try_block_contexts_stack
+            .current_try_block_context()
+            .borrow_mut()
     }
 
     fn push_scope(&mut self, node: NodeWithScopeRef) {
@@ -167,7 +175,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         &mut self.ast_ids[scope_id]
     }
 
-    pub(super) fn flow_snapshot(&self) -> FlowSnapshot {
+    fn flow_snapshot(&self) -> FlowSnapshot {
         self.current_use_def_map().snapshot()
     }
 
@@ -232,8 +240,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             DefinitionCategory::Binding => use_def.record_binding(symbol, definition),
         }
 
-        if let Some(current_try_block) = self.try_block_contexts().borrow_mut().current_try_block()
-        {
+        if let Some(current_try_block) = self.try_block_contexts_mut().current_try_block() {
             current_try_block.record_definition(self);
         }
 
@@ -533,6 +540,7 @@ where
 
                         builder.push_scope(NodeWithScopeRef::Class(class));
                         builder.visit_body(&class.body);
+
                         builder.pop_scope()
                     },
                 );
@@ -783,7 +791,7 @@ where
                 if let Some(parent_try_block) =
                     self.try_block_contexts().borrow_mut().current_try_block()
                 {
-                    parent_try_block.record_visiting_nested_try_stmt();
+                    parent_try_block.enter_nested_try_stmt();
                 }
                 self.flow_restore(pre_try_block_state);
                 for state in visiting_try_block_states.snapshots() {
@@ -877,10 +885,8 @@ where
                 // Account for the fact that we could be visiting a nested `try` block,
                 // in which case the outer `try` block must be kept informed about all the possible
                 // between-definition states we could have encountered in the inner `try` block(!)
-                if let Some(current_try_block) =
-                    self.try_block_contexts().borrow_mut().current_try_block()
-                {
-                    current_try_block.record_exiting_nested_try_stmt();
+                if let Some(current_try_block) = self.try_block_contexts_mut().current_try_block() {
+                    current_try_block.exit_nested_try_stmt();
                     current_try_block.record_definition(self);
                 }
             }

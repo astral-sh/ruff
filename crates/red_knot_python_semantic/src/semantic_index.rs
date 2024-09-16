@@ -23,7 +23,6 @@ pub mod ast_ids;
 mod builder;
 pub(crate) mod constraint;
 pub mod definition;
-mod except_handlers;
 pub mod expression;
 pub mod symbol;
 mod use_def;
