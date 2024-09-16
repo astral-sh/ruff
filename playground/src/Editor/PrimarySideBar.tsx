@@ -18,7 +18,7 @@ export default function PrimarySideBar({
         title="Source"
         position={"left"}
         onClick={() => onSelectTool("Source")}
-        selected={selected == "Source"}
+        selected={selected === "Source"}
       >
         <FileIcon />
       </SideBarEntry>
@@ -27,7 +27,7 @@ export default function PrimarySideBar({
         title="Settings"
         position={"left"}
         onClick={() => onSelectTool("Settings")}
-        selected={selected == "Settings"}
+        selected={selected === "Settings"}
       >
         <SettingsIcon />
       </SideBarEntry>

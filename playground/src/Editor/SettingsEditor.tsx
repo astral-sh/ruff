@@ -70,7 +70,7 @@ export default function SettingsEditor({
         await navigator.clipboard.writeText(tomlSettings);
       },
     });
-    editor.onDidPaste((event) => {
+    const didPaste = editor.onDidPaste((event) => {
       const model = editor.getModel();
 
       if (model == null) {
@@ -97,6 +97,8 @@ export default function SettingsEditor({
         }
       }
     });
+
+    return () => didPaste.dispose();
   }, []);
 
   return (
@@ -123,7 +125,7 @@ function stripToolRuff(settings: object) {
   const { tool, ...nonToolSettings } = settings as any;
 
   // Flatten out `tool.ruff.x` to just `x`
-  if (typeof tool == "object" && !Array.isArray(tool)) {
+  if (typeof tool === "object" && !Array.isArray(tool)) {
     if (tool.ruff != null) {
       return { ...nonToolSettings, ...tool.ruff };
     }
