@@ -42,9 +42,9 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
     )
 ))]
 #[allow(non_upper_case_globals)]
-#[export_name = "malloc_conf"]
+#[export_name = "_rjem_malloc_conf"]
 #[allow(unsafe_code)]
-pub static malloc_conf: &[u8] = b"dirty_decay_ms:-1,muzzy_decay_ms:-1\0";
+pub static _rjem_malloc_conf: &[u8] = b"dirty_decay_ms:-1,muzzy_decay_ms:-1\0";
 
 fn create_test_cases() -> Result<Vec<TestCase>, TestFileDownloadError> {
     Ok(vec![
