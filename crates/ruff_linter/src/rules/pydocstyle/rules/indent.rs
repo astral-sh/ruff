@@ -291,10 +291,21 @@ pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
             let line_indent = leading_space(last);
             let line_indent_size = line_indent.chars().count();
             if line_indent_size > docstring_indent_size {
+                let mut offset_len = line_indent.text_len();
+                // When a non-space character is on the last line, the trailing quotes are also on the same line.
+                // No diagnostic is added if the indentation difference equals the indent size.
+                if last.chars().any(|c| !c.is_whitespace()) {
+                    let prev_line_indent = leading_space(&lines[lines.len() - 2]);
+                    let prev_line_indent_size = prev_line_indent.chars().count();
+                    if line_indent_size - prev_line_indent_size == docstring_indent_size {
+                        return;
+                    }
+                    offset_len = line_indent.text_len() - prev_line_indent.text_len();
+                }
                 let mut diagnostic =
                     Diagnostic::new(OverIndentation, TextRange::empty(last.start()));
                 let indent = clean_space(docstring.indentation);
-                let range = TextRange::at(last.start(), line_indent.text_len());
+                let range = TextRange::at(last.start(), offset_len);
                 let edit = if indent.is_empty() {
                     Edit::range_deletion(range)
                 } else {
