@@ -70,3 +70,47 @@ async def async_function(self): ...
 
 @decorated
 async def async_function(self): ...
+
+
+class ClassA:
+    def f(self): ...
+
+
+class ClassB:
+    def f(self): ...
+
+
+class ClassC:
+    def f(self):
+
+        ...
+        # Comment
+
+
+class ClassD:
+    def f(self):  # Comment 1
+
+        ...  # Comment 2
+        # Comment 3
+
+
+class ClassE:
+    def f(self): ...
+    def f2(self):
+        print(10)
+
+
+class ClassF:
+    def f(self): ...  # Comment 2
+
+
+class ClassG:
+    def f(self):  # Comment 1
+        ...  # Comment 2
+
+
+class ClassH:
+    def f(self):
+        # Comment
+
+        ...
