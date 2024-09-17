@@ -1,4 +1,6 @@
 # single-line failures
+
+var, table, val, var2, x = "", "", "", "", ""
 query1 = "SELECT %s FROM table" % (var,) # bad
 query2 = "SELECT var FROM " + table
 query3 = "SELECT " + val + " FROM " + table
@@ -79,6 +81,7 @@ def query41():
         f"WHERE var = {var}"
     )
 
+cursor = None
 # # cursor-wrapped failures
 query42 = cursor.execute("SELECT * FROM table WHERE var = %s" % var)
 query43 = cursor.execute(f"SELECT * FROM table WHERE var = {var}")
@@ -110,3 +113,49 @@ query = "Deselect something that is not SQL even though it has a ' from ' somewh
 # # errors
 "SELECT * FROM " + ("table1" if x > 0 else "table2")
 "SELECT * FROM " + ("table1" if x > 0 else ["table2"])
+
+# test cases from #12044
+
+def sql():
+    foo = "foo"
+
+    query = f"""
+SELECT {foo}
+    FROM bar
+    """
+
+def sql():
+    foo = "foo"
+    query = f"""
+    SELECT
+        {foo}
+    FROM bar
+    """
+
+def sql():
+    foo = "foo"
+    query = f"""
+    SELECT {foo}
+    FROM
+        bar
+    """
+
+
+foo = "foo"
+
+f"""SELECT * FROM 
+{foo}.table
+"""
+
+f"""SELECT *
+FROM {foo}.table
+"""
+
+f"""
+SELECT *
+FROM {foo}.table
+"""
+
+
+f"SELECT\
+ * FROM {foo}.table"
