@@ -142,52 +142,28 @@ variable: (
  ): ...
  
  
-@@ -143,34 +141,31 @@
- 
- 
- def foo(
--    arg: (  # comment with non-return annotation
--        int
--        # comment with non-return annotation
--    ),
-+    # comment with non-return annotation
-+    # comment with non-return annotation
-+    arg: (int),
- ):
-     pass
- 
+@@ -153,16 +151,18 @@
  
  def foo(
--    arg: (  # comment with non-return annotation
+     arg: (  # comment with non-return annotation
 -        int
 -        | range
 -        | memoryview
--        # comment with non-return annotation
--    ),
-+    # comment with non-return annotation
-+    # comment with non-return annotation
-+    arg: (int | range | memoryview),
++        int | range | memoryview
+         # comment with non-return annotation
+     ),
  ):
      pass
  
  
 -def foo(arg: int):  # only before
 +def foo(
-+    # only before
-+    arg: (int),
++    arg: (  # only before
++        int
++    ),
 +):
      pass
  
- 
- def foo(
--    arg: (
--        int
--        # only after
--    ),
-+    # only after
-+    arg: (int),
- ):
-     pass
  
 ```
 
@@ -337,31 +313,36 @@ def foo() -> (
 
 
 def foo(
-    # comment with non-return annotation
-    # comment with non-return annotation
-    arg: (int),
+    arg: (  # comment with non-return annotation
+        int
+        # comment with non-return annotation
+    ),
 ):
     pass
 
 
 def foo(
-    # comment with non-return annotation
-    # comment with non-return annotation
-    arg: (int | range | memoryview),
+    arg: (  # comment with non-return annotation
+        int | range | memoryview
+        # comment with non-return annotation
+    ),
 ):
     pass
 
 
 def foo(
-    # only before
-    arg: (int),
+    arg: (  # only before
+        int
+    ),
 ):
     pass
 
 
 def foo(
-    # only after
-    arg: (int),
+    arg: (
+        int
+        # only after
+    ),
 ):
     pass
 

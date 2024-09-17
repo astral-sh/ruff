@@ -203,8 +203,11 @@ fn handle_enclosed_comment<'a>(
             })
         }
         AnyNodeRef::Parameter(parameter) => {
-            // E.g. a comment between the `*` or `**` and the parameter name.
-            if comment.preceding_node().is_none() || comment.following_node().is_none() {
+            let is_arg_or_kwarg = locator.slice(parameter.range()).starts_with('*');
+
+            // A comment between the `*` or `**` and the parameter name.
+            // Move the comment before the node.
+            if is_arg_or_kwarg && comment.preceding_node().is_none() {
                 CommentPlacement::leading(parameter, comment)
             } else {
                 CommentPlacement::Default(comment)
