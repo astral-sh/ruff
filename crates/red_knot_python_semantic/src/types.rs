@@ -513,11 +513,14 @@ impl<'db> Type<'db> {
     /// for y in x:
     ///     pass
     /// ```
-    fn iterate(&self, db: &'db dyn Db) -> IterationOutcome<'db> {
+    /// Return None and emit a diagnostic if this type is not iterable.
+    fn iterate(
+        &self,
+        db: &'db dyn Db,
+        context: &mut TypeInferenceContext<'db>,
+    ) -> Option<Type<'db>> {
         if let Type::Tuple(tuple_type) = self {
-            return IterationOutcome::Iterable {
-                element_ty: UnionType::from_elements(db, &**tuple_type.elements(db)),
-            };
+            return Some(UnionType::from_elements(db, &**tuple_type.elements(db)));
         }
 
         // `self` represents the type of the iterable;
@@ -527,18 +530,15 @@ impl<'db> Type<'db> {
         let dunder_iter_method = iterable_meta_type.member(db, "__iter__");
         if !dunder_iter_method.is_unbound() {
             let Some(iterator_ty) = dunder_iter_method.call(db) else {
-                return IterationOutcome::NotIterable {
-                    not_iterable_ty: *self,
-                };
+                context.not_iterable_diagnostic(*self);
+                return None;
             };
 
             let dunder_next_method = iterator_ty.to_meta_type(db).member(db, "__next__");
-            return dunder_next_method
-                .call(db)
-                .map(|element_ty| IterationOutcome::Iterable { element_ty })
-                .unwrap_or(IterationOutcome::NotIterable {
-                    not_iterable_ty: *self,
-                });
+            return dunder_next_method.call(db).or_else(|| {
+                context.not_iterable_diagnostic(*self);
+                None
+            });
         }
 
         // Although it's not considered great practice,
@@ -549,12 +549,10 @@ impl<'db> Type<'db> {
         // accepting `int` or `SupportsIndex`
         let dunder_get_item_method = iterable_meta_type.member(db, "__getitem__");
 
-        dunder_get_item_method
-            .call(db)
-            .map(|element_ty| IterationOutcome::Iterable { element_ty })
-            .unwrap_or(IterationOutcome::NotIterable {
-                not_iterable_ty: *self,
-            })
+        dunder_get_item_method.call(db).or_else(|| {
+            context.not_iterable_diagnostic(*self);
+            None
+        })
     }
 
     #[must_use]
@@ -616,27 +614,6 @@ impl<'db> Type<'db> {
 impl<'db> From<&Type<'db>> for Type<'db> {
     fn from(value: &Type<'db>) -> Self {
         *value
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum IterationOutcome<'db> {
-    Iterable { element_ty: Type<'db> },
-    NotIterable { not_iterable_ty: Type<'db> },
-}
-
-impl<'db> IterationOutcome<'db> {
-    fn unwrap_with_diagnostic(
-        self,
-        inference_context: &mut TypeInferenceContext<'db>,
-    ) -> Type<'db> {
-        match self {
-            Self::Iterable { element_ty } => element_ty,
-            Self::NotIterable { not_iterable_ty } => {
-                inference_context.not_iterable_diagnostic(not_iterable_ty);
-                Type::Unknown
-            }
-        }
     }
 }
 

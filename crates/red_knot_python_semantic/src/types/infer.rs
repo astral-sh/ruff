@@ -1200,8 +1200,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             Type::Unknown
         } else {
             iterable_ty
-                .iterate(self.db)
-                .unwrap_with_diagnostic(&mut self.context)
+                .iterate(self.db, &mut self.context)
+                .unwrap_or(Type::Unknown)
         };
 
         self.context.add_expression_ty(target, loop_var_value_ty);
@@ -1862,8 +1862,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             Type::Unknown
         } else {
             iterable_ty
-                .iterate(self.db)
-                .unwrap_with_diagnostic(&mut self.context)
+                .iterate(self.db, &mut self.context)
+                .unwrap_or(Type::Unknown)
         };
 
         self.context.add_expression_ty(target, target_ty);
@@ -1970,8 +1970,8 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let iterable_ty = self.infer_expression(value);
         iterable_ty
-            .iterate(self.db)
-            .unwrap_with_diagnostic(&mut self.context);
+            .iterate(self.db, &mut self.context)
+            .unwrap_or(Type::Unknown);
 
         // TODO
         Type::Unknown
@@ -1991,8 +1991,8 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let iterable_ty = self.infer_expression(value);
         iterable_ty
-            .iterate(self.db)
-            .unwrap_with_diagnostic(&mut self.context);
+            .iterate(self.db, &mut self.context)
+            .unwrap_or(Type::Unknown);
 
         // TODO get type from `ReturnType` of generator
         Type::Unknown
