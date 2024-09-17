@@ -496,30 +496,38 @@ impl<'db> Type<'db> {
     ///
     /// Returns `None` if `self` is not a callable type.
     #[must_use]
-    pub fn call(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+    fn call(self, db: &'db dyn Db, arg_types: &[Type<'db>]) -> CallOutcome<'db> {
         match self {
-            Type::Function(function_type) => Some(function_type.return_type(db)),
-            Type::RevealTypeFunction(function_type) => {
-                // TODO emit the diagnostic
-                Some(function_type.return_type(db))
-            }
+            // TODO validate typed call arguments vs callable signature
+            Type::Function(function_type) => CallOutcome::callable(function_type.return_type(db)),
+            Type::RevealTypeFunction(function_type) => CallOutcome::RevealType {
+                return_ty: function_type.return_type(db),
+                revealed_ty: *arg_types.first().unwrap_or(&Type::Unknown),
+            },
 
             // TODO annotated return type on `__new__` or metaclass `__call__`
-            Type::Class(class) => Some(Type::Instance(*class)),
+            Type::Class(class) => CallOutcome::callable(Type::Instance(class)),
 
-            // TODO: handle classes which implement the Callable protocol
-            Type::Instance(_instance_ty) => Some(Type::Unknown),
+            // TODO: handle classes which implement the `__call__` protocol
+            Type::Instance(_instance_ty) => CallOutcome::callable(Type::Unknown),
 
             // `Any` is callable, and its return type is also `Any`.
-            Type::Any => Some(Type::Any),
+            Type::Any => CallOutcome::callable(Type::Any),
 
-            Type::Unknown => Some(Type::Unknown),
+            Type::Unknown => CallOutcome::callable(Type::Unknown),
 
-            // TODO: union and intersection types, if they reduce to `Callable`
-            Type::Union(_) => Some(Type::Unknown),
-            Type::Intersection(_) => Some(Type::Unknown),
+            Type::Union(union) => CallOutcome::Union {
+                outcomes: union
+                    .elements(db)
+                    .iter()
+                    .map(|elem| elem.call(db, arg_types))
+                    .collect(),
+            },
 
-            _ => None,
+            // TODO: intersection types
+            Type::Intersection(_) => CallOutcome::callable(Type::Unknown),
+
+            _ => CallOutcome::not_callable(self),
         }
     }
 
@@ -531,7 +539,7 @@ impl<'db> Type<'db> {
     /// for y in x:
     ///     pass
     /// ```
-    fn iterate(&self, db: &'db dyn Db) -> IterationOutcome<'db> {
+    fn iterate(self, db: &'db dyn Db) -> IterationOutcome<'db> {
         if let Type::Tuple(tuple_type) = self {
             return IterationOutcome::Iterable {
                 element_ty: UnionType::from_elements(db, &**tuple_type.elements(db)),
@@ -544,18 +552,22 @@ impl<'db> Type<'db> {
 
         let dunder_iter_method = iterable_meta_type.member(db, "__iter__");
         if !dunder_iter_method.is_unbound() {
-            let Some(iterator_ty) = dunder_iter_method.call(db) else {
+            let CallOutcome::Callable {
+                return_ty: iterator_ty,
+            } = dunder_iter_method.call(db, &[])
+            else {
                 return IterationOutcome::NotIterable {
-                    not_iterable_ty: *self,
+                    not_iterable_ty: self,
                 };
             };
 
             let dunder_next_method = iterator_ty.to_meta_type(db).member(db, "__next__");
             return dunder_next_method
-                .call(db)
+                .call(db, &[])
+                .return_ty(db)
                 .map(|element_ty| IterationOutcome::Iterable { element_ty })
                 .unwrap_or(IterationOutcome::NotIterable {
-                    not_iterable_ty: *self,
+                    not_iterable_ty: self,
                 });
         }
 
@@ -568,10 +580,11 @@ impl<'db> Type<'db> {
         let dunder_get_item_method = iterable_meta_type.member(db, "__getitem__");
 
         dunder_get_item_method
-            .call(db)
+            .call(db, &[])
+            .return_ty(db)
             .map(|element_ty| IterationOutcome::Iterable { element_ty })
             .unwrap_or(IterationOutcome::NotIterable {
-                not_iterable_ty: *self,
+                not_iterable_ty: self,
             })
     }
 
@@ -635,6 +648,98 @@ impl<'db> Type<'db> {
 impl<'db> From<&Type<'db>> for Type<'db> {
     fn from(value: &Type<'db>) -> Self {
         *value
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum CallOutcome<'db> {
+    Callable {
+        return_ty: Type<'db>,
+    },
+    RevealType {
+        return_ty: Type<'db>,
+        revealed_ty: Type<'db>,
+    },
+    NotCallable {
+        not_callable_ty: Type<'db>,
+    },
+    Union {
+        outcomes: Box<[CallOutcome<'db>]>,
+    },
+}
+
+impl<'db> CallOutcome<'db> {
+    /// Create a new `CallOutcome::Callable` with given return type.
+    fn callable(return_ty: Type<'db>) -> CallOutcome {
+        CallOutcome::Callable { return_ty }
+    }
+
+    /// Create a new `CallOutcome::NotCallable` with given not-callable type.
+    fn not_callable(not_callable_ty: Type<'db>) -> CallOutcome {
+        CallOutcome::NotCallable { not_callable_ty }
+    }
+
+    /// Get the return type of the call, or `None` if not callable.
+    fn return_ty(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        match self {
+            Self::Callable { return_ty } => Some(*return_ty),
+            Self::RevealType {
+                return_ty,
+                revealed_ty: _,
+            } => Some(*return_ty),
+            Self::NotCallable { not_callable_ty: _ } => None,
+            Self::Union { outcomes } => outcomes
+                .iter()
+                .fold(None, |acc, outcome| {
+                    let ty = outcome.return_ty(db);
+                    match (acc, ty) {
+                        (None, None) => None,
+                        (None, Some(ty)) => Some(UnionBuilder::new(db).add(ty)),
+                        (Some(builder), ty) => Some(builder.add(ty.unwrap_or(Type::Unknown))),
+                    }
+                })
+                .map(UnionBuilder::build),
+        }
+    }
+
+    /// Get the return type of the call, emitting diagnostics if needed.
+    fn unwrap_with_diagnostic<'a>(
+        &self,
+        db: &'db dyn Db,
+        node: ast::AnyNodeRef,
+        builder: &'a mut TypeInferenceBuilder<'db>,
+    ) -> Type<'db> {
+        match self {
+            Self::Callable { return_ty } => *return_ty,
+            Self::RevealType {
+                return_ty,
+                revealed_ty,
+            } => {
+                builder.add_diagnostic(
+                    node,
+                    "revealed-type",
+                    format_args!("Revealed type is '{}'.", revealed_ty.display(db)),
+                );
+                *return_ty
+            }
+            Self::NotCallable { not_callable_ty } => {
+                builder.add_diagnostic(
+                    node,
+                    "call-non-callable",
+                    format_args!(
+                        "Object of type '{}' is not callable.",
+                        not_callable_ty.display(db)
+                    ),
+                );
+                Type::Unknown
+            }
+            Self::Union { outcomes } => UnionType::from_elements(
+                db,
+                outcomes
+                    .iter()
+                    .map(|outcome| outcome.unwrap_with_diagnostic(db, node, builder)),
+            ),
+        }
     }
 }
 

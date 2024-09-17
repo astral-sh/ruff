@@ -2023,19 +2023,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             arguments,
         } = call_expression;
 
-        self.infer_arguments(arguments);
+        // TODO: proper typed call signature, representing keyword args etc
+        let arg_types = self.infer_arguments(arguments);
         let function_type = self.infer_expression(func);
-        function_type.call(self.db).unwrap_or_else(|| {
-            self.add_diagnostic(
-                func.as_ref().into(),
-                "call-non-callable",
-                format_args!(
-                    "Object of type '{}' is not callable",
-                    function_type.display(self.db)
-                ),
-            );
-            Type::Unknown
-        })
+        function_type
+            .call(self.db, arg_types.as_slice())
+            .unwrap_with_diagnostic(self.db, func.as_ref().into(), self)
     }
 
     fn infer_starred_expression(&mut self, starred: &ast::ExprStarred) -> Type<'db> {
@@ -2410,7 +2403,19 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// Adds a new diagnostic.
     ///
     /// The diagnostic does not get added if the rule isn't enabled for this file.
-    fn add_diagnostic(&mut self, node: AnyNodeRef, rule: &str, message: std::fmt::Arguments) {
+    pub(super) fn add_diagnostic(
+        &mut self,
+        node: AnyNodeRef,
+        rule: &str,
+        message: std::fmt::Arguments,
+    ) {
+        self.add_diagnostic_string(node, rule, message.to_string());
+    }
+
+    /// Adds a new diagnostic with a string message.
+    ///
+    /// The diagnostic does not get added if the rule isn't enabled for this file.
+    pub(super) fn add_diagnostic_string(&mut self, node: AnyNodeRef, rule: &str, message: String) {
         if !self.db.is_file_open(self.file) {
             return;
         }
@@ -2424,7 +2429,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.types.diagnostics.push(TypeCheckDiagnostic {
             file: self.file,
             rule: rule.to_string(),
-            message: message.to_string(),
+            message,
             range: node.range(),
         });
     }
@@ -2760,7 +2765,7 @@ mod tests {
             ",
         )?;
 
-        assert_file_diagnostics(&db, "/src/a.py", &["Revealed type of 'x' is 'Literal[1]'."]);
+        assert_file_diagnostics(&db, "/src/a.py", &["Revealed type is 'Literal[1]'."]);
 
         Ok(())
     }
@@ -3368,7 +3373,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "/src/a.py",
-            &["Object of type 'Literal[123]' is not callable"],
+            &["Object of type 'Literal[123]' is not callable."],
         );
     }
 
