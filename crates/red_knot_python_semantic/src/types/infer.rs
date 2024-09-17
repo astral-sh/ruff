@@ -704,12 +704,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         }
 
-        let function_ty = Type::Function(FunctionType::new(
-            self.db,
-            name.id.clone(),
-            definition,
-            decorator_tys,
-        ));
+        let function_type = FunctionType::new(self.db, name.id.clone(), definition, decorator_tys);
+        let function_ty = if function_type.is_stdlib_symbol(self.db, "typing", "reveal_type") {
+            Type::RevealTypeFunction(function_type)
+        } else {
+            Type::Function(function_type)
+        };
 
         self.add_declaration_with_binding(function.into(), definition, function_ty, function_ty);
     }

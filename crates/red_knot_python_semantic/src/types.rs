@@ -262,6 +262,8 @@ pub enum Type<'db> {
     /// A heterogeneous tuple type, with elements of the given types in source order.
     // TODO: Support variable length homogeneous tuple type like `tuple[int, ...]`.
     Tuple(TupleType<'db>),
+    /// The `typing.reveal_type` function, which has special `__call__` behavior.
+    RevealTypeFunction(FunctionType<'db>),
     // TODO protocols, callable types, overloads, generics, type vars
 }
 
@@ -324,7 +326,9 @@ impl<'db> Type<'db> {
 
     pub const fn into_function_type(self) -> Option<FunctionType<'db>> {
         match self {
-            Type::Function(function_type) => Some(function_type),
+            Type::Function(function_type) | Type::RevealTypeFunction(function_type) => {
+                Some(function_type)
+            }
             _ => None,
         }
     }
@@ -364,6 +368,16 @@ impl<'db> Type<'db> {
                 union.map(db, |element| element.replace_unbound_with(db, replacement))
             }
             ty => *ty,
+        }
+    }
+
+    pub fn is_stdlib_symbol(&self, db: &'db dyn Db, module_name: &str, name: &str) -> bool {
+        match self {
+            Type::Class(class) => class.is_stdlib_symbol(db, module_name, name),
+            Type::Function(function) | Type::RevealTypeFunction(function) => {
+                function.is_stdlib_symbol(db, module_name, name)
+            }
+            _ => false,
         }
     }
 
@@ -436,7 +450,7 @@ impl<'db> Type<'db> {
                 // TODO: attribute lookup on None type
                 Type::Unknown
             }
-            Type::Function(_) => {
+            Type::Function(_) | Type::RevealTypeFunction(_) => {
                 // TODO: attribute lookup on function type
                 Type::Unknown
             }
@@ -485,6 +499,10 @@ impl<'db> Type<'db> {
     pub fn call(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
             Type::Function(function_type) => Some(function_type.return_type(db)),
+            Type::RevealTypeFunction(function_type) => {
+                // TODO emit the diagnostic
+                Some(function_type.return_type(db))
+            }
 
             // TODO annotated return type on `__new__` or metaclass `__call__`
             Type::Class(class) => Some(Type::Instance(*class)),
@@ -573,6 +591,7 @@ impl<'db> Type<'db> {
             Type::BooleanLiteral(_)
             | Type::BytesLiteral(_)
             | Type::Function(_)
+            | Type::RevealTypeFunction(_)
             | Type::Instance(_)
             | Type::Module(_)
             | Type::IntLiteral(_)
@@ -595,7 +614,7 @@ impl<'db> Type<'db> {
             Type::BooleanLiteral(_) => builtins_symbol_ty(db, "bool"),
             Type::BytesLiteral(_) => builtins_symbol_ty(db, "bytes"),
             Type::IntLiteral(_) => builtins_symbol_ty(db, "int"),
-            Type::Function(_) => types_symbol_ty(db, "FunctionType"),
+            Type::Function(_) | Type::RevealTypeFunction(_) => types_symbol_ty(db, "FunctionType"),
             Type::Module(_) => types_symbol_ty(db, "ModuleType"),
             Type::None => typeshed_symbol_ty(db, "NoneType"),
             // TODO not accurate if there's a custom metaclass...
@@ -654,6 +673,14 @@ pub struct FunctionType<'db> {
 }
 
 impl<'db> FunctionType<'db> {
+    /// Return true if this is a standard library function with given module name and name.
+    pub(crate) fn is_stdlib_symbol(self, db: &'db dyn Db, module_name: &str, name: &str) -> bool {
+        name == self.name(db)
+            && file_to_module(db, self.definition(db).file(db)).is_some_and(|module| {
+                module.search_path().is_standard_library() && module.name() == module_name
+            })
+    }
+
     pub fn has_decorator(self, db: &dyn Db, decorator: Type<'_>) -> bool {
         self.decorators(db).contains(&decorator)
     }
