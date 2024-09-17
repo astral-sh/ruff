@@ -128,19 +128,26 @@ impl Display for DisplayUnionType<'_> {
             }
         }
 
-        let elements = elements.iter().filter_map(|ty| {
-            if let Ok(literal_kind) = LiteralTypeKind::try_from(*ty) {
-                let mut literals = grouped_literals.remove(&literal_kind)?;
+        let mut join = f.join(" | ");
+
+        for element in elements {
+            if let Ok(literal_kind) = LiteralTypeKind::try_from(*element) {
+                let Some(mut literals) = grouped_literals.remove(&literal_kind) else {
+                    continue;
+                };
                 if literal_kind == LiteralTypeKind::IntLiteral {
                     literals.sort_unstable_by_key(|ty| ty.expect_int_literal());
                 }
-                Some(DisplayUnionElement::LiteralGroup(literals, self.db))
+                join.entry(&DisplayLiteralGroup {
+                    literals,
+                    db: self.db,
+                });
             } else {
-                Some(DisplayUnionElement::SingleType(ty.display(self.db)))
+                join.entry(&element.display(self.db));
             }
-        });
+        }
 
-        f.join(" | ").entries(elements).finish()?;
+        join.finish()?;
 
         debug_assert!(grouped_literals.is_empty());
 
@@ -154,23 +161,18 @@ impl fmt::Debug for DisplayUnionType<'_> {
     }
 }
 
-enum DisplayUnionElement<'db> {
-    LiteralGroup(Vec<Type<'db>>, &'db dyn Db),
-    SingleType(DisplayType<'db>),
+struct DisplayLiteralGroup<'db> {
+    literals: Vec<Type<'db>>,
+    db: &'db dyn Db,
 }
 
-impl Display for DisplayUnionElement<'_> {
+impl Display for DisplayLiteralGroup<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::LiteralGroup(tys, db) => {
-                f.write_str("Literal[")?;
-                f.join(", ")
-                    .entries(tys.iter().map(|ty| ty.representation(*db)))
-                    .finish()?;
-                f.write_str("]")
-            }
-            Self::SingleType(ty) => ty.fmt(f),
-        }
+        f.write_str("Literal[")?;
+        f.join(", ")
+            .entries(self.literals.iter().map(|ty| ty.representation(self.db)))
+            .finish()?;
+        f.write_str("]")
     }
 }
 
