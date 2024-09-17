@@ -745,7 +745,7 @@ impl<'db> CallOutcome<'db> {
             } => {
                 let mut not_callable = vec![];
                 let mut union_builder = UnionBuilder::new(db);
-                for outcome in outcomes {
+                for outcome in &**outcomes {
                     union_builder =
                         union_builder.add(if let Self::NotCallable { not_callable_ty } = outcome {
                             not_callable.push(*not_callable_ty);
