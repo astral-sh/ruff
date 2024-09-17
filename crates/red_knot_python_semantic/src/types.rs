@@ -51,7 +51,9 @@ fn symbol_ty_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymb
     // on inference from bindings.
     if use_def.has_public_declarations(symbol) {
         let declarations = use_def.public_declarations(symbol);
-        declarations_ty(db, declarations).declared_ty
+        // Intentionally ignore conflicting declared types; that's not our problem, it's the
+        // problem of the module we are importing from.
+        declarations_ty(db, declarations).unwrap_or_else(|(ty, _)| ty)
     } else {
         bindings_ty(
             db,
@@ -162,6 +164,8 @@ fn bindings_ty<'db>(
     }
 }
 
+type DeclaredTypeResult<'db> = Result<Type<'db>, (Type<'db>, Box<[Type<'db>]>)>;
+
 /// Build a declared type from a [`DeclarationsIterator`].
 ///
 /// Will return a union if there is more than one declaration, or at least one plus the possibility
@@ -175,7 +179,7 @@ fn bindings_ty<'db>(
 fn declarations_ty<'db>(
     db: &'db dyn Db,
     declarations: DeclarationsIterator<'_, 'db>,
-) -> DeclaredType<'db> {
+) -> DeclaredTypeResult<'db> {
     let may_be_undeclared = declarations.may_be_undeclared();
     let decl_types = declarations.map(|declaration| declaration_ty(db, declaration));
 
@@ -204,13 +208,13 @@ fn declarations_ty<'db>(
     } else {
         first
     };
-    DeclaredType {
-        declared_ty,
-        conflicting: if conflicting.is_empty() {
-            None
-        } else {
-            Some([first].into_iter().chain(conflicting).collect())
-        },
+    if conflicting.is_empty() {
+        DeclaredTypeResult::Ok(declared_ty)
+    } else {
+        DeclaredTypeResult::Err((
+            declared_ty,
+            [first].into_iter().chain(conflicting).collect(),
+        ))
     }
 }
 
@@ -610,12 +614,6 @@ impl<'db> From<&Type<'db>> for Type<'db> {
     fn from(value: &Type<'db>) -> Self {
         *value
     }
-}
-
-#[derive(Debug)]
-struct DeclaredType<'db> {
-    declared_ty: Type<'db>,
-    conflicting: Option<Box<[Type<'db>]>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

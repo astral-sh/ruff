@@ -51,7 +51,7 @@ use crate::stdlib::builtins_module_scope;
 use crate::types::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 use crate::types::{
     bindings_ty, builtins_symbol_ty, declarations_ty, global_symbol_ty, symbol_ty,
-    BytesLiteralType, ClassType, DeclaredType, FunctionType, StringLiteralType, TupleType, Type,
+    BytesLiteralType, ClassType, FunctionType, StringLiteralType, TupleType, Type,
     TypeArrayDisplay, UnionType,
 };
 use crate::Db;
@@ -507,23 +507,21 @@ impl<'db> TypeInferenceBuilder<'db> {
         let use_def = self.index.use_def_map(binding.file_scope(self.db));
         let declarations = use_def.declarations_at_binding(binding);
         let mut bound_ty = ty;
-        let DeclaredType {
-            declared_ty,
-            conflicting,
-        } = declarations_ty(self.db, declarations);
-        if let Some(conflicting) = conflicting {
-            // TODO point out the conflicting declarations in the diagnostic?
-            let symbol_table = self.index.symbol_table(binding.file_scope(self.db));
-            let symbol_name = symbol_table.symbol(binding.symbol(self.db)).name();
-            self.add_diagnostic(
-                node,
-                "conflicting-declarations",
-                format_args!(
-                    "Conflicting declared types for '{symbol_name}': {}.",
-                    conflicting.display(self.db)
-                ),
-            );
-        }
+        let declared_ty =
+            declarations_ty(self.db, declarations).unwrap_or_else(|(ty, conflicting)| {
+                // TODO point out the conflicting declarations in the diagnostic?
+                let symbol_table = self.index.symbol_table(binding.file_scope(self.db));
+                let symbol_name = symbol_table.symbol(binding.symbol(self.db)).name();
+                self.add_diagnostic(
+                    node,
+                    "conflicting-declarations",
+                    format_args!(
+                        "Conflicting declared types for '{symbol_name}': {}.",
+                        conflicting.display(self.db)
+                    ),
+                );
+                ty
+            });
         if !bound_ty.is_assignable_to(self.db, declared_ty) {
             self.invalid_assignment_diagnostic(node, declared_ty, bound_ty);
             // allow declarations to override inference in case of invalid assignment
