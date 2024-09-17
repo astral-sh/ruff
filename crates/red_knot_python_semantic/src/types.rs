@@ -164,14 +164,17 @@ fn bindings_ty<'db>(
     }
 }
 
+/// The result of looking up a declared type from declarations; see [`declarations_ty`].
 type DeclaredTypeResult<'db> = Result<Type<'db>, (Type<'db>, Box<[Type<'db>]>)>;
 
 /// Build a declared type from a [`DeclarationsIterator`].
 ///
-/// Will return a union if there is more than one declaration, or at least one plus the possibility
-/// of undeclared.
+/// If there is only one declaration, or all declarations declare the same type, returns
+/// `Ok(declared_type)`. If there are conflicting declarations, returns
+/// `Err((union_of_declared_types, conflicting_declared_types))`.
 ///
-/// If undeclared is a possibility, `Unknown` type will be part of the return type.
+/// If undeclared is a possibility, `Unknown` type will be part of the return type (and may
+/// conflict with other declarations.)
 ///
 /// # Panics
 /// Will panic if there are no declarations and no possibility of undeclared. This is a logic
