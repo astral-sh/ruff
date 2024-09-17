@@ -2,6 +2,7 @@
 
 use std::fmt::{self, Display, Formatter};
 
+use ruff_db::display::FormatterJoinExtension;
 use ruff_python_ast::str::Quote;
 use ruff_python_literal::escape::AsciiEscape;
 
@@ -280,57 +281,6 @@ impl<'db> Display for DisplayTypeArray<'_, 'db> {
         f.join(", ")
             .entries(self.types.iter().map(|ty| ty.display(self.db)))
             .finish()
-    }
-}
-
-trait FormatterJoinExtension<'b> {
-    fn join<'a>(&'a mut self, separator: &'static str) -> Join<'a, 'b>;
-}
-
-impl<'b> FormatterJoinExtension<'b> for Formatter<'b> {
-    fn join<'a>(&'a mut self, separator: &'static str) -> Join<'a, 'b> {
-        Join {
-            fmt: self,
-            separator,
-            result: fmt::Result::Ok(()),
-            seen_first: false,
-        }
-    }
-}
-
-struct Join<'a, 'b> {
-    fmt: &'a mut Formatter<'b>,
-    separator: &'static str,
-    result: fmt::Result,
-    seen_first: bool,
-}
-
-impl<'a, 'b> Join<'a, 'b> {
-    fn entry(&mut self, item: &dyn Display) -> &mut Self {
-        if self.seen_first {
-            self.result = self
-                .result
-                .and_then(|()| self.fmt.write_str(self.separator));
-        } else {
-            self.seen_first = true;
-        }
-        self.result = self.result.and_then(|()| item.fmt(self.fmt));
-        self
-    }
-
-    fn entries<I, F>(&mut self, items: I) -> &mut Self
-    where
-        I: IntoIterator<Item = F>,
-        F: Display,
-    {
-        for item in items {
-            self.entry(&item);
-        }
-        self
-    }
-
-    fn finish(&mut self) -> fmt::Result {
-        self.result
     }
 }
 
