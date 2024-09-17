@@ -1,4 +1,4 @@
-use infer::TypeInferenceBuilder;
+use infer::TypeInferenceContext;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 
@@ -628,13 +628,12 @@ enum IterationOutcome<'db> {
 impl<'db> IterationOutcome<'db> {
     fn unwrap_with_diagnostic(
         self,
-        iterable_node: ast::AnyNodeRef,
-        inference_builder: &mut TypeInferenceBuilder<'db>,
+        inference_context: &mut TypeInferenceContext<'db>,
     ) -> Type<'db> {
         match self {
             Self::Iterable { element_ty } => element_ty,
             Self::NotIterable { not_iterable_ty } => {
-                inference_builder.not_iterable_diagnostic(iterable_node, not_iterable_ty);
+                inference_context.not_iterable_diagnostic(not_iterable_ty);
                 Type::Unknown
             }
         }
