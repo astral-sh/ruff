@@ -1949,16 +1949,18 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         self.infer_arguments(arguments);
         let function_type = self.infer_expression(func);
-        function_type.call(self.db).unwrap_or_else(|| {
-            self.context.add_diagnostic(
-                "call-non-callable",
-                format_args!(
-                    "Object of type '{}' is not callable",
-                    function_type.display(self.db)
-                ),
-            );
-            Type::Unknown
-        })
+        function_type
+            .call(self.db, &mut self.context)
+            .unwrap_or_else(|| {
+                self.context.add_diagnostic(
+                    "call-non-callable",
+                    format_args!(
+                        "Object of type '{}' is not callable",
+                        function_type.display(self.db)
+                    ),
+                );
+                Type::Unknown
+            })
     }
 
     fn infer_starred_expression(&mut self, starred: &'db ast::ExprStarred) -> Type<'db> {

@@ -482,14 +482,14 @@ impl<'db> Type<'db> {
     ///
     /// Returns `None` if `self` is not a callable type.
     #[must_use]
-    pub fn call(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+    fn call(&self, db: &'db dyn Db, _context: &mut TypeInferenceContext<'db>) -> Option<Type<'db>> {
         match self {
             Type::Function(function_type) => Some(function_type.return_type(db)),
 
             // TODO annotated return type on `__new__` or metaclass `__call__`
             Type::Class(class) => Some(Type::Instance(*class)),
 
-            // TODO: handle classes which implement the Callable protocol
+            // TODO: handle classes which implement `__call__`
             Type::Instance(_instance_ty) => Some(Type::Unknown),
 
             // `Any` is callable, and its return type is also `Any`.
@@ -497,7 +497,7 @@ impl<'db> Type<'db> {
 
             Type::Unknown => Some(Type::Unknown),
 
-            // TODO: union and intersection types, if they reduce to `Callable`
+            // TODO: union and intersection types
             Type::Union(_) => Some(Type::Unknown),
             Type::Intersection(_) => Some(Type::Unknown),
 
@@ -529,13 +529,13 @@ impl<'db> Type<'db> {
 
         let dunder_iter_method = iterable_meta_type.member(db, "__iter__");
         if !dunder_iter_method.is_unbound() {
-            let Some(iterator_ty) = dunder_iter_method.call(db) else {
+            let Some(iterator_ty) = dunder_iter_method.call(db, context) else {
                 context.not_iterable_diagnostic(*self);
                 return None;
             };
 
             let dunder_next_method = iterator_ty.to_meta_type(db).member(db, "__next__");
-            return dunder_next_method.call(db).or_else(|| {
+            return dunder_next_method.call(db, context).or_else(|| {
                 context.not_iterable_diagnostic(*self);
                 None
             });
@@ -549,7 +549,7 @@ impl<'db> Type<'db> {
         // accepting `int` or `SupportsIndex`
         let dunder_get_item_method = iterable_meta_type.member(db, "__getitem__");
 
-        dunder_get_item_method.call(db).or_else(|| {
+        dunder_get_item_method.call(db, context).or_else(|| {
             context.not_iterable_diagnostic(*self);
             None
         })
