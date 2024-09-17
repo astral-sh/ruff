@@ -2747,6 +2747,25 @@ mod tests {
     }
 
     #[test]
+    fn reveal_type() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            from typing import reveal_type
+
+            x = 1
+            reveal_type(x)
+            ",
+        )?;
+
+        assert_file_diagnostics(&db, "/src/a.py", &["Revealed type of 'x' is 'Literal[1]'."]);
+
+        Ok(())
+    }
+
+    #[test]
     fn follow_import_to_class() -> anyhow::Result<()> {
         let mut db = setup_db();
 
