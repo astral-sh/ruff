@@ -238,6 +238,8 @@ pub enum Type<'db> {
     None,
     /// a specific function object
     Function(FunctionType<'db>),
+    /// The `typing.reveal_type` function, which has special `__call__` behavior.
+    RevealTypeFunction(FunctionType<'db>),
     /// a specific module object
     Module(File),
     /// a specific class object
@@ -262,8 +264,6 @@ pub enum Type<'db> {
     /// A heterogeneous tuple type, with elements of the given types in source order.
     // TODO: Support variable length homogeneous tuple type like `tuple[int, ...]`.
     Tuple(TupleType<'db>),
-    /// The `typing.reveal_type` function, which has special `__call__` behavior.
-    RevealTypeFunction(FunctionType<'db>),
     // TODO protocols, callable types, overloads, generics, type vars
 }
 
@@ -374,9 +374,8 @@ impl<'db> Type<'db> {
     pub fn is_stdlib_symbol(&self, db: &'db dyn Db, module_name: &str, name: &str) -> bool {
         match self {
             Type::Class(class) => class.is_stdlib_symbol(db, module_name, name),
-            Type::Function(function) | Type::RevealTypeFunction(function) => {
-                function.is_stdlib_symbol(db, module_name, name)
-            }
+            Type::Function(function) => function.is_stdlib_symbol(db, module_name, name),
+            Type::RevealTypeFunction(_) => true,
             _ => false,
         }
     }
@@ -517,6 +516,7 @@ impl<'db> Type<'db> {
             Type::Unknown => CallOutcome::callable(Type::Unknown),
 
             Type::Union(union) => CallOutcome::Union {
+                called_ty: self,
                 outcomes: union
                     .elements(db)
                     .iter()
@@ -664,6 +664,7 @@ enum CallOutcome<'db> {
         not_callable_ty: Type<'db>,
     },
     Union {
+        called_ty: Type<'db>,
         outcomes: Box<[CallOutcome<'db>]>,
     },
 }
@@ -688,8 +689,13 @@ impl<'db> CallOutcome<'db> {
                 revealed_ty: _,
             } => Some(*return_ty),
             Self::NotCallable { not_callable_ty: _ } => None,
-            Self::Union { outcomes } => outcomes
+            Self::Union {
+                outcomes,
+                called_ty: _,
+            } => outcomes
                 .iter()
+                // If all outcomes are NotCallable, we return None; if some outcomes are callable
+                // and some are not, we return a union including Unknown.
                 .fold(None, |acc, outcome| {
                     let ty = outcome.return_ty(db);
                     match (acc, ty) {
@@ -733,12 +739,44 @@ impl<'db> CallOutcome<'db> {
                 );
                 Type::Unknown
             }
-            Self::Union { outcomes } => UnionType::from_elements(
-                db,
-                outcomes
-                    .iter()
-                    .map(|outcome| outcome.unwrap_with_diagnostic(db, node, builder)),
-            ),
+            Self::Union {
+                outcomes,
+                called_ty,
+            } => {
+                let mut not_callable = vec![];
+                let mut union_builder = UnionBuilder::new(db);
+                for outcome in outcomes {
+                    union_builder =
+                        union_builder.add(if let Self::NotCallable { not_callable_ty } = outcome {
+                            not_callable.push(*not_callable_ty);
+                            Type::Unknown
+                        } else {
+                            outcome.unwrap_with_diagnostic(db, node, builder)
+                        });
+                }
+                match not_callable[..] {
+                    [] => {}
+                    [elem] => builder.add_diagnostic(
+                        node,
+                        "call-non-callable",
+                        format_args!(
+                            "Union element '{}' of type '{}' is not callable.",
+                            elem.display(db),
+                            called_ty.display(db)
+                        ),
+                    ),
+                    _ => builder.add_diagnostic(
+                        node,
+                        "call-non-callable",
+                        format_args!(
+                            "Union elements {} of type '{}' are not callable.",
+                            not_callable.display(db),
+                            called_ty.display(db)
+                        ),
+                    ),
+                }
+                union_builder.build()
+            }
         }
     }
 }

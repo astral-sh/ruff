@@ -1241,7 +1241,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             node,
             "not-iterable",
             format_args!(
-                "Object of type '{}' is not iterable",
+                "Object of type '{}' is not iterable.",
                 not_iterable_ty.display(self.db)
             ),
         );
@@ -3358,6 +3358,104 @@ mod tests {
     }
 
     #[test]
+    fn call_union() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            if flag:
+                def f() -> int:
+                    return 1
+            else:
+                def f() -> str:
+                    return 'foo'
+            x = f()
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "x", "int | str");
+
+        Ok(())
+    }
+
+    #[test]
+    fn call_union_with_unknown() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            from nonexistent import f
+            if flag:
+                def f() -> int:
+                    return 1
+            x = f()
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "x", "Unknown | int");
+
+        Ok(())
+    }
+
+    #[test]
+    fn call_union_with_not_callable() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            if flag:
+                f = 1
+            else:
+                def f() -> int:
+                    return 1
+            x = f()
+            ",
+        )?;
+
+        assert_file_diagnostics(
+            &db,
+            "src/a.py",
+            &["Union element 'Literal[1]' of type 'Literal[1] | Literal[f]' is not callable."],
+        );
+        assert_public_ty(&db, "src/a.py", "x", "Unknown | int");
+
+        Ok(())
+    }
+
+    #[test]
+    fn call_union_with_multiple_not_callable() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            if flag:
+                f = 1
+            elif flag2:
+                f = 'foo'
+            else:
+                def f() -> int:
+                    return 1
+            x = f()
+            ",
+        )?;
+
+        assert_file_diagnostics(
+            &db,
+            "src/a.py",
+            &[
+                r#"Union elements Literal[1], Literal["foo"] of type 'Literal[1] | Literal["foo"] | Literal[f]' are not callable."#,
+            ],
+        );
+        assert_public_ty(&db, "src/a.py", "x", "Unknown | int");
+
+        Ok(())
+    }
+
+    #[test]
     fn invalid_callable() {
         let mut db = setup_db();
 
@@ -4691,6 +4789,34 @@ mod tests {
     }
 
     #[test]
+    fn for_loop_non_callable_iter() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            class NotIterable:
+                if flag:
+                    __iter__ = 1
+                else:
+                    __iter__ = None
+
+            for x in NotIterable():
+                pass
+            ",
+        )?;
+
+        assert_file_diagnostics(
+            &db,
+            "src/a.py",
+            &["Object of type 'NotIterable' is not iterable."],
+        );
+        assert_public_ty(&db, "src/a.py", "x", "Unbound | Unknown");
+
+        Ok(())
+    }
+
+    #[test]
     fn except_handler_single_exception() -> anyhow::Result<()> {
         let mut db = setup_db();
 
@@ -4994,7 +5120,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "src/a.py",
-            &["Object of type 'Unbound' is not iterable"],
+            &["Object of type 'Unbound' is not iterable."],
         );
 
         Ok(())
@@ -5022,7 +5148,7 @@ mod tests {
 
         assert_scope_ty(&db, "src/a.py", &["foo", "<listcomp>"], "x", "int");
         assert_scope_ty(&db, "src/a.py", &["foo", "<listcomp>"], "z", "Unknown");
-        assert_file_diagnostics(&db, "src/a.py", &["Object of type 'int' is not iterable"]);
+        assert_file_diagnostics(&db, "src/a.py", &["Object of type 'int' is not iterable."]);
 
         Ok(())
     }
@@ -5216,7 +5342,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "/src/a.py",
-            &["Object of type 'Literal[123]' is not iterable"],
+            &["Object of type 'Literal[123]' is not iterable."],
         );
     }
 
@@ -5242,7 +5368,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "/src/a.py",
-            &["Object of type 'NotIterable' is not iterable"],
+            &["Object of type 'NotIterable' is not iterable."],
         );
     }
 
@@ -5271,7 +5397,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "/src/a.py",
-            &["Object of type 'NotIterable' is not iterable"],
+            &["Object of type 'NotIterable' is not iterable."],
         );
     }
 
@@ -5301,7 +5427,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "/src/a.py",
-            &["Object of type 'NotIterable' is not iterable"],
+            &["Object of type 'NotIterable' is not iterable."],
         );
     }
 
