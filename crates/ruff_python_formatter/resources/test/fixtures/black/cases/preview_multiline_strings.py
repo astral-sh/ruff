@@ -173,3 +173,10 @@ this_will_also_become_one_line = (  # comment
     "b"
     "c"
 )
+
+assert some_var == expected_result, """
+test
+"""
+assert some_var == expected_result, f"""
+expected: {expected_result}
+actual: {some_var}"""

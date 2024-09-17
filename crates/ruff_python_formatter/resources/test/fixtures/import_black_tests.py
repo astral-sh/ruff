@@ -104,6 +104,9 @@ IGNORE_LIST = [
 
     # Uses a different output format
     "decorators.py",
+
+    # Tests line ranges that fall outside the source range. This is a CLI test case and not a formatting test case.
+    "line_ranges_outside_source.py",
 ]
 
 
