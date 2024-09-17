@@ -10,7 +10,7 @@ use crate::Db;
 use rustc_hash::FxHashMap;
 
 impl<'db> Type<'db> {
-    pub(crate) fn display(&self, db: &'db dyn Db) -> DisplayType {
+    pub fn display(&self, db: &'db dyn Db) -> DisplayType {
         DisplayType { ty: self, db }
     }
     fn representation(self, db: &'db dyn Db) -> DisplayRepresentation<'db> {
@@ -19,7 +19,7 @@ impl<'db> Type<'db> {
 }
 
 #[derive(Copy, Clone)]
-pub(crate) struct DisplayType<'db> {
+pub struct DisplayType<'db> {
     ty: &'db Type<'db>,
     db: &'db dyn Db,
 }
@@ -100,18 +100,18 @@ impl Display for DisplayRepresentation<'_> {
     }
 }
 
-impl<'a, 'db> UnionType<'db> {
-    fn display(&'a self, db: &'db dyn Db) -> DisplayUnionType<'a, 'db> {
+impl<'db> UnionType<'db> {
+    fn display(&'db self, db: &'db dyn Db) -> DisplayUnionType<'db> {
         DisplayUnionType { db, ty: self }
     }
 }
 
-struct DisplayUnionType<'a, 'db> {
-    ty: &'a UnionType<'db>,
+struct DisplayUnionType<'db> {
+    ty: &'db UnionType<'db>,
     db: &'db dyn Db,
 }
 
-impl Display for DisplayUnionType<'_, '_> {
+impl Display for DisplayUnionType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let elements = self.ty.elements(self.db);
 
@@ -147,7 +147,7 @@ impl Display for DisplayUnionType<'_, '_> {
     }
 }
 
-impl fmt::Debug for DisplayUnionType<'_, '_> {
+impl fmt::Debug for DisplayUnionType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         Display::fmt(self, f)
     }
@@ -197,18 +197,18 @@ impl TryFrom<Type<'_>> for LiteralTypeKind {
     }
 }
 
-impl<'a, 'db> IntersectionType<'db> {
-    fn display(&'a self, db: &'db dyn Db) -> DisplayIntersectionType<'a, 'db> {
+impl<'db> IntersectionType<'db> {
+    fn display(&'db self, db: &'db dyn Db) -> DisplayIntersectionType<'db> {
         DisplayIntersectionType { db, ty: self }
     }
 }
 
-struct DisplayIntersectionType<'a, 'db> {
-    ty: &'a IntersectionType<'db>,
+struct DisplayIntersectionType<'db> {
+    ty: &'db IntersectionType<'db>,
     db: &'db dyn Db,
 }
 
-impl Display for DisplayIntersectionType<'_, '_> {
+impl Display for DisplayIntersectionType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let tys = self
             .ty
@@ -233,7 +233,7 @@ impl Display for DisplayIntersectionType<'_, '_> {
     }
 }
 
-impl fmt::Debug for DisplayIntersectionType<'_, '_> {
+impl fmt::Debug for DisplayIntersectionType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         Display::fmt(self, f)
     }
