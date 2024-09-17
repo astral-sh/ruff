@@ -56,10 +56,11 @@ pub(crate) enum Parenthesize {
     /// Adding parentheses is desired to prevent the comments from wandering.
     IfRequired,
 
-    /// Parenthesizes the expression if the group doesn't fit on a line (e.g., even name expressions are parenthesized), or if
-    /// the expression doesn't break, but _does_ reports that it always requires parentheses in this position (e.g., walrus
-    /// operators in function return annotations).
-    IfBreaksOrIfRequired,
+    /// Same as [`Self::IfBreaks`] except:
+    /// * it adds optional parentheses around expressions that normally don't require parentheses
+    ///   ([`NeedsParentheses::Never`]) but exceed the configured line width.
+    /// * it doesn't use the best fit layout, instead it adds parentheses when the value exceeds the line width.
+    IfBreaksOptionalParentheses,
 }
 
 impl Parenthesize {
@@ -416,27 +417,25 @@ impl Format<PyFormatContext<'_>> for FormatEmptyParenthesized<'_> {
         debug_assert!(self.comments[end_of_line_split..]
             .iter()
             .all(|comment| comment.line_position().is_own_line()));
-        write!(
-            f,
-            [group(&format_args![
-                token(self.left),
-                // end-of-line comments
-                trailing_comments(&self.comments[..end_of_line_split]),
-                // Avoid unstable formatting with
-                // ```python
-                // x = () - (#
-                // )
-                // ```
-                // Without this the comment would go after the empty tuple first, but still expand
-                // the bin op. In the second formatting pass they are trailing bin op comments
-                // so the bin op collapse. Suboptimally we keep parentheses around the bin op in
-                // either case.
-                (!self.comments[..end_of_line_split].is_empty()).then_some(hard_line_break()),
-                // own line comments, which need to be indented
-                soft_block_indent(&dangling_comments(&self.comments[end_of_line_split..])),
-                token(self.right)
-            ])]
-        )
+        group(&format_args![
+            token(self.left),
+            // end-of-line comments
+            trailing_comments(&self.comments[..end_of_line_split]),
+            // Avoid unstable formatting with
+            // ```python
+            // x = () - (#
+            // )
+            // ```
+            // Without this the comment would go after the empty tuple first, but still expand
+            // the bin op. In the second formatting pass they are trailing bin op comments
+            // so the bin op collapse. Suboptimally we keep parentheses around the bin op in
+            // either case.
+            (!self.comments[..end_of_line_split].is_empty()).then_some(hard_line_break()),
+            // own line comments, which need to be indented
+            soft_block_indent(&dangling_comments(&self.comments[end_of_line_split..])),
+            token(self.right)
+        ])
+        .fmt(f)
     }
 }
 
