@@ -289,7 +289,6 @@ impl<'db> UseDefMap<'db> {
         self.public_symbols[symbol].may_be_unbound()
     }
 
-    #[allow(unused)]
     pub(crate) fn bindings_at_declaration(
         &self,
         declaration: Definition<'db>,
@@ -302,7 +301,6 @@ impl<'db> UseDefMap<'db> {
         }
     }
 
-    #[allow(unused)]
     pub(crate) fn declarations_at_binding(
         &self,
         binding: Definition<'db>,
@@ -316,22 +314,16 @@ impl<'db> UseDefMap<'db> {
         }
     }
 
-    #[allow(unused)]
     pub(crate) fn public_declarations(
         &self,
         symbol: ScopedSymbolId,
     ) -> DeclarationsIterator<'_, 'db> {
-        self.declarations_iterator(self.public_symbols[symbol].declarations())
+        let declarations = self.public_symbols[symbol].declarations();
+        self.declarations_iterator(declarations)
     }
 
-    #[allow(unused)]
     pub(crate) fn has_public_declarations(&self, symbol: ScopedSymbolId) -> bool {
         !self.public_symbols[symbol].declarations().is_empty()
-    }
-
-    #[allow(unused)]
-    pub(crate) fn public_may_be_undeclared(&self, symbol: ScopedSymbolId) -> bool {
-        self.public_symbols[symbol].may_be_undeclared()
     }
 
     fn bindings_iterator<'a>(
@@ -352,6 +344,7 @@ impl<'db> UseDefMap<'db> {
         DeclarationsIterator {
             all_definitions: &self.all_definitions,
             inner: declarations.iter(),
+            may_be_undeclared: declarations.may_be_undeclared(),
         }
     }
 }
@@ -413,6 +406,13 @@ impl std::iter::FusedIterator for ConstraintsIterator<'_, '_> {}
 pub(crate) struct DeclarationsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, Definition<'db>>,
     inner: DeclarationIdIterator<'map>,
+    may_be_undeclared: bool,
+}
+
+impl DeclarationsIterator<'_, '_> {
+    pub(crate) fn may_be_undeclared(&self) -> bool {
+        self.may_be_undeclared
+    }
 }
 
 impl<'map, 'db> Iterator for DeclarationsIterator<'map, 'db> {
@@ -550,8 +550,9 @@ impl<'db> UseDefMapBuilder<'db> {
             if let Some(snapshot) = snapshot_definitions_iter.next() {
                 current.merge(snapshot);
             } else {
-                // Symbol not present in snapshot, so it's unbound from that path.
+                // Symbol not present in snapshot, so it's unbound/undeclared from that path.
                 current.set_may_be_unbound();
+                current.set_may_be_undeclared();
             }
         }
     }

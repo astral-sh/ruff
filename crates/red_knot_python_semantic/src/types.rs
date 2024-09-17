@@ -8,7 +8,7 @@ use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId};
 use crate::semantic_index::{
     global_scope, semantic_index, symbol_table, use_def_map, BindingWithConstraints,
-    BindingWithConstraintsIterator,
+    BindingWithConstraintsIterator, DeclarationsIterator,
 };
 use crate::stdlib::{builtins_symbol_ty, types_symbol_ty, typeshed_symbol_ty};
 use crate::types::narrow::narrowing_constraint;
@@ -16,6 +16,7 @@ use crate::{Db, FxOrderSet};
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
 pub(crate) use self::diagnostic::TypeCheckDiagnostics;
+pub(crate) use self::display::TypeArrayDisplay;
 pub(crate) use self::infer::{
     infer_deferred_types, infer_definition_types, infer_expression_types, infer_scope_types,
 };
@@ -41,25 +42,31 @@ pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
 }
 
 /// Infer the public type of a symbol (its type as seen from outside its scope).
-pub(crate) fn symbol_ty_by_id<'db>(
-    db: &'db dyn Db,
-    scope: ScopeId<'db>,
-    symbol: ScopedSymbolId,
-) -> Type<'db> {
-    let _span = tracing::trace_span!("symbol_ty", ?symbol).entered();
+fn symbol_ty_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymbolId) -> Type<'db> {
+    let _span = tracing::trace_span!("symbol_ty_by_id", ?symbol).entered();
 
     let use_def = use_def_map(db, scope);
-    definitions_ty(
-        db,
-        use_def.public_bindings(symbol),
-        use_def
-            .public_may_be_unbound(symbol)
-            .then_some(Type::Unbound),
-    )
+
+    // If the symbol is declared, the public type is based on declarations; otherwise, it's based
+    // on inference from bindings.
+    if use_def.has_public_declarations(symbol) {
+        let declarations = use_def.public_declarations(symbol);
+        // Intentionally ignore conflicting declared types; that's not our problem, it's the
+        // problem of the module we are importing from.
+        declarations_ty(db, declarations).unwrap_or_else(|(ty, _)| ty)
+    } else {
+        bindings_ty(
+            db,
+            use_def.public_bindings(symbol),
+            use_def
+                .public_may_be_unbound(symbol)
+                .then_some(Type::Unbound),
+        )
+    }
 }
 
 /// Shorthand for `symbol_ty` that takes a symbol name instead of an ID.
-pub(crate) fn symbol_ty<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Type<'db> {
+fn symbol_ty<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Type<'db> {
     let table = symbol_table(db, scope);
     table
         .symbol_id_by_name(name)
@@ -72,17 +79,23 @@ pub(crate) fn global_symbol_ty<'db>(db: &'db dyn Db, file: File, name: &str) -> 
     symbol_ty(db, global_scope(db, file), name)
 }
 
-/// Infer the type of a [`Definition`].
-pub(crate) fn definition_ty<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Type<'db> {
+/// Infer the type of a binding.
+pub(crate) fn binding_ty<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Type<'db> {
     let inference = infer_definition_types(db, definition);
-    inference.definition_ty(definition)
+    inference.binding_ty(definition)
+}
+
+/// Infer the type of a declaration.
+fn declaration_ty<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Type<'db> {
+    let inference = infer_definition_types(db, definition);
+    inference.declaration_ty(definition)
 }
 
 /// Infer the type of a (possibly deferred) sub-expression of a [`Definition`].
 ///
 /// ## Panics
 /// If the given expression is not a sub-expression of the given [`Definition`].
-pub(crate) fn definition_expression_ty<'db>(
+fn definition_expression_ty<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
     expression: &ast::Expr,
@@ -96,22 +109,22 @@ pub(crate) fn definition_expression_ty<'db>(
     }
 }
 
-/// Infer the combined type of an array of [`Definition`]s, plus one optional "unbound type".
+/// Infer the combined type of an iterator of bindings, plus one optional "unbound type".
 ///
-/// Will return a union if there is more than one definition, or at least one plus an unbound
+/// Will return a union if there is more than one binding, or at least one plus an unbound
 /// type.
 ///
 /// The "unbound type" represents the type in case control flow may not have passed through any
-/// definitions in this scope. If this isn't possible, then it will be `None`. If it is possible,
-/// and the result in that case should be Unbound (e.g. an unbound function local), then it will be
+/// bindings in this scope. If this isn't possible, then it will be `None`. If it is possible, and
+/// the result in that case should be Unbound (e.g. an unbound function local), then it will be
 /// `Some(Type::Unbound)`. If it is possible and the result should be something else (e.g. an
 /// implicit global lookup), then `unbound_type` will be `Some(the_global_symbol_type)`.
 ///
 /// # Panics
-/// Will panic if called with zero definitions and no `unbound_ty`. This is a logic error,
-/// as any symbol with zero visible definitions clearly may be unbound, and the caller should
-/// provide an `unbound_ty`.
-pub(crate) fn definitions_ty<'db>(
+/// Will panic if called with zero bindings and no `unbound_ty`. This is a logic error, as any
+/// symbol with zero visible bindings clearly may be unbound, and the caller should provide an
+/// `unbound_ty`.
+fn bindings_ty<'db>(
     db: &'db dyn Db,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
     unbound_ty: Option<Type<'db>>,
@@ -123,7 +136,7 @@ pub(crate) fn definitions_ty<'db>(
          }| {
             let mut constraint_tys =
                 constraints.filter_map(|constraint| narrowing_constraint(db, constraint, binding));
-            let binding_ty = definition_ty(db, binding);
+            let binding_ty = binding_ty(db, binding);
             if let Some(first_constraint_ty) = constraint_tys.next() {
                 let mut builder = IntersectionBuilder::new(db);
                 builder = builder
@@ -142,12 +155,69 @@ pub(crate) fn definitions_ty<'db>(
 
     let first = all_types
         .next()
-        .expect("definitions_ty should never be called with zero definitions and no unbound_ty.");
+        .expect("bindings_ty should never be called with zero definitions and no unbound_ty.");
 
     if let Some(second) = all_types.next() {
         UnionType::from_elements(db, [first, second].into_iter().chain(all_types))
     } else {
         first
+    }
+}
+
+/// The result of looking up a declared type from declarations; see [`declarations_ty`].
+type DeclaredTypeResult<'db> = Result<Type<'db>, (Type<'db>, Box<[Type<'db>]>)>;
+
+/// Build a declared type from a [`DeclarationsIterator`].
+///
+/// If there is only one declaration, or all declarations declare the same type, returns
+/// `Ok(declared_type)`. If there are conflicting declarations, returns
+/// `Err((union_of_declared_types, conflicting_declared_types))`.
+///
+/// If undeclared is a possibility, `Unknown` type will be part of the return type (and may
+/// conflict with other declarations.)
+///
+/// # Panics
+/// Will panic if there are no declarations and no possibility of undeclared. This is a logic
+/// error, as any symbol with zero live declarations clearly must be undeclared.
+fn declarations_ty<'db>(
+    db: &'db dyn Db,
+    declarations: DeclarationsIterator<'_, 'db>,
+) -> DeclaredTypeResult<'db> {
+    let may_be_undeclared = declarations.may_be_undeclared();
+    let decl_types = declarations.map(|declaration| declaration_ty(db, declaration));
+
+    let mut all_types = (if may_be_undeclared {
+        Some(Type::Unknown)
+    } else {
+        None
+    })
+    .into_iter()
+    .chain(decl_types);
+
+    let first = all_types.next().expect(
+        "declarations_ty must not be called with zero declarations and no may-be-undeclared.",
+    );
+
+    let mut conflicting: Vec<Type<'db>> = vec![];
+    let declared_ty = if let Some(second) = all_types.next() {
+        let mut builder = UnionBuilder::new(db).add(first);
+        for other in [second].into_iter().chain(all_types) {
+            if !first.is_equivalent_to(db, other) {
+                conflicting.push(other);
+            }
+            builder = builder.add(other);
+        }
+        builder.build()
+    } else {
+        first
+    };
+    if conflicting.is_empty() {
+        DeclaredTypeResult::Ok(declared_ty)
+    } else {
+        DeclaredTypeResult::Err((
+            declared_ty,
+            [first].into_iter().chain(conflicting).collect(),
+        ))
     }
 }
 
@@ -300,7 +370,6 @@ impl<'db> Type<'db> {
     /// Return true if this type is [assignable to] type `target`.
     ///
     /// [assignable to]: https://typing.readthedocs.io/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
-    #[allow(unused)]
     pub(crate) fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
         if self.is_equivalent_to(db, target) {
             return true;
@@ -324,13 +393,16 @@ impl<'db> Type<'db> {
             {
                 true
             }
+            (ty, Type::Union(union)) => union
+                .elements(db)
+                .iter()
+                .any(|&elem_ty| ty.is_assignable_to(db, elem_ty)),
             // TODO
             _ => false,
         }
     }
 
     /// Return true if this type is equivalent to type `other`.
-    #[allow(unused)]
     pub(crate) fn is_equivalent_to(self, _db: &'db dyn Db, other: Type<'db>) -> bool {
         // TODO equivalent but not identical structural types, differently-ordered unions and
         // intersections, other cases?
@@ -578,7 +650,7 @@ pub struct FunctionType<'db> {
     definition: Definition<'db>,
 
     /// types of all decorators on this function
-    decorators: Vec<Type<'db>>,
+    decorators: Box<[Type<'db>]>,
 }
 
 impl<'db> FunctionType<'db> {
@@ -630,7 +702,6 @@ pub struct ClassType<'db> {
 
 impl<'db> ClassType<'db> {
     /// Return true if this class is a standard library type with given module name and name.
-    #[allow(unused)]
     pub(crate) fn is_stdlib_symbol(self, db: &'db dyn Db, module_name: &str, name: &str) -> bool {
         name == self.name(db)
             && file_to_module(db, self.body_scope(db).file(db)).is_some_and(|module| {
@@ -830,6 +901,8 @@ mod tests {
     #[test_case(Ty::StringLiteral("foo"), Ty::LiteralString)]
     #[test_case(Ty::LiteralString, Ty::BuiltinInstance("str"))]
     #[test_case(Ty::BytesLiteral("foo"), Ty::BuiltinInstance("bytes"))]
+    #[test_case(Ty::IntLiteral(1), Ty::Union(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")]))]
+    #[test_case(Ty::IntLiteral(1), Ty::Union(vec![Ty::Unknown, Ty::BuiltinInstance("str")]))]
     fn is_assignable_to(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_assignable_to(&db, to.into_type(&db)));

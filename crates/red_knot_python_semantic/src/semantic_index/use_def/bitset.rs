@@ -32,7 +32,6 @@ impl<const B: usize> BitSet<B> {
         bitset
     }
 
-    #[allow(unused)]
     pub(super) fn is_empty(&self) -> bool {
         self.blocks().iter().all(|&b| b == 0)
     }
@@ -99,7 +98,6 @@ impl<const B: usize> BitSet<B> {
     }
 
     /// Union in-place with another [`BitSet`].
-    #[allow(unused)]
     pub(super) fn union(&mut self, other: &BitSet<B>) {
         let mut max_len = self.blocks().len();
         let other_len = other.blocks().len();

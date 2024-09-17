@@ -105,15 +105,18 @@ impl SymbolDeclarations {
         self.may_be_undeclared = false;
     }
 
+    /// Add undeclared as a possibility for this symbol.
+    fn set_may_be_undeclared(&mut self) {
+        self.may_be_undeclared = true;
+    }
+
     /// Return an iterator over live declarations for this symbol.
-    #[allow(unused)]
     pub(super) fn iter(&self) -> DeclarationIdIterator {
         DeclarationIdIterator {
             inner: self.live_declarations.iter(),
         }
     }
 
-    #[allow(unused)]
     pub(super) fn is_empty(&self) -> bool {
         self.live_declarations.is_empty()
     }
@@ -211,6 +214,11 @@ impl SymbolState {
     /// Add given constraint to all live bindings.
     pub(super) fn record_constraint(&mut self, constraint_id: ScopedConstraintId) {
         self.bindings.record_constraint(constraint_id);
+    }
+
+    /// Add undeclared as a possibility for this symbol.
+    pub(super) fn set_may_be_undeclared(&mut self) {
+        self.declarations.set_may_be_undeclared();
     }
 
     /// Record a newly-encountered declaration of this symbol.
@@ -329,11 +337,6 @@ impl SymbolState {
     pub(super) fn may_be_unbound(&self) -> bool {
         self.bindings.may_be_unbound()
     }
-
-    /// Could the symbol be undeclared?
-    pub(super) fn may_be_undeclared(&self) -> bool {
-        self.declarations.may_be_undeclared()
-    }
 }
 
 /// The default state of a symbol, if we've seen no definitions of it, is undefined (that is,
@@ -393,7 +396,6 @@ impl Iterator for ConstraintIdIterator<'_> {
 
 impl std::iter::FusedIterator for ConstraintIdIterator<'_> {}
 
-#[allow(unused)]
 #[derive(Debug)]
 pub(super) struct DeclarationIdIterator<'a> {
     inner: DeclarationsIterator<'a>,
@@ -413,44 +415,46 @@ impl std::iter::FusedIterator for DeclarationIdIterator<'_> {}
 mod tests {
     use super::{ScopedConstraintId, ScopedDefinitionId, SymbolState};
 
-    impl SymbolState {
-        pub(crate) fn assert_bindings(&self, may_be_unbound: bool, expected: &[&str]) {
-            assert_eq!(self.may_be_unbound(), may_be_unbound);
-            let actual = self
-                .bindings()
-                .iter()
-                .map(|def_id_with_constraints| {
-                    format!(
-                        "{}<{}>",
-                        def_id_with_constraints.definition.as_u32(),
-                        def_id_with_constraints
-                            .constraint_ids
-                            .map(ScopedConstraintId::as_u32)
-                            .map(|idx| idx.to_string())
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    )
-                })
-                .collect::<Vec<_>>();
-            assert_eq!(actual, expected);
-        }
+    fn assert_bindings(symbol: &SymbolState, may_be_unbound: bool, expected: &[&str]) {
+        assert_eq!(symbol.may_be_unbound(), may_be_unbound);
+        let actual = symbol
+            .bindings()
+            .iter()
+            .map(|def_id_with_constraints| {
+                format!(
+                    "{}<{}>",
+                    def_id_with_constraints.definition.as_u32(),
+                    def_id_with_constraints
+                        .constraint_ids
+                        .map(ScopedConstraintId::as_u32)
+                        .map(|idx| idx.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected);
+    }
 
-        pub(crate) fn assert_declarations(&self, may_be_undeclared: bool, expected: &[u32]) {
-            assert_eq!(self.may_be_undeclared(), may_be_undeclared);
-            let actual = self
-                .declarations()
-                .iter()
-                .map(ScopedDefinitionId::as_u32)
-                .collect::<Vec<_>>();
-            assert_eq!(actual, expected);
-        }
+    pub(crate) fn assert_declarations(
+        symbol: &SymbolState,
+        may_be_undeclared: bool,
+        expected: &[u32],
+    ) {
+        assert_eq!(symbol.declarations.may_be_undeclared(), may_be_undeclared);
+        let actual = symbol
+            .declarations()
+            .iter()
+            .map(ScopedDefinitionId::as_u32)
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected);
     }
 
     #[test]
     fn unbound() {
         let sym = SymbolState::undefined();
 
-        sym.assert_bindings(true, &[]);
+        assert_bindings(&sym, true, &[]);
     }
 
     #[test]
@@ -458,7 +462,7 @@ mod tests {
         let mut sym = SymbolState::undefined();
         sym.record_binding(ScopedDefinitionId::from_u32(0));
 
-        sym.assert_bindings(false, &["0<>"]);
+        assert_bindings(&sym, false, &["0<>"]);
     }
 
     #[test]
@@ -467,7 +471,7 @@ mod tests {
         sym.record_binding(ScopedDefinitionId::from_u32(0));
         sym.set_may_be_unbound();
 
-        sym.assert_bindings(true, &["0<>"]);
+        assert_bindings(&sym, true, &["0<>"]);
     }
 
     #[test]
@@ -476,7 +480,7 @@ mod tests {
         sym.record_binding(ScopedDefinitionId::from_u32(0));
         sym.record_constraint(ScopedConstraintId::from_u32(0));
 
-        sym.assert_bindings(false, &["0<0>"]);
+        assert_bindings(&sym, false, &["0<0>"]);
     }
 
     #[test]
@@ -492,7 +496,7 @@ mod tests {
 
         sym0a.merge(sym0b);
         let mut sym0 = sym0a;
-        sym0.assert_bindings(false, &["0<0>"]);
+        assert_bindings(&sym0, false, &["0<0>"]);
 
         // merging the same definition with differing constraints drops all constraints
         let mut sym1a = SymbolState::undefined();
@@ -505,7 +509,7 @@ mod tests {
 
         sym1a.merge(sym1b);
         let sym1 = sym1a;
-        sym1.assert_bindings(false, &["1<>"]);
+        assert_bindings(&sym1, false, &["1<>"]);
 
         // merging a constrained definition with unbound keeps both
         let mut sym2a = SymbolState::undefined();
@@ -516,19 +520,19 @@ mod tests {
 
         sym2a.merge(sym2b);
         let sym2 = sym2a;
-        sym2.assert_bindings(true, &["2<3>"]);
+        assert_bindings(&sym2, true, &["2<3>"]);
 
         // merging different definitions keeps them each with their existing constraints
         sym0.merge(sym2);
         let sym = sym0;
-        sym.assert_bindings(true, &["0<0>", "2<3>"]);
+        assert_bindings(&sym, true, &["0<0>", "2<3>"]);
     }
 
     #[test]
     fn no_declaration() {
         let sym = SymbolState::undefined();
 
-        sym.assert_declarations(true, &[]);
+        assert_declarations(&sym, true, &[]);
     }
 
     #[test]
@@ -536,7 +540,7 @@ mod tests {
         let mut sym = SymbolState::undefined();
         sym.record_declaration(ScopedDefinitionId::from_u32(1));
 
-        sym.assert_declarations(false, &[1]);
+        assert_declarations(&sym, false, &[1]);
     }
 
     #[test]
@@ -545,7 +549,7 @@ mod tests {
         sym.record_declaration(ScopedDefinitionId::from_u32(1));
         sym.record_declaration(ScopedDefinitionId::from_u32(2));
 
-        sym.assert_declarations(false, &[2]);
+        assert_declarations(&sym, false, &[2]);
     }
 
     #[test]
@@ -558,7 +562,7 @@ mod tests {
 
         sym.merge(sym2);
 
-        sym.assert_declarations(false, &[1, 2]);
+        assert_declarations(&sym, false, &[1, 2]);
     }
 
     #[test]
@@ -570,6 +574,15 @@ mod tests {
 
         sym.merge(sym2);
 
-        sym.assert_declarations(true, &[1]);
+        assert_declarations(&sym, true, &[1]);
+    }
+
+    #[test]
+    fn set_may_be_undeclared() {
+        let mut sym = SymbolState::undefined();
+        sym.record_declaration(ScopedDefinitionId::from_u32(0));
+        sym.set_may_be_undeclared();
+
+        assert_declarations(&sym, true, &[0]);
     }
 }
