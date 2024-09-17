@@ -528,3 +528,38 @@ def kwargs_type_annotation(**
     # comment
     kwargs: int): pass
 
+
+def args_many_comments(
+    # before
+    *
+    # between * and name
+    args # trailing args
+    # after name
+    ): pass
+
+
+def args_many_comments_with_type_annotation(
+    # before
+    *
+    # between * and name
+    args # trailing args
+    # before colon
+    :  # after colon
+    # before type
+    int # trailing type
+    # after type
+    ): pass
+
+
+
+def args_with_type_annotations_no_after_colon_comment(
+    # before
+    *
+    # between * and name
+    args # trailing args
+    # before colon
+    :
+    # before type
+    int # trailing type
+    # after type
+    ): pass
