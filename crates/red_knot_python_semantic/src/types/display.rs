@@ -1,31 +1,31 @@
 //! Display implementations for types.
 
-use std::fmt::{Display, Formatter};
+use std::fmt::{self, Display, Formatter};
 
 use ruff_python_ast::str::Quote;
 use ruff_python_literal::escape::AsciiEscape;
 
-use crate::types::{IntersectionType, Type, TypeList, UnionType};
-use crate::{Db, FxOrderMap};
+use crate::types::{IntersectionType, Type, UnionType};
+use crate::Db;
+use rustc_hash::FxHashMap;
 
 impl<'db> Type<'db> {
-    pub fn display(&'db self, db: &'db dyn Db) -> DisplayType<'db> {
+    pub(crate) fn display(&self, db: &'db dyn Db) -> DisplayType {
         DisplayType { ty: self, db }
     }
-
-    fn representation(&'db self, db: &'db dyn Db) -> DisplayRepresentation<'db> {
+    fn representation(self, db: &'db dyn Db) -> DisplayRepresentation<'db> {
         DisplayRepresentation { db, ty: self }
     }
 }
 
 #[derive(Copy, Clone)]
-pub struct DisplayType<'db> {
+pub(crate) struct DisplayType<'db> {
     ty: &'db Type<'db>,
     db: &'db dyn Db,
 }
 
 impl Display for DisplayType<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let representation = self.ty.representation(self.db);
         if matches!(
             self.ty,
@@ -43,9 +43,9 @@ impl Display for DisplayType<'_> {
     }
 }
 
-impl std::fmt::Debug for DisplayType<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Display::fmt(self, f)
+impl fmt::Debug for DisplayType<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        Display::fmt(self, f)
     }
 }
 
@@ -53,12 +53,12 @@ impl std::fmt::Debug for DisplayType<'_> {
 /// `Literal[<repr>]` or `Literal[<repr1>, <repr2>]` for literal types or as `<repr>` for
 /// non literals
 struct DisplayRepresentation<'db> {
-    ty: &'db Type<'db>,
+    ty: Type<'db>,
     db: &'db dyn Db,
 }
 
-impl std::fmt::Display for DisplayRepresentation<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl Display for DisplayRepresentation<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.ty {
             Type::Any => f.write_str("Any"),
             Type::Never => f.write_str("Never"),
@@ -74,8 +74,8 @@ impl std::fmt::Display for DisplayRepresentation<'_> {
             Type::Function(function) => f.write_str(function.name(self.db)),
             Type::Union(union) => union.display(self.db).fmt(f),
             Type::Intersection(intersection) => intersection.display(self.db).fmt(f),
-            Type::IntLiteral(n) => write!(f, "{n}"),
-            Type::BooleanLiteral(boolean) => f.write_str(if *boolean { "True" } else { "False" }),
+            Type::IntLiteral(n) => n.fmt(f),
+            Type::BooleanLiteral(boolean) => f.write_str(if boolean { "True" } else { "False" }),
             Type::StringLiteral(string) => {
                 write!(f, r#""{}""#, string.value(self.db).replace('"', r#"\""#))
             }
@@ -92,14 +92,7 @@ impl std::fmt::Display for DisplayRepresentation<'_> {
                 if elements.is_empty() {
                     f.write_str("()")?;
                 } else {
-                    let mut first = true;
-                    for element in &**elements {
-                        if !first {
-                            f.write_str(", ")?;
-                        }
-                        first = false;
-                        element.display(self.db).fmt(f)?;
-                    }
+                    elements.display(self.db).fmt(f)?;
                 }
                 f.write_str("]")
             }
@@ -107,23 +100,23 @@ impl std::fmt::Display for DisplayRepresentation<'_> {
     }
 }
 
-impl<'db> UnionType<'db> {
-    fn display(&'db self, db: &'db dyn Db) -> DisplayUnionType<'db> {
+impl<'a, 'db> UnionType<'db> {
+    fn display(&'a self, db: &'db dyn Db) -> DisplayUnionType<'a, 'db> {
         DisplayUnionType { db, ty: self }
     }
 }
 
-struct DisplayUnionType<'db> {
-    ty: &'db UnionType<'db>,
+struct DisplayUnionType<'a, 'db> {
+    ty: &'a UnionType<'db>,
     db: &'db dyn Db,
 }
 
-impl Display for DisplayUnionType<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl Display for DisplayUnionType<'_, '_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let elements = self.ty.elements(self.db);
 
         // Group literal types by kind.
-        let mut grouped_literals = FxOrderMap::default();
+        let mut grouped_literals = FxHashMap::default();
 
         for element in elements {
             if let Ok(literal_kind) = LiteralTypeKind::try_from(*element) {
@@ -134,42 +127,19 @@ impl Display for DisplayUnionType<'_> {
             }
         }
 
-        let mut first = true;
-
-        // Print all types, but write all literals together (while preserving their position).
-        for ty in elements {
+        let elements = elements.iter().filter_map(|ty| {
             if let Ok(literal_kind) = LiteralTypeKind::try_from(*ty) {
-                let Some(mut literals) = grouped_literals.remove(&literal_kind) else {
-                    continue;
-                };
-
-                if !first {
-                    f.write_str(" | ")?;
-                };
-
-                f.write_str("Literal[")?;
-
+                let mut literals = grouped_literals.remove(&literal_kind)?;
                 if literal_kind == LiteralTypeKind::IntLiteral {
                     literals.sort_unstable_by_key(|ty| ty.expect_int_literal());
                 }
-
-                for (i, literal_ty) in literals.iter().enumerate() {
-                    if i > 0 {
-                        f.write_str(", ")?;
-                    }
-                    literal_ty.representation(self.db).fmt(f)?;
-                }
-                f.write_str("]")?;
+                Some(DisplayUnionElement::LiteralGroup(literals, self.db))
             } else {
-                if !first {
-                    f.write_str(" | ")?;
-                };
-
-                ty.display(self.db).fmt(f)?;
+                Some(DisplayUnionElement::SingleType(ty.display(self.db)))
             }
+        });
 
-            first = false;
-        }
+        f.join(" | ").entries(elements).finish()?;
 
         debug_assert!(grouped_literals.is_empty());
 
@@ -177,9 +147,29 @@ impl Display for DisplayUnionType<'_> {
     }
 }
 
-impl std::fmt::Debug for DisplayUnionType<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Display::fmt(self, f)
+impl fmt::Debug for DisplayUnionType<'_, '_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        Display::fmt(self, f)
+    }
+}
+
+enum DisplayUnionElement<'db> {
+    LiteralGroup(Vec<Type<'db>>, &'db dyn Db),
+    SingleType(DisplayType<'db>),
+}
+
+impl Display for DisplayUnionElement<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::LiteralGroup(tys, db) => {
+                f.write_str("Literal[")?;
+                f.join(", ")
+                    .entries(tys.iter().map(|ty| ty.representation(*db)))
+                    .finish()?;
+                f.write_str("]")
+            }
+            Self::SingleType(ty) => ty.fmt(f),
+        }
     }
 }
 
@@ -207,68 +197,140 @@ impl TryFrom<Type<'_>> for LiteralTypeKind {
     }
 }
 
-impl<'db> IntersectionType<'db> {
-    fn display(&'db self, db: &'db dyn Db) -> DisplayIntersectionType<'db> {
+impl<'a, 'db> IntersectionType<'db> {
+    fn display(&'a self, db: &'db dyn Db) -> DisplayIntersectionType<'a, 'db> {
         DisplayIntersectionType { db, ty: self }
     }
 }
 
-struct DisplayIntersectionType<'db> {
-    ty: &'db IntersectionType<'db>,
+struct DisplayIntersectionType<'a, 'db> {
+    ty: &'a IntersectionType<'db>,
     db: &'db dyn Db,
 }
 
-impl Display for DisplayIntersectionType<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut first = true;
-        for (neg, ty) in self
+impl Display for DisplayIntersectionType<'_, '_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let tys = self
             .ty
             .positive(self.db)
             .iter()
-            .map(|ty| (false, ty))
-            .chain(self.ty.negative(self.db).iter().map(|ty| (true, ty)))
-        {
-            if !first {
-                f.write_str(" & ")?;
-            };
-            first = false;
-            if neg {
-                f.write_str("~")?;
-            };
-            write!(f, "{}", ty.display(self.db))?;
+            .map(|&ty| DisplayMaybeNegatedType {
+                ty,
+                db: self.db,
+                negated: false,
+            })
+            .chain(
+                self.ty
+                    .negative(self.db)
+                    .iter()
+                    .map(|&ty| DisplayMaybeNegatedType {
+                        ty,
+                        db: self.db,
+                        negated: true,
+                    }),
+            );
+        f.join(" & ").entries(tys).finish()
+    }
+}
+
+impl fmt::Debug for DisplayIntersectionType<'_, '_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        Display::fmt(self, f)
+    }
+}
+
+struct DisplayMaybeNegatedType<'db> {
+    ty: Type<'db>,
+    db: &'db dyn Db,
+    negated: bool,
+}
+
+impl<'db> Display for DisplayMaybeNegatedType<'db> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        if self.negated {
+            f.write_str("~")?;
         }
-        Ok(())
+        self.ty.display(self.db).fmt(f)
     }
 }
 
-impl std::fmt::Debug for DisplayIntersectionType<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Display::fmt(self, f)
+pub(crate) trait TypeArrayDisplay<'db> {
+    fn display(&self, db: &'db dyn Db) -> DisplayTypeArray;
+}
+
+impl<'db> TypeArrayDisplay<'db> for Box<[Type<'db>]> {
+    fn display(&self, db: &'db dyn Db) -> DisplayTypeArray {
+        DisplayTypeArray { types: self, db }
     }
 }
 
-impl<'s, 'db> TypeList<'db> {
-    pub(crate) fn display(&'s self, db: &'db dyn Db) -> DisplayConflictingTypes<'s, 'db> {
-        DisplayConflictingTypes { types: self, db }
+impl<'db> TypeArrayDisplay<'db> for Vec<Type<'db>> {
+    fn display(&self, db: &'db dyn Db) -> DisplayTypeArray {
+        DisplayTypeArray { types: self, db }
     }
 }
 
-pub(crate) struct DisplayConflictingTypes<'l, 'db> {
-    types: &'l TypeList<'db>,
+pub(crate) struct DisplayTypeArray<'b, 'db> {
+    types: &'b [Type<'db>],
     db: &'db dyn Db,
 }
 
-impl std::fmt::Display for DisplayConflictingTypes<'_, '_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut iter = self.types.0.iter();
-        if let Some(first) = iter.next() {
-            write!(f, "'{}'", first.display(self.db))?;
-            for other in iter {
-                f.write_str(", ")?;
-                write!(f, "'{}'", other.display(self.db))?;
-            }
+impl<'db> Display for DisplayTypeArray<'_, 'db> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.join(", ")
+            .entries(self.types.iter().map(|ty| ty.display(self.db)))
+            .finish()
+    }
+}
+
+trait FormatterJoinExtension<'b> {
+    fn join<'a>(&'a mut self, separator: &'static str) -> Join<'a, 'b>;
+}
+
+impl<'b> FormatterJoinExtension<'b> for Formatter<'b> {
+    fn join<'a>(&'a mut self, separator: &'static str) -> Join<'a, 'b> {
+        Join {
+            fmt: self,
+            separator,
+            result: fmt::Result::Ok(()),
+            seen_first: false,
         }
-        Ok(())
+    }
+}
+
+struct Join<'a, 'b> {
+    fmt: &'a mut Formatter<'b>,
+    separator: &'static str,
+    result: fmt::Result,
+    seen_first: bool,
+}
+
+impl<'a, 'b> Join<'a, 'b> {
+    fn entry(&mut self, item: &dyn Display) -> &mut Self {
+        if self.seen_first {
+            self.result = self
+                .result
+                .and_then(|()| self.fmt.write_str(self.separator));
+        } else {
+            self.seen_first = true;
+        }
+        self.result = self.result.and_then(|()| item.fmt(self.fmt));
+        self
+    }
+
+    fn entries<I, F>(&mut self, items: I) -> &mut Self
+    where
+        I: IntoIterator<Item = F>,
+        F: Display,
+    {
+        for item in items {
+            self.entry(&item);
+        }
+        self
+    }
+
+    fn finish(&mut self) -> fmt::Result {
+        self.result
     }
 }
 

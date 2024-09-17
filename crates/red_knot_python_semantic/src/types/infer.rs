@@ -52,7 +52,7 @@ use crate::types::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 use crate::types::{
     bindings_ty, builtins_symbol_ty, declarations_ty, global_symbol_ty, symbol_ty,
     BytesLiteralType, ClassType, DeclaredType, FunctionType, StringLiteralType, TupleType, Type,
-    UnionType,
+    TypeArrayDisplay, UnionType,
 };
 use crate::Db;
 
@@ -511,7 +511,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             declared_ty,
             conflicting,
         } = declarations_ty(self.db, declarations);
-        if !conflicting.is_empty() {
+        if let Some(conflicting) = conflicting {
             // TODO point out the conflicting declarations in the diagnostic?
             let symbol_table = self.index.symbol_table(binding.file_scope(self.db));
             let symbol_name = symbol_table.symbol(binding.symbol(self.db)).name();
@@ -5393,7 +5393,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "/src/a.py",
-            &[r"Conflicting declared types for 'x': 'str', 'int'."],
+            &[r"Conflicting declared types for 'x': str, int."],
         );
     }
 
@@ -5414,7 +5414,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "/src/a.py",
-            &[r"Conflicting declared types for 'x': 'Unknown', 'int'."],
+            &[r"Conflicting declared types for 'x': Unknown, int."],
         );
     }
 
@@ -5438,7 +5438,7 @@ mod tests {
             &db,
             "/src/a.py",
             &[
-                r"Conflicting declared types for 'x': 'str', 'int'.",
+                r"Conflicting declared types for 'x': str, int.",
                 r#"Object of type 'Literal[b"foo"]' is not assignable to 'str | int'."#,
             ],
         );
@@ -5461,7 +5461,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "/src/a.py",
-            &[r"Conflicting declared types for 'x': 'Unknown', 'int'."],
+            &[r"Conflicting declared types for 'x': Unknown, int."],
         );
     }
 

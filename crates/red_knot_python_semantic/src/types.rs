@@ -16,6 +16,7 @@ use crate::{Db, FxOrderSet};
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
 pub(crate) use self::diagnostic::TypeCheckDiagnostics;
+pub(crate) use self::display::TypeArrayDisplay;
 pub(crate) use self::infer::{
     infer_deferred_types, infer_definition_types, infer_expression_types, infer_scope_types,
 };
@@ -206,25 +207,10 @@ fn declarations_ty<'db>(
     DeclaredType {
         declared_ty,
         conflicting: if conflicting.is_empty() {
-            TypeList(conflicting.into())
+            None
         } else {
-            TypeList([first].into_iter().chain(conflicting).collect())
+            Some([first].into_iter().chain(conflicting).collect())
         },
-    }
-}
-
-#[derive(Debug)]
-struct DeclaredType<'db> {
-    declared_ty: Type<'db>,
-    conflicting: TypeList<'db>,
-}
-
-#[derive(Debug)]
-struct TypeList<'db>(Box<[Type<'db>]>);
-
-impl<'db> TypeList<'db> {
-    fn is_empty(&self) -> bool {
-        self.0.is_empty()
     }
 }
 
@@ -626,6 +612,12 @@ impl<'db> From<&Type<'db>> for Type<'db> {
     }
 }
 
+#[derive(Debug)]
+struct DeclaredType<'db> {
+    declared_ty: Type<'db>,
+    conflicting: Option<Box<[Type<'db>]>>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum IterationOutcome<'db> {
     Iterable { element_ty: Type<'db> },
@@ -657,7 +649,7 @@ pub struct FunctionType<'db> {
     definition: Definition<'db>,
 
     /// types of all decorators on this function
-    decorators: Vec<Type<'db>>,
+    decorators: Box<[Type<'db>]>,
 }
 
 impl<'db> FunctionType<'db> {
