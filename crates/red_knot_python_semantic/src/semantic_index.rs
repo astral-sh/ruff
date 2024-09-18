@@ -1044,7 +1044,7 @@ class C[T]:
         }
 
         let TestCase { db, file } = test_case(
-            r#"
+            r"
 class Test:
     def foo():
         def bar():
@@ -1053,7 +1053,7 @@ class Test:
         pass
 
 def x():
-    pass"#,
+    pass",
         );
 
         let index = semantic_index(&db, file);
