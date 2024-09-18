@@ -115,6 +115,9 @@ pub(crate) struct SemanticIndex<'db> {
     /// Note: We should not depend on this map when analysing other files or
     /// changing a file invalidates all dependents.
     ast_ids: IndexVec<FileScopeId, AstIds>,
+
+    /// Flags about the global scope (code usage impacting inference)
+    has_future_annotations: bool,
 }
 
 impl<'db> SemanticIndex<'db> {
@@ -214,6 +217,12 @@ impl<'db> SemanticIndex<'db> {
     /// returns the scope in which that definition is defined in.
     pub(crate) fn node_scope(&self, node: NodeWithScopeRef) -> FileScopeId {
         self.scopes_by_node[&node.node_key()]
+    }
+
+    /// Checks if there is an import of `__future__.annotations` in the global scope, which affects
+    /// the logic for type inference.
+    pub(super) fn has_future_annotations(&self) -> bool {
+        self.has_future_annotations
     }
 }
 

@@ -45,6 +45,9 @@ pub(super) struct SemanticIndexBuilder<'db> {
     /// Flow states at each `break` in the current loop.
     loop_break_states: Vec<FlowSnapshot>,
 
+    /// Flags about the file's global scope
+    has_future_annotations: bool,
+
     // Semantic Index fields
     scopes: IndexVec<FileScopeId, Scope>,
     scope_ids_by_scope: IndexVec<FileScopeId, ScopeId<'db>>,
@@ -67,6 +70,8 @@ impl<'db> SemanticIndexBuilder<'db> {
             current_assignment: None,
             current_match_case: None,
             loop_break_states: vec![],
+
+            has_future_annotations: false,
 
             scopes: IndexVec::new(),
             symbol_tables: IndexVec::new(),
@@ -450,6 +455,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             scopes_by_expression: self.scopes_by_expression,
             scopes_by_node: self.scopes_by_node,
             use_def_maps,
+            has_future_annotations: self.has_future_annotations,
         }
     }
 }
@@ -543,7 +549,15 @@ where
                         &alias.name.id
                     };
 
+                    // Look for imports `from __future__ import annotations`, ignore `as ...`
+                    self.has_future_annotations |= alias.name.id.as_str() == "annotations"
+                        && node
+                            .module
+                            .as_ref()
+                            .is_some_and(|module| module.id().as_str() == "__future__");
+
                     let symbol = self.add_symbol(symbol_name.clone());
+
                     self.add_definition(symbol, ImportFromDefinitionNodeRef { node, alias_index });
                 }
             }

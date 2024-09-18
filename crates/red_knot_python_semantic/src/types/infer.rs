@@ -328,6 +328,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         matches!(self.region, InferenceRegion::Deferred(_))
     }
 
+    fn has_future_annotations(&self) -> bool {
+        self.index.has_future_annotations()
+    }
+
     /// Infers types in the given [`InferenceRegion`].
     fn infer_region(&mut self) {
         match self.region {
@@ -697,7 +701,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             self.infer_parameters(parameters);
 
             // TODO: this should also be applied to parameter annotations.
-            if self.is_stub() {
+            if self.is_stub() || self.has_future_annotations() {
                 self.types.has_deferred = true;
             } else {
                 self.infer_optional_annotation_expression(returns.as_deref());
@@ -825,9 +829,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             self.infer_expression(&keyword.value);
         }
 
-        // inference of bases deferred in stubs
+        // Inference of bases deferred in stubs
         // TODO also defer stringified generic type parameters
-        if self.is_stub() {
+        if self.is_stub() || self.has_future_annotations() {
             self.types.has_deferred = true;
         } else {
             for base in class.bases() {
@@ -837,13 +841,12 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_function_deferred(&mut self, function: &ast::StmtFunctionDef) {
-        if self.is_stub() {
-            self.infer_optional_annotation_expression(function.returns.as_deref());
-        }
+        self.infer_optional_annotation_expression(function.returns.as_deref());
+        if self.is_stub() || self.has_future_annotations() {}
     }
 
     fn infer_class_deferred(&mut self, class: &ast::StmtClassDef) {
-        if self.is_stub() {
+        if self.is_stub() || self.has_future_annotations() {
             for base in class.bases() {
                 self.infer_expression(base);
             }
@@ -4005,6 +4008,63 @@ mod tests {
             .expect("there should be at least one base");
 
         assert_eq!(base.display(&db).to_string(), "Literal[object]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn deferred_annotation_in_stubs_always_resolve() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        // Stub files should always resolve deferred annotations
+        db.write_dedented(
+            "/src/stub.pyi",
+            "
+            def get_foo() -> Foo: ...
+            class Foo: ...
+            foo = get_foo()
+            ",
+        )?;
+        assert_public_ty(&db, "/src/stub.pyi", "foo", "Foo");
+
+        Ok(())
+    }
+
+    #[test]
+    fn deferred_annotations_regular_source_fails() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        // In (regular) source files, deferred annotations are *not* resolved
+        // Also tests imports from `__future__` that are not annotations
+        db.write_dedented(
+            "/src/source.py",
+            "
+            from __future__ import with_statement as annotations
+            def get_foo() -> Foo: ...
+            class Foo: ...
+            foo = get_foo()
+            ",
+        )?;
+        assert_public_ty(&db, "/src/source.py", "foo", "Unknown");
+
+        Ok(())
+    }
+
+    #[test]
+    fn deferred_annotation_in_sources_with_future_resolves() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        // In source files with `__future__.annotations`, deferred annotations are resolved
+        db.write_dedented(
+            "/src/source_with_future.py",
+            "
+            from __future__ import annotations
+            def get_foo() -> Foo: ...
+            class Foo: ...
+            foo = get_foo()
+            ",
+        )?;
+        assert_public_ty(&db, "/src/source_with_future.py", "foo", "Foo");
 
         Ok(())
     }
