@@ -3,6 +3,7 @@
 //! the various parameters.
 
 use std::borrow::Cow;
+use std::collections::BTreeMap;
 use std::env::VarError;
 use std::num::{NonZeroU16, NonZeroU8};
 use std::path::{Path, PathBuf};
@@ -213,14 +214,13 @@ impl Configuration {
         let import_map_defaults = ImportMapSettings::default();
 
         let import_map = ImportMapSettings {
-            src: self
-                .src
-                .clone()
-                .unwrap_or_else(|| vec![project_root.to_path_buf(), project_root.join("src")]),
             extension: self.extension.clone().unwrap_or_default(),
-            direction: import_map
-                .direction
-                .unwrap_or(import_map_defaults.direction),
+            detect_string_imports: import_map
+                .detect_string_imports
+                .unwrap_or(import_map_defaults.detect_string_imports),
+            include_dependencies: import_map
+                .include_dependencies
+                .unwrap_or(import_map_defaults.include_dependencies),
         };
 
         let lint = self.lint;
@@ -553,6 +553,7 @@ impl Configuration {
             )?,
             import_map: ImportMapConfiguration::from_options(
                 options.import_map.unwrap_or_default(),
+                project_root,
             )?,
         })
     }
@@ -1216,13 +1217,24 @@ impl FormatConfiguration {
 #[derive(Clone, Debug, Default)]
 pub struct ImportMapConfiguration {
     pub direction: Option<Direction>,
+    pub detect_string_imports: Option<bool>,
+    pub include_dependencies: Option<BTreeMap<PathBuf, (PathBuf, Vec<String>)>>,
 }
 
 impl ImportMapConfiguration {
     #[allow(clippy::needless_pass_by_value)]
-    pub fn from_options(options: ImportMapOptions) -> Result<Self> {
+    pub fn from_options(options: ImportMapOptions, project_root: &Path) -> Result<Self> {
         Ok(Self {
             direction: options.direction,
+            detect_string_imports: options.detect_string_imports,
+            include_dependencies: options.include_dependencies.map(|dependencies| {
+                dependencies
+                    .into_iter()
+                    .map(|(key, value)| {
+                        (project_root.join(key), (project_root.to_path_buf(), value))
+                    })
+                    .collect::<BTreeMap<_, _>>()
+            }),
         })
     }
 
@@ -1231,6 +1243,8 @@ impl ImportMapConfiguration {
     pub fn combine(self, config: Self) -> Self {
         Self {
             direction: self.direction.or(config.direction),
+            detect_string_imports: self.detect_string_imports.or(config.detect_string_imports),
+            include_dependencies: self.include_dependencies.or(config.include_dependencies),
         }
     }
 }

@@ -37,6 +37,7 @@ clap_complete_command = { workspace = true }
 clearscreen = { workspace = true }
 colored = { workspace = true }
 filetime = { workspace = true }
+globwalk = { workspace = true }
 ignore = { workspace = true }
 is-macro = { workspace = true }
 itertools = { workspace = true }

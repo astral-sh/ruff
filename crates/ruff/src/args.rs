@@ -141,16 +141,19 @@ pub enum Command {
     },
 }
 
-// The `Parser` derive is for ruff_dev, for ruff `Args` would be sufficient
 #[derive(Clone, Debug, clap::Parser)]
-#[allow(clippy::struct_excessive_bools)]
 pub struct ImportMapCommand {
-    /// The direction of the import map.
-    #[clap(long, value_enum)]
-    pub direction: Option<Direction>,
-    /// List of files or directories to check.
+    /// List of files or directories to include.
     #[clap(help = "List of files or directories to include [default: .]")]
     pub files: Vec<PathBuf>,
+    /// The direction of the import map. By default, generates a dependency map, i.e., a map from
+    /// file to files that it depends on. Use `--direction dependents` to generate a map from file
+    /// to files that depend on it.
+    #[clap(long, value_enum, default_value_t)]
+    pub direction: Direction,
+    /// Attempt to detect imports from string literals.
+    #[clap(long)]
+    pub detect_string_imports: bool,
 }
 
 // The `Parser` derive is for ruff_dev, for ruff `Args` would be sufficient
@@ -762,10 +765,17 @@ impl ImportMapCommand {
         self,
         global_options: GlobalConfigArgs,
     ) -> anyhow::Result<(ImportMapArgs, ConfigArguments)> {
-        let format_arguments = ImportMapArgs { files: self.files };
+        let format_arguments = ImportMapArgs {
+            files: self.files,
+            direction: self.direction,
+        };
 
         let cli_overrides = ExplicitConfigOverrides {
-            direction: self.direction,
+            detect_string_imports: if self.detect_string_imports {
+                Some(true)
+            } else {
+                None
+            },
             ..ExplicitConfigOverrides::default()
         };
 
@@ -928,7 +938,7 @@ A `--config` flag must either be a path to a `.toml` configuration file
         // the user was trying to pass in a path to a configuration file
         // or some inline TOML.
         // We want to display the most helpful error to the user as possible.
-        if std::path::Path::new(value)
+        if Path::new(value)
             .extension()
             .map_or(false, |ext| ext.eq_ignore_ascii_case("toml"))
         {
@@ -1188,11 +1198,10 @@ impl LineColumnParseError {
     }
 }
 
-/// CLI settings that are distinct from configuration (commands, lists of files,
-/// etc.).
-#[allow(clippy::struct_excessive_bools)]
+/// CLI settings that are distinct from configuration (commands, lists of files, etc.).
 pub struct ImportMapArgs {
     pub files: Vec<PathBuf>,
+    pub direction: Direction,
 }
 
 /// Configuration overrides provided via dedicated CLI flags:
@@ -1226,7 +1235,7 @@ struct ExplicitConfigOverrides {
     output_format: Option<OutputFormat>,
     show_fixes: Option<bool>,
     extension: Option<Vec<ExtensionPair>>,
-    direction: Option<Direction>,
+    detect_string_imports: Option<bool>,
 }
 
 impl ConfigurationTransformer for ExplicitConfigOverrides {
@@ -1311,8 +1320,8 @@ impl ConfigurationTransformer for ExplicitConfigOverrides {
         if let Some(extension) = &self.extension {
             config.extension = Some(extension.iter().cloned().collect());
         }
-        if let Some(direction) = &self.direction {
-            config.import_map.direction = Some(*direction);
+        if let Some(detect_string_imports) = &self.detect_string_imports {
+            config.import_map.detect_string_imports = Some(*detect_string_imports);
         }
 
         config

@@ -1,6 +1,8 @@
 use regex::Regex;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+use std::path::PathBuf;
 use strum::IntoEnumIterator;
 
 use crate::options_base::{OptionsMetadata, Visit};
@@ -3328,6 +3330,29 @@ pub struct ImportMapOptions {
         "#
     )]
     pub direction: Option<Direction>,
+    /// Whether to detect imports from string literals. When enabled, Ruff will search for string
+    /// literals that "look like" import paths, and include them in the import map, if they resolve
+    /// to valid Python modules.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            detect-string-imports = true
+        "#
+    )]
+    pub detect_string_imports: Option<bool>,
+    /// A map from file path to the list of file paths or globs that should be considered
+    /// dependencies of that file, regardless of whether relevant imports are detected.
+    #[option(
+        default = "{}",
+        value_type = "dict[str, list[str]]",
+        example = r#"
+            include-dependencies = {
+                "foo/bar.py": ["foo/baz/*.py"],
+            }
+        "#
+    )]
+    pub include_dependencies: Option<BTreeMap<PathBuf, Vec<String>>>,
 }
 
 #[cfg(test)]

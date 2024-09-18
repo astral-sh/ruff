@@ -69,6 +69,7 @@ fern = { version = "0.6.1" }
 filetime = { version = "0.2.23" }
 glob = { version = "0.3.1" }
 globset = { version = "0.4.14" }
+globwalk = { version = "0.9.1" }
 hashbrown = "0.14.3"
 ignore = { version = "0.4.22" }
 imara-diff = { version = "0.1.5" }

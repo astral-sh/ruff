@@ -22,6 +22,26 @@ impl ModuleImports {
     pub fn insert(&mut self, path: PathBuf) {
         self.0.insert(path);
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Convert the file paths to be relative to a given path.
+    #[must_use]
+    pub fn relative_to(&self, path: &Path) -> Self {
+        let mut imports = Self::default();
+        for import in &self.0 {
+            if let Ok(path) = import.strip_prefix(path) {
+                imports.insert(path.to_path_buf());
+            }
+        }
+        imports
+    }
 }
 
 #[derive(Debug, Default)]
@@ -47,19 +67,28 @@ impl ImportMap {
 
 impl FromIterator<(PathBuf, ModuleImports)> for ImportMap {
     fn from_iter<I: IntoIterator<Item = (PathBuf, ModuleImports)>>(iter: I) -> Self {
-        Self(iter.into_iter().collect())
+        let mut map = ImportMap::default();
+        for (path, imports) in iter {
+            map.0.entry(path).or_default().0.extend(imports.0);
+        }
+        map
     }
 }
 
 /// Generate the module imports for a given Python file.
-pub fn generate(path: &Path, package: Option<&Path>, db: &ModuleDb) -> Result<ModuleImports> {
+pub fn generate(
+    path: &Path,
+    package: Option<&Path>,
+    string_imports: bool,
+    db: &ModuleDb,
+) -> Result<ModuleImports> {
     // Read and parse the source code.
     let source = std::fs::read_to_string(path)?;
     let parsed = parse(&source, Mode::Module)?;
     let module_path = package.and_then(|package| to_module_path(package, path));
 
     // Collect the imports.
-    let imports = Collector::default().collect(parsed.syntax());
+    let imports = Collector::new(string_imports).collect(parsed.syntax());
 
     // Resolve the imports.
     let mut resolved_imports = ModuleImports::default();

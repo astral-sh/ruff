@@ -1,14 +1,15 @@
 use ruff_linter::display_settings;
 use ruff_linter::settings::types::ExtensionMapping;
 use ruff_macros::CacheKey;
+use std::collections::BTreeMap;
 use std::fmt;
 use std::path::PathBuf;
 
 #[derive(Debug, Default, Clone, CacheKey)]
 pub struct ImportMapSettings {
+    pub detect_string_imports: bool,
+    pub include_dependencies: BTreeMap<PathBuf, (PathBuf, Vec<String>)>,
     pub extension: ExtensionMapping,
-    pub src: Vec<PathBuf>,
-    pub direction: Direction,
 }
 
 impl fmt::Display for ImportMapSettings {
@@ -18,7 +19,9 @@ impl fmt::Display for ImportMapSettings {
             formatter = f,
             namespace = "import_map",
             fields = [
-                self.direction,
+                self.detect_string_imports,
+                self.extension | debug,
+                self.include_dependencies | debug,
             ]
         }
         Ok(())

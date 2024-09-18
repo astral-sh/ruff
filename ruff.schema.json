@@ -1459,6 +1459,13 @@
       "description": "Configures Ruff's import map generation.",
       "type": "object",
       "properties": {
+        "detect-string-imports": {
+          "description": "Whether to detect imports from string literals. When enabled, Ruff will search for string literals that \"look like\" import paths, and include them in the import map, if they resolve to valid Python modules.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "direction": {
           "description": "Whether to generate a map from file to files that it depends on (dependencies) or files that depend on it (dependents).",
           "anyOf": [
@@ -1469,6 +1476,19 @@
               "type": "null"
             }
           ]
+        },
+        "include-dependencies": {
+          "description": "A map from file path to the list of file paths or globs that should be considered dependencies of that file, regardless of whether relevant imports are detected.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         }
       },
       "additionalProperties": false

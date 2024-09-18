@@ -4,7 +4,6 @@ use ruff_db::files::{File, Files};
 use ruff_db::system::{OsSystem, System, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Upcast};
-use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 #[salsa::db]
@@ -15,33 +14,25 @@ pub struct ModuleDb {
     vendored: VendoredFileSystem,
 }
 
-impl ModuleDb {
-    pub fn from_settings(mut sources: BTreeSet<PathBuf>) -> Result<Self> {
-        // TODO(charlie): One database per package root.
-        let search_paths = {
-            let search_path = sources
-                .pop_last()
-                .ok_or_else(|| anyhow::anyhow!("No sources provided to module database"))?;
-            let mut search_paths = SearchPathSettings::new(
-                SystemPathBuf::from_path_buf(search_path)
-                    .map_err(|path| anyhow::anyhow!(format!("Invalid path: {}", path.display())))?,
-            );
-            for source in sources {
-                search_paths.extra_paths.push(
-                    SystemPathBuf::from_path_buf(source.clone()).map_err(|path| {
-                        anyhow::anyhow!(format!("Invalid path: {}", path.display()))
-                    })?,
-                );
-            }
-            search_paths
-        };
+impl Default for ModuleDb {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
+impl ModuleDb {
+    /// Initialize a [`ModuleDb`] from the given source root.
+    pub fn from_src_root(src_root: PathBuf) -> Result<Self> {
         let db = Self::new();
         Program::from_settings(
             &db,
             &ProgramSettings {
                 target_version: PythonVersion::default(),
-                search_paths,
+                search_paths: SearchPathSettings::new(
+                    SystemPathBuf::from_path_buf(src_root).map_err(|path| {
+                        anyhow::anyhow!(format!("Invalid path: {}", path.display()))
+                    })?,
+                ),
             },
         )?;
         Ok(db)
