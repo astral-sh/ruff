@@ -550,6 +550,10 @@ where
                     };
 
                     // Look for imports `from __future__ import annotations`, ignore `as ...`
+                    // We intentionally don't enforce the rules about location of `__future__`
+                    // imports here, we assume the user's intent was to apply the `__future__`
+                    // import, so we still check using it (and will also emit a diagnostic about a
+                    // miss-placed `__future__` import.)
                     self.has_future_annotations |= alias.name.id.as_str() == "annotations"
                         && node
                             .module

@@ -321,7 +321,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// Are we currently inferring types in file with deferred types?
     /// This is true for stub files and files with `__future__.annotations`
     fn are_all_types_deferred(&self) -> bool {
-        self.file.is_stub(self.db.upcast()) || self.index.has_future_annotations()
+        self.index.has_future_annotations() || self.file.is_stub(self.db.upcast())
     }
 
     /// Are we currently inferring deferred types?
