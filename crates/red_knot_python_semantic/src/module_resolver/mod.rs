@@ -1,6 +1,6 @@
 use std::iter::FusedIterator;
 
-pub(crate) use module::Module;
+pub use module::Module;
 pub use resolver::resolve_module;
 pub(crate) use resolver::{file_to_module, SearchPaths};
 use ruff_db::system::SystemPath;

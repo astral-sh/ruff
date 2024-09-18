@@ -20,7 +20,7 @@ use ruff_linter::settings::types::OutputFormat;
 use ruff_linter::{fs, warn_user, warn_user_once};
 use ruff_workspace::Settings;
 
-use crate::args::{Args, CheckCommand, Command, FormatCommand};
+use crate::args::{Args, CheckCommand, Command, FormatCommand, ImportMapCommand};
 use crate::printer::{Flags as PrinterFlags, Printer};
 
 pub mod args;
@@ -186,6 +186,7 @@ pub fn run(
         Command::Check(args) => check(args, global_options),
         Command::Format(args) => format(args, global_options),
         Command::Server(args) => server(args),
+        Command::ImportMap(args) => import_map(args, global_options),
     }
 }
 
@@ -197,6 +198,12 @@ fn format(args: FormatCommand, global_options: GlobalConfigArgs) -> Result<ExitS
     } else {
         commands::format::format(cli, &config_arguments)
     }
+}
+
+fn import_map(args: ImportMapCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {
+    let (cli, config_arguments) = args.partition(global_options)?;
+
+    commands::import_map::import_map(cli, &config_arguments)
 }
 
 fn server(args: ServerCommand) -> Result<ExitStatus> {

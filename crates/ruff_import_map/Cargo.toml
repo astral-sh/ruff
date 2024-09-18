@@ -1,0 +1,29 @@
+[package]
+name = "ruff_import_map"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+repository.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+ruff_cache = { workspace = true }
+ruff_macros = { workspace = true }
+ruff_python_trivia = { workspace = true }
+ruff_source_file = { workspace = true }
+ruff_text_size = { workspace = true }
+ruff_python_ast = { workspace = true }
+ruff_linter = { workspace = true }
+ruff_db = { workspace = true }
+ruff_python_parser = { workspace = true }
+ruff_python_stdlib = { workspace = true }
+red_knot_python_semantic = { workspace = true }
+
+anyhow = { workspace = true }
+salsa = { workspace = true }
+
+[lints]
+workspace = true

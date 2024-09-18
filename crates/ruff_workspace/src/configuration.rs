@@ -19,6 +19,7 @@ use strum::IntoEnumIterator;
 
 use ruff_cache::cache_dir;
 use ruff_formatter::IndentStyle;
+use ruff_import_map::ImportMapSettings;
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::registry::RuleNamespace;
 use ruff_linter::registry::{Rule, RuleSet, INCOMPATIBLE_CODES};
@@ -45,8 +46,8 @@ use crate::options::{
     Flake8ErrMsgOptions, Flake8GetTextOptions, Flake8ImplicitStrConcatOptions,
     Flake8ImportConventionsOptions, Flake8PytestStyleOptions, Flake8QuotesOptions,
     Flake8SelfOptions, Flake8TidyImportsOptions, Flake8TypeCheckingOptions,
-    Flake8UnusedArgumentsOptions, FormatOptions, IsortOptions, LintCommonOptions, LintOptions,
-    McCabeOptions, Options, Pep8NamingOptions, PyUpgradeOptions, PycodestyleOptions,
+    Flake8UnusedArgumentsOptions, FormatOptions, ImportMapOptions, IsortOptions, LintCommonOptions,
+    LintOptions, McCabeOptions, Options, Pep8NamingOptions, PyUpgradeOptions, PycodestyleOptions,
     PydocstyleOptions, PyflakesOptions, PylintOptions, RuffOptions,
 };
 use crate::settings::{
@@ -142,6 +143,7 @@ pub struct Configuration {
 
     pub lint: LintConfiguration,
     pub format: FormatConfiguration,
+    pub import_map: ImportMapConfiguration,
 }
 
 impl Configuration {
@@ -209,6 +211,8 @@ impl Configuration {
 
         let lint = self.lint;
         let lint_preview = lint.preview.unwrap_or(global_preview);
+
+        let import_map = ImportMapSettings {};
 
         let line_length = self.line_length.unwrap_or_default();
 
@@ -401,6 +405,7 @@ impl Configuration {
             },
 
             formatter,
+            import_map,
         })
     }
 
@@ -534,6 +539,10 @@ impl Configuration {
                 options.format.unwrap_or_default(),
                 project_root,
             )?,
+            import_map: ImportMapConfiguration::from_options(
+                options.import_map.unwrap_or_default(),
+                project_root,
+            )?,
         })
     }
 
@@ -573,6 +582,7 @@ impl Configuration {
 
             lint: self.lint.combine(config.lint),
             format: self.format.combine(config.format),
+            import_map: self.import_map.combine(config.import_map),
         }
     }
 }
@@ -1191,6 +1201,23 @@ impl FormatConfiguration {
         }
     }
 }
+
+#[derive(Clone, Debug, Default)]
+pub struct ImportMapConfiguration {}
+
+impl ImportMapConfiguration {
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn from_options(options: ImportMapOptions, project_root: &Path) -> Result<Self> {
+        Ok(Self {})
+    }
+
+    #[must_use]
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn combine(self, config: Self) -> Self {
+        Self {}
+    }
+}
+
 pub(crate) trait CombinePluginOptions {
     #[must_use]
     fn combine(self, other: Self) -> Self;

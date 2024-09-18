@@ -92,6 +92,7 @@ pub struct Args {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, clap::Subcommand)]
 pub enum Command {
+    ImportMap(ImportMapCommand),
     /// Run Ruff on the given files or directories (default).
     Check(CheckCommand),
     /// Explain a rule (or all rules).
@@ -127,7 +128,9 @@ pub enum Command {
     Clean,
     /// Generate shell completion.
     #[clap(hide = true)]
-    GenerateShellCompletion { shell: clap_complete_command::Shell },
+    GenerateShellCompletion {
+        shell: clap_complete_command::Shell,
+    },
     /// Run the Ruff formatter on the given files or directories.
     Format(FormatCommand),
     /// Run the language server.
@@ -137,6 +140,24 @@ pub enum Command {
         #[arg(long, value_enum, default_value = "text")]
         output_format: HelpFormat,
     },
+}
+
+// The `Parser` derive is for ruff_dev, for ruff `Args` would be sufficient
+#[derive(Clone, Debug, clap::Parser)]
+#[allow(clippy::struct_excessive_bools)]
+pub struct ImportMapCommand {
+    /// List of files or directories to check.
+    #[clap(help = "List of files or directories to check [default: .]")]
+    pub files: Vec<PathBuf>,
+    /// The name of the file when passing it through stdin.
+    #[arg(long, help_heading = "Miscellaneous")]
+    pub stdin_filename: Option<PathBuf>,
+    /// Disable cache reads.
+    #[arg(short, long, env = "RUFF_NO_CACHE", help_heading = "Miscellaneous")]
+    pub no_cache: bool,
+    /// Path to the cache directory.
+    #[arg(long, env = "RUFF_CACHE_DIR", help_heading = "Miscellaneous")]
+    pub cache_dir: Option<PathBuf>,
 }
 
 // The `Parser` derive is for ruff_dev, for ruff `Args` would be sufficient
@@ -742,6 +763,28 @@ impl FormatCommand {
     }
 }
 
+impl ImportMapCommand {
+    /// Partition the CLI into command-line arguments and configuration
+    /// overrides.
+    pub fn partition(
+        self,
+        global_options: GlobalConfigArgs,
+    ) -> anyhow::Result<(ImportMapArgs, ConfigArguments)> {
+        let format_arguments = ImportMapArgs {
+            files: self.files,
+            no_cache: self.no_cache,
+        };
+
+        let cli_overrides = ExplicitConfigOverrides {
+            // Unsupported on the formatter CLI, but required on `Overrides`.
+            ..ExplicitConfigOverrides::default()
+        };
+
+        let config_args = ConfigArguments::from_cli_arguments(global_options, cli_overrides)?;
+        Ok((format_arguments, config_args))
+    }
+}
+
 fn resolve_bool_arg(yes: bool, no: bool) -> Option<bool> {
     match (yes, no) {
         (true, false) => Some(true),
@@ -1154,6 +1197,14 @@ impl LineColumnParseError {
             }
         }
     }
+}
+
+/// CLI settings that are distinct from configuration (commands, lists of files,
+/// etc.).
+#[allow(clippy::struct_excessive_bools)]
+pub struct ImportMapArgs {
+    pub no_cache: bool,
+    pub files: Vec<PathBuf>,
 }
 
 /// Configuration overrides provided via dedicated CLI flags:

@@ -2213,6 +2213,7 @@ dependencies = [
  "regex",
  "ruff_cache",
  "ruff_diagnostics",
+ "ruff_import_map",
  "ruff_linter",
  "ruff_macros",
  "ruff_notebook",
@@ -2368,6 +2369,25 @@ dependencies = [
  "static_assertions",
  "tracing",
  "unicode-width",
+]
+
+[[package]]
+name = "ruff_import_map"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "red_knot_python_semantic",
+ "ruff_cache",
+ "ruff_db",
+ "ruff_linter",
+ "ruff_macros",
+ "ruff_python_ast",
+ "ruff_python_parser",
+ "ruff_python_stdlib",
+ "ruff_python_trivia",
+ "ruff_source_file",
+ "ruff_text_size",
+ "salsa",
 ]
 
 [[package]]
@@ -2743,6 +2763,7 @@ dependencies = [
  "regex",
  "ruff_cache",
  "ruff_formatter",
+ "ruff_import_map",
  "ruff_linter",
  "ruff_macros",
  "ruff_python_ast",
