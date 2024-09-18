@@ -326,18 +326,18 @@ fn docstring_options() -> Result<()> {
     let ruff_toml = tempdir.path().join("ruff.toml");
     fs::write(
         &ruff_toml,
-        r#"
+        r"
 [format]
 docstring-code-format = true
 docstring-code-line-length = 20
-"#,
+",
     )?;
 
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(["format", "--config"])
         .arg(&ruff_toml)
         .arg("-")
-        .pass_stdin(r#"
+        .pass_stdin(r"
 def f(x):
     '''
     Something about `f`. And an example:
@@ -357,7 +357,7 @@ def f(x):
     >>> foo, bar, quux = this_is_a_long_line(lion, hippo, lemur, bear)
     '''
     pass
-"#), @r###"
+"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -509,9 +509,9 @@ fn syntax_error() -> Result<()> {
 
     fs::write(
         tempdir.path().join("main.py"),
-        r#"
+        r"
 from module import =
-"#,
+",
     )?;
 
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
