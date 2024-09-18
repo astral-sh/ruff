@@ -443,6 +443,17 @@
         "null"
       ]
     },
+    "import-map": {
+      "description": "Options to configure import map generation.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/ImportMapOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "include": {
       "description": "A list of file patterns to include when linting.\n\nInclusion are based on globs, and should be single-path patterns, like `*.pyw`, to include any file with the `.pyw` extension. `pyproject.toml` is included here not for configuration but because we lint whether e.g. the `[project]` matches the schema.\n\nNotebook files (`.ipynb` extension) are included by default on Ruff 0.6.0+.\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
       "type": [
@@ -796,6 +807,24 @@
           "type": "string",
           "enum": [
             "pep257"
+          ]
+        }
+      ]
+    },
+    "Direction": {
+      "oneOf": [
+        {
+          "description": "Construct a map from module to its dependencies (i.e., the modules that it imports).",
+          "type": "string",
+          "enum": [
+            "Dependencies"
+          ]
+        },
+        {
+          "description": "Construct a map from module to its dependents (i.e., the modules that import it).",
+          "type": "string",
+          "enum": [
+            "Dependents"
           ]
         }
       ]
@@ -1421,6 +1450,24 @@
           "type": [
             "boolean",
             "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "ImportMapOptions": {
+      "description": "Configures Ruff's import map generation.",
+      "type": "object",
+      "properties": {
+        "direction": {
+          "description": "Whether to generate a map from file to files that it depends on (dependencies) or files that depend on it (dependents).",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Direction"
+            },
+            {
+              "type": "null"
+            }
           ]
         }
       },

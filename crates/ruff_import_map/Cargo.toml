@@ -10,26 +10,24 @@ authors.workspace = true
 license.workspace = true
 
 [dependencies]
+red_knot_python_semantic = { workspace = true }
 ruff_cache = { workspace = true }
-ruff_macros = { workspace = true }
-ruff_python_trivia = { workspace = true }
-ruff_source_file = { workspace = true }
-ruff_text_size = { workspace = true }
-ruff_python_ast = { workspace = true }
+ruff_db = { workspace = true, features = ["os"] }
 ruff_linter = { workspace = true }
-ruff_db = { workspace = true }
+ruff_macros = { workspace = true }
+ruff_python_ast = { workspace = true }
 ruff_python_parser = { workspace = true }
 ruff_python_stdlib = { workspace = true }
-red_knot_python_semantic = { workspace = true }
 
 anyhow = { workspace = true }
 clap = { workspace = true, optional = true }
-rustc-hash = { workspace = true }
 salsa = { workspace = true }
-serde = { workspace = true, optional = true }
 schemars = { workspace = true, optional = true }
-tracing = "0.1.40"
-tracing-subscriber = "0.3.18"
+serde = { workspace = true, optional = true }
 
 [lints]
 workspace = true
+
+[package.metadata.cargo-shear]
+# Used via `CacheKey` macro expansion.
+ignored = ["ruff_cache"]

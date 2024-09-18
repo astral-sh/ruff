@@ -1,3 +1,4 @@
+use ruff_linter::display_settings;
 use ruff_linter::settings::types::ExtensionMapping;
 use ruff_macros::CacheKey;
 use std::fmt;
@@ -12,7 +13,14 @@ pub struct ImportMapSettings {
 
 impl fmt::Display for ImportMapSettings {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // STOPSHIP(charlie): Add these.
+        writeln!(f, "\n# Import Map Settings")?;
+        display_settings! {
+            formatter = f,
+            namespace = "import_map",
+            fields = [
+                self.direction,
+            ]
+        }
         Ok(())
     }
 }
@@ -27,4 +35,13 @@ pub enum Direction {
     Dependencies,
     /// Construct a map from module to its dependents (i.e., the modules that import it).
     Dependents,
+}
+
+impl fmt::Display for Direction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Dependencies => write!(f, "\"dependencies\""),
+            Self::Dependents => write!(f, "\"dependents\""),
+        }
+    }
 }

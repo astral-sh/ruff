@@ -3311,31 +3311,20 @@ pub struct FormatOptions {
     pub docstring_code_line_length: Option<DocstringCodeLineWidth>,
 }
 
-/// Configures the way Ruff formats your code.
+/// Configures Ruff's import map generation.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Deserialize, Serialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct ImportMapOptions {
-    /// A list of file patterns to exclude from formatting in addition to the files excluded globally (see [`exclude`](#exclude), and [`extend-exclude`](#extend-exclude)).
-    ///
-    /// Exclusions are based on globs, and can be either:
-    ///
-    /// - Single-path patterns, like `.mypy_cache` (to exclude any directory
-    ///   named `.mypy_cache` in the tree), `foo.py` (to exclude any file named
-    ///   `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ).
-    /// - Relative patterns, like `directory/foo.py` (to exclude that specific
-    ///   file) or `directory/*.py` (to exclude any Python files in
-    ///   `directory`). Note that these paths are relative to the project root
-    ///   (e.g., the directory containing your `pyproject.toml`).
-    ///
-    /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
+    /// Whether to generate a map from file to files that it depends on (dependencies) or files that
+    /// depend on it (dependents).
     #[option(
-        default = r#"[]"#,
-        value_type = "list[str]",
+        default = r#"\"dependencies\""#,
+        value_type = "\"dependents\" | \"dependencies\"",
         example = r#"
-            exclude = ["generated"]
+            direction = "dependencies"
         "#
     )]
     pub direction: Option<Direction>,

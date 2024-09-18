@@ -92,7 +92,6 @@ pub struct Args {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, clap::Subcommand)]
 pub enum Command {
-    ImportMap(ImportMapCommand),
     /// Run Ruff on the given files or directories (default).
     Check(CheckCommand),
     /// Explain a rule (or all rules).
@@ -128,13 +127,13 @@ pub enum Command {
     Clean,
     /// Generate shell completion.
     #[clap(hide = true)]
-    GenerateShellCompletion {
-        shell: clap_complete_command::Shell,
-    },
+    GenerateShellCompletion { shell: clap_complete_command::Shell },
     /// Run the Ruff formatter on the given files or directories.
     Format(FormatCommand),
     /// Run the language server.
     Server(ServerCommand),
+    /// Generate a map of Python file dependencies.
+    ImportMap(ImportMapCommand),
     /// Display Ruff's version
     Version {
         #[arg(long, value_enum, default_value = "text")]

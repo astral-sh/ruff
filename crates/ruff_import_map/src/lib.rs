@@ -4,13 +4,10 @@ use crate::resolver::Resolver;
 pub use crate::settings::{Direction, ImportMapSettings};
 use anyhow::Result;
 use ruff_python_ast::helpers::to_module_path;
-use ruff_python_ast::PySourceType;
-use ruff_python_parser::{parse, AsMode};
-use rustc_hash::{FxHashMap, FxHashSet};
+use ruff_python_parser::{parse, Mode};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
-use tracing_subscriber::Layer;
 
 mod collector;
 mod db;
@@ -54,19 +51,11 @@ impl FromIterator<(PathBuf, ModuleImports)> for ImportMap {
     }
 }
 
-pub fn generate(
-    path: &Path,
-    package: Option<&Path>,
-    source_type: PySourceType,
-    settings: &ImportMapSettings,
-    // db: &ModuleDb,
-) -> Result<ModuleImports> {
-    // Initialize the module database.
-    let db = ModuleDb::from_settings(&settings)?;
-
+/// Generate the module imports for a given Python file.
+pub fn generate(path: &Path, package: Option<&Path>, db: &ModuleDb) -> Result<ModuleImports> {
     // Read and parse the source code.
     let source = std::fs::read_to_string(path)?;
-    let parsed = parse(&source, source_type.as_mode())?;
+    let parsed = parse(&source, Mode::Module)?;
     let module_path = package.and_then(|package| to_module_path(package, path));
 
     // Collect the imports.
@@ -75,7 +64,7 @@ pub fn generate(
     // Resolve the imports.
     let mut resolved_imports = ModuleImports::default();
     for import in imports {
-        let Some(resolved) = Resolver::new(module_path.as_deref(), &db).resolve(&import) else {
+        let Some(resolved) = Resolver::new(module_path.as_deref(), db).resolve(&import) else {
             continue;
         };
         let Some(path) = resolved.as_system_path() else {

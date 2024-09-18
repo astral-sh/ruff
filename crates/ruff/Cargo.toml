@@ -56,7 +56,6 @@ toml = { workspace = true }
 tracing = { workspace = true, features = ["log"] }
 walkdir = { workspace = true }
 wild = { workspace = true }
-tracing-subscriber = "0.3.18"
 
 [dev-dependencies]
 # Enable test rules during development

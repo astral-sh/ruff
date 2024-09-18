@@ -15,7 +15,6 @@ from __future__ import annotations
 import argparse
 import subprocess
 
-import _utils
 from _utils import ROOT_DIR, dir_name, get_indent, pascal_case, snake_case
 
 

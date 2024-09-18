@@ -213,7 +213,10 @@ impl Configuration {
         let import_map_defaults = ImportMapSettings::default();
 
         let import_map = ImportMapSettings {
-            src: vec![project_root.to_path_buf()],
+            src: self
+                .src
+                .clone()
+                .unwrap_or_else(|| vec![project_root.to_path_buf(), project_root.join("src")]),
             extension: self.extension.clone().unwrap_or_default(),
             direction: import_map
                 .direction
@@ -550,7 +553,6 @@ impl Configuration {
             )?,
             import_map: ImportMapConfiguration::from_options(
                 options.import_map.unwrap_or_default(),
-                project_root,
             )?,
         })
     }
@@ -1218,7 +1220,7 @@ pub struct ImportMapConfiguration {
 
 impl ImportMapConfiguration {
     #[allow(clippy::needless_pass_by_value)]
-    pub fn from_options(options: ImportMapOptions, project_root: &Path) -> Result<Self> {
+    pub fn from_options(options: ImportMapOptions) -> Result<Self> {
         Ok(Self {
             direction: options.direction,
         })
