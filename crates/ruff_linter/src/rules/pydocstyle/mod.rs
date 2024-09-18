@@ -49,6 +49,7 @@ mod tests {
     #[test_case(Rule::OverIndentation, Path::new("D.py"))]
     #[test_case(Rule::OverIndentation, Path::new("D208.py"))]
     #[test_case(Rule::NoSignature, Path::new("D.py"))]
+    #[test_case(Rule::NoSignature, Path::new("D402.py"))]
     #[test_case(Rule::SurroundingWhitespace, Path::new("D.py"))]
     #[test_case(Rule::DocstringStartsWithThis, Path::new("D.py"))]
     #[test_case(Rule::UnderIndentation, Path::new("D.py"))]
