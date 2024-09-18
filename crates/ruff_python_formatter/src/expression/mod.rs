@@ -385,16 +385,24 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
             OptionalParentheses::Always => OptionalParentheses::Always,
             // The reason to add parentheses is to avoid a syntax error when breaking an expression over multiple lines.
             // Therefore, it is unnecessary to add an additional pair of parentheses if an outer expression
-            // is parenthesized.
-            _ if f.context().node_level().is_parenthesized() => OptionalParentheses::Never,
+            // is parenthesized. Unless, it's the `Parenthesize::IfBreaksParenthesizedNested` layout
+            // where parenthesizing nested `maybe_parenthesized_expression` is explicitly desired.
+            _ if f.context().node_level().is_parenthesized() => {
+                return if let Parenthesize::IfBreaksParenthesizedNested = parenthesize {
+                    parenthesize_if_expands(&expression.format().with_options(Parentheses::Never))
+                        .with_indent(!is_expression_huggable(expression, f.context()))
+                        .fmt(f)
+                } else {
+                    expression.format().with_options(Parentheses::Never).fmt(f)
+                }
+            }
             needs_parentheses => needs_parentheses,
         };
 
         match needs_parentheses {
             OptionalParentheses::Multiline => match parenthesize {
-                Parenthesize::IfBreaksOptionalParentheses
-                    if !is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled(f.context()) =>
-                {
+
+                Parenthesize::IfBreaksParenthesized | Parenthesize::IfBreaksParenthesizedNested if !is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled(f.context()) => {
                     parenthesize_if_expands(&expression.format().with_options(Parentheses::Never))
                         .fmt(f)
                 }
@@ -402,9 +410,7 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                     expression.format().with_options(Parentheses::Never).fmt(f)
                 }
 
-                Parenthesize::Optional
-                | Parenthesize::IfBreaks
-                | Parenthesize::IfBreaksOptionalParentheses => {
+                Parenthesize::Optional | Parenthesize::IfBreaks | Parenthesize::IfBreaksParenthesized | Parenthesize::IfBreaksParenthesizedNested => {
                     if can_omit_optional_parentheses(expression, f.context()) {
                         optional_parentheses(&expression.format().with_options(Parentheses::Never))
                             .fmt(f)
@@ -417,7 +423,7 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                 }
             },
             OptionalParentheses::BestFit => match parenthesize {
-                Parenthesize::IfBreaksOptionalParentheses => {
+                Parenthesize::IfBreaksParenthesized | Parenthesize::IfBreaksParenthesizedNested => {
                     parenthesize_if_expands(&expression.format().with_options(Parentheses::Never))
                         .fmt(f)
                 }
@@ -440,23 +446,11 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                     }
                 }
             },
-            OptionalParentheses::Never => match parenthesize {
-                Parenthesize::IfBreaksOptionalParentheses => {
-                    if is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled(f.context()) {
-                        optional_parentheses(&expression.format().with_options(Parentheses::Never))
-                            .fmt(f)
-                    } else {
-                        parenthesize_if_expands(
-                            &expression.format().with_options(Parentheses::Never),
-                        )
-                        .with_indent(!is_expression_huggable(expression, f.context()))
-                        .fmt(f)
-                    }
-                }
+            OptionalParentheses::Never => {
 
-                Parenthesize::Optional | Parenthesize::IfBreaks | Parenthesize::IfRequired => {
+
                     expression.format().with_options(Parentheses::Never).fmt(f)
-                }
+
             },
 
             OptionalParentheses::Always => {

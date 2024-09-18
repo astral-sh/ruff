@@ -112,7 +112,7 @@ impl FormatNodeRule<WithItem> for FormatWithItem {
                     maybe_parenthesize_expression(
                         context_expr,
                         item,
-                        Parenthesize::IfBreaksOptionalParentheses,
+                        Parenthesize::IfBreaksParenthesizedNested,
                     )
                     .fmt(f)?;
                 } else {

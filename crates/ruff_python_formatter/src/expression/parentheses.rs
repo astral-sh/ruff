@@ -56,11 +56,15 @@ pub(crate) enum Parenthesize {
     /// Adding parentheses is desired to prevent the comments from wandering.
     IfRequired,
 
-    /// Same as [`Self::IfBreaks`] except:
-    /// * it adds optional parentheses around expressions that normally don't require parentheses
-    ///   ([`NeedsParentheses::Never`]) but exceed the configured line width.
-    /// * it doesn't use the best fit layout, instead it adds parentheses when the value exceeds the line width.
-    IfBreaksOptionalParentheses,
+    /// Same as [`Self::IfBreaks`] except that it uses [`parenthesize_if_expands`] for expressions
+    /// with the layout [`NeedsParentheses::BestFit`] which is used by non-splittable
+    /// expressions like literals, name, and strings.
+    IfBreaksParenthesized,
+
+    /// Same as [`Self::IfBreaksParenthesized`] but uses [`parenthesize_if_expands`] for nested
+    /// [`maybe_parenthesized_expression`] calls unlike other layouts that always omit parentheses
+    /// when outer parentheses are present.
+    IfBreaksParenthesizedNested,
 }
 
 impl Parenthesize {

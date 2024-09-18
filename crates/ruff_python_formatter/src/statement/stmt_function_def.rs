@@ -1,6 +1,3 @@
-use ruff_formatter::write;
-use ruff_python_ast::{NodeKind, StmtFunctionDef};
-
 use crate::comments::format::{
     empty_lines_after_leading_comments, empty_lines_before_trailing_comments,
 };
@@ -10,6 +7,8 @@ use crate::prelude::*;
 use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
 use crate::statement::stmt_class_def::FormatDecorators;
 use crate::statement::suite::SuiteKind;
+use ruff_formatter::write;
+use ruff_python_ast::{NodeKind, StmtFunctionDef};
 
 #[derive(Default)]
 pub struct FormatStmtFunctionDef;
@@ -118,17 +117,17 @@ fn format_function_header(f: &mut PyFormatter, item: &StmtFunctionDef) -> Format
     let format_inner = format_with(|f: &mut PyFormatter| {
         parameters.format().fmt(f)?;
 
-        if let Some(return_annotation) = returns.as_ref() {
+        if let Some(return_annotation) = returns.as_deref() {
             write!(f, [space(), token("->"), space()])?;
 
             if return_annotation.is_tuple_expr() {
-                let parentheses = if comments.has_leading(return_annotation.as_ref()) {
+                let parentheses = if comments.has_leading(return_annotation) {
                     Parentheses::Always
                 } else {
                     Parentheses::Never
                 };
                 return_annotation.format().with_options(parentheses).fmt(f)
-            } else if comments.has_trailing(return_annotation.as_ref()) {
+            } else if comments.has_trailing(return_annotation) {
                 // Intentionally parenthesize any return annotations with trailing comments.
                 // This avoids an instability in cases like:
                 // ```python
@@ -163,9 +162,10 @@ fn format_function_header(f: &mut PyFormatter, item: &StmtFunctionDef) -> Format
                     .fmt(f)
             } else {
                 let parenthesize = if parameters.is_empty() && !comments.has(parameters.as_ref()) {
-                    // If the parameters are empty, add parentheses if the return annotation
-                    // breaks at all.
-                    Parenthesize::IfBreaksOptionalParentheses
+                    // If the parameters are empty, add parentheses around literal expressions
+                    // (any non splitable expression) but avoid parenthesizing subscripts and
+                    // other parenthesized expressions unless necessary.
+                    Parenthesize::IfBreaksParenthesized
                 } else {
                     // Otherwise, use our normal rules for parentheses, which allows us to break
                     // like:
