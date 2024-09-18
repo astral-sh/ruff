@@ -388,16 +388,18 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Return true if this type is [assignable to] type `target`.
+    /// Return true if this type is a [subtype of] type `target`.
     ///
-    /// [assignable to]: https://typing.readthedocs.io/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
-    pub(crate) fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
+    /// [subtype of]: https://typing.readthedocs.io/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
+    pub(crate) fn is_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> bool {
         if self.is_equivalent_to(db, target) {
             return true;
         }
         match (self, target) {
-            (Type::Unknown | Type::Any | Type::Never, _) => true,
-            (_, Type::Unknown | Type::Any) => true,
+            (Type::Unknown | Type::Any, _) => false,
+            (_, Type::Unknown | Type::Any) => false,
+            (Type::Never, _) => true,
+            (_, Type::Never) => false,
             (Type::IntLiteral(_), Type::Instance(class))
                 if class.is_stdlib_symbol(db, "builtins", "int") =>
             {
@@ -417,9 +419,25 @@ impl<'db> Type<'db> {
             (ty, Type::Union(union)) => union
                 .elements(db)
                 .iter()
-                .any(|&elem_ty| ty.is_assignable_to(db, elem_ty)),
+                .any(|&elem_ty| ty.is_subtype_of(db, elem_ty)),
             // TODO
             _ => false,
+        }
+    }
+
+    /// Return true if this type is [assignable to] type `target`.
+    ///
+    /// [assignable to]: https://typing.readthedocs.io/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
+    pub(crate) fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
+        match (self, target) {
+            (Type::Unknown | Type::Any, _) => true,
+            (_, Type::Unknown | Type::Any) => true,
+            (ty, Type::Union(union)) => union
+                .elements(db)
+                .iter()
+                .any(|&elem_ty| ty.is_assignable_to(db, elem_ty)),
+            // TODO other types containing gradual forms (e.g. generics containing Any/Unknown)
+            _ => self.is_subtype_of(db, target),
         }
     }
 
@@ -1130,6 +1148,31 @@ mod tests {
     fn is_not_assignable_to(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(!from.into_type(&db).is_assignable_to(&db, to.into_type(&db)));
+    }
+
+    #[test_case(Ty::Never, Ty::IntLiteral(1))]
+    #[test_case(Ty::IntLiteral(1), Ty::BuiltinInstance("int"))]
+    #[test_case(Ty::StringLiteral("foo"), Ty::BuiltinInstance("str"))]
+    #[test_case(Ty::StringLiteral("foo"), Ty::LiteralString)]
+    #[test_case(Ty::LiteralString, Ty::BuiltinInstance("str"))]
+    #[test_case(Ty::BytesLiteral("foo"), Ty::BuiltinInstance("bytes"))]
+    #[test_case(Ty::IntLiteral(1), Ty::Union(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")]))]
+    fn is_subtype_of(from: Ty, to: Ty) {
+        let db = setup_db();
+        assert!(from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
+    }
+
+    #[test_case(Ty::Unknown, Ty::IntLiteral(1))]
+    #[test_case(Ty::Any, Ty::IntLiteral(1))]
+    #[test_case(Ty::IntLiteral(1), Ty::Unknown)]
+    #[test_case(Ty::IntLiteral(1), Ty::Any)]
+    #[test_case(Ty::IntLiteral(1), Ty::Union(vec![Ty::Unknown, Ty::BuiltinInstance("str")]))]
+    #[test_case(Ty::IntLiteral(1), Ty::BuiltinInstance("str"))]
+    #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str"))]
+    #[test_case(Ty::BuiltinInstance("int"), Ty::IntLiteral(1))]
+    fn is_not_subtype_of(from: Ty, to: Ty) {
+        let db = setup_db();
+        assert!(!from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
     }
 
     #[test_case(
