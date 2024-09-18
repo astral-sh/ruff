@@ -762,12 +762,25 @@ impl<'db> CallOutcome<'db> {
             } => {
                 let mut not_callable = vec![];
                 let mut union_builder = UnionBuilder::new(db);
+                let mut revealed = false;
                 for outcome in &**outcomes {
-                    let return_ty = if let Self::NotCallable { not_callable_ty } = outcome {
-                        not_callable.push(*not_callable_ty);
-                        Type::Unknown
-                    } else {
-                        outcome.unwrap_with_diagnostic(db, node, builder)
+                    let return_ty = match outcome {
+                        Self::NotCallable { not_callable_ty } => {
+                            not_callable.push(*not_callable_ty);
+                            Type::Unknown
+                        }
+                        Self::RevealType {
+                            return_ty,
+                            revealed_ty: _,
+                        } => {
+                            if revealed {
+                                *return_ty
+                            } else {
+                                revealed = true;
+                                outcome.unwrap_with_diagnostic(db, node, builder)
+                            }
+                        }
+                        _ => outcome.unwrap_with_diagnostic(db, node, builder),
                     };
                     union_builder = union_builder.add(return_ty);
                 }

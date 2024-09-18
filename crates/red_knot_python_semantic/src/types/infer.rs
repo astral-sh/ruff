@@ -705,7 +705,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         let function_type = FunctionType::new(self.db, name.id.clone(), definition, decorator_tys);
-        let function_ty = if function_type.is_stdlib_symbol(self.db, "typing", "reveal_type") {
+        let function_ty = if function_type.is_stdlib_symbol(self.db, "typing", "reveal_type")
+            || function_type.is_stdlib_symbol(self.db, "typing_extensions", "reveal_type")
+        {
             Type::RevealTypeFunction(function_type)
         } else {
             Type::Function(function_type)
@@ -2753,6 +2755,44 @@ mod tests {
 
             x = 1
             reveal_type(x)
+            ",
+        )?;
+
+        assert_file_diagnostics(&db, "/src/a.py", &["Revealed type is 'Literal[1]'."]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn reveal_type_aliased() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            from typing import reveal_type as rt
+
+            x = 1
+            rt(x)
+            ",
+        )?;
+
+        assert_file_diagnostics(&db, "/src/a.py", &["Revealed type is 'Literal[1]'."]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn reveal_type_typing_extensions() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            import typing_extensions
+
+            x = 1
+            typing_extensions.reveal_type(x)
             ",
         )?;
 
