@@ -318,18 +318,15 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.types.has_deferred |= inference.has_deferred;
     }
 
-    /// Are we currently inferring types in a stub file?
-    fn is_stub(&self) -> bool {
-        self.file.is_stub(self.db.upcast())
+    /// Are we currently inferring types in file with deferred types?
+    /// This is true for stub files and files with `__future__.annotations`
+    fn are_all_types_deferred(&self) -> bool {
+        self.file.is_stub(self.db.upcast()) || self.index.has_future_annotations()
     }
 
     /// Are we currently inferring deferred types?
     fn is_deferred(&self) -> bool {
         matches!(self.region, InferenceRegion::Deferred(_))
-    }
-
-    fn has_future_annotations(&self) -> bool {
-        self.index.has_future_annotations()
     }
 
     /// Infers types in the given [`InferenceRegion`].
@@ -701,7 +698,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             self.infer_parameters(parameters);
 
             // TODO: this should also be applied to parameter annotations.
-            if self.is_stub() || self.has_future_annotations() {
+            if self.are_all_types_deferred() {
                 self.types.has_deferred = true;
             } else {
                 self.infer_optional_annotation_expression(returns.as_deref());
@@ -831,7 +828,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         // Inference of bases deferred in stubs
         // TODO also defer stringified generic type parameters
-        if self.is_stub() || self.has_future_annotations() {
+        if self.are_all_types_deferred() {
             self.types.has_deferred = true;
         } else {
             for base in class.bases() {
@@ -842,11 +839,10 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_function_deferred(&mut self, function: &ast::StmtFunctionDef) {
         self.infer_optional_annotation_expression(function.returns.as_deref());
-        if self.is_stub() || self.has_future_annotations() {}
     }
 
     fn infer_class_deferred(&mut self, class: &ast::StmtClassDef) {
-        if self.is_stub() || self.has_future_annotations() {
+        if self.are_all_types_deferred() {
             for base in class.bases() {
                 self.infer_expression(base);
             }
