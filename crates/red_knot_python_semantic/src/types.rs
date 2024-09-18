@@ -335,7 +335,7 @@ impl<'db> Type<'db> {
 
     pub fn expect_function(self) -> FunctionType<'db> {
         self.into_function_type()
-            .expect("Expected a Type::Function variant")
+            .expect("Expected a variant wrapping a FunctionType")
     }
 
     pub const fn into_int_literal_type(self) -> Option<i64> {
@@ -374,8 +374,9 @@ impl<'db> Type<'db> {
     pub fn is_stdlib_symbol(&self, db: &'db dyn Db, module_name: &str, name: &str) -> bool {
         match self {
             Type::Class(class) => class.is_stdlib_symbol(db, module_name, name),
-            Type::Function(function) => function.is_stdlib_symbol(db, module_name, name),
-            Type::RevealTypeFunction(_) => true,
+            Type::Function(function) | Type::RevealTypeFunction(function) => {
+                function.is_stdlib_symbol(db, module_name, name)
+            }
             _ => false,
         }
     }
@@ -499,10 +500,10 @@ impl<'db> Type<'db> {
         match self {
             // TODO validate typed call arguments vs callable signature
             Type::Function(function_type) => CallOutcome::callable(function_type.return_type(db)),
-            Type::RevealTypeFunction(function_type) => CallOutcome::RevealType {
-                return_ty: function_type.return_type(db),
-                revealed_ty: *arg_types.first().unwrap_or(&Type::Unknown),
-            },
+            Type::RevealTypeFunction(function_type) => CallOutcome::revealed(
+                function_type.return_type(db),
+                *arg_types.first().unwrap_or(&Type::Unknown),
+            ),
 
             // TODO annotated return type on `__new__` or metaclass `__call__`
             Type::Class(class) => CallOutcome::callable(Type::Instance(class)),
@@ -515,14 +516,14 @@ impl<'db> Type<'db> {
 
             Type::Unknown => CallOutcome::callable(Type::Unknown),
 
-            Type::Union(union) => CallOutcome::Union {
-                called_ty: self,
-                outcomes: union
+            Type::Union(union) => CallOutcome::union(
+                self,
+                union
                     .elements(db)
                     .iter()
                     .map(|elem| elem.call(db, arg_types))
-                    .collect(),
-            },
+                    .collect::<Box<[CallOutcome<'db>]>>(),
+            ),
 
             // TODO: intersection types
             Type::Intersection(_) => CallOutcome::callable(Type::Unknown),
@@ -680,6 +681,22 @@ impl<'db> CallOutcome<'db> {
         CallOutcome::NotCallable { not_callable_ty }
     }
 
+    /// Create a new `CallOutcome::RevealType` with given revealed and return types.
+    fn revealed(return_ty: Type<'db>, revealed_ty: Type<'db>) -> CallOutcome<'db> {
+        CallOutcome::RevealType {
+            return_ty,
+            revealed_ty,
+        }
+    }
+
+    /// Create a new `CallOutcome::Union` with given wrapped outcomes.
+    fn union(called_ty: Type<'db>, outcomes: impl Into<Box<[CallOutcome<'db>]>>) -> CallOutcome {
+        CallOutcome::Union {
+            called_ty,
+            outcomes: outcomes.into(),
+        }
+    }
+
     /// Get the return type of the call, or `None` if not callable.
     fn return_ty(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
@@ -746,13 +763,13 @@ impl<'db> CallOutcome<'db> {
                 let mut not_callable = vec![];
                 let mut union_builder = UnionBuilder::new(db);
                 for outcome in &**outcomes {
-                    union_builder =
-                        union_builder.add(if let Self::NotCallable { not_callable_ty } = outcome {
-                            not_callable.push(*not_callable_ty);
-                            Type::Unknown
-                        } else {
-                            outcome.unwrap_with_diagnostic(db, node, builder)
-                        });
+                    let return_ty = if let Self::NotCallable { not_callable_ty } = outcome {
+                        not_callable.push(*not_callable_ty);
+                        Type::Unknown
+                    } else {
+                        outcome.unwrap_with_diagnostic(db, node, builder)
+                    };
+                    union_builder = union_builder.add(return_ty);
                 }
                 match not_callable[..] {
                     [] => {}

@@ -2409,13 +2409,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         rule: &str,
         message: std::fmt::Arguments,
     ) {
-        self.add_diagnostic_string(node, rule, message.to_string());
-    }
-
-    /// Adds a new diagnostic with a string message.
-    ///
-    /// The diagnostic does not get added if the rule isn't enabled for this file.
-    pub(super) fn add_diagnostic_string(&mut self, node: AnyNodeRef, rule: &str, message: String) {
         if !self.db.is_file_open(self.file) {
             return;
         }
@@ -2429,7 +2422,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.types.diagnostics.push(TypeCheckDiagnostic {
             file: self.file,
             rule: rule.to_string(),
-            message,
+            message: message.to_string(),
             range: node.range(),
         });
     }
