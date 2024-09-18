@@ -621,10 +621,22 @@ impl<'a> SemanticModel<'a> {
         }
     }
 
-    /// Lookup a symbol in the current scope. This is a carbon copy of [`Self::resolve_load`], but
-    /// doesn't add any read references to the resolved symbol.
+    /// Lookup a symbol in the current scope
     pub fn lookup_symbol(&self, symbol: &str) -> Option<BindingId> {
-        if self.in_forward_reference() {
+        self.lookup_symbol_in_scope(symbol, self.scope_id, self.in_forward_reference())
+    }
+
+    /// Lookup a symbol in a certain scope
+    ///
+    /// This is a carbon copy of [`Self::resolve_load`], but
+    /// doesn't add any read references to the resolved symbol.
+    pub fn lookup_symbol_in_scope(
+        &self,
+        symbol: &str,
+        scope: ScopeId,
+        in_forward_reference: bool,
+    ) -> Option<BindingId> {
+        if in_forward_reference {
             if let Some(binding_id) = self.scopes.global().get(symbol) {
                 if !self.bindings[binding_id].is_unbound() {
                     return Some(binding_id);
@@ -634,7 +646,7 @@ impl<'a> SemanticModel<'a> {
 
         let mut seen_function = false;
         let mut class_variables_visible = true;
-        for (index, scope_id) in self.scopes.ancestor_ids(self.scope_id).enumerate() {
+        for (index, scope_id) in self.scopes.ancestor_ids(scope).enumerate() {
             let scope = &self.scopes[scope_id];
             if scope.kind.is_class() {
                 if seen_function && matches!(symbol, "__class__") {

@@ -68,3 +68,33 @@ def negative_cases():
     @app.get("/items/{item_id}")
     async def read_item(item_id):
         return {"item_id": item_id}
+
+
+# we shouldn't flag either of these, because the bindings are used elsewhere
+# in contexts that make it clear that they're not meant to be f-strings
+GLOBAL_STRING = "foo {bar}"
+LOGGING_TEMPLATE = "{foo} bar"
+
+def uses_global_strings():
+    print(GLOBAL_STRING.format(bar="whatever"))
+
+    import logging
+    logging.error(LOGGING_TEMPLATE, 42)
+
+
+def binding_defined_after_string():
+    if bool():
+        x = "{foo}"
+    else:
+        x = "{foo}"
+    foo = 42
+    print(x.format(foo=foo))
+
+
+def variable_immediately_used_after_more_complex_binding(arg: str, as_pypath: bool):
+    msg = (
+        "module or package not found: {arg} (missing __init__.py?)"
+        if as_pypath
+        else "file or directory not found: {arg}"
+    )
+    raise TypeError(msg.format(arg=arg))

@@ -163,7 +163,7 @@ RUF027_0.py:39:19: RUF027 [*] Possible f-string without an `f` prefix
 39 |     single_line = """ {a} """  # RUF027
    |                   ^^^^^^^^^^^ RUF027
 40 |     # RUF027
-41 |     multi_line = a = """b { # comment
+41 |     multi_line = """b { # comment
    |
    = help: Add `f` prefix
 
@@ -174,15 +174,15 @@ RUF027_0.py:39:19: RUF027 [*] Possible f-string without an `f` prefix
 39    |-    single_line = """ {a} """  # RUF027
    39 |+    single_line = f""" {a} """  # RUF027
 40 40 |     # RUF027
-41 41 |     multi_line = a = """b { # comment
+41 41 |     multi_line = """b { # comment
 42 42 |     c}  d
 
-RUF027_0.py:41:22: RUF027 [*] Possible f-string without an `f` prefix
+RUF027_0.py:41:18: RUF027 [*] Possible f-string without an `f` prefix
    |
 39 |       single_line = """ {a} """  # RUF027
 40 |       # RUF027
-41 |       multi_line = a = """b { # comment
-   |  ______________________^
+41 |       multi_line = """b { # comment
+   |  __________________^
 42 | |     c}  d
 43 | |     """
    | |_______^ RUF027
@@ -193,8 +193,8 @@ RUF027_0.py:41:22: RUF027 [*] Possible f-string without an `f` prefix
 38 38 |     c = a
 39 39 |     single_line = """ {a} """  # RUF027
 40 40 |     # RUF027
-41    |-    multi_line = a = """b { # comment
-   41 |+    multi_line = a = f"""b { # comment
+41    |-    multi_line = """b { # comment
+   41 |+    multi_line = f"""b { # comment
 42 42 |     c}  d
 43 43 |     """
 44 44 | 
@@ -315,5 +315,64 @@ RUF027_0.py:74:9: RUF027 [*] Possible f-string without an `f` prefix
 73 73 |     a = 4
 74    |-    b = "{a:b} {a:^5}"
    74 |+    b = f"{a:b} {a:^5}"
+75 75 | 
+76 76 | 
+77 77 | def implicitly_concatenated_fstring(x: int):
 
+RUF027_0.py:78:16: RUF027 [*] Possible f-string without an `f` prefix
+   |
+77 | def implicitly_concatenated_fstring(x: int):
+78 |     y = f"{x}" "{x}"  # RUF027
+   |                ^^^^^ RUF027
+79 |     z = "{x}" f"{x}"  # RUF027
+   |
+   = help: Add `f` prefix
 
+ℹ Unsafe fix
+75 75 | 
+76 76 | 
+77 77 | def implicitly_concatenated_fstring(x: int):
+78    |-    y = f"{x}" "{x}"  # RUF027
+   78 |+    y = f"{x}" f"{x}"  # RUF027
+79 79 |     z = "{x}" f"{x}"  # RUF027
+80 80 | 
+81 81 | 
+
+RUF027_0.py:79:9: RUF027 [*] Possible f-string without an `f` prefix
+   |
+77 | def implicitly_concatenated_fstring(x: int):
+78 |     y = f"{x}" "{x}"  # RUF027
+79 |     z = "{x}" f"{x}"  # RUF027
+   |         ^^^^^ RUF027
+   |
+   = help: Add `f` prefix
+
+ℹ Unsafe fix
+76 76 | 
+77 77 | def implicitly_concatenated_fstring(x: int):
+78 78 |     y = f"{x}" "{x}"  # RUF027
+79    |-    z = "{x}" f"{x}"  # RUF027
+   79 |+    z = f"{x}" f"{x}"  # RUF027
+80 80 | 
+81 81 | 
+82 82 | def method_call_passed_to_logging(x: int):
+
+RUF027_0.py:85:13: RUF027 [*] Possible f-string without an `f` prefix
+   |
+83 |     # We special-case bindings that are passed to logging calls later on,
+84 |     # but not bindings that involve arbitrary call expressions!
+85 |     y = foo("{x}")  # RUF027
+   |             ^^^^^ RUF027
+86 |     import logging
+87 |     logging.log(0, y)
+   |
+   = help: Add `f` prefix
+
+ℹ Unsafe fix
+82 82 | def method_call_passed_to_logging(x: int):
+83 83 |     # We special-case bindings that are passed to logging calls later on,
+84 84 |     # but not bindings that involve arbitrary call expressions!
+85    |-    y = foo("{x}")  # RUF027
+   85 |+    y = foo(f"{x}")  # RUF027
+86 86 |     import logging
+87 87 |     logging.log(0, y)
