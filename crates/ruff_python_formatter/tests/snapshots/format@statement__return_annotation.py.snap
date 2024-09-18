@@ -335,24 +335,32 @@ def f[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](
 
 # Breaking return type annotations. Black adds parentheses if the parameters are
 # empty; otherwise, it leverages the expressions own parentheses if possible.
-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
-    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-]: ...
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
+    Set[
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    ]
+): ...
 
 
-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
-    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-]: ...
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
+    Set[
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    ]
+): ...
 
 
-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
-    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-]: ...
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
+    Set[
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    ]
+): ...
 
 
-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
-    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-]: ...
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
+    Set[
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    ]
+): ...
 
 
 def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
@@ -517,7 +525,52 @@ def process_board_action(
 ```diff
 --- Stable
 +++ Preview
-@@ -249,11 +249,8 @@
+@@ -131,32 +131,24 @@
+ 
+ # Breaking return type annotations. Black adds parentheses if the parameters are
+ # empty; otherwise, it leverages the expressions own parentheses if possible.
+-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
+-    Set[
+-        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+-    ]
+-): ...
++def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
++    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
++]: ...
+ 
+ 
+-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
+-    Set[
+-        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+-    ]
+-): ...
++def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
++    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
++]: ...
+ 
+ 
+-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
+-    Set[
+-        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+-    ]
+-): ...
++def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
++    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
++]: ...
+ 
+ 
+-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
+-    Set[
+-        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+-    ]
+-): ...
++def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
++    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
++]: ...
+ 
+ 
+ def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
+@@ -257,11 +249,8 @@
  ): ...
  
  
