@@ -51,9 +51,21 @@ fn symbol_ty_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymb
     // on inference from bindings.
     if use_def.has_public_declarations(symbol) {
         let declarations = use_def.public_declarations(symbol);
+        // If the symbol is undeclared in some paths, include the inferred type in the public type.
+        let undeclared_ty = if declarations.may_be_undeclared() {
+            Some(bindings_ty(
+                db,
+                use_def.public_bindings(symbol),
+                use_def
+                    .public_may_be_unbound(symbol)
+                    .then_some(Type::Unknown),
+            ))
+        } else {
+            None
+        };
         // Intentionally ignore conflicting declared types; that's not our problem, it's the
         // problem of the module we are importing from.
-        declarations_ty(db, declarations).unwrap_or_else(|(ty, _)| ty)
+        declarations_ty(db, declarations, undeclared_ty).unwrap_or_else(|(ty, _)| ty)
     } else {
         bindings_ty(
             db,
@@ -173,26 +185,21 @@ type DeclaredTypeResult<'db> = Result<Type<'db>, (Type<'db>, Box<[Type<'db>]>)>;
 /// `Ok(declared_type)`. If there are conflicting declarations, returns
 /// `Err((union_of_declared_types, conflicting_declared_types))`.
 ///
-/// If undeclared is a possibility, `Unknown` type will be part of the return type (and may
+/// If undeclared is a possibility, `undeclared_ty` type will be part of the return type (and may
 /// conflict with other declarations.)
 ///
 /// # Panics
-/// Will panic if there are no declarations and no possibility of undeclared. This is a logic
-/// error, as any symbol with zero live declarations clearly must be undeclared.
+/// Will panic if there are no declarations and no `undeclared_ty` is provided. This is a logic
+/// error, as any symbol with zero live declarations clearly must be undeclared, and the caller
+/// should provide an `undeclared_ty`.
 fn declarations_ty<'db>(
     db: &'db dyn Db,
     declarations: DeclarationsIterator<'_, 'db>,
+    undeclared_ty: Option<Type<'db>>,
 ) -> DeclaredTypeResult<'db> {
-    let may_be_undeclared = declarations.may_be_undeclared();
     let decl_types = declarations.map(|declaration| declaration_ty(db, declaration));
 
-    let mut all_types = (if may_be_undeclared {
-        Some(Type::Unknown)
-    } else {
-        None
-    })
-    .into_iter()
-    .chain(decl_types);
+    let mut all_types = undeclared_ty.into_iter().chain(decl_types);
 
     let first = all_types.next().expect(
         "declarations_ty must not be called with zero declarations and no may-be-undeclared.",

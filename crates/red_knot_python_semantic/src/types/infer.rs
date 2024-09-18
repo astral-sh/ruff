@@ -506,9 +506,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         debug_assert!(binding.is_binding(self.db));
         let use_def = self.index.use_def_map(binding.file_scope(self.db));
         let declarations = use_def.declarations_at_binding(binding);
+        let undeclared_ty = if declarations.may_be_undeclared() {
+            Some(Type::Unknown)
+        } else {
+            None
+        };
         let mut bound_ty = ty;
-        let declared_ty =
-            declarations_ty(self.db, declarations).unwrap_or_else(|(ty, conflicting)| {
+        let declared_ty = declarations_ty(self.db, declarations, undeclared_ty).unwrap_or_else(
+            |(ty, conflicting)| {
                 // TODO point out the conflicting declarations in the diagnostic?
                 let symbol_table = self.index.symbol_table(binding.file_scope(self.db));
                 let symbol_name = symbol_table.symbol(binding.symbol(self.db)).name();
@@ -521,7 +526,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                     ),
                 );
                 ty
-            });
+            },
+        );
         if !bound_ty.is_assignable_to(self.db, declared_ty) {
             self.invalid_assignment_diagnostic(node, declared_ty, bound_ty);
             // allow declarations to override inference in case of invalid assignment
@@ -5775,6 +5781,27 @@ mod tests {
 
         // TODO we should really disambiguate in such cases: Literal[b.f, c.f]
         assert_public_ty(&db, "/src/a.py", "f", "Literal[f, f]");
+    }
+
+    #[test]
+    fn import_from_conditional_reimport_vs_non_declaration() {
+        let mut db = setup_db();
+
+        db.write_file("/src/a.py", "from b import x").unwrap();
+        db.write_dedented(
+            "/src/b.py",
+            "
+            if flag:
+                from c import x
+            else:
+                x = 1
+            ",
+        )
+        .unwrap();
+        db.write_file("/src/c.pyi", "x: int").unwrap();
+
+        // TODO this should simplify to just 'int'
+        assert_public_ty(&db, "/src/a.py", "x", "int | Literal[1]");
     }
 
     // Incremental inference tests
