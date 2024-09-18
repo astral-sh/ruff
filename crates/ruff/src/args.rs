@@ -11,9 +11,7 @@ use clap::{command, Parser};
 use colored::Colorize;
 use path_absolutize::path_dedot;
 use regex::Regex;
-use rustc_hash::FxHashMap;
-use toml;
-
+use ruff_import_map::Direction;
 use ruff_linter::line_width::LineLength;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::registry::Rule;
@@ -27,6 +25,8 @@ use ruff_text_size::TextRange;
 use ruff_workspace::configuration::{Configuration, RuleSelection};
 use ruff_workspace::options::{Options, PycodestyleOptions};
 use ruff_workspace::resolver::ConfigurationTransformer;
+use rustc_hash::FxHashMap;
+use toml;
 
 /// All configuration options that can be passed "globally",
 /// i.e., can be passed to all subcommands
@@ -146,18 +146,12 @@ pub enum Command {
 #[derive(Clone, Debug, clap::Parser)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct ImportMapCommand {
+    /// The direction of the import map.
+    #[clap(long, value_enum)]
+    pub direction: Option<Direction>,
     /// List of files or directories to check.
-    #[clap(help = "List of files or directories to check [default: .]")]
+    #[clap(help = "List of files or directories to include [default: .]")]
     pub files: Vec<PathBuf>,
-    /// The name of the file when passing it through stdin.
-    #[arg(long, help_heading = "Miscellaneous")]
-    pub stdin_filename: Option<PathBuf>,
-    /// Disable cache reads.
-    #[arg(short, long, env = "RUFF_NO_CACHE", help_heading = "Miscellaneous")]
-    pub no_cache: bool,
-    /// Path to the cache directory.
-    #[arg(long, env = "RUFF_CACHE_DIR", help_heading = "Miscellaneous")]
-    pub cache_dir: Option<PathBuf>,
 }
 
 // The `Parser` derive is for ruff_dev, for ruff `Args` would be sufficient
@@ -721,6 +715,7 @@ impl CheckCommand {
             output_format: resolve_output_format(self.output_format)?,
             show_fixes: resolve_bool_arg(self.show_fixes, self.no_show_fixes),
             extension: self.extension,
+            ..ExplicitConfigOverrides::default()
         };
 
         let config_args = ConfigArguments::from_cli_arguments(global_options, cli_overrides)?;
@@ -753,8 +748,6 @@ impl FormatCommand {
             target_version: self.target_version,
             cache_dir: self.cache_dir,
             extension: self.extension,
-
-            // Unsupported on the formatter CLI, but required on `Overrides`.
             ..ExplicitConfigOverrides::default()
         };
 
@@ -770,13 +763,10 @@ impl ImportMapCommand {
         self,
         global_options: GlobalConfigArgs,
     ) -> anyhow::Result<(ImportMapArgs, ConfigArguments)> {
-        let format_arguments = ImportMapArgs {
-            files: self.files,
-            no_cache: self.no_cache,
-        };
+        let format_arguments = ImportMapArgs { files: self.files };
 
         let cli_overrides = ExplicitConfigOverrides {
-            // Unsupported on the formatter CLI, but required on `Overrides`.
+            direction: self.direction,
             ..ExplicitConfigOverrides::default()
         };
 
@@ -1203,7 +1193,6 @@ impl LineColumnParseError {
 /// etc.).
 #[allow(clippy::struct_excessive_bools)]
 pub struct ImportMapArgs {
-    pub no_cache: bool,
     pub files: Vec<PathBuf>,
 }
 
@@ -1238,6 +1227,7 @@ struct ExplicitConfigOverrides {
     output_format: Option<OutputFormat>,
     show_fixes: Option<bool>,
     extension: Option<Vec<ExtensionPair>>,
+    direction: Option<Direction>,
 }
 
 impl ConfigurationTransformer for ExplicitConfigOverrides {
@@ -1321,6 +1311,9 @@ impl ConfigurationTransformer for ExplicitConfigOverrides {
         }
         if let Some(extension) = &self.extension {
             config.extension = Some(extension.iter().cloned().collect());
+        }
+        if let Some(direction) = &self.direction {
+            config.import_map.direction = Some(*direction);
         }
 
         config

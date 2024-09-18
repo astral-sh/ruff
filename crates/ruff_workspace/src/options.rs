@@ -6,6 +6,7 @@ use strum::IntoEnumIterator;
 use crate::options_base::{OptionsMetadata, Visit};
 use crate::settings::LineEnding;
 use ruff_formatter::IndentStyle;
+use ruff_import_map::Direction;
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::rules::flake8_import_conventions::settings::BannedAliases;
 use ruff_linter::rules::flake8_pytest_style::settings::SettingsError;
@@ -3337,7 +3338,7 @@ pub struct ImportMapOptions {
             exclude = ["generated"]
         "#
     )]
-    pub exclude: Option<Vec<String>>,
+    pub direction: Option<Direction>,
 }
 
 #[cfg(test)]

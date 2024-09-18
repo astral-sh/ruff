@@ -15,7 +15,7 @@ default-run = "ruff"
 [dependencies]
 ruff_cache = { workspace = true }
 ruff_diagnostics = { workspace = true }
-ruff_import_map = { workspace = true }
+ruff_import_map = { workspace = true, features = ["serde", "clap"] }
 ruff_linter = { workspace = true, features = ["clap"] }
 ruff_macros = { workspace = true }
 ruff_notebook = { workspace = true }
@@ -56,6 +56,7 @@ toml = { workspace = true }
 tracing = { workspace = true, features = ["log"] }
 walkdir = { workspace = true }
 wild = { workspace = true }
+tracing-subscriber = "0.3.18"
 
 [dev-dependencies]
 # Enable test rules during development

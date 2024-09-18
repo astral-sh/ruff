@@ -192,9 +192,9 @@ impl SystemPath {
     /// [`self.file_name`]: SystemPath::file_name
     ///
     /// The stem is:
+    /// * The entire file name if there is no embedded `.`;
     ///
     /// * [`None`], if there is no file name;
-    /// * The entire file name if there is no embedded `.`;
     /// * The entire file name if the file name begins with `.` and has no other `.`s within;
     /// * Otherwise, the portion of the file name before the final `.`
     ///

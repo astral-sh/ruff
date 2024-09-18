@@ -2234,6 +2234,7 @@ dependencies = [
  "tikv-jemallocator",
  "toml",
  "tracing",
+ "tracing-subscriber",
  "walkdir",
  "wild",
 ]
@@ -2376,6 +2377,7 @@ name = "ruff_import_map"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "clap",
  "red_knot_python_semantic",
  "ruff_cache",
  "ruff_db",
@@ -2387,7 +2389,12 @@ dependencies = [
  "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
+ "rustc-hash 2.0.0",
  "salsa",
+ "schemars",
+ "serde",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

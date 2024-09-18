@@ -23,7 +23,13 @@ ruff_python_stdlib = { workspace = true }
 red_knot_python_semantic = { workspace = true }
 
 anyhow = { workspace = true }
+clap = { workspace = true, optional = true }
+rustc-hash = { workspace = true }
 salsa = { workspace = true }
+serde = { workspace = true, optional = true }
+schemars = { workspace = true, optional = true }
+tracing = "0.1.40"
+tracing-subscriber = "0.3.18"
 
 [lints]
 workspace = true

@@ -19,7 +19,7 @@ use strum::IntoEnumIterator;
 
 use ruff_cache::cache_dir;
 use ruff_formatter::IndentStyle;
-use ruff_import_map::ImportMapSettings;
+use ruff_import_map::{Direction, ImportMapSettings};
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::registry::RuleNamespace;
 use ruff_linter::registry::{Rule, RuleSet, INCOMPATIBLE_CODES};
@@ -209,10 +209,19 @@ impl Configuration {
                 .unwrap_or(format_defaults.docstring_code_line_width),
         };
 
+        let import_map = self.import_map;
+        let import_map_defaults = ImportMapSettings::default();
+
+        let import_map = ImportMapSettings {
+            src: vec![project_root.to_path_buf()],
+            extension: self.extension.clone().unwrap_or_default(),
+            direction: import_map
+                .direction
+                .unwrap_or(import_map_defaults.direction),
+        };
+
         let lint = self.lint;
         let lint_preview = lint.preview.unwrap_or(global_preview);
-
-        let import_map = ImportMapSettings {};
 
         let line_length = self.line_length.unwrap_or_default();
 
@@ -1203,18 +1212,24 @@ impl FormatConfiguration {
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct ImportMapConfiguration {}
+pub struct ImportMapConfiguration {
+    pub direction: Option<Direction>,
+}
 
 impl ImportMapConfiguration {
     #[allow(clippy::needless_pass_by_value)]
     pub fn from_options(options: ImportMapOptions, project_root: &Path) -> Result<Self> {
-        Ok(Self {})
+        Ok(Self {
+            direction: options.direction,
+        })
     }
 
     #[must_use]
     #[allow(clippy::needless_pass_by_value)]
     pub fn combine(self, config: Self) -> Self {
-        Self {}
+        Self {
+            direction: self.direction.or(config.direction),
+        }
     }
 }
 

@@ -1,12 +1,11 @@
-use red_knot_python_semantic::{Db, Module, ModuleName};
-use ruff_db::files::{File, FilePath, Files};
-use ruff_db::system::{OsSystem, System};
-use ruff_db::vendored::VendoredFileSystem;
-use ruff_db::{Db as SourceDb, Upcast};
+use crate::db::ModuleDb;
+use red_knot_python_semantic::{Module, ModuleName};
+use ruff_db::files::FilePath;
+
+use ruff_db::Db as SourceDb;
 use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder};
 use ruff_python_stdlib::identifiers::is_identifier;
 use std::borrow::Cow;
-use std::sync::Arc;
 
 /// Collect all imports for a given Python file.
 pub(crate) struct Resolver<'ast> {
@@ -86,88 +85,10 @@ fn from_relative_import<'a>(
     Some(qualified_name_builder.build())
 }
 
-pub fn resolve_module<'path>(db: &dyn Db, module_name: &'path [&'path str]) -> Option<Module> {
-    let module_name = ModuleName::from_components(module_name.iter().cloned())?;
+pub(crate) fn resolve_module<'path>(
+    db: &ModuleDb,
+    module_name: &'path [&'path str],
+) -> Option<Module> {
+    let module_name = ModuleName::from_components(module_name.iter().copied())?;
     red_knot_python_semantic::resolve_module(db, module_name)
-}
-
-#[salsa::db]
-pub(crate) struct ModuleDb {
-    storage: salsa::Storage<Self>,
-    files: Files,
-    system: OsSystem,
-    vendored: VendoredFileSystem,
-    events: std::sync::Arc<std::sync::Mutex<Vec<salsa::Event>>>,
-}
-
-impl ModuleDb {
-    pub(crate) fn new() -> Self {
-        Self {
-            storage: salsa::Storage::default(),
-            system: OsSystem::default(),
-            vendored: VendoredFileSystem::default(),
-            events: std::sync::Arc::default(),
-            files: Files::default(),
-        }
-    }
-
-    /// Takes the salsa events.
-    ///
-    /// ## Panics
-    /// If there are any pending salsa snapshots.
-    pub(crate) fn take_salsa_events(&mut self) -> Vec<salsa::Event> {
-        let inner = Arc::get_mut(&mut self.events).expect("no pending salsa snapshots");
-
-        let events = inner.get_mut().unwrap();
-        std::mem::take(&mut *events)
-    }
-
-    /// Clears the salsa events.
-    ///
-    /// ## Panics
-    /// If there are any pending salsa snapshots.
-    pub(crate) fn clear_salsa_events(&mut self) {
-        self.take_salsa_events();
-    }
-}
-
-impl Upcast<dyn SourceDb> for ModuleDb {
-    fn upcast(&self) -> &(dyn SourceDb + 'static) {
-        self
-    }
-    fn upcast_mut(&mut self) -> &mut (dyn SourceDb + 'static) {
-        self
-    }
-}
-
-#[salsa::db]
-impl SourceDb for ModuleDb {
-    fn vendored(&self) -> &VendoredFileSystem {
-        &self.vendored
-    }
-
-    fn system(&self) -> &dyn System {
-        &self.system
-    }
-
-    fn files(&self) -> &Files {
-        &self.files
-    }
-}
-
-#[salsa::db]
-impl Db for ModuleDb {
-    fn is_file_open(&self, file: File) -> bool {
-        !file.path(self).is_vendored_path()
-    }
-}
-
-#[salsa::db]
-impl salsa::Database for ModuleDb {
-    fn salsa_event(&self, event: &dyn Fn() -> salsa::Event) {
-        let event = event();
-
-        let mut events = self.events.lock().unwrap();
-        events.push(event);
-    }
 }

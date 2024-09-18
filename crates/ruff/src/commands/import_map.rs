@@ -1,21 +1,19 @@
-use crate::args::{ConfigArguments, GlobalConfigArgs, ImportMapArgs, ImportMapCommand};
-use crate::cache::PackageCacheMap;
-use crate::diagnostics::Diagnostics;
+use crate::args::{ConfigArguments, ImportMapArgs};
 use crate::resolve::resolve;
 use crate::{resolve_default_files, ExitStatus};
+use colored::Colorize;
 use ignore::Error;
-use log::debug;
+use log::{debug, warn};
 use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
-use std::fmt::Write;
-
-use ruff_import_map::ImportMapSettings;
+use ruff_import_map::{Direction, ImportMap, ModuleDb};
 use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
-use ruff_workspace::resolver::{match_exclusion, python_files_in_path, ResolvedFile};
+use ruff_workspace::resolver::{python_files_in_path, ResolvedFile};
+use std::fmt::Write;
 use std::time::Instant;
 
-pub fn import_map(
+pub(crate) fn import_map(
     args: ImportMapArgs,
     config_arguments: &ConfigArguments,
 ) -> anyhow::Result<ExitStatus> {
@@ -45,43 +43,45 @@ pub fn import_map(
             .collect::<Vec<_>>(),
     );
 
+    // // Initialize the module database.
+    // let settings = resolver.settings().next().expect("settings");
+    // let db = ModuleDb::from_settings(&settings.import_map)?;
+
     // (1) Collect the imports for each file.
-    paths.par_iter().for_each(|resolved_file| {
-        let result = match resolved_file {
-            Ok(resolved_file) => {
-                let path = resolved_file.path();
-                let package = path
-                    .parent()
-                    .and_then(|parent| package_roots.get(parent))
-                    .and_then(|package| *package);
+    let imports = paths
+        .par_iter()
+        .filter_map(|resolved_file| {
+            let result = match resolved_file {
+                Ok(resolved_file) => {
+                    let path = resolved_file.path();
+                    let package = path
+                        .parent()
+                        .and_then(|parent| package_roots.get(parent))
+                        .and_then(|package| *package);
 
-                let settings = resolver.resolve(path);
+                    let settings = resolver.resolve(path);
 
-                if (settings.file_resolver.force_exclude || !resolved_file.is_root())
-                    && match_exclusion(
-                        resolved_file.path(),
-                        resolved_file.file_name(),
-                        &settings.linter.exclude,
+                    // Ignore non-Python files.
+                    let source_type = match settings.import_map.extension.get(path) {
+                        None => match SourceType::from(path) {
+                            SourceType::Python(source_type) => source_type,
+                            SourceType::Toml(_) => {
+                                return None;
+                            }
+                        },
+                        Some(language) => PySourceType::from(language),
+                    };
+                    if !matches!(source_type, PySourceType::Python | PySourceType::Stub) {
+                        return None;
+                    }
+
+                    let imports = ruff_import_map::generate(
+                        path,
+                        package,
+                        source_type,
+                        &settings.import_map,
+                        // &db,
                     )
-                {
-                    return;
-                }
-
-                // Ignore non-Python files.
-                let source_type = match settings.linter.extension.get(path) {
-                    None => match SourceType::from(path) {
-                        SourceType::Python(source_type) => source_type,
-                        SourceType::Toml(_) => {
-                            return;
-                        }
-                    },
-                    Some(language) => PySourceType::from(language),
-                };
-                if !matches!(source_type, PySourceType::Python | PySourceType::Stub) {
-                    return;
-                }
-
-                ruff_import_map::generate(path, package, source_type, &ImportMapSettings::default())
                     .map_err(|e| {
                         (Some(path.to_path_buf()), {
                             let mut error = e.to_string();
@@ -90,52 +90,47 @@ pub fn import_map(
                             }
                             error
                         })
-                    })
-            }
-            Err(e) => Err((
-                if let Error::WithPath { path, .. } = e {
-                    Some(path.clone())
-                } else {
+                    });
+
+                    imports.map(|imports| (path.to_path_buf(), imports))
+                }
+                Err(e) => Err((
+                    if let Error::WithPath { path, .. } = e {
+                        Some(path.clone())
+                    } else {
+                        None
+                    },
+                    e.io_error()
+                        .map_or_else(|| e.to_string(), std::io::Error::to_string),
+                )),
+            };
+
+            match result {
+                Ok(imports) => Some(imports),
+                Err((path, error)) => {
+                    if let Some(path) = path {
+                        warn!(
+                            "Failed to generate import map for {path}: {error}",
+                            path = path.display(),
+                            error = error
+                        );
+                    } else {
+                        warn!("Failed to generate import map: {error}", error = error);
+                    }
                     None
-                },
-                e.io_error()
-                    .map_or_else(|| e.to_string(), std::io::Error::to_string),
-            )),
-        };
+                }
+            }
+        })
+        .collect::<Vec<_>>();
 
-        // Some(result.unwrap_or_else(|(path, message)| {
-        //     if let Some(path) = &path {
-        //         let settings = resolver.resolve(path);
-        //         if settings.linter.rules.enabled(Rule::IOError) {
-        //             let dummy =
-        //                 SourceFileBuilder::new(path.to_string_lossy().as_ref(), "").finish();
-        //
-        //             Diagnostics::new(
-        //                 vec![Message::from_diagnostic(
-        //                     Diagnostic::new(IOError { message }, TextRange::default()),
-        //                     dummy,
-        //                     TextSize::default(),
-        //                 )],
-        //                 FxHashMap::default(),
-        //             )
-        //         } else {
-        //             warn!(
-        //                 "{}{}{} {message}",
-        //                 "Failed to lint ".bold(),
-        //                 fs::relativize_path(path).bold(),
-        //                 ":".bold()
-        //             );
-        //             Diagnostics::default()
-        //         }
-        //     } else {
-        //         warn!("{} {message}", "Encountered error:".bold());
-        //         Diagnostics::default()
-        //     }
-        // }))
-    });
-    // (2) Map each import to a file.
+    let import_map = match pyproject_config.settings.import_map.direction {
+        Direction::Dependencies => ImportMap::from_iter(imports),
+        Direction::Dependents => ImportMap::reverse(imports),
+    };
 
-    // (3) Write the import map to a file.
+    // Print to JSON.
+
+    println!("{}", serde_json::to_string_pretty(&import_map)?);
 
     Ok(ExitStatus::Success)
 }
