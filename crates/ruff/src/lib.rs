@@ -20,7 +20,9 @@ use ruff_linter::settings::types::OutputFormat;
 use ruff_linter::{fs, warn_user, warn_user_once};
 use ruff_workspace::Settings;
 
-use crate::args::{Args, CheckCommand, Command, FormatCommand, GraphBuildCommand, GraphCommand};
+use crate::args::{
+    AnalyzeCommand, AnalyzeGraphCommand, Args, CheckCommand, Command, FormatCommand,
+};
 use crate::printer::{Flags as PrinterFlags, Printer};
 
 pub mod args;
@@ -186,7 +188,7 @@ pub fn run(
         Command::Check(args) => check(args, global_options),
         Command::Format(args) => format(args, global_options),
         Command::Server(args) => server(args),
-        Command::Graph(GraphCommand::Build(args)) => graph_build(args, global_options),
+        Command::Analyze(AnalyzeCommand::Graph(args)) => graph_build(args, global_options),
     }
 }
 
@@ -200,10 +202,10 @@ fn format(args: FormatCommand, global_options: GlobalConfigArgs) -> Result<ExitS
     }
 }
 
-fn graph_build(args: GraphBuildCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {
+fn graph_build(args: AnalyzeGraphCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {
     let (cli, config_arguments) = args.partition(global_options)?;
 
-    commands::graph::graph(cli, &config_arguments)
+    commands::analyze_graph::analyze_graph(cli, &config_arguments)
 }
 
 fn server(args: ServerCommand) -> Result<ExitStatus> {

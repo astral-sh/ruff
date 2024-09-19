@@ -1,11 +1,11 @@
-use crate::args::{ConfigArguments, GraphArgs};
+use crate::args::{AnalyzeGraphArgs, ConfigArguments};
 use crate::resolve::resolve;
 use crate::{resolve_default_files, ExitStatus};
 use anyhow::Result;
 use log::{debug, warn};
-use ruff_db::system::{SystemPath, SystemPathBuf};
+use ruff_db::system::SystemPathBuf;
 use ruff_graph::{Direction, ImportMap, ModuleDb, ModuleImports};
-use ruff_linter::warn_user_once;
+use ruff_linter::{warn_user, warn_user_once};
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_workspace::resolver::{python_files_in_path, ResolvedFile};
 use rustc_hash::FxHashMap;
@@ -14,10 +14,16 @@ use std::path::Path;
 use std::sync::Arc;
 
 /// Generate an import map.
-pub(crate) fn graph(args: GraphArgs, config_arguments: &ConfigArguments) -> Result<ExitStatus> {
+pub(crate) fn analyze_graph(
+    args: AnalyzeGraphArgs,
+    config_arguments: &ConfigArguments,
+) -> Result<ExitStatus> {
     // Construct the "default" settings. These are used when no `pyproject.toml`
     // files are present, or files are injected from outside the hierarchy.
     let pyproject_config = resolve(config_arguments, None)?;
+    if pyproject_config.settings.analyze.preview.is_disabled() {
+        warn_user!("`ruff analyze graph` is experimental and may change without warning");
+    }
 
     // Find all Python files.
     let files = resolve_default_files(args.files, false);
@@ -79,11 +85,11 @@ pub(crate) fn graph(args: GraphArgs, config_arguments: &ConfigArguments) -> Resu
 
             // Resolve the per-file settings.
             let settings = resolver.resolve(&path);
-            let string_imports = settings.graph.detect_string_imports;
-            let include_dependencies = settings.graph.include_dependencies.get(&path).cloned();
+            let string_imports = settings.analyze.detect_string_imports;
+            let include_dependencies = settings.analyze.include_dependencies.get(&path).cloned();
 
             // Ignore non-Python files.
-            let source_type = match settings.graph.extension.get(&path) {
+            let source_type = match settings.analyze.extension.get(&path) {
                 None => match SourceType::from(&path) {
                     SourceType::Python(source_type) => source_type,
                     SourceType::Toml(_) => {

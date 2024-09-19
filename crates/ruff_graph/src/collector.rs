@@ -1,20 +1,22 @@
 use red_knot_python_semantic::ModuleName;
-use ruff_python_ast::helpers::collect_import_from_member;
 use ruff_python_ast::visitor::source_order::{walk_body, walk_expr, walk_stmt, SourceOrderVisitor};
 use ruff_python_ast::{self as ast, Expr, ModModule, Stmt};
 
 /// Collect all imports for a given Python file.
 #[derive(Default, Debug)]
-pub(crate) struct Collector {
+pub(crate) struct Collector<'a> {
+    /// The path to the current module.
+    module_path: Option<&'a [String]>,
     /// Whether to detect imports from string literals.
     string_imports: bool,
     /// The collected imports from the Python AST.
     imports: Vec<CollectedImport>,
 }
 
-impl Collector {
-    pub(crate) fn new(string_imports: bool) -> Self {
+impl<'a> Collector<'a> {
+    pub(crate) fn new(module_path: Option<&'a [String]>, string_imports: bool) -> Self {
         Self {
+            module_path,
             string_imports,
             imports: Vec::new(),
         }
@@ -27,7 +29,7 @@ impl Collector {
     }
 }
 
-impl<'ast> SourceOrderVisitor<'ast> for Collector {
+impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
     fn visit_stmt(&mut self, stmt: &'ast Stmt) {
         match stmt {
             Stmt::ImportFrom(ast::StmtImportFrom {
@@ -39,12 +41,35 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector {
                 let module = module.as_deref();
                 let level = *level;
                 for alias in names {
-                    if let Some(module_name) = ModuleName::from_components(
-                        collect_import_from_member(level, module, &alias.name)
-                            .segments()
-                            .iter()
-                            .cloned(),
-                    ) {
+                    let mut components = vec![];
+
+                    if level > 0 {
+                        // If we're resolving a relative import, we must have a module path.
+                        let Some(module_path) = self.module_path else {
+                            return;
+                        };
+
+                        // Start with the containing module.
+                        components.extend(module_path.iter().map(String::as_str));
+
+                        // Remove segments based on the number of dots.
+                        for _ in 0..level {
+                            if components.is_empty() {
+                                return;
+                            }
+                            components.pop();
+                        }
+                    }
+
+                    // Add the module path.
+                    if let Some(module) = module {
+                        components.extend(module.split('.'));
+                    }
+
+                    // Add the alias name.
+                    components.push(alias.name.as_str());
+
+                    if let Some(module_name) = ModuleName::from_components(components) {
                         self.imports.push(CollectedImport::ImportFrom(module_name));
                     }
                 }

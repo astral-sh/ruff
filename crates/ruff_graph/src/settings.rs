@@ -1,24 +1,26 @@
 use ruff_linter::display_settings;
-use ruff_linter::settings::types::ExtensionMapping;
+use ruff_linter::settings::types::{ExtensionMapping, PreviewMode};
 use ruff_macros::CacheKey;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::path::PathBuf;
 
 #[derive(Debug, Default, Clone, CacheKey)]
-pub struct GraphSettings {
+pub struct AnalyzeSettings {
+    pub preview: PreviewMode,
     pub detect_string_imports: bool,
     pub include_dependencies: BTreeMap<PathBuf, (PathBuf, Vec<String>)>,
     pub extension: ExtensionMapping,
 }
 
-impl fmt::Display for GraphSettings {
+impl fmt::Display for AnalyzeSettings {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "\n# Import Map Settings")?;
+        writeln!(f, "\n# Analyze Settings")?;
         display_settings! {
             formatter = f,
-            namespace = "import_map",
+            namespace = "analyze",
             fields = [
+                self.preview,
                 self.detect_string_imports,
                 self.extension | debug,
                 self.include_dependencies | debug,

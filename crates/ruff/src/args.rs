@@ -132,9 +132,9 @@ pub enum Command {
     Format(FormatCommand),
     /// Run the language server.
     Server(ServerCommand),
-    /// Analyze the import graph of the given files or directories.
+    /// Run analysis over Python source code.
     #[clap(subcommand)]
-    Graph(GraphCommand),
+    Analyze(AnalyzeCommand),
     /// Display Ruff's version
     Version {
         #[arg(long, value_enum, default_value = "text")]
@@ -143,13 +143,13 @@ pub enum Command {
 }
 
 #[derive(Debug, Subcommand)]
-pub enum GraphCommand {
-    /// Generate a map of Python file dependencies.
-    Build(GraphBuildCommand),
+pub enum AnalyzeCommand {
+    /// Generate a map of Python file dependencies or dependents.
+    Graph(AnalyzeGraphCommand),
 }
 
 #[derive(Clone, Debug, clap::Parser)]
-pub struct GraphBuildCommand {
+pub struct AnalyzeGraphCommand {
     /// List of files or directories to include.
     #[clap(help = "List of files or directories to include [default: .]")]
     pub files: Vec<PathBuf>,
@@ -161,6 +161,11 @@ pub struct GraphBuildCommand {
     /// Attempt to detect imports from string literals.
     #[clap(long)]
     pub detect_string_imports: bool,
+    /// Enable preview mode. Use `--no-preview` to disable.
+    #[arg(long, overrides_with("no_preview"))]
+    preview: bool,
+    #[clap(long, overrides_with("preview"), hide = true)]
+    no_preview: bool,
 }
 
 // The `Parser` derive is for ruff_dev, for ruff `Args` would be sufficient
@@ -765,14 +770,14 @@ impl FormatCommand {
     }
 }
 
-impl GraphBuildCommand {
+impl AnalyzeGraphCommand {
     /// Partition the CLI into command-line arguments and configuration
     /// overrides.
     pub fn partition(
         self,
         global_options: GlobalConfigArgs,
-    ) -> anyhow::Result<(GraphArgs, ConfigArguments)> {
-        let format_arguments = GraphArgs {
+    ) -> anyhow::Result<(AnalyzeGraphArgs, ConfigArguments)> {
+        let format_arguments = AnalyzeGraphArgs {
             files: self.files,
             direction: self.direction,
         };
@@ -783,6 +788,7 @@ impl GraphBuildCommand {
             } else {
                 None
             },
+            preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
             ..ExplicitConfigOverrides::default()
         };
 
@@ -1206,7 +1212,8 @@ impl LineColumnParseError {
 }
 
 /// CLI settings that are distinct from configuration (commands, lists of files, etc.).
-pub struct GraphArgs {
+#[derive(Clone, Debug)]
+pub struct AnalyzeGraphArgs {
     pub files: Vec<PathBuf>,
     pub direction: Direction,
 }
@@ -1328,7 +1335,7 @@ impl ConfigurationTransformer for ExplicitConfigOverrides {
             config.extension = Some(extension.iter().cloned().collect());
         }
         if let Some(detect_string_imports) = &self.detect_string_imports {
-            config.graph.detect_string_imports = Some(*detect_string_imports);
+            config.analyze.detect_string_imports = Some(*detect_string_imports);
         }
 
         config

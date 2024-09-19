@@ -439,7 +439,7 @@ pub struct Options {
 
     /// Options to configure import map generation.
     #[option_group]
-    pub graph: Option<GraphOptions>,
+    pub analyze: Option<AnalyzeOptions>,
 }
 
 /// Configures how Ruff checks your code.
@@ -3313,13 +3313,24 @@ pub struct FormatOptions {
     pub docstring_code_line_length: Option<DocstringCodeLineWidth>,
 }
 
-/// Configures Ruff's import map generation.
+/// Configures Ruff's `analyze` command.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Deserialize, Serialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub struct GraphOptions {
+pub struct AnalyzeOptions {
+    /// Whether to enable preview mode. When preview mode is enabled, Ruff will expose unstable
+    /// commands.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # Enable preview features.
+            preview = true
+        "#
+    )]
+    pub preview: Option<bool>,
     /// Whether to generate a map from file to files that it depends on (dependencies) or files that
     /// depend on it (dependents).
     #[option(

@@ -522,7 +522,7 @@ Commands:
   clean    Clear any caches in the current directory and any subdirectories
   format   Run the Ruff formatter on the given files or directories
   server   Run the language server
-  graph    Analyze the import graph of the given files or directories
+  analyze  Run analysis over Python source code
   version  Display Ruff's version
   help     Print this message or the help of the given subcommand(s)
 

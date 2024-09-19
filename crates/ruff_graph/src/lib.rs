@@ -1,7 +1,7 @@
 use crate::collector::Collector;
 pub use crate::db::ModuleDb;
 use crate::resolver::Resolver;
-pub use crate::settings::{Direction, GraphSettings};
+pub use crate::settings::{AnalyzeSettings, Direction};
 use anyhow::Result;
 use red_knot_python_semantic::SemanticModel;
 use ruff_db::files::system_path_to_file;
@@ -62,6 +62,7 @@ impl ImportMap {
             for import in imports.0 {
                 reverse.0.entry(import).or_default().insert(path.clone());
             }
+            reverse.0.entry(path).or_default();
         }
         reverse
     }
@@ -92,12 +93,12 @@ pub fn generate(
     let model = SemanticModel::new(db, file);
 
     // Collect the imports.
-    let imports = Collector::new(string_imports).collect(parsed.syntax());
+    let imports = Collector::new(module_path.as_deref(), string_imports).collect(parsed.syntax());
 
     // Resolve the imports.
     let mut resolved_imports = ModuleImports::default();
     for import in imports {
-        let Some(resolved) = Resolver::new(&model, module_path.as_deref()).resolve(import) else {
+        let Some(resolved) = Resolver::new(&model).resolve(import) else {
             continue;
         };
         let Some(path) = resolved.as_system_path() else {
