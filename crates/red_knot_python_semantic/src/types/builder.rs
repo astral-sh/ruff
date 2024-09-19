@@ -52,11 +52,10 @@ impl<'db> UnionBuilder<'db> {
             }
             Type::Never => {}
             _ => {
-                let mut add = true;
                 let mut remove = vec![];
                 for element in &self.elements {
                     if ty.is_subtype_of(self.db, *element) {
-                        add = false;
+                        return self;
                     } else if element.is_subtype_of(self.db, ty) {
                         remove.push(*element);
                     }
@@ -64,9 +63,7 @@ impl<'db> UnionBuilder<'db> {
                 for element in remove {
                     self.elements.remove(&element);
                 }
-                if add {
-                    self.elements.insert(ty);
-                }
+                self.elements.insert(ty);
             }
         }
 
