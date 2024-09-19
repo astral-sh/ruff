@@ -762,12 +762,25 @@ impl<'db> CallOutcome<'db> {
             } => {
                 let mut not_callable = vec![];
                 let mut union_builder = UnionBuilder::new(db);
+                let mut revealed = false;
                 for outcome in &**outcomes {
-                    let return_ty = if let Self::NotCallable { not_callable_ty } = outcome {
-                        not_callable.push(*not_callable_ty);
-                        Type::Unknown
-                    } else {
-                        outcome.unwrap_with_diagnostic(db, node, builder)
+                    let return_ty = match outcome {
+                        Self::NotCallable { not_callable_ty } => {
+                            not_callable.push(*not_callable_ty);
+                            Type::Unknown
+                        }
+                        Self::RevealType {
+                            return_ty,
+                            revealed_ty: _,
+                        } => {
+                            if revealed {
+                                *return_ty
+                            } else {
+                                revealed = true;
+                                outcome.unwrap_with_diagnostic(db, node, builder)
+                            }
+                        }
+                        _ => outcome.unwrap_with_diagnostic(db, node, builder),
                     };
                     union_builder = union_builder.add(return_ty);
                 }
@@ -838,6 +851,15 @@ impl<'db> FunctionType<'db> {
         name == self.name(db)
             && file_to_module(db, self.definition(db).file(db)).is_some_and(|module| {
                 module.search_path().is_standard_library() && module.name() == module_name
+            })
+    }
+
+    /// Return true if this is a symbol with given name from `typing` or `typing_extensions`.
+    pub(crate) fn is_typing_symbol(self, db: &'db dyn Db, name: &str) -> bool {
+        name == self.name(db)
+            && file_to_module(db, self.definition(db).file(db)).is_some_and(|module| {
+                module.search_path().is_standard_library()
+                    && matches!(&**module.name(), "typing" | "typing_extensions")
             })
     }
 
