@@ -246,6 +246,27 @@ fn affix_removal_data<'a>(
         return None;
     }
     let slice = slice.as_slice_expr()?;
+
+    // Exit early if slice step is...
+    if slice
+        .step
+        .as_deref()
+        // present and
+        .is_some_and(|step| match step {
+            // not equal to 1
+            ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                value: ast::Number::Int(x),
+                ..
+            }) => x.as_u8() != Some(1),
+            // and not equal to `None` or `True`
+            ast::Expr::NoneLiteral(_)
+            | ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value: true, .. }) => false,
+            _ => true,
+        })
+    {
+        return None;
+    };
+
     let compr_test_expr = ast::comparable::ComparableExpr::from(
         &test.as_call_expr()?.func.as_attribute_expr()?.value,
     );
