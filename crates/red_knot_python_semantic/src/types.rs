@@ -854,6 +854,15 @@ impl<'db> FunctionType<'db> {
             })
     }
 
+    /// Return true if this is a symbol with given name from `typing` or `typing_extensions`.
+    pub(crate) fn is_typing_symbol(self, db: &'db dyn Db, name: &str) -> bool {
+        name == self.name(db)
+            && file_to_module(db, self.definition(db).file(db)).is_some_and(|module| {
+                module.search_path().is_standard_library()
+                    && (module.name() == "typing" || module.name() == "typing_extensions")
+            })
+    }
+
     pub fn has_decorator(self, db: &dyn Db, decorator: Type<'_>) -> bool {
         self.decorators(db).contains(&decorator)
     }

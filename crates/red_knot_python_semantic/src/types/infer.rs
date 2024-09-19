@@ -705,9 +705,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         let function_type = FunctionType::new(self.db, name.id.clone(), definition, decorator_tys);
-        let function_ty = if function_type.is_stdlib_symbol(self.db, "typing", "reveal_type")
-            || function_type.is_stdlib_symbol(self.db, "typing_extensions", "reveal_type")
-        {
+        let function_ty = if function_type.is_typing_symbol(self.db, "reveal_type") {
             Type::RevealTypeFunction(function_type)
         } else {
             Type::Function(function_type)
