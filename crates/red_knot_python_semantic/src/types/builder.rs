@@ -47,7 +47,7 @@ impl<'db> UnionBuilder<'db> {
             Type::Union(union) => {
                 let new_elements = union.elements(self.db);
                 self.elements.reserve(new_elements.len());
-                for element in new_elements {
+                for element in &**new_elements {
                     self = self.add(*element);
                 }
             }

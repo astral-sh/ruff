@@ -122,7 +122,7 @@ impl Display for DisplayUnionType<'_> {
         // Group literal types by kind.
         let mut grouped_literals = FxHashMap::default();
 
-        for element in elements {
+        for element in &**elements {
             if let Ok(literal_kind) = LiteralTypeKind::try_from(*element) {
                 grouped_literals
                     .entry(literal_kind)
@@ -133,7 +133,7 @@ impl Display for DisplayUnionType<'_> {
 
         let mut join = f.join(" | ");
 
-        for element in elements {
+        for element in &**elements {
             if let Ok(literal_kind) = LiteralTypeKind::try_from(*element) {
                 let Some(mut literals) = grouped_literals.remove(&literal_kind) else {
                     continue;
