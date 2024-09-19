@@ -859,7 +859,7 @@ impl<'db> FunctionType<'db> {
         name == self.name(db)
             && file_to_module(db, self.definition(db).file(db)).is_some_and(|module| {
                 module.search_path().is_standard_library()
-                    && (module.name() == "typing" || module.name() == "typing_extensions")
+                    && matches!(module.name(), "typing" | "typing_extensions")
             })
     }
 
