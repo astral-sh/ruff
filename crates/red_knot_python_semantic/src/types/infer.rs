@@ -926,14 +926,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = with_statement;
 
         for item in items {
-            match item.optional_vars.as_deref() {
-                Some(ast::Expr::Name(name)) => {
-                    self.infer_definition(name);
-                }
-                _ => {
-                    // TODO infer definitions in unpacking assignment
-                    self.infer_expression(&item.context_expr);
-                }
+            let target = item.optional_vars.as_deref();
+            if let Some(ast::Expr::Name(name)) = target {
+                self.infer_definition(name);
+            } else {
+                // TODO infer definitions in unpacking assignment
+                self.infer_expression(&item.context_expr);
+                self.infer_optional_expression(target);
             }
         }
 
