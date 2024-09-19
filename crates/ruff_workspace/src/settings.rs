@@ -17,7 +17,7 @@ use ruff_source_file::find_newline;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
-#[derive(Clone, Debug, CacheKey)]
+#[derive(Debug, CacheKey)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Settings {
     #[cache_key(ignore)]
@@ -72,14 +72,14 @@ impl fmt::Display for Settings {
                 self.file_resolver | nested,
                 self.linter        | nested,
                 self.formatter     | nested,
-                self.graph    | nested,
+                self.graph         | nested,
             ]
         }
         Ok(())
     }
 }
 
-#[derive(Debug, Clone, CacheKey)]
+#[derive(Debug, CacheKey)]
 pub struct FileResolverSettings {
     pub exclude: FilePatternSet,
     pub extend_exclude: FilePatternSet,

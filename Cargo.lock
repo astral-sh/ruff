@@ -240,6 +240,9 @@ name = "camino"
 version = "1.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b96ec4966b5813e2c0507c1f86115c8c5abaadc3980879c3424042a02fd1ad3"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "cast"
@@ -2224,6 +2227,7 @@ dependencies = [
  "rayon",
  "regex",
  "ruff_cache",
+ "ruff_db",
  "ruff_diagnostics",
  "ruff_graph",
  "ruff_linter",
@@ -2308,6 +2312,7 @@ dependencies = [
  "ruff_text_size",
  "rustc-hash 2.0.0",
  "salsa",
+ "serde",
  "tempfile",
  "thiserror",
  "tracing",

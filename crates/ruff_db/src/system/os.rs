@@ -21,7 +21,7 @@ pub struct OsSystem {
     inner: Arc<OsSystemInner>,
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug)]
 struct OsSystemInner {
     cwd: SystemPathBuf,
 }

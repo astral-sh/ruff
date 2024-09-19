@@ -3,6 +3,7 @@ use crate::resolve::resolve;
 use crate::{resolve_default_files, ExitStatus};
 use anyhow::Result;
 use log::{debug, warn};
+use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_graph::{Direction, ImportMap, ModuleDb, ModuleImports};
 use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
@@ -54,12 +55,12 @@ pub(crate) fn graph(args: GraphArgs, config_arguments: &ConfigArguments) -> Resu
     let inner_result = Arc::clone(&result);
 
     rayon::scope(move |scope| {
-        for resolved_file in &paths {
+        for resolved_file in paths {
             let Ok(resolved_file) = resolved_file else {
                 continue;
             };
 
-            let path = resolved_file.path().to_path_buf();
+            let path = resolved_file.into_path();
             let package = path
                 .parent()
                 .and_then(|parent| package_roots.get(parent))
@@ -97,16 +98,27 @@ pub(crate) fn graph(args: GraphArgs, config_arguments: &ConfigArguments) -> Resu
                 continue;
             }
 
+            // Convert to system paths.
+            let Ok(package) = package.map(SystemPathBuf::from_path_buf).transpose() else {
+                warn!("Failed to convert package to system path");
+                continue;
+            };
+            let Ok(src_root) = SystemPathBuf::from_path_buf(src_root) else {
+                warn!("Failed to convert source root to system path");
+                continue;
+            };
+            let Ok(path) = SystemPathBuf::from_path_buf(path) else {
+                warn!("Failed to convert path to system path");
+                continue;
+            };
+
             let result = inner_result.clone();
             scope.spawn(move |_| {
                 // Identify any imports via static analysis.
                 let mut imports =
                     ruff_graph::generate(&path, package.as_deref(), string_imports, &db)
                         .unwrap_or_else(|err| {
-                            warn!(
-                                "Failed to generate import map for {path}: {err}",
-                                path = path.display(),
-                            );
+                            warn!("Failed to generate import map for {path}: {err}");
                             ModuleImports::default()
                         });
 
@@ -125,7 +137,17 @@ pub(crate) fn graph(args: GraphArgs, config_arguments: &ConfigArguments) -> Resu
                                         continue;
                                     }
                                 };
-                                imports.insert(entry.into_path());
+                                let path = match SystemPathBuf::from_path_buf(entry.into_path()) {
+                                    Ok(path) => path,
+                                    Err(err) => {
+                                        warn!(
+                                            "Failed to convert path to system path: {}",
+                                            err.display()
+                                        );
+                                        continue;
+                                    }
+                                };
+                                imports.insert(path);
                             }
                         }
                         Err(err) => {

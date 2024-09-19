@@ -1,64 +1,51 @@
-use crate::db::ModuleDb;
-use red_knot_python_semantic::{Module, ModuleName};
+use red_knot_python_semantic::{ModuleName, SemanticModel};
 use ruff_db::files::FilePath;
 
 use crate::collector::CollectedImport;
-use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder};
-use ruff_python_stdlib::identifiers::is_identifier;
-use std::borrow::Cow;
 
 /// Collect all imports for a given Python file.
-pub(crate) struct Resolver<'ast> {
-    module_path: Option<&'ast [String]>,
-    db: &'ast ModuleDb,
+pub(crate) struct Resolver<'a> {
+    semantic: &'a SemanticModel<'a>,
+    module_path: Option<&'a [String]>,
 }
 
-impl<'ast> Resolver<'ast> {
-    pub(crate) fn new(module_path: Option<&'ast [String]>, db: &'ast ModuleDb) -> Self {
-        Self { module_path, db }
+impl<'a> Resolver<'a> {
+    pub(crate) fn new(semantic: &'a SemanticModel<'a>, module_path: Option<&'a [String]>) -> Self {
+        Self {
+            semantic,
+            module_path,
+        }
     }
 
-    pub(crate) fn resolve(&self, import: &'ast CollectedImport<'ast>) -> Option<&'ast FilePath> {
+    pub(crate) fn resolve(&self, import: CollectedImport) -> Option<&'a FilePath> {
         match import {
-            CollectedImport::Import(import) => Some(
-                resolve_module(self.db, import.segments())?
-                    .file()
-                    .path(self.db),
-            ),
+            CollectedImport::Import(import) => self
+                .semantic
+                .resolve_module(import)
+                .map(|module| module.file().path(self.semantic.db())),
             CollectedImport::ImportFrom(import) => {
-                let module_path = if import.is_unresolved_import() {
-                    // Only fix is the module path is known, and the import doesn't extend beyond it.
-                    let module_path = from_relative_import(self.module_path?, import)?;
-
-                    // Require import to be a valid module:
-                    // https://python.org/dev/peps/pep-0008/#package-and-module-names
-                    if !module_path
-                        .segments()
-                        .iter()
-                        .all(|segment| is_identifier(segment))
-                    {
-                        return None;
-                    }
-
-                    Cow::Owned(module_path)
+                // If the import is relative, resolve it relative to the current module.
+                let import = if import
+                    .components()
+                    .next()
+                    .is_some_and(|segment| segment == ".")
+                {
+                    from_relative_import(self.module_path?, import)?
                 } else {
-                    Cow::Borrowed(import)
+                    import
                 };
+
                 // Attempt to resolve the member (e.g., given `from foo import bar`, look for `foo.bar`).
-                Some(
-                    resolve_module(self.db, module_path.segments())
-                        .or_else(|| {
-                            // Attempt to resolve the module (e.g., given `import foo`, look for `foo`).
-                            let segments = if module_path.segments().len() > 1 {
-                                Some(&module_path.segments()[..module_path.segments().len() - 1])
-                            } else {
-                                None
-                            }?;
-                            resolve_module(self.db, segments)
-                        })?
-                        .file()
-                        .path(self.db),
-                )
+                let parent = import.parent();
+                self.semantic
+                    .resolve_module(import)
+                    .map(|module| module.file().path(self.semantic.db()))
+                    .or_else(|| {
+                        // Attempt to resolve the module (e.g., given `from foo import bar`, look for `foo`).
+                        self.semantic
+                            .resolve_module(parent?)
+                            .map(|module| module.file().path(self.semantic.db()))
+                    })
             }
         }
     }
@@ -66,37 +53,28 @@ impl<'ast> Resolver<'ast> {
 
 /// Format the call path for a relative import, or `None` if the relative import extends beyond
 /// the root module.
-fn from_relative_import<'a>(
+fn from_relative_import(
     // The path from which the import is relative.
-    module: &'a [String],
+    module: &[String],
     // The path of the import itself (e.g., given `from ..foo import bar`, `[".", ".", "foo", "bar]`).
-    import: &QualifiedName<'a>,
-) -> Option<QualifiedName<'a>> {
-    let mut qualified_name_builder =
-        QualifiedNameBuilder::with_capacity(module.len() + import.segments().len());
+    import: ModuleName,
+) -> Option<ModuleName> {
+    let mut components = Vec::with_capacity(module.len() + import.components().count());
 
     // Start with the module path.
-    qualified_name_builder.extend(module.iter().map(String::as_str));
+    components.extend(module.iter().map(String::as_str));
 
     // Remove segments based on the number of dots.
-    for segment in import.segments() {
-        if *segment == "." {
-            if qualified_name_builder.is_empty() {
+    for segment in import.components() {
+        if segment == "." {
+            if components.is_empty() {
                 return None;
             }
-            qualified_name_builder.pop();
+            components.pop();
         } else {
-            qualified_name_builder.push(segment);
+            components.push(segment);
         }
     }
 
-    Some(qualified_name_builder.build())
-}
-
-pub(crate) fn resolve_module<'path>(
-    db: &ModuleDb,
-    module_name: &'path [&'path str],
-) -> Option<Module> {
-    let module_name = ModuleName::from_components(module_name.iter().copied())?;
-    red_knot_python_semantic::resolve_module(db, module_name)
+    ModuleName::from_components(components)
 }

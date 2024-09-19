@@ -12,7 +12,7 @@ license.workspace = true
 [dependencies]
 red_knot_python_semantic = { workspace = true }
 ruff_cache = { workspace = true }
-ruff_db = { workspace = true, features = ["os"] }
+ruff_db = { workspace = true, features = ["os", "serde"] }
 ruff_linter = { workspace = true }
 ruff_macros = { workspace = true }
 ruff_python_ast = { workspace = true }

@@ -1,20 +1,18 @@
+use red_knot_python_semantic::ModuleName;
 use ruff_python_ast::helpers::collect_import_from_member;
-use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::visitor::source_order::walk_module;
-use ruff_python_ast::visitor::source_order::{walk_expr, walk_stmt, SourceOrderVisitor};
-use ruff_python_ast::{self as ast, Expr, Mod, Stmt};
-use ruff_python_stdlib::identifiers::is_identifier;
+use ruff_python_ast::visitor::source_order::{walk_body, walk_expr, walk_stmt, SourceOrderVisitor};
+use ruff_python_ast::{self as ast, Expr, ModModule, Stmt};
 
 /// Collect all imports for a given Python file.
 #[derive(Default, Debug)]
-pub(crate) struct Collector<'ast> {
+pub(crate) struct Collector {
     /// Whether to detect imports from string literals.
     string_imports: bool,
     /// The collected imports from the Python AST.
-    imports: Vec<CollectedImport<'ast>>,
+    imports: Vec<CollectedImport>,
 }
 
-impl<'ast> Collector<'ast> {
+impl Collector {
     pub(crate) fn new(string_imports: bool) -> Self {
         Self {
             string_imports,
@@ -23,13 +21,13 @@ impl<'ast> Collector<'ast> {
     }
 
     #[must_use]
-    pub(crate) fn collect(mut self, module: &'ast Mod) -> Vec<CollectedImport<'ast>> {
-        walk_module(&mut self, module);
+    pub(crate) fn collect(mut self, module: &ModModule) -> Vec<CollectedImport> {
+        walk_body(&mut self, &module.body);
         self.imports
     }
 }
 
-impl<'ast> SourceOrderVisitor<'ast> for Collector<'ast> {
+impl<'ast> SourceOrderVisitor<'ast> for Collector {
     fn visit_stmt(&mut self, stmt: &'ast Stmt) {
         match stmt {
             Stmt::ImportFrom(ast::StmtImportFrom {
@@ -41,15 +39,21 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'ast> {
                 let module = module.as_deref();
                 let level = *level;
                 for alias in names {
-                    let qualified_name = collect_import_from_member(level, module, &alias.name);
-                    self.imports
-                        .push(CollectedImport::ImportFrom(qualified_name));
+                    if let Some(module_name) = ModuleName::from_components(
+                        collect_import_from_member(level, module, &alias.name)
+                            .segments()
+                            .iter()
+                            .cloned(),
+                    ) {
+                        self.imports.push(CollectedImport::ImportFrom(module_name));
+                    }
                 }
             }
             Stmt::Import(ast::StmtImport { names, range: _ }) => {
                 for alias in names {
-                    let qualified_name = QualifiedName::user_defined(&alias.name);
-                    self.imports.push(CollectedImport::Import(qualified_name));
+                    if let Some(module_name) = ModuleName::new(alias.name.as_str()) {
+                        self.imports.push(CollectedImport::Import(module_name));
+                    }
                 }
             }
             _ => {
@@ -64,9 +68,8 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'ast> {
                 // Determine whether the string literal "looks like" an import statement: contains
                 // a dot, and consists solely of valid Python identifiers.
                 let value = value.to_str();
-                if value.split('.').all(is_identifier) {
-                    let qualified_name = QualifiedName::from_dotted_name(value);
-                    self.imports.push(CollectedImport::Import(qualified_name));
+                if let Some(module_name) = ModuleName::new(value) {
+                    self.imports.push(CollectedImport::Import(module_name));
                 }
             }
             walk_expr(self, expr);
@@ -75,9 +78,9 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'ast> {
 }
 
 #[derive(Debug)]
-pub(crate) enum CollectedImport<'ast> {
+pub(crate) enum CollectedImport {
     /// The import was part of an `import` statement.
-    Import(QualifiedName<'ast>),
+    Import(ModuleName),
     /// The import was part of an `import from` statement.
-    ImportFrom(QualifiedName<'ast>),
+    ImportFrom(ModuleName),
 }
