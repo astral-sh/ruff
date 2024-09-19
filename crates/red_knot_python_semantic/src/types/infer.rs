@@ -5800,8 +5800,7 @@ mod tests {
         .unwrap();
         db.write_file("/src/c.pyi", "x: int").unwrap();
 
-        // TODO this should simplify to just 'int'
-        assert_public_ty(&db, "/src/a.py", "x", "int | Literal[1]");
+        assert_public_ty(&db, "/src/a.py", "x", "int");
     }
 
     // Incremental inference tests

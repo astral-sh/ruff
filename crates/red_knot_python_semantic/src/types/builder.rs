@@ -46,10 +46,23 @@ impl<'db> UnionBuilder<'db> {
     pub(crate) fn add(mut self, ty: Type<'db>) -> Self {
         match ty {
             Type::Union(union) => {
-                self.elements.extend(union.elements(self.db));
+                for element in union.elements(self.db) {
+                    self = self.add(*element);
+                }
             }
             Type::Never => {}
             _ => {
+                let mut remove = vec![];
+                for element in &self.elements {
+                    if ty.is_subtype_of(self.db, *element) {
+                        return self;
+                    } else if element.is_subtype_of(self.db, ty) {
+                        remove.push(*element);
+                    }
+                }
+                for element in remove {
+                    self.elements.remove(&element);
+                }
                 self.elements.insert(ty);
             }
         }
@@ -367,6 +380,24 @@ mod tests {
 
         assert_eq!(union.elements_vec(&db), &[t0, t1, t2]);
     }
+
+    #[test]
+    fn build_union_simplify_subtype() {
+        let db = setup_db();
+        let t0 = builtins_symbol_ty(&db, "str").to_instance(&db);
+        let t1 = Type::LiteralString;
+        let t2 = Type::Unknown;
+        let u0 = UnionType::from_elements(&db, [t0, t1]);
+        let u1 = UnionType::from_elements(&db, [t1, t0]);
+        let u2 = UnionType::from_elements(&db, [t0, t1, t2]);
+
+        assert_eq!(u0, t0);
+        assert_eq!(u1, t0);
+        assert_eq!(u2.expect_union().elements_vec(&db), &[t0, t2]);
+    }
+
+    #[test]
+    fn build_union_no_simplify_any() {}
 
     impl<'db> IntersectionType<'db> {
         fn pos_vec(self, db: &'db TestDb) -> Vec<Type<'db>> {
