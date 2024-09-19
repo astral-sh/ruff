@@ -998,13 +998,6 @@ pub struct UnionType<'db> {
 }
 
 impl<'db> UnionType<'db> {
-    #[deprecated(
-        note = "This is O(n) and we shouldn't need it; TODO eliminate along with Type::Unbound."
-    )]
-    pub fn contains(&self, db: &'db dyn Db, ty: Type<'db>) -> bool {
-        self.elements(db).contains(&ty)
-    }
-
     /// Create a union from a list of elements
     /// (which may be eagerly simplified into a different variant of [`Type`] altogether).
     pub fn from_elements<T: Into<Type<'db>>>(
