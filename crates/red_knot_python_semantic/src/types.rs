@@ -10,7 +10,9 @@ use crate::semantic_index::{
     global_scope, semantic_index, symbol_table, use_def_map, BindingWithConstraints,
     BindingWithConstraintsIterator, DeclarationsIterator,
 };
-use crate::stdlib::{builtins_symbol_ty, types_symbol_ty, typeshed_symbol_ty};
+use crate::stdlib::{
+    builtins_symbol_ty, types_symbol_ty, typeshed_symbol_ty, typing_extensions_symbol_ty,
+};
 use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet};
 
