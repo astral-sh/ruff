@@ -259,7 +259,7 @@ fn affix_removal_data<'a>(
             ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
                 range: _,
                 value: ast::Number::Int(x),
-            }) => !(x.as_u8().is_some_and(|val| val == 1)),
+            }) => x.as_u8() != Some(1),
             // and not equal to `None` or `True`
             ast::Expr::NoneLiteral(_)
             | ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral {
