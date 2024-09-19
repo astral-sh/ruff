@@ -3524,6 +3524,31 @@ mod tests {
     }
 
     #[test]
+    fn call_union_with_all_not_callable() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            if flag:
+                f = 1
+            else:
+                f = 'foo'
+            x = f()
+            ",
+        )?;
+
+        assert_file_diagnostics(
+            &db,
+            "src/a.py",
+            &[r#"No element of union type 'Literal[1] | Literal["foo"]' is callable."#],
+        );
+        assert_public_ty(&db, "src/a.py", "x", "Unknown");
+
+        Ok(())
+    }
+
+    #[test]
     fn invalid_callable() {
         let mut db = setup_db();
 

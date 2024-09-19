@@ -822,6 +822,14 @@ impl<'db> CallOutcome<'db> {
                             called_ty.display(db)
                         ),
                     ),
+                    _ if not_callable.len() == outcomes.len() => builder.add_diagnostic(
+                        node,
+                        "call-non-callable",
+                        format_args!(
+                            "No element of union type '{}' is callable.",
+                            called_ty.display(db)
+                        ),
+                    ),
                     _ => builder.add_diagnostic(
                         node,
                         "call-non-callable",
