@@ -252,20 +252,17 @@ fn affix_removal_data<'a>(
     // Exit early if slice step is...
     if slice
         .step
-        .as_ref()
+        .as_deref()
         // present and
-        .is_some_and(|step| match step.as_ref() {
+        .is_some_and(|step| match step {
             // not equal to 1
             ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-                range: _,
                 value: ast::Number::Int(x),
+                ..
             }) => x.as_u8() != Some(1),
             // and not equal to `None` or `True`
             ast::Expr::NoneLiteral(_)
-            | ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral {
-                range: _,
-                value: true,
-            }) => false,
+            | ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value: true, .. }) => false,
             _ => true,
         })
     {
