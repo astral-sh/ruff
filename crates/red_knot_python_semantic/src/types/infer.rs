@@ -2131,8 +2131,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if builtin_ty.is_unbound() && name == "reveal_type" {
                     self.add_diagnostic(
                         name_node.into(),
-                        "undefined-name",
-                        format_args!("Name '{name}' is not defined."),
+                        "undefined-reveal",
+                        format_args!(
+                            "'reveal_type' used without importing it; this is allowed for debugging convenience but will fail at runtime."),
                     );
                     builtin_ty = typing_extensions_symbol_ty(self.db, name);
                 }
@@ -2830,7 +2831,7 @@ mod tests {
             &db,
             "/src/a.py",
             &[
-                "Name 'reveal_type' is not defined.",
+                "'reveal_type' used without importing it; this is allowed for debugging convenience but will fail at runtime.",
                 "Revealed type is 'Literal[1]'.",
             ],
         );
