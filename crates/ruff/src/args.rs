@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, bail};
 use clap::builder::{TypedValueParser, ValueParserFactory};
-use clap::{command, Parser};
+use clap::{command, Parser, Subcommand};
 use colored::Colorize;
 use path_absolutize::path_dedot;
 use regex::Regex;
@@ -132,8 +132,9 @@ pub enum Command {
     Format(FormatCommand),
     /// Run the language server.
     Server(ServerCommand),
-    /// Generate a map of Python file dependencies.
-    ImportMap(ImportMapCommand),
+    /// Analyze the import graph of the given files or directories.
+    #[clap(subcommand)]
+    Graph(GraphCommand),
     /// Display Ruff's version
     Version {
         #[arg(long, value_enum, default_value = "text")]
@@ -141,8 +142,14 @@ pub enum Command {
     },
 }
 
+#[derive(Debug, Subcommand)]
+pub enum GraphCommand {
+    /// Generate a map of Python file dependencies.
+    Build(GraphBuildCommand),
+}
+
 #[derive(Clone, Debug, clap::Parser)]
-pub struct ImportMapCommand {
+pub struct GraphBuildCommand {
     /// List of files or directories to include.
     #[clap(help = "List of files or directories to include [default: .]")]
     pub files: Vec<PathBuf>,
@@ -758,14 +765,14 @@ impl FormatCommand {
     }
 }
 
-impl ImportMapCommand {
+impl GraphBuildCommand {
     /// Partition the CLI into command-line arguments and configuration
     /// overrides.
     pub fn partition(
         self,
         global_options: GlobalConfigArgs,
-    ) -> anyhow::Result<(ImportMapArgs, ConfigArguments)> {
-        let format_arguments = ImportMapArgs {
+    ) -> anyhow::Result<(GraphArgs, ConfigArguments)> {
+        let format_arguments = GraphArgs {
             files: self.files,
             direction: self.direction,
         };
@@ -1199,7 +1206,7 @@ impl LineColumnParseError {
 }
 
 /// CLI settings that are distinct from configuration (commands, lists of files, etc.).
-pub struct ImportMapArgs {
+pub struct GraphArgs {
     pub files: Vec<PathBuf>,
     pub direction: Direction,
 }

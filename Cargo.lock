@@ -2389,7 +2389,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
- "itertools 0.13.0",
  "red_knot_python_semantic",
  "ruff_cache",
  "ruff_db",

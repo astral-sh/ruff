@@ -21,7 +21,6 @@ ruff_python_stdlib = { workspace = true }
 
 anyhow = { workspace = true }
 clap = { workspace = true, optional = true }
-itertools = { workspace = true }
 salsa = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }

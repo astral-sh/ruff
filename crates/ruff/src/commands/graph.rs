@@ -1,4 +1,4 @@
-use crate::args::{ConfigArguments, ImportMapArgs};
+use crate::args::{ConfigArguments, GraphArgs};
 use crate::resolve::resolve;
 use crate::{resolve_default_files, ExitStatus};
 use anyhow::Result;
@@ -13,10 +13,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 /// Generate an import map.
-pub(crate) fn import_map(
-    args: ImportMapArgs,
-    config_arguments: &ConfigArguments,
-) -> Result<ExitStatus> {
+pub(crate) fn graph(args: GraphArgs, config_arguments: &ConfigArguments) -> Result<ExitStatus> {
     // Construct the "default" settings. These are used when no `pyproject.toml`
     // files are present, or files are injected from outside the hierarchy.
     let pyproject_config = resolve(config_arguments, None)?;

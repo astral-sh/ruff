@@ -5,7 +5,7 @@ pub(crate) mod clean;
 pub(crate) mod config;
 pub(crate) mod format;
 pub(crate) mod format_stdin;
-pub(crate) mod import_map;
+pub(crate) mod graph;
 pub(crate) mod linter;
 pub(crate) mod rule;
 pub(crate) mod server;

@@ -7,6 +7,7 @@ use ruff_db::{Db as SourceDb, Upcast};
 use std::path::PathBuf;
 
 #[salsa::db]
+#[derive(Default)]
 pub struct ModuleDb {
     storage: salsa::Storage<Self>,
     files: Files,
@@ -14,37 +15,21 @@ pub struct ModuleDb {
     vendored: VendoredFileSystem,
 }
 
-impl Default for ModuleDb {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl ModuleDb {
     /// Initialize a [`ModuleDb`] from the given source root.
     pub fn from_src_root(src_root: PathBuf) -> Result<Self> {
-        let db = Self::new();
+        let db = Self::default();
         Program::from_settings(
             &db,
             &ProgramSettings {
                 target_version: PythonVersion::default(),
                 search_paths: SearchPathSettings::new(
-                    SystemPathBuf::from_path_buf(src_root).map_err(|path| {
-                        anyhow::anyhow!(format!("Invalid path: {}", path.display()))
-                    })?,
+                    SystemPathBuf::from_path_buf(src_root)
+                        .map_err(|path| anyhow::anyhow!("Invalid path: {}", path.display()))?,
                 ),
             },
         )?;
         Ok(db)
-    }
-
-    pub fn new() -> Self {
-        Self {
-            storage: salsa::Storage::default(),
-            system: OsSystem::default(),
-            vendored: VendoredFileSystem::default(),
-            files: Files::default(),
-        }
     }
 
     #[must_use]

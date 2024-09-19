@@ -515,16 +515,16 @@ Ruff: An extremely fast Python linter and code formatter.
 Usage: ruff [OPTIONS] <COMMAND>
 
 Commands:
-  check       Run Ruff on the given files or directories (default)
-  rule        Explain a rule (or all rules)
-  config      List or describe the available configuration options
-  linter      List all supported upstream linters
-  clean       Clear any caches in the current directory and any subdirectories
-  format      Run the Ruff formatter on the given files or directories
-  server      Run the language server
-  import-map  Generate a map of Python file dependencies
-  version     Display Ruff's version
-  help        Print this message or the help of the given subcommand(s)
+  check    Run Ruff on the given files or directories (default)
+  rule     Explain a rule (or all rules)
+  config   List or describe the available configuration options
+  linter   List all supported upstream linters
+  clean    Clear any caches in the current directory and any subdirectories
+  format   Run the Ruff formatter on the given files or directories
+  server   Run the language server
+  graph    Analyze the import graph of the given files or directories
+  version  Display Ruff's version
+  help     Print this message or the help of the given subcommand(s)
 
 Options:
   -h, --help     Print help
