@@ -103,14 +103,11 @@ impl<'db> UnionBuilder<'db> {
         self
     }
 
-    pub(crate) fn build(mut self) -> Type<'db> {
+    pub(crate) fn build(self) -> Type<'db> {
         match self.elements.len() {
             0 => Type::Never,
             1 => self.elements[0],
-            _ => {
-                self.elements.shrink_to_fit();
-                Type::Union(UnionType::new(self.db, self.elements))
-            }
+            _ => Type::Union(UnionType::new(self.db, self.elements.into())),
         }
     }
 }
@@ -304,12 +301,6 @@ mod tests {
     use crate::ProgramSettings;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
-    impl<'db> UnionType<'db> {
-        fn elements_vec(self, db: &'db TestDb) -> Vec<Type<'db>> {
-            self.elements(db).clone()
-        }
-    }
-
     fn setup_db() -> TestDb {
         let db = TestDb::new();
 
@@ -337,7 +328,7 @@ mod tests {
         let t1 = Type::IntLiteral(1);
         let union = UnionType::from_elements(&db, [t0, t1]).expect_union();
 
-        assert_eq!(union.elements_vec(&db), &[t0, t1]);
+        assert_eq!(union.elements(&db).as_ref(), &[t0, t1]);
     }
 
     #[test]
@@ -374,10 +365,10 @@ mod tests {
         let t3 = Type::IntLiteral(17);
 
         let union = UnionType::from_elements(&db, [t0, t1, t3]).expect_union();
-        assert_eq!(union.elements_vec(&db), &[t0, t3]);
+        assert_eq!(union.elements(&db).as_ref(), &[t0, t3]);
 
         let union = UnionType::from_elements(&db, [t0, t1, t2, t3]).expect_union();
-        assert_eq!(union.elements_vec(&db), &[bool_ty, t3]);
+        assert_eq!(union.elements(&db).as_ref(), &[bool_ty, t3]);
     }
 
     #[test]
@@ -389,7 +380,7 @@ mod tests {
         let u1 = UnionType::from_elements(&db, [t0, t1]);
         let union = UnionType::from_elements(&db, [u1, t2]).expect_union();
 
-        assert_eq!(union.elements_vec(&db), &[t0, t1, t2]);
+        assert_eq!(union.elements(&db).as_ref(), &[t0, t1, t2]);
     }
 
     #[test]
@@ -405,8 +396,8 @@ mod tests {
 
         assert_eq!(u0, t0);
         assert_eq!(u1, t0);
-        assert_eq!(u2.expect_union().elements_vec(&db), &[t0, t2]);
-        assert_eq!(u3.expect_union().elements_vec(&db), &[t0, t2]);
+        assert_eq!(u2.expect_union().elements(&db).as_ref(), &[t0, t2]);
+        assert_eq!(u3.expect_union().elements(&db).as_ref(), &[t0, t2]);
     }
 
     impl<'db> IntersectionType<'db> {
@@ -487,7 +478,7 @@ mod tests {
             .add_positive(u0)
             .build()
             .expect_union();
-        let [Type::Intersection(i0), Type::Intersection(i1)] = union.elements_vec(&db)[..] else {
+        let [Type::Intersection(i0), Type::Intersection(i1)] = union.elements(&db)[..] else {
             panic!("expected a union of two intersections");
         };
         assert_eq!(i0.pos_vec(&db), &[ta, t0]);

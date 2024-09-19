@@ -994,7 +994,7 @@ impl<'db> ClassType<'db> {
 pub struct UnionType<'db> {
     /// The union type includes values in any of these types.
     #[return_ref]
-    elements: Vec<Type<'db>>,
+    elements: Box<[Type<'db>]>,
 }
 
 impl<'db> UnionType<'db> {
