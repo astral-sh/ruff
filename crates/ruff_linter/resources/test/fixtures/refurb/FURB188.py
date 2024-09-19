@@ -152,3 +152,9 @@ def shadow_builtins(filename: str, extension: str) -> None:
     from builtins import len as builtins_len
 
     return filename[:-builtins_len(extension)] if filename.endswith(extension) else filename
+
+def ignore_step():
+    text = "!x!y!z"
+    if text.startswith("!"):
+        text = text[1::2]
+    print(text)
