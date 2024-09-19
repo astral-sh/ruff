@@ -330,7 +330,7 @@ impl DefinitionCategory {
     /// If so, any assignments reached by this definition are in error if they assign a value of a
     /// type not assignable to the declared type.
     ///
-    /// Annotations establish a declared type. So do function and class definition.
+    /// Annotations establish a declared type. So do function and class definitions, and imports.
     pub(crate) fn is_declaration(self) -> bool {
         matches!(
             self,
@@ -371,10 +371,11 @@ pub enum DefinitionKind {
 impl DefinitionKind {
     pub(crate) fn category(&self) -> DefinitionCategory {
         match self {
-            // functions and classes always bind a value, and we always consider them declarations
-            DefinitionKind::Function(_) | DefinitionKind::Class(_) => {
-                DefinitionCategory::DeclarationAndBinding
-            }
+            // functions, classes, and imports always bind, and we consider them declarations
+            DefinitionKind::Function(_)
+            | DefinitionKind::Class(_)
+            | DefinitionKind::Import(_)
+            | DefinitionKind::ImportFrom(_) => DefinitionCategory::DeclarationAndBinding,
             // a parameter always binds a value, but is only a declaration if annotated
             DefinitionKind::Parameter(parameter) => {
                 if parameter.annotation.is_some() {
@@ -400,9 +401,7 @@ impl DefinitionKind {
                 }
             }
             // all of these bind values without declaring a type
-            DefinitionKind::Import(_)
-            | DefinitionKind::ImportFrom(_)
-            | DefinitionKind::NamedExpression(_)
+            DefinitionKind::NamedExpression(_)
             | DefinitionKind::Assignment(_)
             | DefinitionKind::AugmentedAssignment(_)
             | DefinitionKind::For(_)

@@ -1316,7 +1316,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             Type::Unknown
         };
 
-        self.add_binding(alias.into(), definition, module_ty);
+        self.add_declaration_with_binding(alias.into(), definition, module_ty, module_ty);
     }
 
     fn infer_import_from_statement(&mut self, import: &ast::StmtImportFrom) {
@@ -1500,11 +1500,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         // the runtime error will occur immediately (rather than when the symbol is *used*,
         // as would be the case for a symbol with type `Unbound`), so it's appropriate to
         // think of the type of the imported symbol as `Unknown` rather than `Unbound`
-        self.add_binding(
-            alias.into(),
-            definition,
-            member_ty.replace_unbound_with(self.db, Type::Unknown),
-        );
+        let ty = member_ty.replace_unbound_with(self.db, Type::Unknown);
+
+        self.add_declaration_with_binding(alias.into(), definition, ty, ty);
     }
 
     fn infer_return_statement(&mut self, ret: &ast::StmtReturn) {
@@ -5695,6 +5693,50 @@ mod tests {
         .unwrap();
 
         assert_file_diagnostics(&db, "/src/a.py", &[]);
+    }
+
+    #[test]
+    fn no_implicit_shadow_import() {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            from b import x
+
+            x = 'foo'
+            ",
+        )
+        .unwrap();
+
+        db.write_file("/src/b.py", "x: int").unwrap();
+
+        assert_file_diagnostics(
+            &db,
+            "/src/a.py",
+            &[r#"Object of type 'Literal["foo"]' is not assignable to 'int'."#],
+        );
+    }
+
+    #[test]
+    fn import_from_conditional_reimport() {
+        let mut db = setup_db();
+
+        db.write_file("/src/a.py", "from b import f").unwrap();
+        db.write_dedented(
+            "/src/b.py",
+            "
+            if flag:
+                from c import f
+            else:
+                def f(): ...
+            ",
+        )
+        .unwrap();
+        db.write_file("/src/c.py", "def f(): ...").unwrap();
+
+        // TODO we should really disambiguate in such cases: Literal[b.f, c.f]
+        assert_public_ty(&db, "/src/a.py", "f", "Literal[f, f]");
     }
 
     // Incremental inference tests
