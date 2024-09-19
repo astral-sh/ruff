@@ -1945,11 +1945,10 @@ fn range_end_only() {
 def foo(arg1, arg2,):
     print("Should format this" )
 
-"#), @r###"
+"#), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
-
     def foo(
         arg1,
         arg2,
@@ -1958,7 +1957,7 @@ def foo(arg1, arg2,):
 
 
     ----- stderr -----
-    "###);
+    "#);
 }
 
 #[test]
