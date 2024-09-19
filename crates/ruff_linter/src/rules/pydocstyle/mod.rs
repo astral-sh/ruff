@@ -30,6 +30,7 @@ mod tests {
     #[test_case(Rule::EndsInPeriod, Path::new("D.py"))]
     #[test_case(Rule::EndsInPeriod, Path::new("D400.py"))]
     #[test_case(Rule::EndsInPunctuation, Path::new("D.py"))]
+    #[test_case(Rule::EndsInPunctuation, Path::new("D415.py"))]
     #[test_case(Rule::FirstLineCapitalized, Path::new("D.py"))]
     #[test_case(Rule::FirstLineCapitalized, Path::new("D403.py"))]
     #[test_case(Rule::FitsOnOneLine, Path::new("D.py"))]
