@@ -122,6 +122,7 @@ fn lint_maybe_undefined(context: &SemanticLintContext, name: &ast::ExprName) {
                 name.start(),
             ));
         }
+        #[allow(deprecated)]
         Type::Union(union) if union.contains(semantic.db(), Type::Unbound) => {
             context.push_diagnostic(format_diagnostic(
                 context,

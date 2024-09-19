@@ -362,7 +362,7 @@ impl<'db> Type<'db> {
     pub fn may_be_unbound(&self, db: &'db dyn Db) -> bool {
         match self {
             Type::Unbound => true,
-            Type::Union(union) => union.contains(db, Type::Unbound),
+            Type::Union(union) => union.elements(db).contains(&Type::Unbound),
             // Unbound can't appear in an intersection, because an intersection with Unbound
             // simplifies to just Unbound.
             _ => false,
@@ -998,12 +998,15 @@ pub struct UnionType<'db> {
 }
 
 impl<'db> UnionType<'db> {
+    #[deprecated(
+        note = "This is O(n) and we shouldn't need it; TODO eliminate along with Type::Unbound."
+    )]
     pub fn contains(&self, db: &'db dyn Db, ty: Type<'db>) -> bool {
         self.elements(db).contains(&ty)
     }
 
     /// Create a union from a list of elements
-    /// (which may be eagerly simplified into a different variant of [`Type`] altogether)
+    /// (which may be eagerly simplified into a different variant of [`Type`] altogether).
     pub fn from_elements<T: Into<Type<'db>>>(
         db: &'db dyn Db,
         elements: impl IntoIterator<Item = T>,
@@ -1017,7 +1020,7 @@ impl<'db> UnionType<'db> {
     }
 
     /// Apply a transformation function to all elements of the union,
-    /// and create a new union from the resulting set of types
+    /// and create a new union from the resulting set of types.
     pub fn map(
         &self,
         db: &'db dyn Db,
