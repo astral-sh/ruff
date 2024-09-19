@@ -51,8 +51,8 @@ use crate::stdlib::builtins_module_scope;
 use crate::types::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 use crate::types::{
     bindings_ty, builtins_symbol_ty, declarations_ty, global_symbol_ty, symbol_ty,
-    BytesLiteralType, ClassType, FunctionType, StringLiteralType, TupleType, Type,
-    TypeArrayDisplay, UnionType,
+    typing_extensions_symbol_ty, BytesLiteralType, ClassType, FunctionType, StringLiteralType,
+    TupleType, Type, TypeArrayDisplay, UnionType,
 };
 use crate::Db;
 
@@ -2081,7 +2081,8 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     /// Look up a name reference that isn't bound in the local scope.
-    fn lookup_name(&self, name: &ast::name::Name) -> Type<'db> {
+    fn lookup_name(&mut self, name_node: &ast::ExprName) -> Type<'db> {
+        let ast::ExprName { id: name, .. } = name_node;
         let file_scope_id = self.scope.file_scope_id(self.db);
         let is_bound = self
             .index
@@ -2126,7 +2127,17 @@ impl<'db> TypeInferenceBuilder<'db> {
             };
             // Fallback to builtins (without infinite recursion if we're already in builtins.)
             if ty.may_be_unbound(self.db) && Some(self.scope) != builtins_module_scope(self.db) {
-                ty.replace_unbound_with(self.db, builtins_symbol_ty(self.db, name))
+                let mut builtin_ty = builtins_symbol_ty(self.db, name);
+                if builtin_ty.is_unbound() && name == "reveal_type" {
+                    self.add_diagnostic(
+                        name_node.into(),
+                        "undefined-reveal",
+                        format_args!(
+                            "'reveal_type' used without importing it; this is allowed for debugging convenience but will fail at runtime."),
+                    );
+                    builtin_ty = typing_extensions_symbol_ty(self.db, name);
+                }
+                ty.replace_unbound_with(self.db, builtin_ty)
             } else {
                 ty
             }
@@ -2162,7 +2173,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 };
 
                 let unbound_ty = if may_be_unbound {
-                    Some(self.lookup_name(id))
+                    Some(self.lookup_name(name))
                 } else {
                     None
                 };
@@ -2800,6 +2811,30 @@ mod tests {
         )?;
 
         assert_file_diagnostics(&db, "/src/a.py", &["Revealed type is 'Literal[1]'."]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn reveal_type_builtin() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            x = 1
+            reveal_type(x)
+            ",
+        )?;
+
+        assert_file_diagnostics(
+            &db,
+            "/src/a.py",
+            &[
+                "'reveal_type' used without importing it; this is allowed for debugging convenience but will fail at runtime.",
+                "Revealed type is 'Literal[1]'.",
+            ],
+        );
 
         Ok(())
     }
