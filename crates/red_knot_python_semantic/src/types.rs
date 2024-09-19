@@ -994,7 +994,7 @@ impl<'db> ClassType<'db> {
 pub struct UnionType<'db> {
     /// The union type includes values in any of these types.
     #[return_ref]
-    elements: FxOrderSet<Type<'db>>,
+    elements: Vec<Type<'db>>,
 }
 
 impl<'db> UnionType<'db> {
@@ -1023,7 +1023,7 @@ impl<'db> UnionType<'db> {
         db: &'db dyn Db,
         transform_fn: impl Fn(&Type<'db>) -> Type<'db>,
     ) -> Type<'db> {
-        Self::from_elements(db, self.elements(db).into_iter().map(transform_fn))
+        Self::from_elements(db, self.elements(db).iter().map(transform_fn))
     }
 }
 

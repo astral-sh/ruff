@@ -27,10 +27,9 @@
 //!   * An intersection containing two non-overlapping types should simplify to [`Type::Never`].
 use crate::types::{builtins_symbol_ty, IntersectionType, Type, UnionType};
 use crate::{Db, FxOrderSet};
-use ordermap::set::MutableValues;
 
 pub(crate) struct UnionBuilder<'db> {
-    elements: FxOrderSet<Type<'db>>,
+    elements: Vec<Type<'db>>,
     db: &'db dyn Db,
 }
 
@@ -38,7 +37,7 @@ impl<'db> UnionBuilder<'db> {
     pub(crate) fn new(db: &'db dyn Db) -> Self {
         Self {
             db,
-            elements: FxOrderSet::default(),
+            elements: vec![],
         }
     }
 
@@ -46,42 +45,62 @@ impl<'db> UnionBuilder<'db> {
     pub(crate) fn add(mut self, ty: Type<'db>) -> Self {
         match ty {
             Type::Union(union) => {
-                for element in union.elements(self.db) {
+                let new_elements = union.elements(self.db);
+                self.elements.reserve(new_elements.len());
+                for element in new_elements {
                     self = self.add(*element);
                 }
             }
             Type::Never => {}
             _ => {
-                let mut remove = vec![];
-                for element in &self.elements {
+                let bool_pair = if let Type::BooleanLiteral(b) = ty {
+                    Some(Type::BooleanLiteral(!b))
+                } else {
+                    None
+                };
+                let mut to_add = ty;
+                let mut to_remove = vec![];
+                for (index, element) in self.elements.iter().enumerate() {
+                    if Some(*element) == bool_pair {
+                        to_add = builtins_symbol_ty(self.db, "bool");
+                        to_remove.push(index);
+                        // The type we are adding is a BooleanLiteral, which doesn't have any
+                        // subtypes. And we just found that the union already contained our
+                        // mirror-image BooleanLiteral, so it can't also contain bool or any
+                        // supertype of bool. Therefore, we are done.
+                        break;
+                    }
                     if ty.is_subtype_of(self.db, *element) {
                         return self;
                     } else if element.is_subtype_of(self.db, ty) {
-                        remove.push(*element);
+                        to_remove.push(index);
                     }
                 }
-                for element in remove {
-                    self.elements.remove(&element);
+                match to_remove[..] {
+                    [] => self.elements.push(to_add),
+                    [index] => self.elements[index] = to_add,
+                    _ => {
+                        let mut retain =
+                            Vec::with_capacity(self.elements.len() - to_remove.len() + 1);
+                        let mut remove_iter = to_remove.iter();
+                        let mut elements_iter = self.elements.iter().enumerate();
+                        'outer: for remove_index in remove_iter.by_ref() {
+                            for (index, element) in elements_iter.by_ref() {
+                                if index == *remove_index {
+                                    continue 'outer;
+                                }
+                                retain.push(*element);
+                            }
+                        }
+                        retain.extend(elements_iter.map(|(_, element)| element));
+                        retain.push(to_add);
+                        self.elements = retain;
+                    }
                 }
-                self.elements.insert(ty);
             }
         }
 
         self
-    }
-
-    /// Performs the following normalizations:
-    ///     - Replaces `Literal[True,False]` with `bool`.
-    ///     - TODO For enums `E` with members `X1`,...,`Xn`, replaces
-    ///     `Literal[E.X1,...,E.Xn]` with `E`.
-    fn simplify(&mut self) {
-        if let Some(true_index) = self.elements.get_index_of(&Type::BooleanLiteral(true)) {
-            if self.elements.contains(&Type::BooleanLiteral(false)) {
-                *self.elements.get_index_mut2(true_index).unwrap() =
-                    builtins_symbol_ty(self.db, "bool");
-                self.elements.remove(&Type::BooleanLiteral(false));
-            }
-        }
     }
 
     pub(crate) fn build(mut self) -> Type<'db> {
@@ -89,16 +108,8 @@ impl<'db> UnionBuilder<'db> {
             0 => Type::Never,
             1 => self.elements[0],
             _ => {
-                self.simplify();
-
-                match self.elements.len() {
-                    0 => Type::Never,
-                    1 => self.elements[0],
-                    _ => {
-                        self.elements.shrink_to_fit();
-                        Type::Union(UnionType::new(self.db, self.elements))
-                    }
-                }
+                self.elements.shrink_to_fit();
+                Type::Union(UnionType::new(self.db, self.elements))
             }
         }
     }
@@ -295,7 +306,7 @@ mod tests {
 
     impl<'db> UnionType<'db> {
         fn elements_vec(self, db: &'db TestDb) -> Vec<Type<'db>> {
-            self.elements(db).into_iter().copied().collect()
+            self.elements(db).clone()
         }
     }
 
@@ -390,14 +401,13 @@ mod tests {
         let u0 = UnionType::from_elements(&db, [t0, t1]);
         let u1 = UnionType::from_elements(&db, [t1, t0]);
         let u2 = UnionType::from_elements(&db, [t0, t1, t2]);
+        let u3 = UnionType::from_elements(&db, [t1, t2, t0]);
 
         assert_eq!(u0, t0);
         assert_eq!(u1, t0);
         assert_eq!(u2.expect_union().elements_vec(&db), &[t0, t2]);
+        assert_eq!(u3.expect_union().elements_vec(&db), &[t0, t2]);
     }
-
-    #[test]
-    fn build_union_no_simplify_any() {}
 
     impl<'db> IntersectionType<'db> {
         fn pos_vec(self, db: &'db TestDb) -> Vec<Type<'db>> {
