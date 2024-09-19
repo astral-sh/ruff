@@ -554,11 +554,8 @@ where
                     // imports here, we assume the user's intent was to apply the `__future__`
                     // import, so we still check using it (and will also emit a diagnostic about a
                     // miss-placed `__future__` import.)
-                    self.has_future_annotations |= alias.name.id.as_str() == "annotations"
-                        && node
-                            .module
-                            .as_ref()
-                            .is_some_and(|module| module.id().as_str() == "__future__");
+                    self.has_future_annotations |= alias.name.id == "annotations"
+                        && node.module.as_deref() == Some("__future__");
 
                     let symbol = self.add_symbol(symbol_name.clone());
 
