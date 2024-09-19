@@ -11,7 +11,8 @@ use ruff_text_size::{Ranged, TextLen};
 /// the string to a slice after checking `.startswith()` or `.endswith()`, respectively.
 ///
 /// ## Why is this bad?
-/// The methods [`str.removeprefix`] and [`str.removesuffix`],
+/// The methods [`str.removeprefix`](https://docs.python.org/3/library/stdtypes.html#str.removeprefix)
+/// and [`str.removesuffix`](https://docs.python.org/3/library/stdtypes.html#str.removesuffix),
 /// introduced in Python 3.9, have the same behavior
 /// and are more readable and efficient.
 ///
@@ -33,9 +34,6 @@ use ruff_text_size::{Ranged, TextLen};
 /// ```python
 /// text = text.removeprefix("pre")
 /// ```
-///
-/// [`str.removeprefix`]: https://docs.python.org/3/library/stdtypes.html#str.removeprefix
-/// [`str.removesuffix`]: https://docs.python.org/3/library/stdtypes.html#str.removesuffix
 #[violation]
 pub struct SliceToRemovePrefixOrSuffix {
     string: String,
