@@ -6,13 +6,13 @@ use std::fmt;
 use std::path::PathBuf;
 
 #[derive(Debug, Default, Clone, CacheKey)]
-pub struct ImportMapSettings {
+pub struct GraphSettings {
     pub detect_string_imports: bool,
     pub include_dependencies: BTreeMap<PathBuf, (PathBuf, Vec<String>)>,
     pub extension: ExtensionMapping,
 }
 
-impl fmt::Display for ImportMapSettings {
+impl fmt::Display for GraphSettings {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "\n# Import Map Settings")?;
         display_settings! {

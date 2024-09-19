@@ -1,5 +1,5 @@
 [package]
-name = "ruff_import_map"
+name = "ruff_graph"
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true

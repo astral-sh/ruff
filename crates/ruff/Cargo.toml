@@ -15,7 +15,7 @@ default-run = "ruff"
 [dependencies]
 ruff_cache = { workspace = true }
 ruff_diagnostics = { workspace = true }
-ruff_import_map = { workspace = true, features = ["serde", "clap"] }
+ruff_graph = { workspace = true, features = ["serde", "clap"] }
 ruff_linter = { workspace = true, features = ["clap"] }
 ruff_macros = { workspace = true }
 ruff_notebook = { workspace = true }

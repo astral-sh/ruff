@@ -3,7 +3,7 @@ use crate::resolve::resolve;
 use crate::{resolve_default_files, ExitStatus};
 use anyhow::Result;
 use log::{debug, warn};
-use ruff_import_map::{Direction, ImportMap, ModuleDb, ModuleImports};
+use ruff_graph::{Direction, ImportMap, ModuleDb, ModuleImports};
 use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_workspace::resolver::{python_files_in_path, ResolvedFile};
@@ -81,11 +81,11 @@ pub(crate) fn import_map(
 
             // Resolve the per-file settings.
             let settings = resolver.resolve(&path);
-            let string_imports = settings.import_map.detect_string_imports;
-            let include_dependencies = settings.import_map.include_dependencies.get(&path).cloned();
+            let string_imports = settings.graph.detect_string_imports;
+            let include_dependencies = settings.graph.include_dependencies.get(&path).cloned();
 
             // Ignore non-Python files.
-            let source_type = match settings.import_map.extension.get(&path) {
+            let source_type = match settings.graph.extension.get(&path) {
                 None => match SourceType::from(&path) {
                     SourceType::Python(source_type) => source_type,
                     SourceType::Toml(_) => {
@@ -104,7 +104,7 @@ pub(crate) fn import_map(
             scope.spawn(move |_| {
                 // Identify any imports via static analysis.
                 let mut imports =
-                    ruff_import_map::generate(&path, package.as_deref(), string_imports, &db)
+                    ruff_graph::generate(&path, package.as_deref(), string_imports, &db)
                         .unwrap_or_else(|err| {
                             warn!(
                                 "Failed to generate import map for {path}: {err}",

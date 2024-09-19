@@ -20,7 +20,7 @@ use strum::IntoEnumIterator;
 
 use ruff_cache::cache_dir;
 use ruff_formatter::IndentStyle;
-use ruff_import_map::{Direction, ImportMapSettings};
+use ruff_graph::{Direction, GraphSettings};
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::registry::RuleNamespace;
 use ruff_linter::registry::{Rule, RuleSet, INCOMPATIBLE_CODES};
@@ -47,7 +47,7 @@ use crate::options::{
     Flake8ErrMsgOptions, Flake8GetTextOptions, Flake8ImplicitStrConcatOptions,
     Flake8ImportConventionsOptions, Flake8PytestStyleOptions, Flake8QuotesOptions,
     Flake8SelfOptions, Flake8TidyImportsOptions, Flake8TypeCheckingOptions,
-    Flake8UnusedArgumentsOptions, FormatOptions, ImportMapOptions, IsortOptions, LintCommonOptions,
+    Flake8UnusedArgumentsOptions, FormatOptions, GraphOptions, IsortOptions, LintCommonOptions,
     LintOptions, McCabeOptions, Options, Pep8NamingOptions, PyUpgradeOptions, PycodestyleOptions,
     PydocstyleOptions, PyflakesOptions, PylintOptions, RuffOptions,
 };
@@ -144,7 +144,7 @@ pub struct Configuration {
 
     pub lint: LintConfiguration,
     pub format: FormatConfiguration,
-    pub import_map: ImportMapConfiguration,
+    pub graph: ImportMapConfiguration,
 }
 
 impl Configuration {
@@ -210,17 +210,17 @@ impl Configuration {
                 .unwrap_or(format_defaults.docstring_code_line_width),
         };
 
-        let import_map = self.import_map;
-        let import_map_defaults = ImportMapSettings::default();
+        let graph = self.graph;
+        let graph_defaults = GraphSettings::default();
 
-        let import_map = ImportMapSettings {
+        let graph = GraphSettings {
             extension: self.extension.clone().unwrap_or_default(),
-            detect_string_imports: import_map
+            detect_string_imports: graph
                 .detect_string_imports
-                .unwrap_or(import_map_defaults.detect_string_imports),
-            include_dependencies: import_map
+                .unwrap_or(graph_defaults.detect_string_imports),
+            include_dependencies: graph
                 .include_dependencies
-                .unwrap_or(import_map_defaults.include_dependencies),
+                .unwrap_or(graph_defaults.include_dependencies),
         };
 
         let lint = self.lint;
@@ -417,7 +417,7 @@ impl Configuration {
             },
 
             formatter,
-            import_map,
+            graph,
         })
     }
 
@@ -551,8 +551,8 @@ impl Configuration {
                 options.format.unwrap_or_default(),
                 project_root,
             )?,
-            import_map: ImportMapConfiguration::from_options(
-                options.import_map.unwrap_or_default(),
+            graph: ImportMapConfiguration::from_options(
+                options.graph.unwrap_or_default(),
                 project_root,
             )?,
         })
@@ -594,7 +594,7 @@ impl Configuration {
 
             lint: self.lint.combine(config.lint),
             format: self.format.combine(config.format),
-            import_map: self.import_map.combine(config.import_map),
+            graph: self.graph.combine(config.graph),
         }
     }
 }
@@ -1223,7 +1223,7 @@ pub struct ImportMapConfiguration {
 
 impl ImportMapConfiguration {
     #[allow(clippy::needless_pass_by_value)]
-    pub fn from_options(options: ImportMapOptions, project_root: &Path) -> Result<Self> {
+    pub fn from_options(options: GraphOptions, project_root: &Path) -> Result<Self> {
         Ok(Self {
             direction: options.direction,
             detect_string_imports: options.detect_string_imports,

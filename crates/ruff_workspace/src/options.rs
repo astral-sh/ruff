@@ -8,7 +8,7 @@ use strum::IntoEnumIterator;
 use crate::options_base::{OptionsMetadata, Visit};
 use crate::settings::LineEnding;
 use ruff_formatter::IndentStyle;
-use ruff_import_map::Direction;
+use ruff_graph::Direction;
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::rules::flake8_import_conventions::settings::BannedAliases;
 use ruff_linter::rules::flake8_pytest_style::settings::SettingsError;
@@ -439,7 +439,7 @@ pub struct Options {
 
     /// Options to configure import map generation.
     #[option_group]
-    pub import_map: Option<ImportMapOptions>,
+    pub graph: Option<GraphOptions>,
 }
 
 /// Configures how Ruff checks your code.
@@ -3319,7 +3319,7 @@ pub struct FormatOptions {
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub struct ImportMapOptions {
+pub struct GraphOptions {
     /// Whether to generate a map from file to files that it depends on (dependencies) or files that
     /// depend on it (dependents).
     #[option(

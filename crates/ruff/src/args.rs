@@ -11,7 +11,7 @@ use clap::{command, Parser};
 use colored::Colorize;
 use path_absolutize::path_dedot;
 use regex::Regex;
-use ruff_import_map::Direction;
+use ruff_graph::Direction;
 use ruff_linter::line_width::LineLength;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::registry::Rule;
@@ -1321,7 +1321,7 @@ impl ConfigurationTransformer for ExplicitConfigOverrides {
             config.extension = Some(extension.iter().cloned().collect());
         }
         if let Some(detect_string_imports) = &self.detect_string_imports {
-            config.import_map.detect_string_imports = Some(*detect_string_imports);
+            config.graph.detect_string_imports = Some(*detect_string_imports);
         }
 
         config

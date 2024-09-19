@@ -1,7 +1,7 @@
 use path_absolutize::path_dedot;
 use ruff_cache::cache_dir;
 use ruff_formatter::{FormatOptions, IndentStyle, IndentWidth, LineWidth};
-use ruff_import_map::ImportMapSettings;
+use ruff_graph::GraphSettings;
 use ruff_linter::display_settings;
 use ruff_linter::settings::types::{
     ExtensionMapping, FilePattern, FilePatternSet, OutputFormat, UnsafeFixes,
@@ -36,7 +36,7 @@ pub struct Settings {
     pub file_resolver: FileResolverSettings,
     pub linter: LinterSettings,
     pub formatter: FormatterSettings,
-    pub import_map: ImportMapSettings,
+    pub graph: GraphSettings,
 }
 
 impl Default for Settings {
@@ -52,7 +52,7 @@ impl Default for Settings {
             linter: LinterSettings::new(project_root),
             file_resolver: FileResolverSettings::new(project_root),
             formatter: FormatterSettings::default(),
-            import_map: ImportMapSettings::default(),
+            graph: GraphSettings::default(),
         }
     }
 }
@@ -72,7 +72,7 @@ impl fmt::Display for Settings {
                 self.file_resolver | nested,
                 self.linter        | nested,
                 self.formatter     | nested,
-                self.import_map    | nested,
+                self.graph    | nested,
             ]
         }
         Ok(())

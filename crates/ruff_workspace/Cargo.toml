@@ -15,7 +15,7 @@ license = { workspace = true }
 [dependencies]
 ruff_cache = { workspace = true }
 ruff_formatter = { workspace = true }
-ruff_import_map = { workspace = true, features = ["serde", "schemars"] }
+ruff_graph = { workspace = true, features = ["serde", "schemars"] }
 ruff_linter = { workspace = true }
 ruff_macros = { workspace = true }
 ruff_python_ast = { workspace = true }

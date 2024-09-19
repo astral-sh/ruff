@@ -2225,7 +2225,7 @@ dependencies = [
  "regex",
  "ruff_cache",
  "ruff_diagnostics",
- "ruff_import_map",
+ "ruff_graph",
  "ruff_linter",
  "ruff_macros",
  "ruff_notebook",
@@ -2384,7 +2384,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ruff_import_map"
+name = "ruff_graph"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -2776,7 +2776,7 @@ dependencies = [
  "regex",
  "ruff_cache",
  "ruff_formatter",
- "ruff_import_map",
+ "ruff_graph",
  "ruff_linter",
  "ruff_macros",
  "ruff_python_ast",

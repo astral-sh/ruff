@@ -1,7 +1,7 @@
 use crate::collector::Collector;
 pub use crate::db::ModuleDb;
 use crate::resolver::Resolver;
-pub use crate::settings::{Direction, ImportMapSettings};
+pub use crate::settings::{Direction, GraphSettings};
 use anyhow::Result;
 use ruff_python_ast::helpers::to_module_path;
 use ruff_python_parser::{parse, Mode};

@@ -17,7 +17,7 @@ ruff_cache = { path = "crates/ruff_cache" }
 ruff_db = { path = "crates/ruff_db" }
 ruff_diagnostics = { path = "crates/ruff_diagnostics" }
 ruff_formatter = { path = "crates/ruff_formatter" }
-ruff_import_map = { path = "crates/ruff_import_map" }
+ruff_graph = { path = "crates/ruff_graph" }
 ruff_index = { path = "crates/ruff_index" }
 ruff_linter = { path = "crates/ruff_linter" }
 ruff_macros = { path = "crates/ruff_macros" }
