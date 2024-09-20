@@ -27,6 +27,7 @@
 //!   * An intersection containing two non-overlapping types should simplify to [`Type::Never`].
 use crate::types::{builtins_symbol_ty, IntersectionType, Type, UnionType};
 use crate::{Db, FxOrderSet};
+use smallvec::SmallVec;
 
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<Type<'db>>,
@@ -59,7 +60,7 @@ impl<'db> UnionBuilder<'db> {
                     None
                 };
                 let mut to_add = ty;
-                let mut to_remove = vec![];
+                let mut to_remove = SmallVec::<[usize; 2]>::new();
                 for (index, element) in self.elements.iter().enumerate() {
                     if Some(*element) == bool_pair {
                         to_add = builtins_symbol_ty(self.db, "bool");
