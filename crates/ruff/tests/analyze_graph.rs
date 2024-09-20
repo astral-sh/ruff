@@ -226,13 +226,14 @@ fn globs() -> Result<()> {
 
     root.child("ruff.toml").write_str(indoc::indoc! {r#"
         [analyze]
-        include-dependencies = { "ruff/a.py" = ["ruff/b.py"], "ruff/b.py" = ["ruff/*.py"] }
+        include-dependencies = { "ruff/a.py" = ["ruff/b.py"], "ruff/b.py" = ["ruff/*.py"], "ruff/c.py" = ["*.json"] }
     "#})?;
 
     root.child("ruff").child("__init__.py").write_str("")?;
     root.child("ruff").child("a.py").write_str("")?;
     root.child("ruff").child("b.py").write_str("")?;
     root.child("ruff").child("c.py").write_str("")?;
+    root.child("ruff").child("d.json").write_str("")?;
 
     insta::with_settings!({
         filters => INSTA_FILTERS.to_vec(),
@@ -252,7 +253,9 @@ fn globs() -> Result<()> {
             "ruff/b.py",
             "ruff/c.py"
           ],
-          "ruff/c.py": []
+          "ruff/c.py": [
+            "ruff/d.json"
+          ]
         }
 
         ----- stderr -----
