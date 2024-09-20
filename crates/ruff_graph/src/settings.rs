@@ -1,5 +1,5 @@
 use ruff_linter::display_settings;
-use ruff_linter::settings::types::{ExtensionMapping, PreviewMode};
+use ruff_linter::settings::types::{ExtensionMapping, FilePatternSet, PreviewMode};
 use ruff_macros::CacheKey;
 use std::collections::BTreeMap;
 use std::fmt;
@@ -7,6 +7,7 @@ use std::path::PathBuf;
 
 #[derive(Debug, Default, Clone, CacheKey)]
 pub struct AnalyzeSettings {
+    pub exclude: FilePatternSet,
     pub preview: PreviewMode,
     pub detect_string_imports: bool,
     pub include_dependencies: BTreeMap<PathBuf, (PathBuf, Vec<String>)>,
@@ -20,6 +21,7 @@ impl fmt::Display for AnalyzeSettings {
             formatter = f,
             namespace = "analyze",
             fields = [
+                self.exclude,
                 self.preview,
                 self.detect_string_imports,
                 self.extension | debug,

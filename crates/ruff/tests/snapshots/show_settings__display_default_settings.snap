@@ -389,6 +389,7 @@ formatter.docstring_code_format = disabled
 formatter.docstring_code_line_width = dynamic
 
 # Analyze Settings
+analyze.exclude = []
 analyze.preview = disabled
 analyze.detect_string_imports = false
 analyze.extension = ExtensionMapping({})

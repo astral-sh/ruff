@@ -23,10 +23,10 @@ pub struct ModuleImports(BTreeSet<SystemPathBuf>);
 impl ModuleImports {
     /// Detect the [`ModuleImports`] for a given Python file.
     pub fn detect(
+        db: &ModuleDb,
         path: &SystemPath,
         package: Option<&SystemPath>,
         string_imports: bool,
-        db: &ModuleDb,
     ) -> Result<Self> {
         // Read and parse the source code.
         let file = system_path_to_file(db, path)?;
