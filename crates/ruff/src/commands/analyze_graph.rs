@@ -8,7 +8,7 @@ use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_graph::{Direction, ImportMap, ModuleDb, ModuleImports};
 use ruff_linter::{warn_user, warn_user_once};
 use ruff_python_ast::{PySourceType, SourceType};
-use ruff_workspace::resolver::{python_files_in_path, ResolvedFile};
+use ruff_workspace::resolver::{match_exclusion, python_files_in_path, ResolvedFile};
 use rustc_hash::FxHashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -74,19 +74,30 @@ pub(crate) fn analyze_graph(
                 continue;
             };
 
-            let path = resolved_file.into_path();
+            let path = resolved_file.path();
             let package = path
                 .parent()
                 .and_then(|parent| package_roots.get(parent))
                 .and_then(Clone::clone);
 
             // Resolve the per-file settings.
-            let settings = resolver.resolve(&path);
+            let settings = resolver.resolve(path);
             let string_imports = settings.analyze.detect_string_imports;
-            let include_dependencies = settings.analyze.include_dependencies.get(&path).cloned();
+            let include_dependencies = settings.analyze.include_dependencies.get(path).cloned();
+
+            // Skip excluded files.
+            if (settings.file_resolver.force_exclude || !resolved_file.is_root())
+                && match_exclusion(
+                    resolved_file.path(),
+                    resolved_file.file_name(),
+                    &settings.analyze.exclude,
+                )
+            {
+                continue;
+            }
 
             // Ignore non-Python files.
-            let source_type = match settings.analyze.extension.get(&path) {
+            let source_type = match settings.analyze.extension.get(path) {
                 None => match SourceType::from(&path) {
                     SourceType::Python(source_type) => source_type,
                     SourceType::Toml(_) => {
@@ -106,7 +117,7 @@ pub(crate) fn analyze_graph(
                 warn!("Failed to convert package to system path");
                 continue;
             };
-            let Ok(path) = SystemPathBuf::from_path_buf(path) else {
+            let Ok(path) = SystemPathBuf::from_path_buf(resolved_file.into_path()) else {
                 warn!("Failed to convert path to system path");
                 continue;
             };
@@ -118,7 +129,7 @@ pub(crate) fn analyze_graph(
             scope.spawn(move |_| {
                 // Identify any imports via static analysis.
                 let mut imports =
-                    ModuleImports::detect(&path, package.as_deref(), string_imports, &db)
+                    ModuleImports::detect(&db, &path, package.as_deref(), string_imports)
                         .unwrap_or_else(|err| {
                             warn!("Failed to generate import map for {path}: {err}");
                             ModuleImports::default()

@@ -3320,6 +3320,27 @@ pub struct FormatOptions {
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct AnalyzeOptions {
+    /// A list of file patterns to exclude from analysis in addition to the files excluded globally (see [`exclude`](#exclude), and [`extend-exclude`](#extend-exclude)).
+    ///
+    /// Exclusions are based on globs, and can be either:
+    ///
+    /// - Single-path patterns, like `.mypy_cache` (to exclude any directory
+    ///   named `.mypy_cache` in the tree), `foo.py` (to exclude any file named
+    ///   `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ).
+    /// - Relative patterns, like `directory/foo.py` (to exclude that specific
+    ///   file) or `directory/*.py` (to exclude any Python files in
+    ///   `directory`). Note that these paths are relative to the project root
+    ///   (e.g., the directory containing your `pyproject.toml`).
+    ///
+    /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"
+            exclude = ["generated"]
+        "#
+    )]
+    pub exclude: Option<Vec<String>>,
     /// Whether to enable preview mode. When preview mode is enabled, Ruff will expose unstable
     /// commands.
     #[option(

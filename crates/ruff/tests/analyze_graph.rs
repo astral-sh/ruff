@@ -261,3 +261,44 @@ fn globs() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn exclude() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let root = ChildPath::new(tempdir.path());
+
+    root.child("ruff.toml").write_str(indoc::indoc! {r#"
+        [analyze]
+        exclude = ["ruff/c.py"]
+    "#})?;
+
+    root.child("ruff").child("__init__.py").write_str("")?;
+    root.child("ruff")
+        .child("a.py")
+        .write_str(indoc::indoc! {r#"
+        import ruff.b
+    "#})?;
+    root.child("ruff").child("b.py").write_str("")?;
+    root.child("ruff").child("c.py").write_str("")?;
+
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().current_dir(&root), @r###"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "ruff/__init__.py": [],
+          "ruff/a.py": [
+            "ruff/b.py"
+          ],
+          "ruff/b.py": []
+        }
+
+        ----- stderr -----
+        "###);
+    });
+
+    Ok(())
+}

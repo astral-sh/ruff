@@ -215,6 +215,7 @@ impl Configuration {
         let analyze_defaults = AnalyzeSettings::default();
 
         let analyze = AnalyzeSettings {
+            exclude: FilePatternSet::try_from_iter(analyze.exclude.unwrap_or_default())?,
             preview: analyze_preview,
             extension: self.extension.clone().unwrap_or_default(),
             detect_string_imports: analyze
@@ -1218,7 +1219,9 @@ impl FormatConfiguration {
 
 #[derive(Clone, Debug, Default)]
 pub struct AnalyzeConfiguration {
+    pub exclude: Option<Vec<FilePattern>>,
     pub preview: Option<PreviewMode>,
+
     pub direction: Option<Direction>,
     pub detect_string_imports: Option<bool>,
     pub include_dependencies: Option<BTreeMap<PathBuf, (PathBuf, Vec<String>)>>,
@@ -1228,6 +1231,15 @@ impl AnalyzeConfiguration {
     #[allow(clippy::needless_pass_by_value)]
     pub fn from_options(options: AnalyzeOptions, project_root: &Path) -> Result<Self> {
         Ok(Self {
+            exclude: options.exclude.map(|paths| {
+                paths
+                    .into_iter()
+                    .map(|pattern| {
+                        let absolute = fs::normalize_path_to(&pattern, project_root);
+                        FilePattern::User(pattern, absolute)
+                    })
+                    .collect()
+            }),
             preview: options.preview.map(PreviewMode::from),
             direction: options.direction,
             detect_string_imports: options.detect_string_imports,
@@ -1246,6 +1258,7 @@ impl AnalyzeConfiguration {
     #[allow(clippy::needless_pass_by_value)]
     pub fn combine(self, config: Self) -> Self {
         Self {
+            exclude: self.exclude.or(config.exclude),
             preview: self.preview.or(config.preview),
             direction: self.direction.or(config.direction),
             detect_string_imports: self.detect_string_imports.or(config.detect_string_imports),
