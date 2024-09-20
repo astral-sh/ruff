@@ -2211,6 +2211,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         match (op, self.infer_expression(operand)) {
             (UnaryOp::USub, Type::IntLiteral(value)) => Type::IntLiteral(-value),
+            (UnaryOp::Not, Type::BooleanLiteral(value)) => Type::BooleanLiteral(!value),
             _ => Type::Unknown, // TODO other unary op types
         }
     }
@@ -3138,6 +3139,28 @@ mod tests {
 
         assert_public_ty(&db, "src/a.py", "x", "Literal[True]");
         assert_public_ty(&db, "src/a.py", "y", "Literal[False]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn not_boolean_literal() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_file(
+            "src/a.py",
+            r#"
+            w = True
+            x = False
+            y = not w
+            z = not x
+
+            "#,
+        )?;
+        assert_public_ty(&db, "src/a.py", "w", "Literal[True]");
+        assert_public_ty(&db, "src/a.py", "x", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "y", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "z", "Literal[True]");
 
         Ok(())
     }
