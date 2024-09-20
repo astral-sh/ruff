@@ -3486,7 +3486,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "src/a.py",
-            &["Union element 'Literal[1]' of type 'Literal[1] | Literal[f]' is not callable."],
+            &["Object of type 'Literal[1] | Literal[f]' is not callable (due to union element 'Literal[1]')."],
         );
         assert_public_ty(&db, "src/a.py", "x", "Unknown | int");
 
@@ -3515,7 +3515,7 @@ mod tests {
             &db,
             "src/a.py",
             &[
-                r#"Union elements Literal[1], Literal["foo"] of type 'Literal[1] | Literal["foo"] | Literal[f]' are not callable."#,
+                r#"Object of type 'Literal[1] | Literal["foo"] | Literal[f]' is not callable (due to union elements Literal[1], Literal["foo"])."#,
             ],
         );
         assert_public_ty(&db, "src/a.py", "x", "Unknown | int");

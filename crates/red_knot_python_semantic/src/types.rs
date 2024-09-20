@@ -817,9 +817,9 @@ impl<'db> CallOutcome<'db> {
                         node,
                         "call-non-callable",
                         format_args!(
-                            "Union element '{}' of type '{}' is not callable.",
+                            "Object of type '{}' is not callable (due to union element '{}').",
+                            called_ty.display(db),
                             elem.display(db),
-                            called_ty.display(db)
                         ),
                     ),
                     _ if not_callable.len() == outcomes.len() => builder.add_diagnostic(
@@ -834,9 +834,9 @@ impl<'db> CallOutcome<'db> {
                         node,
                         "call-non-callable",
                         format_args!(
-                            "Union elements {} of type '{}' are not callable.",
+                            "Object of type '{}' is not callable (due to union elements {}).",
+                            called_ty.display(db),
                             not_callable.display(db),
-                            called_ty.display(db)
                         ),
                     ),
                 }
