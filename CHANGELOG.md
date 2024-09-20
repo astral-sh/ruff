@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.6.6
+
+### Preview features
+
+- \[`refurb`\] Skip `slice-to-remove-prefix-or-suffix` (`FURB188`) when non-trivial slice steps are present ([#13405](https://github.com/astral-sh/ruff/pull/13405))
+- Add a subcommand to generate dependency graphs ([#13402](https://github.com/astral-sh/ruff/pull/13402))
+
+### Formatter
+
+- Fix placement of inline parameter comments ([#13379](https://github.com/astral-sh/ruff/pull/13379))
+
+### Server
+
+- Fix off-by one error in the `LineIndex::offset` calculation ([#13407](https://github.com/astral-sh/ruff/pull/13407))
+
+### Bug fixes
+
+- \[`fastapi`\] Respect FastAPI aliases in route definitions ([#13394](https://github.com/astral-sh/ruff/pull/13394))
+- \[`pydocstyle`\] Respect word boundaries when detecting function signature in docs ([#13388](https://github.com/astral-sh/ruff/pull/13388))
+
+### Documentation
+
+- Add backlinks to rule overview linter ([#13368](https://github.com/astral-sh/ruff/pull/13368))
+- Fix documentation for editor vim plugin ALE ([#13348](https://github.com/astral-sh/ruff/pull/13348))
+- Fix rendering of `FURB188` docs ([#13406](https://github.com/astral-sh/ruff/pull/13406))
+
 ## 0.6.5
 
 ### Preview features
