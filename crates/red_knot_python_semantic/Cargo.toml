@@ -38,7 +38,12 @@ test-case = { workspace = true }
 [build-dependencies]
 path-slash = { workspace = true }
 walkdir = { workspace = true }
-zip = { workspace = true, features = ["zstd", "deflate"] }
+
+[target.'cfg(not(target_arch = "powerpc64"))'.build-dependencies]
+zip = { workspace = true, features = ["deflate", "zstd"] }
+
+[target.'cfg(target_arch = "powerpc64")'.build-dependencies]
+zip = { workspace = true, features = ["deflate"] }
 
 [dev-dependencies]
 ruff_db = { workspace = true, features = ["os", "testing"] }
