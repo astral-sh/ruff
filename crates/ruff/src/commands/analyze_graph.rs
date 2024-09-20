@@ -112,13 +112,13 @@ pub(crate) fn analyze_graph(
             };
 
             let db = db.snapshot();
+            let glob_resolver = glob_resolver.clone();
             let root = root.clone();
             let result = inner_result.clone();
-            let glob_resolver = glob_resolver.clone();
             scope.spawn(move |_| {
                 // Identify any imports via static analysis.
                 let mut imports =
-                    ruff_graph::generate(&path, package.as_deref(), string_imports, &db)
+                    ModuleImports::detect(&path, package.as_deref(), string_imports, &db)
                         .unwrap_or_else(|err| {
                             warn!("Failed to generate import map for {path}: {err}");
                             ModuleImports::default()
