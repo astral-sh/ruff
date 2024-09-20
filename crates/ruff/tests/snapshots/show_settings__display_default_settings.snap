@@ -200,7 +200,7 @@ linter.safety_table.forced_unsafe = []
 linter.target_version = Py37
 linter.preview = disabled
 linter.explicit_preview_rules = false
-linter.extension.mapping = {}
+linter.extension = ExtensionMapping({})
 linter.allowed_confusables = []
 linter.builtins = []
 linter.dummy_variable_rgx = ^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$
@@ -387,5 +387,11 @@ formatter.quote_style = double
 formatter.magic_trailing_comma = respect
 formatter.docstring_code_format = disabled
 formatter.docstring_code_line_width = dynamic
+
+# Analyze Settings
+analyze.preview = disabled
+analyze.detect_string_imports = false
+analyze.extension = ExtensionMapping({})
+analyze.include_dependencies = {}
 
 ----- stderr -----

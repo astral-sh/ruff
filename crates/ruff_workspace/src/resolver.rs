@@ -395,7 +395,6 @@ pub fn python_files_in_path<'a>(
     let walker = builder.build_parallel();
 
     // Run the `WalkParallel` to collect all Python files.
-
     let state = WalkPythonFilesState::new(resolver);
     let mut visitor = PythonFilesVisitorBuilder::new(transformer, &state);
     walker.visit(&mut visitor);

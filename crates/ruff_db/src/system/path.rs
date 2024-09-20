@@ -593,6 +593,27 @@ impl ruff_cache::CacheKey for SystemPathBuf {
     }
 }
 
+#[cfg(feature = "serde")]
+impl serde::Serialize for SystemPath {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.0.serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for SystemPathBuf {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.0.serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for SystemPathBuf {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        Utf8PathBuf::deserialize(deserializer).map(SystemPathBuf)
+    }
+}
+
 /// A slice of a virtual path on [`System`](super::System) (akin to [`str`]).
 #[repr(transparent)]
 pub struct SystemVirtualPath(str);

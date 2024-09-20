@@ -285,7 +285,7 @@ impl Display for LinterSettings {
                 self.target_version | debug,
                 self.preview,
                 self.explicit_preview_rules,
-                self.extension | nested,
+                self.extension | debug,
 
                 self.allowed_confusables | array,
                 self.builtins | array,
