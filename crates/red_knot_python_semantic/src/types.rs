@@ -422,6 +422,8 @@ impl<'db> Type<'db> {
                 .elements(db)
                 .iter()
                 .any(|&elem_ty| ty.is_subtype_of(db, elem_ty)),
+            (_, Type::Instance(class)) if class.is_stdlib_symbol(db, "builtins", "object") => true,
+            (Type::Instance(class), _) if class.is_stdlib_symbol(db, "builtins", "object") => false,
             // TODO
             _ => false,
         }
@@ -1123,6 +1125,8 @@ mod tests {
         }
     }
 
+    #[test_case(Ty::BuiltinInstance("str"), Ty::BuiltinInstance("object"))]
+    #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinInstance("object"))]
     #[test_case(Ty::Unknown, Ty::IntLiteral(1))]
     #[test_case(Ty::Any, Ty::IntLiteral(1))]
     #[test_case(Ty::Never, Ty::IntLiteral(1))]
@@ -1140,6 +1144,7 @@ mod tests {
         assert!(from.into_type(&db).is_assignable_to(&db, to.into_type(&db)));
     }
 
+    #[test_case(Ty::BuiltinInstance("object"), Ty::BuiltinInstance("int"))]
     #[test_case(Ty::IntLiteral(1), Ty::BuiltinInstance("str"))]
     #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str"))]
     #[test_case(Ty::BuiltinInstance("int"), Ty::IntLiteral(1))]
@@ -1148,6 +1153,8 @@ mod tests {
         assert!(!from.into_type(&db).is_assignable_to(&db, to.into_type(&db)));
     }
 
+    #[test_case(Ty::BuiltinInstance("str"), Ty::BuiltinInstance("object"))]
+    #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinInstance("object"))]
     #[test_case(Ty::Never, Ty::IntLiteral(1))]
     #[test_case(Ty::IntLiteral(1), Ty::BuiltinInstance("int"))]
     #[test_case(Ty::StringLiteral("foo"), Ty::BuiltinInstance("str"))]
@@ -1160,6 +1167,7 @@ mod tests {
         assert!(from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
     }
 
+    #[test_case(Ty::BuiltinInstance("object"), Ty::BuiltinInstance("int"))]
     #[test_case(Ty::Unknown, Ty::IntLiteral(1))]
     #[test_case(Ty::Any, Ty::IntLiteral(1))]
     #[test_case(Ty::IntLiteral(1), Ty::Unknown)]

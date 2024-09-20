@@ -297,7 +297,7 @@ mod tests {
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
-    use crate::types::{builtins_symbol_ty, UnionBuilder};
+    use crate::types::{builtins_symbol_ty, StringLiteralType, UnionBuilder};
     use crate::ProgramSettings;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
@@ -388,16 +388,23 @@ mod tests {
         let db = setup_db();
         let t0 = builtins_symbol_ty(&db, "str").to_instance(&db);
         let t1 = Type::LiteralString;
-        let t2 = Type::Unknown;
         let u0 = UnionType::from_elements(&db, [t0, t1]);
         let u1 = UnionType::from_elements(&db, [t1, t0]);
-        let u2 = UnionType::from_elements(&db, [t0, t1, t2]);
-        let u3 = UnionType::from_elements(&db, [t1, t2, t0]);
 
         assert_eq!(u0, t0);
         assert_eq!(u1, t0);
-        assert_eq!(u2.expect_union().elements(&db).as_ref(), &[t0, t2]);
-        assert_eq!(u3.expect_union().elements(&db).as_ref(), &[t0, t2]);
+    }
+
+    #[test]
+    fn build_union_no_simplify_unknown() {
+        let db = setup_db();
+        let t0 = builtins_symbol_ty(&db, "str").to_instance(&db);
+        let t1 = Type::Unknown;
+        let u0 = UnionType::from_elements(&db, [t0, t1]);
+        let u1 = UnionType::from_elements(&db, [t1, t0]);
+
+        assert_eq!(u0.expect_union().elements(&db).as_ref(), &[t0, t1]);
+        assert_eq!(u1.expect_union().elements(&db).as_ref(), &[t1, t0]);
     }
 
     impl<'db> IntersectionType<'db> {
