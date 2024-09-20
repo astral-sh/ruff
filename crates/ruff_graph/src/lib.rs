@@ -21,6 +21,39 @@ mod settings;
 pub struct ModuleImports(BTreeSet<SystemPathBuf>);
 
 impl ModuleImports {
+    /// Detect the [`ModuleImports`] for a given Python file.
+    pub fn detect(
+        path: &SystemPath,
+        package: Option<&SystemPath>,
+        string_imports: bool,
+        db: &ModuleDb,
+    ) -> Result<Self> {
+        // Read and parse the source code.
+        let file = system_path_to_file(db, path)?;
+        let parsed = parsed_module(db, file);
+        let module_path =
+            package.and_then(|package| to_module_path(package.as_std_path(), path.as_std_path()));
+        let model = SemanticModel::new(db, file);
+
+        // Collect the imports.
+        let imports =
+            Collector::new(module_path.as_deref(), string_imports).collect(parsed.syntax());
+
+        // Resolve the imports.
+        let mut resolved_imports = ModuleImports::default();
+        for import in imports {
+            let Some(resolved) = Resolver::new(&model).resolve(import) else {
+                continue;
+            };
+            let Some(path) = resolved.as_system_path() else {
+                continue;
+            };
+            resolved_imports.insert(path.to_path_buf());
+        }
+
+        Ok(resolved_imports)
+    }
+
     /// Insert a file path into the module imports.
     pub fn insert(&mut self, path: SystemPathBuf) {
         self.0.insert(path);
@@ -90,36 +123,4 @@ impl FromIterator<(SystemPathBuf, ModuleImports)> for ImportMap {
         }
         map
     }
-}
-
-/// Generate the module imports for a given Python file.
-pub fn generate(
-    path: &SystemPath,
-    package: Option<&SystemPath>,
-    string_imports: bool,
-    db: &ModuleDb,
-) -> Result<ModuleImports> {
-    // Read and parse the source code.
-    let file = system_path_to_file(db, path)?;
-    let parsed = parsed_module(db, file);
-    let module_path =
-        package.and_then(|package| to_module_path(package.as_std_path(), path.as_std_path()));
-    let model = SemanticModel::new(db, file);
-
-    // Collect the imports.
-    let imports = Collector::new(module_path.as_deref(), string_imports).collect(parsed.syntax());
-
-    // Resolve the imports.
-    let mut resolved_imports = ModuleImports::default();
-    for import in imports {
-        let Some(resolved) = Resolver::new(&model).resolve(import) else {
-            continue;
-        };
-        let Some(path) = resolved.as_system_path() else {
-            continue;
-        };
-        resolved_imports.insert(path.to_path_buf());
-    }
-
-    Ok(resolved_imports)
 }
