@@ -217,6 +217,7 @@ impl Configuration {
         let analyze = AnalyzeSettings {
             exclude: FilePatternSet::try_from_iter(analyze.exclude.unwrap_or_default())?,
             preview: analyze_preview,
+            target_version,
             extension: self.extension.clone().unwrap_or_default(),
             detect_string_imports: analyze
                 .detect_string_imports

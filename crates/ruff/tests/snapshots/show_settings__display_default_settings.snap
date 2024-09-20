@@ -391,6 +391,7 @@ formatter.docstring_code_line_width = dynamic
 # Analyze Settings
 analyze.exclude = []
 analyze.preview = disabled
+analyze.target_version = Py37
 analyze.detect_string_imports = false
 analyze.extension = ExtensionMapping({})
 analyze.include_dependencies = {}

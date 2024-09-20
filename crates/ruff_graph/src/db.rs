@@ -16,7 +16,10 @@ pub struct ModuleDb {
 
 impl ModuleDb {
     /// Initialize a [`ModuleDb`] from the given source root.
-    pub fn from_src_roots(mut src_roots: impl Iterator<Item = SystemPathBuf>) -> Result<Self> {
+    pub fn from_src_roots(
+        mut src_roots: impl Iterator<Item = SystemPathBuf>,
+        target_version: PythonVersion,
+    ) -> Result<Self> {
         let search_paths = {
             // Use the first source root.
             let src_root = src_roots
@@ -37,7 +40,7 @@ impl ModuleDb {
         Program::from_settings(
             &db,
             &ProgramSettings {
-                target_version: PythonVersion::default(),
+                target_version,
                 search_paths,
             },
         )?;
