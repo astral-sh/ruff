@@ -30,7 +30,8 @@ fn zip_dir(directory_path: &str, writer: File) -> ZipResult<File> {
     // We can't use `#[cfg(...)]` here because the target-arch in a build script is the
     // architecture of the system running the build script and not the architecture of the build-target.
     // That's why we use the `TARGET` environment variable here.
-    let method = if std::env::var("TARGET").unwrap().contains("wasm32") {
+    let target = std::env::var("TARGET").unwrap();
+    let method = if target.contains("wasm32") || target.contains("powerpc64") {
         CompressionMethod::Deflated
     } else {
         CompressionMethod::Zstd

@@ -34,12 +34,14 @@ tracing-subscriber = { workspace = true, optional = true }
 tracing-tree = { workspace = true, optional = true }
 rustc-hash = { workspace = true }
 
-[target.'cfg(not(target_arch="wasm32"))'.dependencies]
+[target.'cfg(not(any(target_arch = "wasm32", target_arch = "powerpc64")))'.dependencies]
 zip = { workspace = true, features = ["zstd"] }
 
-[target.'cfg(target_arch="wasm32")'.dependencies]
-web-time = { version = "1.1.0" }
+[target.'cfg(any(target_arch = "wasm32", target_arch = "powerpc64"))'.dependencies]
 zip = { workspace = true, features = ["deflate"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+web-time = { version = "1.1.0" }
 
 [dev-dependencies]
 insta = { workspace = true }
