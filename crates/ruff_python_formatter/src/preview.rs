@@ -29,3 +29,10 @@ pub(crate) fn is_comprehension_leading_expression_comments_same_line_enabled(
 ) -> bool {
     context.is_preview()
 }
+
+/// See [#9447](https://github.com/astral-sh/ruff/issues/9447)
+pub(crate) fn is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled(
+    context: &PyFormatContext,
+) -> bool {
+    context.is_preview()
+}
