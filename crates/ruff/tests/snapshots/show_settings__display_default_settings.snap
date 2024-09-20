@@ -388,9 +388,10 @@ formatter.magic_trailing_comma = respect
 formatter.docstring_code_format = disabled
 formatter.docstring_code_line_width = dynamic
 
-# Import Map Settings
-import_map.detect_string_imports = false
-import_map.extension = ExtensionMapping({})
-import_map.include_dependencies = {}
+# Analyze Settings
+analyze.preview = disabled
+analyze.detect_string_imports = false
+analyze.extension = ExtensionMapping({})
+analyze.include_dependencies = {}
 
 ----- stderr -----

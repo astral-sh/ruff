@@ -19,6 +19,11 @@ fn command() -> Command {
     command
 }
 
+const INSTA_FILTERS: &[(&str, &str)] = &[
+    // Rewrite Windows output to Unix output
+    (r"\\", "/"),
+];
+
 #[test]
 fn dependencies() -> Result<()> {
     let tempdir = TempDir::new()?;
@@ -51,29 +56,33 @@ fn dependencies() -> Result<()> {
         def f(): pass
     "#})?;
 
-    assert_cmd_snapshot!(command().current_dir(&root), @r###"
-        success: true
-        exit_code: 0
-        ----- stdout -----
-        {
-          "ruff/__init__.py": [],
-          "ruff/a.py": [
-            "ruff/b.py"
-          ],
-          "ruff/b.py": [
-            "ruff/c.py"
-          ],
-          "ruff/c.py": [
-            "ruff/d.py"
-          ],
-          "ruff/d.py": [
-            "ruff/e.py"
-          ],
-          "ruff/e.py": []
-        }
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().current_dir(&root), @r###"
+            success: true
+            exit_code: 0
+            ----- stdout -----
+            {
+              "ruff/__init__.py": [],
+              "ruff/a.py": [
+                "ruff/b.py"
+              ],
+              "ruff/b.py": [
+                "ruff/c.py"
+              ],
+              "ruff/c.py": [
+                "ruff/d.py"
+              ],
+              "ruff/d.py": [
+                "ruff/e.py"
+              ],
+              "ruff/e.py": []
+            }
 
-        ----- stderr -----
-        "###);
+            ----- stderr -----
+            "###);
+    });
 
     Ok(())
 }
@@ -111,29 +120,33 @@ fn dependents() -> Result<()> {
         def f(): pass
     "#})?;
 
-    assert_cmd_snapshot!(command().arg("--direction").arg("dependents").current_dir(&root), @r###"
-        success: true
-        exit_code: 0
-        ----- stdout -----
-        {
-          "ruff/__init__.py": [],
-          "ruff/a.py": [],
-          "ruff/b.py": [
-            "ruff/a.py"
-          ],
-          "ruff/c.py": [
-            "ruff/b.py"
-          ],
-          "ruff/d.py": [
-            "ruff/c.py"
-          ],
-          "ruff/e.py": [
-            "ruff/d.py"
-          ]
-        }
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().arg("--direction").arg("dependents").current_dir(&root), @r###"
+            success: true
+            exit_code: 0
+            ----- stdout -----
+            {
+              "ruff/__init__.py": [],
+              "ruff/a.py": [],
+              "ruff/b.py": [
+                "ruff/a.py"
+              ],
+              "ruff/c.py": [
+                "ruff/b.py"
+              ],
+              "ruff/d.py": [
+                "ruff/c.py"
+              ],
+              "ruff/e.py": [
+                "ruff/d.py"
+              ]
+            }
 
-        ----- stderr -----
-        "###);
+            ----- stderr -----
+            "###);
+    });
 
     Ok(())
 }
@@ -159,39 +172,47 @@ fn string_detection() -> Result<()> {
     "#})?;
     root.child("ruff").child("c.py").write_str("")?;
 
-    assert_cmd_snapshot!(command().current_dir(&root), @r###"
-        success: true
-        exit_code: 0
-        ----- stdout -----
-        {
-          "ruff/__init__.py": [],
-          "ruff/a.py": [
-            "ruff/b.py"
-          ],
-          "ruff/b.py": [],
-          "ruff/c.py": []
-        }
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().current_dir(&root), @r###"
+            success: true
+            exit_code: 0
+            ----- stdout -----
+            {
+              "ruff/__init__.py": [],
+              "ruff/a.py": [
+                "ruff/b.py"
+              ],
+              "ruff/b.py": [],
+              "ruff/c.py": []
+            }
 
-        ----- stderr -----
-        "###);
+            ----- stderr -----
+            "###);
+    });
 
-    assert_cmd_snapshot!(command().arg("--detect-string-imports").current_dir(&root), @r###"
-        success: true
-        exit_code: 0
-        ----- stdout -----
-        {
-          "ruff/__init__.py": [],
-          "ruff/a.py": [
-            "ruff/b.py"
-          ],
-          "ruff/b.py": [
-            "ruff/c.py"
-          ],
-          "ruff/c.py": []
-        }
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().arg("--detect-string-imports").current_dir(&root), @r###"
+            success: true
+            exit_code: 0
+            ----- stdout -----
+            {
+              "ruff/__init__.py": [],
+              "ruff/a.py": [
+                "ruff/b.py"
+              ],
+              "ruff/b.py": [
+                "ruff/c.py"
+              ],
+              "ruff/c.py": []
+            }
 
-        ----- stderr -----
-        "###);
+            ----- stderr -----
+            "###);
+    });
 
     Ok(())
 }
@@ -212,26 +233,30 @@ fn globs() -> Result<()> {
     root.child("ruff").child("b.py").write_str("")?;
     root.child("ruff").child("c.py").write_str("")?;
 
-    assert_cmd_snapshot!(command().current_dir(&root), @r###"
-    success: true
-    exit_code: 0
-    ----- stdout -----
-    {
-      "ruff/__init__.py": [],
-      "ruff/a.py": [
-        "ruff/b.py"
-      ],
-      "ruff/b.py": [
-        "ruff/__init__.py",
-        "ruff/a.py",
-        "ruff/b.py",
-        "ruff/c.py"
-      ],
-      "ruff/c.py": []
-    }
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().current_dir(&root), @r###"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "ruff/__init__.py": [],
+          "ruff/a.py": [
+            "ruff/b.py"
+          ],
+          "ruff/b.py": [
+            "ruff/__init__.py",
+            "ruff/a.py",
+            "ruff/b.py",
+            "ruff/c.py"
+          ],
+          "ruff/c.py": []
+        }
 
-    ----- stderr -----
-    "###);
+        ----- stderr -----
+        "###);
+    });
 
     Ok(())
 }

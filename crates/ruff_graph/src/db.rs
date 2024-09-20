@@ -4,7 +4,6 @@ use ruff_db::files::{File, Files};
 use ruff_db::system::{OsSystem, System, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Upcast};
-use std::path::PathBuf;
 
 #[salsa::db]
 #[derive(Default)]
@@ -17,21 +16,36 @@ pub struct ModuleDb {
 
 impl ModuleDb {
     /// Initialize a [`ModuleDb`] from the given source root.
-    pub fn from_src_root(src_root: PathBuf) -> Result<Self> {
+    pub fn from_src_roots(mut src_roots: impl Iterator<Item = SystemPathBuf>) -> Result<Self> {
+        let search_paths = {
+            // Use the first source root.
+            let src_root = src_roots
+                .next()
+                .ok_or_else(|| anyhow::anyhow!("No source roots provided"))?;
+
+            let mut search_paths = SearchPathSettings::new(src_root.to_path_buf());
+
+            // Add the remaining source roots as extra paths.
+            for src_root in src_roots {
+                search_paths.extra_paths.push(src_root.to_path_buf());
+            }
+
+            search_paths
+        };
+
         let db = Self::default();
         Program::from_settings(
             &db,
             &ProgramSettings {
                 target_version: PythonVersion::default(),
-                search_paths: SearchPathSettings::new(
-                    SystemPathBuf::from_path_buf(src_root)
-                        .map_err(|path| anyhow::anyhow!("Invalid path: {}", path.display()))?,
-                ),
+                search_paths,
             },
         )?;
+
         Ok(db)
     }
 
+    /// Create a snapshot of the current database.
     #[must_use]
     pub fn snapshot(&self) -> Self {
         Self {

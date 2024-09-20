@@ -21,14 +21,17 @@ mod settings;
 pub struct ModuleImports(BTreeSet<SystemPathBuf>);
 
 impl ModuleImports {
+    /// Insert a file path into the module imports.
     pub fn insert(&mut self, path: SystemPathBuf) {
         self.0.insert(path);
     }
 
+    /// Returns `true` if the module imports are empty.
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
+    /// Returns the number of module imports.
     pub fn len(&self) -> usize {
         self.0.len()
     }
@@ -36,12 +39,17 @@ impl ModuleImports {
     /// Convert the file paths to be relative to a given path.
     #[must_use]
     pub fn relative_to(self, path: &SystemPath) -> Self {
-        Self(BTreeSet::from_iter(self.0.into_iter().map(|import| {
-            import
-                .strip_prefix(path)
-                .map(SystemPath::to_path_buf)
-                .unwrap_or(import)
-        })))
+        Self(
+            self.0
+                .into_iter()
+                .map(|import| {
+                    import
+                        .strip_prefix(path)
+                        .map(SystemPath::to_path_buf)
+                        .unwrap_or(import)
+                })
+                .collect(),
+        )
     }
 }
 
@@ -50,10 +58,12 @@ impl ModuleImports {
 pub struct ImportMap(BTreeMap<SystemPathBuf, ModuleImports>);
 
 impl ImportMap {
+    /// Insert a module's imports into the map.
     pub fn insert(&mut self, path: SystemPathBuf, imports: ModuleImports) {
         self.0.insert(path, imports);
     }
 
+    /// Reverse the [`ImportMap`], e.g., to convert from dependencies to dependents.
     #[must_use]
     pub fn reverse(imports: impl IntoIterator<Item = (SystemPathBuf, ModuleImports)>) -> Self {
         let mut reverse = ImportMap::default();

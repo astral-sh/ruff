@@ -10,7 +10,6 @@ use ruff_linter::{warn_user, warn_user_once};
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_workspace::resolver::{python_files_in_path, ResolvedFile};
 use rustc_hash::FxHashMap;
-use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -53,13 +52,14 @@ pub(crate) fn analyze_graph(
         .collect::<FxHashMap<_, _>>();
 
     // Create a database for each source root.
-    let databases = package_roots
-        .values()
-        .filter_map(|package| package.as_deref())
-        .filter_map(|package| package.parent())
-        .map(Path::to_path_buf)
-        .map(|source_root| Ok((source_root.clone(), ModuleDb::from_src_root(source_root)?)))
-        .collect::<Result<BTreeMap<_, _>>>()?;
+    let db = ModuleDb::from_src_roots(
+        package_roots
+            .values()
+            .filter_map(|package| package.as_deref())
+            .filter_map(|package| package.parent())
+            .map(Path::to_path_buf)
+            .filter_map(|path| SystemPathBuf::from_path_buf(path).ok()),
+    )?;
 
     // Collect and resolve the imports for each file.
     let result = Arc::new(std::sync::Mutex::new(Vec::new()));
@@ -76,17 +76,6 @@ pub(crate) fn analyze_graph(
                 .parent()
                 .and_then(|parent| package_roots.get(parent))
                 .and_then(Clone::clone);
-            let Some(src_root) = package
-                .as_ref()
-                .and_then(|package| package.parent())
-                .map(Path::to_path_buf)
-            else {
-                debug!("Ignoring file outside of source root: {}", path.display());
-                continue;
-            };
-            let Some(db) = databases.get(&src_root).map(ModuleDb::snapshot) else {
-                continue;
-            };
 
             // Resolve the per-file settings.
             let settings = resolver.resolve(&path);
@@ -118,8 +107,9 @@ pub(crate) fn analyze_graph(
                 warn!("Failed to convert path to system path");
                 continue;
             };
-            let root = root.clone();
 
+            let db = db.snapshot();
+            let root = root.clone();
             let result = inner_result.clone();
             scope.spawn(move |_| {
                 // Identify any imports via static analysis.

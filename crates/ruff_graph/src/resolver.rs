@@ -9,10 +9,12 @@ pub(crate) struct Resolver<'a> {
 }
 
 impl<'a> Resolver<'a> {
+    /// Initialize a [`Resolver`] with a given [`SemanticModel`].
     pub(crate) fn new(semantic: &'a SemanticModel<'a>) -> Self {
         Self { semantic }
     }
 
+    /// Resolve the [`CollectedImport`] into a [`FilePath`].
     pub(crate) fn resolve(&self, import: CollectedImport) -> Option<&'a FilePath> {
         match import {
             CollectedImport::Import(import) => self
