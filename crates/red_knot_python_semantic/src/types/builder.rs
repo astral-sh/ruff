@@ -297,7 +297,7 @@ mod tests {
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
-    use crate::types::{builtins_symbol_ty, StringLiteralType, UnionBuilder};
+    use crate::types::{builtins_symbol_ty, UnionBuilder};
     use crate::ProgramSettings;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
@@ -405,6 +405,22 @@ mod tests {
 
         assert_eq!(u0.expect_union().elements(&db).as_ref(), &[t0, t1]);
         assert_eq!(u1.expect_union().elements(&db).as_ref(), &[t1, t0]);
+    }
+
+    #[test]
+    fn build_union_subsume_multiple() {
+        let db = setup_db();
+        let str_ty = builtins_symbol_ty(&db, "str").to_instance(&db);
+        let int_ty = builtins_symbol_ty(&db, "int").to_instance(&db);
+        let object_ty = builtins_symbol_ty(&db, "object").to_instance(&db);
+        let unknown_ty = Type::Unknown;
+
+        let u0 = UnionType::from_elements(&db, [str_ty, unknown_ty, int_ty, object_ty]);
+
+        assert_eq!(
+            u0.expect_union().elements(&db).as_ref(),
+            &[unknown_ty, object_ty]
+        );
     }
 
     impl<'db> IntersectionType<'db> {
