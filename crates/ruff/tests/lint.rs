@@ -1619,6 +1619,58 @@ print(
     Ok(())
 }
 
+#[test]
+fn add_noqa_exclude() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint]
+exclude = ["excluded.py"]
+select = ["RUF015"]
+"#,
+    )?;
+
+    let test_path = tempdir.path().join("noqa.py");
+
+    fs::write(
+        &test_path,
+        r#"
+def first_square():
+    return [x * x for x in range(20)][0]
+"#,
+    )?;
+
+    let exclude_path = tempdir.path().join("excluded.py");
+
+    fs::write(
+        &exclude_path,
+        r#"
+def first_square():
+    return [x * x for x in range(20)][0]
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .current_dir(tempdir.path())
+            .args(STDIN_BASE_OPTIONS)
+            .args(["--add-noqa"]), @r###"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+
+        ----- stderr -----
+        Added 1 noqa directive.
+        "###);
+    });
+
+    Ok(())
+}
+
 /// Infer `3.11` from `requires-python` in `pyproject.toml`.
 #[test]
 fn requires_python() -> Result<()> {
