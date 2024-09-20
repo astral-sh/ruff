@@ -59,6 +59,12 @@ pub(crate) fn analyze_graph(
             .filter_map(|package| package.parent())
             .map(Path::to_path_buf)
             .filter_map(|path| SystemPathBuf::from_path_buf(path).ok()),
+        pyproject_config
+            .settings
+            .analyze
+            .target_version
+            .as_tuple()
+            .into(),
     )?;
 
     // Create a cache for resolved globs.

@@ -152,20 +152,23 @@ pub enum AnalyzeCommand {
 pub struct AnalyzeGraphCommand {
     /// List of files or directories to include.
     #[clap(help = "List of files or directories to include [default: .]")]
-    pub files: Vec<PathBuf>,
+    files: Vec<PathBuf>,
     /// The direction of the import map. By default, generates a dependency map, i.e., a map from
     /// file to files that it depends on. Use `--direction dependents` to generate a map from file
     /// to files that depend on it.
     #[clap(long, value_enum, default_value_t)]
-    pub direction: Direction,
+    direction: Direction,
     /// Attempt to detect imports from string literals.
     #[clap(long)]
-    pub detect_string_imports: bool,
+    detect_string_imports: bool,
     /// Enable preview mode. Use `--no-preview` to disable.
     #[arg(long, overrides_with("no_preview"))]
     preview: bool,
     #[clap(long, overrides_with("preview"), hide = true)]
     no_preview: bool,
+    /// The minimum Python version that should be supported.
+    #[arg(long, value_enum)]
+    target_version: Option<PythonVersion>,
 }
 
 // The `Parser` derive is for ruff_dev, for ruff `Args` would be sufficient
@@ -789,6 +792,7 @@ impl AnalyzeGraphCommand {
                 None
             },
             preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
+            target_version: self.target_version,
             ..ExplicitConfigOverrides::default()
         };
 
