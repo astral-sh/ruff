@@ -3,7 +3,8 @@ use crate::resolve::resolve;
 use crate::{resolve_default_files, ExitStatus};
 use anyhow::Result;
 use log::{debug, warn};
-use ruff_db::system::SystemPathBuf;
+use path_absolutize::CWD;
+use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_graph::{Direction, ImportMap, ModuleDb, ModuleImports};
 use ruff_linter::{warn_user, warn_user_once};
 use ruff_python_ast::{PySourceType, SourceType};
@@ -24,6 +25,10 @@ pub(crate) fn analyze_graph(
     if pyproject_config.settings.analyze.preview.is_disabled() {
         warn_user!("`ruff analyze graph` is experimental and may change without warning");
     }
+
+    // Write all paths relative to the current working directory.
+    let root =
+        SystemPathBuf::from_path_buf(CWD.clone()).expect("Expected a UTF-8 working directory");
 
     // Find all Python files.
     let files = resolve_default_files(args.files, false);
@@ -109,14 +114,11 @@ pub(crate) fn analyze_graph(
                 warn!("Failed to convert package to system path");
                 continue;
             };
-            let Ok(src_root) = SystemPathBuf::from_path_buf(src_root) else {
-                warn!("Failed to convert source root to system path");
-                continue;
-            };
             let Ok(path) = SystemPathBuf::from_path_buf(path) else {
                 warn!("Failed to convert path to system path");
                 continue;
             };
+            let root = root.clone();
 
             let result = inner_result.clone();
             scope.spawn(move |_| {
@@ -162,9 +164,12 @@ pub(crate) fn analyze_graph(
                     }
                 }
 
-                // Convert the path (and imports) to be relative to the source root.
-                let path = path.strip_prefix(&src_root).unwrap_or(&path).to_path_buf();
-                let imports = imports.relative_to(&src_root);
+                // Convert the path (and imports) to be relative to the working directory.
+                let path = path
+                    .strip_prefix(&root)
+                    .map(SystemPath::to_path_buf)
+                    .unwrap_or(path);
+                let imports = imports.relative_to(&root);
 
                 result.lock().unwrap().push((path, imports));
             });

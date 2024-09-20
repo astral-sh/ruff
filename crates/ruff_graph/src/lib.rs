@@ -35,14 +35,13 @@ impl ModuleImports {
 
     /// Convert the file paths to be relative to a given path.
     #[must_use]
-    pub fn relative_to(&self, path: &SystemPath) -> Self {
-        let mut imports = Self::default();
-        for import in &self.0 {
-            if let Ok(path) = import.strip_prefix(path) {
-                imports.insert(path.to_path_buf());
-            }
-        }
-        imports
+    pub fn relative_to(self, path: &SystemPath) -> Self {
+        Self(BTreeSet::from_iter(self.0.into_iter().map(|import| {
+            import
+                .strip_prefix(path)
+                .map(SystemPath::to_path_buf)
+                .unwrap_or(import)
+        })))
     }
 }
 
