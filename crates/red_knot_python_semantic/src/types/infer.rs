@@ -3486,7 +3486,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "src/a.py",
-            &["Union element 'Literal[1]' of type 'Literal[1] | Literal[f]' is not callable."],
+            &["Object of type 'Literal[1] | Literal[f]' is not callable (due to union element 'Literal[1]')."],
         );
         assert_public_ty(&db, "src/a.py", "x", "Unknown | int");
 
@@ -3515,10 +3515,35 @@ mod tests {
             &db,
             "src/a.py",
             &[
-                r#"Union elements Literal[1], Literal["foo"] of type 'Literal[1] | Literal["foo"] | Literal[f]' are not callable."#,
+                r#"Object of type 'Literal[1] | Literal["foo"] | Literal[f]' is not callable (due to union elements Literal[1], Literal["foo"])."#,
             ],
         );
         assert_public_ty(&db, "src/a.py", "x", "Unknown | int");
+
+        Ok(())
+    }
+
+    #[test]
+    fn call_union_with_all_not_callable() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            if flag:
+                f = 1
+            else:
+                f = 'foo'
+            x = f()
+            ",
+        )?;
+
+        assert_file_diagnostics(
+            &db,
+            "src/a.py",
+            &[r#"Object of type 'Literal[1] | Literal["foo"]' is not callable."#],
+        );
+        assert_public_ty(&db, "src/a.py", "x", "Unknown");
 
         Ok(())
     }
