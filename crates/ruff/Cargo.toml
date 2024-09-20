@@ -62,8 +62,11 @@ wild = { workspace = true }
 [dev-dependencies]
 # Enable test rules during development
 ruff_linter = { workspace = true, features = ["clap", "test-rules"] }
+
+assert_fs = { workspace = true }
 # Avoid writing colored snapshots when running tests from the terminal
 colored = { workspace = true, features = ["no-color"] }
+indoc = { workspace = true }
 insta = { workspace = true, features = ["filters", "json"] }
 insta-cmd = { workspace = true }
 tempfile = { workspace = true }
