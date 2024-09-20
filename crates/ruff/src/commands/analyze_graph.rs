@@ -10,8 +10,8 @@ use ruff_linter::{warn_user, warn_user_once};
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_workspace::resolver::{python_files_in_path, ResolvedFile};
 use rustc_hash::FxHashMap;
-use std::path::Path;
-use std::sync::Arc;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 /// Generate an import map.
 pub(crate) fn analyze_graph(
@@ -51,7 +51,7 @@ pub(crate) fn analyze_graph(
         .map(|(path, package)| (path.to_path_buf(), package.map(Path::to_path_buf)))
         .collect::<FxHashMap<_, _>>();
 
-    // Create a database for each source root.
+    // Create a database from the source roots.
     let db = ModuleDb::from_src_roots(
         package_roots
             .values()
@@ -61,8 +61,11 @@ pub(crate) fn analyze_graph(
             .filter_map(|path| SystemPathBuf::from_path_buf(path).ok()),
     )?;
 
+    // Create a cache for resolved globs.
+    let glob_resolver = Arc::new(Mutex::new(GlobResolver::default()));
+
     // Collect and resolve the imports for each file.
-    let result = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let result = Arc::new(Mutex::new(Vec::new()));
     let inner_result = Arc::clone(&result);
 
     rayon::scope(move |scope| {
@@ -111,6 +114,7 @@ pub(crate) fn analyze_graph(
             let db = db.snapshot();
             let root = root.clone();
             let result = inner_result.clone();
+            let glob_resolver = glob_resolver.clone();
             scope.spawn(move |_| {
                 // Identify any imports via static analysis.
                 let mut imports =
@@ -120,38 +124,12 @@ pub(crate) fn analyze_graph(
                             ModuleImports::default()
                         });
 
+                debug!("Discovered {} imports for {}", imports.len(), path);
+
                 // Append any imports that were statically defined in the configuration.
                 if let Some((root, globs)) = include_dependencies {
-                    match globwalk::GlobWalkerBuilder::from_patterns(root, &globs)
-                        .file_type(globwalk::FileType::FILE)
-                        .build()
-                    {
-                        Ok(walker) => {
-                            for entry in walker {
-                                let entry = match entry {
-                                    Ok(entry) => entry,
-                                    Err(err) => {
-                                        warn!("Failed to read glob entry: {err}");
-                                        continue;
-                                    }
-                                };
-                                let path = match SystemPathBuf::from_path_buf(entry.into_path()) {
-                                    Ok(path) => path,
-                                    Err(err) => {
-                                        warn!(
-                                            "Failed to convert path to system path: {}",
-                                            err.display()
-                                        );
-                                        continue;
-                                    }
-                                };
-                                imports.insert(path);
-                            }
-                        }
-                        Err(err) => {
-                            warn!("Failed to read glob walker: {err}");
-                        }
-                    }
+                    let mut glob_resolver = glob_resolver.lock().unwrap();
+                    imports.extend(glob_resolver.resolve(root, globs));
                 }
 
                 // Convert the path (and imports) to be relative to the working directory.
@@ -179,4 +157,68 @@ pub(crate) fn analyze_graph(
     println!("{}", serde_json::to_string_pretty(&import_map)?);
 
     Ok(ExitStatus::Success)
+}
+
+/// A resolver for glob sets.
+#[derive(Default, Debug)]
+struct GlobResolver {
+    cache: GlobCache,
+}
+
+impl GlobResolver {
+    /// Resolve a set of globs, anchored at a given root.
+    fn resolve(&mut self, root: PathBuf, globs: Vec<String>) -> Vec<SystemPathBuf> {
+        if let Some(cached) = self.cache.get(&root, &globs) {
+            return cached.clone();
+        }
+
+        let walker = match globwalk::GlobWalkerBuilder::from_patterns(&root, &globs)
+            .file_type(globwalk::FileType::FILE)
+            .build()
+        {
+            Ok(walker) => walker,
+            Err(err) => {
+                warn!("Failed to read glob walker: {err}");
+                return Vec::new();
+            }
+        };
+
+        let mut paths = Vec::new();
+        for entry in walker {
+            let entry = match entry {
+                Ok(entry) => entry,
+                Err(err) => {
+                    warn!("Failed to read glob entry: {err}");
+                    continue;
+                }
+            };
+            let path = match SystemPathBuf::from_path_buf(entry.into_path()) {
+                Ok(path) => path,
+                Err(err) => {
+                    warn!("Failed to convert path to system path: {}", err.display());
+                    continue;
+                }
+            };
+            paths.push(path);
+        }
+
+        self.cache.insert(root, globs, paths.clone());
+        paths
+    }
+}
+
+/// A cache for resolved globs.
+#[derive(Default, Debug)]
+struct GlobCache(FxHashMap<PathBuf, FxHashMap<Vec<String>, Vec<SystemPathBuf>>>);
+
+impl GlobCache {
+    /// Insert a resolved glob.
+    fn insert(&mut self, root: PathBuf, globs: Vec<String>, paths: Vec<SystemPathBuf>) {
+        self.0.entry(root).or_default().insert(globs, paths);
+    }
+
+    /// Get a resolved glob.
+    fn get(&self, root: &Path, globs: &[String]) -> Option<&Vec<SystemPathBuf>> {
+        self.0.get(root).and_then(|map| map.get(globs))
+    }
 }
