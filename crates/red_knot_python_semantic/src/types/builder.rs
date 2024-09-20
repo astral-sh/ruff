@@ -59,6 +59,7 @@ impl<'db> UnionBuilder<'db> {
                 } else {
                     None
                 };
+
                 let mut to_add = ty;
                 let mut to_remove = SmallVec::<[usize; 2]>::new();
                 for (index, element) in self.elements.iter().enumerate() {
@@ -77,6 +78,7 @@ impl<'db> UnionBuilder<'db> {
                         to_remove.push(index);
                     }
                 }
+
                 match to_remove[..] {
                     [] => self.elements.push(to_add),
                     [index] => self.elements[index] = to_add,
