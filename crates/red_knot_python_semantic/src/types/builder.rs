@@ -47,7 +47,7 @@ impl<'db> UnionBuilder<'db> {
             Type::Union(union) => {
                 let new_elements = union.elements(self.db);
                 self.elements.reserve(new_elements.len());
-                for element in &**new_elements {
+                for element in new_elements {
                     self = self.add(*element);
                 }
             }
@@ -328,7 +328,7 @@ mod tests {
         let t1 = Type::IntLiteral(1);
         let union = UnionType::from_elements(&db, [t0, t1]).expect_union();
 
-        assert_eq!(union.elements(&db).as_ref(), &[t0, t1]);
+        assert_eq!(union.elements(&db), &[t0, t1]);
     }
 
     #[test]
@@ -365,10 +365,10 @@ mod tests {
         let t3 = Type::IntLiteral(17);
 
         let union = UnionType::from_elements(&db, [t0, t1, t3]).expect_union();
-        assert_eq!(union.elements(&db).as_ref(), &[t0, t3]);
+        assert_eq!(union.elements(&db), &[t0, t3]);
 
         let union = UnionType::from_elements(&db, [t0, t1, t2, t3]).expect_union();
-        assert_eq!(union.elements(&db).as_ref(), &[bool_ty, t3]);
+        assert_eq!(union.elements(&db), &[bool_ty, t3]);
     }
 
     #[test]
@@ -380,7 +380,7 @@ mod tests {
         let u1 = UnionType::from_elements(&db, [t0, t1]);
         let union = UnionType::from_elements(&db, [u1, t2]).expect_union();
 
-        assert_eq!(union.elements(&db).as_ref(), &[t0, t1, t2]);
+        assert_eq!(union.elements(&db), &[t0, t1, t2]);
     }
 
     #[test]
@@ -403,8 +403,8 @@ mod tests {
         let u0 = UnionType::from_elements(&db, [t0, t1]);
         let u1 = UnionType::from_elements(&db, [t1, t0]);
 
-        assert_eq!(u0.expect_union().elements(&db).as_ref(), &[t0, t1]);
-        assert_eq!(u1.expect_union().elements(&db).as_ref(), &[t1, t0]);
+        assert_eq!(u0.expect_union().elements(&db), &[t0, t1]);
+        assert_eq!(u1.expect_union().elements(&db), &[t1, t0]);
     }
 
     #[test]
@@ -417,10 +417,7 @@ mod tests {
 
         let u0 = UnionType::from_elements(&db, [str_ty, unknown_ty, int_ty, object_ty]);
 
-        assert_eq!(
-            u0.expect_union().elements(&db).as_ref(),
-            &[unknown_ty, object_ty]
-        );
+        assert_eq!(u0.expect_union().elements(&db), &[unknown_ty, object_ty]);
     }
 
     impl<'db> IntersectionType<'db> {

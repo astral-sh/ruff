@@ -996,10 +996,14 @@ impl<'db> ClassType<'db> {
 pub struct UnionType<'db> {
     /// The union type includes values in any of these types.
     #[return_ref]
-    elements: Box<[Type<'db>]>,
+    elements_boxed: Box<[Type<'db>]>,
 }
 
 impl<'db> UnionType<'db> {
+    fn elements(self, db: &'db dyn Db) -> &'db [Type<'db>] {
+        self.elements_boxed(db)
+    }
+
     /// Create a union from a list of elements
     /// (which may be eagerly simplified into a different variant of [`Type`] altogether).
     pub fn from_elements<T: Into<Type<'db>>>(
