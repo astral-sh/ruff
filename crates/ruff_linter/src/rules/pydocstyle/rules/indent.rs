@@ -5,6 +5,7 @@ use ruff_python_ast::docstrings::{clean_space, leading_space};
 use ruff_source_file::NewlineWithTrailingNewline;
 use ruff_text_size::{Ranged, TextSize};
 use ruff_text_size::{TextLen, TextRange};
+use std::cmp::Ordering;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
@@ -291,21 +292,28 @@ pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
             let line_indent = leading_space(last);
             let line_indent_size = line_indent.chars().count();
             if line_indent_size > docstring_indent_size {
-                let mut offset_len = line_indent.text_len();
-                // When a non-space character is on the last line, the trailing quotes are also on the same line.
-                // No diagnostic is added if the indentation difference equals the indent size.
-                if last.chars().any(|c| !c.is_whitespace()) {
-                    let prev_line_indent = leading_space(&lines[lines.len() - 2]);
-                    let prev_line_indent_size = prev_line_indent.chars().count();
-                    if line_indent_size - prev_line_indent_size == docstring_indent_size {
-                        return;
+                let mut offset_len = line_indent_size;
+                // The trailing quotes are not on a separate line.
+                if line_indent.text_len() != last.text_len() {
+                    over_indented_size =
+                        std::cmp::min(line_indent_size - docstring_indent_size, over_indented_size);
+                    match over_indented_size.cmp(&docstring_indent_size) {
+                        Ordering::Equal => {
+                            return;
+                        }
+                        Ordering::Less => {
+                            offset_len = over_indented_size;
+                        }
+                        Ordering::Greater => {
+                            offset_len -= over_indented_size - docstring_indent_size;
+                        }
                     }
-                    offset_len = line_indent.text_len() - prev_line_indent.text_len();
                 }
                 let mut diagnostic =
                     Diagnostic::new(OverIndentation, TextRange::empty(last.start()));
                 let indent = clean_space(docstring.indentation);
-                let range = TextRange::at(last.start(), offset_len);
+                let range =
+                    TextRange::at(last.start(), TextSize::new(offset_len.try_into().unwrap()));
                 let edit = if indent.is_empty() {
                     Edit::range_deletion(range)
                 } else {

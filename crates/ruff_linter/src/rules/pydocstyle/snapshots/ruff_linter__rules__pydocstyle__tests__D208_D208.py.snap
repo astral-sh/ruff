@@ -115,4 +115,5 @@ D208.py:45:1: D208 [*] Docstring is over-indented
 45    |-      A parameter."""
    45 |+        A parameter."""
 46 46 |     pass
-47 47 |
+47 47 | 
+48 48 |

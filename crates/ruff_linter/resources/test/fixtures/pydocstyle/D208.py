@@ -45,3 +45,16 @@ def under_indent_quotes_same_line(a: int) -> None:
       A parameter."""
     pass
 
+
+
+def right_indent_quotes_same_line_with_multiple_empty_lines(a: int) -> None:
+    """Foo.
+    Parameters
+    ----------
+    a : int
+
+
+
+
+        A parameter."""
+    pass
