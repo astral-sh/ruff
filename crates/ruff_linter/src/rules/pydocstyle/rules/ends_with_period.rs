@@ -1,7 +1,7 @@
 use ruff_text_size::TextLen;
 use strum::IntoEnumIterator;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{FixAvailability, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_source_file::{UniversalNewlineIterator, UniversalNewlines};
 use ruff_text_size::Ranged;
@@ -47,14 +47,18 @@ use crate::rules::pydocstyle::helpers::logical_line;
 #[violation]
 pub struct EndsInPeriod;
 
-impl AlwaysFixableViolation for EndsInPeriod {
+impl Violation for EndsInPeriod {
+    /// `None` in the case a fix is never available or otherwise Some
+    /// [`FixAvailability`] describing the available fix.
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("First line should end with a period")
     }
 
-    fn fix_title(&self) -> String {
-        "Add period".to_string()
+    fn fix_title(&self) -> Option<String> {
+        Some("Add period".to_string())
     }
 }
 
