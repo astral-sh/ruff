@@ -11,6 +11,7 @@ enum CoreStdlibModule {
     Builtins,
     Types,
     Typeshed,
+    TypingExtensions,
 }
 
 impl CoreStdlibModule {
@@ -19,6 +20,7 @@ impl CoreStdlibModule {
             Self::Builtins => "builtins",
             Self::Types => "types",
             Self::Typeshed => "_typeshed",
+            Self::TypingExtensions => "typing_extensions",
         };
         ModuleName::new_static(module_name)
             .unwrap_or_else(|| panic!("{module_name} should be a valid module name!"))
@@ -60,6 +62,14 @@ pub(crate) fn types_symbol_ty<'db>(db: &'db dyn Db, symbol: &str) -> Type<'db> {
 #[inline]
 pub(crate) fn typeshed_symbol_ty<'db>(db: &'db dyn Db, symbol: &str) -> Type<'db> {
     core_module_symbol_ty(db, CoreStdlibModule::Typeshed, symbol)
+}
+
+/// Lookup the type of `symbol` in the `typing_extensions` module namespace.
+///
+/// Returns `Unbound` if the `typing_extensions` module isn't available for some reason.
+#[inline]
+pub(crate) fn typing_extensions_symbol_ty<'db>(db: &'db dyn Db, symbol: &str) -> Type<'db> {
+    core_module_symbol_ty(db, CoreStdlibModule::TypingExtensions, symbol)
 }
 
 /// Get the scope of a core stdlib module.

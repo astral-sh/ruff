@@ -1,3 +1,4 @@
+# ruff: noqa: PYI036 # This is the module declaring BaseException
 import _ast
 import _typeshed
 import sys

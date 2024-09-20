@@ -208,6 +208,18 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn f821_with_builtin_added_on_new_py_version_but_old_target_version_specified() {
+        let diagnostics = test_snippet(
+            "PythonFinalizationError",
+            &LinterSettings {
+                target_version: crate::settings::types::PythonVersion::Py312,
+                ..LinterSettings::for_rule(Rule::UndefinedName)
+            },
+        );
+        assert_messages!(diagnostics);
+    }
+
     #[test_case(Rule::UnusedVariable, Path::new("F841_4.py"))]
     #[test_case(Rule::UnusedImport, Path::new("__init__.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_24/__init__.py"))]

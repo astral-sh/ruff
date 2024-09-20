@@ -11,7 +11,8 @@ use ruff_text_size::{Ranged, TextLen};
 /// the string to a slice after checking `.startswith()` or `.endswith()`, respectively.
 ///
 /// ## Why is this bad?
-/// The methods [`str.removeprefix`] and [`str.removesuffix`],
+/// The methods [`str.removeprefix`](https://docs.python.org/3/library/stdtypes.html#str.removeprefix)
+/// and [`str.removesuffix`](https://docs.python.org/3/library/stdtypes.html#str.removesuffix),
 /// introduced in Python 3.9, have the same behavior
 /// and are more readable and efficient.
 ///
@@ -33,9 +34,6 @@ use ruff_text_size::{Ranged, TextLen};
 /// ```python
 /// text = text.removeprefix("pre")
 /// ```
-///
-/// [`str.removeprefix`]: https://docs.python.org/3/library/stdtypes.html#str.removeprefix
-/// [`str.removesuffix`]: https://docs.python.org/3/library/stdtypes.html#str.removesuffix
 #[violation]
 pub struct SliceToRemovePrefixOrSuffix {
     string: String,
@@ -248,6 +246,27 @@ fn affix_removal_data<'a>(
         return None;
     }
     let slice = slice.as_slice_expr()?;
+
+    // Exit early if slice step is...
+    if slice
+        .step
+        .as_deref()
+        // present and
+        .is_some_and(|step| match step {
+            // not equal to 1
+            ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                value: ast::Number::Int(x),
+                ..
+            }) => x.as_u8() != Some(1),
+            // and not equal to `None` or `True`
+            ast::Expr::NoneLiteral(_)
+            | ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value: true, .. }) => false,
+            _ => true,
+        })
+    {
+        return None;
+    };
+
     let compr_test_expr = ast::comparable::ComparableExpr::from(
         &test.as_call_expr()?.func.as_attribute_expr()?.value,
     );

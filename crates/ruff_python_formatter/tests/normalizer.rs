@@ -62,7 +62,7 @@ impl Transformer for Normalizer {
     fn visit_string_literal(&self, string_literal: &mut ast::StringLiteral) {
         static STRIP_DOC_TESTS: Lazy<Regex> = Lazy::new(|| {
             Regex::new(
-                r#"(?mx)
+                r"(?mx)
                     (
                         # strip doctest PS1 prompt lines
                         ^\s*>>>\s.*(\n|$)
@@ -71,7 +71,7 @@ impl Transformer for Normalizer {
                         # Also handles the case of an empty ... line.
                         ^\s*\.\.\.((\n|$)|\s.*(\n|$))
                     )+
-                "#,
+                ",
             )
             .unwrap()
         });
@@ -80,11 +80,11 @@ impl Transformer for Normalizer {
             // impossible) to detect a reStructuredText block with a simple
             // regex. So we just look for the start of a block and remove
             // everything after it. Talk about a hammer.
-            Regex::new(r#"::(?s:.*)"#).unwrap()
+            Regex::new(r"::(?s:.*)").unwrap()
         });
         static STRIP_MARKDOWN_BLOCKS: Lazy<Regex> = Lazy::new(|| {
             // This covers more than valid Markdown blocks, but that's OK.
-            Regex::new(r#"(```|~~~)\p{any}*(```|~~~|$)"#).unwrap()
+            Regex::new(r"(```|~~~)\p{any}*(```|~~~|$)").unwrap()
         });
 
         // Start by (1) stripping everything that looks like a code

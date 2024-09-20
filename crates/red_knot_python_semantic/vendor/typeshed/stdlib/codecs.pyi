@@ -80,7 +80,7 @@ class _Encoder(Protocol):
     def __call__(self, input: str, errors: str = ..., /) -> tuple[bytes, int]: ...  # signature of Codec().encode
 
 class _Decoder(Protocol):
-    def __call__(self, input: bytes, errors: str = ..., /) -> tuple[str, int]: ...  # signature of Codec().decode
+    def __call__(self, input: ReadableBuffer, errors: str = ..., /) -> tuple[str, int]: ...  # signature of Codec().decode
 
 class _StreamReader(Protocol):
     def __call__(self, stream: _ReadableStream, errors: str = ..., /) -> StreamReader: ...

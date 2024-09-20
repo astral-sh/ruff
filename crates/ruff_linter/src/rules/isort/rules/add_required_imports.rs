@@ -35,6 +35,9 @@ use crate::settings::LinterSettings;
 ///
 /// import typing
 /// ```
+///
+/// ## Options
+/// - `lint.isort.required-imports`
 #[violation]
 pub struct MissingRequiredImport(pub String);
 

@@ -32,17 +32,25 @@ impl<const B: usize> BitSet<B> {
         bitset
     }
 
+    pub(super) fn is_empty(&self) -> bool {
+        self.blocks().iter().all(|&b| b == 0)
+    }
+
     /// Convert from Inline to Heap, if needed, and resize the Heap vector, if needed.
     fn resize(&mut self, value: u32) {
         let num_blocks_needed = (value / 64) + 1;
+        self.resize_blocks(num_blocks_needed as usize);
+    }
+
+    fn resize_blocks(&mut self, num_blocks_needed: usize) {
         match self {
             Self::Inline(blocks) => {
                 let mut vec = blocks.to_vec();
-                vec.resize(num_blocks_needed as usize, 0);
+                vec.resize(num_blocks_needed, 0);
                 *self = Self::Heap(vec);
             }
             Self::Heap(vec) => {
-                vec.resize(num_blocks_needed as usize, 0);
+                vec.resize(num_blocks_needed, 0);
             }
         }
     }
@@ -86,6 +94,19 @@ impl<const B: usize> BitSet<B> {
         }
         for block in my_blocks.iter_mut().skip(min_len) {
             *block = 0;
+        }
+    }
+
+    /// Union in-place with another [`BitSet`].
+    pub(super) fn union(&mut self, other: &BitSet<B>) {
+        let mut max_len = self.blocks().len();
+        let other_len = other.blocks().len();
+        if other_len > max_len {
+            max_len = other_len;
+            self.resize_blocks(max_len);
+        }
+        for (my_block, other_block) in self.blocks_mut().iter_mut().zip(other.blocks()) {
+            *my_block |= other_block;
         }
     }
 
@@ -219,10 +240,70 @@ mod tests {
     }
 
     #[test]
+    fn union() {
+        let mut b1 = BitSet::<1>::with(2);
+        let b2 = BitSet::<1>::with(4);
+
+        b1.union(&b2);
+        assert_bitset(&b1, &[2, 4]);
+    }
+
+    #[test]
+    fn union_mixed_1() {
+        let mut b1 = BitSet::<1>::with(4);
+        let mut b2 = BitSet::<1>::with(4);
+        b1.insert(89);
+        b2.insert(5);
+
+        b1.union(&b2);
+        assert_bitset(&b1, &[4, 5, 89]);
+    }
+
+    #[test]
+    fn union_mixed_2() {
+        let mut b1 = BitSet::<1>::with(4);
+        let mut b2 = BitSet::<1>::with(4);
+        b1.insert(23);
+        b2.insert(89);
+
+        b1.union(&b2);
+        assert_bitset(&b1, &[4, 23, 89]);
+    }
+
+    #[test]
+    fn union_heap() {
+        let mut b1 = BitSet::<1>::with(4);
+        let mut b2 = BitSet::<1>::with(4);
+        b1.insert(89);
+        b2.insert(90);
+
+        b1.union(&b2);
+        assert_bitset(&b1, &[4, 89, 90]);
+    }
+
+    #[test]
+    fn union_heap_2() {
+        let mut b1 = BitSet::<1>::with(89);
+        let mut b2 = BitSet::<1>::with(89);
+        b1.insert(91);
+        b2.insert(90);
+
+        b1.union(&b2);
+        assert_bitset(&b1, &[89, 90, 91]);
+    }
+
+    #[test]
     fn multiple_blocks() {
         let mut b = BitSet::<2>::with(120);
         b.insert(45);
         assert!(matches!(b, BitSet::Inline(_)));
         assert_bitset(&b, &[45, 120]);
+    }
+
+    #[test]
+    fn empty() {
+        let b = BitSet::<1>::default();
+
+        assert!(b.is_empty());
     }
 }

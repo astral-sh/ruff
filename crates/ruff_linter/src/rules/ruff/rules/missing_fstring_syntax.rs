@@ -61,7 +61,7 @@ pub struct MissingFStringSyntax;
 impl AlwaysFixableViolation for MissingFStringSyntax {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(r#"Possible f-string without an `f` prefix"#)
+        format!(r"Possible f-string without an `f` prefix")
     }
 
     fn fix_title(&self) -> String {

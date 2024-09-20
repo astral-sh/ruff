@@ -66,7 +66,25 @@ pub(crate) fn no_signature(checker: &mut Checker, docstring: &Docstring) {
     // a function named `foo`).
     if first_line
         .match_indices(function.name.as_str())
-        .any(|(index, _)| first_line[index + function.name.len()..].starts_with('('))
+        .any(|(index, _)| {
+            // The function name must be preceded by a word boundary.
+            let preceded_by_word_boundary = first_line[..index]
+                .chars()
+                .next_back()
+                .map_or(true, |c| matches!(c, ' ' | '\t' | ';' | ','));
+            if !preceded_by_word_boundary {
+                return false;
+            }
+
+            // The function name must be followed by an open parenthesis.
+            let followed_by_open_parenthesis =
+                first_line[index + function.name.len()..].starts_with('(');
+            if !followed_by_open_parenthesis {
+                return false;
+            }
+
+            true
+        })
     {
         checker
             .diagnostics

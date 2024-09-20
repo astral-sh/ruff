@@ -166,6 +166,8 @@ FURB188.py:154:12: FURB188 [*] Prefer `removesuffix` over conditionally replacin
 153 | 
 154 |     return filename[:-builtins_len(extension)] if filename.endswith(extension) else filename
     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB188
+155 | 
+156 | def okay_steps():
     |
     = help: Use removesuffix instead of ternary expression conditional upon endswith.
 
@@ -175,3 +177,77 @@ FURB188.py:154:12: FURB188 [*] Prefer `removesuffix` over conditionally replacin
 153 153 | 
 154     |-    return filename[:-builtins_len(extension)] if filename.endswith(extension) else filename
     154 |+    return filename.removesuffix(extension)
+155 155 | 
+156 156 | def okay_steps():
+157 157 |     text = "!x!y!z"
+
+FURB188.py:158:5: FURB188 [*] Prefer `removeprefix` over conditionally replacing with slice.
+    |
+156 |   def okay_steps():
+157 |       text = "!x!y!z"
+158 |       if text.startswith("!"):
+    |  _____^
+159 | |         text = text[1::1]
+    | |_________________________^ FURB188
+160 |       if text.startswith("!"):
+161 |           text = text[1::True]
+    |
+    = help: Use removeprefix instead of assignment conditional upon startswith.
+
+ℹ Safe fix
+155 155 | 
+156 156 | def okay_steps():
+157 157 |     text = "!x!y!z"
+158     |-    if text.startswith("!"):
+159     |-        text = text[1::1]
+    158 |+    text = text.removeprefix("!")
+160 159 |     if text.startswith("!"):
+161 160 |         text = text[1::True]
+162 161 |     if text.startswith("!"):
+
+FURB188.py:160:5: FURB188 [*] Prefer `removeprefix` over conditionally replacing with slice.
+    |
+158 |       if text.startswith("!"):
+159 |           text = text[1::1]
+160 |       if text.startswith("!"):
+    |  _____^
+161 | |         text = text[1::True]
+    | |____________________________^ FURB188
+162 |       if text.startswith("!"):
+163 |           text = text[1::None]
+    |
+    = help: Use removeprefix instead of assignment conditional upon startswith.
+
+ℹ Safe fix
+157 157 |     text = "!x!y!z"
+158 158 |     if text.startswith("!"):
+159 159 |         text = text[1::1]
+160     |-    if text.startswith("!"):
+161     |-        text = text[1::True]
+    160 |+    text = text.removeprefix("!")
+162 161 |     if text.startswith("!"):
+163 162 |         text = text[1::None]
+164 163 |     print(text)
+
+FURB188.py:162:5: FURB188 [*] Prefer `removeprefix` over conditionally replacing with slice.
+    |
+160 |       if text.startswith("!"):
+161 |           text = text[1::True]
+162 |       if text.startswith("!"):
+    |  _____^
+163 | |         text = text[1::None]
+    | |____________________________^ FURB188
+164 |       print(text)
+    |
+    = help: Use removeprefix instead of assignment conditional upon startswith.
+
+ℹ Safe fix
+159 159 |         text = text[1::1]
+160 160 |     if text.startswith("!"):
+161 161 |         text = text[1::True]
+162     |-    if text.startswith("!"):
+163     |-        text = text[1::None]
+    162 |+    text = text.removeprefix("!")
+164 163 |     print(text)
+165 164 | 
+166 165 |
