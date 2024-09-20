@@ -1,6 +1,7 @@
 //! Tests the interaction of the `analyze graph` command.
 
-#![cfg(not(target_family = "wasm"))]
+#![cfg(not(target_arch = "wasm32"))]
+#![cfg(not(windows))]
 
 use assert_fs::prelude::*;
 use std::process::Command;

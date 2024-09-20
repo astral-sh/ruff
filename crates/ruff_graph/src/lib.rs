@@ -26,6 +26,11 @@ impl ModuleImports {
         self.0.insert(path);
     }
 
+    /// Extend the module imports with additional file paths.
+    pub fn extend(&mut self, paths: impl IntoIterator<Item = SystemPathBuf>) {
+        self.0.extend(paths);
+    }
+
     /// Returns `true` if the module imports are empty.
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
