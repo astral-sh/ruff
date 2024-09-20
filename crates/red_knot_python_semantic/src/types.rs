@@ -826,7 +826,7 @@ impl<'db> CallOutcome<'db> {
                         node,
                         "call-non-callable",
                         format_args!(
-                            "No element of union type '{}' is callable.",
+                            "Object of type '{}' is not callable.",
                             called_ty.display(db)
                         ),
                     ),

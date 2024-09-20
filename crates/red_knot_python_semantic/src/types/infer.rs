@@ -3541,7 +3541,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "src/a.py",
-            &[r#"No element of union type 'Literal[1] | Literal["foo"]' is callable."#],
+            &[r#"Object of type 'Literal[1] | Literal["foo"]' is not callable."#],
         );
         assert_public_ty(&db, "src/a.py", "x", "Unknown");
 
