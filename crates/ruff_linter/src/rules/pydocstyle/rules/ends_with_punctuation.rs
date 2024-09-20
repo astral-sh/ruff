@@ -107,7 +107,7 @@ pub(crate) fn ends_with_punctuation(checker: &mut Checker, docstring: &Docstring
         if !trimmed.ends_with(['.', '!', '?']) {
             let mut diagnostic = Diagnostic::new(EndsInPunctuation, docstring.range());
             // Best-effort fix: avoid adding a period after other punctuation marks.
-            if !trimmed.ends_with([':', ';', '?', '!']) {
+            if !trimmed.ends_with([':', ';']) {
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
                     ".".to_string(),
                     line.start() + trimmed.text_len(),
