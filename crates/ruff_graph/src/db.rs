@@ -1,5 +1,7 @@
 use anyhow::Result;
-use red_knot_python_semantic::{Db, Program, ProgramSettings, PythonVersion, SearchPathSettings};
+use red_knot_python_semantic::{
+    vendored_typeshed_stubs, Db, Program, ProgramSettings, PythonVersion, SearchPathSettings,
+};
 use ruff_db::files::{File, Files};
 use ruff_db::system::{OsSystem, System, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
@@ -11,7 +13,6 @@ pub struct ModuleDb {
     storage: salsa::Storage<Self>,
     files: Files,
     system: OsSystem,
-    vendored: VendoredFileSystem,
 }
 
 impl ModuleDb {
@@ -26,12 +27,10 @@ impl ModuleDb {
                 .next()
                 .ok_or_else(|| anyhow::anyhow!("No source roots provided"))?;
 
-            let mut search_paths = SearchPathSettings::new(src_root.to_path_buf());
+            let mut search_paths = SearchPathSettings::new(src_root);
 
             // Add the remaining source roots as extra paths.
-            for src_root in src_roots {
-                search_paths.extra_paths.push(src_root.to_path_buf());
-            }
+            search_paths.extra_paths.extend(src_roots);
 
             search_paths
         };
@@ -54,7 +53,6 @@ impl ModuleDb {
         Self {
             storage: self.storage.clone(),
             system: self.system.clone(),
-            vendored: self.vendored.clone(),
             files: self.files.snapshot(),
         }
     }
@@ -72,7 +70,7 @@ impl Upcast<dyn SourceDb> for ModuleDb {
 #[salsa::db]
 impl SourceDb for ModuleDb {
     fn vendored(&self) -> &VendoredFileSystem {
-        &self.vendored
+        vendored_typeshed_stubs()
     }
 
     fn system(&self) -> &dyn System {
