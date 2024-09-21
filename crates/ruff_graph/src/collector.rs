@@ -1,8 +1,8 @@
 use red_knot_python_semantic::ModuleName;
 use ruff_python_ast::visitor::source_order::{
-    walk_expr, walk_module, walk_stmt, SourceOrderVisitor,
+    walk_expr, walk_module, walk_stmt, SourceOrderVisitor, TraversalSignal,
 };
-use ruff_python_ast::{self as ast, Expr, Mod, Stmt};
+use ruff_python_ast::{self as ast, AnyNodeRef, Expr, Mod, Stmt};
 
 /// Collect all imports for a given Python file.
 #[derive(Default, Debug)]
@@ -32,6 +32,28 @@ impl<'a> Collector<'a> {
 }
 
 impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
+    fn enter_node(&mut self, node: AnyNodeRef<'ast>) -> TraversalSignal {
+        // If string detection is enabled, we have to visit everything. Otherwise, we should only
+        // visit compounds statements, which can contain import statements.
+        if self.string_imports
+            || matches!(
+                node,
+                AnyNodeRef::ModModule(_)
+                    | AnyNodeRef::StmtFunctionDef(_)
+                    | AnyNodeRef::StmtClassDef(_)
+                    | AnyNodeRef::StmtWhile(_)
+                    | AnyNodeRef::StmtFor(_)
+                    | AnyNodeRef::StmtWith(_)
+                    | AnyNodeRef::StmtIf(_)
+                    | AnyNodeRef::StmtTry(_)
+            )
+        {
+            TraversalSignal::Traverse
+        } else {
+            TraversalSignal::Skip
+        }
+    }
+
     fn visit_stmt(&mut self, stmt: &'ast Stmt) {
         match stmt {
             Stmt::ImportFrom(ast::StmtImportFrom {
