@@ -169,8 +169,8 @@ pub(crate) fn analyze_graph(
 
     // Generate the import map.
     let import_map = match args.direction {
-        Direction::Dependencies => ImportMap::from_iter(imports),
-        Direction::Dependents => ImportMap::reverse(imports),
+        Direction::Dependencies => ImportMap::dependencies(imports),
+        Direction::Dependents => ImportMap::dependents(imports),
     };
 
     // Print to JSON.
