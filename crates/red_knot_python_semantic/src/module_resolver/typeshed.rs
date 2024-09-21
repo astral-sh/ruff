@@ -390,7 +390,8 @@ mod tests {
     fn typeshed_versions_consistent_with_vendored_stubs() {
         let db = TestDb::new();
         let vendored_typeshed_versions = vendored_typeshed_versions(&db);
-        let vendored_typeshed_dir = Path::new("vendor/typeshed").canonicalize().unwrap();
+        let vendored_typeshed_dir =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../ruff_vendored/vendor/typeshed");
 
         let mut empty_iterator = true;
 
