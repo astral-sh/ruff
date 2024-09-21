@@ -60,7 +60,7 @@ fn symbol_ty_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymb
                 use_def.public_bindings(symbol),
                 use_def
                     .public_may_be_unbound(symbol)
-                    .then_some(Type::Unknown),
+                    .then_some(Type::Unknown(UnknownTypeKind::TypeError)),
             ))
         } else {
             None
@@ -231,7 +231,7 @@ fn declarations_ty<'db>(
 }
 
 /// Unique ID for a type.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum Type<'db> {
     /// the dynamic type: a statically-unknown set of values
     Any,
@@ -275,6 +275,36 @@ pub enum Type<'db> {
     Tuple(TupleType<'db>),
     // TODO protocols, callable types, overloads, generics, type vars
 }
+
+//impl<'db> PartialEq for Type<'db> {
+//fn eq(&self, other: &Self) -> bool {
+//match (self, other) {
+//// All unknowns are equal regardless of kind
+//(Self::Unknown(_), Self::Unknown(_)) => true,
+//// Other types are implemented like #[derice(PartialEq)]
+//(Self::Any, Self::Any) => true,
+//(Self::Never, Self::Never) => true,
+//(Self::Unbound, Self::Unbound) => true,
+//(Self::None, Self::None) => true,
+//(Self::Function(a), Self::Function(b)) => a == b,
+//(Self::RevealTypeFunction(a), Self::RevealTypeFunction(b)) => a == b,
+//(Self::Module(a), Self::Module(b)) => a == b,
+//(Self::Class(a), Self::Class(b)) => a == b,
+//(Self::Instance(a), Self::Instance(b)) => a == b,
+//(Self::Union(a), Self::Union(b)) => a == b,
+//(Self::Intersection(a), Self::Intersection(b)) => a == b,
+//(Self::IntLiteral(a), Self::IntLiteral(b)) => a == b,
+//(Self::BooleanLiteral(a), Self::BooleanLiteral(b)) => a == b,
+//(Self::StringLiteral(a), Self::StringLiteral(b)) => a == b,
+//(Self::LiteralString, Self::LiteralString) => true,
+//(Self::BytesLiteral(a), Self::BytesLiteral(b)) => a == b,
+//(Self::Tuple(a), Self::Tuple(b)) => a == b,
+//(_, _) => false,
+//}
+//}
+//}
+
+//impl Eq for Type<'_> {}
 
 impl<'db> Type<'db> {
     pub const fn is_unbound(&self) -> bool {
@@ -383,7 +413,7 @@ impl<'db> Type<'db> {
                 .elements(db)
                 .into_iter()
                 .fold(UnionBuilder::new(db), |builder, ty| {
-                    builder.add(transform_fn(ty))
+                    builder.add(transform_fn(*ty))
                 })
                 .build(),
             ty => transform_fn(ty),
@@ -408,8 +438,8 @@ impl<'db> Type<'db> {
             return true;
         }
         match (self, target) {
-            (Type::Unknown | Type::Any, _) => false,
-            (_, Type::Unknown | Type::Any) => false,
+            (Type::Unknown(_) | Type::Any, _) => false,
+            (_, Type::Unknown(_) | Type::Any) => false,
             (Type::Never, _) => true,
             (_, Type::Never) => false,
             (Type::IntLiteral(_), Type::Instance(class))
@@ -444,8 +474,8 @@ impl<'db> Type<'db> {
     /// [assignable to]: https://typing.readthedocs.io/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
     pub(crate) fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
         match (self, target) {
-            (Type::Unknown | Type::Any, _) => true,
-            (_, Type::Unknown | Type::Any) => true,
+            (Type::Unknown(_) | Type::Any, _) => true,
+            (_, Type::Unknown(_) | Type::Any) => true,
             (ty, Type::Union(union)) => union
                 .elements(db)
                 .iter()
@@ -541,19 +571,23 @@ impl<'db> Type<'db> {
             Type::Function(function_type) => CallOutcome::callable(function_type.return_type(db)),
             Type::RevealTypeFunction(function_type) => CallOutcome::revealed(
                 function_type.return_type(db),
-                *arg_types.first().unwrap_or(&Type::Unknown),
+                *arg_types
+                    .first()
+                    .unwrap_or(&Type::Unknown(UnknownTypeKind::TypeError)),
             ),
 
             // TODO annotated return type on `__new__` or metaclass `__call__`
             Type::Class(class) => CallOutcome::callable(Type::Instance(class)),
 
             // TODO: handle classes which implement the `__call__` protocol
-            Type::Instance(_instance_ty) => CallOutcome::callable(Type::Unknown),
+            Type::Instance(_instance_ty) => {
+                CallOutcome::callable(Type::Unknown(UnknownTypeKind::RedKnotLimitation))
+            }
 
             // `Any` is callable, and its return type is also `Any`.
             Type::Any => CallOutcome::callable(Type::Any),
 
-            Type::Unknown => CallOutcome::callable(Type::Unknown),
+            Type::Unknown(kind) => CallOutcome::callable(Type::Unknown(kind)),
 
             Type::Union(union) => CallOutcome::union(
                 self,
@@ -565,7 +599,9 @@ impl<'db> Type<'db> {
             ),
 
             // TODO: intersection types
-            Type::Intersection(_) => CallOutcome::callable(Type::Unknown),
+            Type::Intersection(_) => {
+                CallOutcome::callable(Type::Unknown(UnknownTypeKind::RedKnotLimitation))
+            }
 
             _ => CallOutcome::not_callable(self),
         }
@@ -886,7 +922,7 @@ impl<'db> IterationOutcome<'db> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy)]
 pub enum UnknownTypeKind {
     /// Temporary variant that indicates that we *should*
     /// be able to infer a type here in due course, but currently can't
@@ -917,6 +953,19 @@ pub enum UnknownTypeKind {
     /// a "first-order" Unknown type. For example, if the type of `x` is `Unknown`,
     /// the type of `x + 1` will also be `Unknown`
     SecondOrder,
+}
+
+impl PartialEq for UnknownTypeKind {
+    /// When comparing `Type::Unknown` values, we consider them equal regardless of their kind.
+    fn eq(&self, _other: &Self) -> bool {
+        true
+    }
+}
+
+impl Eq for UnknownTypeKind {}
+
+impl std::hash::Hash for UnknownTypeKind {
+    fn hash<H: std::hash::Hasher>(&self, _state: &mut H) {}
 }
 
 impl UnknownTypeKind {
@@ -1080,7 +1129,8 @@ impl<'db> UnionType<'db> {
         elements
             .into_iter()
             .fold(UnionBuilder::new(db), |builder, element| {
-                builder.add(element.into())
+                let e = element.into();
+                builder.add(e)
             })
             .build()
     }
@@ -1131,7 +1181,9 @@ pub struct TupleType<'db> {
 
 #[cfg(test)]
 mod tests {
-    use super::{builtins_symbol_ty, BytesLiteralType, StringLiteralType, Type, UnionType};
+    use super::{
+        builtins_symbol_ty, BytesLiteralType, StringLiteralType, Type, UnionType, UnknownTypeKind,
+    };
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
@@ -1260,5 +1312,12 @@ mod tests {
         let db = setup_db();
 
         assert!(from.into_type(&db).is_equivalent_to(&db, to.into_type(&db)));
+    }
+
+    #[test]
+    fn unknown_of_different_kinds_are_equal() {
+        let ut0 = Type::Unknown(UnknownTypeKind::TypeError);
+        let ut1 = Type::Unknown(UnknownTypeKind::InvalidSyntax);
+        assert_eq!(ut0, ut1);
     }
 }

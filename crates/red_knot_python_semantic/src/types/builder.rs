@@ -53,12 +53,6 @@ impl<'db> UnionBuilder<'db> {
                 }
             }
             Type::Never => {}
-            Type::Unknown(kind) => {
-                self.unknown_elements = Some(
-                    self.unknown_elements
-                        .map_or(kind, |existing| existing.union(kind)),
-                );
-            }
             _ => {
                 let bool_pair = if let Type::BooleanLiteral(b) = ty {
                     Some(Type::BooleanLiteral(!b))
@@ -82,6 +76,16 @@ impl<'db> UnionBuilder<'db> {
                         return self;
                     } else if element.is_subtype_of(self.db, ty) {
                         to_remove.push(index);
+                    }
+                    match (element, ty) {
+                        // Aggregate unknown types together as a single unknown type. Can only
+                        // happen once because there can't be two unknown types in the same union.
+                        (Type::Unknown(kind1), Type::Unknown(kind2)) => {
+                            to_add = Type::Unknown(kind1.union(kind2));
+                            to_remove.push(index);
+                            break;
+                        }
+                        _ => {}
                     }
                 }
 
@@ -319,7 +323,7 @@ mod tests {
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
-    use crate::types::{builtins_symbol_ty, UnionBuilder};
+    use crate::types::{builtins_symbol_ty, UnionBuilder, UnknownTypeKind};
     use crate::ProgramSettings;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
@@ -410,6 +414,7 @@ mod tests {
         let db = setup_db();
         let t0 = builtins_symbol_ty(&db, "str").to_instance(&db);
         let t1 = Type::LiteralString;
+        let t2 = Type::Unknown(UnknownTypeKind::TypeError);
         let u0 = UnionType::from_elements(&db, [t0, t1]);
         let u1 = UnionType::from_elements(&db, [t1, t0]);
 
@@ -442,6 +447,54 @@ mod tests {
         assert_eq!(u0.expect_union().elements(&db), &[unknown_ty, object_ty]);
     }
 
+    #[test]
+    fn build_union_with_multiple_unknowns_keeps_order() {
+        let db = setup_db();
+
+        let kind1 = UnknownTypeKind::TypeError;
+        let kind2 = UnknownTypeKind::InvalidSyntax;
+        let kind3 = UnknownTypeKind::RedKnotLimitation;
+        let kind_aggregate = kind1.union(kind2).union(kind3);
+
+        let t0 = Type::IntLiteral(0);
+        let t1 = Type::BooleanLiteral(true);
+
+        let union = UnionType::from_elements(
+            &db,
+            [
+                t0,
+                Type::Unknown(kind1), // Unknown kinds aggregate should be here
+                t1,
+                Type::Unknown(kind2),
+                Type::Unknown(kind3),
+            ],
+        );
+
+        assert_eq!(
+            union.expect_union().elements_vec(&db),
+            &[t0, Type::Unknown(kind_aggregate), t1]
+        );
+    }
+
+    #[test]
+    fn build_union_of_multiple_unknowns_into_single_unknown() {
+        let db = setup_db();
+        let kind1 = UnknownTypeKind::TypeError;
+        let kind2 = UnknownTypeKind::InvalidSyntax;
+
+        assert_eq!(
+            UnionType::from_elements(
+                &db,
+                [
+                    Type::Unknown(kind1),
+                    Type::Unknown(kind2),
+                    Type::Unknown(kind1),
+                ],
+            ),
+            Type::Unknown(kind1.union(kind2))
+        );
+    }
+
     impl<'db> IntersectionType<'db> {
         fn pos_vec(self, db: &'db TestDb) -> Vec<Type<'db>> {
             self.positive(db).into_iter().copied().collect()
@@ -465,6 +518,26 @@ mod tests {
 
         assert_eq!(intersection.pos_vec(&db), &[ta]);
         assert_eq!(intersection.neg_vec(&db), &[t0]);
+    }
+
+    #[test]
+    fn build_intersection_with_multiple_unknowns() {
+        let db = setup_db();
+        let t0 = Type::IntLiteral(0);
+        let kind1 = UnknownTypeKind::TypeError;
+        let kind2 = UnknownTypeKind::InvalidSyntax;
+        let intersection = IntersectionBuilder::new(&db)
+            .add_positive(t0)
+            .add_negative(Type::Unknown(kind1))
+            .add_negative(Type::Unknown(kind2))
+            .build()
+            .expect_intersection();
+
+        assert_eq!(intersection.pos_vec(&db), &[t0]);
+        assert_eq!(
+            intersection.neg_vec(&db),
+            &[Type::Unknown(kind1.union(kind2))]
+        );
     }
 
     #[test]

@@ -64,6 +64,8 @@ impl Display for DisplayRepresentation<'_> {
         match self.ty {
             Type::Any => f.write_str("Any"),
             Type::Never => f.write_str("Never"),
+            // REVIEWERS: should we display 'RedKnotLimitation' differently?
+            // => intent: any test including 'red-knot-limitation' should be updated one day
             Type::Unknown(_) => f.write_str("Unknown"),
             Type::Unbound => f.write_str("Unbound"),
             Type::None => f.write_str("None"),
@@ -118,6 +120,8 @@ struct DisplayUnionType<'db> {
 impl Display for DisplayUnionType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let elements = self.ty.elements(self.db);
+
+        println!("elements: {:?}", elements);
 
         // Group literal types by kind.
         let mut grouped_literals = FxHashMap::default();
@@ -338,7 +342,7 @@ mod tests {
         let mod_file = system_path_to_file(&db, "src/main.py").expect("Expected file to exist.");
 
         let union_elements = &[
-            Type::Unknown,
+            Type::Unknown(crate::types::UnknownTypeKind::TypeError),
             Type::IntLiteral(-1),
             global_symbol_ty(&db, mod_file, "A"),
             Type::StringLiteral(StringLiteralType::new(&db, Box::from("A"))),

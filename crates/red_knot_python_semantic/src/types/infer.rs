@@ -28,6 +28,7 @@
 //! definitions once the rest of the types in the scope have been inferred.
 use std::num::NonZeroU32;
 
+use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
 use salsa;
 use salsa::plumbing::AsId;
@@ -512,7 +513,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let use_def = self.index.use_def_map(binding.file_scope(self.db));
         let declarations = use_def.declarations_at_binding(binding);
         let undeclared_ty = if declarations.may_be_undeclared() {
-            Some(Type::Unknown)
+            Some(Type::Unknown(UnknownTypeKind::TypeError))
         } else {
             None
         };
@@ -560,7 +561,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     inferred_ty.display(self.db)
                 ),
             );
-            Type::Unknown
+            Type::Unknown(UnknownTypeKind::TypeError)
         };
         self.types.declarations.insert(declaration, ty);
     }
@@ -973,7 +974,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let node_ty = except_handler_definition
             .handled_exceptions()
             .map(|ty| self.infer_expression(ty))
-            .unwrap_or(Type::Unknown);
+            .unwrap_or(Type::Unknown(UnknownTypeKind::TypeError));
 
         let symbol_ty = if except_handler_definition.is_star() {
             // TODO should be generic --Alex
@@ -986,9 +987,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             // `type[BaseException] | tuple[type[BaseException], ...]` should be valid;
             // anything else should be invalid --Alex
             match node_ty {
-                Type::Any | Type::Unknown => node_ty,
+                Type::Any | Type::Unknown(_) => node_ty,
                 Type::Class(class_ty) => Type::Instance(class_ty),
-                _ => Type::Unknown,
+                _ => Type::Unknown(UnknownTypeKind::RedKnotLimitation),
             }
         };
 
@@ -1033,7 +1034,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         // against the subject expression type (which we can query via `infer_expression_types`)
         // and extract the type at the `index` position if the pattern matches. This will be
         // similar to the logic in `self.infer_assignment_definition`.
-        self.add_binding(pattern.into(), definition, Type::Unknown);
+        self.add_binding(
+            pattern.into(),
+            definition,
+            Type::Unknown(UnknownTypeKind::RedKnotLimitation),
+        );
     }
 
     fn infer_match_pattern(&mut self, pattern: &ast::Pattern) {
@@ -1271,7 +1276,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let loop_var_value_ty = if is_async {
             // TODO(Alex): async iterables/iterators!
-            Type::Unknown
+            Type::Unknown(UnknownTypeKind::RedKnotLimitation)
         } else {
             iterable_ty
                 .iterate(self.db)
@@ -1313,23 +1318,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = alias;
 
         let module_ty = if let Some(module_name) = ModuleName::new(name) {
-            if let Some(module) = self.module_ty_from_name(module_name) {
-                module
-            } else {
-                self.unresolved_module_diagnostic(alias, 0, Some(name));
-                Type::Unknown
-            }
+            self.module_ty_from_name(module_name)
         } else {
             tracing::debug!("Failed to resolve import due to invalid syntax");
             Type::Unknown(UnknownTypeKind::InvalidSyntax)
         };
 
         if matches!(module_ty, Type::Unknown(UnknownTypeKind::UnresolvedImport)) {
-            self.add_diagnostic(
-                AnyNodeRef::Alias(alias),
-                "unresolved-import",
-                format_args!("Import '{name}' could not be resolved."),
-            );
+            self.unresolved_module_diagnostic(alias, 0, Some(name));
         }
 
         self.add_declaration_with_binding(alias.into(), definition, module_ty, module_ty);
@@ -1459,17 +1455,16 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let module_ty = match module_name {
             Ok(name) => {
-                if let Some(ty) = self.module_ty_from_name(name) {
-                    ty
-                } else {
+                let ty = self.module_ty_from_name(name);
+                if matches!(ty, Type::Unknown(UnknownTypeKind::UnresolvedImport)) {
                     self.unresolved_module_diagnostic(import_from, *level, module);
-                    Type::Unknown
                 }
+                ty
             }
             Err(ModuleNameResolutionError::InvalidSyntax) => {
                 tracing::debug!("Failed to resolve import due to invalid syntax");
                 // Invalid syntax diagnostics are emitted elsewhere.
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::InvalidSyntax)
             }
             Err(ModuleNameResolutionError::TooManyDots) => {
                 tracing::debug!(
@@ -1477,7 +1472,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     format_import_from_module(*level, module),
                 );
                 self.unresolved_module_diagnostic(import_from, *level, module);
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::UnresolvedImport)
             }
             Err(ModuleNameResolutionError::UnknownCurrentModule) => {
                 tracing::debug!(
@@ -1486,7 +1481,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     self.file.path(self.db)
                 );
                 self.unresolved_module_diagnostic(import_from, *level, module);
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::UnresolvedImport)
             }
         };
 
@@ -1536,7 +1531,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         // the runtime error will occur immediately (rather than when the symbol is *used*,
         // as would be the case for a symbol with type `Unbound`), so it's appropriate to
         // think of the type of the imported symbol as `Unknown` rather than `Unbound`
-        let ty = member_ty.replace_unbound_with(self.db, Type::Unknown);
+        let ty = member_ty.recursive_transform(self.db, |ty| {
+            if ty.is_unbound() {
+                Type::Unknown(UnknownTypeKind::UnresolvedImport)
+            } else {
+                ty
+            }
+        });
 
         self.add_declaration_with_binding(alias.into(), definition, ty, ty);
     }
@@ -1970,7 +1971,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let target_ty = if is_async {
             // TODO: async iterables/iterators! -- Alex
-            Type::Unknown
+            Type::Unknown(UnknownTypeKind::RedKnotLimitation)
         } else {
             iterable_ty
                 .iterate(self.db)
@@ -2170,7 +2171,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     );
                     builtin_ty = typing_extensions_symbol_ty(self.db, name);
                 }
-                ty.replace_unbound_with(self.db, builtin_ty)
+                ty.recursive_transform(self.db, |ty| if ty.is_unbound() { builtin_ty } else { ty })
             } else {
                 ty
             }
@@ -2492,7 +2493,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             // TODO: parse the expression and check whether it is a string annotation, since they
             // can be annotation expressions distinct from type expressions.
             // https://typing.readthedocs.io/en/latest/spec/annotations.html#string-annotations
-            ast::Expr::StringLiteral(_literal) => Type::Unknown,
+            ast::Expr::StringLiteral(_literal) => Type::Unknown(UnknownTypeKind::RedKnotLimitation),
 
             // Annotation expressions also get special handling for `*args` and `**kwargs`.
             ast::Expr::Starred(starred) => self.infer_starred_expression(starred),
@@ -2526,119 +2527,123 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             // TODO: parse the expression and check whether it is a string annotation.
             // https://typing.readthedocs.io/en/latest/spec/annotations.html#string-annotations
-            ast::Expr::StringLiteral(_literal) => Type::Unknown,
+            ast::Expr::StringLiteral(_literal) => Type::Unknown(UnknownTypeKind::RedKnotLimitation),
 
             // TODO: an Ellipsis literal *on its own* does not have any meaning in annotation
             // expressions, but is meaningful in the context of a number of special forms.
-            ast::Expr::EllipsisLiteral(_literal) => Type::Unknown,
+            ast::Expr::EllipsisLiteral(_literal) => {
+                Type::Unknown(UnknownTypeKind::RedKnotLimitation)
+            }
 
             // Other literals do not have meaningful values in the annotation expression context.
             // However, we will we want to handle these differently when working with special forms,
             // since (e.g.) `123` is not valid in an annotation expression but `Literal[123]` is.
-            ast::Expr::BytesLiteral(_literal) => Type::Unknown,
-            ast::Expr::NumberLiteral(_literal) => Type::Unknown,
-            ast::Expr::BooleanLiteral(_literal) => Type::Unknown,
+            ast::Expr::BytesLiteral(_literal) => Type::Unknown(UnknownTypeKind::RedKnotLimitation),
+            ast::Expr::NumberLiteral(_literal) => Type::Unknown(UnknownTypeKind::RedKnotLimitation),
+            ast::Expr::BooleanLiteral(_literal) => {
+                Type::Unknown(UnknownTypeKind::RedKnotLimitation)
+            }
 
             // Forms which are invalid in the context of annotation expressions: we infer their
             // nested expressions as normal expressions, but the type of the top-level expression is
             // always `Type::Unknown` in these cases.
             ast::Expr::BoolOp(bool_op) => {
                 self.infer_boolean_expression(bool_op);
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::TypeError)
             }
             ast::Expr::Named(named) => {
                 self.infer_named_expression(named);
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::TypeError)
             }
             ast::Expr::BinOp(binary) => {
                 self.infer_binary_expression(binary);
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::TypeError)
             }
             ast::Expr::UnaryOp(unary) => {
                 self.infer_unary_expression(unary);
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::TypeError)
             }
             ast::Expr::Lambda(lambda_expression) => {
                 self.infer_lambda_expression(lambda_expression);
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::TypeError)
             }
             ast::Expr::If(if_expression) => {
                 self.infer_if_expression(if_expression);
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::TypeError)
             }
             ast::Expr::Dict(dict) => {
                 self.infer_dict_expression(dict);
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::TypeError)
             }
             ast::Expr::Set(set) => {
                 self.infer_set_expression(set);
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::TypeError)
             }
             ast::Expr::ListComp(listcomp) => {
                 self.infer_list_comprehension_expression(listcomp);
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::TypeError)
             }
             ast::Expr::SetComp(setcomp) => {
                 self.infer_set_comprehension_expression(setcomp);
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::TypeError)
             }
             ast::Expr::DictComp(dictcomp) => {
                 self.infer_dict_comprehension_expression(dictcomp);
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::TypeError)
             }
             ast::Expr::Generator(generator) => {
                 self.infer_generator_expression(generator);
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::TypeError)
             }
             ast::Expr::Await(await_expression) => {
                 self.infer_await_expression(await_expression);
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::TypeError)
             }
             ast::Expr::Yield(yield_expression) => {
                 self.infer_yield_expression(yield_expression);
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::TypeError)
             }
             ast::Expr::YieldFrom(yield_from) => {
                 self.infer_yield_from_expression(yield_from);
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::TypeError)
             }
             ast::Expr::Compare(compare) => {
                 self.infer_compare_expression(compare);
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::TypeError)
             }
             ast::Expr::Call(call_expr) => {
                 self.infer_call_expression(call_expr);
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::TypeError)
             }
             ast::Expr::FString(fstring) => {
                 self.infer_fstring_expression(fstring);
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::TypeError)
             }
             //
             ast::Expr::Attribute(attribute) => {
                 self.infer_attribute_expression(attribute);
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::TypeError)
             }
             // TODO: this may be a place we need to revisit with special forms.
             ast::Expr::Subscript(subscript) => {
                 self.infer_subscript_expression(subscript);
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::RedKnotLimitation)
             }
             ast::Expr::Starred(starred) => {
                 self.infer_starred_expression(starred);
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::TypeError)
             }
             ast::Expr::List(list) => {
                 self.infer_list_expression(list);
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::TypeError)
             }
             ast::Expr::Tuple(tuple) => {
                 self.infer_tuple_expression(tuple);
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::TypeError)
             }
             ast::Expr::Slice(slice) => {
                 self.infer_slice_expression(slice);
-                Type::Unknown
+                Type::Unknown(UnknownTypeKind::TypeError)
             }
 
             ast::Expr::IpyEscapeCommand(_) => todo!("Implement Ipy escape command support"),
