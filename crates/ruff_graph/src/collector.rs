@@ -1,6 +1,8 @@
 use red_knot_python_semantic::ModuleName;
-use ruff_python_ast::visitor::source_order::{walk_body, walk_expr, walk_stmt, SourceOrderVisitor};
-use ruff_python_ast::{self as ast, Expr, ModModule, Stmt};
+use ruff_python_ast::visitor::source_order::{
+    walk_expr, walk_module, walk_stmt, SourceOrderVisitor,
+};
+use ruff_python_ast::{self as ast, Expr, Mod, Stmt};
 
 /// Collect all imports for a given Python file.
 #[derive(Default, Debug)]
@@ -23,8 +25,8 @@ impl<'a> Collector<'a> {
     }
 
     #[must_use]
-    pub(crate) fn collect(mut self, module: &ModModule) -> Vec<CollectedImport> {
-        walk_body(&mut self, &module.body);
+    pub(crate) fn collect(mut self, module: &Mod) -> Vec<CollectedImport> {
+        walk_module(&mut self, module);
         self.imports
     }
 }

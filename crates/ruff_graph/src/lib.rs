@@ -3,11 +3,9 @@ pub use crate::db::ModuleDb;
 use crate::resolver::Resolver;
 pub use crate::settings::{AnalyzeSettings, Direction};
 use anyhow::Result;
-use red_knot_python_semantic::SemanticModel;
-use ruff_db::files::system_path_to_file;
-use ruff_db::parsed::parsed_module;
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_python_ast::helpers::to_module_path;
+use ruff_python_parser::{parse, Mode};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -29,11 +27,11 @@ impl ModuleImports {
         string_imports: bool,
     ) -> Result<Self> {
         // Read and parse the source code.
-        let file = system_path_to_file(db, path)?;
-        let parsed = parsed_module(db, file);
+        let source = std::fs::read_to_string(path)?;
+        let parsed = parse(&source, Mode::Module)?;
+
         let module_path =
             package.and_then(|package| to_module_path(package.as_std_path(), path.as_std_path()));
-        let model = SemanticModel::new(db, file);
 
         // Collect the imports.
         let imports =
@@ -42,7 +40,7 @@ impl ModuleImports {
         // Resolve the imports.
         let mut resolved_imports = ModuleImports::default();
         for import in imports {
-            let Some(resolved) = Resolver::new(&model).resolve(import) else {
+            let Some(resolved) = Resolver::new(db).resolve(import) else {
                 continue;
             };
             let Some(path) = resolved.as_system_path() else {

@@ -2456,6 +2456,7 @@ dependencies = [
  "ruff_linter",
  "ruff_macros",
  "ruff_python_ast",
+ "ruff_python_parser",
  "salsa",
  "schemars",
  "serde",
