@@ -936,7 +936,6 @@ impl Truthiness {
         matches!(self, Truthiness::Ambiguous)
     }
 
-    #[allow(unused)]
     const fn negate(self) -> Self {
         match self {
             Self::AlwaysTrue => Self::AlwaysFalse,
@@ -945,7 +944,6 @@ impl Truthiness {
         }
     }
 
-    #[allow(unused)]
     fn into_type(self, db: &dyn Db) -> Type {
         match self {
             Self::AlwaysTrue => Type::BooleanLiteral(true),
