@@ -94,14 +94,21 @@ impl ModuleImports {
 pub struct ImportMap(BTreeMap<SystemPathBuf, ModuleImports>);
 
 impl ImportMap {
-    /// Insert a module's imports into the map.
-    pub fn insert(&mut self, path: SystemPathBuf, imports: ModuleImports) {
-        self.0.insert(path, imports);
+    /// Create an [`ImportMap`] of file to its dependencies.
+    ///
+    /// Assumes that the input is a collection of unique file paths and their imports.
+    pub fn dependencies(imports: impl IntoIterator<Item = (SystemPathBuf, ModuleImports)>) -> Self {
+        let mut map = ImportMap::default();
+        for (path, imports) in imports {
+            map.0.insert(path, imports);
+        }
+        map
     }
 
-    /// Reverse the [`ImportMap`], e.g., to convert from dependencies to dependents.
-    #[must_use]
-    pub fn reverse(imports: impl IntoIterator<Item = (SystemPathBuf, ModuleImports)>) -> Self {
+    /// Create an [`ImportMap`] of file to its dependents.
+    ///
+    /// Assumes that the input is a collection of unique file paths and their imports.
+    pub fn dependents(imports: impl IntoIterator<Item = (SystemPathBuf, ModuleImports)>) -> Self {
         let mut reverse = ImportMap::default();
         for (path, imports) in imports {
             for import in imports.0 {
@@ -110,15 +117,5 @@ impl ImportMap {
             reverse.0.entry(path).or_default();
         }
         reverse
-    }
-}
-
-impl FromIterator<(SystemPathBuf, ModuleImports)> for ImportMap {
-    fn from_iter<I: IntoIterator<Item = (SystemPathBuf, ModuleImports)>>(iter: I) -> Self {
-        let mut map = ImportMap::default();
-        for (path, imports) in iter {
-            map.0.entry(path).or_default().0.extend(imports.0);
-        }
-        map
     }
 }
