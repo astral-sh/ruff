@@ -503,7 +503,8 @@ mod tests {
     use crate::files::{system_path_to_file, vendored_path_to_file, FileError};
     use crate::system::DbWithTestSystem;
     use crate::tests::TestDb;
-    use crate::vendored::tests::VendoredFileSystemBuilder;
+    use crate::vendored::VendoredFileSystemBuilder;
+    use zip::CompressionMethod;
 
     #[test]
     fn system_existing_file() -> crate::system::Result<()> {
@@ -548,7 +549,7 @@ mod tests {
     fn stubbed_vendored_file() -> crate::system::Result<()> {
         let mut db = TestDb::new();
 
-        let mut vendored_builder = VendoredFileSystemBuilder::new();
+        let mut vendored_builder = VendoredFileSystemBuilder::new(CompressionMethod::Stored);
         vendored_builder
             .add_file("test.pyi", "def foo() -> str")
             .unwrap();

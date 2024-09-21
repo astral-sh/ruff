@@ -1,11 +1,18 @@
 use anyhow::Result;
-use red_knot_python_semantic::{
-    vendored_typeshed_stubs, Db, Program, ProgramSettings, PythonVersion, SearchPathSettings,
-};
+use zip::CompressionMethod;
+
+use red_knot_python_semantic::{Db, Program, ProgramSettings, PythonVersion, SearchPathSettings};
 use ruff_db::files::{File, Files};
 use ruff_db::system::{OsSystem, System, SystemPathBuf};
-use ruff_db::vendored::VendoredFileSystem;
+use ruff_db::vendored::{VendoredFileSystem, VendoredFileSystemBuilder};
 use ruff_db::{Db as SourceDb, Upcast};
+
+static EMPTY_VENDORED: once_cell::sync::Lazy<VendoredFileSystem> =
+    once_cell::sync::Lazy::new(|| {
+        let mut builder = VendoredFileSystemBuilder::new(CompressionMethod::Stored);
+        builder.add_file("stdlib/VERSIONS", "\n").unwrap();
+        builder.finish().unwrap()
+    });
 
 #[salsa::db]
 #[derive(Default)]
@@ -70,7 +77,7 @@ impl Upcast<dyn SourceDb> for ModuleDb {
 #[salsa::db]
 impl SourceDb for ModuleDb {
     fn vendored(&self) -> &VendoredFileSystem {
-        vendored_typeshed_stubs()
+        &EMPTY_VENDORED
     }
 
     fn system(&self) -> &dyn System {

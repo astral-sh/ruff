@@ -701,12 +701,12 @@ enum CallOutcome<'db> {
 
 impl<'db> CallOutcome<'db> {
     /// Create a new `CallOutcome::Callable` with given return type.
-    fn callable(return_ty: Type<'db>) -> CallOutcome {
+    fn callable(return_ty: Type<'db>) -> CallOutcome<'db> {
         CallOutcome::Callable { return_ty }
     }
 
     /// Create a new `CallOutcome::NotCallable` with given not-callable type.
-    fn not_callable(not_callable_ty: Type<'db>) -> CallOutcome {
+    fn not_callable(not_callable_ty: Type<'db>) -> CallOutcome<'db> {
         CallOutcome::NotCallable { not_callable_ty }
     }
 
@@ -719,7 +719,10 @@ impl<'db> CallOutcome<'db> {
     }
 
     /// Create a new `CallOutcome::Union` with given wrapped outcomes.
-    fn union(called_ty: Type<'db>, outcomes: impl Into<Box<[CallOutcome<'db>]>>) -> CallOutcome {
+    fn union(
+        called_ty: Type<'db>,
+        outcomes: impl Into<Box<[CallOutcome<'db>]>>,
+    ) -> CallOutcome<'db> {
         CallOutcome::Union {
             called_ty,
             outcomes: outcomes.into(),

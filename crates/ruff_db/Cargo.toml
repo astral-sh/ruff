@@ -33,19 +33,17 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true, optional = true }
 tracing-tree = { workspace = true, optional = true }
 rustc-hash = { workspace = true }
-
-[target.'cfg(not(target_arch="wasm32"))'.dependencies]
-zip = { workspace = true, features = ["zstd"] }
+zip = { workspace = true }
 
 [target.'cfg(target_arch="wasm32")'.dependencies]
 web-time = { version = "1.1.0" }
-zip = { workspace = true, features = ["deflate"] }
 
 [dev-dependencies]
 insta = { workspace = true }
 tempfile = { workspace = true }
 
 [features]
+default = ["os"]
 cache = ["ruff_cache"]
 os = ["ignore"]
 serde = ["dep:serde", "camino/serde1"]

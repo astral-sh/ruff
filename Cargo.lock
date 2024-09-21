@@ -2083,9 +2083,7 @@ dependencies = [
  "countme",
  "hashbrown",
  "insta",
- "once_cell",
  "ordermap",
- "path-slash",
  "ruff_db",
  "ruff_index",
  "ruff_python_ast",
@@ -2094,6 +2092,7 @@ dependencies = [
  "ruff_python_stdlib",
  "ruff_source_file",
  "ruff_text_size",
+ "ruff_vendored",
  "rustc-hash 2.0.0",
  "salsa",
  "smallvec",
@@ -2102,8 +2101,6 @@ dependencies = [
  "test-case",
  "thiserror",
  "tracing",
- "walkdir",
- "zip",
 ]
 
 [[package]]
@@ -2159,6 +2156,7 @@ dependencies = [
  "ruff_db",
  "ruff_python_ast",
  "ruff_text_size",
+ "ruff_vendored",
  "rustc-hash 2.0.0",
  "salsa",
  "tempfile",
@@ -2450,6 +2448,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "once_cell",
  "red_knot_python_semantic",
  "ruff_cache",
  "ruff_db",
@@ -2460,6 +2459,7 @@ dependencies = [
  "salsa",
  "schemars",
  "serde",
+ "zip",
 ]
 
 [[package]]
@@ -2788,6 +2788,17 @@ dependencies = [
  "serde",
  "serde_test",
  "static_assertions",
+]
+
+[[package]]
+name = "ruff_vendored"
+version = "0.0.0"
+dependencies = [
+ "once_cell",
+ "path-slash",
+ "ruff_db",
+ "walkdir",
+ "zip",
 ]
 
 [[package]]
