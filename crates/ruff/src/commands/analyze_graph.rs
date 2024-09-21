@@ -67,102 +67,105 @@ pub(crate) fn analyze_graph(
             .into(),
     )?;
 
-    // Create a cache for resolved globs.
-    let glob_resolver = Arc::new(Mutex::new(GlobResolver::default()));
+    let imports = {
+        // Create a cache for resolved globs.
+        let glob_resolver = Arc::new(Mutex::new(GlobResolver::default()));
 
-    // Collect and resolve the imports for each file.
-    let result = Arc::new(Mutex::new(Vec::new()));
-    let inner_result = Arc::clone(&result);
+        // Collect and resolve the imports for each file.
+        let result = Arc::new(Mutex::new(Vec::new()));
+        let inner_result = Arc::clone(&result);
+        let db = db.snapshot();
 
-    rayon::scope(move |scope| {
-        for resolved_file in paths {
-            let Ok(resolved_file) = resolved_file else {
-                continue;
-            };
+        rayon::scope(move |scope| {
+            for resolved_file in paths {
+                let Ok(resolved_file) = resolved_file else {
+                    continue;
+                };
 
-            let path = resolved_file.path();
-            let package = path
-                .parent()
-                .and_then(|parent| package_roots.get(parent))
-                .and_then(Clone::clone);
+                let path = resolved_file.path();
+                let package = path
+                    .parent()
+                    .and_then(|parent| package_roots.get(parent))
+                    .and_then(Clone::clone);
 
-            // Resolve the per-file settings.
-            let settings = resolver.resolve(path);
-            let string_imports = settings.analyze.detect_string_imports;
-            let include_dependencies = settings.analyze.include_dependencies.get(path).cloned();
+                // Resolve the per-file settings.
+                let settings = resolver.resolve(path);
+                let string_imports = settings.analyze.detect_string_imports;
+                let include_dependencies = settings.analyze.include_dependencies.get(path).cloned();
 
-            // Skip excluded files.
-            if (settings.file_resolver.force_exclude || !resolved_file.is_root())
-                && match_exclusion(
-                    resolved_file.path(),
-                    resolved_file.file_name(),
-                    &settings.analyze.exclude,
-                )
-            {
-                continue;
-            }
-
-            // Ignore non-Python files.
-            let source_type = match settings.analyze.extension.get(path) {
-                None => match SourceType::from(&path) {
-                    SourceType::Python(source_type) => source_type,
-                    SourceType::Toml(_) => {
-                        debug!("Ignoring TOML file: {}", path.display());
-                        continue;
-                    }
-                },
-                Some(language) => PySourceType::from(language),
-            };
-            if matches!(source_type, PySourceType::Ipynb) {
-                debug!("Ignoring Jupyter notebook: {}", path.display());
-                continue;
-            }
-
-            // Convert to system paths.
-            let Ok(package) = package.map(SystemPathBuf::from_path_buf).transpose() else {
-                warn!("Failed to convert package to system path");
-                continue;
-            };
-            let Ok(path) = SystemPathBuf::from_path_buf(resolved_file.into_path()) else {
-                warn!("Failed to convert path to system path");
-                continue;
-            };
-
-            let db = db.snapshot();
-            let glob_resolver = glob_resolver.clone();
-            let root = root.clone();
-            let result = inner_result.clone();
-            scope.spawn(move |_| {
-                // Identify any imports via static analysis.
-                let mut imports =
-                    ModuleImports::detect(&db, &path, package.as_deref(), string_imports)
-                        .unwrap_or_else(|err| {
-                            warn!("Failed to generate import map for {path}: {err}");
-                            ModuleImports::default()
-                        });
-
-                debug!("Discovered {} imports for {}", imports.len(), path);
-
-                // Append any imports that were statically defined in the configuration.
-                if let Some((root, globs)) = include_dependencies {
-                    let mut glob_resolver = glob_resolver.lock().unwrap();
-                    imports.extend(glob_resolver.resolve(root, globs));
+                // Skip excluded files.
+                if (settings.file_resolver.force_exclude || !resolved_file.is_root())
+                    && match_exclusion(
+                        resolved_file.path(),
+                        resolved_file.file_name(),
+                        &settings.analyze.exclude,
+                    )
+                {
+                    continue;
                 }
 
-                // Convert the path (and imports) to be relative to the working directory.
-                let path = path
-                    .strip_prefix(&root)
-                    .map(SystemPath::to_path_buf)
-                    .unwrap_or(path);
-                let imports = imports.relative_to(&root);
+                // Ignore non-Python files.
+                let source_type = match settings.analyze.extension.get(path) {
+                    None => match SourceType::from(&path) {
+                        SourceType::Python(source_type) => source_type,
+                        SourceType::Toml(_) => {
+                            debug!("Ignoring TOML file: {}", path.display());
+                            continue;
+                        }
+                    },
+                    Some(language) => PySourceType::from(language),
+                };
+                if matches!(source_type, PySourceType::Ipynb) {
+                    debug!("Ignoring Jupyter notebook: {}", path.display());
+                    continue;
+                }
 
-                result.lock().unwrap().push((path, imports));
-            });
-        }
-    });
+                // Convert to system paths.
+                let Ok(package) = package.map(SystemPathBuf::from_path_buf).transpose() else {
+                    warn!("Failed to convert package to system path");
+                    continue;
+                };
+                let Ok(path) = SystemPathBuf::from_path_buf(resolved_file.into_path()) else {
+                    warn!("Failed to convert path to system path");
+                    continue;
+                };
 
-    // Collect the results.
-    let imports = Arc::into_inner(result).unwrap().into_inner()?;
+                let db = db.snapshot();
+                let glob_resolver = glob_resolver.clone();
+                let root = root.clone();
+                let result = inner_result.clone();
+                scope.spawn(move |_| {
+                    // Identify any imports via static analysis.
+                    let mut imports =
+                        ModuleImports::detect(&db, &path, package.as_deref(), string_imports)
+                            .unwrap_or_else(|err| {
+                                warn!("Failed to generate import map for {path}: {err}");
+                                ModuleImports::default()
+                            });
+
+                    debug!("Discovered {} imports for {}", imports.len(), path);
+
+                    // Append any imports that were statically defined in the configuration.
+                    if let Some((root, globs)) = include_dependencies {
+                        let mut glob_resolver = glob_resolver.lock().unwrap();
+                        imports.extend(glob_resolver.resolve(root, globs));
+                    }
+
+                    // Convert the path (and imports) to be relative to the working directory.
+                    let path = path
+                        .strip_prefix(&root)
+                        .map(SystemPath::to_path_buf)
+                        .unwrap_or(path);
+                    let imports = imports.relative_to(&root);
+
+                    result.lock().unwrap().push((path, imports));
+                });
+            }
+        });
+
+        // Collect the results.
+        Arc::into_inner(result).unwrap().into_inner()?
+    };
 
     // Generate the import map.
     let import_map = match args.direction {
@@ -172,6 +175,8 @@ pub(crate) fn analyze_graph(
 
     // Print to JSON.
     println!("{}", serde_json::to_string_pretty(&import_map)?);
+
+    std::mem::forget(db);
 
     Ok(ExitStatus::Success)
 }
