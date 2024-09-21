@@ -1500,21 +1500,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             .member(self.db, &Name::new(&name.id))
             .recursive_transform(self.db, |ty| match ty {
                 Type::Unbound => Type::Unknown(UnknownTypeKind::UnresolvedImport),
-                Type::Unknown(_) => Type::Unknown(UnknownTypeKind::SecondOrder),
+                // If the symbol was already `Unknown`, we enrich that `UnknownKind` with
+                // the `UnresolvedImport` variant
+                Type::Unknown(kind) => Type::Unknown(kind.union(UnknownTypeKind::UnresolvedImport)),
                 ty => ty,
             });
 
-        if matches!(module_ty, Type::Unknown(UnknownTypeKind::UnresolvedImport)) {
-            self.add_diagnostic(
-                AnyNodeRef::StmtImportFrom(import_from),
-                "unresolved-import",
-                format_args!(
-                    "Import '{}{}' could not be resolved.",
-                    ".".repeat(*level as usize),
-                    module.unwrap_or_default()
-                ),
-            );
-        } else if matches!(member_ty, Type::Unknown(UnknownTypeKind::UnresolvedImport)) {
+        if matches!(member_ty, Type::Unknown(UnknownTypeKind::UnresolvedImport)) {
             self.add_diagnostic(
                 AnyNodeRef::Alias(alias),
                 "unresolved-import",
@@ -2264,9 +2256,8 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         match (left_ty, right_ty, op) {
             (Type::Any, _, _) | (_, Type::Any, _) => Type::Any,
-            (Type::Unknown(_), _, _) | (_, Type::Unknown(_), _) => {
-                Type::Unknown(UnknownTypeKind::SecondOrder)
-            }
+            (Type::Unknown(kind1), Type::Unknown(kind2), _) => Type::Unknown(kind1.union(kind2)),
+            (Type::Unknown(kind), _, _) | (_, Type::Unknown(kind), _) => Type::Unknown(kind),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Add) => n
                 .checked_add(m)

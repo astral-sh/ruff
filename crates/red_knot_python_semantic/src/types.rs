@@ -922,6 +922,9 @@ impl<'db> IterationOutcome<'db> {
     }
 }
 
+// When it really matters to distinguish between different kinds of `Unknown` types
+// (see `PartialEq` implementation), we use the representation as `u8`
+#[repr(u8)]
 #[derive(Debug, Clone, Copy)]
 pub enum UnknownTypeKind {
     /// Temporary variant that indicates that we *should*
@@ -970,7 +973,7 @@ impl std::hash::Hash for UnknownTypeKind {
 
 impl UnknownTypeKind {
     pub(crate) fn union(self, other: Self) -> Self {
-        if self == other {
+        if (self as u8) == (other as u8) {
             self
         } else {
             UnknownTypeKind::SecondOrder
@@ -1319,5 +1322,14 @@ mod tests {
         let ut0 = Type::Unknown(UnknownTypeKind::TypeError);
         let ut1 = Type::Unknown(UnknownTypeKind::InvalidSyntax);
         assert_eq!(ut0, ut1);
+    }
+
+    #[test]
+    fn unknown_union_does_not_change_same_kinds() {
+        let uk0 = UnknownTypeKind::TypeError;
+        let uk1 = UnknownTypeKind::InvalidSyntax;
+        assert!(uk0 as u8 != uk1 as u8);
+        assert!(uk0.union(uk0) as u8 == uk0 as u8);
+        // We don't really need to test the outcome of union of different kinds (yet)
     }
 }

@@ -534,10 +534,7 @@ mod tests {
             .expect_intersection();
 
         assert_eq!(intersection.pos_vec(&db), &[t0]);
-        assert_eq!(
-            intersection.neg_vec(&db),
-            &[Type::Unknown(kind1.union(kind2))]
-        );
+        assert_eq!(intersection.neg_vec(&db), &[Type::Unknown(kind1)]);
     }
 
     #[test]
