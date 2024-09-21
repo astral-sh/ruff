@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.6.7
+
+### Preview features
+
+- Add Python version support to ruff analyze CLI ([#13426](https://github.com/astral-sh/ruff/pull/13426))
+- Add `exclude` support to `ruff analyze` ([#13425](https://github.com/astral-sh/ruff/pull/13425))
+- Fix parentheses around return type annotations ([#13381](https://github.com/astral-sh/ruff/pull/13381))
+
+### Rule changes
+
+- \[`pycodestyle`\] Fix: Don't autofix if the first line ends in a question mark? (D400) ([#13399](https://github.com/astral-sh/ruff/pull/13399))
+
+### Bug fixes
+
+- Respect `lint.exclude` in ruff check `--add-noqa` ([#13427](https://github.com/astral-sh/ruff/pull/13427))
+
+### Performance
+
+- Avoid tracking module resolver files in Salsa ([#13437](https://github.com/astral-sh/ruff/pull/13437))
+- Use `forget` for module resolver database ([#13438](https://github.com/astral-sh/ruff/pull/13438))
+
 ## 0.6.6
 
 ### Preview features
