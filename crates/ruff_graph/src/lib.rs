@@ -3,8 +3,6 @@ pub use crate::db::ModuleDb;
 use crate::resolver::Resolver;
 pub use crate::settings::{AnalyzeSettings, Direction};
 use anyhow::Result;
-use red_knot_python_semantic::SemanticModel;
-use ruff_db::files::system_path_to_file;
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_python_ast::helpers::to_module_path;
 use ruff_python_parser::{parse, Mode};
@@ -28,10 +26,6 @@ impl ModuleImports {
         package: Option<&SystemPath>,
         string_imports: bool,
     ) -> Result<Self> {
-        // Initialize the semantic model.
-        let file = system_path_to_file(db, path)?;
-        let semantic = SemanticModel::new(db, file);
-
         // Read and parse the source code.
         let source = std::fs::read_to_string(path)?;
         let parsed = parse(&source, Mode::Module)?;
@@ -46,7 +40,7 @@ impl ModuleImports {
         // Resolve the imports.
         let mut resolved_imports = ModuleImports::default();
         for import in imports {
-            let Some(resolved) = Resolver::new(&semantic).resolve(import) else {
+            let Some(resolved) = Resolver::new(db).resolve(import) else {
                 continue;
             };
             let Some(path) = resolved.as_system_path() else {
