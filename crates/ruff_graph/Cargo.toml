@@ -16,6 +16,7 @@ ruff_db = { workspace = true, features = ["os", "serde"] }
 ruff_linter = { workspace = true }
 ruff_macros = { workspace = true }
 ruff_python_ast = { workspace = true }
+ruff_python_parser = { workspace = true }
 
 anyhow = { workspace = true }
 clap = { workspace = true, optional = true }
