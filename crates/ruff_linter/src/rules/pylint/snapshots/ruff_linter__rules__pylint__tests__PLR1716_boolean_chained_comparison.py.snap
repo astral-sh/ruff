@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-boolean_chained_comparison.py:8:4: PLR1716 [*] TODO
+boolean_chained_comparison.py:8:4: PLR1716 [*] Contains chained boolean comparison that can be simplified
   |
 6 | b = int(input())
 7 | c = int(input())
@@ -9,7 +9,7 @@ boolean_chained_comparison.py:8:4: PLR1716 [*] TODO
   |    ^^^^^^^^^^^^^^^ PLR1716
 9 |     pass
   |
-  = help: TODO
+  = help: Simplify chained boolean comparisons
 
 ℹ Safe fix
 5 5 | a = int(input())
@@ -21,7 +21,7 @@ boolean_chained_comparison.py:8:4: PLR1716 [*] TODO
 10 10 | 
 11 11 | a = int(input())
 
-boolean_chained_comparison.py:14:4: PLR1716 [*] TODO
+boolean_chained_comparison.py:14:4: PLR1716 [*] Contains chained boolean comparison that can be simplified
    |
 12 | b = int(input())
 13 | c = int(input())
@@ -29,7 +29,7 @@ boolean_chained_comparison.py:14:4: PLR1716 [*] TODO
    |    ^^^^^^^^^^^^^^^^ PLR1716
 15 |     pass
    |
-   = help: TODO
+   = help: Simplify chained boolean comparisons
 
 ℹ Safe fix
 11 11 | a = int(input())
@@ -41,7 +41,7 @@ boolean_chained_comparison.py:14:4: PLR1716 [*] TODO
 16 16 | 
 17 17 | a = int(input())
 
-boolean_chained_comparison.py:20:4: PLR1716 [*] TODO
+boolean_chained_comparison.py:20:4: PLR1716 [*] Contains chained boolean comparison that can be simplified
    |
 18 | b = int(input())
 19 | c = int(input())
@@ -49,7 +49,7 @@ boolean_chained_comparison.py:20:4: PLR1716 [*] TODO
    |    ^^^^^^^^^^^^^^^^ PLR1716
 21 |     pass
    |
-   = help: TODO
+   = help: Simplify chained boolean comparisons
 
 ℹ Safe fix
 17 17 | a = int(input())
@@ -61,7 +61,7 @@ boolean_chained_comparison.py:20:4: PLR1716 [*] TODO
 22 22 | 
 23 23 | a = int(input())
 
-boolean_chained_comparison.py:26:4: PLR1716 [*] TODO
+boolean_chained_comparison.py:26:4: PLR1716 [*] Contains chained boolean comparison that can be simplified
    |
 24 | b = int(input())
 25 | c = int(input())
@@ -69,7 +69,7 @@ boolean_chained_comparison.py:26:4: PLR1716 [*] TODO
    |    ^^^^^^^^^^^^^^^^^ PLR1716
 27 |     pass
    |
-   = help: TODO
+   = help: Simplify chained boolean comparisons
 
 ℹ Safe fix
 23 23 | a = int(input())
@@ -81,7 +81,7 @@ boolean_chained_comparison.py:26:4: PLR1716 [*] TODO
 28 28 | 
 29 29 | # ---------------------
 
-boolean_chained_comparison.py:36:4: PLR1716 [*] TODO
+boolean_chained_comparison.py:36:4: PLR1716 [*] Contains chained boolean comparison that can be simplified
    |
 34 | b = int(input())
 35 | c = int(input())
@@ -89,7 +89,7 @@ boolean_chained_comparison.py:36:4: PLR1716 [*] TODO
    |    ^^^^^^^^^^^^^^^ PLR1716
 37 |     pass
    |
-   = help: TODO
+   = help: Simplify chained boolean comparisons
 
 ℹ Safe fix
 33 33 | a = int(input())
@@ -101,7 +101,7 @@ boolean_chained_comparison.py:36:4: PLR1716 [*] TODO
 38 38 | 
 39 39 | a = int(input())
 
-boolean_chained_comparison.py:42:4: PLR1716 [*] TODO
+boolean_chained_comparison.py:42:4: PLR1716 [*] Contains chained boolean comparison that can be simplified
    |
 40 | b = int(input())
 41 | c = int(input())
@@ -109,7 +109,7 @@ boolean_chained_comparison.py:42:4: PLR1716 [*] TODO
    |    ^^^^^^^^^^^^^^^^ PLR1716
 43 |     pass
    |
-   = help: TODO
+   = help: Simplify chained boolean comparisons
 
 ℹ Safe fix
 39 39 | a = int(input())
@@ -121,7 +121,7 @@ boolean_chained_comparison.py:42:4: PLR1716 [*] TODO
 44 44 | 
 45 45 | a = int(input())
 
-boolean_chained_comparison.py:48:4: PLR1716 [*] TODO
+boolean_chained_comparison.py:48:4: PLR1716 [*] Contains chained boolean comparison that can be simplified
    |
 46 | b = int(input())
 47 | c = int(input())
@@ -129,7 +129,7 @@ boolean_chained_comparison.py:48:4: PLR1716 [*] TODO
    |    ^^^^^^^^^^^^^^^^ PLR1716
 49 |     pass
    |
-   = help: TODO
+   = help: Simplify chained boolean comparisons
 
 ℹ Safe fix
 45 45 | a = int(input())
@@ -141,7 +141,7 @@ boolean_chained_comparison.py:48:4: PLR1716 [*] TODO
 50 50 | 
 51 51 | a = int(input())
 
-boolean_chained_comparison.py:54:4: PLR1716 [*] TODO
+boolean_chained_comparison.py:54:4: PLR1716 [*] Contains chained boolean comparison that can be simplified
    |
 52 | b = int(input())
 53 | c = int(input())
@@ -149,7 +149,7 @@ boolean_chained_comparison.py:54:4: PLR1716 [*] TODO
    |    ^^^^^^^^^^^^^^^^^ PLR1716
 55 |     pass
    |
-   = help: TODO
+   = help: Simplify chained boolean comparisons
 
 ℹ Safe fix
 51 51 | a = int(input())
@@ -161,7 +161,7 @@ boolean_chained_comparison.py:54:4: PLR1716 [*] TODO
 56 56 | 
 57 57 | # -----------------------
 
-boolean_chained_comparison.py:65:4: PLR1716 [*] TODO
+boolean_chained_comparison.py:65:4: PLR1716 [*] Contains chained boolean comparison that can be simplified
    |
 63 | c = int(input())
 64 | d = int(input())
@@ -169,7 +169,7 @@ boolean_chained_comparison.py:65:4: PLR1716 [*] TODO
    |    ^^^^^^^^^^^^^^^ PLR1716
 66 |     pass
    |
-   = help: TODO
+   = help: Simplify chained boolean comparisons
 
 ℹ Safe fix
 62 62 | b = int(input())
@@ -181,7 +181,7 @@ boolean_chained_comparison.py:65:4: PLR1716 [*] TODO
 67 67 | 
 68 68 | a = int(input())
 
-boolean_chained_comparison.py:65:14: PLR1716 [*] TODO
+boolean_chained_comparison.py:65:14: PLR1716 [*] Contains chained boolean comparison that can be simplified
    |
 63 | c = int(input())
 64 | d = int(input())
@@ -189,7 +189,7 @@ boolean_chained_comparison.py:65:14: PLR1716 [*] TODO
    |              ^^^^^^^^^^^^^^^ PLR1716
 66 |     pass
    |
-   = help: TODO
+   = help: Simplify chained boolean comparisons
 
 ℹ Safe fix
 62 62 | b = int(input())
@@ -201,7 +201,7 @@ boolean_chained_comparison.py:65:14: PLR1716 [*] TODO
 67 67 | 
 68 68 | a = int(input())
 
-boolean_chained_comparison.py:73:4: PLR1716 [*] TODO
+boolean_chained_comparison.py:73:4: PLR1716 [*] Contains chained boolean comparison that can be simplified
    |
 71 | d = int(input())
 72 | e = int(input())
@@ -209,7 +209,7 @@ boolean_chained_comparison.py:73:4: PLR1716 [*] TODO
    |    ^^^^^^^^^^^^^^^ PLR1716
 74 |     pass
    |
-   = help: TODO
+   = help: Simplify chained boolean comparisons
 
 ℹ Safe fix
 70 70 | c = int(input())
@@ -221,7 +221,7 @@ boolean_chained_comparison.py:73:4: PLR1716 [*] TODO
 75 75 | 
 76 76 | # ------------
 
-boolean_chained_comparison.py:73:14: PLR1716 [*] TODO
+boolean_chained_comparison.py:73:14: PLR1716 [*] Contains chained boolean comparison that can be simplified
    |
 71 | d = int(input())
 72 | e = int(input())
@@ -229,7 +229,7 @@ boolean_chained_comparison.py:73:14: PLR1716 [*] TODO
    |              ^^^^^^^^^^^^^^^ PLR1716
 74 |     pass
    |
-   = help: TODO
+   = help: Simplify chained boolean comparisons
 
 ℹ Safe fix
 70 70 | c = int(input())
@@ -241,7 +241,7 @@ boolean_chained_comparison.py:73:14: PLR1716 [*] TODO
 75 75 | 
 76 76 | # ------------
 
-boolean_chained_comparison.py:73:24: PLR1716 [*] TODO
+boolean_chained_comparison.py:73:24: PLR1716 [*] Contains chained boolean comparison that can be simplified
    |
 71 | d = int(input())
 72 | e = int(input())
@@ -249,7 +249,7 @@ boolean_chained_comparison.py:73:24: PLR1716 [*] TODO
    |                        ^^^^^^^^^^^^^^^^ PLR1716
 74 |     pass
    |
-   = help: TODO
+   = help: Simplify chained boolean comparisons
 
 ℹ Safe fix
 70 70 | c = int(input())

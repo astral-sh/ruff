@@ -39,15 +39,15 @@ pub struct BooleanChainedComparison {
 }
 
 impl Violation for BooleanChainedComparison {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("TODO")
+        format!("Contains chained boolean comparison that can be simplified")
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("TODO"))
+        Some("Simplify chained boolean comparisons".to_string())
     }
 }
 
