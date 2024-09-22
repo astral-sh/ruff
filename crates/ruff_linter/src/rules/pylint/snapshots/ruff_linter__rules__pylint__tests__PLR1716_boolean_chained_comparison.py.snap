@@ -11,7 +11,7 @@ boolean_chained_comparison.py:8:4: PLR1716 [*] TODO
   |
   = help: TODO
 
-ℹ Unsafe fix
+ℹ Safe fix
 5 5 | a = int(input())
 6 6 | b = int(input())
 7 7 | c = int(input())
@@ -31,7 +31,7 @@ boolean_chained_comparison.py:14:4: PLR1716 [*] TODO
    |
    = help: TODO
 
-ℹ Unsafe fix
+ℹ Safe fix
 11 11 | a = int(input())
 12 12 | b = int(input())
 13 13 | c = int(input())
@@ -51,7 +51,7 @@ boolean_chained_comparison.py:20:4: PLR1716 [*] TODO
    |
    = help: TODO
 
-ℹ Unsafe fix
+ℹ Safe fix
 17 17 | a = int(input())
 18 18 | b = int(input())
 19 19 | c = int(input())
@@ -71,7 +71,7 @@ boolean_chained_comparison.py:26:4: PLR1716 [*] TODO
    |
    = help: TODO
 
-ℹ Unsafe fix
+ℹ Safe fix
 23 23 | a = int(input())
 24 24 | b = int(input())
 25 25 | c = int(input())
@@ -91,7 +91,7 @@ boolean_chained_comparison.py:36:4: PLR1716 [*] TODO
    |
    = help: TODO
 
-ℹ Unsafe fix
+ℹ Safe fix
 33 33 | a = int(input())
 34 34 | b = int(input())
 35 35 | c = int(input())
@@ -111,7 +111,7 @@ boolean_chained_comparison.py:42:4: PLR1716 [*] TODO
    |
    = help: TODO
 
-ℹ Unsafe fix
+ℹ Safe fix
 39 39 | a = int(input())
 40 40 | b = int(input())
 41 41 | c = int(input())
@@ -131,7 +131,7 @@ boolean_chained_comparison.py:48:4: PLR1716 [*] TODO
    |
    = help: TODO
 
-ℹ Unsafe fix
+ℹ Safe fix
 45 45 | a = int(input())
 46 46 | b = int(input())
 47 47 | c = int(input())
@@ -151,7 +151,7 @@ boolean_chained_comparison.py:54:4: PLR1716 [*] TODO
    |
    = help: TODO
 
-ℹ Unsafe fix
+ℹ Safe fix
 51 51 | a = int(input())
 52 52 | b = int(input())
 53 53 | c = int(input())
@@ -171,7 +171,7 @@ boolean_chained_comparison.py:65:4: PLR1716 [*] TODO
    |
    = help: TODO
 
-ℹ Unsafe fix
+ℹ Safe fix
 62 62 | b = int(input())
 63 63 | c = int(input())
 64 64 | d = int(input())
@@ -191,7 +191,7 @@ boolean_chained_comparison.py:65:14: PLR1716 [*] TODO
    |
    = help: TODO
 
-ℹ Unsafe fix
+ℹ Safe fix
 62 62 | b = int(input())
 63 63 | c = int(input())
 64 64 | d = int(input())
@@ -211,7 +211,7 @@ boolean_chained_comparison.py:73:4: PLR1716 [*] TODO
    |
    = help: TODO
 
-ℹ Unsafe fix
+ℹ Safe fix
 70 70 | c = int(input())
 71 71 | d = int(input())
 72 72 | e = int(input())
@@ -231,7 +231,7 @@ boolean_chained_comparison.py:73:14: PLR1716 [*] TODO
    |
    = help: TODO
 
-ℹ Unsafe fix
+ℹ Safe fix
 70 70 | c = int(input())
 71 71 | d = int(input())
 72 72 | e = int(input())
@@ -251,7 +251,7 @@ boolean_chained_comparison.py:73:24: PLR1716 [*] TODO
    |
    = help: TODO
 
-ℹ Unsafe fix
+ℹ Safe fix
 70 70 | c = int(input())
 71 71 | d = int(input())
 72 72 | e = int(input())
