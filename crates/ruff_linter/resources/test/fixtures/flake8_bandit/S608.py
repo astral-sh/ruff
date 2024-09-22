@@ -98,64 +98,56 @@ cursor.execute('SELECT * FROM table WHERE id = 1')
 cursor.executemany('SELECT * FROM table WHERE id = %s', [var, var2])
 
 # # INSERT without INTO (e.g. MySQL and derivatives)
-query = "INSERT table VALUES (%s)" % (var,)
+query46 = "INSERT table VALUES (%s)" % (var,)
 
 # # REPLACE (e.g. MySQL and derivatives, SQLite)
-query = "REPLACE INTO table VALUES (%s)" % (var,)
-query = "REPLACE table VALUES (%s)" % (var,)
+query47 = "REPLACE INTO table VALUES (%s)" % (var,)
+query48 = "REPLACE table VALUES (%s)" % (var,)
 
-query = "Deselect something that is not SQL even though it has a ' from ' somewhere in %s." % "there"
+query49 = "Deselect something that is not SQL even though it has a ' from ' somewhere in %s." % "there"
 
 # # pass
 ["select colA from tableA"] + ["select colB from tableB"]
 "SELECT * FROM " + (["table1"] if x > 0 else ["table2"])
 
 # # errors
-"SELECT * FROM " + ("table1" if x > 0 else "table2")
-"SELECT * FROM " + ("table1" if x > 0 else ["table2"])
+"SELECT * FROM " + ("table1" if x > 0 else "table2") # query50
+"SELECT * FROM " + ("table1" if x > 0 else ["table2"]) # query51
 
 # test cases from #12044
 
-def sql():
-    foo = "foo"
-
-    query = f"""
-SELECT {foo}
+def query52():
+    return f"""
+SELECT {var}
     FROM bar
     """
 
-def sql():
-    foo = "foo"
-    query = f"""
+def query53():
+    return f"""
     SELECT
-        {foo}
+        {var}
     FROM bar
     """
 
-def sql():
-    foo = "foo"
-    query = f"""
-    SELECT {foo}
+def query54():
+    return f"""
+    SELECT {var}
     FROM
         bar
     """
 
-
-foo = "foo"
-
-f"""SELECT * FROM 
-{foo}.table
+query55 = f"""SELECT * FROM 
+{var}.table
 """
 
-f"""SELECT *
-FROM {foo}.table
+query56 = f"""SELECT *
+FROM {var}.table
 """
 
-f"""
+query57 = f"""
 SELECT *
-FROM {foo}.table
+FROM {var}.table
 """
 
-
-f"SELECT\
- * FROM {foo}.table"
+query58 = f"SELECT\
+ * FROM {var}.table"
