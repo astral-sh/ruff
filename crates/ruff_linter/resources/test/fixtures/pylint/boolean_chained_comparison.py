@@ -70,7 +70,7 @@ b = int(input())
 c = int(input())
 d = int(input())
 e = int(input())
-if a < b and b < c and c < d  and d < e:  # [boolean-chained-comparison]
+if a < b and b < c and c < d and d < e:  # [boolean-chained-comparison]
     pass
 
 # ------------

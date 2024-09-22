@@ -205,7 +205,7 @@ boolean_chained_comparison.py:73:4: PLR1716 [*] Contains chained boolean compari
    |
 71 | d = int(input())
 72 | e = int(input())
-73 | if a < b and b < c and c < d  and d < e:  # [boolean-chained-comparison]
+73 | if a < b and b < c and c < d and d < e:  # [boolean-chained-comparison]
    |    ^^^^^^^^^^^^^^^ PLR1716
 74 |     pass
    |
@@ -215,8 +215,8 @@ boolean_chained_comparison.py:73:4: PLR1716 [*] Contains chained boolean compari
 70 70 | c = int(input())
 71 71 | d = int(input())
 72 72 | e = int(input())
-73    |-if a < b and b < c and c < d  and d < e:  # [boolean-chained-comparison]
-   73 |+if a < b < c and c < d  and d < e:  # [boolean-chained-comparison]
+73    |-if a < b and b < c and c < d and d < e:  # [boolean-chained-comparison]
+   73 |+if a < b < c and c < d and d < e:  # [boolean-chained-comparison]
 74 74 |     pass
 75 75 | 
 76 76 | # ------------
@@ -225,7 +225,7 @@ boolean_chained_comparison.py:73:14: PLR1716 [*] Contains chained boolean compar
    |
 71 | d = int(input())
 72 | e = int(input())
-73 | if a < b and b < c and c < d  and d < e:  # [boolean-chained-comparison]
+73 | if a < b and b < c and c < d and d < e:  # [boolean-chained-comparison]
    |              ^^^^^^^^^^^^^^^ PLR1716
 74 |     pass
    |
@@ -235,8 +235,8 @@ boolean_chained_comparison.py:73:14: PLR1716 [*] Contains chained boolean compar
 70 70 | c = int(input())
 71 71 | d = int(input())
 72 72 | e = int(input())
-73    |-if a < b and b < c and c < d  and d < e:  # [boolean-chained-comparison]
-   73 |+if a < b and b < c < d  and d < e:  # [boolean-chained-comparison]
+73    |-if a < b and b < c and c < d and d < e:  # [boolean-chained-comparison]
+   73 |+if a < b and b < c < d and d < e:  # [boolean-chained-comparison]
 74 74 |     pass
 75 75 | 
 76 76 | # ------------
@@ -245,8 +245,8 @@ boolean_chained_comparison.py:73:24: PLR1716 [*] Contains chained boolean compar
    |
 71 | d = int(input())
 72 | e = int(input())
-73 | if a < b and b < c and c < d  and d < e:  # [boolean-chained-comparison]
-   |                        ^^^^^^^^^^^^^^^^ PLR1716
+73 | if a < b and b < c and c < d and d < e:  # [boolean-chained-comparison]
+   |                        ^^^^^^^^^^^^^^^ PLR1716
 74 |     pass
    |
    = help: Simplify chained boolean comparisons
@@ -255,7 +255,7 @@ boolean_chained_comparison.py:73:24: PLR1716 [*] Contains chained boolean compar
 70 70 | c = int(input())
 71 71 | d = int(input())
 72 72 | e = int(input())
-73    |-if a < b and b < c and c < d  and d < e:  # [boolean-chained-comparison]
+73    |-if a < b and b < c and c < d and d < e:  # [boolean-chained-comparison]
    73 |+if a < b and b < c and c < d < e:  # [boolean-chained-comparison]
 74 74 |     pass
 75 75 | 
