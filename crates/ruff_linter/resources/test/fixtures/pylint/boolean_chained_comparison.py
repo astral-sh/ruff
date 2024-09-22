@@ -80,6 +80,18 @@ if a < b and b < c and c < d  and d < e:  # [boolean-chained-comparison]
 a = int(input())
 b = int(input())
 c = int(input())
+if a > b or b > c: 
+    pass
+
+a = int(input())
+b = int(input())
+c = int(input())
+if a > b or b in (1, 2): 
+    pass
+
+a = int(input())
+b = int(input())
+c = int(input())
 if a < b and b > c: 
     pass
 

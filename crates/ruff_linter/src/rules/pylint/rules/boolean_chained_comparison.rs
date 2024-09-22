@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{name::Name, CmpOp, Expr, ExprBoolOp, ExprCompare};
+use ruff_python_ast::{name::Name, BoolOp, CmpOp, Expr, ExprBoolOp, ExprCompare};
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
@@ -39,7 +39,7 @@ pub struct BooleanChainedComparison {
 }
 
 impl Violation for BooleanChainedComparison {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -51,24 +51,15 @@ impl Violation for BooleanChainedComparison {
     }
 }
 
-fn iter_all_eq<T: PartialEq>(iter: impl IntoIterator<Item = T>) -> Option<T> {
-    let mut iter = iter.into_iter();
-    let first = iter.next()?;
-    iter.all(|elem| elem == first).then_some(first)
-}
-
-#[derive(Clone, Debug, PartialEq, is_macro::Is, Copy, Hash, Eq)]
-enum CompareGrouping {
-    Less,
-    Greater,
-}
-
 /// PLR1716
 pub(crate) fn boolean_chained_comparison(checker: &mut Checker, expr_bool_op: &ExprBoolOp) {
-    // dbg!(expr_bool_op);
-
     // early out for boolean expression without multiple compare values
     if expr_bool_op.values.len() == 1 {
+        return;
+    }
+
+    // early out for non `and` boolean operations
+    if expr_bool_op.op != BoolOp::And {
         return;
     }
 
@@ -85,14 +76,12 @@ pub(crate) fn boolean_chained_comparison(checker: &mut Checker, expr_bool_op: &E
         .map(|stmt| stmt.as_compare_expr().unwrap())
         .collect();
 
-    // TODO: maybe this should be done per tuple pair instead
-    if !are_compare_expr_simplifiable(&compare_exprs) {
-        return;
-    }
-
     let results: Vec<Result<(), BooleanChainedComparison>> = compare_exprs
         .iter()
         .tuple_windows::<(&&ExprCompare, &&ExprCompare)>()
+        .filter(|(left_compare, right_compare)| {
+            are_compare_expr_simplifiable(left_compare, right_compare)
+        })
         .map(|(left_compare, right_compare)| {
             let Expr::Name(left_compare_right) = left_compare.comparators.first().unwrap() else {
                 return Ok(());
@@ -141,17 +130,16 @@ pub(crate) fn boolean_chained_comparison(checker: &mut Checker, expr_bool_op: &E
     );
 }
 
-fn are_compare_expr_simplifiable(compare_exprs: &[&ExprCompare]) -> bool {
-    // map compare expressions to compare groups, to be able to check whether grouping is allowed
-    let compare_groupings: Vec<CompareGrouping> = compare_exprs
-        .iter()
-        .filter_map(|compare_expr| compare_expr.ops.first())
-        .filter_map(|compare_op| match compare_op {
-            CmpOp::Lt | CmpOp::LtE => Some(CompareGrouping::Less),
-            CmpOp::Gt | CmpOp::GtE => Some(CompareGrouping::Greater),
-            _ => None,
-        })
-        .collect();
+/// Checks whether two compare expressions are simplifiable
+fn are_compare_expr_simplifiable(left: &ExprCompare, right: &ExprCompare) -> bool {
+    // only allow simplifyng simple compare operations
+    if left.ops.len() != 1 || right.ops.len() != 1 {
+        return false;
+    }
 
-    iter_all_eq(compare_groupings).is_some()
+    matches!(
+        (left.ops.first().unwrap(), right.ops.first().unwrap()),
+        (CmpOp::Lt | CmpOp::LtE, CmpOp::Lt | CmpOp::LtE)
+            | (CmpOp::Gt | CmpOp::GtE, CmpOp::Gt | CmpOp::GtE)
+    )
 }
