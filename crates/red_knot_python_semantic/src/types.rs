@@ -522,8 +522,8 @@ impl<'db> Type<'db> {
     }
 
     /// Resolves the boolean value of a type.
-    /// This is used to determine the value that would be returned by calling `bool()` on an object of this type.
-    pub fn boolean_value(&self, db: &'db dyn Db) -> Option<bool> {
+    /// This is used to determine the value that would be returned when `__bool__` is called on an object
+    pub fn bool(&self, db: &'db dyn Db) -> Option<bool> {
         match self {
             Type::Any => None,
             Type::Never => None,
@@ -538,7 +538,7 @@ impl<'db> Type<'db> {
                 let inner_values = union
                     .elements(db)
                     .iter()
-                    .map(|elem| elem.boolean_value(db))
+                    .map(|elem| elem.bool(db))
                     .collect::<FxOrderSet<_>>();
                 let mut found_true = false;
                 let mut found_false = false;
@@ -1267,7 +1267,7 @@ mod tests {
     #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]))]
     fn is_truthy(ty: Ty) {
         let db = setup_db();
-        assert_eq!(ty.into_type(&db).boolean_value(&db), Some(true));
+        assert_eq!(ty.into_type(&db).bool(&db), Some(true));
     }
 
     #[test_case(Ty::Tuple(vec![]))]
@@ -1276,7 +1276,7 @@ mod tests {
     #[test_case(Ty::Union(vec![Ty::IntLiteral(0), Ty::IntLiteral(0)]))]
     fn is_falsy(ty: Ty) {
         let db = setup_db();
-        assert_eq!(ty.into_type(&db).boolean_value(&db), Some(false));
+        assert_eq!(ty.into_type(&db).bool(&db), Some(false));
     }
 
     #[test_case(Ty::BuiltinInstance("str"))]
@@ -1285,6 +1285,6 @@ mod tests {
     #[test_case(Ty::Union(vec![Ty::BuiltinInstance("str"), Ty::IntLiteral(1)]))]
     fn boolean_value_is_unknown(ty: Ty) {
         let db = setup_db();
-        assert_eq!(ty.into_type(&db).boolean_value(&db), None);
+        assert_eq!(ty.into_type(&db).bool(&db), None);
     }
 }

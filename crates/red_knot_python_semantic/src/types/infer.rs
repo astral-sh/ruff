@@ -2327,7 +2327,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .map(|value| self.infer_expression(value))
             .collect();
         for (i, value_type) in inferred_types.iter().enumerate() {
-            let boolean_value = value_type.boolean_value(self.db);
+            let boolean_value = value_type.bool(self.db);
             if let Some(boolean_value) = boolean_value {
                 let is_last = i == values.len() - 1;
                 match (boolean_value, is_last, op) {
