@@ -458,19 +458,21 @@ parentheses:
 
 ```python
 # Input
-for a, f(b,) in c:
+for a, [b, d,] in c:
     pass
 
 # Black
-for a, f(
+for a, [
     b,
-) in c:
+    d,
+] in c:
     pass
 
 # Ruff
-for a, f(
+for a, [
     b,
-) in c:
+    d,
+] in c:
     pass
 ```
 

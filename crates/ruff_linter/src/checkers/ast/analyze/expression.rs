@@ -259,11 +259,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                         }
                     }
                     if checker.enabled(Rule::AmbiguousVariableName) {
-                        if let Some(diagnostic) =
-                            pycodestyle::rules::ambiguous_variable_name(id, expr.range())
-                        {
-                            checker.diagnostics.push(diagnostic);
-                        }
+                        pycodestyle::rules::ambiguous_variable_name(checker, id, expr.range());
                     }
                     if !checker.semantic.current_scope().kind.is_class() {
                         if checker.enabled(Rule::BuiltinVariableShadowing) {
@@ -1407,6 +1403,12 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::IfExpInsteadOfOrOperator) {
                 refurb::rules::if_exp_instead_of_or_operator(checker, if_exp);
+            }
+            if checker.enabled(Rule::UselessIfElse) {
+                ruff::rules::useless_if_else(checker, if_exp);
+            }
+            if checker.enabled(Rule::SliceToRemovePrefixOrSuffix) {
+                refurb::rules::slice_to_remove_affix_expr(checker, if_exp);
             }
         }
         Expr::ListComp(

@@ -23,13 +23,13 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 ///
-/// ```python
+/// ```pyi
 /// def foo(arg: str = "51 character stringgggggggggggggggggggggggggggggggg") -> None: ...
 /// ```
 ///
 /// Use instead:
 ///
-/// ```python
+/// ```pyi
 /// def foo(arg: str = ...) -> None: ...
 /// ```
 #[violation]

@@ -31,13 +31,13 @@ use crate::settings::types::PythonVersion;
 ///
 /// ## Example
 ///
-/// ```python
+/// ```pyi
 /// def foo(arg: list[int] = list(range(10_000))) -> None: ...
 /// ```
 ///
 /// Use instead:
 ///
-/// ```python
+/// ```pyi
 /// def foo(arg: list[int] = ...) -> None: ...
 /// ```
 ///
@@ -77,13 +77,13 @@ impl AlwaysFixableViolation for TypedArgumentDefaultInStub {
 ///
 /// ## Example
 ///
-/// ```python
+/// ```pyi
 /// def foo(arg=[]) -> None: ...
 /// ```
 ///
 /// Use instead:
 ///
-/// ```python
+/// ```pyi
 /// def foo(arg=...) -> None: ...
 /// ```
 ///
@@ -122,12 +122,12 @@ impl AlwaysFixableViolation for ArgumentDefaultInStub {
 /// or varies according to the current platform or Python version.
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// foo: str = "..."
 /// ```
 ///
 /// Use instead:
-/// ```python
+/// ```pyi
 /// foo: str = ...
 /// ```
 ///
@@ -176,12 +176,12 @@ impl Violation for UnannotatedAssignmentInStub {
 /// runtime counterparts.
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// __all__: list[str]
 /// ```
 ///
 /// Use instead:
-/// ```python
+/// ```pyi
 /// __all__: list[str] = ["foo", "bar"]
 /// ```
 #[violation]
@@ -210,12 +210,12 @@ impl Violation for UnassignedSpecialVariableInStub {
 /// to a normal variable assignment.
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// Vector = list[float]
 /// ```
 ///
 /// Use instead:
-/// ```python
+/// ```pyi
 /// from typing import TypeAlias
 ///
 /// Vector: TypeAlias = list[float]

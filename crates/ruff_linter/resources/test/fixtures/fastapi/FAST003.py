@@ -1,4 +1,6 @@
-from fastapi import FastAPI
+from typing import Annotated
+
+from fastapi import FastAPI, Path
 
 app = FastAPI()
 
@@ -82,6 +84,11 @@ async def read_thing(
     return {"query": query}
 
 
+@app.get("/books/{name}/{title}")
+async def read_thing(*, author: Annotated[str, Path(alias="author_name")], title: str):
+    return {"author": author, "title": title}
+
+
 # OK
 @app.get("/things/{thing_id}")
 async def read_thing(thing_id: int, query: str):
@@ -115,6 +122,11 @@ async def read_thing(*, author: str, title: str):
 
 @app.get("/books/{author}/{title:path}")
 async def read_thing(*, author: str, title: str):
+    return {"author": author, "title": title}
+
+
+@app.get("/books/{name}/{title}")
+async def read_thing(*, author: Annotated[str, Path(alias="name")], title: str):
     return {"author": author, "title": title}
 
 

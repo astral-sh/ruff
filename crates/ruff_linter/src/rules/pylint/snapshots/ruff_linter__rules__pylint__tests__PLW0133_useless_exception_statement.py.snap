@@ -213,3 +213,39 @@ useless_exception_statement.py:71:5: PLW0133 [*] Missing `raise` statement on ex
 72 72 | 
 73 73 | 
 74 74 | # Non-violation test cases: PLW0133
+
+useless_exception_statement.py:126:1: PLW0133 [*] Missing `raise` statement on exception
+    |
+124 | import builtins
+125 | 
+126 | builtins.TypeError("still an exception even though it's an Attribute")
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW0133
+127 | 
+128 | PythonFinalizationError("Added in Python 3.13")
+    |
+    = help: Add `raise` keyword
+
+ℹ Unsafe fix
+123 123 | 
+124 124 | import builtins
+125 125 | 
+126     |-builtins.TypeError("still an exception even though it's an Attribute")
+    126 |+raise builtins.TypeError("still an exception even though it's an Attribute")
+127 127 | 
+128 128 | PythonFinalizationError("Added in Python 3.13")
+
+useless_exception_statement.py:128:1: PLW0133 [*] Missing `raise` statement on exception
+    |
+126 | builtins.TypeError("still an exception even though it's an Attribute")
+127 | 
+128 | PythonFinalizationError("Added in Python 3.13")
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW0133
+    |
+    = help: Add `raise` keyword
+
+ℹ Unsafe fix
+125 125 | 
+126 126 | builtins.TypeError("still an exception even though it's an Attribute")
+127 127 | 
+128     |-PythonFinalizationError("Added in Python 3.13")
+    128 |+raise PythonFinalizationError("Added in Python 3.13")

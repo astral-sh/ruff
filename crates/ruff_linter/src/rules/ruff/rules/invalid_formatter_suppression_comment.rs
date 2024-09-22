@@ -75,7 +75,7 @@ pub(crate) fn ignored_formatter_suppression_comment(checker: &mut Checker, suite
         .into_iter()
         .filter_map(|range| {
             Some(SuppressionComment {
-                range: *range,
+                range,
                 kind: SuppressionKind::from_comment(locator.slice(range))?,
             })
         })
@@ -336,6 +336,7 @@ const fn is_valid_enclosing_node(node: AnyNodeRef) -> bool {
         | AnyNodeRef::TypeParamParamSpec(_)
         | AnyNodeRef::FString(_)
         | AnyNodeRef::StringLiteral(_)
-        | AnyNodeRef::BytesLiteral(_) => false,
+        | AnyNodeRef::BytesLiteral(_)
+        | AnyNodeRef::Identifier(_) => false,
     }
 }

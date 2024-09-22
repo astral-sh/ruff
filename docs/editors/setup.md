@@ -153,7 +153,7 @@ extension for [coc.nvim](https://github.com/neoclide/coc.nvim).
 " Linter
 let g:ale_linters = { "python": ["ruff"] }
 " Formatter
-let g:ale_fixers = { "python": ["ruff-format"] }
+let g:ale_fixers = { "python": ["ruff_format"] }
 ```
 
 </details>

@@ -530,6 +530,8 @@ You can run the benchmarks with
 cargo benchmark
 ```
 
+`cargo benchmark` is an alias for `cargo bench -p ruff_benchmark --bench linter --bench formatter --`
+
 #### Benchmark-driven Development
 
 Ruff uses [Criterion.rs](https://bheisler.github.io/criterion.rs/book/) for benchmarks. You can use
@@ -568,7 +570,7 @@ cargo install critcmp
 
 #### Tips
 
-- Use `cargo bench -p ruff_benchmark <filter>` to only run specific benchmarks. For example: `cargo benchmark lexer`
+- Use `cargo bench -p ruff_benchmark <filter>` to only run specific benchmarks. For example: `cargo bench -p ruff_benchmark lexer`
     to only run the lexer benchmarks.
 - Use `cargo bench -p ruff_benchmark -- --quiet` for a more cleaned up output (without statistical relevance)
 - Use `cargo bench -p ruff_benchmark -- --quick` to get faster results (more prone to noise)

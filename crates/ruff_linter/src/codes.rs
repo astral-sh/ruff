@@ -960,6 +960,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "030") => (RuleGroup::Preview, rules::ruff::rules::AssertWithPrintMessage),
         (Ruff, "031") => (RuleGroup::Preview, rules::ruff::rules::IncorrectlyParenthesizedTupleInSubscript),
         (Ruff, "032") => (RuleGroup::Preview, rules::ruff::rules::DecimalFromFloatLiteral),
+        (Ruff, "033") => (RuleGroup::Preview, rules::ruff::rules::PostInitDefault),
+        (Ruff, "034") => (RuleGroup::Preview, rules::ruff::rules::UselessIfElse),
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
         (Ruff, "101") => (RuleGroup::Stable, rules::ruff::rules::RedirectedNOQA),
 
@@ -1065,6 +1067,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "180") => (RuleGroup::Preview, rules::refurb::rules::MetaClassABCMeta),
         (Refurb, "181") => (RuleGroup::Stable, rules::refurb::rules::HashlibDigestHex),
         (Refurb, "187") => (RuleGroup::Stable, rules::refurb::rules::ListReverseCopy),
+        (Refurb, "188") => (RuleGroup::Preview, rules::refurb::rules::SliceToRemovePrefixOrSuffix),
         (Refurb, "192") => (RuleGroup::Preview, rules::refurb::rules::SortedMinMax),
 
         // flake8-logging

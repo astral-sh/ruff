@@ -1,5 +1,6 @@
 #![allow(clippy::disallowed_names)]
 
+use rayon::ThreadPoolBuilder;
 use red_knot_python_semantic::PythonVersion;
 use red_knot_workspace::db::RootDatabase;
 use red_knot_workspace::watch::{ChangeEvent, ChangedKind};
@@ -20,18 +21,9 @@ struct Case {
 
 const TOMLLIB_312_URL: &str = "https://raw.githubusercontent.com/python/cpython/8e8a4baf652f6e1cee7acde9d78c4b6154539748/Lib/tomllib";
 
-// This first "unresolved import" is because we don't understand `*` imports yet.
-// The following "unresolved import" violations are because we can't distinguish currently from
-// "Symbol exists in the module but its type is unknown" and
-// "Symbol does not exist in the module"
+// The failed import from 'collections.abc' is due to lack of support for 'import *'.
 static EXPECTED_DIAGNOSTICS: &[&str] = &[
-    "/src/tomllib/_parser.py:7:29: Could not resolve import of 'Iterable' from 'collections.abc'",
-    "/src/tomllib/_parser.py:10:20: Could not resolve import of 'Any' from 'typing'",
-    "/src/tomllib/_parser.py:13:5: Could not resolve import of 'RE_DATETIME' from '._re'",
-    "/src/tomllib/_parser.py:14:5: Could not resolve import of 'RE_LOCALTIME' from '._re'",
-    "/src/tomllib/_parser.py:15:5: Could not resolve import of 'RE_NUMBER' from '._re'",
-    "/src/tomllib/_parser.py:20:21: Could not resolve import of 'Key' from '._types'",
-    "/src/tomllib/_parser.py:20:26: Could not resolve import of 'ParseFloat' from '._types'",
+    "/src/tomllib/_parser.py:7:29: Module 'collections.abc' has no member 'Iterable'",
     "Line 69 is too long (89 characters)",
     "Use double quotes for strings",
     "Use double quotes for strings",
@@ -40,25 +32,6 @@ static EXPECTED_DIAGNOSTICS: &[&str] = &[
     "Use double quotes for strings",
     "Use double quotes for strings",
     "Use double quotes for strings",
-    "/src/tomllib/_parser.py:153:22: Name 'key' used when not defined.",
-    "/src/tomllib/_parser.py:153:27: Name 'flag' used when not defined.",
-    "/src/tomllib/_parser.py:159:16: Name 'k' used when not defined.",
-    "/src/tomllib/_parser.py:161:25: Name 'k' used when not defined.",
-    "/src/tomllib/_parser.py:168:16: Name 'k' used when not defined.",
-    "/src/tomllib/_parser.py:169:22: Name 'k' used when not defined.",
-    "/src/tomllib/_parser.py:170:25: Name 'k' used when not defined.",
-    "/src/tomllib/_parser.py:180:16: Name 'k' used when not defined.",
-    "/src/tomllib/_parser.py:182:31: Name 'k' used when not defined.",
-    "/src/tomllib/_parser.py:206:16: Name 'k' used when not defined.",
-    "/src/tomllib/_parser.py:207:22: Name 'k' used when not defined.",
-    "/src/tomllib/_parser.py:208:25: Name 'k' used when not defined.",
-    "/src/tomllib/_parser.py:330:32: Name 'header' used when not defined.",
-    "/src/tomllib/_parser.py:330:41: Name 'key' used when not defined.",
-    "/src/tomllib/_parser.py:333:26: Name 'cont_key' used when not defined.",
-    "/src/tomllib/_parser.py:334:71: Name 'cont_key' used when not defined.",
-    "/src/tomllib/_parser.py:337:31: Name 'cont_key' used when not defined.",
-    "/src/tomllib/_parser.py:628:75: Name 'e' used when not defined.",
-    "/src/tomllib/_parser.py:686:23: Name 'parse_float' used when not defined.",
 ];
 
 fn get_test_file(name: &str) -> TestFile {
@@ -112,7 +85,25 @@ fn setup_case() -> Case {
     }
 }
 
+static RAYON_INITIALIZED: std::sync::Once = std::sync::Once::new();
+
+fn setup_rayon() {
+    // Initialize the rayon thread pool outside the benchmark because it has a significant cost.
+    // We limit the thread pool to only one (the current thread) because we're focused on
+    // where red knot spends time and less about how well the code runs concurrently.
+    // We might want to add a benchmark focusing on concurrency to detect congestion in the future.
+    RAYON_INITIALIZED.call_once(|| {
+        ThreadPoolBuilder::new()
+            .num_threads(1)
+            .use_current_thread()
+            .build_global()
+            .unwrap();
+    });
+}
+
 fn benchmark_incremental(criterion: &mut Criterion) {
+    setup_rayon();
+
     criterion.bench_function("red_knot_check_file[incremental]", |b| {
         b.iter_batched_ref(
             || {
@@ -149,6 +140,8 @@ fn benchmark_incremental(criterion: &mut Criterion) {
 }
 
 fn benchmark_cold(criterion: &mut Criterion) {
+    setup_rayon();
+
     criterion.bench_function("red_knot_check_file[cold]", |b| {
         b.iter_batched_ref(
             setup_case,

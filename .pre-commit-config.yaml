@@ -2,7 +2,7 @@ fail_fast: true
 
 exclude: |
   (?x)^(
-    crates/red_knot_python_semantic/vendor/.*|
+    crates/ruff_vendored/vendor/.*|
     crates/red_knot_workspace/resources/.*|
     crates/ruff_linter/resources/.*|
     crates/ruff_linter/src/rules/.*/snapshots/.*|
@@ -45,7 +45,7 @@ repos:
           )$
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.23.6
+    rev: v1.24.5
     hooks:
       - id: typos
 
@@ -59,7 +59,7 @@ repos:
         pass_filenames: false # This makes it a lot faster
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.6.1
+    rev: v0.6.5
     hooks:
       - id: ruff-format
       - id: ruff

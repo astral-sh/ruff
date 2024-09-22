@@ -15,7 +15,8 @@ use ruff_db::{
 use ruff_python_ast::{name::Name, PySourceType};
 use ruff_text_size::Ranged;
 
-use crate::workspace::files::{Index, Indexed, PackageFiles};
+use crate::db::RootDatabase;
+use crate::workspace::files::{Index, Indexed, IndexedIter, PackageFiles};
 use crate::{
     db::Db,
     lint::{lint_semantic, lint_syntax},
@@ -190,23 +191,35 @@ impl Workspace {
     }
 
     /// Checks all open files in the workspace and its dependencies.
-    #[tracing::instrument(level = "debug", skip_all)]
-    pub fn check(self, db: &dyn Db) -> Vec<String> {
+    pub fn check(self, db: &RootDatabase) -> Vec<String> {
+        let workspace_span = tracing::debug_span!("check_workspace");
+        let _span = workspace_span.enter();
+
         tracing::debug!("Checking workspace");
+        let files = WorkspaceFiles::new(db, self);
+        let result = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let inner_result = Arc::clone(&result);
 
-        let mut result = Vec::new();
+        let db = db.snapshot();
+        let workspace_span = workspace_span.clone();
 
-        if let Some(open_files) = self.open_files(db) {
-            for file in open_files {
-                result.extend_from_slice(&check_file(db, *file));
+        rayon::scope(move |scope| {
+            for file in &files {
+                let result = inner_result.clone();
+                let db = db.snapshot();
+                let workspace_span = workspace_span.clone();
+
+                scope.spawn(move |_| {
+                    let check_file_span = tracing::debug_span!(parent: &workspace_span, "check_file", file=%file.path(&db));
+                    let _entered = check_file_span.entered();
+
+                    let file_diagnostics = check_file(&db, file);
+                    result.lock().unwrap().extend(file_diagnostics);
+                });
             }
-        } else {
-            for package in self.packages(db) {
-                result.extend(package.check(db));
-            }
-        }
+        });
 
-        result
+        Arc::into_inner(result).unwrap().into_inner().unwrap()
     }
 
     /// Opens a file in the workspace.
@@ -284,7 +297,6 @@ impl Workspace {
     }
 }
 
-#[salsa::tracked]
 impl Package {
     pub fn root(self, db: &dyn Db) -> &SystemPath {
         self.root_buf(db)
@@ -322,19 +334,6 @@ impl Package {
         };
 
         index.insert(file);
-    }
-
-    #[tracing::instrument(level = "debug", skip(db))]
-    pub(crate) fn check(self, db: &dyn Db) -> Vec<String> {
-        tracing::debug!("Checking package '{}'", self.root(db));
-
-        let mut result = Vec::new();
-        for file in &self.files(db) {
-            let diagnostics = check_file(db, file);
-            result.extend_from_slice(&diagnostics);
-        }
-
-        result
     }
 
     /// Returns the files belonging to this package.
@@ -384,9 +383,7 @@ impl Package {
 
 #[salsa::tracked]
 pub(super) fn check_file(db: &dyn Db, file: File) -> Vec<String> {
-    let path = file.path(db);
-    let _span = tracing::debug_span!("check_file", file=%path).entered();
-    tracing::debug!("Checking file '{path}'");
+    tracing::debug!("Checking file '{path}'", path = file.path(db));
 
     let mut diagnostics = Vec::new();
 
@@ -472,6 +469,73 @@ fn discover_package_files(db: &dyn Db, path: &SystemPath) -> FxHashSet<File> {
     }
 
     files
+}
+
+#[derive(Debug)]
+enum WorkspaceFiles<'a> {
+    OpenFiles(&'a FxHashSet<File>),
+    PackageFiles(Vec<Indexed<'a>>),
+}
+
+impl<'a> WorkspaceFiles<'a> {
+    fn new(db: &'a dyn Db, workspace: Workspace) -> Self {
+        if let Some(open_files) = workspace.open_files(db) {
+            WorkspaceFiles::OpenFiles(open_files)
+        } else {
+            WorkspaceFiles::PackageFiles(
+                workspace
+                    .packages(db)
+                    .map(|package| package.files(db))
+                    .collect(),
+            )
+        }
+    }
+}
+
+impl<'a> IntoIterator for &'a WorkspaceFiles<'a> {
+    type Item = File;
+    type IntoIter = WorkspaceFilesIter<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match self {
+            WorkspaceFiles::OpenFiles(files) => WorkspaceFilesIter::OpenFiles(files.iter()),
+            WorkspaceFiles::PackageFiles(package_files) => {
+                let mut package_files = package_files.iter();
+                WorkspaceFilesIter::PackageFiles {
+                    current: package_files.next().map(IntoIterator::into_iter),
+                    package_files,
+                }
+            }
+        }
+    }
+}
+
+enum WorkspaceFilesIter<'db> {
+    OpenFiles(std::collections::hash_set::Iter<'db, File>),
+    PackageFiles {
+        package_files: std::slice::Iter<'db, Indexed<'db>>,
+        current: Option<IndexedIter<'db>>,
+    },
+}
+
+impl Iterator for WorkspaceFilesIter<'_> {
+    type Item = File;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            WorkspaceFilesIter::OpenFiles(files) => files.next().copied(),
+            WorkspaceFilesIter::PackageFiles {
+                package_files,
+                current,
+            } => loop {
+                if let Some(file) = current.as_mut().and_then(Iterator::next) {
+                    return Some(file);
+                }
+
+                *current = Some(package_files.next()?.into_iter());
+            },
+        }
+    }
 }
 
 #[cfg(test)]

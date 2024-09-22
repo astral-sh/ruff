@@ -158,9 +158,11 @@ impl Deref for Indexed<'_> {
     }
 }
 
+pub(super) type IndexedIter<'a> = std::iter::Copied<std::collections::hash_set::Iter<'a, File>>;
+
 impl<'a> IntoIterator for &'a Indexed<'_> {
     type Item = File;
-    type IntoIter = std::iter::Copied<std::collections::hash_set::Iter<'a, File>>;
+    type IntoIter = IndexedIter<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.files.iter().copied()

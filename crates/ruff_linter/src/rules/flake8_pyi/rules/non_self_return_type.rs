@@ -51,30 +51,23 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 ///
-/// ```python
+/// ```pyi
 /// class Foo:
 ///     def __new__(cls, *args: Any, **kwargs: Any) -> Foo: ...
-///
 ///     def __enter__(self) -> Foo: ...
-///
 ///     async def __aenter__(self) -> Foo: ...
-///
 ///     def __iadd__(self, other: Foo) -> Foo: ...
 /// ```
 ///
 /// Use instead:
 ///
-/// ```python
+/// ```pyi
 /// from typing_extensions import Self
-///
 ///
 /// class Foo:
 ///     def __new__(cls, *args: Any, **kwargs: Any) -> Self: ...
-///
 ///     def __enter__(self) -> Self: ...
-///
 ///     async def __aenter__(self) -> Self: ...
-///
 ///     def __iadd__(self, other: Foo) -> Self: ...
 /// ```
 /// ## References
@@ -156,7 +149,7 @@ pub(crate) fn non_self_return_type(
 
     // In-place methods that are expected to return `Self`.
     if is_inplace_bin_op(name) {
-        if !is_self(returns, semantic) {
+        if !is_self(returns, checker) {
             checker.diagnostics.push(Diagnostic::new(
                 NonSelfReturnType {
                     class_name: class_def.name.to_string(),
@@ -242,8 +235,10 @@ fn is_name(expr: &Expr, name: &str) -> bool {
 }
 
 /// Return `true` if the given expression resolves to `typing.Self`.
-fn is_self(expr: &Expr, semantic: &SemanticModel) -> bool {
-    semantic.match_typing_expr(expr, "Self")
+fn is_self(expr: &Expr, checker: &Checker) -> bool {
+    checker.match_maybe_stringized_annotation(expr, |expr| {
+        checker.semantic().match_typing_expr(expr, "Self")
+    })
 }
 
 /// Return `true` if the given class extends `collections.abc.Iterator`.

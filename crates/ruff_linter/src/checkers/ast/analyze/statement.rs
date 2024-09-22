@@ -24,16 +24,16 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pylint::rules::global_at_module_level(checker, stmt);
             }
             if checker.enabled(Rule::AmbiguousVariableName) {
-                checker.diagnostics.extend(names.iter().filter_map(|name| {
-                    pycodestyle::rules::ambiguous_variable_name(name, name.range())
-                }));
+                for name in names {
+                    pycodestyle::rules::ambiguous_variable_name(checker, name, name.range());
+                }
             }
         }
         Stmt::Nonlocal(nonlocal @ ast::StmtNonlocal { names, range: _ }) => {
             if checker.enabled(Rule::AmbiguousVariableName) {
-                checker.diagnostics.extend(names.iter().filter_map(|name| {
-                    pycodestyle::rules::ambiguous_variable_name(name, name.range())
-                }));
+                for name in names {
+                    pycodestyle::rules::ambiguous_variable_name(checker, name, name.range());
+                }
             }
             if checker.enabled(Rule::NonlocalWithoutBinding) {
                 if !checker.semantic.scope_id.is_global() {
@@ -379,6 +379,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::WhitespaceAfterDecorator) {
                 pycodestyle::rules::whitespace_after_decorator(checker, decorator_list);
+            }
+            if checker.enabled(Rule::PostInitDefault) {
+                ruff::rules::post_init_default(checker, function_def);
             }
         }
         Stmt::Return(_) => {
@@ -1174,6 +1177,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::CheckAndRemoveFromSet) {
                 refurb::rules::check_and_remove_from_set(checker, if_);
+            }
+            if checker.enabled(Rule::SliceToRemovePrefixOrSuffix) {
+                refurb::rules::slice_to_remove_affix_stmt(checker, if_);
             }
             if checker.enabled(Rule::TooManyBooleanExpressions) {
                 pylint::rules::too_many_boolean_expressions(checker, if_);

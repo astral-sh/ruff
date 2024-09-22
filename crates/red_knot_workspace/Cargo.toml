@@ -18,16 +18,24 @@ ruff_cache = { workspace = true }
 ruff_db = { workspace = true, features = ["os", "cache"] }
 ruff_python_ast = { workspace = true }
 ruff_text_size = { workspace = true }
+ruff_vendored = { workspace = true }
 
 anyhow = { workspace = true }
 crossbeam = { workspace = true }
 notify = { workspace = true }
+rayon = { workspace = true }
 rustc-hash = { workspace = true }
 salsa = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
-ruff_db = { workspace = true, features = ["testing"]}
+ruff_db = { workspace = true, features = ["testing"] }
+tempfile = { workspace = true }
+
+[features]
+default = ["zstd"]
+zstd = ["ruff_vendored/zstd"]
+deflate = ["ruff_vendored/deflate"]
 
 [lints]
 workspace = true

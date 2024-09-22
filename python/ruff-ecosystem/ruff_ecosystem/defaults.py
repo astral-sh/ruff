@@ -125,6 +125,7 @@ DEFAULT_TARGETS = [
                 "examples/Chat_finetuning_data_prep.ipynb",
                 "examples/chatgpt/gpt_actions_library/gpt_action_google_drive.ipynb",
                 "examples/chatgpt/gpt_actions_library/gpt_action_redshift.ipynb",
+                "examples/chatgpt/gpt_actions_library/gpt_action_salesforce.ipynb",
             ],
         },
     ),

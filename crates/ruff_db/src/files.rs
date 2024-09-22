@@ -8,6 +8,7 @@ use salsa::{Durability, Setter};
 pub use file_root::{FileRoot, FileRootKind};
 pub use path::FilePath;
 use ruff_notebook::{Notebook, NotebookError};
+use ruff_python_ast::PySourceType;
 
 use crate::file_revision::FileRevision;
 use crate::files::file_root::FileRoots;
@@ -424,6 +425,13 @@ impl File {
     pub fn exists(self, db: &dyn Db) -> bool {
         self.status(db) == FileStatus::Exists
     }
+
+    /// Returns `true` if the file should be analyzed as a type stub.
+    pub fn is_stub(self, db: &dyn Db) -> bool {
+        self.path(db)
+            .extension()
+            .is_some_and(|extension| PySourceType::from_extension(extension).is_stub())
+    }
 }
 
 /// A virtual file that doesn't exist on the file system.
@@ -495,7 +503,8 @@ mod tests {
     use crate::files::{system_path_to_file, vendored_path_to_file, FileError};
     use crate::system::DbWithTestSystem;
     use crate::tests::TestDb;
-    use crate::vendored::tests::VendoredFileSystemBuilder;
+    use crate::vendored::VendoredFileSystemBuilder;
+    use zip::CompressionMethod;
 
     #[test]
     fn system_existing_file() -> crate::system::Result<()> {
@@ -540,7 +549,7 @@ mod tests {
     fn stubbed_vendored_file() -> crate::system::Result<()> {
         let mut db = TestDb::new();
 
-        let mut vendored_builder = VendoredFileSystemBuilder::new();
+        let mut vendored_builder = VendoredFileSystemBuilder::new(CompressionMethod::Stored);
         vendored_builder
             .add_file("test.pyi", "def foo() -> str")
             .unwrap();

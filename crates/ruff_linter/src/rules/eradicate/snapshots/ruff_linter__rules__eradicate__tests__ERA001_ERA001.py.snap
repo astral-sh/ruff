@@ -321,3 +321,38 @@ ERA001.py:47:1: ERA001 Found commented-out code
 48 47 | # ///
 49 48 | 
 50 49 | # Script tag (OK)
+
+ERA001.py:75:1: ERA001 Found commented-out code
+   |
+73 | # /// script
+74 | # requires-python = ">=3.11"
+75 | # dependencies = [
+   | ^^^^^^^^^^^^^^^^^^ ERA001
+76 | #   "requests<3",
+77 | #   "rich",
+   |
+   = help: Remove commented-out code
+
+ℹ Display-only fix
+72 72 | 
+73 73 | # /// script
+74 74 | # requires-python = ">=3.11"
+75    |-# dependencies = [
+76 75 | #   "requests<3",
+77 76 | #   "rich",
+78 77 | # ]
+
+ERA001.py:78:1: ERA001 Found commented-out code
+   |
+76 | #   "requests<3",
+77 | #   "rich",
+78 | # ]
+   | ^^^ ERA001
+   |
+   = help: Remove commented-out code
+
+ℹ Display-only fix
+75 75 | # dependencies = [
+76 76 | #   "requests<3",
+77 77 | #   "rich",
+78    |-# ]

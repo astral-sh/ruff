@@ -99,11 +99,8 @@ pub(crate) fn delete_comment(range: TextRange, locator: &Locator) -> Edit {
     }
     // Ex) `x = 1  # noqa here`
     else {
-        // Replace `# noqa here` with `# here`.
-        Edit::range_replacement(
-            "# ".to_string(),
-            TextRange::new(range.start(), range.end() + trailing_space_len),
-        )
+        // Remove `# noqa here` and whitespace
+        Edit::deletion(range.start() - leading_space_len, line_range.end())
     }
 }
 

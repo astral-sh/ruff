@@ -326,18 +326,18 @@ fn docstring_options() -> Result<()> {
     let ruff_toml = tempdir.path().join("ruff.toml");
     fs::write(
         &ruff_toml,
-        r#"
+        r"
 [format]
 docstring-code-format = true
 docstring-code-line-length = 20
-"#,
+",
     )?;
 
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(["format", "--config"])
         .arg(&ruff_toml)
         .arg("-")
-        .pass_stdin(r#"
+        .pass_stdin(r"
 def f(x):
     '''
     Something about `f`. And an example:
@@ -357,7 +357,7 @@ def f(x):
     >>> foo, bar, quux = this_is_a_long_line(lion, hippo, lemur, bear)
     '''
     pass
-"#), @r###"
+"), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -509,9 +509,9 @@ fn syntax_error() -> Result<()> {
 
     fs::write(
         tempdir.path().join("main.py"),
-        r#"
+        r"
 from module import =
-"#,
+",
     )?;
 
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
@@ -785,7 +785,7 @@ if condition:
     	print('Should change quotes')
 
     ----- stderr -----
-    warning: The following rules may cause conflicts when used with the formatter: `COM812`. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding them to the `ignore` configuration.
+    warning: The following rule may cause conflicts when used with the formatter: `COM812`. To avoid unexpected behavior, we recommend disabling this rule, either by removing it from the `select` or `extend-select` configuration, or adding it to the `ignore` configuration.
     "###);
     Ok(())
 }
@@ -1945,11 +1945,10 @@ fn range_end_only() {
 def foo(arg1, arg2,):
     print("Should format this" )
 
-"#), @r###"
+"#), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
-
     def foo(
         arg1,
         arg2,
@@ -1958,7 +1957,7 @@ def foo(arg1, arg2,):
 
 
     ----- stderr -----
-    "###);
+    "#);
 }
 
 #[test]

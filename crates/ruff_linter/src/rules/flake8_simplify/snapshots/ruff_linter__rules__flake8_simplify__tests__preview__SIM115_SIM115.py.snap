@@ -324,3 +324,11 @@ SIM115.py:244:9: SIM115 Use a context manager for opening files
     |         ^^^^^^^^^^^^^^ SIM115
 245 |     f.close()
     |
+
+SIM115.py:257:5: SIM115 Use a context manager for opening files
+    |
+256 | # SIM115
+257 | f = dbm.sqlite3.open("foo.db")
+    |     ^^^^^^^^^^^^^^^^ SIM115
+258 | f.close()
+    |

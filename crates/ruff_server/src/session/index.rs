@@ -9,6 +9,7 @@ use rustc_hash::FxHashMap;
 
 pub(crate) use ruff_settings::RuffSettings;
 
+use crate::edit::LanguageId;
 use crate::{
     edit::{DocumentKey, DocumentVersion, NotebookDocument},
     PositionEncoding, TextDocument,
@@ -601,6 +602,14 @@ impl DocumentQuery {
             } => cell_uri
                 .as_ref()
                 .and_then(|cell_uri| notebook.cell_document_by_uri(cell_uri)),
+        }
+    }
+
+    pub(crate) fn text_document_language_id(&self) -> Option<LanguageId> {
+        if let DocumentQuery::Text { document, .. } = self {
+            document.language_id()
+        } else {
+            None
         }
     }
 }

@@ -243,3 +243,16 @@ def aliased():
     from tarfile import TarFile as TF
     f = TF("foo").open()
     f.close()
+
+import dbm.sqlite3
+
+# OK
+with dbm.sqlite3.open("foo.db") as f:
+    print(f.keys())
+
+# OK
+dbm.sqlite3.open("foo.db").close()
+
+# SIM115
+f = dbm.sqlite3.open("foo.db")
+f.close()

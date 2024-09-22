@@ -60,3 +60,54 @@ class Bar:
             A number
         """
         print('test')
+
+
+import typing
+
+
+# OK
+def foo() -> typing.Generator[None, None, None]:
+    """
+    Do something
+
+    Yields
+    ------
+        When X.
+    """
+    yield None
+
+
+# OK
+def foo() -> typing.Generator[None, None, None]:
+    """
+    Do something
+
+    Yields
+    ------
+        When X.
+    """
+    yield
+
+
+# OK
+def foo():
+    """
+    Do something
+
+    Yields
+    ------
+        When X.
+    """
+    yield None
+
+
+# OK
+def foo():
+    """
+    Do something
+
+    Yields
+    ------
+        When X.
+    """
+    yield

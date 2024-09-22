@@ -54,6 +54,7 @@ fn format_text_document_range(
             file_resolver_settings,
             None,
             Some(formatter_settings),
+            text_document.language_id(),
         ) {
             return Ok(None);
         }
