@@ -6135,4 +6135,33 @@ mod tests {
         assert_public_ty(&db, "/src/a.py", "g", r#"Literal[""]"#);
         Ok(())
     }
+
+    #[test]
+    fn boolean_complex_expression() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+            def foo() -> str:
+                pass
+
+            a = "x" and "y" or "z"
+            b = "x" or "y" and "z"
+            c = "" and "y" or "z"
+            d = "" or "y" and "z"
+            e = "x" and "y" or ""
+            f = "x" or "y" and ""
+
+            "#,
+        )?;
+
+        assert_public_ty(&db, "/src/a.py", "a", r#"Literal["y"]"#);
+        assert_public_ty(&db, "/src/a.py", "b", r#"Literal["x"]"#);
+        assert_public_ty(&db, "/src/a.py", "c", r#"Literal["z"]"#);
+        assert_public_ty(&db, "/src/a.py", "d", r#"Literal["z"]"#);
+        assert_public_ty(&db, "/src/a.py", "e", r#"Literal["y"]"#);
+        assert_public_ty(&db, "/src/a.py", "f", r#"Literal["x"]"#);
+        Ok(())
+    }
 }
