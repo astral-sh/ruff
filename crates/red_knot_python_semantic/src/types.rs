@@ -521,6 +521,39 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Resolves the boolean value of a type.
+    /// This is used to determine the value that would be returned by calling `bool()` on an object of this type.
+    pub fn boolean_value(&self, db: &'db dyn Db) -> Option<bool> {
+        match self {
+            Type::Any => None,
+            Type::Never => None,
+            Type::Unknown => None,
+            Type::Unbound => None,
+            Type::None => Some(false),
+            Type::Function(_) | Type::RevealTypeFunction(_) => Some(true),
+            Type::Module(_) => Some(true),
+            Type::Class(_) => Some(true),
+            Type::Instance(_) => {
+                // TODO
+                None
+            }
+            Type::Union(union) => {
+                // TODO
+                None
+            }
+            Type::Intersection(_) => {
+                // TODO
+                None
+            }
+            Type::IntLiteral(num) => Some(*num != 0),
+            Type::BooleanLiteral(bool) => Some(*bool),
+            Type::StringLiteral(str) => Some(!str.value(db).is_empty()),
+            Type::LiteralString => None,
+            Type::BytesLiteral(bytes) => Some(!bytes.value(db).is_empty()),
+            Type::Tuple(items) => Some(!items.elements(db).is_empty()),
+        }
+    }
+
     /// Return the type resulting from calling an object of this type.
     ///
     /// Returns `None` if `self` is not a callable type.

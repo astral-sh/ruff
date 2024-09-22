@@ -2318,16 +2318,42 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_boolean_expression(&mut self, bool_op: &ast::ExprBoolOp) -> Type<'db> {
         let ast::ExprBoolOp {
             range: _,
-            op: _,
+            op,
             values,
         } = bool_op;
-
-        for value in values {
-            self.infer_expression(value);
+        let mut value_tys = Vec::new();
+        match op {
+            ast::BoolOp::And => {
+                for (i, value) in values.iter().enumerate() {
+                    let value_type = self.infer_expression(value);
+                    let boolean_value = value_type.boolean_value(self.db);
+                    if let Some(boolean_value) = boolean_value {
+                        if boolean_value && i < values.len() - 1 {
+                            continue;
+                        } else if !boolean_value {
+                            return value_type;
+                        }
+                    }
+                    value_tys.push(value_type);
+                }
+            }
+            ast::BoolOp::Or => {
+                for (i, value) in values.iter().enumerate() {
+                    let value_type = self.infer_expression(value);
+                    let boolean_value = value_type.boolean_value(self.db);
+                    if let Some(boolean_value) = boolean_value {
+                        if boolean_value {
+                            value_tys.push(value_type);
+                            break;
+                        } else if !boolean_value && i < values.len() - 1 {
+                            continue;
+                        }
+                    }
+                    value_tys.push(value_type);
+                }
+            }
         }
-
-        // TODO resolve bool op
-        Type::Unknown
+        UnionType::from_elements(self.db, value_tys)
     }
 
     fn infer_compare_expression(&mut self, compare: &ast::ExprCompare) -> Type<'db> {
@@ -6046,6 +6072,67 @@ mod tests {
             first_public_binding(&db, a, "x"),
             &events,
         );
+        Ok(())
+    }
+
+    #[test]
+    fn boolean_or_expression() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            def foo() -> str:
+                pass
+
+            a = True or False
+            b = 'x' or 'y' or 'z'
+            c = '' or 'y' or 'z'
+            d = False or 'z'
+            e = False or True
+            f = False or False
+            g = foo() or False
+            ",
+        )?;
+
+        assert_public_ty(&db, "/src/a.py", "a", "Literal[True]");
+        assert_public_ty(&db, "/src/a.py", "b", r#"Literal["x"]"#);
+        assert_public_ty(&db, "/src/a.py", "c", r#"Literal["y"]"#);
+        assert_public_ty(&db, "/src/a.py", "d", r#"Literal["z"]"#);
+        assert_public_ty(&db, "/src/a.py", "e", r#"Literal[True]"#);
+        assert_public_ty(&db, "/src/a.py", "f", r#"Literal[False]"#);
+        assert_public_ty(&db, "/src/a.py", "g", r#"str | Literal[False]"#);
+
+        Ok(())
+    }
+
+    #[test]
+    fn boolean_and_expression() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            def foo() -> str:
+                pass
+
+            a = True and False
+            b = False and True
+            c = foo() and False
+            d = foo() and True
+            e = 'x' and 'y' and 'z'
+            f = 'x' and 'y' and ''
+            g = '' and 'y'
+            ",
+        )?;
+
+        assert_public_ty(&db, "/src/a.py", "a", "Literal[False]");
+        assert_public_ty(&db, "/src/a.py", "b", "Literal[False]");
+        assert_public_ty(&db, "/src/a.py", "c", r#"Literal[False]"#);
+        assert_public_ty(&db, "/src/a.py", "d", r#"str | Literal[True]"#);
+        assert_public_ty(&db, "/src/a.py", "e", r#"Literal["z"]"#);
+        assert_public_ty(&db, "/src/a.py", "f", r#"Literal[""]"#);
+        assert_public_ty(&db, "/src/a.py", "g", r#"Literal[""]"#);
         Ok(())
     }
 }
