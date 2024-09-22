@@ -10,7 +10,7 @@ use crate::checkers::ast::Checker;
 /// Check for chained boolean operations that can be simplified.
 ///
 /// ## Why is this bad?
-/// Refactoring the code will improve readability for these chained boolean operations.
+/// Refactoring the code will improve readability for these cases.
 ///
 /// ## Example
 ///
