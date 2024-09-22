@@ -2322,14 +2322,17 @@ impl<'db> TypeInferenceBuilder<'db> {
             values,
         } = bool_op;
         let mut value_tys = Vec::new();
-        for (i, value) in values.iter().enumerate() {
-            let value_type = self.infer_expression(value);
+        let inferred_types: Vec<Type<'db>> = values
+            .iter()
+            .map(|value| self.infer_expression(value))
+            .collect();
+        for (i, value_type) in inferred_types.iter().enumerate() {
             let boolean_value = value_type.boolean_value(self.db);
             if let Some(boolean_value) = boolean_value {
                 let is_last = i == values.len() - 1;
                 match (boolean_value, is_last, op) {
                     (true, false, ast::BoolOp::And) => continue,
-                    (false, _, ast::BoolOp::And) => return value_type,
+                    (false, _, ast::BoolOp::And) => return *value_type,
                     (true, _, ast::BoolOp::Or) => {
                         value_tys.push(value_type);
                         break;
