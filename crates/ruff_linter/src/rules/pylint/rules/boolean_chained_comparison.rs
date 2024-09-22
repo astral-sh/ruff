@@ -131,7 +131,7 @@ pub(crate) fn boolean_chained_comparison(checker: &mut Checker, expr_bool_op: &E
                 let range = result.range;
                 let replace_range = result.replace_range;
                 let mut diagnostic = Diagnostic::new(result, range);
-                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                     variable.to_string(),
                     replace_range,
                 )));
