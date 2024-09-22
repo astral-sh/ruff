@@ -2322,35 +2322,23 @@ impl<'db> TypeInferenceBuilder<'db> {
             values,
         } = bool_op;
         let mut value_tys = Vec::new();
-        match op {
-            ast::BoolOp::And => {
-                for (i, value) in values.iter().enumerate() {
-                    let value_type = self.infer_expression(value);
-                    let boolean_value = value_type.boolean_value(self.db);
-                    if let Some(boolean_value) = boolean_value {
-                        if boolean_value && i < values.len() - 1 {
-                            continue;
-                        } else if !boolean_value {
-                            return value_type;
-                        }
+        for (i, value) in values.iter().enumerate() {
+            let value_type = self.infer_expression(value);
+            let boolean_value = value_type.boolean_value(self.db);
+            if let Some(boolean_value) = boolean_value {
+                let is_last = i == values.len() - 1;
+                match (boolean_value, is_last, op) {
+                    (true, false, ast::BoolOp::And) => continue,
+                    (false, _, ast::BoolOp::And) => return value_type,
+                    (true, _, ast::BoolOp::Or) => {
+                        value_tys.push(value_type);
+                        break;
                     }
-                    value_tys.push(value_type);
+                    (false, false, ast::BoolOp::Or) => continue,
+                    (_, true, _) => value_tys.push(value_type),
                 }
-            }
-            ast::BoolOp::Or => {
-                for (i, value) in values.iter().enumerate() {
-                    let value_type = self.infer_expression(value);
-                    let boolean_value = value_type.boolean_value(self.db);
-                    if let Some(boolean_value) = boolean_value {
-                        if boolean_value {
-                            value_tys.push(value_type);
-                            break;
-                        } else if !boolean_value && i < values.len() - 1 {
-                            continue;
-                        }
-                    }
-                    value_tys.push(value_type);
-                }
+            } else {
+                value_tys.push(value_type);
             }
         }
         UnionType::from_elements(self.db, value_tys)

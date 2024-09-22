@@ -533,13 +533,27 @@ impl<'db> Type<'db> {
             Type::Function(_) | Type::RevealTypeFunction(_) => Some(true),
             Type::Module(_) => Some(true),
             Type::Class(_) => Some(true),
-            Type::Instance(_) => {
-                // TODO
-                None
-            }
+            Type::Instance(_) => None,
             Type::Union(union) => {
-                // TODO
-                None
+                let inner_values = union
+                    .elements(db)
+                    .iter()
+                    .map(|elem| elem.boolean_value(db))
+                    .collect::<FxOrderSet<_>>();
+                let mut found_true = false;
+                let mut found_false = false;
+                for value in inner_values {
+                    match value {
+                        Some(true) => found_true = true,
+                        Some(false) => found_false = true,
+                        None => return None,
+                    }
+                }
+                match (found_true, found_false) {
+                    (true, false) => Some(true),
+                    (false, true) => Some(false),
+                    _ => None,
+                }
             }
             Type::Intersection(_) => {
                 // TODO
@@ -1108,7 +1122,9 @@ pub struct TupleType<'db> {
 
 #[cfg(test)]
 mod tests {
-    use super::{builtins_symbol_ty, BytesLiteralType, StringLiteralType, Type, UnionType};
+    use super::{
+        builtins_symbol_ty, BytesLiteralType, StringLiteralType, TupleType, Type, UnionType,
+    };
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
@@ -1149,6 +1165,7 @@ mod tests {
         BytesLiteral(&'static str),
         BuiltinInstance(&'static str),
         Union(Vec<Ty>),
+        Tuple(Vec<Ty>),
     }
 
     impl Ty {
@@ -1168,6 +1185,10 @@ mod tests {
                 Ty::BuiltinInstance(s) => builtins_symbol_ty(db, s).to_instance(db),
                 Ty::Union(tys) => {
                     UnionType::from_elements(db, tys.into_iter().map(|ty| ty.into_type(db)))
+                }
+                Ty::Tuple(tys) => {
+                    let elements = tys.into_iter().map(|ty| ty.into_type(db)).collect();
+                    Type::Tuple(TupleType::new(db, elements))
                 }
             }
         }
@@ -1237,5 +1258,33 @@ mod tests {
         let db = setup_db();
 
         assert!(from.into_type(&db).is_equivalent_to(&db, to.into_type(&db)));
+    }
+
+    #[test_case(Ty::IntLiteral(1); "is_int_literal_truthy")]
+    #[test_case(Ty::IntLiteral(-1))]
+    #[test_case(Ty::StringLiteral("foo"))]
+    #[test_case(Ty::Tuple(vec![Ty::IntLiteral(0)]))]
+    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]))]
+    fn is_truthy(ty: Ty) {
+        let db = setup_db();
+        assert_eq!(ty.into_type(&db).boolean_value(&db), Some(true));
+    }
+
+    #[test_case(Ty::Tuple(vec![]))]
+    #[test_case(Ty::IntLiteral(0))]
+    #[test_case(Ty::StringLiteral(""))]
+    #[test_case(Ty::Union(vec![Ty::IntLiteral(0), Ty::IntLiteral(0)]))]
+    fn is_falsy(ty: Ty) {
+        let db = setup_db();
+        assert_eq!(ty.into_type(&db).boolean_value(&db), Some(false));
+    }
+
+    #[test_case(Ty::BuiltinInstance("str"))]
+    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(0)]))]
+    #[test_case(Ty::Union(vec![Ty::BuiltinInstance("str"), Ty::IntLiteral(0)]))]
+    #[test_case(Ty::Union(vec![Ty::BuiltinInstance("str"), Ty::IntLiteral(1)]))]
+    fn boolean_value_is_unknown(ty: Ty) {
+        let db = setup_db();
+        assert_eq!(ty.into_type(&db).boolean_value(&db), None);
     }
 }
