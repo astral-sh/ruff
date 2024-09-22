@@ -132,7 +132,7 @@ pub(crate) fn boolean_chained_comparison(checker: &mut Checker, expr_bool_op: &E
 
 /// Checks whether two compare expressions are simplifiable
 fn are_compare_expr_simplifiable(left: &ExprCompare, right: &ExprCompare) -> bool {
-    // only allow simplifyng simple compare operations
+    // only allow simplifying simple compare operations
     if left.ops.len() != 1 || right.ops.len() != 1 {
         return false;
     }
