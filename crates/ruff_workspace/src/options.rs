@@ -3355,8 +3355,8 @@ pub struct AnalyzeOptions {
     /// Whether to generate a map from file to files that it depends on (dependencies) or files that
     /// depend on it (dependents).
     #[option(
-        default = r#"\"dependencies\""#,
-        value_type = "\"dependents\" | \"dependencies\"",
+        default = r#""dependencies""#,
+        value_type = r#""dependents" | "dependencies""#,
         example = r#"
             direction = "dependencies"
         "#
