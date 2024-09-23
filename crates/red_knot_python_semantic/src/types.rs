@@ -924,8 +924,8 @@ impl<'db> IterationOutcome<'db> {
 
 // When it really matters to distinguish between different kinds of `Unknown` types
 // (see `PartialEq` implementation), we use the representation as `u8`
+#[derive(Debug, Clone, Copy, Eq, Hash)]
 #[repr(u8)]
-#[derive(Debug, Clone, Copy)]
 pub enum UnknownTypeKind {
     /// Temporary variant that indicates that we *should*
     /// be able to infer a type here in due course, but currently can't
@@ -956,22 +956,24 @@ pub enum UnknownTypeKind {
     /// a "first-order" Unknown type. For example, if the type of `x` is `Unknown`,
     /// the type of `x + 1` will also be `Unknown`
     SecondOrder,
+
+    /// Special kind for intersections that is equal to all other kinds. This allows to consider a
+    /// single Type::Unknown(_) in intersections. Should not be used in other contexts.
+    AllKinds,
 }
 
 impl PartialEq for UnknownTypeKind {
-    /// When comparing `Type::Unknown` values, we consider them equal regardless of their kind.
-    fn eq(&self, _other: &Self) -> bool {
-        true
+    fn eq(&self, other: &Self) -> bool {
+        // The special kind `AllKinds` is equal to all other kinds
+        match (self, other) {
+            (UnknownTypeKind::AllKinds, _) | (_, UnknownTypeKind::AllKinds) => true,
+            _ => *self as u8 == *other as u8,
+        }
     }
 }
 
-impl Eq for UnknownTypeKind {}
-
-impl std::hash::Hash for UnknownTypeKind {
-    fn hash<H: std::hash::Hasher>(&self, _state: &mut H) {}
-}
-
 impl UnknownTypeKind {
+    /// Method to aggregate multiple `UnknownTypeKind`s when they interact in any context
     pub(crate) fn union(self, other: Self) -> Self {
         if (self as u8) == (other as u8) {
             self
@@ -1318,18 +1320,23 @@ mod tests {
     }
 
     #[test]
-    fn unknown_of_different_kinds_are_equal() {
-        let ut0 = Type::Unknown(UnknownTypeKind::TypeError);
-        let ut1 = Type::Unknown(UnknownTypeKind::InvalidSyntax);
-        assert_eq!(ut0, ut1);
+    fn unknown_of_different_kinds_are_equal_to_all_kinds() {
+        let kind1 = UnknownTypeKind::TypeError;
+        let kind2 = UnknownTypeKind::InvalidSyntax;
+        let all_kinds = UnknownTypeKind::AllKinds;
+        assert_ne!(kind1, kind2);
+        assert_eq!(kind1, all_kinds);
+        assert_eq!(kind2, all_kinds);
     }
 
     #[test]
     fn unknown_union_does_not_change_same_kinds() {
         let uk0 = UnknownTypeKind::TypeError;
         let uk1 = UnknownTypeKind::InvalidSyntax;
-        assert!(uk0 as u8 != uk1 as u8);
-        assert!(uk0.union(uk0) as u8 == uk0 as u8);
-        // We don't really need to test the outcome of union of different kinds (yet)
+        assert_ne!(uk0, uk1);
+        assert_eq!(uk0.union(uk0), uk0);
+        assert_eq!(uk1.union(uk1), uk1);
+        // TODO: unit test the outcome of != kind of unions once the correct implementation is
+        // decided
     }
 }

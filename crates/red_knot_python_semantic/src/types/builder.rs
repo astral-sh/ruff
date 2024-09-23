@@ -25,9 +25,11 @@
 //!   * No type in an intersection can be a supertype of any other type in the intersection (just
 //!     eliminate the supertype from the intersection).
 //!   * An intersection containing two non-overlapping types should simplify to [`Type::Never`].
-use crate::types::{builtins_symbol_ty, IntersectionType, Type, UnionType, UnknownTypeKind};
+use crate::types::{builtins_symbol_ty, IntersectionType, Type, UnionType};
 use crate::{Db, FxOrderSet};
 use smallvec::SmallVec;
+
+use super::UnknownTypeKind;
 
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<Type<'db>>,
@@ -115,21 +117,7 @@ impl<'db> UnionBuilder<'db> {
         self
     }
 
-    /// Performs the following normalizations:
-    ///     - Replaces `Literal[True,False]` with `bool`.
-    ///     - TODO For enums `E` with members `X1`,...,`Xn`, replaces
-    ///     `Literal[E.X1,...,E.Xn]` with `E`.
-    fn simplify(&mut self) {
-        if let Some(true_index) = self.elements.get_index_of(&Type::BooleanLiteral(true)) {
-            if self.elements.contains(&Type::BooleanLiteral(false)) {
-                *self.elements.get_index_mut2(true_index).unwrap() =
-                    builtins_symbol_ty(self.db, "bool");
-                self.elements.remove(&Type::BooleanLiteral(false));
-            }
-        }
-    }
-
-    pub(crate) fn build(mut self) -> Type<'db> {
+    pub(crate) fn build(self) -> Type<'db> {
         match self.elements.len() {
             0 => Type::Never,
             1 => self.elements[0],
@@ -239,6 +227,12 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
     /// Adds a positive type to this intersection.
     fn add_positive(&mut self, db: &'db dyn Db, ty: Type<'db>) {
+        // Replace any unknown kind with a unique unknown kind for intersections
+        let ty = if let Type::Unknown(_) = ty {
+            Type::Unknown(UnknownTypeKind::TypeError)
+        } else {
+            ty
+        };
         match ty {
             Type::Intersection(inter) => {
                 let pos = inter.positive(db);
@@ -258,6 +252,12 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
     /// Adds a negative type to this intersection.
     fn add_negative(&mut self, db: &'db dyn Db, ty: Type<'db>) {
+        // Replace any unknown kind with a unique unknown kind for intersections
+        let ty = if let Type::Unknown(_) = ty {
+            Type::Unknown(UnknownTypeKind::TypeError)
+        } else {
+            ty
+        };
         // TODO Any/Unknown actually should not self-cancel
         match ty {
             Type::Intersection(intersection) => {
@@ -414,7 +414,6 @@ mod tests {
         let db = setup_db();
         let t0 = builtins_symbol_ty(&db, "str").to_instance(&db);
         let t1 = Type::LiteralString;
-        let t2 = Type::Unknown(UnknownTypeKind::TypeError);
         let u0 = UnionType::from_elements(&db, [t0, t1]);
         let u1 = UnionType::from_elements(&db, [t1, t0]);
 
@@ -426,7 +425,7 @@ mod tests {
     fn build_union_no_simplify_unknown() {
         let db = setup_db();
         let t0 = builtins_symbol_ty(&db, "str").to_instance(&db);
-        let t1 = Type::Unknown;
+        let t1 = Type::Unknown(UnknownTypeKind::TypeError);
         let u0 = UnionType::from_elements(&db, [t0, t1]);
         let u1 = UnionType::from_elements(&db, [t1, t0]);
 
@@ -440,7 +439,7 @@ mod tests {
         let str_ty = builtins_symbol_ty(&db, "str").to_instance(&db);
         let int_ty = builtins_symbol_ty(&db, "int").to_instance(&db);
         let object_ty = builtins_symbol_ty(&db, "object").to_instance(&db);
-        let unknown_ty = Type::Unknown;
+        let unknown_ty = Type::Unknown(UnknownTypeKind::TypeError);
 
         let u0 = UnionType::from_elements(&db, [str_ty, unknown_ty, int_ty, object_ty]);
 
@@ -471,7 +470,7 @@ mod tests {
         );
 
         assert_eq!(
-            union.expect_union().elements_vec(&db),
+            union.expect_union().elements(&db),
             &[t0, Type::Unknown(kind_aggregate), t1]
         );
     }
@@ -521,20 +520,43 @@ mod tests {
     }
 
     #[test]
-    fn build_intersection_with_multiple_unknowns() {
+    fn build_intersection_with_multiple_positive_unknowns() {
         let db = setup_db();
         let t0 = Type::IntLiteral(0);
         let kind1 = UnknownTypeKind::TypeError;
         let kind2 = UnknownTypeKind::InvalidSyntax;
-        let intersection = IntersectionBuilder::new(&db)
+        let neg_intersection = IntersectionBuilder::new(&db)
             .add_positive(t0)
             .add_negative(Type::Unknown(kind1))
             .add_negative(Type::Unknown(kind2))
             .build()
             .expect_intersection();
 
-        assert_eq!(intersection.pos_vec(&db), &[t0]);
-        assert_eq!(intersection.neg_vec(&db), &[Type::Unknown(kind1)]);
+        assert_eq!(neg_intersection.pos_vec(&db), &[t0]);
+        assert_eq!(
+            neg_intersection.neg_vec(&db),
+            &[Type::Unknown(UnknownTypeKind::AllKinds)]
+        );
+    }
+
+    #[test]
+    fn build_intersection_with_multiple_negative_unknowns() {
+        let db = setup_db();
+        let t0 = Type::IntLiteral(0);
+        let kind1 = UnknownTypeKind::TypeError;
+        let kind2 = UnknownTypeKind::InvalidSyntax;
+        let pos_intersection = IntersectionBuilder::new(&db)
+            .add_positive(Type::Unknown(kind1))
+            .add_positive(Type::Unknown(kind2))
+            .add_negative(t0)
+            .build()
+            .expect_intersection();
+
+        assert_eq!(
+            pos_intersection.pos_vec(&db),
+            &[Type::Unknown(UnknownTypeKind::AllKinds)]
+        );
+        assert_eq!(pos_intersection.neg_vec(&db), &[t0]);
     }
 
     #[test]

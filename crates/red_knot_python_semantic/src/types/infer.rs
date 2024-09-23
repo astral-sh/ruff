@@ -1491,22 +1491,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             asname: _,
         } = alias;
 
-        // If a symbol is unbound in the module the symbol was originally defined in,
-        // when we're trying to import the symbol from that module into "our" module,
-        // the runtime error will occur immediately (rather than when the symbol is *used*,
-        // as would be the case for a symbol with type `Unbound`), so it's appropriate to
-        // think of the type of the imported symbol as `Unknown` rather than `Unbound`
-        let member_ty = module_ty
-            .member(self.db, &Name::new(&name.id))
-            .recursive_transform(self.db, |ty| match ty {
-                Type::Unbound => Type::Unknown(UnknownTypeKind::UnresolvedImport),
-                // If the symbol was already `Unknown`, we enrich that `UnknownKind` with
-                // the `UnresolvedImport` variant
-                Type::Unknown(kind) => Type::Unknown(kind.union(UnknownTypeKind::UnresolvedImport)),
-                ty => ty,
-            });
+        let member_ty = module_ty.member(self.db, &Name::new(&name.id));
 
-        if matches!(member_ty, Type::Unknown(UnknownTypeKind::UnresolvedImport)) {
+        // TODO: What if it's a union where one of the elements is `Unbound`?
+        if member_ty.is_unbound() {
             self.add_diagnostic(
                 AnyNodeRef::Alias(alias),
                 "unresolved-import",
@@ -1523,12 +1511,12 @@ impl<'db> TypeInferenceBuilder<'db> {
         // the runtime error will occur immediately (rather than when the symbol is *used*,
         // as would be the case for a symbol with type `Unbound`), so it's appropriate to
         // think of the type of the imported symbol as `Unknown` rather than `Unbound`
-        let ty = member_ty.recursive_transform(self.db, |ty| {
-            if ty.is_unbound() {
-                Type::Unknown(UnknownTypeKind::UnresolvedImport)
-            } else {
-                ty
-            }
+        let ty = member_ty.recursive_transform(self.db, |ty| match ty {
+            Type::Unbound => Type::Unknown(UnknownTypeKind::UnresolvedImport),
+            // If the symbol was already `Unknown`, we enrich that `UnknownKind` with
+            // the `UnresolvedImport` variant
+            Type::Unknown(kind) => Type::Unknown(kind.union(UnknownTypeKind::UnresolvedImport)),
+            ty => ty,
         });
 
         self.add_declaration_with_binding(alias.into(), definition, ty, ty);
