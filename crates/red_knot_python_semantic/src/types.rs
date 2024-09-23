@@ -540,20 +540,18 @@ impl<'db> Type<'db> {
                 None
             }
             Type::Union(union) => {
-                let mut found_true = false;
-                let mut found_false = false;
+                let mut result: Option<bool> = None;
                 for value in union.elements(db) {
-                    match value.bool(db) {
-                        Some(true) => found_true = true,
-                        Some(false) => found_false = true,
-                        None => return None,
+                    if let Some(value) = value.bool(db) {
+                        if result.is_some_and(|result| value != result) {
+                            return None;
+                        }
+                        result = Some(value);
+                    } else {
+                        return None;
                     }
                 }
-                match (found_true, found_false) {
-                    (true, false) => Some(true),
-                    (false, true) => Some(false),
-                    _ => None,
-                }
+                result
             }
             Type::Intersection(_) => {
                 // TODO
