@@ -722,9 +722,9 @@ dependencies = [
 
 [[package]]
 name = "dashmap"
-version = "6.0.1"
+version = "6.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "804c8821570c3f8b70230c2ba75ffa5c0f9a4189b9a432b6656c536712acae28"
+checksum = "5041cc499144891f3790297212f32a74fb938e5136a14943f338ef9e0ae276cf"
 dependencies = [
  "cfg-if",
  "crossbeam-utils",
@@ -2351,7 +2351,7 @@ version = "0.0.0"
 dependencies = [
  "camino",
  "countme",
- "dashmap 6.0.1",
+ "dashmap 6.1.0",
  "filetime",
  "ignore",
  "insta",
@@ -2949,7 +2949,7 @@ dependencies = [
  "append-only-vec",
  "arc-swap",
  "crossbeam",
- "dashmap 6.0.1",
+ "dashmap 6.1.0",
  "hashlink",
  "indexmap",
  "lazy_static",
