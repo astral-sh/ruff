@@ -10,6 +10,7 @@ use ruff_linter::{warn_user, warn_user_once};
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_workspace::resolver::{match_exclusion, python_files_in_path, ResolvedFile};
 use rustc_hash::FxHashMap;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
@@ -174,7 +175,11 @@ pub(crate) fn analyze_graph(
     };
 
     // Print to JSON.
-    println!("{}", serde_json::to_string_pretty(&import_map)?);
+    writeln!(
+        std::io::stdout(),
+        "{}",
+        serde_json::to_string_pretty(&import_map)?
+    )?;
 
     std::mem::forget(db);
 
