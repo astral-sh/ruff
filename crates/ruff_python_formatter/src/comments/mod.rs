@@ -839,6 +839,20 @@ def test(
     }
 
     #[test]
+    fn fmt_skip_applies_to_entire_compound_statement() {
+        let source = r#"
+if True: x = 0  # fmt: skip
+
+def foo(self, lorem, ipsum, dolor, sit, amet, consectetur, adipiscing, elit, sed, do): ...  # fmt: skip
+"#;
+
+        let test_case = CommentsTestCase::from_code(source);
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
     fn positional_argument_only_comment() {
         let source = r"
 def test(

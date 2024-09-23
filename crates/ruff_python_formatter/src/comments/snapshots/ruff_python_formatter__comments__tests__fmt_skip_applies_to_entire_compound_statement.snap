@@ -1,0 +1,36 @@
+---
+source: crates/ruff_python_formatter/src/comments/mod.rs
+expression: comments.debug(test_case.source_code)
+---
+{
+    Node {
+        kind: StmtIf,
+        range: 1..15,
+        source: `if True: x = 0`,
+    }: {
+        "leading": [],
+        "dangling": [],
+        "trailing": [
+            SourceComment {
+                text: "# fmt: skip",
+                position: EndOfLine,
+                formatted: false,
+            },
+        ],
+    },
+    Node {
+        kind: StmtFunctionDef,
+        range: 30..120,
+        source: `def foo(self, lorem, ipsum,..., do): ...`,
+    }: {
+        "leading": [],
+        "dangling": [],
+        "trailing": [
+            SourceComment {
+                text: "# fmt: skip",
+                position: EndOfLine,
+                formatted: false,
+            },
+        ],
+    },
+}
