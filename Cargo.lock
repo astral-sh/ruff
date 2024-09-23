@@ -2944,7 +2944,7 @@ checksum = "e86697c916019a8588c99b5fac3cead74ec0b4b819707a682fd4d23fa0ce1ba1"
 [[package]]
 name = "salsa"
 version = "0.18.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=f608ff8b24f07706492027199f51132244034f29#f608ff8b24f07706492027199f51132244034f29"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=4a7c955255e707e64e43f3ce5eabb771ae067768#4a7c955255e707e64e43f3ce5eabb771ae067768"
 dependencies = [
  "append-only-vec",
  "arc-swap",
@@ -2964,12 +2964,12 @@ dependencies = [
 [[package]]
 name = "salsa-macro-rules"
 version = "0.1.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=f608ff8b24f07706492027199f51132244034f29#f608ff8b24f07706492027199f51132244034f29"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=4a7c955255e707e64e43f3ce5eabb771ae067768#4a7c955255e707e64e43f3ce5eabb771ae067768"
 
 [[package]]
 name = "salsa-macros"
 version = "0.18.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=f608ff8b24f07706492027199f51132244034f29#f608ff8b24f07706492027199f51132244034f29"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=4a7c955255e707e64e43f3ce5eabb771ae067768#4a7c955255e707e64e43f3ce5eabb771ae067768"
 dependencies = [
  "heck",
  "proc-macro2",
