@@ -292,28 +292,58 @@ pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
             let line_indent = leading_space(last);
             let line_indent_size = line_indent.chars().count();
             if line_indent_size > docstring_indent_size {
-                let mut offset_len = line_indent_size;
+                let offset_len = if line_indent.text_len() == last.text_len() {
+                    line_indent_size
                 // The trailing quotes are not on a separate line.
-                if line_indent.text_len() != last.text_len() {
-                    over_indented_size =
+                } else {
+                    let over_indented_size =
                         std::cmp::min(line_indent_size - docstring_indent_size, over_indented_size);
                     match over_indented_size.cmp(&docstring_indent_size) {
+                        // If indentation is exactly the same, no changes are needed.
+                        // Example:
+                        // ```
+                        // def f():
+                        //    """A docstring.
+                        //    Args:
+                        //    ^^^^This line is correctly indented (4 spaces)."""
+                        // ```
                         Ordering::Equal => {
                             return;
                         }
-                        Ordering::Less => {
-                            offset_len = over_indented_size;
-                        }
+                        // If the indentation is less then docstring_indent_size,
+                        // replace the over-indentation with `docstring.indentation`.
+                        // Example:
+                        // ```
+                        // def f():
+                        //    """A docstring.
+                        //    ^^This line is slightly over-indented (2 spaces)."""
+                        // ```
+                        Ordering::Less => over_indented_size,
+                        // If the indentation is significantly larger than needed,
+                        // reduce the extra spaces down to match `docstring.indentation`.
+                        // Example:
+                        // ```
+                        // def f():
+                        //    """A docstring.
+                        //    ^^^^^^^^This line is over-indented by 8 spaces; it needs fixing."""
+                        // ```
                         Ordering::Greater => {
-                            offset_len -= over_indented_size - docstring_indent_size;
+                            line_indent_size - (over_indented_size - docstring_indent_size)
                         }
                     }
-                }
+                };
+
                 let mut diagnostic =
                     Diagnostic::new(OverIndentation, TextRange::empty(last.start()));
                 let indent = clean_space(docstring.indentation);
-                let range =
-                    TextRange::at(last.start(), TextSize::new(offset_len.try_into().unwrap()));
+                let offset = checker
+                    .locator()
+                    .after(last.start())
+                    .chars()
+                    .take(offset_len)
+                    .map(TextLen::text_len)
+                    .sum::<TextSize>();
+                let range = TextRange::at(last.start(), offset);
                 let edit = if indent.is_empty() {
                     Edit::range_deletion(range)
                 } else {
