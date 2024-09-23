@@ -90,8 +90,10 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
                         components.extend(module.split('.'));
                     }
 
-                    // Add the alias name.
-                    components.push(alias.name.as_str());
+                    // Add the alias name, unless it's a wildcard import.
+                    if alias.name.as_str() != "*" {
+                        components.push(alias.name.as_str());
+                    }
 
                     if let Some(module_name) = ModuleName::from_components(components) {
                         self.imports.push(CollectedImport::ImportFrom(module_name));
