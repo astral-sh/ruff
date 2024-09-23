@@ -532,18 +532,21 @@ impl<'db> Type<'db> {
             Type::None => Some(false),
             Type::Function(_) | Type::RevealTypeFunction(_) => Some(true),
             Type::Module(_) => Some(true),
-            Type::Class(_) => Some(true),
-            Type::Instance(_) => None,
+            Type::Class(_) => {
+                // TODO: lookup `__bool__` and `__len__` methods on the class's metaclass
+                // More info in https://docs.python.org/3/library/stdtypes.html#truth-value-testing
+                None
+            }
+            Type::Instance(_) => {
+                // TODO: lookup `__bool__` and `__len__` methods on the instance's class
+                // More info in https://docs.python.org/3/library/stdtypes.html#truth-value-testing
+                None
+            }
             Type::Union(union) => {
-                let inner_values = union
-                    .elements(db)
-                    .iter()
-                    .map(|elem| elem.bool(db))
-                    .collect::<FxOrderSet<_>>();
                 let mut found_true = false;
                 let mut found_false = false;
-                for value in inner_values {
-                    match value {
+                for value in union.elements(db) {
+                    match value.bool(db) {
                         Some(true) => found_true = true,
                         Some(false) => found_false = true,
                         None => return None,
