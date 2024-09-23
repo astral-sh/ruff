@@ -525,10 +525,7 @@ impl<'db> Type<'db> {
     /// This is used to determine the value that would be returned when `__bool__` is called on an object
     pub fn bool(&self, db: &'db dyn Db) -> Option<bool> {
         match self {
-            Type::Any => None,
-            Type::Never => None,
-            Type::Unknown => None,
-            Type::Unbound => None,
+            Type::Any | Type::Never | Type::Unknown | Type::Unbound => None,
             Type::None => Some(false),
             Type::Function(_) | Type::RevealTypeFunction(_) => Some(true),
             Type::Module(_) => Some(true),
