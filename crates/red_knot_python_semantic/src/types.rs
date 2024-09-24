@@ -522,8 +522,10 @@ impl<'db> Type<'db> {
     }
 
     /// Resolves the boolean value of a type.
-    /// This is used to determine the value that would be returned when `__bool__` is called on an object
-    pub(crate) fn bool(&self, db: &'db dyn Db) -> Truthiness {
+    ///
+    /// This is used to determine the value that would be returned
+    /// when `bool(x)` is called on an object `x`.
+    fn bool(&self, db: &'db dyn Db) -> Truthiness {
         match self {
             Type::Any | Type::Never | Type::Unknown | Type::Unbound => Truthiness::Ambiguous,
             Type::None => Truthiness::AlwaysFalse,
@@ -540,22 +542,19 @@ impl<'db> Type<'db> {
                 Truthiness::Ambiguous
             }
             Type::Union(union) => {
-                let mut result: Option<Truthiness> = None;
-                for value in union.elements(db) {
-                    let truthiness = value.bool(db);
-                    match truthiness {
-                        Truthiness::AlwaysTrue | Truthiness::AlwaysFalse => {
-                            if result.is_some_and(|result| truthiness != result) {
-                                return Truthiness::Ambiguous;
-                            }
-                            result = Some(truthiness);
-                        }
-                        Truthiness::Ambiguous => {
-                            return Truthiness::Ambiguous;
-                        }
-                    }
+                let union_elements = union.elements(db);
+                let first_element_truthiness = union_elements[0].bool(db);
+                if first_element_truthiness.is_ambiguous() {
+                    return Truthiness::Ambiguous;
                 }
-                result.unwrap_or(Truthiness::Ambiguous)
+                if !union_elements
+                    .iter()
+                    .skip(1)
+                    .all(|element| element.bool(db) == first_element_truthiness)
+                {
+                    return Truthiness::Ambiguous;
+                }
+                first_element_truthiness
             }
             Type::Intersection(_) => {
                 // TODO
@@ -923,15 +922,22 @@ impl<'db> IterationOutcome<'db> {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(crate) enum Truthiness {
+enum Truthiness {
+    /// For an object `x`, `bool(x)` will always return `True`
     AlwaysTrue,
+    /// For an object `x`, `bool(x)` will always return `False`
     AlwaysFalse,
+    /// For an object `x`, `bool(x)` could return either `True` or `False`
     Ambiguous,
 }
 
 impl Truthiness {
+    const fn is_ambiguous(self) -> bool {
+        matches!(self, Truthiness::Ambiguous)
+    }
+
     #[allow(unused)]
-    fn negate(self) -> Self {
+    const fn negate(self) -> Self {
         match self {
             Self::AlwaysTrue => Self::AlwaysFalse,
             Self::AlwaysFalse => Self::AlwaysTrue,
