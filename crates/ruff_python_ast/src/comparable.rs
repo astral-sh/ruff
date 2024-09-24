@@ -1935,7 +1935,7 @@ mod tests {
         }
         .into();
 
-        // `f"{foo!r} this{bar!s} that"`
+        // `f"{foo!r} this and {bar!s} that"`
         let fstring_expr: ast::Expr = ast::ExprFString {
             range: TextRange::default(),
             value: ast::FStringValue::single(ast::FString {
@@ -2049,7 +2049,7 @@ mod tests {
         }
         .into();
 
-        // `f"{foo!r} this{bar!s} that"`
+        // `f"{foo!r} this\\n raw and {bar!s} that"`
         let fstring_expr: ast::Expr = ast::ExprFString {
             range: TextRange::default(),
             value: ast::FStringValue::single(ast::FString {
