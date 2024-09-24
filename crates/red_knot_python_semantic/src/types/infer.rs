@@ -2320,27 +2320,32 @@ impl<'db> TypeInferenceBuilder<'db> {
             op,
             values,
         } = bool_op;
-        let mut value_tys = Vec::new();
-        let inferred_types: Vec<Type<'db>> = values
-            .iter()
-            .map(|value| self.infer_expression(value))
-            .collect();
-        for (i, value_type) in inferred_types.iter().enumerate() {
-            let boolean_value = value_type.bool(self.db);
-            let is_last = i == values.len() - 1;
-            match (boolean_value, is_last, op) {
-                (Truthiness::Ambiguous, _, _) => value_tys.push(value_type),
-                (Truthiness::AlwaysTrue, false, ast::BoolOp::And) => continue,
-                (Truthiness::AlwaysTrue, _, ast::BoolOp::Or)
-                | (Truthiness::AlwaysFalse, _, ast::BoolOp::And) => {
-                    value_tys.push(value_type);
-                    break;
+        let mut done = false;
+        UnionType::from_elements(
+            self.db,
+            values.iter().enumerate().map(|(i, value)| {
+                // We need to infer the type of every expression (that's an invariant maintained by
+                // type inference), even if we can short-circuit boolean evaluation of some of
+                // those types.
+                let value_ty = self.infer_expression(value);
+                if done {
+                    Type::Never
+                } else {
+                    let is_last = i == values.len() - 1;
+                    match (value_ty.bool(self.db), is_last, op) {
+                        (Truthiness::Ambiguous, _, _) => value_ty,
+                        (Truthiness::AlwaysTrue, false, ast::BoolOp::And) => Type::Never,
+                        (Truthiness::AlwaysFalse, false, ast::BoolOp::Or) => Type::Never,
+                        (Truthiness::AlwaysFalse, _, ast::BoolOp::And)
+                        | (Truthiness::AlwaysTrue, _, ast::BoolOp::Or) => {
+                            done = true;
+                            value_ty
+                        }
+                        (_, true, _) => value_ty,
+                    }
                 }
-                (Truthiness::AlwaysFalse, false, ast::BoolOp::Or) => continue,
-                (_, true, _) => value_tys.push(value_type),
-            }
-        }
-        UnionType::from_elements(self.db, value_tys)
+            }),
+        )
     }
 
     fn infer_compare_expression(&mut self, compare: &ast::ExprCompare) -> Type<'db> {
