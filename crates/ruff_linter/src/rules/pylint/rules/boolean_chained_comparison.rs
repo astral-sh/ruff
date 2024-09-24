@@ -47,7 +47,7 @@ impl Violation for BooleanChainedComparison {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Simplify chained boolean comparisons".to_string())
+        Some("Use a single compare expression".to_string())
     }
 }
 
