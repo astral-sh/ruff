@@ -64,7 +64,6 @@ pub(crate) fn boolean_chained_comparison(checker: &mut Checker, expr_bool_op: &E
     }
 
     // early exit when not all expressions are compare expressions
-    // TODO: check if this can even happen?
     if !expr_bool_op.values.iter().all(Expr::is_compare_expr) {
         return;
     }
