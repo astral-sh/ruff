@@ -70,37 +70,31 @@ pub(crate) fn boolean_chained_comparison(checker: &mut Checker, expr_bool_op: &E
         .map(|stmt| stmt.as_compare_expr().unwrap())
         .collect();
 
-    let results: Vec<Result<(), BooleanChainedComparison>> = compare_exprs
+    let results: Vec<BooleanChainedComparison> = compare_exprs
         .iter()
         .tuple_windows::<(&&ExprCompare, &&ExprCompare)>()
         .filter(|(left_compare, right_compare)| {
             are_compare_expr_simplifiable(left_compare, right_compare)
         })
-        .map(|(left_compare, right_compare)| {
+        .filter_map(|(left_compare, right_compare)| {
             let Expr::Name(left_compare_right) = left_compare.comparators.first().unwrap() else {
-                return Ok(());
+                return None;
             };
 
             let Expr::Name(ref right_compare_left) = right_compare.left.as_ref() else {
-                return Ok(());
+                return None;
             };
 
             if left_compare_right.id() != right_compare_left.id() {
-                return Ok(());
+                return None;
             }
 
-            Err(BooleanChainedComparison {
+            Some(BooleanChainedComparison {
                 variable: left_compare_right.id().clone(),
                 range: TextRange::new(left_compare.start(), right_compare.end()),
                 replace_range: TextRange::new(left_compare_right.start(), right_compare_left.end()),
             })
         })
-        .collect();
-
-    let results: Vec<BooleanChainedComparison> = results
-        .into_iter()
-        .filter(Result::is_err)
-        .map(|result| result.err().unwrap())
         .collect();
 
     checker
