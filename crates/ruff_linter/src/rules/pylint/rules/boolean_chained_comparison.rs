@@ -53,12 +53,7 @@ impl Violation for BooleanChainedComparison {
 
 /// PLR1716
 pub(crate) fn boolean_chained_comparison(checker: &mut Checker, expr_bool_op: &ExprBoolOp) {
-    // early out for boolean expression without multiple compare values
-    if expr_bool_op.values.len() == 1 {
-        return;
-    }
-
-    // early out for non `and` boolean operations
+    // early exit for non `and` boolean operations
     if expr_bool_op.op != BoolOp::And {
         return;
     }
