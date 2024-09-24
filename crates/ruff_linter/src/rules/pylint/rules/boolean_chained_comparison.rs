@@ -103,22 +103,19 @@ pub(crate) fn boolean_chained_comparison(checker: &mut Checker, expr_bool_op: &E
         .map(|result| result.err().unwrap())
         .collect();
 
-    checker.diagnostics.extend(
-        results
-            .into_iter()
-            .map(|result| {
-                let variable = result.variable.clone();
-                let range = result.range;
-                let replace_range = result.replace_range;
-                let mut diagnostic = Diagnostic::new(result, range);
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    variable.to_string(),
-                    replace_range,
-                )));
-                diagnostic
-            })
-            .collect::<Vec<Diagnostic>>(),
-    );
+    checker
+        .diagnostics
+        .extend(results.into_iter().map(|result| {
+            let variable = result.variable.clone();
+            let range = result.range;
+            let replace_range = result.replace_range;
+            let mut diagnostic = Diagnostic::new(result, range);
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                variable.to_string(),
+                replace_range,
+            )));
+            diagnostic
+        }));
 }
 
 /// Checks whether two compare expressions are simplifiable
