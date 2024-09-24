@@ -79,15 +79,13 @@ impl<'db> UnionBuilder<'db> {
                     } else if element.is_subtype_of(self.db, ty) {
                         to_remove.push(index);
                     }
-                    match (element, ty) {
+
+                    if let (Type::Unknown(kind1), Type::Unknown(kind2)) = (element, ty) {
                         // Aggregate unknown types together as a single unknown type. Can only
                         // happen once because there can't be two unknown types in the same union.
-                        (Type::Unknown(kind1), Type::Unknown(kind2)) => {
-                            to_add = Type::Unknown(kind1.union(kind2));
-                            to_remove.push(index);
-                            break;
-                        }
-                        _ => {}
+                        to_add = Type::Unknown(kind1.union(kind2));
+                        to_remove.push(index);
+                        break;
                     }
                 }
 

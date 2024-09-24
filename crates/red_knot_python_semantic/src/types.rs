@@ -381,7 +381,7 @@ impl<'db> Type<'db> {
         match self {
             Type::Union(union) => union
                 .elements(db)
-                .into_iter()
+                .iter()
                 .fold(UnionBuilder::new(db), |builder, ty| {
                     builder.add(transform_fn(*ty))
                 })
@@ -893,7 +893,7 @@ impl<'db> IterationOutcome<'db> {
 
 // When it really matters to distinguish between different kinds of `Unknown` types
 // (see `PartialEq` implementation), we use the representation as `u8`
-#[derive(Debug, Clone, Copy, Eq, Hash)]
+#[derive(Debug, Clone, Copy, Eq)]
 #[repr(u8)]
 pub enum UnknownTypeKind {
     /// Temporary variant that indicates that we *should*
@@ -927,7 +927,7 @@ pub enum UnknownTypeKind {
     SecondOrder,
 
     /// Special kind for intersections that is equal to all other kinds. This allows to consider a
-    /// single Type::Unknown(_) in intersections. Should not be used in other contexts.
+    /// single `Type::Unknown(_)` in intersections. Should not be used in other contexts.
     AllKinds,
 }
 
@@ -938,6 +938,13 @@ impl PartialEq for UnknownTypeKind {
             (UnknownTypeKind::AllKinds, _) | (_, UnknownTypeKind::AllKinds) => true,
             _ => *self as u8 == *other as u8,
         }
+    }
+}
+
+impl std::hash::Hash for UnknownTypeKind {
+    // Deriving `Hash` with an explicit implementation of `PartialEq` is flagged by clippy
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        (*self as u8).hash(state);
     }
 }
 
