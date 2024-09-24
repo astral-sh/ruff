@@ -9,7 +9,7 @@ boolean_chained_comparison.py:8:4: PLR1716 [*] Contains chained boolean comparis
   |    ^^^^^^^^^^^^^^^ PLR1716
 9 |     pass
   |
-  = help: Simplify chained boolean comparisons
+  = help: Use a single compare expression
 
 ℹ Safe fix
 5 5 | a = int(input())
@@ -29,7 +29,7 @@ boolean_chained_comparison.py:14:4: PLR1716 [*] Contains chained boolean compari
    |    ^^^^^^^^^^^^^^^^ PLR1716
 15 |     pass
    |
-   = help: Simplify chained boolean comparisons
+   = help: Use a single compare expression
 
 ℹ Safe fix
 11 11 | a = int(input())
@@ -49,7 +49,7 @@ boolean_chained_comparison.py:20:4: PLR1716 [*] Contains chained boolean compari
    |    ^^^^^^^^^^^^^^^^ PLR1716
 21 |     pass
    |
-   = help: Simplify chained boolean comparisons
+   = help: Use a single compare expression
 
 ℹ Safe fix
 17 17 | a = int(input())
@@ -69,7 +69,7 @@ boolean_chained_comparison.py:26:4: PLR1716 [*] Contains chained boolean compari
    |    ^^^^^^^^^^^^^^^^^ PLR1716
 27 |     pass
    |
-   = help: Simplify chained boolean comparisons
+   = help: Use a single compare expression
 
 ℹ Safe fix
 23 23 | a = int(input())
@@ -89,7 +89,7 @@ boolean_chained_comparison.py:36:4: PLR1716 [*] Contains chained boolean compari
    |    ^^^^^^^^^^^^^^^ PLR1716
 37 |     pass
    |
-   = help: Simplify chained boolean comparisons
+   = help: Use a single compare expression
 
 ℹ Safe fix
 33 33 | a = int(input())
@@ -109,7 +109,7 @@ boolean_chained_comparison.py:42:4: PLR1716 [*] Contains chained boolean compari
    |    ^^^^^^^^^^^^^^^^ PLR1716
 43 |     pass
    |
-   = help: Simplify chained boolean comparisons
+   = help: Use a single compare expression
 
 ℹ Safe fix
 39 39 | a = int(input())
@@ -129,7 +129,7 @@ boolean_chained_comparison.py:48:4: PLR1716 [*] Contains chained boolean compari
    |    ^^^^^^^^^^^^^^^^ PLR1716
 49 |     pass
    |
-   = help: Simplify chained boolean comparisons
+   = help: Use a single compare expression
 
 ℹ Safe fix
 45 45 | a = int(input())
@@ -149,7 +149,7 @@ boolean_chained_comparison.py:54:4: PLR1716 [*] Contains chained boolean compari
    |    ^^^^^^^^^^^^^^^^^ PLR1716
 55 |     pass
    |
-   = help: Simplify chained boolean comparisons
+   = help: Use a single compare expression
 
 ℹ Safe fix
 51 51 | a = int(input())
@@ -169,7 +169,7 @@ boolean_chained_comparison.py:65:4: PLR1716 [*] Contains chained boolean compari
    |    ^^^^^^^^^^^^^^^ PLR1716
 66 |     pass
    |
-   = help: Simplify chained boolean comparisons
+   = help: Use a single compare expression
 
 ℹ Safe fix
 62 62 | b = int(input())
@@ -189,7 +189,7 @@ boolean_chained_comparison.py:65:14: PLR1716 [*] Contains chained boolean compar
    |              ^^^^^^^^^^^^^^^ PLR1716
 66 |     pass
    |
-   = help: Simplify chained boolean comparisons
+   = help: Use a single compare expression
 
 ℹ Safe fix
 62 62 | b = int(input())
@@ -209,7 +209,7 @@ boolean_chained_comparison.py:73:4: PLR1716 [*] Contains chained boolean compari
    |    ^^^^^^^^^^^^^^^ PLR1716
 74 |     pass
    |
-   = help: Simplify chained boolean comparisons
+   = help: Use a single compare expression
 
 ℹ Safe fix
 70 70 | c = int(input())
@@ -229,7 +229,7 @@ boolean_chained_comparison.py:73:14: PLR1716 [*] Contains chained boolean compar
    |              ^^^^^^^^^^^^^^^ PLR1716
 74 |     pass
    |
-   = help: Simplify chained boolean comparisons
+   = help: Use a single compare expression
 
 ℹ Safe fix
 70 70 | c = int(input())
@@ -249,7 +249,7 @@ boolean_chained_comparison.py:73:24: PLR1716 [*] Contains chained boolean compar
    |                        ^^^^^^^^^^^^^^^ PLR1716
 74 |     pass
    |
-   = help: Simplify chained boolean comparisons
+   = help: Use a single compare expression
 
 ℹ Safe fix
 70 70 | c = int(input())
