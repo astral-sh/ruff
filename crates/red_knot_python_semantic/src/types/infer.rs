@@ -28,7 +28,6 @@
 //! definitions once the rest of the types in the scope have been inferred.
 use std::num::NonZeroU32;
 
-use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
 use salsa;
 use salsa::plumbing::AsId;
@@ -1318,15 +1317,16 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = alias;
 
         let module_ty = if let Some(module_name) = ModuleName::new(name) {
-            self.module_ty_from_name(module_name)
+            if let Some(module) = self.module_ty_from_name(module_name) {
+                module
+            } else {
+                self.unresolved_module_diagnostic(alias, 0, Some(name));
+                Type::Unknown(UnknownTypeKind::UnresolvedImport)
+            }
         } else {
             tracing::debug!("Failed to resolve import due to invalid syntax");
             Type::Unknown(UnknownTypeKind::InvalidSyntax)
         };
-
-        if matches!(module_ty, Type::Unknown(UnknownTypeKind::UnresolvedImport)) {
-            self.unresolved_module_diagnostic(alias, 0, Some(name));
-        }
 
         self.add_declaration_with_binding(alias.into(), definition, module_ty, module_ty);
     }
@@ -1455,11 +1455,12 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let module_ty = match module_name {
             Ok(name) => {
-                let ty = self.module_ty_from_name(name);
-                if matches!(ty, Type::Unknown(UnknownTypeKind::UnresolvedImport)) {
+                if let Some(ty) = self.module_ty_from_name(name) {
+                    ty
+                } else {
                     self.unresolved_module_diagnostic(import_from, *level, module);
+                    Type::Unknown(UnknownTypeKind::UnresolvedImport)
                 }
-                ty
             }
             Err(ModuleNameResolutionError::InvalidSyntax) => {
                 tracing::debug!("Failed to resolve import due to invalid syntax");
@@ -1491,7 +1492,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             asname: _,
         } = alias;
 
-        let member_ty = module_ty.member(self.db, &Name::new(&name.id));
+        let member_ty = module_ty.member(self.db, &ast::name::Name::new(&name.id));
 
         // TODO: What if it's a union where one of the elements is `Unbound`?
         if member_ty.is_unbound() {
@@ -1533,10 +1534,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    fn module_ty_from_name(&self, module_name: ModuleName) -> Type<'db> {
-        resolve_module(self.db, module_name)
-            .map(|module| Type::Module(module.file()))
-            .unwrap_or(Type::Unknown(UnknownTypeKind::UnresolvedImport))
+    fn module_ty_from_name(&self, module_name: ModuleName) -> Option<Type<'db>> {
+        // REVIEW: There was an opportunity here to replace `Option<Type>` with `Type` by returning
+        // `Type::Unknown(UnknownTypeKind::UnresolvedImport)` instead of `None`.
+        // I'm not including this to simplify the PR, could be done later if deemed useful.
+        resolve_module(self.db, module_name).map(|module| Type::Module(module.file()))
     }
 
     fn infer_decorator(&mut self, decorator: &ast::Decorator) -> Type<'db> {
@@ -2244,8 +2246,9 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         match (left_ty, right_ty, op) {
             (Type::Any, _, _) | (_, Type::Any, _) => Type::Any,
-            (Type::Unknown(kind1), Type::Unknown(kind2), _) => Type::Unknown(kind1.union(kind2)),
-            (Type::Unknown(kind), _, _) | (_, Type::Unknown(kind), _) => Type::Unknown(kind),
+            (Type::Unknown(_), _, _) | (_, Type::Unknown(_), _) => {
+                Type::Unknown(UnknownTypeKind::SecondOrder)
+            }
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Add) => n
                 .checked_add(m)

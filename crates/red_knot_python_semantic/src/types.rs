@@ -231,7 +231,7 @@ fn declarations_ty<'db>(
 }
 
 /// Unique ID for a type.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Type<'db> {
     /// the dynamic type: a statically-unknown set of values
     Any,
@@ -275,36 +275,6 @@ pub enum Type<'db> {
     Tuple(TupleType<'db>),
     // TODO protocols, callable types, overloads, generics, type vars
 }
-
-//impl<'db> PartialEq for Type<'db> {
-//fn eq(&self, other: &Self) -> bool {
-//match (self, other) {
-//// All unknowns are equal regardless of kind
-//(Self::Unknown(_), Self::Unknown(_)) => true,
-//// Other types are implemented like #[derice(PartialEq)]
-//(Self::Any, Self::Any) => true,
-//(Self::Never, Self::Never) => true,
-//(Self::Unbound, Self::Unbound) => true,
-//(Self::None, Self::None) => true,
-//(Self::Function(a), Self::Function(b)) => a == b,
-//(Self::RevealTypeFunction(a), Self::RevealTypeFunction(b)) => a == b,
-//(Self::Module(a), Self::Module(b)) => a == b,
-//(Self::Class(a), Self::Class(b)) => a == b,
-//(Self::Instance(a), Self::Instance(b)) => a == b,
-//(Self::Union(a), Self::Union(b)) => a == b,
-//(Self::Intersection(a), Self::Intersection(b)) => a == b,
-//(Self::IntLiteral(a), Self::IntLiteral(b)) => a == b,
-//(Self::BooleanLiteral(a), Self::BooleanLiteral(b)) => a == b,
-//(Self::StringLiteral(a), Self::StringLiteral(b)) => a == b,
-//(Self::LiteralString, Self::LiteralString) => true,
-//(Self::BytesLiteral(a), Self::BytesLiteral(b)) => a == b,
-//(Self::Tuple(a), Self::Tuple(b)) => a == b,
-//(_, _) => false,
-//}
-//}
-//}
-
-//impl Eq for Type<'_> {}
 
 impl<'db> Type<'db> {
     pub const fn is_unbound(&self) -> bool {
@@ -669,7 +639,6 @@ impl<'db> Type<'db> {
         match self {
             Type::Any => Type::Any,
             Type::Unknown(kind) => Type::Unknown(*kind),
-            // REVIEW: I am not sure about the correct subtype here --Slyces
             Type::Unbound => Type::Unknown(UnknownTypeKind::TypeError),
             Type::Never => Type::Never,
             Type::Class(class) => Type::Instance(*class),
@@ -714,7 +683,7 @@ impl<'db> Type<'db> {
             // TODO: `type[Any]`?
             Type::Any => Type::Any,
             // TODO: `type[Unknown]`?
-            Type::Unknown(kind) => Type::Unknown(*kind),
+            Type::Unknown(_) => Type::Unknown(UnknownTypeKind::RedKnotLimitation),
             // TODO intersections
             Type::Intersection(_) => Type::Unknown(UnknownTypeKind::RedKnotLimitation),
             Type::Tuple(_) => builtins_symbol_ty(db, "tuple"),
@@ -974,12 +943,8 @@ impl PartialEq for UnknownTypeKind {
 
 impl UnknownTypeKind {
     /// Method to aggregate multiple `UnknownTypeKind`s when they interact in any context
-    pub(crate) fn union(self, other: Self) -> Self {
-        if (self as u8) == (other as u8) {
-            self
-        } else {
-            UnknownTypeKind::SecondOrder
-        }
+    pub(crate) fn union(self, _other: Self) -> Self {
+        self
     }
 }
 
@@ -1134,8 +1099,7 @@ impl<'db> UnionType<'db> {
         elements
             .into_iter()
             .fold(UnionBuilder::new(db), |builder, element| {
-                let e = element.into();
-                builder.add(e)
+                builder.add(element.into())
             })
             .build()
     }

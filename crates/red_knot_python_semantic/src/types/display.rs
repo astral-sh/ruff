@@ -121,8 +121,6 @@ impl Display for DisplayUnionType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let elements = self.ty.elements(self.db);
 
-        println!("elements: {:?}", elements);
-
         // Group literal types by kind.
         let mut grouped_literals = FxHashMap::default();
 
