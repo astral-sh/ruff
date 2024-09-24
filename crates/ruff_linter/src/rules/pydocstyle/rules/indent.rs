@@ -311,7 +311,7 @@ pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
                             return;
                         }
                         // If the indentation is less then docstring_indent_size,
-                        // replace the over-indentation with `docstring.indentation`.
+                        // return over_indented_size, which will be corrected later to match `docstring.indentation`.
                         // Example:
                         // ```
                         // def f():
@@ -320,7 +320,7 @@ pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
                         // ```
                         Ordering::Less => over_indented_size,
                         // If the indentation is significantly larger than needed,
-                        // reduce the extra spaces down to match `docstring.indentation`.
+                        // return the excess spaces to be replaced with the correct `docstring.indentation` later.
                         // Example:
                         // ```
                         // def f():
