@@ -6086,9 +6086,9 @@ mod tests {
         assert_public_ty(&db, "/src/a.py", "b", r#"Literal["x"]"#);
         assert_public_ty(&db, "/src/a.py", "c", r#"Literal["y"]"#);
         assert_public_ty(&db, "/src/a.py", "d", r#"Literal["z"]"#);
-        assert_public_ty(&db, "/src/a.py", "e", r#"Literal[True]"#);
-        assert_public_ty(&db, "/src/a.py", "f", r#"Literal[False]"#);
-        assert_public_ty(&db, "/src/a.py", "g", r#"str | Literal[False]"#);
+        assert_public_ty(&db, "/src/a.py", "e", "Literal[True]");
+        assert_public_ty(&db, "/src/a.py", "f", "Literal[False]");
+        assert_public_ty(&db, "/src/a.py", "g", "str | Literal[False]");
 
         Ok(())
     }
@@ -6115,8 +6115,8 @@ mod tests {
 
         assert_public_ty(&db, "/src/a.py", "a", "Literal[False]");
         assert_public_ty(&db, "/src/a.py", "b", "Literal[False]");
-        assert_public_ty(&db, "/src/a.py", "c", r#"Literal[False]"#);
-        assert_public_ty(&db, "/src/a.py", "d", r#"str | Literal[True]"#);
+        assert_public_ty(&db, "/src/a.py", "c", "Literal[False]");
+        assert_public_ty(&db, "/src/a.py", "d", "str | Literal[True]");
         assert_public_ty(&db, "/src/a.py", "e", r#"Literal["z"]"#);
         assert_public_ty(&db, "/src/a.py", "f", r#"Literal[""]"#);
         assert_public_ty(&db, "/src/a.py", "g", r#"Literal[""]"#);
