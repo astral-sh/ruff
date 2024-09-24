@@ -210,7 +210,7 @@ C401.py:21:34: C401 [*] Unnecessary generator (rewrite using `set()`)
 23 23 | 
 24 24 | 
 
-C401.py:22:11: C401 [*] Unnecessary generator (rewrite using `set()`
+C401.py:22:11: C401 [*] Unnecessary generator (rewrite using `set()`)
    |
 20 | print(f"Hello {set(a for a in range(3))} World")
 21 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
@@ -229,7 +229,7 @@ C401.py:22:11: C401 [*] Unnecessary generator (rewrite using `set()`
 24 24 | 
 25 25 | # Not built-in set.
 
-C401.py:22:35: C401 [*] Unnecessary generator (rewrite using `set()`
+C401.py:22:35: C401 [*] Unnecessary generator (rewrite using `set()`)
    |
 20 | print(f"Hello {set(a for a in range(3))} World")
 21 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
