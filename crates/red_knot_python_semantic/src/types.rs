@@ -523,46 +523,50 @@ impl<'db> Type<'db> {
 
     /// Resolves the boolean value of a type.
     /// This is used to determine the value that would be returned when `__bool__` is called on an object
-    pub fn bool(&self, db: &'db dyn Db) -> Option<bool> {
+    pub(crate) fn bool(&self, db: &'db dyn Db) -> Truthiness {
         match self {
-            Type::Any | Type::Never | Type::Unknown | Type::Unbound => None,
-            Type::None => Some(false),
-            Type::Function(_) | Type::RevealTypeFunction(_) => Some(true),
-            Type::Module(_) => Some(true),
+            Type::Any | Type::Never | Type::Unknown | Type::Unbound => Truthiness::Ambiguous,
+            Type::None => Truthiness::AlwaysFalse,
+            Type::Function(_) | Type::RevealTypeFunction(_) => Truthiness::AlwaysTrue,
+            Type::Module(_) => Truthiness::AlwaysTrue,
             Type::Class(_) => {
                 // TODO: lookup `__bool__` and `__len__` methods on the class's metaclass
                 // More info in https://docs.python.org/3/library/stdtypes.html#truth-value-testing
-                None
+                Truthiness::Ambiguous
             }
             Type::Instance(_) => {
                 // TODO: lookup `__bool__` and `__len__` methods on the instance's class
                 // More info in https://docs.python.org/3/library/stdtypes.html#truth-value-testing
-                None
+                Truthiness::Ambiguous
             }
             Type::Union(union) => {
-                let mut result: Option<bool> = None;
+                let mut result: Option<Truthiness> = None;
                 for value in union.elements(db) {
-                    if let Some(value) = value.bool(db) {
-                        if result.is_some_and(|result| value != result) {
-                            return None;
+                    let truthiness = value.bool(db);
+                    match truthiness {
+                        Truthiness::AlwaysTrue | Truthiness::AlwaysFalse => {
+                            if result.is_some_and(|result| truthiness != result) {
+                                return Truthiness::Ambiguous;
+                            }
+                            result = truthiness.into();
                         }
-                        result = Some(value);
-                    } else {
-                        return None;
+                        Truthiness::Ambiguous => {
+                            return Truthiness::Ambiguous;
+                        }
                     }
                 }
-                result
+                result.unwrap_or(Truthiness::Ambiguous)
             }
             Type::Intersection(_) => {
                 // TODO
-                None
+                Truthiness::Ambiguous
             }
-            Type::IntLiteral(num) => Some(*num != 0),
-            Type::BooleanLiteral(bool) => Some(*bool),
-            Type::StringLiteral(str) => Some(!str.value(db).is_empty()),
-            Type::LiteralString => None,
-            Type::BytesLiteral(bytes) => Some(!bytes.value(db).is_empty()),
-            Type::Tuple(items) => Some(!items.elements(db).is_empty()),
+            Type::IntLiteral(num) => (*num != 0).into(),
+            Type::BooleanLiteral(bool) => (*bool).into(),
+            Type::StringLiteral(str) => (!str.value(db).is_empty()).into(),
+            Type::LiteralString => Truthiness::Ambiguous,
+            Type::BytesLiteral(bytes) => (!bytes.value(db).is_empty()).into(),
+            Type::Tuple(items) => (!items.elements(db).is_empty()).into(),
         }
     }
 
@@ -918,6 +922,43 @@ impl<'db> IterationOutcome<'db> {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub(crate) enum Truthiness {
+    AlwaysTrue,
+    AlwaysFalse,
+    Ambiguous,
+}
+
+impl Truthiness {
+    #[allow(unused)]
+    fn negate(self) -> Self {
+        match self {
+            Self::AlwaysTrue => Self::AlwaysFalse,
+            Self::AlwaysFalse => Self::AlwaysTrue,
+            Self::Ambiguous => Self::Ambiguous,
+        }
+    }
+
+    #[allow(unused)]
+    fn into_type(self, db: &dyn Db) -> Type {
+        match self {
+            Self::AlwaysTrue => Type::BooleanLiteral(true),
+            Self::AlwaysFalse => Type::BooleanLiteral(false),
+            Self::Ambiguous => builtins_symbol_ty(db, "bool").to_instance(db),
+        }
+    }
+}
+
+impl From<bool> for Truthiness {
+    fn from(value: bool) -> Self {
+        if value {
+            Truthiness::AlwaysTrue
+        } else {
+            Truthiness::AlwaysFalse
+        }
+    }
+}
+
 #[salsa::interned]
 pub struct FunctionType<'db> {
     /// name of the function at definition
@@ -1121,7 +1162,8 @@ pub struct TupleType<'db> {
 #[cfg(test)]
 mod tests {
     use super::{
-        builtins_symbol_ty, BytesLiteralType, StringLiteralType, TupleType, Type, UnionType,
+        builtins_symbol_ty, BytesLiteralType, StringLiteralType, Truthiness, TupleType, Type,
+        UnionType,
     };
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
@@ -1265,7 +1307,7 @@ mod tests {
     #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]))]
     fn is_truthy(ty: Ty) {
         let db = setup_db();
-        assert_eq!(ty.into_type(&db).bool(&db), Some(true));
+        assert_eq!(ty.into_type(&db).bool(&db), Truthiness::AlwaysTrue);
     }
 
     #[test_case(Ty::Tuple(vec![]))]
@@ -1274,7 +1316,7 @@ mod tests {
     #[test_case(Ty::Union(vec![Ty::IntLiteral(0), Ty::IntLiteral(0)]))]
     fn is_falsy(ty: Ty) {
         let db = setup_db();
-        assert_eq!(ty.into_type(&db).bool(&db), Some(false));
+        assert_eq!(ty.into_type(&db).bool(&db), Truthiness::AlwaysFalse);
     }
 
     #[test_case(Ty::BuiltinInstance("str"))]
@@ -1283,6 +1325,6 @@ mod tests {
     #[test_case(Ty::Union(vec![Ty::BuiltinInstance("str"), Ty::IntLiteral(1)]))]
     fn boolean_value_is_unknown(ty: Ty) {
         let db = setup_db();
-        assert_eq!(ty.into_type(&db).bool(&db), None);
+        assert_eq!(ty.into_type(&db).bool(&db), Truthiness::Ambiguous);
     }
 }

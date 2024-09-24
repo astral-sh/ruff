@@ -28,14 +28,13 @@
 //! definitions once the rest of the types in the scope have been inferred.
 use std::num::NonZeroU32;
 
-use rustc_hash::FxHashMap;
-use salsa;
-use salsa::plumbing::AsId;
-
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext, UnaryOp};
 use ruff_text_size::Ranged;
+use rustc_hash::FxHashMap;
+use salsa;
+use salsa::plumbing::AsId;
 
 use crate::module_name::ModuleName;
 use crate::module_resolver::{file_to_module, resolve_module};
@@ -52,7 +51,7 @@ use crate::types::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 use crate::types::{
     bindings_ty, builtins_symbol_ty, declarations_ty, global_symbol_ty, symbol_ty,
     typing_extensions_symbol_ty, BytesLiteralType, ClassType, FunctionType, StringLiteralType,
-    TupleType, Type, TypeArrayDisplay, UnionType,
+    Truthiness, TupleType, Type, TypeArrayDisplay, UnionType,
 };
 use crate::Db;
 
@@ -2328,20 +2327,17 @@ impl<'db> TypeInferenceBuilder<'db> {
             .collect();
         for (i, value_type) in inferred_types.iter().enumerate() {
             let boolean_value = value_type.bool(self.db);
-            if let Some(boolean_value) = boolean_value {
-                let is_last = i == values.len() - 1;
-                match (boolean_value, is_last, op) {
-                    (true, false, ast::BoolOp::And) => continue,
-                    (false, _, ast::BoolOp::And) => return *value_type,
-                    (true, _, ast::BoolOp::Or) => {
-                        value_tys.push(value_type);
-                        break;
-                    }
-                    (false, false, ast::BoolOp::Or) => continue,
-                    (_, true, _) => value_tys.push(value_type),
+            let is_last = i == values.len() - 1;
+            match (boolean_value, is_last, op) {
+                (Truthiness::Ambiguous, _, _) => value_tys.push(value_type),
+                (Truthiness::AlwaysTrue, false, ast::BoolOp::And) => continue,
+                (Truthiness::AlwaysFalse, _, ast::BoolOp::And) => return *value_type,
+                (Truthiness::AlwaysTrue, _, ast::BoolOp::Or) => {
+                    value_tys.push(value_type);
+                    break;
                 }
-            } else {
-                value_tys.push(value_type);
+                (Truthiness::AlwaysFalse, false, ast::BoolOp::Or) => continue,
+                (_, true, _) => value_tys.push(value_type),
             }
         }
         UnionType::from_elements(self.db, value_tys)
