@@ -54,6 +54,13 @@ impl TryFrom<(&str, &str)> for PythonVersion {
     }
 }
 
+impl From<(u8, u8)> for PythonVersion {
+    fn from(value: (u8, u8)) -> Self {
+        let (major, minor) = value;
+        Self { major, minor }
+    }
+}
+
 impl fmt::Display for PythonVersion {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let PythonVersion { major, minor } = self;

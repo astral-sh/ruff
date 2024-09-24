@@ -16,6 +16,17 @@
         "minLength": 1
       }
     },
+    "analyze": {
+      "description": "Options to configure import map generation.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/AnalyzeOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "builtins": {
       "description": "A list of builtins to treat as defined references, in addition to the system builtins.",
       "type": [
@@ -746,6 +757,61 @@
   },
   "additionalProperties": false,
   "definitions": {
+    "AnalyzeOptions": {
+      "description": "Configures Ruff's `analyze` command.",
+      "type": "object",
+      "properties": {
+        "detect-string-imports": {
+          "description": "Whether to detect imports from string literals. When enabled, Ruff will search for string literals that \"look like\" import paths, and include them in the import map, if they resolve to valid Python modules.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "direction": {
+          "description": "Whether to generate a map from file to files that it depends on (dependencies) or files that depend on it (dependents).",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Direction"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "exclude": {
+          "description": "A list of file patterns to exclude from analysis in addition to the files excluded globally (see [`exclude`](#exclude), and [`extend-exclude`](#extend-exclude)).\n\nExclusions are based on globs, and can be either:\n\n- Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ). - Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py` (to exclude any Python files in `directory`). Note that these paths are relative to the project root (e.g., the directory containing your `pyproject.toml`).\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "include-dependencies": {
+          "description": "A map from file path to the list of file paths or globs that should be considered dependencies of that file, regardless of whether relevant imports are detected.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "preview": {
+          "description": "Whether to enable preview mode. When preview mode is enabled, Ruff will expose unstable commands.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
     "ApiBan": {
       "type": "object",
       "required": [
@@ -796,6 +862,24 @@
           "type": "string",
           "enum": [
             "pep257"
+          ]
+        }
+      ]
+    },
+    "Direction": {
+      "oneOf": [
+        {
+          "description": "Construct a map from module to its dependencies (i.e., the modules that it imports).",
+          "type": "string",
+          "enum": [
+            "Dependencies"
+          ]
+        },
+        {
+          "description": "Construct a map from module to its dependents (i.e., the modules that import it).",
+          "type": "string",
+          "enum": [
+            "Dependents"
           ]
         }
       ]

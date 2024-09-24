@@ -362,7 +362,7 @@ impl<'db> Type<'db> {
     pub fn may_be_unbound(&self, db: &'db dyn Db) -> bool {
         match self {
             Type::Unbound => true,
-            Type::Union(union) => union.contains(db, Type::Unbound),
+            Type::Union(union) => union.elements(db).contains(&Type::Unbound),
             // Unbound can't appear in an intersection, because an intersection with Unbound
             // simplifies to just Unbound.
             _ => false,
@@ -422,6 +422,8 @@ impl<'db> Type<'db> {
                 .elements(db)
                 .iter()
                 .any(|&elem_ty| ty.is_subtype_of(db, elem_ty)),
+            (_, Type::Instance(class)) if class.is_stdlib_symbol(db, "builtins", "object") => true,
+            (Type::Instance(class), _) if class.is_stdlib_symbol(db, "builtins", "object") => false,
             // TODO
             _ => false,
         }
@@ -699,12 +701,12 @@ enum CallOutcome<'db> {
 
 impl<'db> CallOutcome<'db> {
     /// Create a new `CallOutcome::Callable` with given return type.
-    fn callable(return_ty: Type<'db>) -> CallOutcome {
+    fn callable(return_ty: Type<'db>) -> CallOutcome<'db> {
         CallOutcome::Callable { return_ty }
     }
 
     /// Create a new `CallOutcome::NotCallable` with given not-callable type.
-    fn not_callable(not_callable_ty: Type<'db>) -> CallOutcome {
+    fn not_callable(not_callable_ty: Type<'db>) -> CallOutcome<'db> {
         CallOutcome::NotCallable { not_callable_ty }
     }
 
@@ -717,7 +719,10 @@ impl<'db> CallOutcome<'db> {
     }
 
     /// Create a new `CallOutcome::Union` with given wrapped outcomes.
-    fn union(called_ty: Type<'db>, outcomes: impl Into<Box<[CallOutcome<'db>]>>) -> CallOutcome {
+    fn union(
+        called_ty: Type<'db>,
+        outcomes: impl Into<Box<[CallOutcome<'db>]>>,
+    ) -> CallOutcome<'db> {
         CallOutcome::Union {
             called_ty,
             outcomes: outcomes.into(),
@@ -817,8 +822,16 @@ impl<'db> CallOutcome<'db> {
                         node,
                         "call-non-callable",
                         format_args!(
-                            "Union element '{}' of type '{}' is not callable.",
+                            "Object of type '{}' is not callable (due to union element '{}').",
+                            called_ty.display(db),
                             elem.display(db),
+                        ),
+                    ),
+                    _ if not_callable.len() == outcomes.len() => builder.add_diagnostic(
+                        node,
+                        "call-non-callable",
+                        format_args!(
+                            "Object of type '{}' is not callable.",
                             called_ty.display(db)
                         ),
                     ),
@@ -826,9 +839,9 @@ impl<'db> CallOutcome<'db> {
                         node,
                         "call-non-callable",
                         format_args!(
-                            "Union elements {} of type '{}' are not callable.",
+                            "Object of type '{}' is not callable (due to union elements {}).",
+                            called_ty.display(db),
                             not_callable.display(db),
-                            called_ty.display(db)
                         ),
                     ),
                 }
@@ -994,16 +1007,16 @@ impl<'db> ClassType<'db> {
 pub struct UnionType<'db> {
     /// The union type includes values in any of these types.
     #[return_ref]
-    elements: FxOrderSet<Type<'db>>,
+    elements_boxed: Box<[Type<'db>]>,
 }
 
 impl<'db> UnionType<'db> {
-    pub fn contains(&self, db: &'db dyn Db, ty: Type<'db>) -> bool {
-        self.elements(db).contains(&ty)
+    fn elements(self, db: &'db dyn Db) -> &'db [Type<'db>] {
+        self.elements_boxed(db)
     }
 
     /// Create a union from a list of elements
-    /// (which may be eagerly simplified into a different variant of [`Type`] altogether)
+    /// (which may be eagerly simplified into a different variant of [`Type`] altogether).
     pub fn from_elements<T: Into<Type<'db>>>(
         db: &'db dyn Db,
         elements: impl IntoIterator<Item = T>,
@@ -1017,13 +1030,13 @@ impl<'db> UnionType<'db> {
     }
 
     /// Apply a transformation function to all elements of the union,
-    /// and create a new union from the resulting set of types
+    /// and create a new union from the resulting set of types.
     pub fn map(
         &self,
         db: &'db dyn Db,
         transform_fn: impl Fn(&Type<'db>) -> Type<'db>,
     ) -> Type<'db> {
-        Self::from_elements(db, self.elements(db).into_iter().map(transform_fn))
+        Self::from_elements(db, self.elements(db).iter().map(transform_fn))
     }
 }
 
@@ -1127,6 +1140,8 @@ mod tests {
         }
     }
 
+    #[test_case(Ty::BuiltinInstance("str"), Ty::BuiltinInstance("object"))]
+    #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinInstance("object"))]
     #[test_case(Ty::Unknown, Ty::IntLiteral(1))]
     #[test_case(Ty::Any, Ty::IntLiteral(1))]
     #[test_case(Ty::Never, Ty::IntLiteral(1))]
@@ -1144,6 +1159,7 @@ mod tests {
         assert!(from.into_type(&db).is_assignable_to(&db, to.into_type(&db)));
     }
 
+    #[test_case(Ty::BuiltinInstance("object"), Ty::BuiltinInstance("int"))]
     #[test_case(Ty::IntLiteral(1), Ty::BuiltinInstance("str"))]
     #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str"))]
     #[test_case(Ty::BuiltinInstance("int"), Ty::IntLiteral(1))]
@@ -1152,6 +1168,8 @@ mod tests {
         assert!(!from.into_type(&db).is_assignable_to(&db, to.into_type(&db)));
     }
 
+    #[test_case(Ty::BuiltinInstance("str"), Ty::BuiltinInstance("object"))]
+    #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinInstance("object"))]
     #[test_case(Ty::Never, Ty::IntLiteral(1))]
     #[test_case(Ty::IntLiteral(1), Ty::BuiltinInstance("int"))]
     #[test_case(Ty::StringLiteral("foo"), Ty::BuiltinInstance("str"))]
@@ -1164,6 +1182,7 @@ mod tests {
         assert!(from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
     }
 
+    #[test_case(Ty::BuiltinInstance("object"), Ty::BuiltinInstance("int"))]
     #[test_case(Ty::Unknown, Ty::IntLiteral(1))]
     #[test_case(Ty::Any, Ty::IntLiteral(1))]
     #[test_case(Ty::IntLiteral(1), Ty::Unknown)]

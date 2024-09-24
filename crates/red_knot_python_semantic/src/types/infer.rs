@@ -2211,6 +2211,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         match (op, self.infer_expression(operand)) {
             (UnaryOp::USub, Type::IntLiteral(value)) => Type::IntLiteral(-value),
+            (UnaryOp::Not, Type::BooleanLiteral(value)) => Type::BooleanLiteral(!value),
             _ => Type::Unknown, // TODO other unary op types
         }
     }
@@ -3143,6 +3144,28 @@ mod tests {
     }
 
     #[test]
+    fn not_boolean_literal() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_file(
+            "src/a.py",
+            r#"
+            w = True
+            x = False
+            y = not w
+            z = not x
+
+            "#,
+        )?;
+        assert_public_ty(&db, "src/a.py", "w", "Literal[True]");
+        assert_public_ty(&db, "src/a.py", "x", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "y", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "z", "Literal[True]");
+
+        Ok(())
+    }
+
+    #[test]
     fn string_type() -> anyhow::Result<()> {
         let mut db = setup_db();
 
@@ -3486,7 +3509,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "src/a.py",
-            &["Union element 'Literal[1]' of type 'Literal[1] | Literal[f]' is not callable."],
+            &["Object of type 'Literal[1] | Literal[f]' is not callable (due to union element 'Literal[1]')."],
         );
         assert_public_ty(&db, "src/a.py", "x", "Unknown | int");
 
@@ -3515,10 +3538,35 @@ mod tests {
             &db,
             "src/a.py",
             &[
-                r#"Union elements Literal[1], Literal["foo"] of type 'Literal[1] | Literal["foo"] | Literal[f]' are not callable."#,
+                r#"Object of type 'Literal[1] | Literal["foo"] | Literal[f]' is not callable (due to union elements Literal[1], Literal["foo"])."#,
             ],
         );
         assert_public_ty(&db, "src/a.py", "x", "Unknown | int");
+
+        Ok(())
+    }
+
+    #[test]
+    fn call_union_with_all_not_callable() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            if flag:
+                f = 1
+            else:
+                f = 'foo'
+            x = f()
+            ",
+        )?;
+
+        assert_file_diagnostics(
+            &db,
+            "src/a.py",
+            &[r#"Object of type 'Literal[1] | Literal["foo"]' is not callable."#],
+        );
+        assert_public_ty(&db, "src/a.py", "x", "Unknown");
 
         Ok(())
     }

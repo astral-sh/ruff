@@ -1,19 +1,20 @@
-use rustc_hash::{FxBuildHasher, FxHashSet};
 use std::borrow::Cow;
 use std::iter::FusedIterator;
-use std::ops::Deref;
+
+use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_db::files::{File, FilePath, FileRootKind};
 use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::{VendoredFileSystem, VendoredPath};
 
-use super::module::{Module, ModuleKind};
-use super::path::{ModulePath, SearchPath, SearchPathValidationError};
 use crate::db::Db;
 use crate::module_name::ModuleName;
 use crate::module_resolver::typeshed::{vendored_typeshed_versions, TypeshedVersions};
 use crate::site_packages::VirtualEnvironment;
 use crate::{Program, PythonVersion, SearchPathSettings, SitePackages};
+
+use super::module::{Module, ModuleKind};
+use super::path::{ModulePath, SearchPath, SearchPathValidationError};
 
 /// Resolves a module name to a module.
 pub fn resolve_module(db: &dyn Db, module_name: ModuleName) -> Option<Module> {
@@ -136,7 +137,7 @@ pub(crate) struct SearchPaths {
     /// for the first `site-packages` path
     site_packages: Vec<SearchPath>,
 
-    typeshed_versions: ResolvedTypeshedVersions,
+    typeshed_versions: TypeshedVersions,
 }
 
 impl SearchPaths {
@@ -202,11 +203,11 @@ impl SearchPaths {
 
             let search_path = SearchPath::custom_stdlib(db, &custom_typeshed)?;
 
-            (ResolvedTypeshedVersions::Custom(parsed), search_path)
+            (parsed, search_path)
         } else {
             tracing::debug!("Using vendored stdlib");
             (
-                ResolvedTypeshedVersions::Vendored(vendored_typeshed_versions()),
+                vendored_typeshed_versions(db),
                 SearchPath::vendored_stdlib(),
             )
         };
@@ -276,23 +277,6 @@ impl SearchPaths {
 
     pub(super) fn typeshed_versions(&self) -> &TypeshedVersions {
         &self.typeshed_versions
-    }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-enum ResolvedTypeshedVersions {
-    Vendored(&'static TypeshedVersions),
-    Custom(TypeshedVersions),
-}
-
-impl Deref for ResolvedTypeshedVersions {
-    type Target = TypeshedVersions;
-
-    fn deref(&self) -> &Self::Target {
-        match self {
-            ResolvedTypeshedVersions::Vendored(versions) => versions,
-            ResolvedTypeshedVersions::Custom(versions) => versions,
-        }
     }
 }
 

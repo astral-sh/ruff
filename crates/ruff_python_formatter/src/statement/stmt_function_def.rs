@@ -1,6 +1,3 @@
-use ruff_formatter::write;
-use ruff_python_ast::{NodeKind, StmtFunctionDef};
-
 use crate::comments::format::{
     empty_lines_after_leading_comments, empty_lines_before_trailing_comments,
 };
@@ -10,6 +7,8 @@ use crate::prelude::*;
 use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
 use crate::statement::stmt_class_def::FormatDecorators;
 use crate::statement::suite::SuiteKind;
+use ruff_formatter::write;
+use ruff_python_ast::{NodeKind, StmtFunctionDef};
 
 #[derive(Default)]
 pub struct FormatStmtFunctionDef;
@@ -112,23 +111,23 @@ fn format_function_header(f: &mut PyFormatter, item: &StmtFunctionDef) -> Format
     write!(f, [token("def"), space(), name.format()])?;
 
     if let Some(type_params) = type_params.as_ref() {
-        write!(f, [type_params.format()])?;
+        type_params.format().fmt(f)?;
     }
 
     let format_inner = format_with(|f: &mut PyFormatter| {
-        write!(f, [parameters.format()])?;
+        parameters.format().fmt(f)?;
 
-        if let Some(return_annotation) = returns.as_ref() {
+        if let Some(return_annotation) = returns.as_deref() {
             write!(f, [space(), token("->"), space()])?;
 
             if return_annotation.is_tuple_expr() {
-                let parentheses = if comments.has_leading(return_annotation.as_ref()) {
+                let parentheses = if comments.has_leading(return_annotation) {
                     Parentheses::Always
                 } else {
                     Parentheses::Never
                 };
-                write!(f, [return_annotation.format().with_options(parentheses)])?;
-            } else if comments.has_trailing(return_annotation.as_ref()) {
+                return_annotation.format().with_options(parentheses).fmt(f)
+            } else if comments.has_trailing(return_annotation) {
                 // Intentionally parenthesize any return annotations with trailing comments.
                 // This avoids an instability in cases like:
                 // ```python
@@ -156,15 +155,17 @@ fn format_function_header(f: &mut PyFormatter, item: &StmtFunctionDef) -> Format
                 // requires that the parent be aware of how the child is formatted, which
                 // is challenging. As a compromise, we break those expressions to avoid an
                 // instability.
-                write!(
-                    f,
-                    [return_annotation.format().with_options(Parentheses::Always)]
-                )?;
+
+                return_annotation
+                    .format()
+                    .with_options(Parentheses::Always)
+                    .fmt(f)
             } else {
                 let parenthesize = if parameters.is_empty() && !comments.has(parameters.as_ref()) {
-                    // If the parameters are empty, add parentheses if the return annotation
-                    // breaks at all.
-                    Parenthesize::IfBreaksOrIfRequired
+                    // If the parameters are empty, add parentheses around literal expressions
+                    // (any non splitable expression) but avoid parenthesizing subscripts and
+                    // other parenthesized expressions unless necessary.
+                    Parenthesize::IfBreaksParenthesized
                 } else {
                     // Otherwise, use our normal rules for parentheses, which allows us to break
                     // like:
@@ -179,17 +180,11 @@ fn format_function_header(f: &mut PyFormatter, item: &StmtFunctionDef) -> Format
                     // ```
                     Parenthesize::IfBreaks
                 };
-                write!(
-                    f,
-                    [maybe_parenthesize_expression(
-                        return_annotation,
-                        item,
-                        parenthesize
-                    )]
-                )?;
+                maybe_parenthesize_expression(return_annotation, item, parenthesize).fmt(f)
             }
+        } else {
+            Ok(())
         }
-        Ok(())
     });
 
     group(&format_inner).fmt(f)

@@ -4,25 +4,19 @@ use std::num::{NonZeroU16, NonZeroUsize};
 use std::ops::{RangeFrom, RangeInclusive};
 use std::str::FromStr;
 
-use once_cell::sync::Lazy;
 use rustc_hash::FxHashMap;
 
-use super::vendored::vendored_typeshed_stubs;
 use crate::db::Db;
 use crate::module_name::ModuleName;
 use crate::{Program, PythonVersion};
 
-static VENDORED_VERSIONS: Lazy<TypeshedVersions> = Lazy::new(|| {
+pub(in crate::module_resolver) fn vendored_typeshed_versions(db: &dyn Db) -> TypeshedVersions {
     TypeshedVersions::from_str(
-        &vendored_typeshed_stubs()
+        &db.vendored()
             .read_to_string("stdlib/VERSIONS")
-            .unwrap(),
+            .expect("The vendored typeshed stubs should contain a VERSIONS file"),
     )
-    .unwrap()
-});
-
-pub(crate) fn vendored_typeshed_versions() -> &'static TypeshedVersions {
-    &VENDORED_VERSIONS
+    .expect("The VERSIONS file in the vendored typeshed stubs should be well-formed")
 }
 
 pub(crate) fn typeshed_versions(db: &dyn Db) -> &TypeshedVersions {
@@ -332,6 +326,8 @@ mod tests {
 
     use insta::assert_snapshot;
 
+    use crate::db::tests::TestDb;
+
     use super::*;
 
     const TYPESHED_STDLIB_DIR: &str = "stdlib";
@@ -353,12 +349,9 @@ mod tests {
 
     #[test]
     fn can_parse_vendored_versions_file() {
-        let versions_data = include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/vendor/typeshed/stdlib/VERSIONS"
-        ));
+        let db = TestDb::new();
 
-        let versions = TypeshedVersions::from_str(versions_data).unwrap();
+        let versions = vendored_typeshed_versions(&db);
         assert!(versions.len() > 100);
         assert!(versions.len() < 1000);
 
@@ -395,9 +388,10 @@ mod tests {
 
     #[test]
     fn typeshed_versions_consistent_with_vendored_stubs() {
-        const VERSIONS_DATA: &str = include_str!("../../../vendor/typeshed/stdlib/VERSIONS");
-        let vendored_typeshed_dir = Path::new("vendor/typeshed").canonicalize().unwrap();
-        let vendored_typeshed_versions = TypeshedVersions::from_str(VERSIONS_DATA).unwrap();
+        let db = TestDb::new();
+        let vendored_typeshed_versions = vendored_typeshed_versions(&db);
+        let vendored_typeshed_dir =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../ruff_vendored/vendor/typeshed");
 
         let mut empty_iterator = true;
 
