@@ -1801,4 +1801,225 @@ mod tests {
             ast::comparable::ComparableExpr::from(&fstring_expr)
         );
     }
+    #[test]
+    fn compare_concatenated_fstring_with_string_literal_interspersed_to_value() {
+        // `f"{foo!r} this" f" and {bar!s} that"`
+        let concatenated_fstring_expr: ast::Expr = ast::ExprFString {
+            range: TextRange::default(),
+            value: ast::FStringValue::concatenated(vec![
+                ast::FStringPart::FString(ast::FString {
+                    range: TextRange::default(),
+                    elements: ast::FStringElements::from(vec![
+                        ast::FStringElement::Expression(ast::FStringExpressionElement {
+                            range: TextRange::default(),
+                            expression: ast::Expr::from(ast::ExprName {
+                                range: TextRange::default(),
+                                id: ast::name::Name::from("foo"),
+                                ctx: crate::ExprContext::Load,
+                            })
+                            .into(),
+                            debug_text: None,
+                            conversion: ast::ConversionFlag::Repr,
+                            format_spec: None,
+                        }),
+                        ast::FStringElement::Literal(ast::FStringLiteralElement {
+                            range: TextRange::default(),
+                            value: " this".into(),
+                        }),
+                    ]),
+                    flags: ast::FStringFlags::default(),
+                }),
+                ast::FStringPart::FString(ast::FString {
+                    range: TextRange::default(),
+                    elements: ast::FStringElements::from(vec![
+                        ast::FStringElement::Literal(ast::FStringLiteralElement {
+                            range: TextRange::default(),
+                            value: " and ".into(),
+                        }),
+                        ast::FStringElement::Expression(ast::FStringExpressionElement {
+                            range: TextRange::default(),
+                            expression: ast::Expr::from(ast::ExprName {
+                                range: TextRange::default(),
+                                id: ast::name::Name::from("bar"),
+                                ctx: ast::ExprContext::Load,
+                            })
+                            .into(),
+                            debug_text: None,
+                            conversion: ast::ConversionFlag::Str,
+                            format_spec: None,
+                        }),
+                        ast::FStringElement::Literal(ast::FStringLiteralElement {
+                            range: TextRange::default(),
+                            value: " that".into(),
+                        }),
+                    ]),
+                    flags: ast::FStringFlags::default(),
+                }),
+            ]),
+        }
+        .into();
+
+        // `f"{foo!r} this{bar!s} that"`
+        let fstring_expr: ast::Expr = ast::ExprFString {
+            range: TextRange::default(),
+            value: ast::FStringValue::single(ast::FString {
+                range: TextRange::default(),
+                elements: ast::FStringElements::from(vec![
+                    ast::FStringElement::Expression(ast::FStringExpressionElement {
+                        range: TextRange::default(),
+                        expression: ast::Expr::from(ast::ExprName {
+                            range: TextRange::default(),
+                            id: ast::name::Name::from("foo"),
+                            ctx: ast::ExprContext::Load,
+                        })
+                        .into(),
+                        debug_text: None,
+                        conversion: ast::ConversionFlag::Repr,
+                        format_spec: None,
+                    }),
+                    ast::FStringElement::Literal(ast::FStringLiteralElement {
+                        range: TextRange::default(),
+                        value: " this and ".into(),
+                    }),
+                    ast::FStringElement::Expression(ast::FStringExpressionElement {
+                        range: TextRange::default(),
+                        expression: ast::Expr::from(ast::ExprName {
+                            range: TextRange::default(),
+                            id: ast::name::Name::from("bar"),
+                            ctx: ast::ExprContext::Load,
+                        })
+                        .into(),
+                        debug_text: None,
+                        conversion: ast::ConversionFlag::Str,
+                        format_spec: None,
+                    }),
+                    ast::FStringElement::Literal(ast::FStringLiteralElement {
+                        range: TextRange::default(),
+                        value: " that".into(),
+                    }),
+                ]),
+                flags: ast::FStringFlags::default(),
+            }),
+        }
+        .into();
+
+        assert_eq!(
+            ast::comparable::ComparableExpr::from(&concatenated_fstring_expr),
+            ast::comparable::ComparableExpr::from(&fstring_expr)
+        );
+    }
+    #[test]
+    fn compare_concatenated_fstring_with_raw_string_literal_interspersed_to_value() {
+        // `f"{foo!r} this" r"\n raw" f" and {bar!s} that"`
+        let concatenated_fstring_expr: ast::Expr = ast::ExprFString {
+            range: TextRange::default(),
+            value: ast::FStringValue::concatenated(vec![
+                ast::FStringPart::FString(ast::FString {
+                    range: TextRange::default(),
+                    elements: ast::FStringElements::from(vec![
+                        ast::FStringElement::Expression(ast::FStringExpressionElement {
+                            range: TextRange::default(),
+                            expression: ast::Expr::from(ast::ExprName {
+                                range: TextRange::default(),
+                                id: ast::name::Name::from("foo"),
+                                ctx: crate::ExprContext::Load,
+                            })
+                            .into(),
+                            debug_text: None,
+                            conversion: ast::ConversionFlag::Repr,
+                            format_spec: None,
+                        }),
+                        ast::FStringElement::Literal(ast::FStringLiteralElement {
+                            range: TextRange::default(),
+                            value: " this".into(),
+                        }),
+                    ]),
+                    flags: ast::FStringFlags::default(),
+                }),
+                ast::FStringPart::Literal(ast::StringLiteral {
+                    range: TextRange::default(),
+                    value: "\\n raw".into(),
+                    flags: ast::StringLiteralFlags::default().with_prefix(
+                        ast::str_prefix::StringLiteralPrefix::Raw { uppercase: false },
+                    ),
+                }),
+                ast::FStringPart::FString(ast::FString {
+                    range: TextRange::default(),
+                    elements: ast::FStringElements::from(vec![
+                        ast::FStringElement::Literal(ast::FStringLiteralElement {
+                            range: TextRange::default(),
+                            value: " and ".into(),
+                        }),
+                        ast::FStringElement::Expression(ast::FStringExpressionElement {
+                            range: TextRange::default(),
+                            expression: ast::Expr::from(ast::ExprName {
+                                range: TextRange::default(),
+                                id: ast::name::Name::from("bar"),
+                                ctx: ast::ExprContext::Load,
+                            })
+                            .into(),
+                            debug_text: None,
+                            conversion: ast::ConversionFlag::Str,
+                            format_spec: None,
+                        }),
+                        ast::FStringElement::Literal(ast::FStringLiteralElement {
+                            range: TextRange::default(),
+                            value: " that".into(),
+                        }),
+                    ]),
+                    flags: ast::FStringFlags::default(),
+                }),
+            ]),
+        }
+        .into();
+
+        // `f"{foo!r} this{bar!s} that"`
+        let fstring_expr: ast::Expr = ast::ExprFString {
+            range: TextRange::default(),
+            value: ast::FStringValue::single(ast::FString {
+                range: TextRange::default(),
+                elements: ast::FStringElements::from(vec![
+                    ast::FStringElement::Expression(ast::FStringExpressionElement {
+                        range: TextRange::default(),
+                        expression: ast::Expr::from(ast::ExprName {
+                            range: TextRange::default(),
+                            id: ast::name::Name::from("foo"),
+                            ctx: ast::ExprContext::Load,
+                        })
+                        .into(),
+                        debug_text: None,
+                        conversion: ast::ConversionFlag::Repr,
+                        format_spec: None,
+                    }),
+                    ast::FStringElement::Literal(ast::FStringLiteralElement {
+                        range: TextRange::default(),
+                        value: " this\\n raw and ".into(),
+                    }),
+                    ast::FStringElement::Expression(ast::FStringExpressionElement {
+                        range: TextRange::default(),
+                        expression: ast::Expr::from(ast::ExprName {
+                            range: TextRange::default(),
+                            id: ast::name::Name::from("bar"),
+                            ctx: ast::ExprContext::Load,
+                        })
+                        .into(),
+                        debug_text: None,
+                        conversion: ast::ConversionFlag::Str,
+                        format_spec: None,
+                    }),
+                    ast::FStringElement::Literal(ast::FStringLiteralElement {
+                        range: TextRange::default(),
+                        value: " that".into(),
+                    }),
+                ]),
+                flags: ast::FStringFlags::default(),
+            }),
+        }
+        .into();
+
+        assert_eq!(
+            ast::comparable::ComparableExpr::from(&concatenated_fstring_expr),
+            ast::comparable::ComparableExpr::from(&fstring_expr)
+        );
+    }
 }
