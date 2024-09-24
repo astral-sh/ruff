@@ -2,7 +2,7 @@ use itertools::Itertools;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{name::Name, BoolOp, CmpOp, Expr, ExprBoolOp, ExprCompare};
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 
@@ -91,11 +91,8 @@ pub(crate) fn boolean_chained_comparison(checker: &mut Checker, expr_bool_op: &E
 
             Err(BooleanChainedComparison {
                 variable: left_compare_right.id().clone(),
-                range: TextRange::new(left_compare.range.start(), right_compare.range.end()),
-                replace_range: TextRange::new(
-                    left_compare_right.range.start(),
-                    right_compare_left.range.end(),
-                ),
+                range: TextRange::new(left_compare.start(), right_compare.end()),
+                replace_range: TextRange::new(left_compare_right.start(), right_compare_left.end()),
             })
         })
         .collect();
