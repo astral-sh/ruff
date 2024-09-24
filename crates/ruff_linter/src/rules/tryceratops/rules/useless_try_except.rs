@@ -38,7 +38,7 @@ impl Violation for UselessTryExcept {
     }
 }
 
-/// TRY302
+/// TRY203 (previously TRY302)
 pub(crate) fn useless_try_except(checker: &mut Checker, handlers: &[ExceptHandler]) {
     if let Some(diagnostics) = handlers
         .iter()
