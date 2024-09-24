@@ -36,6 +36,10 @@ mod tests {
     #[test_case(Rule::BadStringFormatType, Path::new("bad_string_format_type.py"))]
     #[test_case(Rule::BidirectionalUnicode, Path::new("bidirectional_unicode.py"))]
     #[test_case(Rule::BinaryOpException, Path::new("binary_op_exception.py"))]
+    #[test_case(
+        Rule::ClassVariableSlotsConflict,
+        Path::new("class_variable_slots_conflict.py")
+    )]
     #[test_case(Rule::CollapsibleElseIf, Path::new("collapsible_else_if.py"))]
     #[test_case(Rule::CompareToEmptyString, Path::new("compare_to_empty_string.py"))]
     #[test_case(Rule::ComparisonOfConstant, Path::new("comparison_of_constant.py"))]
