@@ -2331,8 +2331,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             match (boolean_value, is_last, op) {
                 (Truthiness::Ambiguous, _, _) => value_tys.push(value_type),
                 (Truthiness::AlwaysTrue, false, ast::BoolOp::And) => continue,
-                (Truthiness::AlwaysFalse, _, ast::BoolOp::And) => return *value_type,
-                (Truthiness::AlwaysTrue, _, ast::BoolOp::Or) => {
+                (Truthiness::AlwaysTrue, _, ast::BoolOp::Or)
+                | (Truthiness::AlwaysFalse, _, ast::BoolOp::And) => {
                     value_tys.push(value_type);
                     break;
                 }
@@ -6079,6 +6079,7 @@ mod tests {
             e = False or True
             f = False or False
             g = foo() or False
+            h = foo() or True
             ",
         )?;
 
@@ -6089,6 +6090,7 @@ mod tests {
         assert_public_ty(&db, "/src/a.py", "e", "Literal[True]");
         assert_public_ty(&db, "/src/a.py", "f", "Literal[False]");
         assert_public_ty(&db, "/src/a.py", "g", "str | Literal[False]");
+        assert_public_ty(&db, "/src/a.py", "h", "str | Literal[True]");
 
         Ok(())
     }
@@ -6115,7 +6117,7 @@ mod tests {
 
         assert_public_ty(&db, "/src/a.py", "a", "Literal[False]");
         assert_public_ty(&db, "/src/a.py", "b", "Literal[False]");
-        assert_public_ty(&db, "/src/a.py", "c", "Literal[False]");
+        assert_public_ty(&db, "/src/a.py", "c", "str | Literal[False]");
         assert_public_ty(&db, "/src/a.py", "d", "str | Literal[True]");
         assert_public_ty(&db, "/src/a.py", "e", r#"Literal["z"]"#);
         assert_public_ty(&db, "/src/a.py", "f", r#"Literal[""]"#);
