@@ -33,3 +33,19 @@ age = ages.get("Cat", None)
 # OK
 ages = ["Tom", "Maria", "Dog"]
 age = ages.get("Cat", None)
+
+# SIM910
+def foo(**kwargs):
+    a = kwargs.get('a', None)
+
+# SIM910
+def foo(some_dict: dict):
+    a = some_dict.get('a', None)
+
+# OK
+def foo(some_other: object):
+    a = some_other.get('a', None)
+
+# OK
+def foo(some_other):
+    a = some_other.get('a', None)
