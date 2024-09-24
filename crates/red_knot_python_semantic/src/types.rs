@@ -548,7 +548,7 @@ impl<'db> Type<'db> {
                             if result.is_some_and(|result| truthiness != result) {
                                 return Truthiness::Ambiguous;
                             }
-                            result = truthiness.into();
+                            result = Some(truthiness);
                         }
                         Truthiness::Ambiguous => {
                             return Truthiness::Ambiguous;
@@ -561,12 +561,12 @@ impl<'db> Type<'db> {
                 // TODO
                 Truthiness::Ambiguous
             }
-            Type::IntLiteral(num) => (*num != 0).into(),
-            Type::BooleanLiteral(bool) => (*bool).into(),
-            Type::StringLiteral(str) => (!str.value(db).is_empty()).into(),
+            Type::IntLiteral(num) => Truthiness::from(*num != 0),
+            Type::BooleanLiteral(bool) => Truthiness::from(*bool),
+            Type::StringLiteral(str) => Truthiness::from(!str.value(db).is_empty()),
             Type::LiteralString => Truthiness::Ambiguous,
-            Type::BytesLiteral(bytes) => (!bytes.value(db).is_empty()).into(),
-            Type::Tuple(items) => (!items.elements(db).is_empty()).into(),
+            Type::BytesLiteral(bytes) => Truthiness::from(!bytes.value(db).is_empty()),
+            Type::Tuple(items) => Truthiness::from(!items.elements(db).is_empty()),
         }
     }
 
