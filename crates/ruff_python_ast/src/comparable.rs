@@ -531,18 +531,29 @@ impl<'a> From<&'a ast::FStringElement> for ComparableFStringElement<'a> {
             ast::FStringElement::Literal(ast::FStringLiteralElement { value, .. }) => {
                 Self::Literal(value.as_ref().into())
             }
-            ast::FStringElement::Expression(formatted_value) => {
-                Self::FStringExpressionElement(FStringExpressionElement {
-                    expression: (&formatted_value.expression).into(),
-                    debug_text: formatted_value.debug_text.as_ref(),
-                    conversion: formatted_value.conversion,
-                    format_spec: formatted_value
-                        .format_spec
-                        .as_ref()
-                        .map(|spec| spec.elements.iter().map(Into::into).collect()),
-                })
-            }
+            ast::FStringElement::Expression(formatted_value) => formatted_value.into(),
         }
+    }
+}
+
+impl<'a> From<&'a ast::FStringExpressionElement> for ComparableFStringElement<'a> {
+    fn from(fstring_expression_element: &'a ast::FStringExpressionElement) -> Self {
+        let ast::FStringExpressionElement {
+            expression,
+            debug_text,
+            conversion,
+            format_spec,
+            range: _,
+        } = fstring_expression_element;
+
+        Self::FStringExpressionElement(FStringExpressionElement {
+            expression: (expression).into(),
+            debug_text: debug_text.as_ref(),
+            conversion: *conversion,
+            format_spec: format_spec
+                .as_ref()
+                .map(|spec| spec.elements.iter().map(Into::into).collect()),
+        })
     }
 }
 
@@ -623,79 +634,58 @@ impl<'a> From<&'a ast::FStringValue> for ComparableFString<'a> {
     // literals. String literals may be separated for two reasons: either
     // they appear in adjacent string literal parts, or else a string literal
     // part is adjacent to a string literal _element_ inside of an f-string part.
-    //
-    // So the idea of the code below is as follows:
-    // - Iterate over parts.
-    // - When a literal is encountered, push it to an accumulator.
-    // - When an f-string part is encountered, iterate over its elements.
-    //      - When a literal element is encountered, push it to the accumulator.
-    //      - When an f-string expression is encountered, empty the accumulator
-    //      and push it to our result, then push the f-string expression.
-    //
-    // The remaining messiness of the code results from an attempt to minimize unnecessary
-    // allocations: if concatenating strings is unnecessary, we can re-use
-    // `&str` from the original f-string node.
     fn from(value: &'a ast::FStringValue) -> Self {
-        // For parsing into an fstring part when encountered.
-        fn process_fstring_elements<'a>(
-            elements: &'a [ast::FStringElement],
-            fstring_compr_elements: &mut Vec<ComparableFStringElement<'a>>,
-            literal_accumulator: &mut Option<Cow<'a, str>>,
-        ) {
-            for element in elements {
-                match element {
-                    ast::FStringElement::Literal(literal) => match literal_accumulator {
-                        None => {
-                            *literal_accumulator = Some(literal.value.as_ref().into());
+        #[derive(Default)]
+        struct Collector<'a> {
+            elements: Vec<ComparableFStringElement<'a>>,
+        }
+
+        impl<'a> Collector<'a> {
+            // The logic for concatenating adjacent string literals
+            // occurs here, implicitly: when we encounter a sequence
+            // of string literals, the first gets pushed to the
+            // `elements` vector, while subsequent strings
+            // are concatenated onto this top string.
+            fn push_literal(&mut self, literal: &'a str) {
+                if let Some(ComparableFStringElement::Literal(existing_literal)) =
+                    self.elements.last_mut()
+                {
+                    existing_literal.to_mut().push_str(literal);
+                } else {
+                    self.elements
+                        .push(ComparableFStringElement::Literal(literal.into()));
+                }
+            }
+
+            fn push_expression(&mut self, expression: &'a ast::FStringExpressionElement) {
+                self.elements.push(expression.into());
+            }
+        }
+
+        let mut collector = Collector::default();
+
+        for part in value {
+            match part {
+                ast::FStringPart::Literal(string_literal) => {
+                    collector.push_literal(&string_literal.value);
+                }
+                ast::FStringPart::FString(fstring) => {
+                    for element in &fstring.elements {
+                        match element {
+                            ast::FStringElement::Literal(literal) => {
+                                collector.push_literal(&literal.value);
+                            }
+                            ast::FStringElement::Expression(expression) => {
+                                collector.push_expression(expression);
+                            }
                         }
-                        Some(existing_literal) => {
-                            existing_literal.to_mut().push_str(&literal.value);
-                        }
-                    },
-                    ast::FStringElement::Expression(_) => {
-                        if let Some(literal) = literal_accumulator.take() {
-                            fstring_compr_elements.push(ComparableFStringElement::Literal(literal));
-                        }
-                        fstring_compr_elements.push(element.into());
                     }
                 }
             }
         }
 
-        let mut fstring_compr_elements = Vec::new();
-        let mut literal_accumulator: Option<Cow<'a, str>> = None;
-
-        for part in value {
-            match part {
-                ast::FStringPart::Literal(string_literal) => {
-                    literal_accumulator = Some(match literal_accumulator.take() {
-                        None => Cow::Borrowed(string_literal),
-                        Some(existing_literal) => {
-                            let mut s = existing_literal.into_owned();
-                            s.push_str(string_literal);
-                            s.into()
-                        }
-                    });
-                }
-                ast::FStringPart::FString(fstring) => {
-                    // Note: we do _not_ clear the literal buffer here
-                    // since we may encounter literals amongst the
-                    // f-string elements.
-                    process_fstring_elements(
-                        &fstring.elements,
-                        &mut fstring_compr_elements,
-                        &mut literal_accumulator,
-                    );
-                }
-            }
-        }
-        // Clear any remaining literals here.
-        if let Some(literal) = literal_accumulator {
-            fstring_compr_elements.push(ComparableFStringElement::Literal(literal));
-        }
-
         Self {
-            elements: fstring_compr_elements.into_boxed_slice(),
+            elements: collector.elements.into_boxed_slice(),
         }
     }
 }
