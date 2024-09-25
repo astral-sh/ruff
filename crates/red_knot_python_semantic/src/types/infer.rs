@@ -3604,6 +3604,7 @@ mod tests {
             "
             x = 0
             y = str()
+            z = False
 
             a = f'hello'
             b = f'h {x}'
@@ -3611,6 +3612,7 @@ mod tests {
             d = 'first ' f'second({b})' f' third'
             e = f'-{y}-'
             f = f'-{y}-' f'--' '--'
+            g = f'{z} == {False} is {True}'
             ",
         )?;
 
@@ -3620,22 +3622,7 @@ mod tests {
         assert_public_ty(&db, "src/a.py", "d", "Literal[\"first second(h 0) third\"]");
         assert_public_ty(&db, "src/a.py", "e", "str");
         assert_public_ty(&db, "src/a.py", "f", "str");
-
-        // More realistic use-case for inferring literals inside f-strings
-        db.write_dedented(
-            "src/endpoint.py",
-            "
-            BASE_URL = 'https://httpbin.org'
-            VERSION = 'v1'
-            endpoint = f'{BASE_URL}/{VERSION}/post'
-            ",
-        )?;
-        assert_public_ty(
-            &db,
-            "src/endpoint.py",
-            "endpoint",
-            "Literal[\"https://httpbin.org/v1/post\"]",
-        );
+        assert_public_ty(&db, "src/a.py", "g", "Literal[\"False == False is True\"]");
 
         Ok(())
     }
