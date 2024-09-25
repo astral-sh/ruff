@@ -81,3 +81,85 @@ def _serve_method(fn):
             .markup(highlight=args.region)
     ):
         yield h
+
+
+# UP028: The later loop variable is not a reference to the earlier loop variable
+def f():
+    for x in (1, 2, 3):
+        yield x
+    # Shadowing with another loop
+    for x in (1, 2, 3):
+        yield x
+
+
+# UP028: The exception binding is not a reference to the loop variable
+def f():
+    for x in (1, 2, 3):
+        yield x
+    # Shadowing with an `except`
+    try:
+        pass
+    except Exception as x:
+        pass
+
+
+# UP028: The context binding is not a reference to the loop variable
+def f():
+    for x in (1, 2, 3):
+        yield x
+    # Shadowing with `with`
+    with contextlib.nullcontext() as x:
+        pass
+
+
+
+# UP028: The type annotation binding is not a reference to the loop variable
+def f():
+    for x in (1, 2, 3):
+        yield x
+    # Shadowing with a type annotation
+    x: int
+
+
+# OK: The `del` statement requires the loop variable to exist
+def f():
+    for x in (1, 2, 3):
+        yield x
+    # Shadowing with `del`
+    del x
+
+
+# UP028: The exception bindings are not a reference to the loop variable
+def f():
+    for x in (1, 2, 3):
+        yield x
+    # Shadowing with multiple `except` blocks
+    try:
+        pass
+    except Exception as x:
+        pass
+    try:
+        pass
+    except Exception as x:
+        pass
+
+
+# OK: The `del` statement requires the loop variable to exist
+def f():
+    for x in (1, 2, 3):
+        yield x
+    # Shadowing with multiple `del` statements
+    del x
+    del x
+
+
+# OK: The `print` call requires the loop variable to exist
+def f():
+    for x in (1, 2, 3):
+        yield x
+    # Shadowing with a reference and non-reference binding
+    print(x)
+    try:
+        pass
+    except Exception as x:
+        pass

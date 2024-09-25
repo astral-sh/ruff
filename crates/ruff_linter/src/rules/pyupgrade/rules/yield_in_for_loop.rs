@@ -101,7 +101,9 @@ pub(crate) fn yield_in_for_loop(checker: &mut Checker, stmt_for: &ast::StmtFor) 
             .semantic()
             .current_scope()
             .get_all(name.id.as_str())
-            .any(|binding_id| {
+            // Skip unbound bindings like `del x`
+            .find(|&id| !checker.semantic().binding(id).is_unbound())
+            .is_some_and(|binding_id| {
                 let binding = checker.semantic().binding(binding_id);
                 binding.references.iter().any(|reference_id| {
                     checker.semantic().reference(*reference_id).range() != name.range()
