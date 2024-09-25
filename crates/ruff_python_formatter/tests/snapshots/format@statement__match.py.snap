@@ -1250,7 +1250,18 @@ match x:
          pass
  
      case "this is a long line for if condition with parentheses" if (
-@@ -249,7 +251,9 @@
+@@ -198,7 +200,9 @@
+         # trailing own 2
+     ):
+         pass
+-    case True:  # trailing
++    case (
++        True  # trailing
++    ):
+         pass
+     case False:
+         pass
+@@ -249,7 +253,9 @@
          1
      ):
          y = 1
@@ -1261,4 +1272,28 @@ match x:
          y = 1
      case (
          1
+@@ -507,11 +513,8 @@
+         pass
+ 
+     case (
+-        (
+-            a  # trailing
+-        )
+-        | (b)
+-    ):
++        a  # trailing
++    ) | (b):
+         pass
+ 
+     case a | b | c:
+@@ -525,8 +528,7 @@
+         pass
+ 
+     case (  # end of line
+-        a
+-        | b
++        a | b
+         # own line
+     ):
+         pass
 ```
