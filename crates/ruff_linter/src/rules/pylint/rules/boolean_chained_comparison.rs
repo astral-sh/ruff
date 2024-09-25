@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{name::Name, BoolOp, CmpOp, Expr, ExprBoolOp, ExprCompare};
 use ruff_text_size::{Ranged, TextRange};
@@ -36,16 +36,14 @@ pub struct BooleanChainedComparison {
     variable: Name,
 }
 
-impl Violation for BooleanChainedComparison {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
-
+impl AlwaysFixableViolation for BooleanChainedComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Contains chained boolean comparison that can be simplified")
     }
 
-    fn fix_title(&self) -> Option<String> {
-        Some("Use a single compare expression".to_string())
+    fn fix_title(&self) -> String {
+        "Use a single compare expression".to_string()
     }
 }
 
