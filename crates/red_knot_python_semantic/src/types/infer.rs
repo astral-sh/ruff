@@ -2210,7 +2210,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         match (op, self.infer_expression(operand)) {
             (UnaryOp::USub, Type::IntLiteral(value)) => Type::IntLiteral(-value),
-            (UnaryOp::Not, Type::BooleanLiteral(value)) => Type::BooleanLiteral(!value),
+            (UnaryOp::Not, ty) => ty.bool(self.db).negate().into_type(self.db),
             _ => Type::Unknown, // TODO other unary op types
         }
     }
@@ -3162,6 +3162,127 @@ mod tests {
     }
 
     #[test]
+    fn not_none_literal() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_file(
+            "src/a.py",
+            r#"
+            a = not None
+            b = not not None
+            "#,
+        )?;
+        assert_public_ty(&db, "src/a.py", "a", "Literal[True]");
+        assert_public_ty(&db, "src/a.py", "b", "Literal[False]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn not_function() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_file(
+            "src/a.py",
+            r#"
+            from typing import reveal_type
+            def f():
+                return 1
+
+            a = not f
+            b = not reveal_type
+            "#,
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "a", "Literal[False]");
+        // TODO Unknown should not be part of the type of typing.reveal_type
+        // assert_public_ty(&db, "src/a.py", "b", "Literal[False]");
+        Ok(())
+    }
+
+    #[test]
+    fn not_module() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_files([
+            (
+                "src/a.py",
+                "import b; import warnings;
+                x = not b;
+                z = not warnings",
+            ),
+            ("src/b.py", "y = 1"),
+        ])?;
+
+        assert_public_ty(&db, "src/a.py", "x", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "z", "Literal[False]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn not_union() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_file(
+            "src/a.py",
+            r#"
+            if flag:
+                p = 1
+                q = 3.3
+                r = "hello"
+                s = "world"
+                t = 0
+            else:
+                p = "hello"
+                q = 4
+                r = ""
+                s = 0
+                t = ""
+
+            a = not p
+            b = not q
+            c = not r
+            d = not s
+            e = not t
+            "#,
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "a", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "b", "bool");
+        assert_public_ty(&db, "src/a.py", "c", "bool");
+        assert_public_ty(&db, "src/a.py", "d", "bool");
+        assert_public_ty(&db, "src/a.py", "e", "Literal[True]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn not_integer_literal() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_file(
+            "src/a.py",
+            r#"
+            a = not 1
+            b = not 1234567890987654321
+            e = not 0
+            x = not -1
+            y = not -1234567890987654321
+            z = not --987
+            "#,
+        )?;
+        assert_public_ty(&db, "src/a.py", "a", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "b", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "e", "Literal[True]");
+        assert_public_ty(&db, "src/a.py", "x", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "y", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "z", "Literal[False]");
+
+        Ok(())
+    }
+
+    #[test]
     fn not_boolean_literal() -> anyhow::Result<()> {
         let mut db = setup_db();
 
@@ -3179,6 +3300,98 @@ mod tests {
         assert_public_ty(&db, "src/a.py", "x", "Literal[False]");
         assert_public_ty(&db, "src/a.py", "y", "Literal[False]");
         assert_public_ty(&db, "src/a.py", "z", "Literal[True]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn not_string_literal() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_file(
+            "src/a.py",
+            r#"
+            a = not "hello"
+            b = not ""
+            c = not "0"
+            d = not "hello" + "world"
+            "#,
+        )?;
+        assert_public_ty(&db, "src/a.py", "a", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "b", "Literal[True]");
+        assert_public_ty(&db, "src/a.py", "c", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "d", "Literal[False]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn not_literal_string() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        let content = format!(
+            r#"
+        v = not "{y}"
+        w = not 10*"{y}"
+        x = not "{y}"*10
+        z = not 0*"{y}"
+        u = not (-100)*"{y}"
+        "#,
+            y = "a".repeat(TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE + 1),
+        );
+        db.write_dedented("src/a.py", &content)?;
+
+        assert_public_ty(&db, "src/a.py", "v", "bool");
+        assert_public_ty(&db, "src/a.py", "w", "bool");
+        assert_public_ty(&db, "src/a.py", "x", "bool");
+        assert_public_ty(&db, "src/a.py", "z", "Literal[True]");
+        assert_public_ty(&db, "src/a.py", "u", "Literal[True]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn not_bytes_literal() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_file(
+            "src/a.py",
+            r#"
+            a = not b"hello"
+            b = not b""
+            c = not b"0"
+            d = not b"hello" + b"world"
+            "#,
+        )?;
+        assert_public_ty(&db, "src/a.py", "a", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "b", "Literal[True]");
+        assert_public_ty(&db, "src/a.py", "c", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "d", "Literal[False]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn not_tuple() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_file(
+            "src/a.py",
+            r#"
+            a = not (1,)
+            b = not (1, 2)
+            c = not (1, 2, 3)
+            d = not ()
+            e = not ("hello",)
+            f = not (1, "hello")
+            "#,
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "a", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "b", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "c", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "d", "Literal[True]");
+        assert_public_ty(&db, "src/a.py", "e", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "f", "Literal[False]");
 
         Ok(())
     }
