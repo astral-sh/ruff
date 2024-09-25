@@ -1537,6 +1537,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
         }
         Expr::BoolOp(bool_op) => {
+            if checker.enabled(Rule::BooleanChainedComparison) {
+                pylint::rules::boolean_chained_comparison(checker, bool_op);
+            }
             if checker.enabled(Rule::MultipleStartsEndsWith) {
                 flake8_pie::rules::multiple_starts_ends_with(checker, expr);
             }
