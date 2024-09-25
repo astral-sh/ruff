@@ -59,6 +59,10 @@ pub(crate) enum Parenthesize {
     /// Same as [`Self::IfBreaks`] except that it uses [`parenthesize_if_expands`] for expressions
     /// with the layout [`NeedsParentheses::BestFit`] which is used by non-splittable
     /// expressions like literals, name, and strings.
+    ///
+    /// Use this layout over `IfBreaks` when there's a sequence of `maybe_parenthesize_expression`
+    /// in a single logical-line and you want to break from right-to-left. Use `IfBreaks` for the
+    /// first expression and `IfBreaksParenthesized` for the rest.
     IfBreaksParenthesized,
 
     /// Same as [`Self::IfBreaksParenthesized`] but uses [`parenthesize_if_expands`] for nested

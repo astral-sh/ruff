@@ -3,7 +3,10 @@ use ruff_python_ast::AstNode;
 use ruff_python_ast::MatchCase;
 
 use crate::builders::parenthesize_if_expands;
-use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parentheses};
+use crate::expression::maybe_parenthesize_expression;
+use crate::expression::parentheses::{
+    NeedsParentheses, OptionalParentheses, Parentheses, Parenthesize,
+};
 use crate::pattern::maybe_parenthesize_pattern;
 use crate::prelude::*;
 use crate::preview::is_match_case_parentheses_enabled;
@@ -62,6 +65,19 @@ impl FormatNodeRule<MatchCase> for FormatMatchCase {
             }
         });
 
+        let format_guard = guard.as_deref().map(|guard| {
+            format_with(|f| {
+                write!(f, [space(), token("if"), space()])?;
+
+                if is_match_case_parentheses_enabled(f.context()) {
+                    maybe_parenthesize_expression(guard, item, Parenthesize::IfBreaksParenthesized)
+                        .fmt(f)
+                } else {
+                    guard.format().fmt(f)
+                }
+            })
+        });
+
         write!(
             f,
             [
@@ -69,13 +85,7 @@ impl FormatNodeRule<MatchCase> for FormatMatchCase {
                     ClauseHeader::MatchCase(item),
                     dangling_item_comments,
                     &format_with(|f| {
-                        write!(f, [token("case"), space(), format_pattern])?;
-
-                        if let Some(guard) = guard {
-                            write!(f, [space(), token("if"), space(), guard.format()])?;
-                        }
-
-                        Ok(())
+                        write!(f, [token("case"), space(), format_pattern, format_guard])
                     }),
                 ),
                 clause_body(
