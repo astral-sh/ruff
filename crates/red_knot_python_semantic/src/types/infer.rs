@@ -28,14 +28,13 @@
 //! definitions once the rest of the types in the scope have been inferred.
 use std::num::NonZeroU32;
 
-use rustc_hash::FxHashMap;
-use salsa;
-use salsa::plumbing::AsId;
-
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext, UnaryOp};
 use ruff_text_size::Ranged;
+use rustc_hash::FxHashMap;
+use salsa;
+use salsa::plumbing::AsId;
 
 use crate::module_name::ModuleName;
 use crate::module_resolver::{file_to_module, resolve_module};
@@ -52,7 +51,7 @@ use crate::types::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 use crate::types::{
     bindings_ty, builtins_symbol_ty, declarations_ty, global_symbol_ty, symbol_ty,
     typing_extensions_symbol_ty, BytesLiteralType, ClassType, FunctionType, StringLiteralType,
-    TupleType, Type, TypeArrayDisplay, UnionType,
+    Truthiness, TupleType, Type, TypeArrayDisplay, UnionType,
 };
 use crate::Db;
 
@@ -2318,16 +2317,35 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_boolean_expression(&mut self, bool_op: &ast::ExprBoolOp) -> Type<'db> {
         let ast::ExprBoolOp {
             range: _,
-            op: _,
+            op,
             values,
         } = bool_op;
-
-        for value in values {
-            self.infer_expression(value);
-        }
-
-        // TODO resolve bool op
-        Type::Unknown
+        let mut done = false;
+        UnionType::from_elements(
+            self.db,
+            values.iter().enumerate().map(|(i, value)| {
+                // We need to infer the type of every expression (that's an invariant maintained by
+                // type inference), even if we can short-circuit boolean evaluation of some of
+                // those types.
+                let value_ty = self.infer_expression(value);
+                if done {
+                    Type::Never
+                } else {
+                    let is_last = i == values.len() - 1;
+                    match (value_ty.bool(self.db), is_last, op) {
+                        (Truthiness::Ambiguous, _, _) => value_ty,
+                        (Truthiness::AlwaysTrue, false, ast::BoolOp::And) => Type::Never,
+                        (Truthiness::AlwaysFalse, false, ast::BoolOp::Or) => Type::Never,
+                        (Truthiness::AlwaysFalse, _, ast::BoolOp::And)
+                        | (Truthiness::AlwaysTrue, _, ast::BoolOp::Or) => {
+                            done = true;
+                            value_ty
+                        }
+                        (_, true, _) => value_ty,
+                    }
+                }
+            }),
+        )
     }
 
     fn infer_compare_expression(&mut self, compare: &ast::ExprCompare) -> Type<'db> {
@@ -6046,6 +6064,98 @@ mod tests {
             first_public_binding(&db, a, "x"),
             &events,
         );
+        Ok(())
+    }
+
+    #[test]
+    fn boolean_or_expression() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            def foo() -> str:
+                pass
+
+            a = True or False
+            b = 'x' or 'y' or 'z'
+            c = '' or 'y' or 'z'
+            d = False or 'z'
+            e = False or True
+            f = False or False
+            g = foo() or False
+            h = foo() or True
+            ",
+        )?;
+
+        assert_public_ty(&db, "/src/a.py", "a", "Literal[True]");
+        assert_public_ty(&db, "/src/a.py", "b", r#"Literal["x"]"#);
+        assert_public_ty(&db, "/src/a.py", "c", r#"Literal["y"]"#);
+        assert_public_ty(&db, "/src/a.py", "d", r#"Literal["z"]"#);
+        assert_public_ty(&db, "/src/a.py", "e", "Literal[True]");
+        assert_public_ty(&db, "/src/a.py", "f", "Literal[False]");
+        assert_public_ty(&db, "/src/a.py", "g", "str | Literal[False]");
+        assert_public_ty(&db, "/src/a.py", "h", "str | Literal[True]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn boolean_and_expression() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            def foo() -> str:
+                pass
+
+            a = True and False
+            b = False and True
+            c = foo() and False
+            d = foo() and True
+            e = 'x' and 'y' and 'z'
+            f = 'x' and 'y' and ''
+            g = '' and 'y'
+            ",
+        )?;
+
+        assert_public_ty(&db, "/src/a.py", "a", "Literal[False]");
+        assert_public_ty(&db, "/src/a.py", "b", "Literal[False]");
+        assert_public_ty(&db, "/src/a.py", "c", "str | Literal[False]");
+        assert_public_ty(&db, "/src/a.py", "d", "str | Literal[True]");
+        assert_public_ty(&db, "/src/a.py", "e", r#"Literal["z"]"#);
+        assert_public_ty(&db, "/src/a.py", "f", r#"Literal[""]"#);
+        assert_public_ty(&db, "/src/a.py", "g", r#"Literal[""]"#);
+        Ok(())
+    }
+
+    #[test]
+    fn boolean_complex_expression() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+            def foo() -> str:
+                pass
+
+            a = "x" and "y" or "z"
+            b = "x" or "y" and "z"
+            c = "" and "y" or "z"
+            d = "" or "y" and "z"
+            e = "x" and "y" or ""
+            f = "x" or "y" and ""
+
+            "#,
+        )?;
+
+        assert_public_ty(&db, "/src/a.py", "a", r#"Literal["y"]"#);
+        assert_public_ty(&db, "/src/a.py", "b", r#"Literal["x"]"#);
+        assert_public_ty(&db, "/src/a.py", "c", r#"Literal["z"]"#);
+        assert_public_ty(&db, "/src/a.py", "d", r#"Literal["z"]"#);
+        assert_public_ty(&db, "/src/a.py", "e", r#"Literal["y"]"#);
+        assert_public_ty(&db, "/src/a.py", "f", r#"Literal["x"]"#);
         Ok(())
     }
 }
