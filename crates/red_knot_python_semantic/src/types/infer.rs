@@ -1665,6 +1665,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     for element in &fstring.elements {
                         match element {
                             ast::FStringElement::Expression(expression) => {
+                                // TODO: handle the format-spec in expression
                                 // Always infer sub-expressions, even if we've figured out the type
                                 let ty = self.infer_expression(&expression.expression);
                                 if !done {
