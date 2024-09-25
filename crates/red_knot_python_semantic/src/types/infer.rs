@@ -1688,6 +1688,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 }
             }
+            if literals.iter().fold(0, |acc, box_str| acc + box_str.len())
+                <= Self::MAX_STRING_LITERAL_SIZE
+            {
+                break;
+            }
         }
 
         if has_expression {
