@@ -110,13 +110,16 @@ pub(crate) fn boolean_chained_comparison(checker: &mut Checker, expr_bool_op: &E
 
 /// Checks whether two compare expressions are simplifiable
 fn are_compare_expr_simplifiable(left: &ExprCompare, right: &ExprCompare) -> bool {
-    // only allow simplifying simple compare operations
-    if left.ops.len() != 1 || right.ops.len() != 1 {
+    let [left_operator] = &*left.ops else {
         return false;
-    }
+    };
+
+    let [right_operator] = &*right.ops else {
+        return false;
+    };
 
     matches!(
-        (left.ops.first().unwrap(), right.ops.first().unwrap()),
+        (left_operator, right_operator),
         (CmpOp::Lt | CmpOp::LtE, CmpOp::Lt | CmpOp::LtE)
             | (CmpOp::Gt | CmpOp::GtE, CmpOp::Gt | CmpOp::GtE)
     )
