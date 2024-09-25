@@ -34,8 +34,6 @@ use crate::checkers::ast::Checker;
 #[violation]
 pub struct BooleanChainedComparison {
     variable: Name,
-    range: TextRange,
-    replace_range: TextRange,
 }
 
 impl Violation for BooleanChainedComparison {
@@ -64,12 +62,12 @@ pub(crate) fn boolean_chained_comparison(checker: &mut Checker, expr_bool_op: &E
     }
 
     // retrieve all compare statements from expression
-    let compare_exprs = expr_bool_op
+    let compare_expressions = expr_bool_op
         .values
         .iter()
         .map(|stmt| stmt.as_compare_expr().unwrap());
 
-    let results = compare_exprs
+    let diagnostics = compare_expressions
         .tuple_windows()
         .filter(|(left_compare, right_compare)| {
             are_compare_expr_simplifiable(left_compare, right_compare)
@@ -87,20 +85,23 @@ pub(crate) fn boolean_chained_comparison(checker: &mut Checker, expr_bool_op: &E
                 return None;
             }
 
-            Some(BooleanChainedComparison {
-                variable: left_compare_right.id().clone(),
-                range: TextRange::new(left_compare.start(), right_compare.end()),
-                replace_range: TextRange::new(left_compare_right.start(), right_compare_left.end()),
-            })
+            let edit = Edit::range_replacement(
+                left_compare_right.id().to_string(),
+                TextRange::new(left_compare_right.start(), right_compare_left.end()),
+            );
+
+            Some(
+                Diagnostic::new(
+                    BooleanChainedComparison {
+                        variable: left_compare_right.id().clone(),
+                    },
+                    TextRange::new(left_compare.start(), right_compare.end()),
+                )
+                .with_fix(Fix::safe_edit(edit)),
+            )
         });
 
-    checker.diagnostics.extend(results.map(|result| {
-        let range = result.range;
-        let edit = Edit::range_replacement(result.variable.to_string(), result.replace_range);
-        let mut diagnostic = Diagnostic::new(result, range);
-        diagnostic.set_fix(Fix::safe_edit(edit));
-        diagnostic
-    }));
+    checker.diagnostics.extend(diagnostics);
 }
 
 /// Checks whether two compare expressions are simplifiable
