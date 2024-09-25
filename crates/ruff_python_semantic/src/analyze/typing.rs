@@ -731,7 +731,7 @@ impl TypeChecker for IoBaseChecker {
 /// Test whether the given binding can be considered a list.
 ///
 /// For this, we check what value might be associated with it through it's initialization and
-/// what annotation it has (we consider `list` and `typing.List`).
+/// what annotation it has (we consider `list` and `typing.List`)
 pub fn is_list(binding: &Binding, semantic: &SemanticModel) -> bool {
     check_type::<ListChecker>(binding, semantic)
 }
@@ -771,10 +771,26 @@ pub fn is_set(binding: &Binding, semantic: &SemanticModel) -> bool {
 
 /// Test whether the given binding can be considered a tuple.
 ///
-/// For this, we check what value might be associated with it through
-/// it's initialization and what annotation it has (we consider `tuple` and
-/// `typing.Tuple`).
+/// For this, we check what value might be associated with it through it's initialization, what
+/// annotation it has (we consider `tuple` and `typing.Tuple`), and if it is a variadic positional
+/// argument.
 pub fn is_tuple(binding: &Binding, semantic: &SemanticModel) -> bool {
+    // ```python
+    // def foo(*args):
+    //   ...
+    // ```
+    if matches!(binding.kind, BindingKind::Argument) {
+        if let Some(Stmt::FunctionDef(ast::StmtFunctionDef { parameters, .. })) =
+            binding.statement(semantic)
+        {
+            if let Some(arg_parameter) = parameters.vararg.as_deref() {
+                if arg_parameter.name.range() == binding.range() {
+                    return true;
+                }
+            }
+        }
+    }
+
     check_type::<TupleChecker>(binding, semantic)
 }
 
