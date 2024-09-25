@@ -1654,13 +1654,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ast::ExprFString { range: _, value } = fstring;
 
         let mut has_expression = false;
-        let mut literals = Vec::new();
-        // Build an arena to allocate expression string representation
-        let expr_arena = typed_arena::Arena::new();
+        let mut concatenated = String::new();
         for part in value {
             match part {
                 ast::FStringPart::Literal(literal) => {
-                    literals.push(&literal.value);
+                    concatenated.push_str(&literal.value);
                 }
                 ast::FStringPart::FString(fstring) => {
                     for element in &fstring.elements {
@@ -1670,11 +1668,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 match ty {
                                     Type::BooleanLiteral(_) | Type::IntLiteral(_) => {
                                         let repr = format!("{}", ty.representation(self.db));
-                                        let boxed_str = expr_arena.alloc(repr.into_boxed_str());
-                                        literals.push(boxed_str);
+                                        concatenated.push_str(&repr);
                                     }
                                     Type::StringLiteral(literal) => {
-                                        literals.push(literal.value(self.db));
+                                        concatenated.push_str(literal.value(self.db));
                                     }
                                     _ => {
                                         has_expression = true;
@@ -1682,15 +1679,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 }
                             }
                             ast::FStringElement::Literal(literal) => {
-                                literals.push(&literal.value);
+                                concatenated.push_str(&literal.value);
                             }
                         }
                     }
                 }
             }
-            if literals.iter().fold(0, |acc, box_str| acc + box_str.len())
-                <= Self::MAX_STRING_LITERAL_SIZE
-            {
+            if concatenated.len() > Self::MAX_STRING_LITERAL_SIZE {
                 break;
             }
         }
@@ -1698,10 +1693,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         if has_expression {
             builtins_symbol_ty(self.db, "str").to_instance(self.db)
         } else {
-            if literals.iter().fold(0, |acc, box_str| acc + box_str.len())
-                <= Self::MAX_STRING_LITERAL_SIZE
-            {
-                let concatenated: String = literals.into_iter().map(Box::as_ref).collect();
+            if concatenated.len() <= Self::MAX_STRING_LITERAL_SIZE {
                 Type::StringLiteral(StringLiteralType::new(
                     self.db,
                     concatenated.into_boxed_str(),

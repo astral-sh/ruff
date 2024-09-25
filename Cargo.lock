@@ -2101,7 +2101,6 @@ dependencies = [
  "test-case",
  "thiserror",
  "tracing",
- "typed-arena",
 ]
 
 [[package]]
