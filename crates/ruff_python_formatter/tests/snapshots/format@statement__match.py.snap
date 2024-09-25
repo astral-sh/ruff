@@ -1235,4 +1235,30 @@ match x:
 ```
 
 
-
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -82,7 +82,9 @@
+ 
+ 
+ match long_lines:
+-    case "this is a long line for if condition" if aaaaaaaaahhhhhhhh == 1 and bbbbbbaaaaaaaaaaa == 2:  # comment
++    case (
++        "this is a long line for if condition"
++    ) if aaaaaaaaahhhhhhhh == 1 and bbbbbbaaaaaaaaaaa == 2:  # comment
+         pass
+ 
+     case "this is a long line for if condition with parentheses" if (
+@@ -249,7 +251,9 @@
+         1
+     ):
+         y = 1
+-    case 1:  # comment
++    case (
++        1  # comment
++    ):
+         y = 1
+     case (
+         1
+```

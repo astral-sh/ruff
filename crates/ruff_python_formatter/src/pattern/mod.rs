@@ -1,14 +1,16 @@
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions};
 use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::Pattern;
+use ruff_python_ast::{MatchCase, Pattern};
 use ruff_python_trivia::CommentRanges;
 use ruff_python_trivia::{
     first_non_trivia_token, BackwardsTokenizer, SimpleToken, SimpleTokenKind,
 };
 use ruff_text_size::Ranged;
 
+use crate::builders::parenthesize_if_expands;
+use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::parentheses::{
-    parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
+    optional_parentheses, parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
 };
 use crate::prelude::*;
 
@@ -149,4 +151,71 @@ impl NeedsParentheses for Pattern {
             Pattern::MatchOr(pattern) => pattern.needs_parentheses(parent, context),
         }
     }
+}
+
+pub(crate) fn maybe_parenthesize_pattern<'a>(
+    pattern: &'a Pattern,
+    case: &'a MatchCase,
+) -> MaybeParenthesizePattern<'a> {
+    MaybeParenthesizePattern { pattern, case }
+}
+
+#[derive(Debug)]
+pub(crate) struct MaybeParenthesizePattern<'a> {
+    pattern: &'a Pattern,
+    case: &'a MatchCase,
+}
+
+impl Format<PyFormatContext<'_>> for MaybeParenthesizePattern<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+        let MaybeParenthesizePattern { pattern, case } = self;
+
+        let comments = f.context().comments();
+        let pattern_comments = comments.leading_dangling_trailing(*pattern);
+
+        // If the pattern has comments, we always want to preserve the parentheses. This also
+        // ensures that we correctly handle parenthesized comments, and don't need to worry about
+        // them in the implementation below.
+        if pattern_comments.has_leading() || pattern_comments.has_trailing_own_line() {
+            return pattern.format().with_options(Parentheses::Always).fmt(f);
+        }
+
+        let needs_parentheses = pattern.needs_parentheses(AnyNodeRef::from(*case), f.context());
+
+        match needs_parentheses {
+            OptionalParentheses::Always => {
+                pattern.format().with_options(Parentheses::Always).fmt(f)
+            }
+            OptionalParentheses::Never => pattern.format().with_options(Parentheses::Never).fmt(f),
+            OptionalParentheses::Multiline => {
+                if can_pattern_omit_optional_parentheses(pattern, f.context()) {
+                    optional_parentheses(&pattern.format().with_options(Parentheses::Never)).fmt(f)
+                } else {
+                    parenthesize_if_expands(&pattern.format().with_options(Parentheses::Never))
+                        .fmt(f)
+                }
+            }
+            OptionalParentheses::BestFit => {
+                if pattern_comments.has_trailing() {
+                    pattern.format().with_options(Parentheses::Always).fmt(f)
+                } else {
+                    // The group id is necessary because the nested expressions may reference it.
+                    let group_id = f.group_id("optional_parentheses");
+                    let f = &mut WithNodeLevel::new(NodeLevel::Expression(Some(group_id)), f);
+
+                    best_fit_parenthesize(&pattern.format().with_options(Parentheses::Never))
+                        .with_group_id(Some(group_id))
+                        .fmt(f)
+                }
+            }
+        }
+    }
+}
+
+pub(crate) fn can_pattern_omit_optional_parentheses(
+    _pattern: &Pattern,
+    _context: &PyFormatContext,
+) -> bool {
+    // TODO Implement
+    false
 }

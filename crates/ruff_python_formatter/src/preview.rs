@@ -36,3 +36,9 @@ pub(crate) fn is_empty_parameters_no_unnecessary_parentheses_around_return_value
 ) -> bool {
     context.is_preview()
 }
+
+/// See [#6933](https://github.com/astral-sh/ruff/issues/6933).
+/// This style also covers the black preview styles `remove_redundant_guard_parens` and `parens_for_long_if_clauses_in_case_block `.
+pub(crate) fn is_match_case_parentheses_enabled(context: &PyFormatContext) -> bool {
+    context.is_preview()
+}
