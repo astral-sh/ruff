@@ -28,6 +28,7 @@ ordermap = { workspace = true }
 salsa = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+typed-arena = { workspace = true }
 rustc-hash = { workspace = true }
 hashbrown = { workspace = true }
 smallvec = { workspace = true }

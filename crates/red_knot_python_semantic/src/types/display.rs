@@ -14,7 +14,7 @@ impl<'db> Type<'db> {
     pub fn display(&self, db: &'db dyn Db) -> DisplayType {
         DisplayType { ty: self, db }
     }
-    fn representation(self, db: &'db dyn Db) -> DisplayRepresentation<'db> {
+    pub(super) fn representation(self, db: &'db dyn Db) -> DisplayRepresentation<'db> {
         DisplayRepresentation { db, ty: self }
     }
 }
@@ -54,7 +54,7 @@ impl fmt::Debug for DisplayType<'_> {
 /// Writes the string representation of a type, which is the value displayed either as
 /// `Literal[<repr>]` or `Literal[<repr1>, <repr2>]` for literal types or as `<repr>` for
 /// non literals
-struct DisplayRepresentation<'db> {
+pub(super) struct DisplayRepresentation<'db> {
     ty: Type<'db>,
     db: &'db dyn Db,
 }

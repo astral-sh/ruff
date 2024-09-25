@@ -1653,24 +1653,33 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_fstring_expression(&mut self, fstring: &ast::ExprFString) -> Type<'db> {
         let ast::ExprFString { range: _, value } = fstring;
 
-        // When we infer an fstring, there are only 2 outcomes:
-        // - The fstring contains *any* expression, and we infer `builtins.str`
-        // - The fstring contains *only* literals, and we use the same logic as
-        //   `infer_string_literal_expression`
         let mut has_expression = false;
         let mut literals = Vec::new();
+        // Build an arena to allocate expression string representation
+        let expr_arena = typed_arena::Arena::new();
         for part in value {
             match part {
                 ast::FStringPart::Literal(literal) => {
                     literals.push(&literal.value);
                 }
                 ast::FStringPart::FString(fstring) => {
-                    for element in fstring.elements.into_iter() {
+                    for element in &fstring.elements {
                         match element {
-                            ast::FStringElement::Expression(_) => {
-                                // We can short-circuit on any found expression
-                                has_expression = true;
-                                break;
+                            ast::FStringElement::Expression(expression) => {
+                                let ty = self.infer_expression(&expression.expression);
+                                match ty {
+                                    Type::BooleanLiteral(_) | Type::IntLiteral(_) => {
+                                        let repr = format!("{}", ty.representation(self.db));
+                                        let boxed_str = expr_arena.alloc(repr.into_boxed_str());
+                                        literals.push(boxed_str);
+                                    }
+                                    Type::StringLiteral(literal) => {
+                                        literals.push(literal.value(self.db));
+                                    }
+                                    _ => {
+                                        has_expression = true;
+                                    }
+                                }
                             }
                             ast::FStringElement::Literal(literal) => {
                                 literals.push(&literal.value);
@@ -3597,17 +3606,39 @@ mod tests {
             "src/a.py",
             "
             x = 0
+            y = str()
+
             a = f'hello'
-            b = f'hello {x}'
+            b = f'h {x}'
             c = 'one ' f'single ' f'literal'
-            d = 'first ' f'second({x})' f'third'
+            d = 'first ' f'second({b})' f' third'
+            e = f'-{y}-'
+            f = f'-{y}-' f'--' '--'
             ",
         )?;
 
         assert_public_ty(&db, "src/a.py", "a", "Literal[\"hello\"]");
-        assert_public_ty(&db, "src/a.py", "b", "str");
+        assert_public_ty(&db, "src/a.py", "b", "Literal[\"h 0\"]");
         assert_public_ty(&db, "src/a.py", "c", "Literal[\"one single literal\"]");
-        assert_public_ty(&db, "src/a.py", "d", "str");
+        assert_public_ty(&db, "src/a.py", "d", "Literal[\"first second(h 0) third\"]");
+        assert_public_ty(&db, "src/a.py", "e", "str");
+        assert_public_ty(&db, "src/a.py", "f", "str");
+
+        // More realistic use-case for inferring literals inside f-strings
+        db.write_dedented(
+            "src/endpoint.py",
+            "
+            BASE_URL = 'https://httpbin.org'
+            VERSION = 'v1'
+            endpoint = f'{BASE_URL}/{VERSION}/post'
+            ",
+        )?;
+        assert_public_ty(
+            &db,
+            "src/endpoint.py",
+            "endpoint",
+            "Literal[\"https://httpbin.org/v1/post\"]",
+        );
 
         Ok(())
     }
