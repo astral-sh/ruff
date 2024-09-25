@@ -64,15 +64,13 @@ pub(crate) fn boolean_chained_comparison(checker: &mut Checker, expr_bool_op: &E
     }
 
     // retrieve all compare statements from expression
-    let compare_exprs: Vec<&ExprCompare> = expr_bool_op
+    let compare_exprs = expr_bool_op
         .values
         .iter()
-        .map(|stmt| stmt.as_compare_expr().unwrap())
-        .collect();
+        .map(|stmt| stmt.as_compare_expr().unwrap());
 
-    let results: Vec<BooleanChainedComparison> = compare_exprs
-        .iter()
-        .tuple_windows::<(&&ExprCompare, &&ExprCompare)>()
+    let results = compare_exprs
+        .tuple_windows()
         .filter(|(left_compare, right_compare)| {
             are_compare_expr_simplifiable(left_compare, right_compare)
         })
@@ -94,18 +92,15 @@ pub(crate) fn boolean_chained_comparison(checker: &mut Checker, expr_bool_op: &E
                 range: TextRange::new(left_compare.start(), right_compare.end()),
                 replace_range: TextRange::new(left_compare_right.start(), right_compare_left.end()),
             })
-        })
-        .collect();
+        });
 
-    checker
-        .diagnostics
-        .extend(results.into_iter().map(|result| {
-            let range = result.range;
-            let edit = Edit::range_replacement(result.variable.to_string(), result.replace_range);
-            let mut diagnostic = Diagnostic::new(result, range);
-            diagnostic.set_fix(Fix::safe_edit(edit));
-            diagnostic
-        }));
+    checker.diagnostics.extend(results.map(|result| {
+        let range = result.range;
+        let edit = Edit::range_replacement(result.variable.to_string(), result.replace_range);
+        let mut diagnostic = Diagnostic::new(result, range);
+        diagnostic.set_fix(Fix::safe_edit(edit));
+        diagnostic
+    }));
 }
 
 /// Checks whether two compare expressions are simplifiable
