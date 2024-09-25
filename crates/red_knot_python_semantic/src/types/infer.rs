@@ -1653,6 +1653,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_fstring_expression(&mut self, fstring: &ast::ExprFString) -> Type<'db> {
         let ast::ExprFString { range: _, value } = fstring;
 
+        let mut done = false;
         let mut has_expression = false;
         let mut concatenated = String::new();
         for part in value {
@@ -1664,29 +1665,30 @@ impl<'db> TypeInferenceBuilder<'db> {
                     for element in &fstring.elements {
                         match element {
                             ast::FStringElement::Expression(expression) => {
+                                // Always infer sub-expressions, even if we've figured out the type
                                 let ty = self.infer_expression(&expression.expression);
-                                match ty {
-                                    Type::BooleanLiteral(_) | Type::IntLiteral(_) => {
-                                        let repr = format!("{}", ty.representation(self.db));
-                                        concatenated.push_str(&repr);
-                                    }
-                                    Type::StringLiteral(literal) => {
-                                        concatenated.push_str(literal.value(self.db));
-                                    }
-                                    _ => {
+                                if !done {
+                                    // `f-strings` use the `str` builtin
+                                    let maybe_str = ty.str(self.db);
+                                    if let Some(string) = maybe_str {
+                                        concatenated.push_str(string.as_str());
+                                    } else {
                                         has_expression = true;
+                                        done = true;
                                     }
                                 }
                             }
                             ast::FStringElement::Literal(literal) => {
-                                concatenated.push_str(&literal.value);
+                                if !done {
+                                    concatenated.push_str(&literal.value);
+                                }
                             }
                         }
                     }
                 }
             }
             if concatenated.len() > Self::MAX_STRING_LITERAL_SIZE {
-                break;
+                done = true;
             }
         }
 
@@ -2597,7 +2599,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_call_expression(call_expr);
                 Type::Unknown
             }
-            ast::Expr::FString(_) => Type::Unknown,
+            ast::Expr::FString(fstring) => {
+                self.infer_fstring_expression(fstring);
+                Type::Unknown
+            }
             //
             ast::Expr::Attribute(attribute) => {
                 self.infer_attribute_expression(attribute);

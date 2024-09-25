@@ -721,6 +721,36 @@ impl<'db> Type<'db> {
             Type::Tuple(_) => builtins_symbol_ty(db, "tuple"),
         }
     }
+
+    /// Return the string representation of this type when converted to string as it would be
+    /// provided by the builtin `str` function at runtime (see `__str`). If that can't be
+    /// determined, return `None`.
+    ///
+    /// When not available, this should fall back to the value of `[Type::repr]`.
+    /// Note: this method is used in the builtins `format`, `print`, `str.format` and `f-strings`.
+    pub fn str(&self, db: &'db dyn Db) -> Option<String> {
+        let str_result = match self {
+            // For those primitive types, `str` and `repr` are equivalent so we rely on `repr` to
+            // avoid code duplication.
+            Type::IntLiteral(_) | Type::BooleanLiteral(_) | Type::StringLiteral(_) => None,
+            // TODO: handle more complex types
+            _ => None,
+        };
+        str_result.or_else(|| self.repr(db))
+    }
+
+    /// Return the string representation of this type as it would be provided by the builtin `repr`
+    /// function at runtime (see `__repr__`). If that can't be determined, return `None`.
+    pub fn repr(&self, db: &'db dyn Db) -> Option<String> {
+        match self {
+            Type::IntLiteral(number) => Some(number.to_string()),
+            Type::BooleanLiteral(true) => Some("True".to_string()),
+            Type::BooleanLiteral(false) => Some("False".to_string()),
+            Type::StringLiteral(string) => Some(string.value(db).to_string()),
+            // TODO: handle more complex types
+            _ => None,
+        }
+    }
 }
 
 impl<'db> From<&Type<'db>> for Type<'db> {
