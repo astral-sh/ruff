@@ -1,8 +1,9 @@
 use std::borrow::Cow;
 use std::iter;
+use unicode_normalization::UnicodeNormalization;
 
 use anyhow::{anyhow, bail, Result};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 use ruff_diagnostics::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -275,75 +276,95 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
     // Collect all unused imports by statement.
     let mut unused: BTreeMap<(NodeId, Exceptions), Vec<ImportBinding>> = BTreeMap::default();
     let mut ignored: BTreeMap<(NodeId, Exceptions), Vec<ImportBinding>> = BTreeMap::default();
+    let mut already_checked_imports: HashSet<String> = HashSet::new();
 
     for binding_id in scope.binding_ids() {
-        let binding = checker.semantic().binding(binding_id);
+        let top_binding = checker.semantic().binding(binding_id);
 
-        if binding.is_used()
-            || binding.is_explicit_export()
-            || binding.is_nonlocal()
-            || binding.is_global()
-        {
-            continue;
-        }
-
-        let Some(import) = binding.as_any_import() else {
+        let Some(_) = top_binding.as_any_import() else {
             continue;
         };
 
-        let Some(node_id) = binding.source else {
-            continue;
-        };
+        let binding_name = top_binding.name(checker.locator()).split(".").next().unwrap_or("");
 
-        let name = binding.name(checker.locator());
-
-        // If an import is marked as required, avoid treating it as unused, regardless of whether
-        // it was _actually_ used.
-        if checker
-            .settings
-            .isort
-            .required_imports
-            .iter()
-            .any(|required_import| required_import.matches(name, &import))
+        for binding in scope
+            .get_all(&binding_name.nfkc().collect::<String>())
+            .map(|binding_id| checker.semantic().binding(binding_id))
         {
-            continue;
-        }
+            let name = binding.name(checker.locator());
 
-        // If an import was marked as allowed, avoid treating it as unused.
-        if checker
-            .settings
-            .pyflakes
-            .allowed_unused_imports
-            .iter()
-            .any(|allowed_unused_import| {
-                let allowed_unused_import = QualifiedName::from_dotted_name(allowed_unused_import);
-                import.qualified_name().starts_with(&allowed_unused_import)
-            })
-        {
-            continue;
-        }
+            if already_checked_imports.contains(name)
+            {
+                continue;
+            }
+            {
+                already_checked_imports.insert(name.to_string());
+            }
 
-        let import = ImportBinding {
-            name,
-            import,
-            range: binding.range(),
-            parent_range: binding.parent_range(checker.semantic()),
-        };
+            if binding.is_used()
+                || binding.is_explicit_export()
+                || binding.is_nonlocal()
+                || binding.is_global()
+            {
+                continue;
+            }
 
-        if checker.rule_is_ignored(Rule::UnusedImport, import.start())
-            || import.parent_range.is_some_and(|parent_range| {
-                checker.rule_is_ignored(Rule::UnusedImport, parent_range.start())
-            })
-        {
-            ignored
-                .entry((node_id, binding.exceptions))
-                .or_default()
-                .push(import);
-        } else {
-            unused
-                .entry((node_id, binding.exceptions))
-                .or_default()
-                .push(import);
+            let Some(import) = binding.as_any_import() else {
+                continue;
+            };
+
+            let Some(stmt_id) = binding.source else {
+                continue;
+            };
+
+            // If an import is marked as required, avoid treating it as unused, regardless of whether
+            // it was _actually_ used.
+            if checker
+                .settings
+                .isort
+                .required_imports
+                .iter()
+                .any(|required_import| required_import.matches(name, &import))
+            {
+                continue;
+            }
+
+            // If an import was marked as allowed, avoid treating it as unused.
+            if checker
+                .settings
+                .pyflakes
+                .allowed_unused_imports
+                .iter()
+                .any(|allowed_unused_import| {
+                    let allowed_unused_import = QualifiedName::from_dotted_name(allowed_unused_import);
+                    import.qualified_name().starts_with(&allowed_unused_import)
+                })
+            {
+                continue;
+            }
+
+            let import = ImportBinding {
+                name,
+                import,
+                range: binding.range(),
+                parent_range: binding.parent_range(checker.semantic()),
+            };
+
+            if checker.rule_is_ignored(Rule::UnusedImport, import.start())
+                || import.parent_range.is_some_and(|parent_range| {
+                    checker.rule_is_ignored(Rule::UnusedImport, parent_range.start())
+                })
+            {
+                ignored
+                    .entry((stmt_id, binding.exceptions))
+                    .or_default()
+                    .push(import);
+            } else {
+                unused
+                    .entry((stmt_id, binding.exceptions))
+                    .or_default()
+                    .push(import);
+            }
         }
     }
 

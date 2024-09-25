@@ -2654,7 +2654,7 @@ lambda: fu
         import foo.baz as foo
         foo
         ",
-            &[Rule::RedefinedWhileUnused],
+            &[Rule::UnusedImport, Rule::RedefinedWhileUnused],
         );
     }
 
@@ -2704,13 +2704,13 @@ lambda: fu
 
     #[test]
     fn unused_package_with_submodule_import() {
-        // When a package and its submodule are imported, only report once.
+        // When a package and its submodule are imported, report both.
         flakes(
             r"
         import fu
         import fu.bar
         ",
-            &[Rule::UnusedImport],
+            &[Rule::UnusedImport, Rule::UnusedImport],
         );
     }
 

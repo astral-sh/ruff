@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::Path;
 
 use bitflags::bitflags;
@@ -5,7 +6,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_python_ast::helpers::from_relative_import;
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
-use ruff_python_ast::{self as ast, Expr, ExprContext, Operator, PySourceType, Stmt};
+use ruff_python_ast::{self as ast, Expr, ExprContext, ExprName, Operator, PySourceType, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::binding::{
@@ -352,10 +353,274 @@ impl<'a> SemanticModel<'a> {
         }
     }
 
+    fn resolve_binding(
+        &mut self,
+        binding_id: BindingId,
+        name_expr: &ExprName,
+        scope_id: &ScopeId,
+    ) -> Option<ReadResult>
+    {
+
+        let reference_id = self.resolved_references.push(
+            self.scope_id,
+            self.node_id,
+            ExprContext::Load,
+            self.flags,
+            name_expr.range,
+        );
+
+        self.bindings[binding_id].references.push(reference_id);
+
+        if let Some(binding_id) = self.resolve_submodule(
+            name_expr.id.as_str(),
+            *scope_id,
+            binding_id,
+        ) {
+            let reference_id = self.resolved_references.push(
+                self.scope_id,
+                self.node_id,
+                ExprContext::Load,
+                self.flags,
+                name_expr.range,
+            );
+            self.bindings[binding_id].references.push(reference_id);
+        }
+
+        match self.bindings[binding_id].kind {
+            // If it's a type annotation, don't treat it as resolved. For example, given:
+            //
+            // ```python
+            // name: str
+            // print(name)
+            // ```
+            //
+            // The `name` in `print(name)` should be treated as unresolved, but the `name` in
+            // `name: str` should be treated as used.
+            //
+            // Stub files are an exception. In a stub file, it _is_ considered valid to
+            // resolve to a type annotation.
+            BindingKind::Annotation if !self.in_stub_file() => None,
+
+            // If it's a deletion, don't treat it as resolved, since the name is now
+            // unbound. For example, given:
+            //
+            // ```python
+            // x = 1
+            // del x
+            // print(x)
+            // ```
+            //
+            // The `x` in `print(x)` should be treated as unresolved.
+            //
+            // Similarly, given:
+            //
+            // ```python
+            // try:
+            //     pass
+            // except ValueError as x:
+            //     pass
+            //
+            // print(x)
+            //
+            // The `x` in `print(x)` should be treated as unresolved.
+            BindingKind::Deletion | BindingKind::UnboundException(None) => {
+                self.unresolved_references.push(
+                    name_expr.range,
+                    self.exceptions(),
+                    UnresolvedReferenceFlags::empty(),
+                );
+                Some(ReadResult::UnboundLocal(binding_id))
+            }
+
+            BindingKind::ConditionalDeletion(binding_id) => {
+                self.unresolved_references.push(
+                    name_expr.range,
+                    self.exceptions(),
+                    UnresolvedReferenceFlags::empty(),
+                );
+                Some(ReadResult::UnboundLocal(binding_id))
+            }
+
+            // If we hit an unbound exception that shadowed a bound name, resole to the
+            // bound name. For example, given:
+            //
+            // ```python
+            // x = 1
+            //
+            // try:
+            //     pass
+            // except ValueError as x:
+            //     pass
+            //
+            // print(x)
+            // ```
+            //
+            // The `x` in `print(x)` should resolve to the `x` in `x = 1`.
+            BindingKind::UnboundException(Some(binding_id)) => {
+                // Mark the binding as used.
+                let reference_id = self.resolved_references.push(
+                    self.scope_id,
+                    self.node_id,
+                    ExprContext::Load,
+                    self.flags,
+                    name_expr.range,
+                );
+                self.bindings[binding_id].references.push(reference_id);
+
+                // Mark any submodule aliases as used.
+                if let Some(binding_id) = self.resolve_submodule(
+                    name_expr.id.as_str(),
+                    *scope_id,
+                    binding_id,
+                ) {
+                    let reference_id = self.resolved_references.push(
+                        self.scope_id,
+                        self.node_id,
+                        ExprContext::Load,
+                        self.flags,
+                        name_expr.range,
+                    );
+                    self.bindings[binding_id].references.push(reference_id);
+                }
+
+                self.resolved_names
+                    .insert(name_expr.into(), binding_id);
+                Some(ReadResult::Resolved(binding_id))
+            }
+
+            BindingKind::Global(Some(binding_id))
+            | BindingKind::Nonlocal(binding_id, _) => {
+                // Mark the shadowed binding as used.
+                let reference_id = self.resolved_references.push(
+                    self.scope_id,
+                    self.node_id,
+                    ExprContext::Load,
+                    self.flags,
+                    name_expr.range,
+                );
+                self.bindings[binding_id].references.push(reference_id);
+
+                // Treat it as resolved.
+                self.resolved_names
+                    .insert(name_expr.into(), binding_id);
+                Some(ReadResult::Resolved(binding_id))
+            }
+
+            _ => {
+                // Otherwise, treat it as resolved.
+                self.resolved_names
+                    .insert(name_expr.into(), binding_id);
+                Some(ReadResult::Resolved(binding_id))
+            }
+        }
+    }
+
+    /// Resolve a `load` reference to an [`ast::ExprAttribute`].
+    pub fn resolve_attribute_load(&mut self, attribute: &ast::ExprAttribute) -> ReadResult {
+        let name_expr;
+
+        let mut full_name = format!("{}", attribute.attr.id);
+        let mut current_expr = &*attribute.value;
+        let mut result = None;
+        let mut is_name_exist = false;
+        let mut already_checked_imports: HashSet<String> = HashSet::new();
+
+        while let Expr::Attribute(expr_attr) = &current_expr {
+            full_name = format!("{}.{}", expr_attr.attr.id, full_name);
+            current_expr = &*expr_attr.value;
+        }
+
+        if let Expr::Name(ref expr_name) = current_expr {
+            full_name = format!("{}.{}", expr_name.id, full_name);
+            name_expr = Some(expr_name);
+        } else {
+            return ReadResult::NotFound;
+        }
+
+        if name_expr.is_none() {
+            return ReadResult::NotFound;
+        }
+
+        full_name = full_name.trim_end_matches('.').to_string();
+
+        let ancestor_scope_ids: Vec<_> = self.scopes.ancestor_ids(self.scope_id).collect();
+        let mut binding_ids: Vec<(BindingId, ScopeId)> = vec![];
+
+        for (_index, scope_id) in ancestor_scope_ids.into_iter().enumerate() {
+            for binding_id in self.scopes[scope_id].get_all(name_expr.unwrap().id.as_str()){
+                binding_ids.push((binding_id, scope_id));
+            }
+        }
+
+        for (binding_id, scope_id) in binding_ids.iter() {
+            if let BindingKind::SubmoduleImport(binding_kind) = &self.binding(*binding_id).kind
+            {
+                if binding_kind.qualified_name.to_string() == full_name {
+                    if let Some(result) = self.resolve_binding(
+                        *binding_id,
+                        &name_expr.unwrap(),
+                        scope_id,
+                    ) {
+                        return result;
+                    }
+                }
+            }
+            if let BindingKind::Import(_) = &self.binding(*binding_id).kind {
+                is_name_exist = true;
+            }
+        }
+
+        // TODO: need to move the block implementation to resolve_load, but carefully
+        // start check module import
+        for (binding_id, scope_id) in binding_ids.iter() {
+            let Some(import) = self.binding(*binding_id).as_any_import() else {
+                continue;
+            };
+            let name = &import.qualified_name().to_string()
+                .split(".").next().unwrap_or("").to_owned();
+
+            match self.bindings[*binding_id].kind {
+                BindingKind::SubmoduleImport(_) if !is_name_exist => continue,
+                BindingKind::WithItemVar => continue,
+                BindingKind::SubmoduleImport(_) => {
+                    result = self.resolve_binding(
+                        *binding_id,
+                        &name_expr.unwrap(),
+                        scope_id,
+                    );
+                },
+                BindingKind::Import(_) => {
+
+                    if already_checked_imports.contains(&name.to_string())
+                    {
+                        continue;
+                    } else {
+                        already_checked_imports.insert(name.to_string());
+                    }
+
+                    result = self.resolve_binding(
+                        *binding_id,
+                        &name_expr.unwrap(),
+                        scope_id,
+                    );
+                }
+                _ => {}
+            }
+        }
+        // end check module import
+
+        if result.is_none() {
+            ReadResult::NotFound
+        } else {
+            result.unwrap()
+        }
+    }
+
     /// Resolve a `load` reference to an [`ast::ExprName`].
     pub fn resolve_load(&mut self, name: &ast::ExprName) -> ReadResult {
         // PEP 563 indicates that if a forward reference can be resolved in the module scope, we
         // should prefer it over local resolutions.
+
         if self.in_forward_reference() {
             if let Some(binding_id) = self.scopes.global().get(name.id.as_str()) {
                 if !self.bindings[binding_id].is_unbound() {
@@ -392,9 +657,18 @@ impl<'a> SemanticModel<'a> {
         let mut seen_function = false;
         let mut import_starred = false;
         let mut class_variables_visible = true;
-        for (index, scope_id) in self.scopes.ancestor_ids(self.scope_id).enumerate() {
+        let mut result = None;
+
+        let ancestor_scope_ids: Vec<_> = self.scopes.ancestor_ids(self.scope_id).collect();
+
+        for (index, scope_id) in ancestor_scope_ids.into_iter().enumerate() {
             let scope = &self.scopes[scope_id];
-            if scope.kind.is_class() {
+            let is_class = scope.kind.is_class();
+            let is_function = scope.kind.is_function();
+            let uses_star_imports = scope.uses_star_imports();
+            let mut is_name = false;
+
+            if is_class {
                 // Allow usages of `__class__` within methods, e.g.:
                 //
                 // ```python
@@ -430,154 +704,42 @@ impl<'a> SemanticModel<'a> {
             class_variables_visible = scope.kind.is_type() && index == 0;
 
             if let Some(binding_id) = scope.get(name.id.as_str()) {
-                // Mark the binding as used.
-                let reference_id = self.resolved_references.push(
-                    self.scope_id,
-                    self.node_id,
-                    ExprContext::Load,
-                    self.flags,
-                    name.range,
-                );
-                self.bindings[binding_id].references.push(reference_id);
-
-                // Mark any submodule aliases as used.
-                if let Some(binding_id) =
-                    self.resolve_submodule(name.id.as_str(), scope_id, binding_id)
-                {
-                    let reference_id = self.resolved_references.push(
-                        self.scope_id,
-                        self.node_id,
-                        ExprContext::Load,
-                        self.flags,
-                        name.range,
-                    );
-                    self.bindings[binding_id].references.push(reference_id);
+                // Return solved if there is at least one import with a submodule
+                for temp_binding_id in scope.get_all(name.id.as_str()) {
+                    if let BindingKind::Import(_) = &self.bindings[temp_binding_id].kind {
+                        is_name = true;
+                    }
                 }
 
-                match self.bindings[binding_id].kind {
-                    // If it's a type annotation, don't treat it as resolved. For example, given:
-                    //
-                    // ```python
-                    // name: str
-                    // print(name)
-                    // ```
-                    //
-                    // The `name` in `print(name)` should be treated as unresolved, but the `name` in
-                    // `name: str` should be treated as used.
-                    //
-                    // Stub files are an exception. In a stub file, it _is_ considered valid to
-                    // resolve to a type annotation.
-                    BindingKind::Annotation if !self.in_stub_file() => continue,
+                // Todo: Move the implementation here
+                for temp_binding_id in scope.get_all(name.id.as_str()) {
+                    if let BindingKind::SubmoduleImport(_) = &self
+                        .bindings[temp_binding_id].kind {
 
-                    // If it's a deletion, don't treat it as resolved, since the name is now
-                    // unbound. For example, given:
-                    //
-                    // ```python
-                    // x = 1
-                    // del x
-                    // print(x)
-                    // ```
-                    //
-                    // The `x` in `print(x)` should be treated as unresolved.
-                    //
-                    // Similarly, given:
-                    //
-                    // ```python
-                    // try:
-                    //     pass
-                    // except ValueError as x:
-                    //     pass
-                    //
-                    // print(x)
-                    //
-                    // The `x` in `print(x)` should be treated as unresolved.
-                    BindingKind::Deletion | BindingKind::UnboundException(None) => {
-                        self.unresolved_references.push(
-                            name.range,
-                            self.exceptions(),
-                            UnresolvedReferenceFlags::empty(),
-                        );
-                        return ReadResult::UnboundLocal(binding_id);
-                    }
-
-                    BindingKind::ConditionalDeletion(binding_id) => {
-                        self.unresolved_references.push(
-                            name.range,
-                            self.exceptions(),
-                            UnresolvedReferenceFlags::empty(),
-                        );
-                        return ReadResult::UnboundLocal(binding_id);
-                    }
-
-                    // If we hit an unbound exception that shadowed a bound name, resole to the
-                    // bound name. For example, given:
-                    //
-                    // ```python
-                    // x = 1
-                    //
-                    // try:
-                    //     pass
-                    // except ValueError as x:
-                    //     pass
-                    //
-                    // print(x)
-                    // ```
-                    //
-                    // The `x` in `print(x)` should resolve to the `x` in `x = 1`.
-                    BindingKind::UnboundException(Some(binding_id)) => {
-                        // Mark the binding as used.
-                        let reference_id = self.resolved_references.push(
-                            self.scope_id,
-                            self.node_id,
-                            ExprContext::Load,
-                            self.flags,
-                            name.range,
-                        );
-                        self.bindings[binding_id].references.push(reference_id);
-
-                        // Mark any submodule aliases as used.
-                        if let Some(binding_id) =
-                            self.resolve_submodule(name.id.as_str(), scope_id, binding_id)
-                        {
-                            let reference_id = self.resolved_references.push(
-                                self.scope_id,
-                                self.node_id,
-                                ExprContext::Load,
-                                self.flags,
-                                name.range,
-                            );
-                            self.bindings[binding_id].references.push(reference_id);
+                        if !is_name {
+                            return ReadResult::NotFound;
                         }
 
-                        self.resolved_names.insert(name.into(), binding_id);
-                        return ReadResult::Resolved(binding_id);
-                    }
-
-                    BindingKind::Global(Some(binding_id))
-                    | BindingKind::Nonlocal(binding_id, _) => {
-                        // Mark the shadowed binding as used.
-                        let reference_id = self.resolved_references.push(
-                            self.scope_id,
-                            self.node_id,
-                            ExprContext::Load,
-                            self.flags,
-                            name.range,
-                        );
-                        self.bindings[binding_id].references.push(reference_id);
-
-                        // Treat it as resolved.
-                        self.resolved_names.insert(name.into(), binding_id);
-                        return ReadResult::Resolved(binding_id);
-                    }
-
-                    _ => {
-                        // Otherwise, treat it as resolved.
-                        self.resolved_names.insert(name.into(), binding_id);
-                        return ReadResult::Resolved(binding_id);
+                        for reference_id in self.bindings[temp_binding_id].references() {
+                            if self.resolved_references[reference_id].range()
+                                .contains_range(self.bindings[temp_binding_id].range)
+                            {
+                                return ReadResult::Resolved(temp_binding_id);
+                            }
+                        }
                     }
                 }
-            }
 
+                result = self.resolve_binding(
+                    binding_id,
+                    &name,
+                    &scope_id,
+                );
+
+                if !result.is_none() {
+                    return result.unwrap();
+                }
+            }
             // Allow usages of `__module__` and `__qualname__` within class scopes, e.g.:
             //
             // ```python
@@ -593,14 +755,14 @@ impl<'a> SemanticModel<'a> {
             //     __qualname__ = "Bar"
             //     print(__qualname__)
             // ```
-            if index == 0 && scope.kind.is_class() {
+            if index == 0 && is_class {
                 if matches!(name.id.as_str(), "__module__" | "__qualname__") {
                     return ReadResult::ImplicitGlobal;
                 }
             }
 
-            seen_function |= scope.kind.is_function();
-            import_starred = import_starred || scope.uses_star_imports();
+            seen_function |= is_function;
+            import_starred = import_starred || uses_star_imports;
         }
 
         if import_starred {

@@ -39,6 +39,46 @@ F401_0.py:6:5: F401 [*] `collections.OrderedDict` imported but unused
 8 7 | )
 9 8 | import multiprocessing.pool
 
+F401_0.py:10:8: F401 [*] `multiprocessing.process` imported but unused
+   |
+ 8 | )
+ 9 | import multiprocessing.pool
+10 | import multiprocessing.process
+   |        ^^^^^^^^^^^^^^^^^^^^^^^ F401
+11 | import logging.config
+12 | import logging.handlers
+   |
+   = help: Remove unused import: `multiprocessing.process`
+
+ℹ Safe fix
+7  7  |     namedtuple,
+8  8  | )
+9  9  | import multiprocessing.pool
+10    |-import multiprocessing.process
+11 10 | import logging.config
+12 11 | import logging.handlers
+13 12 | from typing import (
+
+F401_0.py:11:8: F401 [*] `logging.config` imported but unused
+   |
+ 9 | import multiprocessing.pool
+10 | import multiprocessing.process
+11 | import logging.config
+   |        ^^^^^^^^^^^^^^ F401
+12 | import logging.handlers
+13 | from typing import (
+   |
+   = help: Remove unused import: `logging.config`
+
+ℹ Safe fix
+8  8  | )
+9  9  | import multiprocessing.pool
+10 10 | import multiprocessing.process
+11    |-import logging.config
+12 11 | import logging.handlers
+13 12 | from typing import (
+14 13 |     TYPE_CHECKING,
+
 F401_0.py:12:8: F401 [*] `logging.handlers` imported but unused
    |
 10 | import multiprocessing.process
@@ -282,5 +322,3 @@ F401_0.py:122:1: F401 [*] `datameta_client_lib.model_helpers.noqa` imported but 
 120 120 | 
 121     |-from datameta_client_lib.model_helpers import (
 122     |-noqa )
-
-
