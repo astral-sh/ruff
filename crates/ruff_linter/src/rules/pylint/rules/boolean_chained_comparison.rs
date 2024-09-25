@@ -71,11 +71,11 @@ pub(crate) fn boolean_chained_comparison(checker: &mut Checker, expr_bool_op: &E
             are_compare_expr_simplifiable(left_compare, right_compare)
         })
         .filter_map(|(left_compare, right_compare)| {
-            let Expr::Name(left_compare_right) = left_compare.comparators.first().unwrap() else {
+            let Expr::Name(left_compare_right) = left_compare.comparators.first()? else {
                 return None;
             };
 
-            let Expr::Name(ref right_compare_left) = right_compare.left.as_ref() else {
+            let Expr::Name(right_compare_left) = &*right_compare.left else {
                 return None;
             };
 
