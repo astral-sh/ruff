@@ -599,7 +599,7 @@ impl<'a> From<ast::LiteralExpressionRef<'a>> for ComparableLiteral<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ComparableFString<'a> {
-    elements: Vec<ComparableFStringElement<'a>>,
+    elements: Box<[ComparableFStringElement<'a>]>,
 }
 
 impl<'a> From<&'a ast::FStringValue> for ComparableFString<'a> {
@@ -626,12 +626,11 @@ impl<'a> From<&'a ast::FStringValue> for ComparableFString<'a> {
     //
     // So the idea of the code below is as follows:
     // - Iterate over parts.
-    // - When a literal is encountered, push it to a stack.
+    // - When a literal is encountered, push it to an accumulator.
     // - When an f-string part is encountered, iterate over its elements.
-    //      - When a literal element is encountered, push it to the stack.
-    //      - When an f-string expression is encountered, empty the stack into
-    //      a concatenated string and push it to our result, then push the f-string
-    //      expression.
+    //      - When a literal element is encountered, push it to the accumulator.
+    //      - When an f-string expression is encountered, empty the accumulator
+    //      and push it to our result, then push the f-string expression.
     //
     // The remaining messiness of the code results from an attempt to minimize unnecessary
     // allocations: if concatenating strings is unnecessary, we can re-use
@@ -649,17 +648,9 @@ impl<'a> From<&'a ast::FStringValue> for ComparableFString<'a> {
                         None => {
                             *literal_accumulator = Some(literal.value.as_ref().into());
                         }
-                        Some(existing_literal) => match existing_literal {
-                            Cow::Borrowed(s1) => {
-                                let mut s = String::with_capacity(s1.len() + literal.len());
-                                s.push_str(s1);
-                                s.push_str(literal);
-                                *existing_literal = Cow::Owned(s);
-                            }
-                            Cow::Owned(ref mut s1) => {
-                                s1.push_str(literal);
-                            }
-                        },
+                        Some(existing_literal) => {
+                            existing_literal.to_mut().push_str(&literal.value);
+                        }
                     },
                     ast::FStringElement::Expression(_) => {
                         if let Some(literal) = literal_accumulator.take() {
@@ -676,22 +667,16 @@ impl<'a> From<&'a ast::FStringValue> for ComparableFString<'a> {
 
         for part in value {
             match part {
-                ast::FStringPart::Literal(string_literal) => match &mut literal_accumulator {
-                    None => {
-                        literal_accumulator = Some(Cow::Borrowed(string_literal.as_str()));
-                    }
-                    Some(existing_literal) => match existing_literal {
-                        Cow::Borrowed(s1) => {
-                            let mut s = String::with_capacity(s1.len() + string_literal.len());
-                            s.push_str(s1);
-                            s.push_str(string_literal.as_str());
-                            *existing_literal = Cow::Owned(s);
+                ast::FStringPart::Literal(string_literal) => {
+                    literal_accumulator = Some(match literal_accumulator.take() {
+                        None => Cow::Borrowed(string_literal),
+                        Some(existing_literal) => {
+                            let mut s = existing_literal.into_owned();
+                            s.push_str(string_literal);
+                            s.into()
                         }
-                        Cow::Owned(ref mut s1) => {
-                            s1.push_str(string_literal.as_str());
-                        }
-                    },
-                },
+                    });
+                }
                 ast::FStringPart::FString(fstring) => {
                     // Note: we do _not_ clear the literal buffer here
                     // since we may encounter literals amongst the
@@ -710,7 +695,7 @@ impl<'a> From<&'a ast::FStringValue> for ComparableFString<'a> {
         }
 
         Self {
-            elements: fstring_compr_elements,
+            elements: fstring_compr_elements.into_boxed_slice(),
         }
     }
 }
