@@ -1243,6 +1243,7 @@ mod tests {
         Unknown,
         Any,
         IntLiteral(i64),
+        BoolLiteral(bool),
         StringLiteral(&'static str),
         LiteralString,
         BytesLiteral(&'static str),
@@ -1261,6 +1262,7 @@ mod tests {
                 Ty::StringLiteral(s) => {
                     Type::StringLiteral(StringLiteralType::new(db, (*s).into()))
                 }
+                Ty::BoolLiteral(b) => Type::BooleanLiteral(b),
                 Ty::LiteralString => Type::LiteralString,
                 Ty::BytesLiteral(s) => {
                     Type::BytesLiteral(BytesLiteralType::new(db, s.as_bytes().into()))
@@ -1371,10 +1373,31 @@ mod tests {
         assert_eq!(ty.into_type(&db).bool(&db), Truthiness::Ambiguous);
     }
 
-    #[test_case(Ty::IntLiteral(1), "1")]
-    fn has_correct_repr(ty: Ty, expected: &str) {
+    #[test_case(Ty::IntLiteral(1), Some("1"))]
+    #[test_case(Ty::BoolLiteral(true), Some("True"))]
+    #[test_case(Ty::BoolLiteral(false), Some("False"))]
+    #[test_case(Ty::StringLiteral("hello"), Some("hello"))] // no quotes
+    #[test_case(Ty::LiteralString, None)]
+    #[test_case(Ty::BuiltinInstance("int"), None)]
+    fn has_correct_str(ty: Ty, expected: Option<&str>) {
         let db = setup_db();
 
-        assert_eq!(ty.into_type(&db).repr(&db), Some(expected.to_string()));
+        let expected = expected.map(|s| Type::StringLiteral(StringLiteralType::new(&db, s.into())));
+
+        assert_eq!(ty.into_type(&db).str(&db), expected);
+    }
+
+    #[test_case(Ty::IntLiteral(1), Some("1"))]
+    #[test_case(Ty::BoolLiteral(true), Some("True"))]
+    #[test_case(Ty::BoolLiteral(false), Some("False"))]
+    #[test_case(Ty::StringLiteral("hello"), Some("'hello'"))] // single quotes
+    #[test_case(Ty::LiteralString, None)]
+    #[test_case(Ty::BuiltinInstance("int"), None)]
+    fn has_correct_repr(ty: Ty, expected: Option<&str>) {
+        let db = setup_db();
+
+        let expected = expected.map(|s| Type::StringLiteral(StringLiteralType::new(&db, s.into())));
+
+        assert_eq!(ty.into_type(&db).repr(&db), expected);
     }
 }

@@ -3651,6 +3651,39 @@ mod tests {
     }
 
     #[test]
+    fn fstring_expression_with_conversion_flags() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            string = 'hello'
+            a = f'{string!r}'
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "a", "str"); // Should be `Literal["'hello'"]`
+
+        Ok(())
+    }
+
+    #[test]
+    fn fstring_expression_with_format_specifier() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            a = f'{1:02}'
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "a", "str"); // Should be `Literal["01"]`
+
+        Ok(())
+    }
+
+    #[test]
     fn basic_call_expression() -> anyhow::Result<()> {
         let mut db = setup_db();
 
