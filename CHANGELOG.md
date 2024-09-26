@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.6.8
+
+### Preview features
+
+- Remove unnecessary parentheses around `match case` clauses ([#13510](https://github.com/astral-sh/ruff/pull/13510))
+- Parenthesize overlong `if` guards in `match..case` clauses ([#13513](https://github.com/astral-sh/ruff/pull/13513))
+- Detect basic wildcard imports in `ruff analyze graph` ([#13486](https://github.com/astral-sh/ruff/pull/13486))
+- \[`pylint`\] Implement `boolean-chained-comparison` (`R1716`) ([#13435](https://github.com/astral-sh/ruff/pull/13435))
+
+### Rule changes
+
+- \[`lake8-simplify`\] Detect `SIM910` when using variadic keyword arguments, i.e., `**kwargs` ([#13503](https://github.com/astral-sh/ruff/pull/13503))
+- \[`pyupgrade`\] Avoid false negatives with non-reference shadowed bindings of loop variables (`UP028`) ([#13504](https://github.com/astral-sh/ruff/pull/13504))
+
+### Bug fixes
+
+- Detect tuples bound to variadic positional arguments i.e. `*args` ([#13512](https://github.com/astral-sh/ruff/pull/13512))
+- Exit gracefully on broken pipe errors ([#13485](https://github.com/astral-sh/ruff/pull/13485))
+- Avoid panic when analyze graph hits broken pipe ([#13484](https://github.com/astral-sh/ruff/pull/13484))
+
+### Performance
+
+- Reuse `BTreeSets` in module resolver ([#13440](https://github.com/astral-sh/ruff/pull/13440))
+- Skip traversal for non-compound statements ([#13441](https://github.com/astral-sh/ruff/pull/13441))
+
 ## 0.6.7
 
 ### Preview features
