@@ -46,6 +46,12 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
                     | AnyNodeRef::StmtWith(_)
                     | AnyNodeRef::StmtIf(_)
                     | AnyNodeRef::StmtTry(_)
+                    | AnyNodeRef::StmtMatch(_)
+                    | AnyNodeRef::MatchCase(_)
+                    | AnyNodeRef::StmtImport(_)
+                    | AnyNodeRef::StmtImportFrom(_)
+                    | AnyNodeRef::ElifElseClause(_)
+                    | AnyNodeRef::ExceptHandlerExceptHandler(_)
             )
         {
             TraversalSignal::Traverse
