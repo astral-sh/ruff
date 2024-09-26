@@ -16,45 +16,34 @@ def memory_test():
     """
 
 
-def right_indent_quotes_same_line(a: int) -> None:
-    """Foo.
 
-    Parameters
-    ----------
-    a : int
-        A parameter."""
-    pass
+class Platform:
+    """Over indented last line
+    Args:
+    Returns:
+                """
 
 
-def over_indent_quotes_same_line(a: int) -> None:
-    """Foo.
+class Platform:
+    """All lines are over indented including the last containing the closing quotes
+        Args:
+        Returns:
+        """
 
-    Parameters
-    ----------
-    a : int
-            A parameter."""
-    pass
+class Platform:
+    """All lines are over indented including the last
+        Args:
+        Returns"""
 
+# OK: This doesn't get flagged because it is accepted when the closing quotes are on a separate line  (see next test). Raises D209
+class Platform:
+    """Over indented last line with content
+    Args:
+        Some content on the last line"""
 
-def under_indent_quotes_same_line(a: int) -> None:
-    """Foo.
-
-    Parameters
-    ----------
-    a : int
-      A parameter."""
-    pass
-
-
-
-def right_indent_quotes_same_line_with_multiple_empty_lines(a: int) -> None:
-    """Foo.
-    Parameters
-    ----------
-    a : int
-
-
-
-
-        A parameter."""
-    pass
+# OK:
+class Platform:
+    """Over indented last line with content
+    Args:
+        Some content on the last line
+    """
