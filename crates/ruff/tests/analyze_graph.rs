@@ -25,7 +25,11 @@ const INSTA_FILTERS: &[(&str, &str)] = &[
     (r"\\", "/"),
 ];
 
-fn setup_sample_project(root: &ChildPath) -> Result<()> {
+#[test]
+fn dependencies() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let root = ChildPath::new(tempdir.path());
+
     root.child("ruff").child("__init__.py").write_str("")?;
     root.child("ruff")
         .child("a.py")
@@ -52,16 +56,6 @@ fn setup_sample_project(root: &ChildPath) -> Result<()> {
         .write_str(indoc::indoc! {r#"
         def f(): pass
     "#})?;
-
-    Ok(())
-}
-
-#[test]
-fn dependencies() -> Result<()> {
-    let tempdir = TempDir::new()?;
-    let root = ChildPath::new(tempdir.path());
-
-    setup_sample_project(&root)?;
 
     insta::with_settings!({
         filters => INSTA_FILTERS.to_vec(),
