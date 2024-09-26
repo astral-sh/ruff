@@ -367,3 +367,58 @@ fn wildcard() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn nested_imports() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let root = ChildPath::new(tempdir.path());
+
+    root.child("ruff").child("__init__.py").write_str("")?;
+    root.child("ruff")
+        .child("a.py")
+        .write_str(indoc::indoc! {r#"
+        match x:
+            case 1:
+                import ruff.b
+    "#})?;
+    root.child("ruff")
+        .child("b.py")
+        .write_str(indoc::indoc! {r#"
+            try:
+                import ruff.c
+            except ImportError as e:
+                import ruff.d
+    "#})?;
+    root.child("ruff")
+        .child("c.py")
+        .write_str(indoc::indoc! {r#"def c(): ..."#})?;
+    root.child("ruff")
+        .child("d.py")
+        .write_str(indoc::indoc! {r#"def d(): ..."#})?;
+
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "ruff/__init__.py": [],
+          "ruff/a.py": [
+            "ruff/b.py"
+          ],
+          "ruff/b.py": [
+            "ruff/c.py",
+            "ruff/d.py"
+          ],
+          "ruff/c.py": [],
+          "ruff/d.py": []
+        }
+
+        ----- stderr -----
+        "#);
+    });
+
+    Ok(())
+}
