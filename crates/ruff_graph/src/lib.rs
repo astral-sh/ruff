@@ -92,7 +92,7 @@ impl ModuleImports {
 }
 
 #[derive(Debug, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ImportMap(BTreeMap<SystemPathBuf, ModuleImports>);
 
 impl ImportMap {

@@ -1,0 +1,6 @@
+{"run_id":"1727350954-469459432","line":315,"new":{"module_name":"analyze_graph","snapshot_name":"nested_imports","metadata":{"source":"crates/ruff/tests/analyze_graph.rs","assertion_line":315,"info":{"program":"ruff","args":["analyze","graph","--preview"]}},"snapshot":"success: true\nexit_code: 0\n----- stdout -----\n{\n  \"ruff/__init__.py\": [],\n  \"ruff/a.py\": [],\n  \"ruff/b.py\": [\n    \"ruff/c.py\"\n  ],\n  \"ruff/c.py\": [],\n  \"ruff/d.py\": []\n}\n\n----- stderr -----\n"},"old":{"module_name":"analyze_graph","metadata":{},"snapshot":"success: true\nexit_code: 0\n----- stdout -----\n{\n  \"ruff/__init__.py\": [],\n  \"ruff/a.py\": [\n    \"ruff/b.py\"\n  ],\n  \"ruff/b.py\": [\n    \"ruff/c.py\",\n    \"ruff/d.py\"\n  ],\n  \"ruff/c.py\": [],\n  \"ruff/d.py\": []\n}\n\n----- stderr -----"}}
+{"run_id":"1727351009-933385109","line":255,"new":null,"old":null}
+{"run_id":"1727351009-933385109","line":153,"new":null,"old":null}
+{"run_id":"1727351009-933385109","line":69,"new":null,"old":null}
+{"run_id":"1727351009-933385109","line":314,"new":null,"old":null}
+{"run_id":"1727351009-933385109","line":202,"new":null,"old":null}
