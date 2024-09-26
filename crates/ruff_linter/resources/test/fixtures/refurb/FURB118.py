@@ -83,3 +83,13 @@ class Class:
     @staticmethod
     def add(x, y):
         return x + y
+
+# See https://github.com/astral-sh/ruff/issues/13508
+op_itemgetter = lambda x: x[:, 1]
+op_itemgetter = lambda x: x[1, :]
+
+# With a slice, trivia is dropped
+op_itemgetter = lambda x: x[1,          :]
+
+# Without a slice, trivia is retained
+op_itemgetter = lambda x: x[1,          2]
