@@ -44,36 +44,9 @@ match x:
 ```diff
 --- Black
 +++ Ruff
-@@ -3,34 +3,36 @@
+@@ -21,11 +21,17 @@
          pass
- 
- match smth:
--    case "test" if (
--        "any long condition" != "another long condition" and "this is a long condition"
--    ):
-+    case "test" if "any long condition" != "another long condition" and "this is a long condition":
-         pass
--    case test if (
--        "any long condition" != "another long condition"
--        and "this is a looooong condition"
--    ):
-+    case (
-+        test
-+    ) if "any long condition" != "another long condition" and "this is a looooong condition":
-         pass
--    case test if (
--        "any long condition" != "another long condition"
--        and "this is a looooong condition"
--    ):  # some additional comments
-+    case (
-+        test
-+    ) if "any long condition" != "another long condition" and "this is a looooong condition":  # some additional comments
-         pass
--    case test if True:  # some comment
-+    case test if (True):  # some comment
-         pass
--    case test if False:  # some comment
-+    case test if (False):  # some comment
+     case test if False:  # some comment
          pass
 -    case test if True:  # some comment
 +    case test if (
@@ -92,12 +65,6 @@ match x:
          pass  # some comment
  
  # case black_test_patma_052 (originally in the pattern_matching_complex test case)
- match x:
-     case [1, 0] if x := x[:0]:
-         y = 1
--    case [1, 0] if x := x[:0]:
-+    case [1, 0] if (x := x[:0]):
-         y = 1
 ```
 
 ## Ruff Output
@@ -108,19 +75,23 @@ match match:
         pass
 
 match smth:
-    case "test" if "any long condition" != "another long condition" and "this is a long condition":
+    case "test" if (
+        "any long condition" != "another long condition" and "this is a long condition"
+    ):
         pass
-    case (
-        test
-    ) if "any long condition" != "another long condition" and "this is a looooong condition":
+    case test if (
+        "any long condition" != "another long condition"
+        and "this is a looooong condition"
+    ):
         pass
-    case (
-        test
-    ) if "any long condition" != "another long condition" and "this is a looooong condition":  # some additional comments
+    case test if (
+        "any long condition" != "another long condition"
+        and "this is a looooong condition"
+    ):  # some additional comments
         pass
-    case test if (True):  # some comment
+    case test if True:  # some comment
         pass
-    case test if (False):  # some comment
+    case test if False:  # some comment
         pass
     case test if (
         True  # some comment
@@ -139,7 +110,7 @@ match smth:
 match x:
     case [1, 0] if x := x[:0]:
         y = 1
-    case [1, 0] if (x := x[:0]):
+    case [1, 0] if x := x[:0]:
         y = 1
 ```
 
