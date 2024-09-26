@@ -723,30 +723,39 @@ impl<'db> Type<'db> {
     }
 
     /// Return the string representation of this type when converted to string as it would be
-    /// provided by the builtin `str` function at runtime (see `__str`). If that can't be
-    /// determined, return `None`.
+    /// provided by the `__str__` method. If that can't be determined, return `None`.
     ///
     /// When not available, this should fall back to the value of `[Type::repr]`.
     /// Note: this method is used in the builtins `format`, `print`, `str.format` and `f-strings`.
-    pub fn str(&self, db: &'db dyn Db) -> Option<String> {
+    pub fn str(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         let str_result = match self {
-            // For those primitive types, `str` and `repr` are equivalent so we rely on `repr` to
-            // avoid code duplication.
-            Type::IntLiteral(_) | Type::BooleanLiteral(_) | Type::StringLiteral(_) => None,
+            Type::IntLiteral(_) => None,
+            Type::BooleanLiteral(_) => None,
+            Type::StringLiteral(_) => Some(*self),
             // TODO: handle more complex types
             _ => None,
         };
         str_result.or_else(|| self.repr(db))
     }
 
-    /// Return the string representation of this type as it would be provided by the builtin `repr`
-    /// function at runtime (see `__repr__`). If that can't be determined, return `None`.
-    pub fn repr(&self, db: &'db dyn Db) -> Option<String> {
+    /// Return the string representation of this type as it would be provided by the  `__repr__`
+    /// method at runtime. If that can't be determined, return `None`.
+    pub fn repr(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
-            Type::IntLiteral(number) => Some(number.to_string()),
-            Type::BooleanLiteral(true) => Some("True".to_string()),
-            Type::BooleanLiteral(false) => Some("False".to_string()),
-            Type::StringLiteral(string) => Some(string.value(db).to_string()),
+            Type::IntLiteral(number) => Some(Type::StringLiteral(StringLiteralType::new(db, {
+                number.to_string().into_boxed_str()
+            }))),
+            Type::BooleanLiteral(true) => Some(Type::StringLiteral(StringLiteralType::new(db, {
+                "True".into()
+            }))),
+            Type::BooleanLiteral(false) => Some(Type::StringLiteral(StringLiteralType::new(db, {
+                "False".into()
+            }))),
+            Type::StringLiteral(literal) => {
+                Some(Type::StringLiteral(StringLiteralType::new(db, {
+                    format!("'{}'", literal.value(db)).into()
+                })))
+            }
             // TODO: handle more complex types
             _ => None,
         }
@@ -1360,5 +1369,12 @@ mod tests {
     fn boolean_value_is_unknown(ty: Ty) {
         let db = setup_db();
         assert_eq!(ty.into_type(&db).bool(&db), Truthiness::Ambiguous);
+    }
+
+    #[test_case(Ty::IntLiteral(1), "1")]
+    fn has_correct_repr(ty: Ty, expected: &str) {
+        let db = setup_db();
+
+        assert_eq!(ty.into_type(&db).repr(&db), Some(expected.to_string()));
     }
 }

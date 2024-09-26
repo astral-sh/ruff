@@ -14,7 +14,7 @@ impl<'db> Type<'db> {
     pub fn display(&self, db: &'db dyn Db) -> DisplayType {
         DisplayType { ty: self, db }
     }
-    pub(super) fn representation(self, db: &'db dyn Db) -> DisplayRepresentation<'db> {
+    fn representation(self, db: &'db dyn Db) -> DisplayRepresentation<'db> {
         DisplayRepresentation { db, ty: self }
     }
 }

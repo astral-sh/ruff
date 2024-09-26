@@ -1665,17 +1665,34 @@ impl<'db> TypeInferenceBuilder<'db> {
                     for element in &fstring.elements {
                         match element {
                             ast::FStringElement::Expression(expression) => {
-                                // TODO: handle the format-spec in expression
+                                let ast::FStringExpressionElement {
+                                    range: _,
+                                    expression,
+                                    debug_text: _,
+                                    conversion,
+                                    format_spec,
+                                } = expression;
                                 // Always infer sub-expressions, even if we've figured out the type
-                                let ty = self.infer_expression(&expression.expression);
+                                let ty = self.infer_expression(&expression);
                                 if !done {
-                                    // `f-strings` use the `str` builtin
-                                    let maybe_str = ty.str(self.db);
-                                    if let Some(string) = maybe_str {
-                                        concatenated.push_str(string.as_str());
-                                    } else {
+                                    // TODO: handle format specifiers by calling a method
+                                    // (`Type::format`?) that handles the `__format__` method.
+                                    // Conversion flags should be handled before calling
+                                    // `__format__`.
+                                    // https://docs.python.org/3/library/string.html#format-string-syntax
+                                    if !conversion.is_none() || format_spec.is_some() {
                                         has_expression = true;
                                         done = true;
+                                    } else {
+                                        match ty.str(self.db) {
+                                            Some(Type::StringLiteral(literal)) => {
+                                                concatenated.push_str(literal.value(self.db));
+                                            }
+                                            _ => {
+                                                has_expression = true;
+                                                done = true;
+                                            }
+                                        }
                                     }
                                 }
                             }
