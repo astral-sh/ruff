@@ -121,6 +121,100 @@ fn dependents() -> Result<()> {
         def f(): pass
     "#})?;
 
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().arg("--direction").arg("dependents").current_dir(&root), @r###"
+            success: true
+            exit_code: 0
+            ----- stdout -----
+            {
+              "ruff/__init__.py": [],
+              "ruff/a.py": [],
+              "ruff/b.py": [
+                "ruff/a.py"
+              ],
+              "ruff/c.py": [
+                "ruff/b.py"
+              ],
+              "ruff/d.py": [
+                "ruff/c.py"
+              ],
+              "ruff/e.py": [
+                "ruff/d.py"
+              ]
+            }
+
+            ----- stderr -----
+            "###);
+    });
+
+    Ok(())
+}
+
+#[test]
+fn string_detection() -> Result<()> {
+    let tempdir = TempDir::new()?;
+
+    let root = ChildPath::new(tempdir.path());
+
+    root.child("ruff").child("__init__.py").write_str("")?;
+    root.child("ruff")
+        .child("a.py")
+        .write_str(indoc::indoc! {r#"
+        import ruff.b
+    "#})?;
+    root.child("ruff")
+        .child("b.py")
+        .write_str(indoc::indoc! {r#"
+        import importlib
+
+        importlib.import_module("ruff.c")
+    "#})?;
+    root.child("ruff").child("c.py").write_str("")?;
+
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().current_dir(&root), @r###"
+            success: true
+            exit_code: 0
+            ----- stdout -----
+            {
+              "ruff/__init__.py": [],
+              "ruff/a.py": [
+                "ruff/b.py"
+              ],
+              "ruff/b.py": [],
+              "ruff/c.py": []
+            }
+
+            ----- stderr -----
+            "###);
+    });
+
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().arg("--detect-string-imports").current_dir(&root), @r###"
+            success: true
+            exit_code: 0
+            ----- stdout -----
+            {
+              "ruff/__init__.py": [],
+              "ruff/a.py": [
+                "ruff/b.py"
+              ],
+              "ruff/b.py": [
+                "ruff/c.py"
+              ],
+              "ruff/c.py": []
+            }
+
+            ----- stderr -----
+            "###);
+    });
+
     Ok(())
 }
 
