@@ -1673,7 +1673,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                     format_spec,
                                 } = expression;
                                 // Always infer sub-expressions, even if we've figured out the type
-                                let ty = self.infer_expression(&expression);
+                                let ty = self.infer_expression(expression);
                                 if !done {
                                     // TODO: handle format specifiers by calling a method
                                     // (`Type::format`?) that handles the `__format__` method.
@@ -1684,14 +1684,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                                         has_expression = true;
                                         done = true;
                                     } else {
-                                        match ty.str(self.db) {
-                                            Some(Type::StringLiteral(literal)) => {
-                                                concatenated.push_str(literal.value(self.db));
-                                            }
-                                            _ => {
-                                                has_expression = true;
-                                                done = true;
-                                            }
+                                        if let Some(Type::StringLiteral(literal)) = ty.str(self.db)
+                                        {
+                                            concatenated.push_str(literal.value(self.db));
+                                        } else {
+                                            has_expression = true;
+                                            done = true;
                                         }
                                     }
                                 }
