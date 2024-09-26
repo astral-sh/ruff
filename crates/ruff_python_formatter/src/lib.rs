@@ -160,10 +160,7 @@ mod tests {
     use ruff_python_trivia::CommentRanges;
     use ruff_text_size::{TextRange, TextSize};
 
-    use crate::{
-        format_module_ast, format_module_source, format_range, DocstringCode, PreviewMode,
-        PyFormatOptions,
-    };
+    use crate::{format_module_ast, format_module_source, format_range, PyFormatOptions};
 
     /// Very basic test intentionally kept very similar to the CLI
     #[test]
@@ -191,16 +188,13 @@ if True:
     #[test]
     fn quick_test() {
         let source = r#"
-"""example.py file."""
-
-
-def length(numbers: list[int]) -> int:
-    """Get the length of the given list of numbers.
-    Example:
-      >>> length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
-      20
-    """
-    return len(numbers)
+def main() -> None:
+    if True:
+        some_very_long_variable_name_abcdefghijk = Foo()
+        some_very_long_variable_name_abcdefghijk = some_very_long_variable_name_abcdefghijk[
+            some_very_long_variable_name_abcdefghijk.some_very_long_attribute_name
+            == "This is a very long string abcdefghijk"
+        ]
 
 "#;
         let source_type = PySourceType::Python;
@@ -209,9 +203,7 @@ def length(numbers: list[int]) -> int:
         let source_path = "code_inline.py";
         let parsed = parse(source, source_type.as_mode()).unwrap();
         let comment_ranges = CommentRanges::from(parsed.tokens());
-        let options = PyFormatOptions::from_extension(Path::new(source_path))
-            .with_preview(PreviewMode::Enabled)
-            .with_docstring_code(DocstringCode::Enabled);
+        let options = PyFormatOptions::from_extension(Path::new(source_path));
         let formatted = format_module_ast(&parsed, &comment_ranges, source, options).unwrap();
 
         // Uncomment the `dbg` to print the IR.
