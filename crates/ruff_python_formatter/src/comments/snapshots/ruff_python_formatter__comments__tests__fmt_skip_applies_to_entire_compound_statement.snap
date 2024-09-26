@@ -33,4 +33,19 @@ expression: comments.debug(test_case.source_code)
             },
         ],
     },
+    Node {
+        kind: StmtExpr,
+        range: 162..165,
+        source: `...`,
+    }: {
+        "leading": [],
+        "dangling": [],
+        "trailing": [
+            SourceComment {
+                text: "# fmt: skip",
+                position: EndOfLine,
+                formatted: false,
+            },
+        ],
+    },
 }

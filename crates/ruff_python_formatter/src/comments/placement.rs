@@ -429,8 +429,9 @@ fn is_clause_header(node: AnyNodeRef) -> bool {
             | NodeKind::StmtFor
             | NodeKind::StmtWhile
             | NodeKind::StmtTry
-            | NodeKind::StmtMatch
             | NodeKind::StmtFunctionDef
+            | NodeKind::StmtWith
+            | NodeKind::ElifElseClause
     )
 }
 
@@ -456,13 +457,31 @@ fn handle_suppression_comment_on_clause_header<'a>(
         return CommentPlacement::Default(comment);
     };
 
-    // Only proceed if the preceding node is a clause header
+    // Handle clause headers with their own nodes (if, while, for, etc.)
     if is_clause_header(preceding_node) {
-        // Attach the comment as a trailing comment to the specific clause, not the enclosing node
-        return CommentPlacement::trailing(preceding_node, comment);
+        // Check if the comment is on the same line as the clause header
+        let header_line_start = locator.line_start(preceding_node.start());
+        let comment_line_start = locator.line_start(comment.start());
+
+        if header_line_start == comment_line_start {
+            // The comment is on the same line as the clause header, apply fmt: skip to the entire clause
+            return CommentPlacement::trailing(preceding_node, comment);
+        }
     }
 
-    // Default handling if not a clause header
+    // Handle special cases like `else`, `except`, `finally` blocks that are not their own nodes
+    if let Some(parent) = comment.enclosing_parent() {
+        if is_clause_header(parent) {
+            // Apply fmt: skip if the comment is on the same line as the 'else', 'except', or 'finally'
+            let header_line_start = locator.line_start(parent.start());
+            let comment_line_start = locator.line_start(comment.start());
+
+            if header_line_start == comment_line_start {
+                return CommentPlacement::trailing(parent, comment);
+            }
+        }
+    }
+
     CommentPlacement::Default(comment)
 }
 
