@@ -260,3 +260,54 @@ boolean_chained_comparison.py:73:24: PLR1716 [*] Contains chained boolean compar
 74 74 |     pass
 75 75 | 
 76 76 | # ------------
+
+boolean_chained_comparison.py:124:2: PLR1716 Contains chained boolean comparison that can be simplified
+    |
+123 | # Unfixable due to parentheses.
+124 | (a < b) and b < c
+    |  ^^^^^^^^^^^^^^^^ PLR1716
+125 | a < b and (b < c)
+126 | ((a < b) and b < c)
+    |
+    = help: Use a single compare expression
+
+boolean_chained_comparison.py:125:1: PLR1716 Contains chained boolean comparison that can be simplified
+    |
+123 | # Unfixable due to parentheses.
+124 | (a < b) and b < c
+125 | a < b and (b < c)
+    | ^^^^^^^^^^^^^^^^ PLR1716
+126 | ((a < b) and b < c)
+127 | (a < b) and (b < c)
+    |
+    = help: Use a single compare expression
+
+boolean_chained_comparison.py:126:3: PLR1716 Contains chained boolean comparison that can be simplified
+    |
+124 | (a < b) and b < c
+125 | a < b and (b < c)
+126 | ((a < b) and b < c)
+    |   ^^^^^^^^^^^^^^^^ PLR1716
+127 | (a < b) and (b < c)
+128 | (((a < b))) and (b < c)
+    |
+    = help: Use a single compare expression
+
+boolean_chained_comparison.py:127:2: PLR1716 Contains chained boolean comparison that can be simplified
+    |
+125 | a < b and (b < c)
+126 | ((a < b) and b < c)
+127 | (a < b) and (b < c)
+    |  ^^^^^^^^^^^^^^^^^ PLR1716
+128 | (((a < b))) and (b < c)
+    |
+    = help: Use a single compare expression
+
+boolean_chained_comparison.py:128:4: PLR1716 Contains chained boolean comparison that can be simplified
+    |
+126 | ((a < b) and b < c)
+127 | (a < b) and (b < c)
+128 | (((a < b))) and (b < c)
+    |    ^^^^^^^^^^^^^^^^^^^ PLR1716
+    |
+    = help: Use a single compare expression
