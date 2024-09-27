@@ -46,8 +46,6 @@ impl StringLiteralKind {
 
 impl Format<PyFormatContext<'_>> for FormatStringLiteral<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let locator = f.context().locator();
-
         let quote_style = f.options().quote_style();
         let quote_style = if self.layout.is_docstring() && !quote_style.is_preserve() {
             // Per PEP 8 and PEP 257, always prefer double quotes for docstrings,
@@ -60,7 +58,7 @@ impl Format<PyFormatContext<'_>> for FormatStringLiteral<'_> {
         let normalized = StringNormalizer::from_context(f.context())
             .with_quoting(self.layout.quoting())
             .with_preferred_quote_style(quote_style)
-            .normalize(self.value.into(), &locator);
+            .normalize(self.value.into());
 
         if self.layout.is_docstring() {
             docstring::format(&normalized, f)
