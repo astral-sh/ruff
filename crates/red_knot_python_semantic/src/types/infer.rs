@@ -2031,7 +2031,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         // If the function is a bool (for example `x = bool(1)`), we can do some special handling
         // and return more specific types.
         return if function_type == builtins_symbol_ty(self.db, "bool") {
-            self.infer_bool_call_expression(&arg_types)
+            self.infer_bool_call_expression(arg_types.as_slice())
         } else {
             function_type
                 .call(self.db, arg_types.as_slice())
