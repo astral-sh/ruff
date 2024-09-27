@@ -118,6 +118,24 @@ impl<'a> From<&AnyString<'a>> for ExpressionRef<'a> {
     }
 }
 
+impl<'a> From<&'a ExprBytesLiteral> for AnyString<'a> {
+    fn from(value: &'a ExprBytesLiteral) -> Self {
+        AnyString::Bytes(value)
+    }
+}
+
+impl<'a> From<&'a ExprStringLiteral> for AnyString<'a> {
+    fn from(value: &'a ExprStringLiteral) -> Self {
+        AnyString::String(value)
+    }
+}
+
+impl<'a> From<&'a ExprFString> for AnyString<'a> {
+    fn from(value: &'a ExprFString) -> Self {
+        AnyString::FString(value)
+    }
+}
+
 pub(super) enum AnyStringPartsIter<'a> {
     String(std::slice::Iter<'a, StringLiteral>),
     Bytes(std::slice::Iter<'a, ast::BytesLiteral>),
