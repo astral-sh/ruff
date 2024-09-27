@@ -2027,20 +2027,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         // TODO: proper typed call signature, representing keyword args etc
         let arg_types = self.infer_arguments(arguments);
         let function_type = self.infer_expression(func);
-
-        // If the function is a bool (for example `x = bool(1)`), we can do some special handling
-        // and return more specific types.
-        return if function_type == builtins_symbol_ty(self.db, "bool") {
-            self.infer_bool_call_expression(arg_types.as_slice())
-        } else {
-            function_type
-                .call(self.db, arg_types.as_slice())
-                .unwrap_with_diagnostic(self.db, func.as_ref().into(), self)
-        };
-    }
-
-    fn infer_bool_call_expression(&self, arg_types: &[Type]) -> Type<'db> {
-        arg_types[0].bool(self.db).into_type(self.db)
+        function_type
+            .call(self.db, arg_types.as_slice())
+            .unwrap_with_diagnostic(self.db, func.as_ref().into(), self)
     }
 
     fn infer_starred_expression(&mut self, starred: &ast::ExprStarred) -> Type<'db> {
