@@ -38,9 +38,10 @@ for node_line in node_lines:
     # implementation.
     if node in (
         "FString",
-        "StringLiteral",
         "FStringLiteralElement",
         "FStringExpressionElement",
+        "FStringFormatSpec",
+        "Identifier",
     ):
         continue
     nodes.append(node)

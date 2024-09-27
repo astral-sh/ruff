@@ -4,37 +4,17 @@ use ruff_python_ast::{AnyNodeRef, ExprStringLiteral};
 use crate::expression::parentheses::{
     in_parentheses_only_group, NeedsParentheses, OptionalParentheses,
 };
-use crate::other::string_literal::{FormatStringLiteral, StringLiteralKind};
+use crate::other::string_literal::StringLiteralKind;
 use crate::prelude::*;
 use crate::string::{AnyString, FormatImplicitConcatenatedString};
 
 #[derive(Default)]
 pub struct FormatExprStringLiteral {
-    kind: ExprStringLiteralKind,
-}
-
-#[derive(Default, Copy, Clone, Debug)]
-pub enum ExprStringLiteralKind {
-    #[default]
-    String,
-    Docstring,
-}
-
-impl ExprStringLiteralKind {
-    const fn string_literal_kind(self) -> StringLiteralKind {
-        match self {
-            ExprStringLiteralKind::String => StringLiteralKind::String,
-            ExprStringLiteralKind::Docstring => StringLiteralKind::Docstring,
-        }
-    }
-
-    const fn is_docstring(self) -> bool {
-        matches!(self, ExprStringLiteralKind::Docstring)
-    }
+    kind: StringLiteralKind,
 }
 
 impl FormatRuleWithOptions<ExprStringLiteral, PyFormatContext<'_>> for FormatExprStringLiteral {
-    type Options = ExprStringLiteralKind;
+    type Options = StringLiteralKind;
 
     fn with_options(mut self, options: Self::Options) -> Self {
         self.kind = options;
@@ -47,9 +27,7 @@ impl FormatNodeRule<ExprStringLiteral> for FormatExprStringLiteral {
         let ExprStringLiteral { value, .. } = item;
 
         match value.as_slice() {
-            [string_literal] => {
-                FormatStringLiteral::new(string_literal, self.kind.string_literal_kind()).fmt(f)
-            }
+            [string_literal] => string_literal.format().with_options(self.kind).fmt(f),
             _ => {
                 // This is just a sanity check because [`DocstringStmt::try_from_statement`]
                 // ensures that the docstring is a *single* string literal.
