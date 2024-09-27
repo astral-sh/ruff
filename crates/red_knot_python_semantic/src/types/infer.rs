@@ -2711,12 +2711,6 @@ mod tests {
 
     use anyhow::Context;
 
-    use ruff_db::files::{system_path_to_file, File};
-    use ruff_db::parsed::parsed_module;
-    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
-    use ruff_db::testing::assert_function_query_was_not_run;
-    use ruff_python_ast::name::Name;
-
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
@@ -2728,6 +2722,11 @@ mod tests {
         check_types, global_symbol_ty, infer_definition_types, symbol_ty, TypeCheckDiagnostics,
     };
     use crate::{HasTy, ProgramSettings, SemanticModel};
+    use ruff_db::files::{system_path_to_file, File};
+    use ruff_db::parsed::parsed_module;
+    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+    use ruff_db::testing::assert_function_query_was_not_run;
+    use ruff_python_ast::name::Name;
 
     use super::TypeInferenceBuilder;
 
@@ -6481,6 +6480,93 @@ mod tests {
         assert_public_ty(&db, "/src/a.py", "d", r#"Literal["z"]"#);
         assert_public_ty(&db, "/src/a.py", "e", r#"Literal["y"]"#);
         assert_public_ty(&db, "/src/a.py", "f", r#"Literal["x"]"#);
+        Ok(())
+    }
+
+    #[test]
+    fn bool_function_falsy_values() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+            a = bool(0)
+            b = bool(())
+            c = bool(None)
+            d = bool("")
+            e = bool(False)
+            "#,
+        )?;
+        assert_public_ty(&db, "/src/a.py", "a", "Literal[False]");
+        assert_public_ty(&db, "/src/a.py", "b", "Literal[False]");
+        assert_public_ty(&db, "/src/a.py", "c", "Literal[False]");
+        assert_public_ty(&db, "/src/a.py", "d", "Literal[False]");
+        assert_public_ty(&db, "/src/a.py", "e", "Literal[False]");
+        Ok(())
+    }
+
+    #[test]
+    fn builtin_bool_function_detected() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            "
+            redefined_builtin_bool = bool
+
+            def my_bool(x)-> bool: pass
+            ",
+        )?;
+        db.write_dedented(
+            "/src/b.py",
+            "
+            from a import redefined_builtin_bool, my_bool
+            a = redefined_builtin_bool(0)
+            b = my_bool(0)
+            ",
+        )?;
+        assert_public_ty(&db, "/src/b.py", "a", "Literal[False]");
+        assert_public_ty(&db, "/src/b.py", "b", "bool");
+        Ok(())
+    }
+
+    #[test]
+    fn bool_function_truthy_values() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+            a = bool(1)
+            b = bool((0,))
+            c = bool("NON EMPTY")
+            d = bool(True)
+
+            def foo(): pass
+            e = bool(foo)
+            "#,
+        )?;
+
+        assert_public_ty(&db, "/src/a.py", "a", "Literal[True]");
+        assert_public_ty(&db, "/src/a.py", "b", "Literal[True]");
+        assert_public_ty(&db, "/src/a.py", "c", "Literal[True]");
+        assert_public_ty(&db, "/src/a.py", "d", "Literal[True]");
+        assert_public_ty(&db, "/src/a.py", "e", "Literal[True]");
+        Ok(())
+    }
+
+    #[test]
+    fn bool_function_ambiguous_values() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            "
+            a = bool([])
+            b = bool({})
+            c = bool(set())
+            ",
+        )?;
+
+        assert_public_ty(&db, "/src/a.py", "a", "bool");
+        assert_public_ty(&db, "/src/a.py", "b", "bool");
+        assert_public_ty(&db, "/src/a.py", "c", "bool");
         Ok(())
     }
 }

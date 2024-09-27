@@ -587,7 +587,20 @@ impl<'db> Type<'db> {
             ),
 
             // TODO annotated return type on `__new__` or metaclass `__call__`
-            Type::Class(class) => CallOutcome::callable(Type::Instance(class)),
+            Type::Class(class) => {
+                // If the class is the builtin-bool class (for example `bool(1)`), we try to return
+                // the specific truthiness value of the input arg, `Literal[True]` for the example above.
+                let is_bool = class.is_stdlib_symbol(db, "builtins", "bool");
+                CallOutcome::callable(if is_bool {
+                    arg_types
+                        .first()
+                        .unwrap_or(&Type::Unknown)
+                        .bool(db)
+                        .into_type(db)
+                } else {
+                    Type::Instance(class)
+                })
+            }
 
             // TODO: handle classes which implement the `__call__` protocol
             Type::Instance(_instance_ty) => CallOutcome::callable(Type::Unknown),
