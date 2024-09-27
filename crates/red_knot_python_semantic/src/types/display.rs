@@ -54,7 +54,7 @@ impl fmt::Debug for DisplayType<'_> {
 /// Writes the string representation of a type, which is the value displayed either as
 /// `Literal[<repr>]` or `Literal[<repr1>, <repr2>]` for literal types or as `<repr>` for
 /// non literals
-pub(super) struct DisplayRepresentation<'db> {
+struct DisplayRepresentation<'db> {
     ty: Type<'db>,
     db: &'db dyn Db,
 }

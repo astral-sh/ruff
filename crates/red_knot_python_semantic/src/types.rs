@@ -737,7 +737,7 @@ impl<'db> Type<'db> {
             Type::IntLiteral(_) | Type::BooleanLiteral(_) => self.repr(db),
             Type::StringLiteral(_) | Type::LiteralString => *self,
             // TODO: handle more complex types
-            _ => builtins_symbol_ty(db, "str").to_instance(db),
+            _ => Type::builtin_str(db).to_instance(db),
         }
     }
 
@@ -760,7 +760,7 @@ impl<'db> Type<'db> {
             })),
             Type::LiteralString => Type::LiteralString,
             // TODO: handle more complex types
-            _ => builtins_symbol_ty(db, "str").to_instance(db),
+            _ => Type::builtin_str(db).to_instance(db),
         }
     }
 }
