@@ -219,3 +219,72 @@ def doctest_extra_indent3():
     ...     df1, df2, df3, on="dt"
     ... )  # doctest: +IGNORE_RESULT
     """
+
+# See https://github.com/astral-sh/ruff/issues/13358
+def length_doctest():
+    """Get the length of the given list of numbers.
+
+    Args:
+        numbers: List of numbers.
+
+    Returns:
+        Integer length of the list of numbers.
+
+    Example:
+        >>> length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+        20
+    """
+
+
+def length_doctest_underindent():
+    """Get the length of the given list of numbers.
+
+        Args:
+            numbers: List of numbers.
+
+        Returns:
+            Integer length of the list of numbers.
+
+    Example:
+        >>> length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+        20
+    """
+
+
+# See https://github.com/astral-sh/ruff/issues/13358
+def length_markdown():
+    """Get the length of the given list of numbers.
+
+    Args:
+        numbers: List of numbers.
+
+    Returns:
+        Integer length of the list of numbers.
+
+    Example:
+
+        ```
+        length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
+        ```
+    """
+
+
+# See https://github.com/astral-sh/ruff/issues/13358
+def length_rst():
+    """
+    Do cool stuff::
+
+        length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
+    """
+    pass
+
+
+# See https://github.com/astral-sh/ruff/issues/13358
+def length_rst_in_section():
+    """
+    Examples:
+        Do cool stuff::
+
+            length([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+    """
+    pass
