@@ -1653,50 +1653,50 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_fstring_expression(&mut self, fstring: &ast::ExprFString) -> Type<'db> {
         let ast::ExprFString { range: _, value } = fstring;
 
+        let mut collector = StringPartsCollector::new();
         for part in value {
+            // Make sure we iter through every parts to infer all sub-expressions. The `collector`
+            // struct ensures we don't allocate unnecessary strings.
             match part {
-                ast::FStringPart::Literal(_) => {
-                    // TODO string literal type
+                ast::FStringPart::Literal(literal) => {
+                    collector.push_str(&literal.value);
                 }
                 ast::FStringPart::FString(fstring) => {
-                    let ast::FString {
-                        range: _,
-                        elements,
-                        flags: _,
-                    } = fstring;
-                    for element in elements {
-                        self.infer_fstring_element(element);
+                    for element in &fstring.elements {
+                        match element {
+                            ast::FStringElement::Expression(expression) => {
+                                let ast::FStringExpressionElement {
+                                    range: _,
+                                    expression,
+                                    debug_text: _,
+                                    conversion,
+                                    format_spec,
+                                } = expression;
+                                let ty = self.infer_expression(expression);
+
+                                // TODO: handle format specifiers by calling a method
+                                // (`Type::format`?) that handles the `__format__` method.
+                                // Conversion flags should be handled before calling `__format__`.
+                                // https://docs.python.org/3/library/string.html#format-string-syntax
+                                if !conversion.is_none() || format_spec.is_some() {
+                                    collector.add_expression();
+                                } else {
+                                    if let Type::StringLiteral(literal) = ty.str(self.db) {
+                                        collector.push_str(literal.value(self.db));
+                                    } else {
+                                        collector.add_expression();
+                                    }
+                                }
+                            }
+                            ast::FStringElement::Literal(literal) => {
+                                collector.push_str(&literal.value);
+                            }
+                        }
                     }
                 }
             }
         }
-
-        // TODO str type
-        Type::Unknown
-    }
-
-    fn infer_fstring_element(&mut self, element: &ast::FStringElement) {
-        match element {
-            ast::FStringElement::Literal(_) => {
-                // TODO string literal type
-            }
-            ast::FStringElement::Expression(expr_element) => {
-                let ast::FStringExpressionElement {
-                    range: _,
-                    expression,
-                    debug_text: _,
-                    conversion: _,
-                    format_spec,
-                } = expr_element;
-                self.infer_expression(expression);
-
-                if let Some(format_spec) = format_spec {
-                    for spec_element in &format_spec.elements {
-                        self.infer_fstring_element(spec_element);
-                    }
-                }
-            }
-        }
+        collector.ty(self.db)
     }
 
     fn infer_ellipsis_literal_expression(
@@ -2659,6 +2659,53 @@ enum ModuleNameResolutionError {
     TooManyDots,
 }
 
+/// Struct collecting string parts when inferring a formatted string. Infers a string literal if the
+/// concatenated string is small enough, otherwise infers a literal string.
+///
+/// If the formatted string contains an expression (with a representation unknown at compile time),
+/// infers an instance of `builtins.str`.
+struct StringPartsCollector {
+    concatenated: Option<String>,
+    expression: bool,
+}
+
+impl StringPartsCollector {
+    fn new() -> Self {
+        Self {
+            concatenated: Some(String::new()),
+            expression: false,
+        }
+    }
+
+    fn push_str(&mut self, literal: &str) {
+        if let Some(mut concatenated) = self.concatenated.take() {
+            if concatenated.len().saturating_add(literal.len())
+                <= TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE
+            {
+                concatenated.push_str(literal);
+                self.concatenated = Some(concatenated);
+            } else {
+                self.concatenated = None;
+            }
+        }
+    }
+
+    fn add_expression(&mut self) {
+        self.concatenated = None;
+        self.expression = true;
+    }
+
+    fn ty(self, db: &dyn Db) -> Type {
+        if self.expression {
+            Type::builtin_str(db).to_instance(db)
+        } else if let Some(concatenated) = self.concatenated {
+            Type::StringLiteral(StringLiteralType::new(db, concatenated.into_boxed_str()))
+        } else {
+            Type::LiteralString
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -3589,6 +3636,71 @@ mod tests {
         let function = global_symbol_ty(&db, mod_file, "example").expect_function();
         let returns = function.return_type(&db);
         assert_eq!(returns.display(&db).to_string(), "int");
+
+        Ok(())
+    }
+
+    #[test]
+    fn fstring_expression() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            x = 0
+            y = str()
+            z = False
+
+            a = f'hello'
+            b = f'h {x}'
+            c = 'one ' f'single ' f'literal'
+            d = 'first ' f'second({b})' f' third'
+            e = f'-{y}-'
+            f = f'-{y}-' f'--' '--'
+            g = f'{z} == {False} is {True}'
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "a", "Literal[\"hello\"]");
+        assert_public_ty(&db, "src/a.py", "b", "Literal[\"h 0\"]");
+        assert_public_ty(&db, "src/a.py", "c", "Literal[\"one single literal\"]");
+        assert_public_ty(&db, "src/a.py", "d", "Literal[\"first second(h 0) third\"]");
+        assert_public_ty(&db, "src/a.py", "e", "str");
+        assert_public_ty(&db, "src/a.py", "f", "str");
+        assert_public_ty(&db, "src/a.py", "g", "Literal[\"False == False is True\"]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn fstring_expression_with_conversion_flags() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            string = 'hello'
+            a = f'{string!r}'
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "a", "str"); // Should be `Literal["'hello'"]`
+
+        Ok(())
+    }
+
+    #[test]
+    fn fstring_expression_with_format_specifier() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            a = f'{1:02}'
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "a", "str"); // Should be `Literal["01"]`
 
         Ok(())
     }

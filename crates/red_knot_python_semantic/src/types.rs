@@ -380,6 +380,10 @@ impl<'db> Type<'db> {
         }
     }
 
+    pub fn builtin_str(db: &'db dyn Db) -> Self {
+        builtins_symbol_ty(db, "str")
+    }
+
     pub fn is_stdlib_symbol(&self, db: &'db dyn Db, module_name: &str, name: &str) -> bool {
         match self {
             Type::Class(class) => class.is_stdlib_symbol(db, module_name, name),
@@ -719,6 +723,44 @@ impl<'db> Type<'db> {
             // TODO intersections
             Type::Intersection(_) => Type::Unknown,
             Type::Tuple(_) => builtins_symbol_ty(db, "tuple"),
+        }
+    }
+
+    /// Return the string representation of this type when converted to string as it would be
+    /// provided by the `__str__` method.
+    ///
+    /// When not available, this should fall back to the value of `[Type::repr]`.
+    /// Note: this method is used in the builtins `format`, `print`, `str.format` and `f-strings`.
+    #[must_use]
+    pub fn str(&self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Type::IntLiteral(_) | Type::BooleanLiteral(_) => self.repr(db),
+            Type::StringLiteral(_) | Type::LiteralString => *self,
+            // TODO: handle more complex types
+            _ => Type::builtin_str(db).to_instance(db),
+        }
+    }
+
+    /// Return the string representation of this type as it would be provided by the  `__repr__`
+    /// method at runtime.
+    #[must_use]
+    pub fn repr(&self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Type::IntLiteral(number) => Type::StringLiteral(StringLiteralType::new(db, {
+                number.to_string().into_boxed_str()
+            })),
+            Type::BooleanLiteral(true) => {
+                Type::StringLiteral(StringLiteralType::new(db, "True".into()))
+            }
+            Type::BooleanLiteral(false) => {
+                Type::StringLiteral(StringLiteralType::new(db, "False".into()))
+            }
+            Type::StringLiteral(literal) => Type::StringLiteral(StringLiteralType::new(db, {
+                format!("'{}'", literal.value(db).escape_default()).into()
+            })),
+            Type::LiteralString => Type::LiteralString,
+            // TODO: handle more complex types
+            _ => Type::builtin_str(db).to_instance(db),
         }
     }
 }
@@ -1198,12 +1240,13 @@ mod tests {
 
     /// A test representation of a type that can be transformed unambiguously into a real Type,
     /// given a db.
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     enum Ty {
         Never,
         Unknown,
         Any,
         IntLiteral(i64),
+        BoolLiteral(bool),
         StringLiteral(&'static str),
         LiteralString,
         BytesLiteral(&'static str),
@@ -1222,6 +1265,7 @@ mod tests {
                 Ty::StringLiteral(s) => {
                     Type::StringLiteral(StringLiteralType::new(db, (*s).into()))
                 }
+                Ty::BoolLiteral(b) => Type::BooleanLiteral(b),
                 Ty::LiteralString => Type::LiteralString,
                 Ty::BytesLiteral(s) => {
                     Type::BytesLiteral(BytesLiteralType::new(db, s.as_bytes().into()))
@@ -1330,5 +1374,29 @@ mod tests {
     fn boolean_value_is_unknown(ty: Ty) {
         let db = setup_db();
         assert_eq!(ty.into_type(&db).bool(&db), Truthiness::Ambiguous);
+    }
+
+    #[test_case(Ty::IntLiteral(1), Ty::StringLiteral("1"))]
+    #[test_case(Ty::BoolLiteral(true), Ty::StringLiteral("True"))]
+    #[test_case(Ty::BoolLiteral(false), Ty::StringLiteral("False"))]
+    #[test_case(Ty::StringLiteral("ab'cd"), Ty::StringLiteral("ab'cd"))] // no quotes
+    #[test_case(Ty::LiteralString, Ty::LiteralString)]
+    #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str"))]
+    fn has_correct_str(ty: Ty, expected: Ty) {
+        let db = setup_db();
+
+        assert_eq!(ty.into_type(&db).str(&db), expected.into_type(&db));
+    }
+
+    #[test_case(Ty::IntLiteral(1), Ty::StringLiteral("1"))]
+    #[test_case(Ty::BoolLiteral(true), Ty::StringLiteral("True"))]
+    #[test_case(Ty::BoolLiteral(false), Ty::StringLiteral("False"))]
+    #[test_case(Ty::StringLiteral("ab'cd"), Ty::StringLiteral("'ab\\'cd'"))] // single quotes
+    #[test_case(Ty::LiteralString, Ty::LiteralString)]
+    #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str"))]
+    fn has_correct_repr(ty: Ty, expected: Ty) {
+        let db = setup_db();
+
+        assert_eq!(ty.into_type(&db).repr(&db), expected.into_type(&db));
     }
 }
