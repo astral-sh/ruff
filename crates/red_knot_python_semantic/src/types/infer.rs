@@ -1653,13 +1653,13 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_fstring_expression(&mut self, fstring: &ast::ExprFString) -> Type<'db> {
         let ast::ExprFString { range: _, value } = fstring;
 
-        let mut done = false;
-        let mut has_expression = false;
-        let mut concatenated = String::new();
+        let mut collector = StringPartsCollector::new();
         for part in value {
+            // Make sure we iter through every parts to infer all sub-expressions. The `collector`
+            // struct ensures we don't allocate unnecessary strings.
             match part {
                 ast::FStringPart::Literal(literal) => {
-                    concatenated.push_str(&literal.value);
+                    collector.push_str(&literal.value);
                 }
                 ast::FStringPart::FString(fstring) => {
                     for element in &fstring.elements {
@@ -1672,54 +1672,31 @@ impl<'db> TypeInferenceBuilder<'db> {
                                     conversion,
                                     format_spec,
                                 } = expression;
-                                // Always infer sub-expressions, even if we've figured out the type
                                 let ty = self.infer_expression(expression);
-                                if !done {
-                                    // TODO: handle format specifiers by calling a method
-                                    // (`Type::format`?) that handles the `__format__` method.
-                                    // Conversion flags should be handled before calling
-                                    // `__format__`.
-                                    // https://docs.python.org/3/library/string.html#format-string-syntax
-                                    if !conversion.is_none() || format_spec.is_some() {
-                                        has_expression = true;
-                                        done = true;
+
+                                // TODO: handle format specifiers by calling a method
+                                // (`Type::format`?) that handles the `__format__` method.
+                                // Conversion flags should be handled before calling `__format__`.
+                                // https://docs.python.org/3/library/string.html#format-string-syntax
+                                if !conversion.is_none() || format_spec.is_some() {
+                                    collector.add_expression();
+                                } else {
+                                    if let Type::StringLiteral(literal) = ty.str(self.db) {
+                                        collector.push_str(literal.value(self.db));
                                     } else {
-                                        if let Some(Type::StringLiteral(literal)) = ty.str(self.db)
-                                        {
-                                            concatenated.push_str(literal.value(self.db));
-                                        } else {
-                                            has_expression = true;
-                                            done = true;
-                                        }
+                                        collector.add_expression();
                                     }
                                 }
                             }
                             ast::FStringElement::Literal(literal) => {
-                                if !done {
-                                    concatenated.push_str(&literal.value);
-                                }
+                                collector.push_str(&literal.value);
                             }
                         }
                     }
                 }
             }
-            if concatenated.len() > Self::MAX_STRING_LITERAL_SIZE {
-                done = true;
-            }
         }
-
-        if has_expression {
-            builtins_symbol_ty(self.db, "str").to_instance(self.db)
-        } else {
-            if concatenated.len() <= Self::MAX_STRING_LITERAL_SIZE {
-                Type::StringLiteral(StringLiteralType::new(
-                    self.db,
-                    concatenated.into_boxed_str(),
-                ))
-            } else {
-                Type::LiteralString
-            }
-        }
+        collector.ty(self.db)
     }
 
     fn infer_ellipsis_literal_expression(
@@ -2680,6 +2657,53 @@ enum ModuleNameResolutionError {
     /// (e.g. our current module is `foo.bar`, and the relative import statement in `foo.bar`
     /// is `from ....baz import spam`)
     TooManyDots,
+}
+
+/// Struct collecting string parts when inferring a formatted string. Infers a string literal if the
+/// concatenated string is small enough, otherwise infers a literal string.
+///
+/// If the formatted string contains an expression (with a representation unknown at compile time),
+/// infers an instance of `builtins.str`.
+struct StringPartsCollector {
+    concatenated: Option<String>,
+    expression: bool,
+}
+
+impl StringPartsCollector {
+    fn new() -> Self {
+        Self {
+            concatenated: Some(String::new()),
+            expression: false,
+        }
+    }
+
+    fn push_str(&mut self, literal: &str) {
+        if let Some(mut concatenated) = self.concatenated.take() {
+            if concatenated.len().saturating_add(literal.len())
+                <= TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE
+            {
+                concatenated.push_str(literal);
+                self.concatenated = Some(concatenated);
+            } else {
+                self.concatenated = None;
+            }
+        }
+    }
+
+    fn add_expression(&mut self) {
+        self.concatenated = None;
+        self.expression = true;
+    }
+
+    fn ty(self, db: &dyn Db) -> Type {
+        if self.expression {
+            Type::builtin_str(db).to_instance(db)
+        } else if let Some(concatenated) = self.concatenated {
+            Type::StringLiteral(StringLiteralType::new(db, concatenated.into_boxed_str()))
+        } else {
+            Type::LiteralString
+        }
+    }
 }
 
 #[cfg(test)]
