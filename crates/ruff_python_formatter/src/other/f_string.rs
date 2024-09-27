@@ -36,7 +36,7 @@ impl Format<PyFormatContext<'_>> for FormatFString<'_> {
         // If f-string formatting is disabled (not in preview), then we will
         // fall back to the previous behavior of normalizing the f-string.
         if !is_f_string_formatting_enabled(f.context()) {
-            let result = normalizer.normalize(self.value.into(), &locator).fmt(f);
+            let result = normalizer.normalize(self.value.into()).fmt(f);
             let comments = f.context().comments();
             self.value.elements.iter().for_each(|value| {
                 comments.mark_verbatim_node_comments_formatted(value.into());
@@ -56,9 +56,7 @@ impl Format<PyFormatContext<'_>> for FormatFString<'_> {
             return result;
         }
 
-        let string_kind = normalizer
-            .choose_quotes(self.value.into(), &locator)
-            .flags();
+        let string_kind = normalizer.choose_quotes(self.value.into()).flags();
 
         let context = FStringContext::new(
             string_kind,

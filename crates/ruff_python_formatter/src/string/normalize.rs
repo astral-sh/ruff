@@ -1,36 +1,29 @@
 use std::borrow::Cow;
+use std::cmp::Ordering;
 use std::iter::FusedIterator;
 
 use ruff_formatter::FormatContext;
 use ruff_python_ast::{str::Quote, AnyStringFlags, StringFlags};
-use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::context::FStringState;
-use crate::options::PythonVersion;
 use crate::prelude::*;
 use crate::preview::is_f_string_formatting_enabled;
 use crate::string::{Quoting, StringPart, StringQuotes};
 use crate::QuoteStyle;
 
-pub(crate) struct StringNormalizer {
+pub(crate) struct StringNormalizer<'a, 'src> {
     quoting: Quoting,
     preferred_quote_style: QuoteStyle,
-    parent_docstring_quote_char: Option<Quote>,
-    f_string_state: FStringState,
-    target_version: PythonVersion,
-    format_fstring: bool,
+    context: &'a PyFormatContext<'src>,
 }
 
-impl StringNormalizer {
-    pub(crate) fn from_context(context: &PyFormatContext<'_>) -> Self {
+impl<'a, 'src> StringNormalizer<'a, 'src> {
+    pub(crate) fn from_context(context: &'a PyFormatContext<'src>) -> Self {
         Self {
             quoting: Quoting::default(),
             preferred_quote_style: QuoteStyle::default(),
-            parent_docstring_quote_char: context.docstring(),
-            f_string_state: context.f_string_state(),
-            target_version: context.options().target_version(),
-            format_fstring: is_f_string_formatting_enabled(context),
+            context,
         }
     }
 
@@ -45,7 +38,7 @@ impl StringNormalizer {
     }
 
     fn quoting(&self, string: StringPart) -> Quoting {
-        if let FStringState::InsideExpressionElement(context) = self.f_string_state {
+        if let FStringState::InsideExpressionElement(context) = self.context.f_string_state() {
             // If we're inside an f-string, we need to make sure to preserve the
             // existing quotes unless we're inside a triple-quoted f-string and
             // the inner string itself isn't triple-quoted. For example:
@@ -61,7 +54,7 @@ impl StringNormalizer {
             // the original f-string is valid in terms of quoting, and we don't
             // want to change that to make it invalid.
             if (context.f_string().flags().is_triple_quoted() && !string.flags().is_triple_quoted())
-                || self.target_version.supports_pep_701()
+                || self.context.options().target_version().supports_pep_701()
             {
                 self.quoting
             } else {
@@ -73,8 +66,8 @@ impl StringNormalizer {
     }
 
     /// Computes the strings preferred quotes.
-    pub(crate) fn choose_quotes(&self, string: StringPart, locator: &Locator) -> QuoteSelection {
-        let raw_content = locator.slice(string.content_range());
+    pub(crate) fn choose_quotes(&self, string: StringPart) -> QuoteSelection {
+        let raw_content = self.context.locator().slice(string.content_range());
         let first_quote_or_normalized_char_offset = raw_content
             .bytes()
             .position(|b| matches!(b, b'\\' | b'"' | b'\'' | b'\r' | b'{'));
@@ -131,7 +124,7 @@ impl StringNormalizer {
                     // Overall this is a bit of a corner case and just inverting the
                     // style from what the parent ultimately decided upon works, even
                     // if it doesn't have perfect alignment with PEP8.
-                    if let Some(quote) = self.parent_docstring_quote_char {
+                    if let Some(quote) = self.context.docstring() {
                         QuoteStyle::from(quote.opposite())
                     } else if self.preferred_quote_style.is_preserve() {
                         QuoteStyle::Preserve
@@ -175,13 +168,9 @@ impl StringNormalizer {
     }
 
     /// Computes the strings preferred quotes and normalizes its content.
-    pub(crate) fn normalize<'a>(
-        &self,
-        string: StringPart,
-        locator: &'a Locator,
-    ) -> NormalizedString<'a> {
-        let raw_content = locator.slice(string.content_range());
-        let quote_selection = self.choose_quotes(string, locator);
+    pub(crate) fn normalize(&self, string: StringPart) -> NormalizedString<'src> {
+        let raw_content = self.context.locator().slice(string.content_range());
+        let quote_selection = self.choose_quotes(string);
 
         let normalized = if let Some(first_quote_or_escape_offset) =
             quote_selection.first_quote_or_normalized_char_offset
@@ -192,7 +181,7 @@ impl StringNormalizer {
                 quote_selection.flags,
                 // TODO: Remove the `b'{'` in `choose_quotes` when promoting the
                 // `format_fstring` preview style
-                self.format_fstring,
+                is_f_string_formatting_enabled(self.context),
             )
         } else {
             Cow::Borrowed(raw_content)
@@ -405,21 +394,10 @@ fn choose_quotes_impl(
             }
         }
 
-        match preferred_quote {
-            Quote::Single => {
-                if single_quotes > double_quotes {
-                    Quote::Double
-                } else {
-                    Quote::Single
-                }
-            }
-            Quote::Double => {
-                if double_quotes > single_quotes {
-                    Quote::Single
-                } else {
-                    Quote::Double
-                }
-            }
+        match single_quotes.cmp(&double_quotes) {
+            Ordering::Less => Quote::Single,
+            Ordering::Equal => preferred_quote,
+            Ordering::Greater => Quote::Double,
         }
     };
 
