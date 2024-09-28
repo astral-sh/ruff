@@ -87,7 +87,7 @@ pub(crate) fn get_section_contexts<'a>(
         Some(Convention::Sphinx) if checker.settings.preview.is_enabled() => {
             return SectionContexts::from_docstring(docstring, SectionStyle::Sphinx);
         }
-        Some(Convention::Pep257) | Some(Convention::Sphinx) | None => {
+        Some(Convention::Pep257 | Convention::Sphinx) | None => {
             if matches!(convention, Some(Convention::Sphinx)) {
                 warn_user_once!("Sphinx support is currently in preview. Setting convention = \"sphinx\" will be ignored.");
             }
