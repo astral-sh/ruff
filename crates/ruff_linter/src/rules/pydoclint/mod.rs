@@ -12,6 +12,7 @@ mod tests {
     use crate::registry::Rule;
     use crate::rules::pydocstyle;
     use crate::rules::pydocstyle::settings::Convention;
+    use crate::settings::types::PreviewMode;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
@@ -75,6 +76,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pydoclint").join(path).as_path(),
             &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
                 pydocstyle: pydocstyle::settings::Settings::new(Some(Convention::Sphinx), [], []),
                 ..settings::LinterSettings::for_rule(rule_code)
             },
