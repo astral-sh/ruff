@@ -1200,7 +1200,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_expression(target);
 
         // TODO(dhruvmanila): Resolve the target type using the value type and the operator
-        Type::Unknown
+        Type::Todo
     }
 
     fn infer_type_alias_statement(&mut self, type_alias_statement: &ast::StmtTypeAlias) {
@@ -1300,14 +1300,19 @@ impl<'db> TypeInferenceBuilder<'db> {
             .types
             .expression_ty(iterable.scoped_ast_id(self.db, self.scope));
 
+        tracing::debug!("For::IterableTy: {}", iterable_ty.display(self.db));
+        tracing::debug!("For::IsAsync: {}", is_async);
+
         let loop_var_value_ty = if is_async {
             // TODO(Alex): async iterables/iterators!
-            Type::Unknown
+            Type::Todo
         } else {
             iterable_ty
                 .iterate(self.db)
                 .unwrap_with_diagnostic(iterable.into(), self)
         };
+
+        tracing::debug!("For::LoopVar: {}", loop_var_value_ty.display(self.db));
 
         self.types
             .expressions
@@ -1637,6 +1642,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::Await(await_expression) => self.infer_await_expression(await_expression),
             ast::Expr::IpyEscapeCommand(_) => todo!("Implement Ipy escape command support"),
         };
+        tracing::trace!("=> {}", ty.display(self.db));
 
         let expr_id = expression.scoped_ast_id(self.db, self.scope);
         let previous = self.types.expressions.insert(expr_id, ty);
@@ -1816,7 +1822,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_first_comprehension_iter(generators);
 
         // TODO generator type
-        Type::Unknown
+        Type::Todo
     }
 
     fn infer_list_comprehension_expression(&mut self, listcomp: &ast::ExprListComp) -> Type<'db> {
@@ -1829,7 +1835,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_first_comprehension_iter(generators);
 
         // TODO list type
-        Type::Unknown
+        Type::Todo
     }
 
     fn infer_dict_comprehension_expression(&mut self, dictcomp: &ast::ExprDictComp) -> Type<'db> {
@@ -1843,7 +1849,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_first_comprehension_iter(generators);
 
         // TODO dict type
-        Type::Unknown
+        Type::Todo
     }
 
     fn infer_set_comprehension_expression(&mut self, setcomp: &ast::ExprSetComp) -> Type<'db> {
@@ -1856,7 +1862,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_first_comprehension_iter(generators);
 
         // TODO set type
-        Type::Unknown
+        Type::Todo
     }
 
     fn infer_generator_expression_scope(&mut self, generator: &ast::ExprGenerator) {
@@ -1971,7 +1977,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let target_ty = if is_async {
             // TODO: async iterables/iterators! -- Alex
-            Type::Unknown
+            Type::Todo
         } else {
             iterable_ty
                 .iterate(self.db)
@@ -2050,7 +2056,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // TODO function type
-        Type::Unknown
+        Type::Todo
     }
 
     fn infer_call_expression(&mut self, call_expression: &ast::ExprCall) -> Type<'db> {
@@ -2081,7 +2087,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .unwrap_with_diagnostic(value.as_ref().into(), self);
 
         // TODO
-        Type::Unknown
+        Type::Todo
     }
 
     fn infer_yield_expression(&mut self, yield_expression: &ast::ExprYield) -> Type<'db> {
@@ -2090,7 +2096,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_optional_expression(value.as_deref());
 
         // TODO awaitable type
-        Type::Unknown
+        Type::Todo
     }
 
     fn infer_yield_from_expression(&mut self, yield_from: &ast::ExprYieldFrom) -> Type<'db> {
@@ -2102,7 +2108,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .unwrap_with_diagnostic(value.as_ref().into(), self);
 
         // TODO get type from `ReturnType` of generator
-        Type::Unknown
+        Type::Todo
     }
 
     fn infer_await_expression(&mut self, await_expression: &ast::ExprAwait) -> Type<'db> {
@@ -2111,7 +2117,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_expression(value);
 
         // TODO awaitable type
-        Type::Unknown
+        Type::Todo
     }
 
     /// Look up a name reference that isn't bound in the local scope.
@@ -2255,7 +2261,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             (UnaryOp::Not, ty) => ty.bool(self.db).negate().into_type(self.db),
 
-            _ => Type::Unknown, // TODO other unary op types
+            _ => Type::Todo, // TODO other unary op types
         }
     }
 
@@ -2271,6 +2277,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         let right_ty = self.infer_expression(right);
 
         match (left_ty, right_ty, op) {
+            // When interacting with Todo, Any & Unknown should propagate (as if we fix this Todo
+            // in the future, the result would then become Any or Unknown, respectively.)
+            (Type::Any, Type::Todo, _) | (Type::Todo, Type::Any, _) => Type::Any,
+            (Type::Unknown, Type::Todo, _) | (Type::Todo, Type::Unknown, _) => Type::Unknown,
+
             (Type::Any, _, _) | (_, Type::Any, _) => Type::Any,
             (Type::Unknown, _, _) | (_, Type::Unknown, _) => Type::Unknown,
 
@@ -2306,8 +2317,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Mod) => n
                 .checked_rem(m)
                 .map(Type::IntLiteral)
-                // TODO: division by zero error
-                .unwrap_or(Type::Unknown),
+                // TODO division by zero error
+                .unwrap_or(Type::Todo),
 
             (Type::BytesLiteral(lhs), Type::BytesLiteral(rhs), ast::Operator::Add) => {
                 Type::BytesLiteral(BytesLiteralType::new(
@@ -2363,7 +2374,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
 
-            _ => Type::Unknown, // TODO
+            _ => Type::Todo, // TODO
         }
     }
 
@@ -2414,7 +2425,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         for right in comparators.as_ref() {
             self.infer_expression(right);
         }
-        Type::Unknown
+        Type::Todo
     }
 
     fn infer_subscript_expression(&mut self, subscript: &ast::ExprSubscript) -> Type<'db> {
@@ -2544,7 +2555,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         Type::Unknown
                     })
             }
-            _ => Type::Unknown,
+            _ => Type::Todo,
         }
     }
 
@@ -2561,7 +2572,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_optional_expression(step.as_deref());
 
         // TODO slice
-        Type::Unknown
+        Type::Todo
     }
 
     fn infer_type_parameters(&mut self, type_parameters: &ast::TypeParams) {
@@ -2643,7 +2654,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             // TODO: parse the expression and check whether it is a string annotation, since they
             // can be annotation expressions distinct from type expressions.
             // https://typing.readthedocs.io/en/latest/spec/annotations.html#string-annotations
-            ast::Expr::StringLiteral(_literal) => Type::Unknown,
+            ast::Expr::StringLiteral(_literal) => Type::Todo,
 
             // Annotation expressions also get special handling for `*args` and `**kwargs`.
             ast::Expr::Starred(starred) => self.infer_starred_expression(starred),
@@ -2677,18 +2688,24 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             // TODO: parse the expression and check whether it is a string annotation.
             // https://typing.readthedocs.io/en/latest/spec/annotations.html#string-annotations
-            ast::Expr::StringLiteral(_literal) => Type::Unknown,
+            ast::Expr::StringLiteral(_literal) => Type::Todo,
 
             // TODO: an Ellipsis literal *on its own* does not have any meaning in annotation
             // expressions, but is meaningful in the context of a number of special forms.
-            ast::Expr::EllipsisLiteral(_literal) => Type::Unknown,
+            ast::Expr::EllipsisLiteral(_literal) => Type::Todo,
 
             // Other literals do not have meaningful values in the annotation expression context.
             // However, we will we want to handle these differently when working with special forms,
             // since (e.g.) `123` is not valid in an annotation expression but `Literal[123]` is.
-            ast::Expr::BytesLiteral(_literal) => Type::Unknown,
-            ast::Expr::NumberLiteral(_literal) => Type::Unknown,
-            ast::Expr::BooleanLiteral(_literal) => Type::Unknown,
+            ast::Expr::BytesLiteral(_literal) => Type::Todo,
+            ast::Expr::NumberLiteral(_literal) => Type::Todo,
+            ast::Expr::BooleanLiteral(_literal) => Type::Todo,
+
+            // TODO: this may be a place we need to revisit with special forms.
+            ast::Expr::Subscript(subscript) => {
+                self.infer_subscript_expression(subscript);
+                Type::Todo
+            }
 
             // Forms which are invalid in the context of annotation expressions: we infer their
             // nested expressions as normal expressions, but the type of the top-level expression is
@@ -2768,11 +2785,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             //
             ast::Expr::Attribute(attribute) => {
                 self.infer_attribute_expression(attribute);
-                Type::Unknown
-            }
-            // TODO: this may be a place we need to revisit with special forms.
-            ast::Expr::Subscript(subscript) => {
-                self.infer_subscript_expression(subscript);
                 Type::Unknown
             }
             ast::Expr::Starred(starred) => {
@@ -3907,7 +3919,7 @@ mod tests {
         )?;
 
         // TODO: Generic `types.CoroutineType`!
-        assert_public_ty(&db, "src/a.py", "x", "Unknown");
+        assert_public_ty(&db, "src/a.py", "x", "@Todo");
 
         Ok(())
     }
@@ -3936,7 +3948,7 @@ mod tests {
         )?;
 
         // TODO: should be `int`!
-        assert_public_ty(&db, "src/a.py", "x", "Unknown");
+        assert_public_ty(&db, "src/a.py", "x", "@Todo");
 
         Ok(())
     }
@@ -5435,7 +5447,8 @@ mod tests {
             ",
         )?;
 
-        assert_scope_ty(&db, "src/a.py", &["foo"], "x", "Unbound | Unknown");
+        // We currently return `Todo` for any async for loop, including invalid
+        assert_scope_ty(&db, "src/a.py", &["foo"], "x", "Unbound | @Todo");
 
         Ok(())
     }
@@ -5462,7 +5475,7 @@ mod tests {
         )?;
 
         // TODO(Alex) async iterables/iterators!
-        assert_scope_ty(&db, "src/a.py", &["foo"], "x", "Unbound | Unknown");
+        assert_scope_ty(&db, "src/a.py", &["foo"], "x", "Unbound | @Todo");
 
         Ok(())
     }
@@ -5997,7 +6010,8 @@ mod tests {
             ",
         )?;
 
-        assert_scope_ty(&db, "src/a.py", &["foo", "<listcomp>"], "x", "Unknown");
+        // We currently return `Todo` for any async comprehension, including invalid
+        assert_scope_ty(&db, "src/a.py", &["foo", "<listcomp>"], "x", "@Todo");
 
         Ok(())
     }
@@ -6021,7 +6035,7 @@ mod tests {
         )?;
 
         // TODO async iterables/iterators! --Alex
-        assert_scope_ty(&db, "src/a.py", &["foo", "<listcomp>"], "x", "Unknown");
+        assert_scope_ty(&db, "src/a.py", &["foo", "<listcomp>"], "x", "@Todo");
 
         Ok(())
     }

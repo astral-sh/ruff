@@ -67,6 +67,9 @@ impl Display for DisplayRepresentation<'_> {
             Type::Unknown => f.write_str("Unknown"),
             Type::Unbound => f.write_str("Unbound"),
             Type::None => f.write_str("None"),
+            // `[Type::Todo]`'s display should be anything explicit that is not a valid display of
+            // any other type
+            Type::Todo => f.write_str("@Todo"),
             Type::Module(file) => {
                 write!(f, "<module '{:?}'>", file.path(self.db))
             }

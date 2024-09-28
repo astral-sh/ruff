@@ -224,6 +224,8 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 self.positive.retain(|elem| !neg.contains(elem));
                 self.negative.retain(|elem| !pos.contains(elem));
             }
+            // Note: `[Type::Todo]` is included to show that an unimplemented type was added, but
+            // this can lead to cases where separate `Type::Todo` cancel eachother
             _ => {
                 if !self.negative.remove(&ty) {
                     self.positive.insert(ty);
@@ -246,6 +248,8 @@ impl<'db> InnerIntersectionBuilder<'db> {
             }
             Type::Never => {}
             Type::Unbound => {}
+            // Note: `[Type::Todo]` is included to show that an unimplemented type was added, but
+            // this can lead to cases where separate `Type::Todo` cancel eachother
             _ => {
                 if !self.positive.remove(&ty) {
                     self.negative.insert(ty);

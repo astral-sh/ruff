@@ -233,31 +233,39 @@ fn declarations_ty<'db>(
 /// Unique ID for a type.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Type<'db> {
-    /// the dynamic type: a statically-unknown set of values
+    /// The dynamic type: a statically-unknown set of values
     Any,
-    /// the empty set of values
+    /// The empty set of values
     Never,
-    /// unknown type (either no annotation, or some kind of type error)
-    /// equivalent to Any, or possibly to object in strict mode
+    /// Unknown type (either no annotation, or some kind of type error)
+    /// Equivalent to Any, or possibly to object in strict mode
     Unknown,
-    /// name does not exist or is not bound to any value (this represents an error, but with some
-    /// leniency options it could be silently resolved to Unknown in some cases)
+    /// Name does not exist or is not bound to any value (this represents an error, but with some
+    /// Leniency options it could be silently resolved to Unknown in some cases)
     Unbound,
-    /// the None object -- TODO remove this in favor of Instance(types.NoneType)
+    /// The None object -- TODO remove this in favor of Instance(types.NoneType)
     None,
-    /// a specific function object
+    /// Temporary type for symbols that can't be inferred yet because of missing implementations.
+    /// Uses only for debugging purpose, should eventually be removed or never used.
+    ///
+    /// General rule: Todo should only propagate when the presence of the input Todo caused the
+    /// output to be unknown. An output should only be Todo if fixing the input to be correctly
+    /// inferred would cause the output to be known - this is not the case with `[Type::Any]` or
+    /// `[Type::Unknown]`.
+    Todo,
+    /// A specific function object
     Function(FunctionType<'db>),
     /// The `typing.reveal_type` function, which has special `__call__` behavior.
     RevealTypeFunction(FunctionType<'db>),
-    /// a specific module object
+    /// A specific module object
     Module(File),
-    /// a specific class object
+    /// A specific class object
     Class(ClassType<'db>),
-    /// the set of Python objects with the given class in their __class__'s method resolution order
+    /// The set of Python objects with the given class in their __class__'s method resolution order
     Instance(ClassType<'db>),
-    /// the set of objects in any of the types in the union
+    /// The set of objects in any of the types in the union
     Union(UnionType<'db>),
-    /// the set of objects in all of the types in the intersection
+    /// The set of objects in all of the types in the intersection
     Intersection(IntersectionType<'db>),
     /// An integer literal
     IntLiteral(i64),
@@ -402,8 +410,8 @@ impl<'db> Type<'db> {
             return true;
         }
         match (self, target) {
-            (Type::Unknown | Type::Any, _) => false,
-            (_, Type::Unknown | Type::Any) => false,
+            (Type::Unknown | Type::Any | Type::Todo, _) => false,
+            (_, Type::Unknown | Type::Any | Type::Todo) => false,
             (Type::Never, _) => true,
             (_, Type::Never) => false,
             (Type::IntLiteral(_), Type::Instance(class))
@@ -438,8 +446,8 @@ impl<'db> Type<'db> {
     /// [assignable to]: https://typing.readthedocs.io/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
     pub(crate) fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
         match (self, target) {
-            (Type::Unknown | Type::Any, _) => true,
-            (_, Type::Unknown | Type::Any) => true,
+            (Type::Unknown | Type::Any | Type::Todo, _) => true,
+            (_, Type::Unknown | Type::Any | Type::Todo) => true,
             (ty, Type::Union(union)) => union
                 .elements(db)
                 .iter()
@@ -475,29 +483,29 @@ impl<'db> Type<'db> {
             Type::Any => Type::Any,
             Type::Never => {
                 // TODO: attribute lookup on Never type
-                Type::Unknown
+                Type::Todo
             }
             Type::Unknown => Type::Unknown,
             Type::Unbound => Type::Unbound,
             Type::None => {
                 // TODO: attribute lookup on None type
-                Type::Unknown
+                Type::Todo
             }
             Type::Function(_) | Type::RevealTypeFunction(_) => {
                 // TODO: attribute lookup on function type
-                Type::Unknown
+                Type::Todo
             }
             Type::Module(file) => global_symbol_ty(db, *file, name),
             Type::Class(class) => class.class_member(db, name),
             Type::Instance(_) => {
                 // TODO MRO? get_own_instance_member, get_instance_member
-                Type::Unknown
+                Type::Todo
             }
             Type::Union(union) => union.map(db, |element| element.member(db, name)),
             Type::Intersection(_) => {
                 // TODO perform the get_member on each type in the intersection
                 // TODO return the intersection of those results
-                Type::Unknown
+                Type::Todo
             }
             Type::IntLiteral(_) => {
                 // TODO raise error
@@ -507,21 +515,22 @@ impl<'db> Type<'db> {
             Type::StringLiteral(_) => {
                 // TODO defer to `typing.LiteralString`/`builtins.str` methods
                 // from typeshed's stubs
-                Type::Unknown
+                Type::Todo
             }
             Type::LiteralString => {
                 // TODO defer to `typing.LiteralString`/`builtins.str` methods
                 // from typeshed's stubs
-                Type::Unknown
+                Type::Todo
             }
             Type::BytesLiteral(_) => {
                 // TODO defer to Type::Instance(<bytes from typeshed>).member
-                Type::Unknown
+                Type::Todo
             }
             Type::Tuple(_) => {
                 // TODO: implement tuple methods
-                Type::Unknown
+                Type::Todo
             }
+            Type::Todo => Type::Todo,
         }
     }
 
@@ -570,6 +579,7 @@ impl<'db> Type<'db> {
             Type::LiteralString => Truthiness::Ambiguous,
             Type::BytesLiteral(bytes) => Truthiness::from(!bytes.value(db).is_empty()),
             Type::Tuple(items) => Truthiness::from(!items.elements(db).is_empty()),
+            Type::Todo => Truthiness::Ambiguous,
         }
     }
 
@@ -602,7 +612,7 @@ impl<'db> Type<'db> {
             }
 
             // TODO: handle classes which implement the `__call__` protocol
-            Type::Instance(_instance_ty) => CallOutcome::callable(Type::Unknown),
+            Type::Instance(_instance_ty) => CallOutcome::callable(Type::Todo),
 
             // `Any` is callable, and its return type is also `Any`.
             Type::Any => CallOutcome::callable(Type::Any),
@@ -619,7 +629,10 @@ impl<'db> Type<'db> {
             ),
 
             // TODO: intersection types
-            Type::Intersection(_) => CallOutcome::callable(Type::Unknown),
+            Type::Intersection(_) => CallOutcome::callable(Type::Todo),
+
+            // `Todo` is callable, and its return type is also `Todo`.
+            Type::Todo => CallOutcome::callable(Type::Todo),
 
             _ => CallOutcome::not_callable(self),
         }
@@ -643,6 +656,7 @@ impl<'db> Type<'db> {
         // `self` represents the type of the iterable;
         // `__iter__` and `__next__` are both looked up on the class of the iterable:
         let iterable_meta_type = self.to_meta_type(db);
+        tracing::debug!("iterable_meta_type: {:?}", iterable_meta_type);
 
         let dunder_iter_method = iterable_meta_type.member(db, "__iter__");
         if !dunder_iter_method.is_unbound() {
@@ -692,7 +706,7 @@ impl<'db> Type<'db> {
             Type::Class(class) => Type::Instance(*class),
             Type::Union(union) => union.map(db, |element| element.to_instance(db)),
             // TODO: we can probably do better here: --Alex
-            Type::Intersection(_) => Type::Unknown,
+            Type::Intersection(_) => Type::Todo,
             // TODO: calling `.to_instance()` on any of these should result in a diagnostic,
             // since they already indicate that the object is an instance of some kind:
             Type::BooleanLiteral(_)
@@ -706,6 +720,7 @@ impl<'db> Type<'db> {
             | Type::Tuple(_)
             | Type::LiteralString
             | Type::None => Type::Unknown,
+            Type::Todo => Type::Todo,
         }
     }
 
@@ -723,6 +738,7 @@ impl<'db> Type<'db> {
             Type::IntLiteral(_) => builtins_symbol_ty(db, "int"),
             Type::Function(_) | Type::RevealTypeFunction(_) => types_symbol_ty(db, "FunctionType"),
             Type::Module(_) => types_symbol_ty(db, "ModuleType"),
+            Type::Tuple(_) => builtins_symbol_ty(db, "tuple"),
             Type::None => typeshed_symbol_ty(db, "NoneType"),
             // TODO not accurate if there's a custom metaclass...
             Type::Class(_) => builtins_symbol_ty(db, "type"),
@@ -733,8 +749,8 @@ impl<'db> Type<'db> {
             // TODO: `type[Unknown]`?
             Type::Unknown => Type::Unknown,
             // TODO intersections
-            Type::Intersection(_) => Type::Unknown,
-            Type::Tuple(_) => builtins_symbol_ty(db, "tuple"),
+            Type::Intersection(_) => Type::Todo,
+            Type::Todo => Type::Todo,
         }
     }
 
@@ -1064,7 +1080,7 @@ impl<'db> FunctionType<'db> {
         // rather than from `bar`'s return annotation
         // in order to determine the type that `bar` returns
         if !function_stmt_node.decorator_list.is_empty() {
-            return Type::Unknown;
+            return Type::Todo;
         }
 
         function_stmt_node
@@ -1073,7 +1089,7 @@ impl<'db> FunctionType<'db> {
             .map(|returns| {
                 if function_stmt_node.is_async {
                     // TODO: generic `types.CoroutineType`!
-                    Type::Unknown
+                    Type::Todo
                 } else {
                     definition_expression_ty(db, definition, returns.as_ref())
                 }
