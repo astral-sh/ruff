@@ -290,6 +290,25 @@ impl<'a> ClauseHeader<'a> {
     }
 }
 
+impl<'a> ClauseHeader<'a> {
+    pub(crate) fn from(node: AnyNodeRef<'a>) -> Option<Self> {
+        match node {
+            AnyNodeRef::StmtClassDef(node) => Some(ClauseHeader::Class(node)),
+            AnyNodeRef::StmtFunctionDef(node) => Some(ClauseHeader::Function(node)),
+            AnyNodeRef::StmtIf(node) => Some(ClauseHeader::If(node)),
+            AnyNodeRef::ElifElseClause(node) => Some(ClauseHeader::ElifElse(node)),
+            AnyNodeRef::StmtTry(node) => Some(ClauseHeader::Try(node)),
+            AnyNodeRef::ExceptHandlerExceptHandler(node) => Some(ClauseHeader::ExceptHandler(node)),
+            AnyNodeRef::StmtMatch(node) => Some(ClauseHeader::Match(node)),
+            AnyNodeRef::MatchCase(node) => Some(ClauseHeader::MatchCase(node)),
+            AnyNodeRef::StmtFor(node) => Some(ClauseHeader::For(node)),
+            AnyNodeRef::StmtWhile(node) => Some(ClauseHeader::While(node)),
+            AnyNodeRef::StmtWith(node) => Some(ClauseHeader::With(node)),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Copy, Clone)]
 pub(crate) enum ElseClause<'a> {
     Try(&'a StmtTry),

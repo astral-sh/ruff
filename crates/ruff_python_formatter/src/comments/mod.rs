@@ -846,7 +846,22 @@ def foo(self, lorem, ipsum, dolor, sit, amet, consectetur, adipiscing, elit, sed
 
 while test:
     pass
-else: ...  # fmt: skip
+
+def test(
+	a, 
+	b, 
+): ... # fmt: skip
+
+def test() -> List[
+	str,
+	int,
+]: ... # fmt: skip
+
+if True:  # fmt: skip
+    x = 0
+
+while test:  # fmt: skip
+    pass
 "#;
 
         let test_case = CommentsTestCase::from_code(source);
@@ -854,6 +869,7 @@ else: ...  # fmt: skip
 
         assert_debug_snapshot!(comments.debug(test_case.source_code));
     }
+
     #[test]
     fn positional_argument_only_comment() {
         let source = r"

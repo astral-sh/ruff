@@ -1,8 +1,8 @@
 use std::cmp::Ordering;
 
+use crate::statement::clause::ClauseHeader;
 use ast::helpers::comment_indentation_after;
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::NodeKind;
 use ruff_python_ast::{
     self as ast, AnyNodeRef, Comprehension, Expr, ModModule, Parameter, Parameters,
 };
@@ -422,19 +422,6 @@ fn handle_end_of_line_comment_around_body<'a>(
     CommentPlacement::Default(comment)
 }
 
-fn is_clause_header(node: AnyNodeRef) -> bool {
-    matches!(
-        node.kind(),
-        NodeKind::StmtIf
-            | NodeKind::StmtFor
-            | NodeKind::StmtWhile
-            | NodeKind::StmtTry
-            | NodeKind::StmtFunctionDef
-            | NodeKind::StmtWith
-            | NodeKind::ElifElseClause
-    )
-}
-
 fn handle_suppression_comment_on_clause_header<'a>(
     comment: DecoratedComment<'a>,
     locator: &Locator,
@@ -458,26 +445,27 @@ fn handle_suppression_comment_on_clause_header<'a>(
     };
 
     // Handle clause headers with their own nodes (if, while, for, etc.)
-    if is_clause_header(preceding_node) {
-        // Check if the comment is on the same line as the clause header
-        let header_line_start = locator.line_start(preceding_node.start());
-        let comment_line_start = locator.line_start(comment.start());
-
-        if header_line_start == comment_line_start {
-            // The comment is on the same line as the clause header, apply fmt: skip to the entire clause
-            return CommentPlacement::trailing(preceding_node, comment);
+    if let Some(header) = ClauseHeader::from(preceding_node) {
+        // Check if the comment is within the range of the clause header
+        let source = locator.contents();
+        if let Ok(header_range) = ClauseHeader::range(header, source) {
+            if header_range.contains(comment.start()) {
+                // The comment is within the range of the clause header, apply fmt: skip to the entire clause
+                return CommentPlacement::dangling(comment.enclosing_node(), comment);
+            }
         }
     }
 
     // Handle special cases like `else`, `except`, `finally` blocks that are not their own nodes
     if let Some(parent) = comment.enclosing_parent() {
-        if is_clause_header(parent) {
-            // Apply fmt: skip if the comment is on the same line as the 'else', 'except', or 'finally'
-            let header_line_start = locator.line_start(parent.start());
-            let comment_line_start = locator.line_start(comment.start());
-
-            if header_line_start == comment_line_start {
-                return CommentPlacement::trailing(parent, comment);
+        if let Some(header) = ClauseHeader::from(parent) {
+            // Check if the comment is within the range of the clause header
+            let source = locator.contents();
+            if let Ok(header_range) = ClauseHeader::range(header, source) {
+                if header_range.contains(comment.start()) {
+                    // The comment is within the range of the clause header, apply fmt: skip to the entire clause
+                    return CommentPlacement::dangling(comment.enclosing_node(), comment);
+                }
             }
         }
     }
