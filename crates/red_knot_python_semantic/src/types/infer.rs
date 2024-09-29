@@ -1302,9 +1302,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             .types
             .expression_ty(iterable.scoped_ast_id(self.db, self.scope));
 
-        tracing::debug!("For::IterableTy: {}", iterable_ty.display(self.db));
-        tracing::debug!("For::IsAsync: {}", is_async);
-
         let loop_var_value_ty = if is_async {
             // TODO(Alex): async iterables/iterators!
             Type::Todo
@@ -1313,8 +1310,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .iterate(self.db)
                 .unwrap_with_diagnostic(iterable.into(), self)
         };
-
-        tracing::debug!("For::LoopVar: {}", loop_var_value_ty.display(self.db));
 
         self.types
             .expressions
@@ -1644,7 +1639,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::Await(await_expression) => self.infer_await_expression(await_expression),
             ast::Expr::IpyEscapeCommand(_) => todo!("Implement Ipy escape command support"),
         };
-        tracing::trace!("=> {}", ty.display(self.db));
 
         let expr_id = expression.scoped_ast_id(self.db, self.scope);
         let previous = self.types.expressions.insert(expr_id, ty);
@@ -2281,9 +2275,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         match (left_ty, right_ty, op) {
             // When interacting with Todo, Any and Unknown should propagate (as if we fix this
             // `Todo` in the future, the result would then become Any or Unknown, respectively.)
-            (Type::Any, Type::Todo, _) | (Type::Todo, Type::Any, _) => Type::Any,
-            (Type::Unknown, Type::Todo, _) | (Type::Todo, Type::Unknown, _) => Type::Unknown,
-
             (Type::Any, _, _) | (_, Type::Any, _) => Type::Any,
             (Type::Unknown, _, _) | (_, Type::Unknown, _) => Type::Unknown,
 

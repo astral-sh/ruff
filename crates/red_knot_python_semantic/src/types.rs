@@ -662,7 +662,6 @@ impl<'db> Type<'db> {
         // `self` represents the type of the iterable;
         // `__iter__` and `__next__` are both looked up on the class of the iterable:
         let iterable_meta_type = self.to_meta_type(db);
-        tracing::debug!("iterable_meta_type: {:?}", iterable_meta_type);
 
         let dunder_iter_method = iterable_meta_type.member(db, "__iter__");
         if !dunder_iter_method.is_unbound() {
