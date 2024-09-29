@@ -511,7 +511,7 @@ impl<'db> Type<'db> {
                 // TODO raise error
                 Type::Todo
             }
-            Type::BooleanLiteral(_) => Type::Unknown,
+            Type::BooleanLiteral(_) => Type::Todo,
             Type::StringLiteral(_) => {
                 // TODO defer to `typing.LiteralString`/`builtins.str` methods
                 // from typeshed's stubs

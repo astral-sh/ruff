@@ -1956,7 +1956,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         is_async: bool,
         definition: Definition<'db>,
     ) {
-        println!("=> infer comprehension");
         let expression = self.index.expression(iterable);
         let result = infer_expression_types(self.db, expression);
 
@@ -1977,8 +1976,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             self.extend(result);
             result.expression_ty(iterable.scoped_ast_id(self.db, self.scope))
         };
-
-        println!("=> iterable_ty: {:?}", iterable_ty.display(self.db));
 
         let target_ty = if is_async {
             // TODO: async iterables/iterators! -- Alex
