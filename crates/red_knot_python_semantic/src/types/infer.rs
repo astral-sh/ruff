@@ -782,7 +782,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     ) {
         // TODO(dhruvmanila): Annotation expression is resolved at the enclosing scope, infer the
         // parameter type from there
-        let annotated_ty = Type::Unknown;
+        let annotated_ty = Type::Todo;
         if parameter.annotation.is_some() {
             self.add_declaration_with_binding(
                 parameter.into(),
@@ -968,6 +968,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         let node_ty = except_handler_definition
             .handled_exceptions()
             .map(|ty| self.infer_expression(ty))
+            // If there is no handled exception, it's invalid syntax;
+            // a diagnostic will have already been emitted
             .unwrap_or(Type::Unknown);
 
         let symbol_ty = if except_handler_definition.is_star() {
@@ -983,7 +985,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             match node_ty {
                 Type::Any | Type::Unknown => node_ty,
                 Type::Class(class_ty) => Type::Instance(class_ty),
-                _ => Type::Unknown,
+                _ => Type::Todo,
             }
         };
 
@@ -1028,7 +1030,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         // against the subject expression type (which we can query via `infer_expression_types`)
         // and extract the type at the `index` position if the pattern matches. This will be
         // similar to the logic in `self.infer_assignment_definition`.
-        self.add_binding(pattern.into(), definition, Type::Unknown);
+        self.add_binding(pattern.into(), definition, Type::Todo);
     }
 
     fn infer_match_pattern(&mut self, pattern: &ast::Pattern) {
@@ -1954,6 +1956,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         is_async: bool,
         definition: Definition<'db>,
     ) {
+        println!("=> infer comprehension");
         let expression = self.index.expression(iterable);
         let result = infer_expression_types(self.db, expression);
 
@@ -1974,6 +1977,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             self.extend(result);
             result.expression_ty(iterable.scoped_ast_id(self.db, self.scope))
         };
+
+        println!("=> iterable_ty: {:?}", iterable_ty.display(self.db));
 
         let target_ty = if is_async {
             // TODO: async iterables/iterators! -- Alex
@@ -5606,9 +5611,9 @@ mod tests {
         // For these TODOs we need support for `tuple` types:
 
         // TODO: Should be `RuntimeError | OSError` --Alex
-        assert_public_ty(&db, "src/a.py", "e", "Unknown");
+        assert_public_ty(&db, "src/a.py", "e", "@Todo");
         // TODO: Should be `AttributeError | TypeError` --Alex
-        assert_public_ty(&db, "src/a.py", "e", "Unknown");
+        assert_public_ty(&db, "src/a.py", "e", "@Todo");
 
         Ok(())
     }

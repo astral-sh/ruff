@@ -509,7 +509,7 @@ impl<'db> Type<'db> {
             }
             Type::IntLiteral(_) => {
                 // TODO raise error
-                Type::Unknown
+                Type::Todo
             }
             Type::BooleanLiteral(_) => Type::Unknown,
             Type::StringLiteral(_) => {
@@ -653,6 +653,12 @@ impl<'db> Type<'db> {
             };
         }
 
+        if let Type::Unknown | Type::Any = self {
+            // Explicit handling of `Unknown` and `Any` necessary until `type[Unknown]` and
+            // `type[Any]` are not defined as `Todo` anymore.
+            return IterationOutcome::Iterable { element_ty: self };
+        }
+
         // `self` represents the type of the iterable;
         // `__iter__` and `__next__` are both looked up on the class of the iterable:
         let iterable_meta_type = self.to_meta_type(db);
@@ -745,9 +751,9 @@ impl<'db> Type<'db> {
             // TODO can we do better here? `type[LiteralString]`?
             Type::StringLiteral(_) | Type::LiteralString => builtins_symbol_ty(db, "str"),
             // TODO: `type[Any]`?
-            Type::Any => Type::Any,
+            Type::Any => Type::Todo,
             // TODO: `type[Unknown]`?
-            Type::Unknown => Type::Unknown,
+            Type::Unknown => Type::Todo,
             // TODO intersections
             Type::Intersection(_) => Type::Todo,
             Type::Todo => Type::Todo,
