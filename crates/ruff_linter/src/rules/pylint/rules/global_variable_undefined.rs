@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, Stmt, StmtGlobal};
-use ruff_python_semantic::{BindingKind, Scope, ScopeKind};
+use ruff_python_semantic::{BindingId, BindingKind, Scope, ScopeKind};
 
 use crate::checkers::ast::Checker;
 
@@ -61,13 +61,7 @@ pub(crate) fn global_variable_undefined(checker: &mut Checker, stmt: &Stmt) {
         return;
     }
 
-    let Some(module_scope) = checker
-        .semantic()
-        .current_scopes()
-        .find(|scope| scope.kind.is_module())
-    else {
-        return;
-    };
+    let module_scope = checker.semantic().global_scope();
     let imported_names = get_imports(checker);
     let mut undefined_names = vec![];
 
@@ -76,25 +70,19 @@ pub(crate) fn global_variable_undefined(checker: &mut Checker, stmt: &Stmt) {
         if imported_names.contains(&name.as_str()) {
             continue;
         }
-        // Skip if module level class or function definition
+        // Test binding which has been already defined
         let Some(binding_id) = module_scope.get(name) else {
             continue;
         };
-        let binding = checker.semantic().binding(binding_id);
-        if matches!(
-            binding.kind,
-            BindingKind::ClassDefinition(_) | BindingKind::FunctionDefinition(_)
-        ) {
+        if is_global_binding(checker, binding_id) {
             continue;
         }
-        // Skip if module level definition
-        let Some(node_id) = binding.source else {
-            continue;
-        };
-        let node = checker.semantic().node(node_id);
-        if let Some(Expr::Name(ast::ExprName { .. })) = node.as_expression() {
-            continue;
-        };
+        // Test binding which has been only declared
+        if let Some(shadowed_binding_id) = module_scope.shadowed_binding(binding_id) {
+            if is_global_binding(checker, shadowed_binding_id) {
+                continue;
+            }
+        }
 
         undefined_names.push(name);
     }
@@ -134,4 +122,24 @@ fn get_imports<'a>(checker: &'a Checker) -> Vec<&'a str> {
         }
     }
     import_names
+}
+
+fn is_global_binding(checker: &Checker, binding_id: BindingId) -> bool {
+    let binding = checker.semantic().binding(binding_id);
+    // Skip if module level class or function definition
+    if matches!(
+        binding.kind,
+        BindingKind::ClassDefinition(_) | BindingKind::FunctionDefinition(_)
+    ) {
+        return true;
+    }
+    // Skip if module level definition
+    let Some(node_id) = binding.source else {
+        return true;
+    };
+    let node = checker.semantic().node(node_id);
+    if let Some(Expr::Name(ast::ExprName { .. })) = node.as_expression() {
+        return true;
+    };
+    false
 }

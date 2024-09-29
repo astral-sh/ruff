@@ -2,6 +2,7 @@
 # pylint: disable=missing-module-docstring, missing-function-docstring, missing-class-docstring
 # pylint: disable=global-at-module-level, global-statement, global-variable-not-assigned
 CONSTANT = 1
+UNDEFINED: int
 
 
 def FUNC():
@@ -22,6 +23,10 @@ def global_variable_undefined():
 def global_constant():
     global CONSTANT
     print(CONSTANT)
+    global UNDEFINED
+    UNDEFINED = 1
+    global CONSTANT_2
+    print(CONSTANT_2)
 
 
 def global_with_import():
@@ -50,3 +55,6 @@ def override_class():
         pass
 
     CLASS()
+
+
+CONSTANT_2 = 2
