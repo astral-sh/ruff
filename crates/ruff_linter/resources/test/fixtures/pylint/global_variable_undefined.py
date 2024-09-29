@@ -1,6 +1,10 @@
 # pylint: disable=invalid-name, import-outside-toplevel, too-few-public-methods, unused-import
 # pylint: disable=missing-module-docstring, missing-function-docstring, missing-class-docstring
 # pylint: disable=global-at-module-level, global-statement, global-variable-not-assigned
+# pylint: diable=redefined-outer-name
+import dataclasses
+from os import getenv
+
 CONSTANT = 1
 UNDEFINED: int
 
@@ -27,6 +31,10 @@ def global_constant():
     UNDEFINED = 1
     global CONSTANT_2
     print(CONSTANT_2)
+    global dataclasses
+    dataclasses = 3
+    global getenv
+    getenv = 4
 
 
 def global_with_import():

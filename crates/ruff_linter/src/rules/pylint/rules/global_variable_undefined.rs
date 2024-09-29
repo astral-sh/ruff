@@ -126,6 +126,13 @@ fn get_imports<'a>(checker: &'a Checker) -> Vec<&'a str> {
 
 fn is_global_binding(checker: &Checker, binding_id: BindingId) -> bool {
     let binding = checker.semantic().binding(binding_id);
+    // Skip if import
+    if matches!(
+        binding.kind,
+        BindingKind::FromImport(_) | BindingKind::Import(_) | BindingKind::FutureImport
+    ) {
+        return true;
+    }
     // Skip if module level class or function definition
     if matches!(
         binding.kind,
