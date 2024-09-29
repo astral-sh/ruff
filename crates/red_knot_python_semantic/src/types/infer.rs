@@ -2277,8 +2277,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         let right_ty = self.infer_expression(right);
 
         match (left_ty, right_ty, op) {
-            // When interacting with Todo, Any & Unknown should propagate (as if we fix this Todo
-            // in the future, the result would then become Any or Unknown, respectively.)
+            // When interacting with Todo, Any and Unknown should propagate (as if we fix this
+            // `Todo` in the future, the result would then become Any or Unknown, respectively.)
             (Type::Any, Type::Todo, _) | (Type::Todo, Type::Any, _) => Type::Any,
             (Type::Unknown, Type::Todo, _) | (Type::Todo, Type::Unknown, _) => Type::Unknown,
 
@@ -5447,7 +5447,8 @@ mod tests {
             ",
         )?;
 
-        // We currently return `Todo` for any async for loop, including invalid
+        // We currently return `Todo` for all `async for` loops,
+        // including loops that have invalid syntax
         assert_scope_ty(&db, "src/a.py", &["foo"], "x", "Unbound | @Todo");
 
         Ok(())
@@ -6010,7 +6011,8 @@ mod tests {
             ",
         )?;
 
-        // We currently return `Todo` for any async comprehension, including invalid
+        // We currently return `Todo` for all async comprehensions,
+        // including comprehensions that have invalid syntax
         assert_scope_ty(&db, "src/a.py", &["foo", "<listcomp>"], "x", "@Todo");
 
         Ok(())

@@ -237,19 +237,19 @@ pub enum Type<'db> {
     Any,
     /// The empty set of values
     Never,
-    /// Unknown type (either no annotation, or some kind of type error)
+    /// Unknown type (either no annotation, or some kind of type error).
     /// Equivalent to Any, or possibly to object in strict mode
     Unknown,
     /// Name does not exist or is not bound to any value (this represents an error, but with some
-    /// Leniency options it could be silently resolved to Unknown in some cases)
+    /// leniency options it could be silently resolved to Unknown in some cases)
     Unbound,
     /// The None object -- TODO remove this in favor of Instance(types.NoneType)
     None,
     /// Temporary type for symbols that can't be inferred yet because of missing implementations.
-    /// Uses only for debugging purpose, should eventually be removed or never used.
+    /// This variant should eventually be removed once red-knot is spec-compliant.
     ///
-    /// General rule: Todo should only propagate when the presence of the input Todo caused the
-    /// output to be unknown. An output should only be Todo if fixing the input to be correctly
+    /// General rule: `Todo` should only propagate when the presence of the input `Todo` caused the
+    /// output to be unknown. An output should only be `Todo` if fixing the input to be correctly
     /// inferred would cause the output to be known - this is not the case with `[Type::Any]` or
     /// `[Type::Unknown]`.
     Todo,
