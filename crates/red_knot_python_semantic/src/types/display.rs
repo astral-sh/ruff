@@ -36,7 +36,6 @@ impl Display for DisplayType<'_> {
                 | Type::BytesLiteral(_)
                 | Type::Class(_)
                 | Type::Function(_)
-                | Type::RevealTypeFunction(_)
         ) {
             write!(f, "Literal[{representation}]",)
         } else {
@@ -76,9 +75,7 @@ impl Display for DisplayRepresentation<'_> {
             // TODO functions and classes should display using a fully qualified name
             Type::Class(class) => f.write_str(class.name(self.db)),
             Type::Instance(class) => f.write_str(class.name(self.db)),
-            Type::Function(function) | Type::RevealTypeFunction(function) => {
-                f.write_str(function.name(self.db))
-            }
+            Type::Function(function) => f.write_str(function.name(self.db)),
             Type::Union(union) => union.display(self.db).fmt(f),
             Type::Intersection(intersection) => intersection.display(self.db).fmt(f),
             Type::IntLiteral(n) => n.fmt(f),
@@ -197,7 +194,7 @@ impl TryFrom<Type<'_>> for LiteralTypeKind {
     fn try_from(value: Type<'_>) -> Result<Self, Self::Error> {
         match value {
             Type::Class(_) => Ok(Self::Class),
-            Type::Function(_) | Type::RevealTypeFunction(_) => Ok(Self::Function),
+            Type::Function(_) => Ok(Self::Function),
             Type::IntLiteral(_) => Ok(Self::IntLiteral),
             Type::StringLiteral(_) => Ok(Self::StringLiteral),
             Type::BytesLiteral(_) => Ok(Self::BytesLiteral),
