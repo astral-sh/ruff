@@ -58,9 +58,7 @@ fn symbol_ty_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymb
             Some(bindings_ty(
                 db,
                 use_def.public_bindings(symbol),
-                use_def
-                    .public_may_be_unbound(symbol)
-                    .then_some(Type::Unknown),
+                use_def.public_may_be_unbound(symbol).then_some(Type::Never),
             ))
         } else {
             None
@@ -72,9 +70,7 @@ fn symbol_ty_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymb
         bindings_ty(
             db,
             use_def.public_bindings(symbol),
-            use_def
-                .public_may_be_unbound(symbol)
-                .then_some(Type::Unbound),
+            use_def.public_may_be_unbound(symbol).then_some(Type::Never),
         )
     }
 }
