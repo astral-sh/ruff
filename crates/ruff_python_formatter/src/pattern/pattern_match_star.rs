@@ -31,6 +31,8 @@ impl NeedsParentheses for PatternMatchStar {
         _parent: AnyNodeRef,
         _context: &PyFormatContext,
     ) -> OptionalParentheses {
+        // Doesn't matter what we return here because starred patterns can never be used
+        // outside a sequence pattern.
         OptionalParentheses::Never
     }
 }

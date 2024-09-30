@@ -380,6 +380,10 @@ impl<'db> Type<'db> {
         }
     }
 
+    pub fn builtin_str(db: &'db dyn Db) -> Self {
+        builtins_symbol_ty(db, "str")
+    }
+
     pub fn is_stdlib_symbol(&self, db: &'db dyn Db, module_name: &str, name: &str) -> bool {
         match self {
             Type::Class(class) => class.is_stdlib_symbol(db, module_name, name),
@@ -521,6 +525,54 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Resolves the boolean value of a type.
+    ///
+    /// This is used to determine the value that would be returned
+    /// when `bool(x)` is called on an object `x`.
+    fn bool(&self, db: &'db dyn Db) -> Truthiness {
+        match self {
+            Type::Any | Type::Never | Type::Unknown | Type::Unbound => Truthiness::Ambiguous,
+            Type::None => Truthiness::AlwaysFalse,
+            Type::Function(_) | Type::RevealTypeFunction(_) => Truthiness::AlwaysTrue,
+            Type::Module(_) => Truthiness::AlwaysTrue,
+            Type::Class(_) => {
+                // TODO: lookup `__bool__` and `__len__` methods on the class's metaclass
+                // More info in https://docs.python.org/3/library/stdtypes.html#truth-value-testing
+                Truthiness::Ambiguous
+            }
+            Type::Instance(_) => {
+                // TODO: lookup `__bool__` and `__len__` methods on the instance's class
+                // More info in https://docs.python.org/3/library/stdtypes.html#truth-value-testing
+                Truthiness::Ambiguous
+            }
+            Type::Union(union) => {
+                let union_elements = union.elements(db);
+                let first_element_truthiness = union_elements[0].bool(db);
+                if first_element_truthiness.is_ambiguous() {
+                    return Truthiness::Ambiguous;
+                }
+                if !union_elements
+                    .iter()
+                    .skip(1)
+                    .all(|element| element.bool(db) == first_element_truthiness)
+                {
+                    return Truthiness::Ambiguous;
+                }
+                first_element_truthiness
+            }
+            Type::Intersection(_) => {
+                // TODO
+                Truthiness::Ambiguous
+            }
+            Type::IntLiteral(num) => Truthiness::from(*num != 0),
+            Type::BooleanLiteral(bool) => Truthiness::from(*bool),
+            Type::StringLiteral(str) => Truthiness::from(!str.value(db).is_empty()),
+            Type::LiteralString => Truthiness::Ambiguous,
+            Type::BytesLiteral(bytes) => Truthiness::from(!bytes.value(db).is_empty()),
+            Type::Tuple(items) => Truthiness::from(!items.elements(db).is_empty()),
+        }
+    }
+
     /// Return the type resulting from calling an object of this type.
     ///
     /// Returns `None` if `self` is not a callable type.
@@ -535,7 +587,19 @@ impl<'db> Type<'db> {
             ),
 
             // TODO annotated return type on `__new__` or metaclass `__call__`
-            Type::Class(class) => CallOutcome::callable(Type::Instance(class)),
+            Type::Class(class) => {
+                // If the class is the builtin-bool class (for example `bool(1)`), we try to return
+                // the specific truthiness value of the input arg, `Literal[True]` for the example above.
+                let is_bool = class.is_stdlib_symbol(db, "builtins", "bool");
+                CallOutcome::callable(if is_bool {
+                    arg_types
+                        .first()
+                        .map(|arg| arg.bool(db).into_type(db))
+                        .unwrap_or(Type::BooleanLiteral(false))
+                } else {
+                    Type::Instance(class)
+                })
+            }
 
             // TODO: handle classes which implement the `__call__` protocol
             Type::Instance(_instance_ty) => CallOutcome::callable(Type::Unknown),
@@ -671,6 +735,44 @@ impl<'db> Type<'db> {
             // TODO intersections
             Type::Intersection(_) => Type::Unknown,
             Type::Tuple(_) => builtins_symbol_ty(db, "tuple"),
+        }
+    }
+
+    /// Return the string representation of this type when converted to string as it would be
+    /// provided by the `__str__` method.
+    ///
+    /// When not available, this should fall back to the value of `[Type::repr]`.
+    /// Note: this method is used in the builtins `format`, `print`, `str.format` and `f-strings`.
+    #[must_use]
+    pub fn str(&self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Type::IntLiteral(_) | Type::BooleanLiteral(_) => self.repr(db),
+            Type::StringLiteral(_) | Type::LiteralString => *self,
+            // TODO: handle more complex types
+            _ => Type::builtin_str(db).to_instance(db),
+        }
+    }
+
+    /// Return the string representation of this type as it would be provided by the  `__repr__`
+    /// method at runtime.
+    #[must_use]
+    pub fn repr(&self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Type::IntLiteral(number) => Type::StringLiteral(StringLiteralType::new(db, {
+                number.to_string().into_boxed_str()
+            })),
+            Type::BooleanLiteral(true) => {
+                Type::StringLiteral(StringLiteralType::new(db, "True".into()))
+            }
+            Type::BooleanLiteral(false) => {
+                Type::StringLiteral(StringLiteralType::new(db, "False".into()))
+            }
+            Type::StringLiteral(literal) => Type::StringLiteral(StringLiteralType::new(db, {
+                format!("'{}'", literal.value(db).escape_default()).into()
+            })),
+            Type::LiteralString => Type::LiteralString,
+            // TODO: handle more complex types
+            _ => Type::builtin_str(db).to_instance(db),
         }
     }
 }
@@ -869,6 +971,48 @@ impl<'db> IterationOutcome<'db> {
                 inference_builder.not_iterable_diagnostic(iterable_node, not_iterable_ty);
                 Type::Unknown
             }
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum Truthiness {
+    /// For an object `x`, `bool(x)` will always return `True`
+    AlwaysTrue,
+    /// For an object `x`, `bool(x)` will always return `False`
+    AlwaysFalse,
+    /// For an object `x`, `bool(x)` could return either `True` or `False`
+    Ambiguous,
+}
+
+impl Truthiness {
+    const fn is_ambiguous(self) -> bool {
+        matches!(self, Truthiness::Ambiguous)
+    }
+
+    const fn negate(self) -> Self {
+        match self {
+            Self::AlwaysTrue => Self::AlwaysFalse,
+            Self::AlwaysFalse => Self::AlwaysTrue,
+            Self::Ambiguous => Self::Ambiguous,
+        }
+    }
+
+    fn into_type(self, db: &dyn Db) -> Type {
+        match self {
+            Self::AlwaysTrue => Type::BooleanLiteral(true),
+            Self::AlwaysFalse => Type::BooleanLiteral(false),
+            Self::Ambiguous => builtins_symbol_ty(db, "bool").to_instance(db),
+        }
+    }
+}
+
+impl From<bool> for Truthiness {
+    fn from(value: bool) -> Self {
+        if value {
+            Truthiness::AlwaysTrue
+        } else {
+            Truthiness::AlwaysFalse
         }
     }
 }
@@ -1075,7 +1219,10 @@ pub struct TupleType<'db> {
 
 #[cfg(test)]
 mod tests {
-    use super::{builtins_symbol_ty, BytesLiteralType, StringLiteralType, Type, UnionType};
+    use super::{
+        builtins_symbol_ty, BytesLiteralType, StringLiteralType, Truthiness, TupleType, Type,
+        UnionType,
+    };
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
@@ -1105,17 +1252,19 @@ mod tests {
 
     /// A test representation of a type that can be transformed unambiguously into a real Type,
     /// given a db.
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     enum Ty {
         Never,
         Unknown,
         Any,
         IntLiteral(i64),
+        BoolLiteral(bool),
         StringLiteral(&'static str),
         LiteralString,
         BytesLiteral(&'static str),
         BuiltinInstance(&'static str),
         Union(Vec<Ty>),
+        Tuple(Vec<Ty>),
     }
 
     impl Ty {
@@ -1128,6 +1277,7 @@ mod tests {
                 Ty::StringLiteral(s) => {
                     Type::StringLiteral(StringLiteralType::new(db, (*s).into()))
                 }
+                Ty::BoolLiteral(b) => Type::BooleanLiteral(b),
                 Ty::LiteralString => Type::LiteralString,
                 Ty::BytesLiteral(s) => {
                     Type::BytesLiteral(BytesLiteralType::new(db, s.as_bytes().into()))
@@ -1135,6 +1285,10 @@ mod tests {
                 Ty::BuiltinInstance(s) => builtins_symbol_ty(db, s).to_instance(db),
                 Ty::Union(tys) => {
                     UnionType::from_elements(db, tys.into_iter().map(|ty| ty.into_type(db)))
+                }
+                Ty::Tuple(tys) => {
+                    let elements = tys.into_iter().map(|ty| ty.into_type(db)).collect();
+                    Type::Tuple(TupleType::new(db, elements))
                 }
             }
         }
@@ -1204,5 +1358,57 @@ mod tests {
         let db = setup_db();
 
         assert!(from.into_type(&db).is_equivalent_to(&db, to.into_type(&db)));
+    }
+
+    #[test_case(Ty::IntLiteral(1); "is_int_literal_truthy")]
+    #[test_case(Ty::IntLiteral(-1))]
+    #[test_case(Ty::StringLiteral("foo"))]
+    #[test_case(Ty::Tuple(vec![Ty::IntLiteral(0)]))]
+    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]))]
+    fn is_truthy(ty: Ty) {
+        let db = setup_db();
+        assert_eq!(ty.into_type(&db).bool(&db), Truthiness::AlwaysTrue);
+    }
+
+    #[test_case(Ty::Tuple(vec![]))]
+    #[test_case(Ty::IntLiteral(0))]
+    #[test_case(Ty::StringLiteral(""))]
+    #[test_case(Ty::Union(vec![Ty::IntLiteral(0), Ty::IntLiteral(0)]))]
+    fn is_falsy(ty: Ty) {
+        let db = setup_db();
+        assert_eq!(ty.into_type(&db).bool(&db), Truthiness::AlwaysFalse);
+    }
+
+    #[test_case(Ty::BuiltinInstance("str"))]
+    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(0)]))]
+    #[test_case(Ty::Union(vec![Ty::BuiltinInstance("str"), Ty::IntLiteral(0)]))]
+    #[test_case(Ty::Union(vec![Ty::BuiltinInstance("str"), Ty::IntLiteral(1)]))]
+    fn boolean_value_is_unknown(ty: Ty) {
+        let db = setup_db();
+        assert_eq!(ty.into_type(&db).bool(&db), Truthiness::Ambiguous);
+    }
+
+    #[test_case(Ty::IntLiteral(1), Ty::StringLiteral("1"))]
+    #[test_case(Ty::BoolLiteral(true), Ty::StringLiteral("True"))]
+    #[test_case(Ty::BoolLiteral(false), Ty::StringLiteral("False"))]
+    #[test_case(Ty::StringLiteral("ab'cd"), Ty::StringLiteral("ab'cd"))] // no quotes
+    #[test_case(Ty::LiteralString, Ty::LiteralString)]
+    #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str"))]
+    fn has_correct_str(ty: Ty, expected: Ty) {
+        let db = setup_db();
+
+        assert_eq!(ty.into_type(&db).str(&db), expected.into_type(&db));
+    }
+
+    #[test_case(Ty::IntLiteral(1), Ty::StringLiteral("1"))]
+    #[test_case(Ty::BoolLiteral(true), Ty::StringLiteral("True"))]
+    #[test_case(Ty::BoolLiteral(false), Ty::StringLiteral("False"))]
+    #[test_case(Ty::StringLiteral("ab'cd"), Ty::StringLiteral("'ab\\'cd'"))] // single quotes
+    #[test_case(Ty::LiteralString, Ty::LiteralString)]
+    #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str"))]
+    fn has_correct_repr(ty: Ty, expected: Ty) {
+        let db = setup_db();
+
+        assert_eq!(ty.into_type(&db).repr(&db), expected.into_type(&db));
     }
 }

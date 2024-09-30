@@ -847,3 +847,102 @@ FURB118.py:42:5: FURB118 Use `operator.add` instead of defining a function
 43 |     return x + y
    |
    = help: Replace with `operator.add`
+
+FURB118.py:88:17: FURB118 [*] Use `operator.itemgetter((slice(None), 1))` instead of defining a lambda
+   |
+87 | # See https://github.com/astral-sh/ruff/issues/13508
+88 | op_itemgetter = lambda x: x[:, 1]
+   |                 ^^^^^^^^^^^^^^^^^ FURB118
+89 | op_itemgetter = lambda x: x[1, :]
+   |
+   = help: Replace with `operator.itemgetter((slice(None), 1))`
+
+ℹ Safe fix
+1  1  | # Errors.
+   2  |+import operator
+2  3  | op_bitnot = lambda x: ~x
+3  4  | op_not = lambda x: not x
+4  5  | op_pos = lambda x: +x
+--------------------------------------------------------------------------------
+85 86 |         return x + y
+86 87 | 
+87 88 | # See https://github.com/astral-sh/ruff/issues/13508
+88    |-op_itemgetter = lambda x: x[:, 1]
+   89 |+op_itemgetter = operator.itemgetter((slice(None), 1))
+89 90 | op_itemgetter = lambda x: x[1, :]
+90 91 | 
+91 92 | # With a slice, trivia is dropped
+
+FURB118.py:89:17: FURB118 [*] Use `operator.itemgetter((1, slice(None)))` instead of defining a lambda
+   |
+87 | # See https://github.com/astral-sh/ruff/issues/13508
+88 | op_itemgetter = lambda x: x[:, 1]
+89 | op_itemgetter = lambda x: x[1, :]
+   |                 ^^^^^^^^^^^^^^^^^ FURB118
+90 | 
+91 | # With a slice, trivia is dropped
+   |
+   = help: Replace with `operator.itemgetter((1, slice(None)))`
+
+ℹ Safe fix
+1  1  | # Errors.
+   2  |+import operator
+2  3  | op_bitnot = lambda x: ~x
+3  4  | op_not = lambda x: not x
+4  5  | op_pos = lambda x: +x
+--------------------------------------------------------------------------------
+86 87 | 
+87 88 | # See https://github.com/astral-sh/ruff/issues/13508
+88 89 | op_itemgetter = lambda x: x[:, 1]
+89    |-op_itemgetter = lambda x: x[1, :]
+   90 |+op_itemgetter = operator.itemgetter((1, slice(None)))
+90 91 | 
+91 92 | # With a slice, trivia is dropped
+92 93 | op_itemgetter = lambda x: x[1,          :]
+
+FURB118.py:92:17: FURB118 [*] Use `operator.itemgetter((1, slice(None)))` instead of defining a lambda
+   |
+91 | # With a slice, trivia is dropped
+92 | op_itemgetter = lambda x: x[1,          :]
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB118
+93 | 
+94 | # Without a slice, trivia is retained
+   |
+   = help: Replace with `operator.itemgetter((1, slice(None)))`
+
+ℹ Safe fix
+1  1  | # Errors.
+   2  |+import operator
+2  3  | op_bitnot = lambda x: ~x
+3  4  | op_not = lambda x: not x
+4  5  | op_pos = lambda x: +x
+--------------------------------------------------------------------------------
+89 90 | op_itemgetter = lambda x: x[1, :]
+90 91 | 
+91 92 | # With a slice, trivia is dropped
+92    |-op_itemgetter = lambda x: x[1,          :]
+   93 |+op_itemgetter = operator.itemgetter((1, slice(None)))
+93 94 | 
+94 95 | # Without a slice, trivia is retained
+95 96 | op_itemgetter = lambda x: x[1,          2]
+
+FURB118.py:95:17: FURB118 [*] Use `operator.itemgetter((1,          2))` instead of defining a lambda
+   |
+94 | # Without a slice, trivia is retained
+95 | op_itemgetter = lambda x: x[1,          2]
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB118
+   |
+   = help: Replace with `operator.itemgetter((1,          2))`
+
+ℹ Safe fix
+1  1  | # Errors.
+   2  |+import operator
+2  3  | op_bitnot = lambda x: ~x
+3  4  | op_not = lambda x: not x
+4  5  | op_pos = lambda x: +x
+--------------------------------------------------------------------------------
+92 93 | op_itemgetter = lambda x: x[1,          :]
+93 94 | 
+94 95 | # Without a slice, trivia is retained
+95    |-op_itemgetter = lambda x: x[1,          2]
+   96 |+op_itemgetter = operator.itemgetter((1,          2))

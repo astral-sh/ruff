@@ -42,7 +42,8 @@ markdown_extensions:
   - admonition
   - pymdownx.details
   - toc:
-      permalink: "#"
+      anchorlink: true
+      anchorlink_class: "toclink"
   - pymdownx.snippets:
   - pymdownx.magiclink:
   - attr_list:
@@ -61,7 +62,6 @@ markdown_extensions:
       alternate_style: true
 plugins:
   - search
-  - typeset
 extra_css:
   - stylesheets/extra.css
 extra_javascript:

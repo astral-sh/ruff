@@ -1,13 +1,15 @@
+use std::collections::{BTreeMap, BTreeSet};
+
+use anyhow::Result;
+
+use ruff_db::system::{SystemPath, SystemPathBuf};
+use ruff_python_ast::helpers::to_module_path;
+use ruff_python_parser::{parse, Mode};
+
 use crate::collector::Collector;
 pub use crate::db::ModuleDb;
 use crate::resolver::Resolver;
 pub use crate::settings::{AnalyzeSettings, Direction};
-use anyhow::Result;
-use ruff_db::system::{SystemPath, SystemPathBuf};
-use ruff_python_ast::helpers::to_module_path;
-use ruff_python_parser::{parse, Mode};
-use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
 
 mod collector;
 mod db;
@@ -15,7 +17,7 @@ mod resolver;
 mod settings;
 
 #[derive(Debug, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ModuleImports(BTreeSet<SystemPathBuf>);
 
 impl ModuleImports {
@@ -90,7 +92,7 @@ impl ModuleImports {
 }
 
 #[derive(Debug, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ImportMap(BTreeMap<SystemPathBuf, ModuleImports>);
 
 impl ImportMap {

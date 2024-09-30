@@ -3,6 +3,7 @@ use std::fmt::{Debug, Display, Formatter};
 
 use anyhow::Result;
 
+use itertools::Itertools;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::any_over_expr;
@@ -213,7 +214,18 @@ fn subscript_slice_to_string<'a>(expr: &Expr, locator: &Locator<'a>) -> Cow<'a, 
     if let Expr::Slice(expr_slice) = expr {
         Cow::Owned(slice_expr_to_slice_call(expr_slice, locator))
     } else if let Expr::Tuple(tuple) = expr {
-        if tuple.parenthesized {
+        if locator.slice(tuple).contains(':') {
+            // We cannot perform a trivial replacement if there's a `:` in the expression
+            let inner = tuple
+                .iter()
+                .map(|expr| match expr {
+                    Expr::Slice(expr) => Cow::Owned(slice_expr_to_slice_call(expr, locator)),
+                    _ => Cow::Borrowed(locator.slice(expr)),
+                })
+                .join(", ");
+
+            Cow::Owned(format!("({inner})"))
+        } else if tuple.parenthesized {
             Cow::Borrowed(locator.slice(expr))
         } else {
             Cow::Owned(format!("({})", locator.slice(tuple)))

@@ -3,6 +3,7 @@ use ruff_python_ast::{PatternMatchSingleton, Singleton};
 
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
+use crate::preview::is_match_case_parentheses_enabled;
 
 #[derive(Default)]
 pub struct FormatPatternMatchSingleton;
@@ -21,8 +22,12 @@ impl NeedsParentheses for PatternMatchSingleton {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,
-        _context: &PyFormatContext,
+        context: &PyFormatContext,
     ) -> OptionalParentheses {
-        OptionalParentheses::Never
+        if is_match_case_parentheses_enabled(context) {
+            OptionalParentheses::BestFit
+        } else {
+            OptionalParentheses::Never
+        }
     }
 }

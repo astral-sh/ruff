@@ -27,17 +27,19 @@ pub(crate) enum Quoting {
 
 /// Formats any implicitly concatenated string. This could be any valid combination
 /// of string, bytes or f-string literals.
-pub(crate) struct FormatStringContinuation<'a> {
-    string: &'a AnyString<'a>,
+pub(crate) struct FormatImplicitConcatenatedString<'a> {
+    string: AnyString<'a>,
 }
 
-impl<'a> FormatStringContinuation<'a> {
-    pub(crate) fn new(string: &'a AnyString<'a>) -> Self {
-        Self { string }
+impl<'a> FormatImplicitConcatenatedString<'a> {
+    pub(crate) fn new(string: impl Into<AnyString<'a>>) -> Self {
+        Self {
+            string: string.into(),
+        }
     }
 }
 
-impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
+impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedString<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let comments = f.context().comments().clone();
         let quoting = self.string.quoting(&f.context().locator());
@@ -45,11 +47,12 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
         let mut joiner = f.join_with(in_parentheses_only_soft_line_break_or_space());
 
         for part in self.string.parts(quoting) {
+            let part_comments = comments.leading_dangling_trailing(&part);
             joiner.entry(&format_args![
                 line_suffix_boundary(),
-                leading_comments(comments.leading(&part)),
+                leading_comments(part_comments.leading),
                 part,
-                trailing_comments(comments.trailing(&part))
+                trailing_comments(part_comments.trailing)
             ]);
         }
 

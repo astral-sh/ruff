@@ -3,6 +3,7 @@ use std::process::ExitCode;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use log::error;
+use std::io::Write;
 
 use ruff::args::{Args, Command};
 use ruff::{run, ExitStatus};
@@ -15,6 +16,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[cfg(all(
     not(target_os = "windows"),
     not(target_os = "openbsd"),
+    not(target_os = "aix"),
     any(
         target_arch = "x86_64",
         target_arch = "aarch64",
@@ -86,7 +88,16 @@ pub fn main() -> ExitCode {
         Ok(code) => code.into(),
         Err(err) => {
             {
-                use std::io::Write;
+                // Exit "gracefully" on broken pipe errors.
+                //
+                // See: https://github.com/BurntSushi/ripgrep/blob/bf63fe8f258afc09bae6caa48f0ae35eaf115005/crates/core/main.rs#L47C1-L61C14
+                for cause in err.chain() {
+                    if let Some(ioerr) = cause.downcast_ref::<std::io::Error>() {
+                        if ioerr.kind() == std::io::ErrorKind::BrokenPipe {
+                            return ExitCode::from(0);
+                        }
+                    }
+                }
 
                 // Use `writeln` instead of `eprintln` to avoid panicking when the stderr pipe is broken.
                 let mut stderr = std::io::stderr().lock();

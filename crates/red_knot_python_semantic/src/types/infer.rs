@@ -28,14 +28,13 @@
 //! definitions once the rest of the types in the scope have been inferred.
 use std::num::NonZeroU32;
 
-use rustc_hash::FxHashMap;
-use salsa;
-use salsa::plumbing::AsId;
-
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext, UnaryOp};
 use ruff_text_size::Ranged;
+use rustc_hash::FxHashMap;
+use salsa;
+use salsa::plumbing::AsId;
 
 use crate::module_name::ModuleName;
 use crate::module_resolver::{file_to_module, resolve_module};
@@ -52,7 +51,7 @@ use crate::types::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 use crate::types::{
     bindings_ty, builtins_symbol_ty, declarations_ty, global_symbol_ty, symbol_ty,
     typing_extensions_symbol_ty, BytesLiteralType, ClassType, FunctionType, StringLiteralType,
-    TupleType, Type, TypeArrayDisplay, UnionType,
+    Truthiness, TupleType, Type, TypeArrayDisplay, UnionType,
 };
 use crate::Db;
 
@@ -1654,50 +1653,50 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_fstring_expression(&mut self, fstring: &ast::ExprFString) -> Type<'db> {
         let ast::ExprFString { range: _, value } = fstring;
 
+        let mut collector = StringPartsCollector::new();
         for part in value {
+            // Make sure we iter through every parts to infer all sub-expressions. The `collector`
+            // struct ensures we don't allocate unnecessary strings.
             match part {
-                ast::FStringPart::Literal(_) => {
-                    // TODO string literal type
+                ast::FStringPart::Literal(literal) => {
+                    collector.push_str(&literal.value);
                 }
                 ast::FStringPart::FString(fstring) => {
-                    let ast::FString {
-                        range: _,
-                        elements,
-                        flags: _,
-                    } = fstring;
-                    for element in elements {
-                        self.infer_fstring_element(element);
+                    for element in &fstring.elements {
+                        match element {
+                            ast::FStringElement::Expression(expression) => {
+                                let ast::FStringExpressionElement {
+                                    range: _,
+                                    expression,
+                                    debug_text: _,
+                                    conversion,
+                                    format_spec,
+                                } = expression;
+                                let ty = self.infer_expression(expression);
+
+                                // TODO: handle format specifiers by calling a method
+                                // (`Type::format`?) that handles the `__format__` method.
+                                // Conversion flags should be handled before calling `__format__`.
+                                // https://docs.python.org/3/library/string.html#format-string-syntax
+                                if !conversion.is_none() || format_spec.is_some() {
+                                    collector.add_expression();
+                                } else {
+                                    if let Type::StringLiteral(literal) = ty.str(self.db) {
+                                        collector.push_str(literal.value(self.db));
+                                    } else {
+                                        collector.add_expression();
+                                    }
+                                }
+                            }
+                            ast::FStringElement::Literal(literal) => {
+                                collector.push_str(&literal.value);
+                            }
+                        }
                     }
                 }
             }
         }
-
-        // TODO str type
-        Type::Unknown
-    }
-
-    fn infer_fstring_element(&mut self, element: &ast::FStringElement) {
-        match element {
-            ast::FStringElement::Literal(_) => {
-                // TODO string literal type
-            }
-            ast::FStringElement::Expression(expr_element) => {
-                let ast::FStringExpressionElement {
-                    range: _,
-                    expression,
-                    debug_text: _,
-                    conversion: _,
-                    format_spec,
-                } = expr_element;
-                self.infer_expression(expression);
-
-                if let Some(format_spec) = format_spec {
-                    for spec_element in &format_spec.elements {
-                        self.infer_fstring_element(spec_element);
-                    }
-                }
-            }
-        }
+        collector.ty(self.db)
     }
 
     fn infer_ellipsis_literal_expression(
@@ -2210,8 +2209,16 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = unary;
 
         match (op, self.infer_expression(operand)) {
+            (UnaryOp::UAdd, Type::IntLiteral(value)) => Type::IntLiteral(value),
             (UnaryOp::USub, Type::IntLiteral(value)) => Type::IntLiteral(-value),
-            (UnaryOp::Not, Type::BooleanLiteral(value)) => Type::BooleanLiteral(!value),
+            (UnaryOp::Invert, Type::IntLiteral(value)) => Type::IntLiteral(!value),
+
+            (UnaryOp::UAdd, Type::BooleanLiteral(bool)) => Type::IntLiteral(i64::from(bool)),
+            (UnaryOp::USub, Type::BooleanLiteral(bool)) => Type::IntLiteral(-i64::from(bool)),
+            (UnaryOp::Invert, Type::BooleanLiteral(bool)) => Type::IntLiteral(!i64::from(bool)),
+
+            (UnaryOp::Not, ty) => ty.bool(self.db).negate().into_type(self.db),
+
             _ => Type::Unknown, // TODO other unary op types
         }
     }
@@ -2318,16 +2325,35 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_boolean_expression(&mut self, bool_op: &ast::ExprBoolOp) -> Type<'db> {
         let ast::ExprBoolOp {
             range: _,
-            op: _,
+            op,
             values,
         } = bool_op;
-
-        for value in values {
-            self.infer_expression(value);
-        }
-
-        // TODO resolve bool op
-        Type::Unknown
+        let mut done = false;
+        UnionType::from_elements(
+            self.db,
+            values.iter().enumerate().map(|(i, value)| {
+                // We need to infer the type of every expression (that's an invariant maintained by
+                // type inference), even if we can short-circuit boolean evaluation of some of
+                // those types.
+                let value_ty = self.infer_expression(value);
+                if done {
+                    Type::Never
+                } else {
+                    let is_last = i == values.len() - 1;
+                    match (value_ty.bool(self.db), is_last, op) {
+                        (Truthiness::Ambiguous, _, _) => value_ty,
+                        (Truthiness::AlwaysTrue, false, ast::BoolOp::And) => Type::Never,
+                        (Truthiness::AlwaysFalse, false, ast::BoolOp::Or) => Type::Never,
+                        (Truthiness::AlwaysFalse, _, ast::BoolOp::And)
+                        | (Truthiness::AlwaysTrue, _, ast::BoolOp::Or) => {
+                            done = true;
+                            value_ty
+                        }
+                        (_, true, _) => value_ty,
+                    }
+                }
+            }),
+        )
     }
 
     fn infer_compare_expression(&mut self, compare: &ast::ExprCompare) -> Type<'db> {
@@ -2641,16 +2667,57 @@ enum ModuleNameResolutionError {
     TooManyDots,
 }
 
+/// Struct collecting string parts when inferring a formatted string. Infers a string literal if the
+/// concatenated string is small enough, otherwise infers a literal string.
+///
+/// If the formatted string contains an expression (with a representation unknown at compile time),
+/// infers an instance of `builtins.str`.
+struct StringPartsCollector {
+    concatenated: Option<String>,
+    expression: bool,
+}
+
+impl StringPartsCollector {
+    fn new() -> Self {
+        Self {
+            concatenated: Some(String::new()),
+            expression: false,
+        }
+    }
+
+    fn push_str(&mut self, literal: &str) {
+        if let Some(mut concatenated) = self.concatenated.take() {
+            if concatenated.len().saturating_add(literal.len())
+                <= TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE
+            {
+                concatenated.push_str(literal);
+                self.concatenated = Some(concatenated);
+            } else {
+                self.concatenated = None;
+            }
+        }
+    }
+
+    fn add_expression(&mut self) {
+        self.concatenated = None;
+        self.expression = true;
+    }
+
+    fn ty(self, db: &dyn Db) -> Type {
+        if self.expression {
+            Type::builtin_str(db).to_instance(db)
+        } else if let Some(concatenated) = self.concatenated {
+            Type::StringLiteral(StringLiteralType::new(db, concatenated.into_boxed_str()))
+        } else {
+            Type::LiteralString
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
     use anyhow::Context;
-
-    use ruff_db::files::{system_path_to_file, File};
-    use ruff_db::parsed::parsed_module;
-    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
-    use ruff_db::testing::assert_function_query_was_not_run;
-    use ruff_python_ast::name::Name;
 
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
@@ -2663,6 +2730,11 @@ mod tests {
         check_types, global_symbol_ty, infer_definition_types, symbol_ty, TypeCheckDiagnostics,
     };
     use crate::{HasTy, ProgramSettings, SemanticModel};
+    use ruff_db::files::{system_path_to_file, File};
+    use ruff_db::parsed::parsed_module;
+    use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+    use ruff_db::testing::assert_function_query_was_not_run;
+    use ruff_python_ast::name::Name;
 
     use super::TypeInferenceBuilder;
 
@@ -3144,6 +3216,127 @@ mod tests {
     }
 
     #[test]
+    fn not_none_literal() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_file(
+            "src/a.py",
+            r#"
+            a = not None
+            b = not not None
+            "#,
+        )?;
+        assert_public_ty(&db, "src/a.py", "a", "Literal[True]");
+        assert_public_ty(&db, "src/a.py", "b", "Literal[False]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn not_function() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_file(
+            "src/a.py",
+            r#"
+            from typing import reveal_type
+            def f():
+                return 1
+
+            a = not f
+            b = not reveal_type
+            "#,
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "a", "Literal[False]");
+        // TODO Unknown should not be part of the type of typing.reveal_type
+        // assert_public_ty(&db, "src/a.py", "b", "Literal[False]");
+        Ok(())
+    }
+
+    #[test]
+    fn not_module() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_files([
+            (
+                "src/a.py",
+                "import b; import warnings;
+                x = not b;
+                z = not warnings",
+            ),
+            ("src/b.py", "y = 1"),
+        ])?;
+
+        assert_public_ty(&db, "src/a.py", "x", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "z", "Literal[False]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn not_union() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_file(
+            "src/a.py",
+            r#"
+            if flag:
+                p = 1
+                q = 3.3
+                r = "hello"
+                s = "world"
+                t = 0
+            else:
+                p = "hello"
+                q = 4
+                r = ""
+                s = 0
+                t = ""
+
+            a = not p
+            b = not q
+            c = not r
+            d = not s
+            e = not t
+            "#,
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "a", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "b", "bool");
+        assert_public_ty(&db, "src/a.py", "c", "bool");
+        assert_public_ty(&db, "src/a.py", "d", "bool");
+        assert_public_ty(&db, "src/a.py", "e", "Literal[True]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn not_integer_literal() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_file(
+            "src/a.py",
+            r#"
+            a = not 1
+            b = not 1234567890987654321
+            e = not 0
+            x = not -1
+            y = not -1234567890987654321
+            z = not --987
+            "#,
+        )?;
+        assert_public_ty(&db, "src/a.py", "a", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "b", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "e", "Literal[True]");
+        assert_public_ty(&db, "src/a.py", "x", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "y", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "z", "Literal[False]");
+
+        Ok(())
+    }
+
+    #[test]
     fn not_boolean_literal() -> anyhow::Result<()> {
         let mut db = setup_db();
 
@@ -3161,6 +3354,98 @@ mod tests {
         assert_public_ty(&db, "src/a.py", "x", "Literal[False]");
         assert_public_ty(&db, "src/a.py", "y", "Literal[False]");
         assert_public_ty(&db, "src/a.py", "z", "Literal[True]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn not_string_literal() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_file(
+            "src/a.py",
+            r#"
+            a = not "hello"
+            b = not ""
+            c = not "0"
+            d = not "hello" + "world"
+            "#,
+        )?;
+        assert_public_ty(&db, "src/a.py", "a", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "b", "Literal[True]");
+        assert_public_ty(&db, "src/a.py", "c", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "d", "Literal[False]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn not_literal_string() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        let content = format!(
+            r#"
+        v = not "{y}"
+        w = not 10*"{y}"
+        x = not "{y}"*10
+        z = not 0*"{y}"
+        u = not (-100)*"{y}"
+        "#,
+            y = "a".repeat(TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE + 1),
+        );
+        db.write_dedented("src/a.py", &content)?;
+
+        assert_public_ty(&db, "src/a.py", "v", "bool");
+        assert_public_ty(&db, "src/a.py", "w", "bool");
+        assert_public_ty(&db, "src/a.py", "x", "bool");
+        assert_public_ty(&db, "src/a.py", "z", "Literal[True]");
+        assert_public_ty(&db, "src/a.py", "u", "Literal[True]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn not_bytes_literal() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_file(
+            "src/a.py",
+            r#"
+            a = not b"hello"
+            b = not b""
+            c = not b"0"
+            d = not b"hello" + b"world"
+            "#,
+        )?;
+        assert_public_ty(&db, "src/a.py", "a", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "b", "Literal[True]");
+        assert_public_ty(&db, "src/a.py", "c", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "d", "Literal[False]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn not_tuple() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_file(
+            "src/a.py",
+            r#"
+            a = not (1,)
+            b = not (1, 2)
+            c = not (1, 2, 3)
+            d = not ()
+            e = not ("hello",)
+            f = not (1, "hello")
+            "#,
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "a", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "b", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "c", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "d", "Literal[True]");
+        assert_public_ty(&db, "src/a.py", "e", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "f", "Literal[False]");
 
         Ok(())
     }
@@ -3358,6 +3643,71 @@ mod tests {
         let function = global_symbol_ty(&db, mod_file, "example").expect_function();
         let returns = function.return_type(&db);
         assert_eq!(returns.display(&db).to_string(), "int");
+
+        Ok(())
+    }
+
+    #[test]
+    fn fstring_expression() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            x = 0
+            y = str()
+            z = False
+
+            a = f'hello'
+            b = f'h {x}'
+            c = 'one ' f'single ' f'literal'
+            d = 'first ' f'second({b})' f' third'
+            e = f'-{y}-'
+            f = f'-{y}-' f'--' '--'
+            g = f'{z} == {False} is {True}'
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "a", "Literal[\"hello\"]");
+        assert_public_ty(&db, "src/a.py", "b", "Literal[\"h 0\"]");
+        assert_public_ty(&db, "src/a.py", "c", "Literal[\"one single literal\"]");
+        assert_public_ty(&db, "src/a.py", "d", "Literal[\"first second(h 0) third\"]");
+        assert_public_ty(&db, "src/a.py", "e", "str");
+        assert_public_ty(&db, "src/a.py", "f", "str");
+        assert_public_ty(&db, "src/a.py", "g", "Literal[\"False == False is True\"]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn fstring_expression_with_conversion_flags() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            string = 'hello'
+            a = f'{string!r}'
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "a", "str"); // Should be `Literal["'hello'"]`
+
+        Ok(())
+    }
+
+    #[test]
+    fn fstring_expression_with_format_specifier() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            a = f'{1:02}'
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "a", "str"); // Should be `Literal["01"]`
 
         Ok(())
     }
@@ -6046,6 +6396,244 @@ mod tests {
             first_public_binding(&db, a, "x"),
             &events,
         );
+        Ok(())
+    }
+
+    #[test]
+    fn boolean_or_expression() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            def foo() -> str:
+                pass
+
+            a = True or False
+            b = 'x' or 'y' or 'z'
+            c = '' or 'y' or 'z'
+            d = False or 'z'
+            e = False or True
+            f = False or False
+            g = foo() or False
+            h = foo() or True
+            ",
+        )?;
+
+        assert_public_ty(&db, "/src/a.py", "a", "Literal[True]");
+        assert_public_ty(&db, "/src/a.py", "b", r#"Literal["x"]"#);
+        assert_public_ty(&db, "/src/a.py", "c", r#"Literal["y"]"#);
+        assert_public_ty(&db, "/src/a.py", "d", r#"Literal["z"]"#);
+        assert_public_ty(&db, "/src/a.py", "e", "Literal[True]");
+        assert_public_ty(&db, "/src/a.py", "f", "Literal[False]");
+        assert_public_ty(&db, "/src/a.py", "g", "str | Literal[False]");
+        assert_public_ty(&db, "/src/a.py", "h", "str | Literal[True]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn boolean_and_expression() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            def foo() -> str:
+                pass
+
+            a = True and False
+            b = False and True
+            c = foo() and False
+            d = foo() and True
+            e = 'x' and 'y' and 'z'
+            f = 'x' and 'y' and ''
+            g = '' and 'y'
+            ",
+        )?;
+
+        assert_public_ty(&db, "/src/a.py", "a", "Literal[False]");
+        assert_public_ty(&db, "/src/a.py", "b", "Literal[False]");
+        assert_public_ty(&db, "/src/a.py", "c", "str | Literal[False]");
+        assert_public_ty(&db, "/src/a.py", "d", "str | Literal[True]");
+        assert_public_ty(&db, "/src/a.py", "e", r#"Literal["z"]"#);
+        assert_public_ty(&db, "/src/a.py", "f", r#"Literal[""]"#);
+        assert_public_ty(&db, "/src/a.py", "g", r#"Literal[""]"#);
+        Ok(())
+    }
+
+    #[test]
+    fn boolean_complex_expression() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+            def foo() -> str:
+                pass
+
+            a = "x" and "y" or "z"
+            b = "x" or "y" and "z"
+            c = "" and "y" or "z"
+            d = "" or "y" and "z"
+            e = "x" and "y" or ""
+            f = "x" or "y" and ""
+
+            "#,
+        )?;
+
+        assert_public_ty(&db, "/src/a.py", "a", r#"Literal["y"]"#);
+        assert_public_ty(&db, "/src/a.py", "b", r#"Literal["x"]"#);
+        assert_public_ty(&db, "/src/a.py", "c", r#"Literal["z"]"#);
+        assert_public_ty(&db, "/src/a.py", "d", r#"Literal["z"]"#);
+        assert_public_ty(&db, "/src/a.py", "e", r#"Literal["y"]"#);
+        assert_public_ty(&db, "/src/a.py", "f", r#"Literal["x"]"#);
+        Ok(())
+    }
+
+    #[test]
+    fn bool_function_falsy_values() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+            a = bool(0)
+            b = bool(())
+            c = bool(None)
+            d = bool("")
+            e = bool(False)
+            f = bool()
+            "#,
+        )?;
+        assert_public_ty(&db, "/src/a.py", "a", "Literal[False]");
+        assert_public_ty(&db, "/src/a.py", "b", "Literal[False]");
+        assert_public_ty(&db, "/src/a.py", "c", "Literal[False]");
+        assert_public_ty(&db, "/src/a.py", "d", "Literal[False]");
+        assert_public_ty(&db, "/src/a.py", "e", "Literal[False]");
+        assert_public_ty(&db, "/src/a.py", "f", "Literal[False]");
+        Ok(())
+    }
+
+    #[test]
+    fn builtin_bool_function_detected() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            "
+            redefined_builtin_bool = bool
+
+            def my_bool(x)-> bool: pass
+            ",
+        )?;
+        db.write_dedented(
+            "/src/b.py",
+            "
+            from a import redefined_builtin_bool, my_bool
+            a = redefined_builtin_bool(0)
+            b = my_bool(0)
+            ",
+        )?;
+        assert_public_ty(&db, "/src/b.py", "a", "Literal[False]");
+        assert_public_ty(&db, "/src/b.py", "b", "bool");
+        Ok(())
+    }
+
+    #[test]
+    fn bool_function_truthy_values() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+            a = bool(1)
+            b = bool((0,))
+            c = bool("NON EMPTY")
+            d = bool(True)
+
+            def foo(): pass
+            e = bool(foo)
+            "#,
+        )?;
+
+        assert_public_ty(&db, "/src/a.py", "a", "Literal[True]");
+        assert_public_ty(&db, "/src/a.py", "b", "Literal[True]");
+        assert_public_ty(&db, "/src/a.py", "c", "Literal[True]");
+        assert_public_ty(&db, "/src/a.py", "d", "Literal[True]");
+        assert_public_ty(&db, "/src/a.py", "e", "Literal[True]");
+        Ok(())
+    }
+
+    #[test]
+    fn bool_function_ambiguous_values() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            "
+            a = bool([])
+            b = bool({})
+            c = bool(set())
+            ",
+        )?;
+
+        assert_public_ty(&db, "/src/a.py", "a", "bool");
+        assert_public_ty(&db, "/src/a.py", "b", "bool");
+        assert_public_ty(&db, "/src/a.py", "c", "bool");
+        Ok(())
+    }
+
+    #[test]
+    fn unary_add() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            a = +0
+            b = +1
+            c = +True
+            ",
+        )?;
+
+        assert_public_ty(&db, "/src/a.py", "a", "Literal[0]");
+        assert_public_ty(&db, "/src/a.py", "b", "Literal[1]");
+        assert_public_ty(&db, "/src/a.py", "c", "Literal[1]");
+        Ok(())
+    }
+
+    #[test]
+    fn unary_sub() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            a = -0
+            b = -1
+            c = -True
+            ",
+        )?;
+
+        assert_public_ty(&db, "/src/a.py", "a", "Literal[0]");
+        assert_public_ty(&db, "/src/a.py", "b", "Literal[-1]");
+        assert_public_ty(&db, "/src/a.py", "c", "Literal[-1]");
+        Ok(())
+    }
+
+    #[test]
+    fn unary_invert() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            a = ~0
+            b = ~1
+            c = ~True
+            ",
+        )?;
+
+        assert_public_ty(&db, "/src/a.py", "a", "Literal[-1]");
+        assert_public_ty(&db, "/src/a.py", "b", "Literal[-2]");
+        assert_public_ty(&db, "/src/a.py", "c", "Literal[-2]");
         Ok(())
     }
 }
