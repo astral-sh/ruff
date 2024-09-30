@@ -59,7 +59,7 @@ include = [
 
 [tool.ruff]
 extend-exclude = [
-  "crates/red_knot_python_semantic/vendor/",
+  "crates/ruff_vendored/vendor/",
   "crates/ruff/resources/",
   "crates/ruff_linter/resources/",
   "crates/ruff_python_formatter/resources/",
@@ -75,7 +75,7 @@ ignore = [
 [tool.black]
 force-exclude = '''
 /(
-  | crates/red_knot_python_semantic/vendor
+  | crates/ruff_vendored/vendor
   | crates/ruff_linter/resources
   | crates/ruff_python_formatter/resources
   | crates/ruff_python_parser/resources

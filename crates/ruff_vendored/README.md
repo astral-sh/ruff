@@ -1,8 +1,4 @@
-# Red Knot
-
-Semantic analysis for the red-knot project.
-
-## Vendored types for the stdlib
+# Vendored types for the stdlib
 
 This crate vendors [typeshed](https://github.com/python/typeshed)'s stubs for the standard library. The vendored stubs can be found in `crates/ruff_vendored/vendor/typeshed`. The file `crates/ruff_vendored/vendor/typeshed/source_commit.txt` tells you the typeshed commit that our vendored stdlib stubs currently correspond to.
 
