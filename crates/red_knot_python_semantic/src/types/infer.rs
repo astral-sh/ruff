@@ -1740,7 +1740,6 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let member_ty = module_ty.member(self.db, &ast::name::Name::new(&name.id));
 
-        // TODO: What if it's a union where one of the elements is `Unbound`?
         if member_ty.is_unbound() {
             self.add_diagnostic(
                 AnyNodeRef::Alias(alias),
@@ -1751,14 +1750,24 @@ impl<'db> TypeInferenceBuilder<'db> {
                     module.unwrap_or_default()
                 ),
             );
+        } else if member_ty.contains_unbound(self.db) {
+            self.add_diagnostic(
+                AnyNodeRef::Alias(alias),
+                "possibly-unresolved-import",
+                format_args!(
+                    "Module `{}{}` may not have member `{name}`",
+                    ".".repeat(*level as usize),
+                    module.unwrap_or_default()
+                ),
+            );
         }
 
         // If a symbol is unbound in the module the symbol was originally defined in,
         // when we're trying to import the symbol from that module into "our" module,
         // the runtime error will occur immediately (rather than when the symbol is *used*,
         // as would be the case for a symbol with type `Unbound`), so it's appropriate to
-        // think of the type of the imported symbol as `Unknown` rather than `Unbound`
-        let ty = member_ty.replace_unbound_with(self.db, Type::Unknown);
+        // think of the type of the imported symbol as `Never` rather than `Unbound`
+        let ty = member_ty.replace_unbound_with(self.db, Type::Never);
 
         self.add_declaration_with_binding(alias.into(), definition, ty, ty);
     }
@@ -2368,6 +2377,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     return symbol_ty(self.db, enclosing_scope_id, name);
                 }
             }
+
             // No nonlocal binding, check module globals. Avoid infinite recursion if `self.scope`
             // already is module globals.
             let ty = if file_scope_id.is_global() {
@@ -2375,6 +2385,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             } else {
                 global_symbol_ty(self.db, self.file, name)
             };
+
             // Fallback to builtins (without infinite recursion if we're already in builtins.)
             if ty.may_be_unbound(self.db) && Some(self.scope()) != builtins_module_scope(self.db) {
                 let mut builtin_ty = builtins_symbol_ty(self.db, name);
@@ -3556,6 +3567,7 @@ mod tests {
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast::name::Name;
+    use test_case::test_case;
 
     use super::TypeInferenceBuilder;
 
@@ -3653,6 +3665,24 @@ mod tests {
         let diagnostics = check_types(db, file);
 
         assert_diagnostic_messages(&diagnostics, expected);
+    }
+
+    #[test]
+    fn imported_unbound_symbol_is_unknown() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_files([
+            ("src/package/__init__.py", ""),
+            ("src/package/foo.py", "x"),
+            ("src/package/bar.py", "from package.foo import x"),
+        ])?;
+
+        // the type as seen from external modules (`Unknown`)
+        // is different from the type inside the module itself (`Never`):
+        assert_public_ty(&db, "src/package/foo.py", "x", "Never");
+        assert_public_ty(&db, "src/package/bar.py", "x", "Unknown");
+
+        Ok(())
     }
 
     #[test]
@@ -3877,7 +3907,7 @@ mod tests {
         )?;
 
         // TODO: sys.version_info, and need to understand @final and @type_check_only
-        assert_public_ty(&db, "src/a.py", "x", "Unknown | EllipsisType");
+        assert_public_ty(&db, "src/a.py", "x", "EllipsisType | Unknown");
 
         Ok(())
     }
@@ -3988,24 +4018,32 @@ mod tests {
         let y_ty = symbol_ty(&db, function_scope, "y");
         let x_ty = symbol_ty(&db, function_scope, "x");
 
-        assert_eq!(x_ty.display(&db).to_string(), "Unbound");
+        assert_eq!(x_ty.display(&db).to_string(), "Never");
         assert_eq!(y_ty.display(&db).to_string(), "Literal[1]");
 
         Ok(())
     }
 
-    #[test]
-    fn conditionally_global_or_builtin() -> anyhow::Result<()> {
+    #[test_case("", "Literal[1]"; "unannotated")]
+    // Tests that we only use the definition of a symbol instead of its declaration when we are
+    // checking module globals without a nonlocal binding.
+    #[test_case(": int", "int"; "annotated")]
+    fn conditionally_global_or_builtin(
+        annotation: &'static str,
+        expected: &str,
+    ) -> anyhow::Result<()> {
         let mut db = setup_db();
 
         db.write_dedented(
             "/src/a.py",
-            "
-            if flag:
-                copyright = 1
-            def f():
-                y = copyright
+            &format!(
+                "
+                if flag:
+                    copyright{annotation} = 1
+                def f():
+                    y = copyright
             ",
+            ),
         )?;
 
         let file = system_path_to_file(&db, "src/a.py").expect("file to exist");
@@ -4020,7 +4058,7 @@ mod tests {
 
         assert_eq!(
             y_ty.display(&db).to_string(),
-            "Literal[copyright] | Literal[1]"
+            format!("Literal[copyright] | {expected}")
         );
 
         Ok(())
@@ -4536,7 +4574,7 @@ mod tests {
             ",
         )?;
 
-        assert_scope_ty(&db, "src/a.py", &["foo", "<listcomp>"], "z", "Unbound");
+        assert_scope_ty(&db, "src/a.py", &["foo", "<listcomp>"], "z", "Never");
 
         // (There is a diagnostic for invalid syntax that's emitted, but it's not listed by `assert_file_diagnostics`)
         assert_file_diagnostics(&db, "src/a.py", &[]);

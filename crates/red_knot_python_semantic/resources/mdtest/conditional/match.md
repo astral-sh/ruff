@@ -14,7 +14,7 @@ reveal_type(y)  # revealed: Literal[2, 3]
 
 ## Without wildcard
 
-```py
+```py path=package/without_wildcard.py
 match 0:
     case 1:
         y = 2
@@ -22,6 +22,12 @@ match 0:
         y = 3
 
 reveal_type(y)  # revealed: Unbound | Literal[2, 3]
+```
+
+```py path=package/public.py
+from .without_wildcard import y # error: [unresolved-import]
+
+reveal_type(y)  # revealed: Literal[2, 3]
 ```
 
 ## Basic match

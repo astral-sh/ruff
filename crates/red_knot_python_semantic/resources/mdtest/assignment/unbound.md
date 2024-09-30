@@ -2,16 +2,39 @@
 
 ## Maybe unbound
 
-```py
+```py path=package/maybe_unbound.py
 if flag:
     y = 3
 x = y
 reveal_type(x)  # revealed: Unbound | Literal[3]
+reveal_type(y)  # revealed: Unbound | Literal[3]
+```
+
+```py path=package/public.py
+from .maybe_unbound import x, y # error: [possibly-unresolved-import]
+reveal_type(x)  # revealed: Literal[3]
+reveal_type(y)  # revealed: Literal[3]
+```
+
+## Maybe unbound annotated
+
+```py path=package/maybe_unbound_annotated.py
+if flag:
+    y: int = 3
+x = y
+reveal_type(x)  # revealed: Unbound | Literal[3]
+reveal_type(y)  # revealed: Unbound | int
+```
+
+```py path=package/public.py
+from .maybe_unbound_annotated import x, y # error: [possibly-unresolved-import]
+reveal_type(x)  # revealed: Literal[3]
+reveal_type(y)  # revealed: int
 ```
 
 ## Unbound
 
-```py
+```py path=unbound/
 x = foo; foo = 1
 reveal_type(x)  # revealed: Unbound
 ```

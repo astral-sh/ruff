@@ -99,7 +99,7 @@ x
 
 ```py path=package/bar.py
 from .foo import x # error: [unresolved-import]
-reveal_type(x)     # revealed: Unknown
+reveal_type(x)     # revealed: Never
 ```
 
 ## Bare to module
@@ -129,5 +129,5 @@ reveal_type(y)     # revealed: Unknown
 # TODO: submodule imports possibly not supported right now?
 from . import foo  # error: [unresolved-import]
 
-reveal_type(foo)   # revealed: Unknown
+reveal_type(foo)   # revealed: Never
 ```

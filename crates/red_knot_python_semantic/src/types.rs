@@ -48,6 +48,7 @@ fn symbol_ty_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymb
     let _span = tracing::trace_span!("symbol_ty_by_id", ?symbol).entered();
 
     let use_def = use_def_map(db, scope);
+    let unbound_ty = || use_def.public_may_be_unbound(symbol).then_some(Type::Never);
 
     // If the symbol is declared, the public type is based on declarations; otherwise, it's based
     // on inference from bindings.
@@ -58,9 +59,7 @@ fn symbol_ty_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymb
             Some(bindings_ty(
                 db,
                 use_def.public_bindings(symbol),
-                use_def
-                    .public_may_be_unbound(symbol)
-                    .then_some(Type::Unknown),
+                unbound_ty(),
             ))
         } else {
             None
@@ -69,17 +68,11 @@ fn symbol_ty_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymb
         // problem of the module we are importing from.
         declarations_ty(db, declarations, undeclared_ty).unwrap_or_else(|(ty, _)| ty)
     } else {
-        bindings_ty(
-            db,
-            use_def.public_bindings(symbol),
-            use_def
-                .public_may_be_unbound(symbol)
-                .then_some(Type::Unbound),
-        )
+        bindings_ty(db, use_def.public_bindings(symbol), unbound_ty())
     }
 }
 
-/// Shorthand for `symbol_ty` that takes a symbol name instead of an ID.
+/// Shorthand for `symbol_ty_by_id` that takes a symbol name instead of an ID.
 fn symbol_ty<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Type<'db> {
     let table = symbol_table(db, scope);
     table
@@ -288,6 +281,14 @@ impl<'db> Type<'db> {
         matches!(self, Type::Unbound)
     }
 
+    fn contains_unbound(&self, db: &'db dyn Db) -> bool {
+        return self.is_equivalent_to(db, Type::Unbound)
+            || match self {
+                Type::Union(union) => union.elements(db).iter().any(|ty| ty.contains_unbound(db)),
+                _ => false,
+            };
+    }
+
     pub const fn is_never(&self) -> bool {
         matches!(self, Type::Never)
     }
@@ -376,12 +377,15 @@ impl<'db> Type<'db> {
 
     #[must_use]
     pub fn replace_unbound_with(&self, db: &'db dyn Db, replacement: Type<'db>) -> Type<'db> {
+        if self.is_equivalent_to(db, Type::Unbound) {
+            return replacement;
+        }
+
         match self {
-            Type::Unbound => replacement,
             Type::Union(union) => {
                 union.map(db, |element| element.replace_unbound_with(db, replacement))
             }
-            ty => *ty,
+            _ => *self,
         }
     }
 
