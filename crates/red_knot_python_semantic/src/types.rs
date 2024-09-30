@@ -594,9 +594,8 @@ impl<'db> Type<'db> {
                 CallOutcome::callable(if is_bool {
                     arg_types
                         .first()
-                        .unwrap_or(&Type::Unknown)
-                        .bool(db)
-                        .into_type(db)
+                        .map(|arg| arg.bool(db).into_type(db))
+                        .unwrap_or(Type::BooleanLiteral(false))
                 } else {
                     Type::Instance(class)
                 })

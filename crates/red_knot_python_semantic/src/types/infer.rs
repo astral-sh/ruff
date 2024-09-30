@@ -6494,6 +6494,7 @@ mod tests {
             c = bool(None)
             d = bool("")
             e = bool(False)
+            f = bool()
             "#,
         )?;
         assert_public_ty(&db, "/src/a.py", "a", "Literal[False]");
@@ -6501,6 +6502,7 @@ mod tests {
         assert_public_ty(&db, "/src/a.py", "c", "Literal[False]");
         assert_public_ty(&db, "/src/a.py", "d", "Literal[False]");
         assert_public_ty(&db, "/src/a.py", "e", "Literal[False]");
+        assert_public_ty(&db, "/src/a.py", "f", "Literal[False]");
         Ok(())
     }
 
