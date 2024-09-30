@@ -8,17 +8,18 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
-
 // Implementation of regex from bandit
 static SQL_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?ixs)
+    Regex::new(
+        r"(?ixs)
         (
             select\s+.*from\s |
             delete\s+from\s  |
             insert\s+into\s.*values\s |
             update\s+.*set\s
-        )"
-        ).unwrap()
+        )",
+    )
+    .unwrap()
 });
 
 /// ## What it does
@@ -104,8 +105,7 @@ pub(crate) fn hardcoded_sql_expression(checker: &mut Checker, expr: &Expr) {
     }
 }
 
-
-/// Removing this public function since it caused bug in identifying multi line sql queries #12044 
+/// Removing this public function since it caused bug in identifying multi line sql queries #12044
 /// Concatenates the contents of an f-string, without the prefix and quotes,
 /// and escapes any special characters.
 ///
