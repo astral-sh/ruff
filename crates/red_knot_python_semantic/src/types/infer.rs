@@ -1251,7 +1251,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     /// Emit a diagnostic declaring that an index is out of bounds for a tuple.
-    pub(super) fn tuple_out_of_bands_diagnostic(
+    pub(super) fn tuple_index_out_of_bounds_diagnostic(
         &mut self,
         node: AnyNodeRef,
         tuple_ty: Type<'db>,
@@ -1269,7 +1269,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     /// Emit a diagnostic declaring that an index is out of bounds for a string.
-    pub(super) fn string_out_of_bands_diagnostic(
+    pub(super) fn string_index_out_of_bounds_diagnostic(
         &mut self,
         node: AnyNodeRef,
         string_ty: Type<'db>,
@@ -2427,7 +2427,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     .ok()
                     .and_then(|index| elements.get(index).copied())
                     .unwrap_or_else(|| {
-                        self.tuple_out_of_bands_diagnostic(
+                        self.tuple_index_out_of_bounds_diagnostic(
                             (&**value).into(),
                             value_ty,
                             elements.len(),
@@ -2440,7 +2440,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let elements = tuple_ty.elements(self.db);
                 let int = i64::from(bool);
                 elements.get(usize::from(bool)).copied().unwrap_or_else(|| {
-                    self.tuple_out_of_bands_diagnostic(
+                    self.tuple_index_out_of_bounds_diagnostic(
                         (&**value).into(),
                         value_ty,
                         elements.len(),
@@ -2461,7 +2461,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         ))
                     })
                     .unwrap_or_else(|| {
-                        self.string_out_of_bands_diagnostic(
+                        self.string_index_out_of_bounds_diagnostic(
                             (&**value).into(),
                             value_ty,
                             literal_value.chars().count(),
@@ -2483,7 +2483,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         ))
                     })
                     .unwrap_or_else(|| {
-                        self.string_out_of_bands_diagnostic(
+                        self.string_index_out_of_bounds_diagnostic(
                             (&**value).into(),
                             value_ty,
                             literal_value.chars().count(),
