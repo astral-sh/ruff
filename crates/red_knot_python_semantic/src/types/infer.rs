@@ -2253,15 +2253,24 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .map(Type::IntLiteral)
                 .unwrap_or_else(|| builtins_symbol_ty(self.db, "int").to_instance(self.db)),
 
-            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Div) => n
+            (Type::IntLiteral(_), Type::IntLiteral(_), ast::Operator::Div) => {
+                // TODO: division by zero error
+                builtins_symbol_ty(self.db, "float").to_instance(self.db)
+            }
+
+            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::FloorDiv) => n
                 .checked_div(m)
                 .map(Type::IntLiteral)
+                // TODO: division by zero error
+                // It should only be possible to hit this with division by zero, not an overflow.
+                // The overflow case is `i64::MIN // -1` and the negative integer is transformed
+                // into a positive integer prior to here (in the AST).
                 .unwrap_or_else(|| builtins_symbol_ty(self.db, "int").to_instance(self.db)),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Mod) => n
                 .checked_rem(m)
                 .map(Type::IntLiteral)
-                // TODO division by zero error
+                // TODO: division by zero error
                 .unwrap_or(Type::Unknown),
 
             (Type::BytesLiteral(lhs), Type::BytesLiteral(rhs), ast::Operator::Add) => {
@@ -3970,7 +3979,7 @@ mod tests {
             a = 2 + 1
             b = a - 4
             c = a * b
-            d = c / 3
+            d = c // 3
             e = 5 % 3
             ",
         )?;
@@ -3981,6 +3990,23 @@ mod tests {
         assert_public_ty(&db, "src/a.py", "d", "Literal[-1]");
         assert_public_ty(&db, "src/a.py", "e", "Literal[2]");
 
+        db.write_dedented(
+            "/src/b.py",
+            "
+            a = 1 / 2
+            b = 1 // 2
+            c = 4 / 2
+            d = 4 // 2
+            e = 4 // 0
+            ",
+        )?;
+
+        assert_public_ty(&db, "/src/b.py", "a", "float");
+        assert_public_ty(&db, "/src/b.py", "b", "Literal[0]");
+        assert_public_ty(&db, "/src/b.py", "c", "float");
+        assert_public_ty(&db, "/src/b.py", "d", "Literal[2]");
+        // TODO: division by zero should be an error
+        assert_public_ty(&db, "/src/b.py", "e", "int");
         Ok(())
     }
 
