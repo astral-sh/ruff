@@ -2209,8 +2209,16 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = unary;
 
         match (op, self.infer_expression(operand)) {
+            (UnaryOp::UAdd, Type::IntLiteral(value)) => Type::IntLiteral(value),
             (UnaryOp::USub, Type::IntLiteral(value)) => Type::IntLiteral(-value),
+            (UnaryOp::Invert, Type::IntLiteral(value)) => Type::IntLiteral(!value),
+
+            (UnaryOp::UAdd, Type::BooleanLiteral(bool)) => Type::IntLiteral(i64::from(bool)),
+            (UnaryOp::USub, Type::BooleanLiteral(bool)) => Type::IntLiteral(-i64::from(bool)),
+            (UnaryOp::Invert, Type::BooleanLiteral(bool)) => Type::IntLiteral(!i64::from(bool)),
+
             (UnaryOp::Not, ty) => ty.bool(self.db).negate().into_type(self.db),
+
             _ => Type::Unknown, // TODO other unary op types
         }
     }
@@ -6567,6 +6575,63 @@ mod tests {
         assert_public_ty(&db, "/src/a.py", "a", "bool");
         assert_public_ty(&db, "/src/a.py", "b", "bool");
         assert_public_ty(&db, "/src/a.py", "c", "bool");
+        Ok(())
+    }
+
+    #[test]
+    fn unary_add() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            a = +0
+            b = +1
+            c = +True
+            ",
+        )?;
+
+        assert_public_ty(&db, "/src/a.py", "a", "Literal[0]");
+        assert_public_ty(&db, "/src/a.py", "b", "Literal[1]");
+        assert_public_ty(&db, "/src/a.py", "c", "Literal[1]");
+        Ok(())
+    }
+
+    #[test]
+    fn unary_sub() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            a = -0
+            b = -1
+            c = -True
+            ",
+        )?;
+
+        assert_public_ty(&db, "/src/a.py", "a", "Literal[0]");
+        assert_public_ty(&db, "/src/a.py", "b", "Literal[-1]");
+        assert_public_ty(&db, "/src/a.py", "c", "Literal[-1]");
+        Ok(())
+    }
+
+    #[test]
+    fn unary_invert() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            a = ~0
+            b = ~1
+            c = ~True
+            ",
+        )?;
+
+        assert_public_ty(&db, "/src/a.py", "a", "Literal[-1]");
+        assert_public_ty(&db, "/src/a.py", "b", "Literal[-2]");
+        assert_public_ty(&db, "/src/a.py", "c", "Literal[-2]");
         Ok(())
     }
 }
