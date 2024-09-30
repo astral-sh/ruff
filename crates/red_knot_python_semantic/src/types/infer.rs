@@ -2466,16 +2466,107 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ast::ExprCompare {
             range: _,
             left,
-            ops: _,
+            ops,
             comparators,
         } = compare;
 
-        self.infer_expression(left);
-        // TODO actually handle ops and return correct type
-        for right in comparators.as_ref() {
-            self.infer_expression(right);
+        // https://docs.python.org/3/reference/expressions.html#comparisons
+        // > Formally, if `a, b, c, …, y, z` are expressions and `op1, op2, …, opN` are comparison
+        // > operators, then `a op1 b op2 c ... y opN z` is equivalent to a `op1 b and b op2 c and
+        // ... > y opN z`, except that each expression is evaluated at most once.
+        let mut inferred_ty: Option<Type<'db>> = None;
+        std::iter::once(left.as_ref())
+            .chain(comparators.as_ref().iter())
+            // Evaluate expressions before iterating through pairs with `windows`
+            .map(|expr| self.infer_expression(expr))
+            // Allocation here is used to access the method `windows` not implemented on
+            // iterators (crates, experimental APIs or manual impl might provide it)
+            .collect::<Vec<Type<'db>>>()
+            .windows(2)
+            .zip(ops.iter())
+            .enumerate()
+            .for_each(|(i, (pair, op))| {
+                let (left_ty, right_ty) = (pair[0], pair[1]);
+                if inferred_ty.is_none() {
+                    let is_last = i == ops.len() - 1;
+                    let comparison_ty = self.infer_binary_type_comparison(left_ty, op, right_ty);
+                    // Special case for `Unknown` returned when an operation is not supported
+                    inferred_ty = if let Type::Unknown = comparison_ty {
+                        Some(Type::Unknown)
+                    } else {
+                        match (comparison_ty.bool(self.db), is_last) {
+                            (Truthiness::AlwaysTrue, false) => None,
+                            (Truthiness::AlwaysTrue, true) => Some(Type::BooleanLiteral(true)),
+                            (Truthiness::AlwaysFalse, _) => Some(Type::BooleanLiteral(false)),
+                            (Truthiness::Ambiguous, _) => {
+                                Some(builtins_symbol_ty(self.db, "bool").to_instance(self.db))
+                            }
+                        }
+                    };
+                }
+            });
+        inferred_ty.expect("A type should always be inferred on the last comparison in the chain")
+    }
+
+    /// Infers the type of a binary comparison (e.g. '<left> == <right>'). See
+    /// `infer_compare_expression` for the higher level logic dealing with multi-comparison
+    /// expressions.
+    fn infer_binary_type_comparison(
+        &mut self,
+        left: Type<'db>,
+        op: &ast::CmpOp,
+        right: Type<'db>,
+    ) -> Type<'db> {
+        match (left, right) {
+            (Type::IntLiteral(n), Type::IntLiteral(m)) => Type::BooleanLiteral(match op {
+                ast::CmpOp::Eq | ast::CmpOp::Is => n == m,
+                ast::CmpOp::NotEq | ast::CmpOp::IsNot => n != m,
+                ast::CmpOp::Lt => n < m,
+                ast::CmpOp::LtE => n <= m,
+                ast::CmpOp::Gt => n > m,
+                ast::CmpOp::GtE => n >= m,
+                // Undefined for (int, int)
+                ast::CmpOp::In | ast::CmpOp::NotIn => false,
+            }),
+            // Booleans are coded as integers (False = 0, True = 1)
+            (Type::IntLiteral(n), Type::BooleanLiteral(b)) => self.infer_binary_type_comparison(
+                Type::IntLiteral(n),
+                op,
+                Type::IntLiteral(if b { 1 } else { 0 }),
+            ),
+            (Type::BooleanLiteral(b), Type::IntLiteral(m)) => self.infer_binary_type_comparison(
+                Type::IntLiteral(if b { 1 } else { 0 }),
+                op,
+                Type::IntLiteral(m),
+            ),
+            // TODO: move this logic wherever we handle class instances
+            (Type::IntLiteral(_), Type::Instance(class_type))
+            | (Type::Instance(class_type), Type::IntLiteral(_)) => class_type
+                .is_stdlib_symbol(self.db, "builtins", "int")
+                .then(|| builtins_symbol_ty(self.db, "bool").to_instance(self.db))
+                .unwrap_or_else(|| Type::Unknown),
+            // TODO: type-generic cases (using _) should be moved after the code handling
+            // classes/instances as they can override the behaviour with literal types by
+            // implementing `__eq__`, ...
+            (Type::IntLiteral(_), _) | (_, Type::IntLiteral(_)) => match op {
+                ast::CmpOp::Eq | ast::CmpOp::Is => Type::BooleanLiteral(false),
+                ast::CmpOp::NotEq | ast::CmpOp::IsNot => Type::BooleanLiteral(true),
+                ast::CmpOp::Lt | ast::CmpOp::LtE | ast::CmpOp::Gt | ast::CmpOp::GtE => {
+                    // TODO: this fails at runtime, we might need a diagnostic
+                    Type::Unknown
+                }
+                // TODO: this is valid for some types (tuples, list, dict, set, ...)
+                ast::CmpOp::In | ast::CmpOp::NotIn => Type::Unknown,
+            },
+            (Type::BooleanLiteral(a), Type::BooleanLiteral(b)) => self
+                .infer_binary_type_comparison(
+                    Type::IntLiteral(if a { 1 } else { 0 }),
+                    op,
+                    Type::IntLiteral(if b { 1 } else { 0 }),
+                ),
+            // TODO: handle more types
+            _ => Some(Type::Todo),
         }
-        Type::Todo
     }
 
     fn infer_subscript_expression(&mut self, subscript: &ast::ExprSubscript) -> Type<'db> {
@@ -3875,6 +3966,61 @@ mod tests {
         assert_public_ty(&db, "src/a.py", "w", "LiteralString");
         assert_public_ty(&db, "src/a.py", "x", "LiteralString");
         assert_public_ty(&db, "src/a.py", "z", "LiteralString");
+
+        Ok(())
+    }
+
+    #[test]
+    fn comparison_integer_literals() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "src/a.py",
+            r#"
+            a = 1 == 1 == True
+            b = 1 == 1 == 2 == 4
+            c = False < True <= 2 < 3 != 6
+            d = 1 < 1
+            e = 1 > 1
+            f = 1 is 1
+            g = 1 is not 1
+            h = 1 is 2
+            i = 1 is ''
+            j = 1 <= ""
+            "#,
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "a", "Literal[True]");
+        assert_public_ty(&db, "src/a.py", "b", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "c", "Literal[True]");
+        assert_public_ty(&db, "src/a.py", "d", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "e", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "f", "Literal[True]");
+        assert_public_ty(&db, "src/a.py", "g", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "h", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "i", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "j", "Unknown");
+
+        Ok(())
+    }
+
+    #[test]
+    fn comparison_integer_instance() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            r#"
+            def foo() -> int: ...
+            a = 1 == foo()
+            b = 9 < foo()
+            c = foo() != foo()
+            "#,
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "a", "bool");
+        assert_public_ty(&db, "src/a.py", "b", "bool");
+        // TODO: handling int/int comparison will be done when implementing instance comparison
+        assert_public_ty(&db, "src/a.py", "c", "Unknown");
 
         Ok(())
     }
