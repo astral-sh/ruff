@@ -1250,6 +1250,54 @@ impl<'db> TypeInferenceBuilder<'db> {
         );
     }
 
+    /// Emit a diagnostic declaring that an `i64` index cannot be represented as a `usize`.
+    pub(super) fn index_out_of_range_diagnostic(&mut self, node: AnyNodeRef, index: i64) {
+        self.add_diagnostic(
+            node,
+            "index-out-of-range",
+            format_args!(
+                "Index {index} exceeds maximum supported size of {}.",
+                usize::MAX
+            ),
+        );
+    }
+
+    /// Emit a diagnostic declaring that an index is out of bounds for a tuple.
+    pub(super) fn tuple_out_of_bands_diagnostic(
+        &mut self,
+        node: AnyNodeRef,
+        tuple_ty: Type<'db>,
+        length: usize,
+        index: usize,
+    ) {
+        self.add_diagnostic(
+            node,
+            "index-out-of-bounds",
+            format_args!(
+                "Index {index} is out of bounds for tuple of type '{}' with length {length}.",
+                tuple_ty.display(self.db)
+            ),
+        );
+    }
+
+    /// Emit a diagnostic declaring that an index is out of bounds for a string.
+    pub(super) fn string_out_of_bands_diagnostic(
+        &mut self,
+        node: AnyNodeRef,
+        string_ty: Type<'db>,
+        length: usize,
+        index: usize,
+    ) {
+        self.add_diagnostic(
+            node,
+            "index-out-of-bounds",
+            format_args!(
+                "Index {index} is out of bounds for string '{}' with length {length}.",
+                string_ty.display(self.db)
+            ),
+        );
+    }
+
     fn infer_for_statement_definition(
         &mut self,
         target: &ast::ExprName,
@@ -2385,42 +2433,82 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         match (value_ty, slice_ty) {
             // TODO handle variable-length tuples
-            (Type::Tuple(ty), Type::IntLiteral(index)) => {
-                if let Some(ty) = ty.elements(self.db).get(index as usize) {
-                    *ty
-                } else {
+            (Type::Tuple(tuple_ty), Type::IntLiteral(int)) => {
+                let Ok(index) = usize::try_from(int) else {
+                    self.index_out_of_range_diagnostic((&**slice).into(), int);
+                    return Type::Unknown;
+                };
+                let elements = tuple_ty.elements(self.db);
+                elements.get(index).copied().unwrap_or_else(|| {
+                    self.tuple_out_of_bands_diagnostic(
+                        (&**value).into(),
+                        value_ty,
+                        elements.len(),
+                        index,
+                    );
                     Type::Unknown
-                }
+                })
             }
-            (Type::Tuple(ty), Type::BooleanLiteral(bool)) => {
-                if let Some(ty) = ty.elements(self.db).get(usize::from(bool)) {
-                    *ty
-                } else {
+            (Type::Tuple(tuple_ty), Type::BooleanLiteral(bool)) => {
+                let index = usize::from(bool);
+                let elements = tuple_ty.elements(self.db);
+                elements.get(index).copied().unwrap_or_else(|| {
+                    self.tuple_out_of_bands_diagnostic(
+                        (&**value).into(),
+                        value_ty,
+                        elements.len(),
+                        index,
+                    );
                     Type::Unknown
-                }
+                })
             }
-            (Type::StringLiteral(literal), Type::IntLiteral(index)) => {
-                if let Some(ch) = literal.value(self.db).chars().nth(index as usize) {
-                    Type::StringLiteral(StringLiteralType::new(
-                        self.db,
-                        ch.to_string().into_boxed_str(),
-                    ))
-                } else {
-                    Type::Unknown
-                }
+            (Type::StringLiteral(literal_ty), Type::IntLiteral(int)) => {
+                let Ok(index) = usize::try_from(int) else {
+                    self.index_out_of_range_diagnostic((&**slice).into(), int);
+                    return Type::Unknown;
+                };
+                let literal_value = literal_ty.value(self.db);
+                literal_value
+                    .chars()
+                    .nth(index)
+                    .map(|ch| {
+                        Type::StringLiteral(StringLiteralType::new(
+                            self.db,
+                            ch.to_string().into_boxed_str(),
+                        ))
+                    })
+                    .unwrap_or_else(|| {
+                        self.string_out_of_bands_diagnostic(
+                            (&**value).into(),
+                            value_ty,
+                            literal_value.chars().count(),
+                            index,
+                        );
+                        Type::Unknown
+                    })
             }
-            (Type::StringLiteral(literal), Type::BooleanLiteral(index)) => {
-                if let Some(ch) = literal.value(self.db).chars().nth(usize::from(index)) {
-                    Type::StringLiteral(StringLiteralType::new(
-                        self.db,
-                        ch.to_string().into_boxed_str(),
-                    ))
-                } else {
-                    Type::Unknown
-                }
+            (Type::StringLiteral(literal_ty), Type::BooleanLiteral(bool)) => {
+                let index = usize::from(bool);
+                let literal_value = literal_ty.value(self.db);
+                literal_value
+                    .chars()
+                    .nth(index)
+                    .map(|ch| {
+                        Type::StringLiteral(StringLiteralType::new(
+                            self.db,
+                            ch.to_string().into_boxed_str(),
+                        ))
+                    })
+                    .unwrap_or_else(|| {
+                        self.string_out_of_bands_diagnostic(
+                            (&**value).into(),
+                            value_ty,
+                            literal_value.chars().count(),
+                            index,
+                        );
+                        Type::Unknown
+                    })
             }
-            // TODO some slices on strings should resolve to type errors rather than literals
-            (Type::StringLiteral(_), _) => Type::LiteralString,
             _ => Type::Unknown,
         }
     }
@@ -6455,11 +6543,18 @@ mod tests {
         assert_public_ty(&db, "/src/a.py", "a", "Literal[1]");
         assert_public_ty(&db, "/src/a.py", "b", "Literal[\"a\"]");
         assert_public_ty(&db, "/src/a.py", "c", "Unknown");
+
+        assert_file_diagnostics(
+            &db,
+            "src/a.py",
+            &["Index 2 is out of bounds for tuple of type 'tuple[Literal[1], Literal[\"a\"]]' with length 2."],
+        );
+
         Ok(())
     }
 
     #[test]
-    fn subscript_string() -> anyhow::Result<()> {
+    fn subscript_literal_string() -> anyhow::Result<()> {
         let mut db = setup_db();
 
         db.write_dedented(
@@ -6469,13 +6564,20 @@ mod tests {
 
             a = s[0]
             b = s[1]
-            c = s[()]
+            c = s[4]
             ",
         )?;
 
         assert_public_ty(&db, "/src/a.py", "a", "Literal[\"a\"]");
         assert_public_ty(&db, "/src/a.py", "b", "Literal[\"b\"]");
-        assert_public_ty(&db, "/src/a.py", "c", "LiteralString");
+        assert_public_ty(&db, "/src/a.py", "c", "Unknown");
+
+        assert_file_diagnostics(
+            &db,
+            "src/a.py",
+            &["Index 4 is out of bounds for string 'Literal[\"abc\"]' with length 3."],
+        );
+
         Ok(())
     }
 
