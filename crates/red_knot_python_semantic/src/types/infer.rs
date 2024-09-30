@@ -2489,7 +2489,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let (left_ty, right_ty) = (pair[0], pair[1]);
                 if inferred_ty.is_none() {
                     let is_last = i == ops.len() - 1;
-                    let comparison_ty = self.infer_binary_type_comparison(left_ty, op, right_ty);
+                    let comparison_ty = self.infer_binary_type_comparison(left_ty, *op, right_ty);
                     // Special case for `Unknown` returned when an operation is not supported
                     inferred_ty = if let Type::Unknown = comparison_ty {
                         Some(Type::Unknown)
@@ -2514,7 +2514,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_binary_type_comparison(
         &mut self,
         left: Type<'db>,
-        op: &ast::CmpOp,
+        op: ast::CmpOp,
         right: Type<'db>,
     ) -> Type<'db> {
         match (left, right) {
@@ -2532,10 +2532,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             (Type::IntLiteral(n), Type::BooleanLiteral(b)) => self.infer_binary_type_comparison(
                 Type::IntLiteral(n),
                 op,
-                Type::IntLiteral(if b { 1 } else { 0 }),
+                Type::IntLiteral(i64::from(b)),
             ),
             (Type::BooleanLiteral(b), Type::IntLiteral(m)) => self.infer_binary_type_comparison(
-                Type::IntLiteral(if b { 1 } else { 0 }),
+                Type::IntLiteral(i64::from(b)),
                 op,
                 Type::IntLiteral(m),
             ),
@@ -2544,7 +2544,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             | (Type::Instance(class_type), Type::IntLiteral(_)) => class_type
                 .is_stdlib_symbol(self.db, "builtins", "int")
                 .then(|| builtins_symbol_ty(self.db, "bool").to_instance(self.db))
-                .unwrap_or_else(|| Type::Unknown),
+                .unwrap_or(Type::Unknown),
             // TODO: type-generic cases (using _) should be moved after the code handling
             // classes/instances as they can override the behaviour with literal types by
             // implementing `__eq__`, ...
@@ -2560,9 +2560,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             },
             (Type::BooleanLiteral(a), Type::BooleanLiteral(b)) => self
                 .infer_binary_type_comparison(
-                    Type::IntLiteral(if a { 1 } else { 0 }),
+                    Type::IntLiteral(i64::from(a)),
                     op,
-                    Type::IntLiteral(if b { 1 } else { 0 }),
+                    Type::IntLiteral(i64::from(b)),
                 ),
             // TODO: handle more types
             _ => Some(Type::Todo),
