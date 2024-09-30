@@ -12,7 +12,6 @@ pn = "pn"  # `import panel as pd` is a thing
 poit = "poit"
 BA = "BA" # acronym for "Bad Allowed", used in testing.
 jod = "jod" # e.g., `jod-thread`
-NumerBlox = "NumerBlox"
 
 [default]
 extend-ignore-re = [
