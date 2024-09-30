@@ -1250,25 +1250,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         );
     }
 
-    /// Emit a diagnostic declaring that an `i64` index cannot be represented as a `usize`.
-    pub(super) fn index_out_of_range_diagnostic(&mut self, node: AnyNodeRef, index: i64) {
-        self.add_diagnostic(
-            node,
-            "index-out-of-range",
-            format_args!(
-                "Index {index} exceeds maximum supported size of {}.",
-                usize::MAX
-            ),
-        );
-    }
-
     /// Emit a diagnostic declaring that an index is out of bounds for a tuple.
     pub(super) fn tuple_out_of_bands_diagnostic(
         &mut self,
         node: AnyNodeRef,
         tuple_ty: Type<'db>,
         length: usize,
-        index: usize,
+        index: i64,
     ) {
         self.add_diagnostic(
             node,
@@ -1286,7 +1274,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         node: AnyNodeRef,
         string_ty: Type<'db>,
         length: usize,
-        index: usize,
+        index: i64,
     ) {
         self.add_diagnostic(
             node,
@@ -2434,43 +2422,38 @@ impl<'db> TypeInferenceBuilder<'db> {
         match (value_ty, slice_ty) {
             // TODO handle variable-length tuples
             (Type::Tuple(tuple_ty), Type::IntLiteral(int)) => {
-                let Ok(index) = usize::try_from(int) else {
-                    self.index_out_of_range_diagnostic((&**slice).into(), int);
-                    return Type::Unknown;
-                };
                 let elements = tuple_ty.elements(self.db);
-                elements.get(index).copied().unwrap_or_else(|| {
-                    self.tuple_out_of_bands_diagnostic(
-                        (&**value).into(),
-                        value_ty,
-                        elements.len(),
-                        index,
-                    );
-                    Type::Unknown
-                })
+                usize::try_from(int)
+                    .ok()
+                    .and_then(|index| elements.get(index).copied())
+                    .unwrap_or_else(|| {
+                        self.tuple_out_of_bands_diagnostic(
+                            (&**value).into(),
+                            value_ty,
+                            elements.len(),
+                            int,
+                        );
+                        Type::Unknown
+                    })
             }
             (Type::Tuple(tuple_ty), Type::BooleanLiteral(bool)) => {
-                let index = usize::from(bool);
                 let elements = tuple_ty.elements(self.db);
-                elements.get(index).copied().unwrap_or_else(|| {
+                let int = i64::from(bool);
+                elements.get(usize::from(bool)).copied().unwrap_or_else(|| {
                     self.tuple_out_of_bands_diagnostic(
                         (&**value).into(),
                         value_ty,
                         elements.len(),
-                        index,
+                        int,
                     );
                     Type::Unknown
                 })
             }
             (Type::StringLiteral(literal_ty), Type::IntLiteral(int)) => {
-                let Ok(index) = usize::try_from(int) else {
-                    self.index_out_of_range_diagnostic((&**slice).into(), int);
-                    return Type::Unknown;
-                };
                 let literal_value = literal_ty.value(self.db);
-                literal_value
-                    .chars()
-                    .nth(index)
+                usize::try_from(int)
+                    .ok()
+                    .and_then(|index| literal_value.chars().nth(index))
                     .map(|ch| {
                         Type::StringLiteral(StringLiteralType::new(
                             self.db,
@@ -2482,17 +2465,17 @@ impl<'db> TypeInferenceBuilder<'db> {
                             (&**value).into(),
                             value_ty,
                             literal_value.chars().count(),
-                            index,
+                            int,
                         );
                         Type::Unknown
                     })
             }
             (Type::StringLiteral(literal_ty), Type::BooleanLiteral(bool)) => {
-                let index = usize::from(bool);
                 let literal_value = literal_ty.value(self.db);
+                let int = i64::from(bool);
                 literal_value
                     .chars()
-                    .nth(index)
+                    .nth(usize::from(bool))
                     .map(|ch| {
                         Type::StringLiteral(StringLiteralType::new(
                             self.db,
@@ -2504,7 +2487,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             (&**value).into(),
                             value_ty,
                             literal_value.chars().count(),
-                            index,
+                            int,
                         );
                         Type::Unknown
                     })
