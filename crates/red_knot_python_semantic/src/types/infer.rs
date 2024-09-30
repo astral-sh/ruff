@@ -2948,7 +2948,11 @@ mod tests {
         let file = system_path_to_file(db, file_name).expect("Expected file to exist.");
 
         let ty = global_symbol_ty(db, file, symbol_name);
-        assert_eq!(ty.display(db).to_string(), expected);
+        assert_eq!(
+            ty.display(db).to_string(),
+            expected,
+            "Mismatch for symbol '{symbol_name}' in '{file_name}'"
+        );
     }
 
     fn assert_scope_ty(
