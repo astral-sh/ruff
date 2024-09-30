@@ -246,12 +246,13 @@ pub enum Type<'db> {
     /// The None object -- TODO remove this in favor of Instance(types.NoneType)
     None,
     /// Temporary type for symbols that can't be inferred yet because of missing implementations.
+    /// Behaves equivalently to `Any`.
+    ///
     /// This variant should eventually be removed once red-knot is spec-compliant.
     ///
     /// General rule: `Todo` should only propagate when the presence of the input `Todo` caused the
-    /// output to be unknown. An output should only be `Todo` if fixing the input to be correctly
-    /// inferred would cause the output to be known - this is not the case with `[Type::Any]` or
-    /// `[Type::Unknown]`.
+    /// output to be unknown. An output should only be `Todo` if fixing all `Todo` inputs to be not
+    /// `Todo` would change the output type.
     Todo,
     /// A specific function object
     Function(FunctionType<'db>),
@@ -540,7 +541,9 @@ impl<'db> Type<'db> {
     /// when `bool(x)` is called on an object `x`.
     fn bool(&self, db: &'db dyn Db) -> Truthiness {
         match self {
-            Type::Any | Type::Never | Type::Unknown | Type::Unbound => Truthiness::Ambiguous,
+            Type::Any | Type::Todo | Type::Never | Type::Unknown | Type::Unbound => {
+                Truthiness::Ambiguous
+            }
             Type::None => Truthiness::AlwaysFalse,
             Type::Function(_) | Type::RevealTypeFunction(_) => Truthiness::AlwaysTrue,
             Type::Module(_) => Truthiness::AlwaysTrue,
@@ -579,7 +582,6 @@ impl<'db> Type<'db> {
             Type::LiteralString => Truthiness::Ambiguous,
             Type::BytesLiteral(bytes) => Truthiness::from(!bytes.value(db).is_empty()),
             Type::Tuple(items) => Truthiness::from(!items.elements(db).is_empty()),
-            Type::Todo => Truthiness::Ambiguous,
         }
     }
 
@@ -617,6 +619,8 @@ impl<'db> Type<'db> {
             // `Any` is callable, and its return type is also `Any`.
             Type::Any => CallOutcome::callable(Type::Any),
 
+            Type::Todo => CallOutcome::callable(Type::Todo),
+
             Type::Unknown => CallOutcome::callable(Type::Unknown),
 
             Type::Union(union) => CallOutcome::union(
@@ -630,9 +634,6 @@ impl<'db> Type<'db> {
 
             // TODO: intersection types
             Type::Intersection(_) => CallOutcome::callable(Type::Todo),
-
-            // `Todo` is callable, and its return type is also `Todo`.
-            Type::Todo => CallOutcome::callable(Type::Todo),
 
             _ => CallOutcome::not_callable(self),
         }
@@ -705,6 +706,7 @@ impl<'db> Type<'db> {
     pub fn to_instance(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Type::Any => Type::Any,
+            Type::Todo => Type::Todo,
             Type::Unknown => Type::Unknown,
             Type::Unbound => Type::Unknown,
             Type::Never => Type::Never,
@@ -725,7 +727,6 @@ impl<'db> Type<'db> {
             | Type::Tuple(_)
             | Type::LiteralString
             | Type::None => Type::Unknown,
-            Type::Todo => Type::Todo,
         }
     }
 

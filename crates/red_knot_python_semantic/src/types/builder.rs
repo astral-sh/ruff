@@ -215,6 +215,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
     /// Adds a positive type to this intersection.
     fn add_positive(&mut self, db: &'db dyn Db, ty: Type<'db>) {
+        // TODO `Any`/`Unknown`/`Todo` actually should not self-cancel
         match ty {
             Type::Intersection(inter) => {
                 let pos = inter.positive(db);
@@ -224,8 +225,6 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 self.positive.retain(|elem| !neg.contains(elem));
                 self.negative.retain(|elem| !pos.contains(elem));
             }
-            // Note: `[Type::Todo]` is included to show that an unimplemented type was added, but
-            // this can lead to cases where separate `Type::Todo` cancel eachother
             _ => {
                 if !self.negative.remove(&ty) {
                     self.positive.insert(ty);
@@ -236,7 +235,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
     /// Adds a negative type to this intersection.
     fn add_negative(&mut self, db: &'db dyn Db, ty: Type<'db>) {
-        // TODO Any/Unknown actually should not self-cancel
+        // TODO `Any`/`Unknown`/`Todo` actually should not self-cancel
         match ty {
             Type::Intersection(intersection) => {
                 let pos = intersection.negative(db);
@@ -248,8 +247,6 @@ impl<'db> InnerIntersectionBuilder<'db> {
             }
             Type::Never => {}
             Type::Unbound => {}
-            // Note: `[Type::Todo]` is included to show that an unimplemented type was added, but
-            // this can lead to cases where separate `Type::Todo` cancel eachother
             _ => {
                 if !self.positive.remove(&ty) {
                     self.negative.insert(ty);
