@@ -2380,11 +2380,49 @@ impl<'db> TypeInferenceBuilder<'db> {
             ctx: _,
         } = subscript;
 
-        self.infer_expression(slice);
-        self.infer_expression(value);
+        let value_ty = self.infer_expression(value);
+        let slice_ty = self.infer_expression(slice);
 
-        // TODO actual subscript support
-        Type::Unknown
+        match (value_ty, slice_ty) {
+            // TODO handle variable-length tuples
+            (Type::Tuple(ty), Type::IntLiteral(index)) => {
+                if let Some(ty) = ty.elements(self.db).get(index as usize) {
+                    *ty
+                } else {
+                    Type::Unknown
+                }
+            }
+            (Type::Tuple(ty), Type::BooleanLiteral(bool)) => {
+                if let Some(ty) = ty.elements(self.db).get(usize::from(bool)) {
+                    *ty
+                } else {
+                    Type::Unknown
+                }
+            }
+            (Type::StringLiteral(literal), Type::IntLiteral(index)) => {
+                if let Some(ch) = literal.value(self.db).chars().nth(index as usize) {
+                    Type::StringLiteral(StringLiteralType::new(
+                        self.db,
+                        ch.to_string().into_boxed_str(),
+                    ))
+                } else {
+                    Type::Unknown
+                }
+            }
+            (Type::StringLiteral(literal), Type::BooleanLiteral(index)) => {
+                if let Some(ch) = literal.value(self.db).chars().nth(usize::from(index)) {
+                    Type::StringLiteral(StringLiteralType::new(
+                        self.db,
+                        ch.to_string().into_boxed_str(),
+                    ))
+                } else {
+                    Type::Unknown
+                }
+            }
+            // TODO some slices on strings should resolve to type errors rather than literals
+            (Type::StringLiteral(_), _) => Type::LiteralString,
+            _ => Type::Unknown,
+        }
     }
 
     fn infer_slice_expression(&mut self, slice: &ast::ExprSlice) -> Type<'db> {
@@ -6396,6 +6434,48 @@ mod tests {
             first_public_binding(&db, a, "x"),
             &events,
         );
+        Ok(())
+    }
+
+    #[test]
+    fn subscript_tuple() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            t = (1, 'a')
+
+            a = t[0]
+            b = t[1]
+            c = t[2]
+            ",
+        )?;
+
+        assert_public_ty(&db, "/src/a.py", "a", "Literal[1]");
+        assert_public_ty(&db, "/src/a.py", "b", "Literal[\"a\"]");
+        assert_public_ty(&db, "/src/a.py", "c", "Unknown");
+        Ok(())
+    }
+
+    #[test]
+    fn subscript_string() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            s = 'abc'
+
+            a = s[0]
+            b = s[1]
+            c = s[()]
+            ",
+        )?;
+
+        assert_public_ty(&db, "/src/a.py", "a", "Literal[\"a\"]");
+        assert_public_ty(&db, "/src/a.py", "b", "Literal[\"b\"]");
+        assert_public_ty(&db, "/src/a.py", "c", "LiteralString");
         Ok(())
     }
 
