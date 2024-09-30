@@ -389,7 +389,7 @@ mod tests {
     #[test]
     fn build_union_simplify_subtype() {
         let db = setup_db();
-        let t0 = builtins_symbol_ty(&db, "str").to_instance(&db);
+        let t0 = Type::builtin_str_instance(&db);
         let t1 = Type::LiteralString;
         let u0 = UnionType::from_elements(&db, [t0, t1]);
         let u1 = UnionType::from_elements(&db, [t1, t0]);
@@ -401,7 +401,7 @@ mod tests {
     #[test]
     fn build_union_no_simplify_unknown() {
         let db = setup_db();
-        let t0 = builtins_symbol_ty(&db, "str").to_instance(&db);
+        let t0 = Type::builtin_str_instance(&db);
         let t1 = Type::Unknown;
         let u0 = UnionType::from_elements(&db, [t0, t1]);
         let u1 = UnionType::from_elements(&db, [t1, t0]);
@@ -413,8 +413,8 @@ mod tests {
     #[test]
     fn build_union_subsume_multiple() {
         let db = setup_db();
-        let str_ty = builtins_symbol_ty(&db, "str").to_instance(&db);
-        let int_ty = builtins_symbol_ty(&db, "int").to_instance(&db);
+        let str_ty = Type::builtin_str_instance(&db);
+        let int_ty = Type::builtin_int_instance(&db);
         let object_ty = builtins_symbol_ty(&db, "object").to_instance(&db);
         let unknown_ty = Type::Unknown;
 
