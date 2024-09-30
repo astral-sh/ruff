@@ -502,6 +502,28 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
+    /// Raise a diagnostic if the given type cannot be divided by zero.
+    ///
+    /// Expects the type of the left side of the binary expression.
+    fn check_division_by_zero(&mut self, node: AnyNodeRef, left: Type<'db>) {
+        match left {
+            Type::IntLiteral(_) => {}
+            Type::Instance(cls)
+                if cls.is_stdlib_symbol(self.db, "builtins", "float")
+                    || cls.is_stdlib_symbol(self.db, "builtins", "int") => {}
+            _ => return,
+        };
+
+        self.add_diagnostic(
+            node,
+            "division-by-zero",
+            format_args!(
+                "Cannot divide object of type '{}' by zero.",
+                left.display(self.db),
+            ),
+        );
+    }
+
     fn add_binding(&mut self, node: AnyNodeRef, binding: Definition<'db>, ty: Type<'db>) {
         debug_assert!(binding.is_binding(self.db));
         let use_def = self.index.use_def_map(binding.file_scope(self.db));
@@ -2272,6 +2294,18 @@ impl<'db> TypeInferenceBuilder<'db> {
         let left_ty = self.infer_expression(left);
         let right_ty = self.infer_expression(right);
 
+        // Check for division by zero; this doesn't change the inferred type for the expression, but
+        // may emit a diagnostic
+        if matches!(
+            (op, right_ty),
+            (
+                ast::Operator::Div | ast::Operator::FloorDiv | ast::Operator::Mod,
+                Type::IntLiteral(0),
+            )
+        ) {
+            self.check_division_by_zero(binary.into(), left_ty);
+        }
+
         match (left_ty, right_ty, op) {
             // When interacting with Todo, Any and Unknown should propagate (as if we fix this
             // `Todo` in the future, the result would then become Any or Unknown, respectively.)
@@ -2294,24 +2328,18 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .unwrap_or_else(|| builtins_symbol_ty(self.db, "int").to_instance(self.db)),
 
             (Type::IntLiteral(_), Type::IntLiteral(_), ast::Operator::Div) => {
-                // TODO: division by zero error
                 builtins_symbol_ty(self.db, "float").to_instance(self.db)
             }
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::FloorDiv) => n
                 .checked_div(m)
                 .map(Type::IntLiteral)
-                // TODO: division by zero error
-                // It should only be possible to hit this with division by zero, not an overflow.
-                // The overflow case is `i64::MIN // -1` and the negative integer is transformed
-                // into a positive integer prior to here (in the AST).
                 .unwrap_or_else(|| builtins_symbol_ty(self.db, "int").to_instance(self.db)),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Mod) => n
                 .checked_rem(m)
                 .map(Type::IntLiteral)
-                // TODO division by zero error
-                .unwrap_or(Type::Todo),
+                .unwrap_or_else(|| builtins_symbol_ty(self.db, "int").to_instance(self.db)),
 
             (Type::BytesLiteral(lhs), Type::BytesLiteral(rhs), ast::Operator::Add) => {
                 Type::BytesLiteral(BytesLiteralType::new(
@@ -4141,7 +4169,8 @@ mod tests {
             b = a - 4
             c = a * b
             d = c // 3
-            e = 5 % 3
+            e = c / 3
+            f = 5 % 3
             ",
         )?;
 
@@ -4149,25 +4178,46 @@ mod tests {
         assert_public_ty(&db, "src/a.py", "b", "Literal[-1]");
         assert_public_ty(&db, "src/a.py", "c", "Literal[-3]");
         assert_public_ty(&db, "src/a.py", "d", "Literal[-1]");
-        assert_public_ty(&db, "src/a.py", "e", "Literal[2]");
+        assert_public_ty(&db, "src/a.py", "e", "float");
+        assert_public_ty(&db, "src/a.py", "f", "Literal[2]");
+
+        Ok(())
+    }
+
+    #[test]
+    fn division_by_zero() -> anyhow::Result<()> {
+        let mut db = setup_db();
 
         db.write_dedented(
-            "/src/b.py",
+            "/src/a.py",
             "
-            a = 1 / 2
-            b = 1 // 2
-            c = 4 / 2
-            d = 4 // 2
-            e = 4 // 0
+            a = 1 / 0
+            b = 2 // 0
+            c = 3 % 0
+            d = int() / 0
+            e = 1.0 / 0
             ",
         )?;
 
-        assert_public_ty(&db, "/src/b.py", "a", "float");
-        assert_public_ty(&db, "/src/b.py", "b", "Literal[0]");
-        assert_public_ty(&db, "/src/b.py", "c", "float");
-        assert_public_ty(&db, "/src/b.py", "d", "Literal[2]");
-        // TODO: division by zero should be an error
-        assert_public_ty(&db, "/src/b.py", "e", "int");
+        assert_public_ty(&db, "/src/a.py", "a", "float");
+        assert_public_ty(&db, "/src/a.py", "b", "int");
+        assert_public_ty(&db, "/src/a.py", "c", "int");
+        // TODO: These should be `int` and `float` respectively once we support inference
+        assert_public_ty(&db, "/src/a.py", "d", "@Todo");
+        assert_public_ty(&db, "/src/a.py", "e", "@Todo");
+
+        assert_file_diagnostics(
+            &db,
+            "src/a.py",
+            &[
+                "Cannot divide object of type 'Literal[1]' by zero.",
+                "Cannot divide object of type 'Literal[2]' by zero.",
+                "Cannot divide object of type 'Literal[3]' by zero.",
+                "Cannot divide object of type 'int' by zero.",
+                "Cannot divide object of type 'float' by zero.",
+            ],
+        );
+
         Ok(())
     }
 
