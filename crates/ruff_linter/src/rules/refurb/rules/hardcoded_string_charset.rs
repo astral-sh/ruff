@@ -58,20 +58,9 @@ struct AsciiCharSet(u128);
 impl AsciiCharSet {
     /// Creates the set of ascii characters from `bytes`.
     /// Returns None if there is non-ascii byte.
-    fn from_bytes(bytes: &[u8]) -> Option<Self> {
-        bytes
-            .iter()
-            .try_fold(0, |acc, &byte| byte.is_ascii().then(|| acc | (1 << byte)))
-            .map(Self)
-    }
-
-    /// Creates the set of ascii characters from `bytes`.
-    /// Returns None if there is non-ascii byte.
-    const fn from_bytes_const(bytes: &[u8]) -> Option<Self> {
-        // TODO: remove in favor of [`Self::from_bytes`], when its implementation will be
-        //  supported in `const` fn
-        //  - https://github.com/rust-lang/rust/issues/67792
-        //  - https://github.com/rust-lang/rust/issues/87575
+    const fn from_bytes(bytes: &[u8]) -> Option<Self> {
+        // TODO: simplify implementation, when const-traits are supported
+        //  https://github.com/rust-lang/rust-project-goals/issues/106
         let mut bitset = 0;
         let mut i = 0;
         while i < bytes.len() {
@@ -83,15 +72,6 @@ impl AsciiCharSet {
         }
         Some(Self(bitset))
     }
-
-    const fn from_bytes_const_unwrap(bytes: &[u8]) -> Self {
-        // TODO: replace with .unwrap() in the caller, when Option::unwrap will be stable in `const fn`
-        //  - https://github.com/rust-lang/rust/issues/67441)
-        match Self::from_bytes_const(bytes) {
-            Some(res) => res,
-            None => unreachable!(),
-        }
-    }
 }
 
 impl NamedCharset {
@@ -100,7 +80,12 @@ impl NamedCharset {
             name,
             bytes,
             // SAFETY: The named charset is guaranteed to have only ascii bytes.
-            ascii_char_set: AsciiCharSet::from_bytes_const_unwrap(bytes),
+            // TODO: replace with `.unwrap()`, when `Option::unwrap` will be stable in `const fn`
+            //  https://github.com/rust-lang/rust/issues/67441
+            ascii_char_set: match AsciiCharSet::from_bytes(bytes) {
+                Some(ascii_char_set) => ascii_char_set,
+                None => unreachable!(),
+            },
         }
     }
 }
