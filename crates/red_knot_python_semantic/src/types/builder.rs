@@ -215,6 +215,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
     /// Adds a positive type to this intersection.
     fn add_positive(&mut self, db: &'db dyn Db, ty: Type<'db>) {
+        // TODO `Any`/`Unknown`/`Todo` actually should not self-cancel
         match ty {
             Type::Intersection(inter) => {
                 let pos = inter.positive(db);
@@ -234,7 +235,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
     /// Adds a negative type to this intersection.
     fn add_negative(&mut self, db: &'db dyn Db, ty: Type<'db>) {
-        // TODO Any/Unknown actually should not self-cancel
+        // TODO `Any`/`Unknown`/`Todo` actually should not self-cancel
         match ty {
             Type::Intersection(intersection) => {
                 let pos = intersection.negative(db);
