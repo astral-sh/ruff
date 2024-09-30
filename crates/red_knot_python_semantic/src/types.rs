@@ -592,11 +592,11 @@ impl<'db> Type<'db> {
                 // the specific truthiness value of the input arg, `Literal[True]` for the example above.
                 let is_bool = class.is_stdlib_symbol(db, "builtins", "bool");
                 CallOutcome::callable(if is_bool {
-                    arg_types
-                        .first()
-                        .unwrap_or(&Type::Unknown)
-                        .bool(db)
-                        .into_type(db)
+                    if let Some(arg) = arg_types.first() {
+                        arg.bool(db).into_type(db)
+                    } else {
+                        Type::BooleanLiteral(false)
+                    }
                 } else {
                     Type::Instance(class)
                 })
