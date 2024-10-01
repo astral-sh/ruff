@@ -1,0 +1,148 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E12.py:38:5: E128 Continuation line under-indented for visual indent
+   |
+36 | #: E128
+37 | print("E128", ("visual",
+38 |     "hanging"))
+   |     ^^^^^^^^^ E128
+39 | #: E128
+40 | print("E128", ("under-",
+   |
+
+E12.py:41:15: E128 Continuation line under-indented for visual indent
+   |
+39 | #: E128
+40 | print("E128", ("under-",
+41 |               "under-indent"))
+   |               ^^^^^^^^^^^^^^ E128
+42 | #:
+   |
+
+E12.py:172:9: E128 Continuation line under-indented for visual indent
+    |
+170 | if line_removed:
+171 |     self.event(cr, uid,
+172 |         name="Removing the option for contract",
+    |         ^^^^ E128
+173 |         description="contract line has been removed",
+174 |         )
+    |
+
+E12.py:173:9: E128 Continuation line under-indented for visual indent
+    |
+171 |     self.event(cr, uid,
+172 |         name="Removing the option for contract",
+173 |         description="contract line has been removed",
+    |         ^^^^^^^^^^^ E128
+174 |         )
+175 | #:
+    |
+
+E12.py:256:5: E128 Continuation line under-indented for visual indent
+    |
+254 | # Arguments on first line forbidden when not using vertical alignment
+255 | foo = long_function_name(var_one, var_two,
+256 |     var_three, var_four)
+    |     ^^^^^^^^^ E128
+257 | #
+258 | #: E128
+    |
+
+E12.py:260:5: E128 Continuation line under-indented for visual indent
+    |
+258 | #: E128
+259 | print('l.%s\t%s\t%s\t%r' %
+260 |     (token[2][0], pos, tokenize.tok_name[token[0]], token[1]))
+    |     ^ E128
+261 | #: E128
+    |
+
+E12.py:265:9: E128 Continuation line under-indented for visual indent
+    |
+264 | def qualify_by_address(self, cr, uid, ids, context=None,
+265 |         params_to_check=frozenset(QUALIF_BY_ADDRESS_PARAM)):
+    |         ^^^^^^^^^^^^^^^ E128
+266 |     """ This gets called by the web server """
+267 | #:
+    |
+
+E12.py:272:1: E128 Continuation line under-indented for visual indent
+    |
+270 | #: E128
+271 | foo(1, 2, 3,
+272 | 4, 5, 6)
+    | ^ E128
+273 | #: E128
+274 | foo(1, 2, 3,
+    |
+
+E12.py:275:2: E128 Continuation line under-indented for visual indent
+    |
+273 | #: E128
+274 | foo(1, 2, 3,
+275 |  4, 5, 6)
+    |  ^ E128
+276 | #: E128
+277 | foo(1, 2, 3,
+    |
+
+E12.py:278:3: E128 Continuation line under-indented for visual indent
+    |
+276 | #: E128
+277 | foo(1, 2, 3,
+278 |   4, 5, 6)
+    |   ^ E128
+279 | #: E128
+280 | foo(1, 2, 3,
+    |
+
+E12.py:281:4: E128 Continuation line under-indented for visual indent
+    |
+279 | #: E128
+280 | foo(1, 2, 3,
+281 |    4, 5, 6)
+    |    ^ E128
+282 | #: E127
+283 | foo(1, 2, 3,
+    |
+
+E12.py:312:15: E128 Continuation line under-indented for visual indent
+    |
+310 | if line_removed:
+311 |     self.event(cr, uid,
+312 |               name="Removing the option for contract",
+    |               ^^^^ E128
+313 |               description="contract line has been removed",
+314 |                )
+    |
+
+E12.py:313:15: E128 Continuation line under-indented for visual indent
+    |
+311 |     self.event(cr, uid,
+312 |               name="Removing the option for contract",
+313 |               description="contract line has been removed",
+    |               ^^^^^^^^^^^ E128
+314 |                )
+315 | #: E124 E127 E127
+    |
+
+E12.py:335:18: E128 Continuation line under-indented for visual indent
+    |
+333 | rv.update(d=('a' + 'b', 'c'),
+334 |           e=42, f=(42
+335 |                  + 42))
+    |                  ^ E128
+336 | #: E123
+337 | if True:
+    |
+
+E12.py:374:1: E128 Continuation line under-indented for visual indent
+    |
+373 | print(a
+374 | , end=' ')
+    | ^ E128
+375 | #: E127:4:12
+376 | def foo():
+    |

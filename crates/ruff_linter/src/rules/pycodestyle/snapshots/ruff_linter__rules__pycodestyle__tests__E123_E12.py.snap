@@ -1,0 +1,72 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E12.py:11:5: E123 Closing bracket does not match indentation of opening bracket's line
+   |
+ 9 |     1, 2, 3,
+10 |     4, 5, 6,
+11 |     ]
+   |     ^ E123
+12 | #: E124
+13 | print("E124", ("visual",
+   |
+
+E12.py:122:5: E123 Closing bracket does not match indentation of opening bracket's line
+    |
+120 | print("E123", (
+121 |     "bad", "hanging", "close"
+122 |     ))
+    |     ^ E123
+123 | #
+124 | #: E123 E123 E123
+    |
+
+E12.py:129:13: E123 Closing bracket does not match indentation of opening bracket's line
+    |
+127 |         'bar', {
+128 |             'baz': 'frop',
+129 |             }
+    |             ^ E123
+130 |         ]
+131 |     }
+    |
+
+E12.py:130:9: E123 Closing bracket does not match indentation of opening bracket's line
+    |
+128 |             'baz': 'frop',
+129 |             }
+130 |         ]
+    |         ^ E123
+131 |     }
+132 | #: E123
+    |
+
+E12.py:131:5: E123 Closing bracket does not match indentation of opening bracket's line
+    |
+129 |             }
+130 |         ]
+131 |     }
+    |     ^ E123
+132 | #: E123
+133 | result = some_function_that_takes_arguments(
+    |
+
+E12.py:136:5: E123 Closing bracket does not match indentation of opening bracket's line
+    |
+134 |     'a', 'b', 'c',
+135 |     'd', 'e', 'f',
+136 |     )
+    |     ^ E123
+137 | #: E124
+138 | my_list = [1, 2, 3,
+    |
+
+E12.py:346:17: E123 Closing bracket does not match indentation of opening bracket's line
+    |
+344 |                 # Replace them.
+345 |                 for replacement in replace(child)
+346 |                 ),
+    |                 ^ E123
+347 |             dict(name=token.undefined)
+348 |         )]
+    |

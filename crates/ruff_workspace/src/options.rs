@@ -2848,6 +2848,19 @@ pub struct PycodestyleOptions {
         "#
     )]
     pub ignore_overlong_task_comments: Option<bool>,
+
+    /// Whether closing brackets should hang off the end of the parameter list instead of
+    /// matching the indentation of the corresponding opening bracket (by default: false).
+    ///
+    /// Must be set to true to enable rule E133, and must be set to false to enable E123.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            hang-closing = true
+        "#
+    )]
+    pub hang_closing: Option<bool>,
 }
 
 impl PycodestyleOptions {
@@ -2856,6 +2869,7 @@ impl PycodestyleOptions {
             max_doc_length: self.max_doc_length,
             max_line_length: self.max_line_length.unwrap_or(global_line_length),
             ignore_overlong_task_comments: self.ignore_overlong_task_comments.unwrap_or_default(),
+            hang_closing: self.hang_closing.unwrap_or_default(),
         }
     }
 }

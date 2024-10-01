@@ -1,0 +1,191 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E12.py:35:19: E127 Continuation line over-indented for visual indent
+   |
+33 | #: E127
+34 | print("E127", ("over-",
+35 |                   "over-indent"))
+   |                   ^^^^^^^^^^^^^ E127
+36 | #: E128
+37 | print("E128", ("visual",
+   |
+
+E12.py:284:6: E127 Continuation line over-indented for visual indent
+    |
+282 | #: E127
+283 | foo(1, 2, 3,
+284 |      4, 5, 6)
+    |      ^ E127
+285 | #: E127
+286 | foo(1, 2, 3,
+    |
+
+E12.py:287:7: E127 Continuation line over-indented for visual indent
+    |
+285 | #: E127
+286 | foo(1, 2, 3,
+287 |       4, 5, 6)
+    |       ^ E127
+288 | #: E127
+289 | foo(1, 2, 3,
+    |
+
+E12.py:290:8: E127 Continuation line over-indented for visual indent
+    |
+288 | #: E127
+289 | foo(1, 2, 3,
+290 |        4, 5, 6)
+    |        ^ E127
+291 | #: E127
+292 | foo(1, 2, 3,
+    |
+
+E12.py:293:9: E127 Continuation line over-indented for visual indent
+    |
+291 | #: E127
+292 | foo(1, 2, 3,
+293 |         4, 5, 6)
+    |         ^ E127
+294 | #: E127
+295 | foo(1, 2, 3,
+    |
+
+E12.py:296:10: E127 Continuation line over-indented for visual indent
+    |
+294 | #: E127
+295 | foo(1, 2, 3,
+296 |          4, 5, 6)
+    |          ^ E127
+297 | #: E127
+298 | foo(1, 2, 3,
+    |
+
+E12.py:299:11: E127 Continuation line over-indented for visual indent
+    |
+297 | #: E127
+298 | foo(1, 2, 3,
+299 |           4, 5, 6)
+    |           ^ E127
+300 | #: E127
+301 | foo(1, 2, 3,
+    |
+
+E12.py:302:12: E127 Continuation line over-indented for visual indent
+    |
+300 | #: E127
+301 | foo(1, 2, 3,
+302 |            4, 5, 6)
+    |            ^ E127
+303 | #: E127
+304 | foo(1, 2, 3,
+    |
+
+E12.py:305:13: E127 Continuation line over-indented for visual indent
+    |
+303 | #: E127
+304 | foo(1, 2, 3,
+305 |             4, 5, 6)
+    |             ^ E127
+306 | #: E127
+307 | foo(1, 2, 3,
+    |
+
+E12.py:308:14: E127 Continuation line over-indented for visual indent
+    |
+306 | #: E127
+307 | foo(1, 2, 3,
+308 |              4, 5, 6)
+    |              ^ E127
+309 | #: E128 E128
+310 | if line_removed:
+    |
+
+E12.py:318:17: E127 Continuation line over-indented for visual indent
+    |
+316 | if line_removed:
+317 |     self.event(cr, uid,
+318 |                 name="Removing the option for contract",
+    |                 ^^^^ E127
+319 |                 description="contract line has been removed",
+320 |                 )
+    |
+
+E12.py:319:17: E127 Continuation line over-indented for visual indent
+    |
+317 |     self.event(cr, uid,
+318 |                 name="Removing the option for contract",
+319 |                 description="contract line has been removed",
+    |                 ^^^^^^^^^^^ E127
+320 |                 )
+321 | #: E127
+    |
+
+E12.py:323:14: E127 Continuation line over-indented for visual indent
+    |
+321 | #: E127
+322 | rv.update(d=('a', 'b', 'c'),
+323 |              e=42)
+    |              ^ E127
+324 | #
+325 | #: E127 W503
+    |
+
+E12.py:328:18: E127 Continuation line over-indented for visual indent
+    |
+326 | rv.update(d=('a' + 'b', 'c'),
+327 |           e=42, f=42
+328 |                  + 42)
+    |                  ^ E127
+329 | #: E127 W503
+330 | input1 = {'a': {'calc': 1 + 2}, 'b': 1
+    |
+
+E12.py:331:27: E127 Continuation line over-indented for visual indent
+    |
+329 | #: E127 W503
+330 | input1 = {'a': {'calc': 1 + 2}, 'b': 1
+331 |                           + 42}
+    |                           ^ E127
+332 | #: E128 W503
+333 | rv.update(d=('a' + 'b', 'c'),
+    |
+
+E12.py:379:12: E127 Continuation line over-indented for visual indent
+    |
+377 |     pass
+378 |     raise 123 + \
+379 |            123
+    |            ^^^ E127
+380 | #: E127:4:13
+381 | class Eggs:
+    |
+
+E12.py:384:13: E127 Continuation line over-indented for visual indent
+    |
+382 |     pass
+383 |     assert 123456 == \
+384 |             123456
+    |             ^^^^^^ E127
+385 | #: E127:4:11
+386 | def f1():
+    |
+
+E12.py:389:11: E127 Continuation line over-indented for visual indent
+    |
+387 |     print('foo')
+388 |     with open('/path/to/some/file/you/want/to/read') as file_1, \
+389 |           open('/path/to/some/file/being/written', 'w') as file_2:
+    |           ^^^^ E127
+390 |         file_2.write(file_1.read())
+391 | #: E127:5:11
+    |
+
+E12.py:396:11: E127 Continuation line over-indented for visual indent
+    |
+394 |     with open('/path/to/some/file/you/want/to/read') as file_1, \
+395 |          open('/path/to/some/file/being/written', 'w') as file_2, \
+396 |           open('later-misindent'):
+    |           ^^^^ E127
+397 |         file_2.write(file_1.read())
+    |

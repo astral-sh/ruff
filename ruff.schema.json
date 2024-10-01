@@ -2538,6 +2538,13 @@
       "description": "Options for the `pycodestyle` plugin.",
       "type": "object",
       "properties": {
+        "hang-closing": {
+          "description": "Whether closing brackets should hang off the end of the parameter list instead of matching the indentation of the corresponding opening bracket (by default: false).\n\nMust be set to true to enable rule E133, and must be set to false to enable E123.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "ignore-overlong-task-comments": {
           "description": "Whether line-length violations (`E501`) should be triggered for comments starting with [`task-tags`](#lint_task-tags) (by default: \"TODO\", \"FIXME\", and \"XXX\").",
           "type": [
@@ -3125,6 +3132,19 @@
         "E115",
         "E116",
         "E117",
+        "E12",
+        "E121",
+        "E122",
+        "E123",
+        "E124",
+        "E125",
+        "E126",
+        "E127",
+        "E128",
+        "E129",
+        "E13",
+        "E131",
+        "E133",
         "E2",
         "E20",
         "E201",

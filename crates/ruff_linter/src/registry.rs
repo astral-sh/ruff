@@ -340,7 +340,18 @@ impl Rule {
             | Rule::WhitespaceAfterOpenBracket
             | Rule::WhitespaceBeforeCloseBracket
             | Rule::WhitespaceBeforeParameters
-            | Rule::WhitespaceBeforePunctuation => LintSource::LogicalLines,
+            | Rule::WhitespaceBeforePunctuation
+            | Rule::ContinuationUnderIndentedHanging
+            | Rule::ContinuationOverIndentedOrMissing
+            | Rule::ClosingBracketMismatched
+            | Rule::ClosingBracketMismatchedVisualIndent
+            | Rule::ContinuationMatchesNextLine
+            | Rule::ContinuationOverIndentedHanging
+            | Rule::ContinuationOverIndentedVisual
+            | Rule::ContinuationUnderIndentedVisual
+            | Rule::VisualIndentMatchesNextLine
+            | Rule::ContinuationUnalignedHanging
+            | Rule::ClosingBracketMissingIndentation => LintSource::LogicalLines,
             _ => LintSource::Ast,
         }
     }
