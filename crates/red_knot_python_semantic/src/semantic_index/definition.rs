@@ -3,6 +3,7 @@ use ruff_db::parsed::ParsedModule;
 use ruff_python_ast as ast;
 
 use crate::ast_node_ref::AstNodeRef;
+use crate::module_resolver::file_to_module;
 use crate::node_key::NodeKey;
 use crate::semantic_index::symbol::{FileScopeId, ScopeId, ScopedSymbolId};
 use crate::Db;
@@ -44,6 +45,14 @@ impl<'db> Definition<'db> {
 
     pub(crate) fn is_binding(self, db: &'db dyn Db) -> bool {
         self.kind(db).category().is_binding()
+    }
+
+    /// Return true if this is a symbol was defined in the `typing` or `typing_extensions` modules
+    pub(crate) fn is_typing_definition(self, db: &'db dyn Db) -> bool {
+        file_to_module(db, self.file(db)).is_some_and(|module| {
+            module.search_path().is_standard_library()
+                && matches!(&**module.name(), "typing" | "typing_extensions")
+        })
     }
 }
 

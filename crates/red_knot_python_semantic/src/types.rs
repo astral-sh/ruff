@@ -256,8 +256,6 @@ pub enum Type<'db> {
     Todo,
     /// A specific function object
     Function(FunctionType<'db>),
-    /// The `typing.reveal_type` function, which has special `__call__` behavior.
-    RevealTypeFunction(FunctionType<'db>),
     /// A specific module object
     Module(File),
     /// A specific class object
@@ -344,16 +342,14 @@ impl<'db> Type<'db> {
 
     pub const fn into_function_type(self) -> Option<FunctionType<'db>> {
         match self {
-            Type::Function(function_type) | Type::RevealTypeFunction(function_type) => {
-                Some(function_type)
-            }
+            Type::Function(function_type) => Some(function_type),
             _ => None,
         }
     }
 
     pub fn expect_function(self) -> FunctionType<'db> {
         self.into_function_type()
-            .expect("Expected a variant wrapping a FunctionType")
+            .expect("Expected a Type::Function variant")
     }
 
     pub const fn into_int_literal_type(self) -> Option<i64> {
@@ -396,9 +392,7 @@ impl<'db> Type<'db> {
     pub fn is_stdlib_symbol(&self, db: &'db dyn Db, module_name: &str, name: &str) -> bool {
         match self {
             Type::Class(class) => class.is_stdlib_symbol(db, module_name, name),
-            Type::Function(function) | Type::RevealTypeFunction(function) => {
-                function.is_stdlib_symbol(db, module_name, name)
-            }
+            Type::Function(function) => function.is_stdlib_symbol(db, module_name, name),
             _ => false,
         }
     }
@@ -492,7 +486,7 @@ impl<'db> Type<'db> {
                 // TODO: attribute lookup on None type
                 Type::Todo
             }
-            Type::Function(_) | Type::RevealTypeFunction(_) => {
+            Type::Function(_) => {
                 // TODO: attribute lookup on function type
                 Type::Todo
             }
@@ -545,7 +539,7 @@ impl<'db> Type<'db> {
                 Truthiness::Ambiguous
             }
             Type::None => Truthiness::AlwaysFalse,
-            Type::Function(_) | Type::RevealTypeFunction(_) => Truthiness::AlwaysTrue,
+            Type::Function(_) => Truthiness::AlwaysTrue,
             Type::Module(_) => Truthiness::AlwaysTrue,
             Type::Class(_) => {
                 // TODO: lookup `__bool__` and `__len__` methods on the class's metaclass
@@ -592,11 +586,13 @@ impl<'db> Type<'db> {
     fn call(self, db: &'db dyn Db, arg_types: &[Type<'db>]) -> CallOutcome<'db> {
         match self {
             // TODO validate typed call arguments vs callable signature
-            Type::Function(function_type) => CallOutcome::callable(function_type.return_type(db)),
-            Type::RevealTypeFunction(function_type) => CallOutcome::revealed(
-                function_type.return_type(db),
-                *arg_types.first().unwrap_or(&Type::Unknown),
-            ),
+            Type::Function(function_type) => match function_type.kind(db) {
+                FunctionKind::Ordinary => CallOutcome::callable(function_type.return_type(db)),
+                FunctionKind::RevealType => CallOutcome::revealed(
+                    function_type.return_type(db),
+                    *arg_types.first().unwrap_or(&Type::Unknown),
+                ),
+            },
 
             // TODO annotated return type on `__new__` or metaclass `__call__`
             Type::Class(class) => {
@@ -719,7 +715,6 @@ impl<'db> Type<'db> {
             Type::BooleanLiteral(_)
             | Type::BytesLiteral(_)
             | Type::Function(_)
-            | Type::RevealTypeFunction(_)
             | Type::Instance(_)
             | Type::Module(_)
             | Type::IntLiteral(_)
@@ -742,7 +737,7 @@ impl<'db> Type<'db> {
             Type::BooleanLiteral(_) => builtins_symbol_ty(db, "bool"),
             Type::BytesLiteral(_) => builtins_symbol_ty(db, "bytes"),
             Type::IntLiteral(_) => builtins_symbol_ty(db, "int"),
-            Type::Function(_) | Type::RevealTypeFunction(_) => types_symbol_ty(db, "FunctionType"),
+            Type::Function(_) => types_symbol_ty(db, "FunctionType"),
             Type::Module(_) => types_symbol_ty(db, "ModuleType"),
             Type::Tuple(_) => builtins_symbol_ty(db, "tuple"),
             Type::None => typeshed_symbol_ty(db, "NoneType"),
@@ -1045,6 +1040,9 @@ pub struct FunctionType<'db> {
     #[return_ref]
     pub name: ast::name::Name,
 
+    /// Is this a function that we special-case somehow? If so, which one?
+    kind: FunctionKind,
+
     definition: Definition<'db>,
 
     /// types of all decorators on this function
@@ -1057,15 +1055,6 @@ impl<'db> FunctionType<'db> {
         name == self.name(db)
             && file_to_module(db, self.definition(db).file(db)).is_some_and(|module| {
                 module.search_path().is_standard_library() && module.name() == module_name
-            })
-    }
-
-    /// Return true if this is a symbol with given name from `typing` or `typing_extensions`.
-    pub(crate) fn is_typing_symbol(self, db: &'db dyn Db, name: &str) -> bool {
-        name == self.name(db)
-            && file_to_module(db, self.definition(db).file(db)).is_some_and(|module| {
-                module.search_path().is_standard_library()
-                    && matches!(&**module.name(), "typing" | "typing_extensions")
             })
     }
 
@@ -1102,6 +1091,15 @@ impl<'db> FunctionType<'db> {
             })
             .unwrap_or(Type::Unknown)
     }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default, Hash)]
+pub enum FunctionKind {
+    /// Just a normal function for which we have no particular special casing
+    #[default]
+    Ordinary,
+    /// `builtins.reveal_type`, `typing.reveal_type` or `typing_extensions.reveal_type`
+    RevealType,
 }
 
 #[salsa::interned]

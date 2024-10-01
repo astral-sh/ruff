@@ -50,8 +50,8 @@ use crate::stdlib::builtins_module_scope;
 use crate::types::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 use crate::types::{
     bindings_ty, builtins_symbol_ty, declarations_ty, global_symbol_ty, symbol_ty,
-    typing_extensions_symbol_ty, BytesLiteralType, ClassType, FunctionType, StringLiteralType,
-    Truthiness, TupleType, Type, TypeArrayDisplay, UnionType,
+    typing_extensions_symbol_ty, BytesLiteralType, ClassType, FunctionKind, FunctionType,
+    StringLiteralType, Truthiness, TupleType, Type, TypeArrayDisplay, UnionType,
 };
 use crate::Db;
 
@@ -732,12 +732,17 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         }
 
-        let function_type = FunctionType::new(self.db, name.id.clone(), definition, decorator_tys);
-        let function_ty = if function_type.is_typing_symbol(self.db, "reveal_type") {
-            Type::RevealTypeFunction(function_type)
-        } else {
-            Type::Function(function_type)
+        let function_kind = match &**name {
+            "reveal_type" if definition.is_typing_definition(self.db) => FunctionKind::RevealType,
+            _ => FunctionKind::Ordinary,
         };
+        let function_ty = Type::Function(FunctionType::new(
+            self.db,
+            name.id.clone(),
+            function_kind,
+            definition,
+            decorator_tys,
+        ));
 
         self.add_declaration_with_binding(function.into(), definition, function_ty, function_ty);
     }
