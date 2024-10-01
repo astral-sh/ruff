@@ -609,8 +609,20 @@ impl<'db> Type<'db> {
                 })
             }
 
-            // TODO: handle classes which implement the `__call__` protocol
-            Type::Instance(_instance_ty) => CallOutcome::callable(Type::Todo),
+            Type::Instance(class) => {
+                // Since `__call__` is a dunder, we need to access it as an attribute on the class
+                // rather than the instance (matching runtime semantics).
+                let meta_ty = Type::Class(class);
+                let dunder_call_method = meta_ty.member(db, "__call__");
+                if dunder_call_method.is_unbound() {
+                    CallOutcome::not_callable(self)
+                } else {
+                    let args = std::iter::once(self)
+                        .chain(arg_types.iter().copied())
+                        .collect::<Vec<_>>();
+                    dunder_call_method.call(db, &args)
+                }
+            }
 
             // `Any` is callable, and its return type is also `Any`.
             Type::Any => CallOutcome::callable(Type::Any),
