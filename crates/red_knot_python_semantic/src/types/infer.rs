@@ -6724,6 +6724,37 @@ mod tests {
     }
 
     #[test]
+    fn dunder_call() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+                class Multiplier:
+                    def __init__(self, factor: float):
+                        self.factor = factor
+
+                    def __call__(self, number: float) -> float:
+                        return number * self.factor
+
+                a = Multiplier(2.0)(3.0)
+
+                class Unit:
+                    ...
+
+                b = Unit()(3.0)
+            ",
+        )?;
+
+        assert_public_ty(&db, "/src/a.py", "a", "float");
+        assert_public_ty(&db, "/src/a.py", "b", "Unknown");
+
+        assert_file_diagnostics(&db, "src/a.py", &["Object of type 'Unit' is not callable."]);
+
+        Ok(())
+    }
+
+    #[test]
     fn boolean_or_expression() -> anyhow::Result<()> {
         let mut db = setup_db();
 
