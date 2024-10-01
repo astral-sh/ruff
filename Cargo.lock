@@ -2336,6 +2336,7 @@ dependencies = [
  "ruff_python_formatter",
  "ruff_python_parser",
  "ruff_python_trivia",
+ "rustc-hash 2.0.0",
  "serde",
  "serde_json",
  "tikv-jemallocator",
