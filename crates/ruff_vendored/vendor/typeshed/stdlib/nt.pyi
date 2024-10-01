@@ -107,5 +107,7 @@ if sys.platform == "win32":
             listvolumes as listvolumes,
             set_blocking as set_blocking,
         )
+    if sys.version_info >= (3, 13):
+        from os import fchmod as fchmod, lchmod as lchmod
 
     environ: dict[str, str]

@@ -161,6 +161,8 @@ importlib.metadata._meta: 3.10-
 importlib.metadata.diagnose: 3.13-
 importlib.readers: 3.10-
 importlib.resources: 3.7-
+importlib.resources._common: 3.11-
+importlib.resources._functional: 3.13-
 importlib.resources.abc: 3.11-
 importlib.resources.readers: 3.11-
 importlib.resources.simple: 3.11-

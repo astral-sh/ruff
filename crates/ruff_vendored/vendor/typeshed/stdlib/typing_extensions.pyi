@@ -261,7 +261,7 @@ OrderedDict = _Alias()
 def get_type_hints(
     obj: Callable[..., Any],
     globalns: dict[str, Any] | None = None,
-    localns: dict[str, Any] | None = None,
+    localns: Mapping[str, Any] | None = None,
     include_extras: bool = False,
 ) -> dict[str, Any]: ...
 def get_args(tp: Any) -> tuple[Any, ...]: ...

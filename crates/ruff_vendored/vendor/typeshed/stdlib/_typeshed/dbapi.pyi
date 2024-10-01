@@ -1,4 +1,4 @@
- # PEP 249 Database API 2.0 Types
+# PEP 249 Database API 2.0 Types
 # https://www.python.org/dev/peps/pep-0249/
 
 from collections.abc import Mapping, Sequence
