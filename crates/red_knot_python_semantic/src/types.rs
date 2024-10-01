@@ -401,6 +401,16 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Return true if the type is a class or a union of classes.
+    pub fn is_class(&self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::Union(union) => union.elements(db).iter().all(|ty| ty.is_class(db)),
+            Type::Class(_) => true,
+            // / TODO include type[X], once we add that type
+            _ => false,
+        }
+    }
+
     /// Return true if this type is a [subtype of] type `target`.
     ///
     /// [subtype of]: https://typing.readthedocs.io/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
