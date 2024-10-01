@@ -2616,7 +2616,19 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if !dunder_getitem_method.is_unbound() {
                     return dunder_getitem_method
                         .call(self.db, &[slice_ty])
-                        .unwrap_with_diagnostic(self.db, value.as_ref().into(), self);
+                        .return_ty_result(self.db, value.as_ref().into(), self)
+                        .unwrap_or_else(|err| {
+                            self.add_diagnostic(
+                                (&**value).into(),
+                                "call-non-callable",
+                                format_args!(
+                                    "Method `__getitem__` of type '{}' is not callable on object of type '{}'.",
+                                    err.called_ty().display(self.db),
+                                    value_ty.display(self.db),
+                                ),
+                            );
+                            err.return_ty()
+                        });
                 }
 
                 // Otherwise, if the value is itself a class and defines `__class_getitem__`,
@@ -2626,7 +2638,19 @@ impl<'db> TypeInferenceBuilder<'db> {
                     if !dunder_class_getitem_method.is_unbound() {
                         return dunder_class_getitem_method
                             .call(self.db, &[slice_ty])
-                            .unwrap_with_diagnostic(self.db, value.as_ref().into(), self);
+                            .return_ty_result(self.db, value.as_ref().into(), self)
+                            .unwrap_or_else(|err| {
+                                self.add_diagnostic(
+                                    (&**value).into(),
+                                    "call-non-callable",
+                                    format_args!(
+                                        "Method `__class_getitem__` of type '{}' is not callable on object of type '{}'.",
+                                        err.called_ty().display(self.db),
+                                        value_ty.display(self.db),
+                                    ),
+                                );
+                                err.return_ty()
+                            });
                     }
 
                     self.non_subscriptable_diagnostic(
@@ -6840,7 +6864,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "/src/a.py",
-            &["Object of type 'None' is not callable."],
+            &["Method `__getitem__` of type 'None' is not callable on object of type 'NotSubscriptable'."],
         );
 
         Ok(())
@@ -7015,7 +7039,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "/src/a.py",
-            &["Object of type 'Literal[__class_getitem__] | Unbound' is not callable (due to union element 'Unbound')."],
+            &["Method `__class_getitem__` of type 'Literal[__class_getitem__] | Unbound' is not callable on object of type 'Literal[Identity, Identity]'."],
         );
 
         Ok(())
