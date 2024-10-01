@@ -10,13 +10,13 @@ use ruff_benchmark::criterion::{criterion_group, criterion_main, BatchSize, Crit
 use ruff_benchmark::TestFile;
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::source::source_text;
-use ruff_db::system::{MemoryFileSystem, SystemPath, TestSystem};
+use ruff_db::system::{MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem};
 
 struct Case {
     db: RootDatabase,
     fs: MemoryFileSystem,
     re: File,
-    re_path: &'static SystemPath,
+    re_path: SystemPathBuf,
 }
 
 const TOMLLIB_312_URL: &str = "https://raw.githubusercontent.com/python/cpython/8e8a4baf652f6e1cee7acde9d78c4b6154539748/Lib/tomllib";
@@ -40,23 +40,21 @@ fn get_test_file(name: &str) -> TestFile {
     TestFile::try_download(&path, &url).unwrap()
 }
 
+fn tomllib_path(filename: &str) -> SystemPathBuf {
+    SystemPathBuf::from(format!("/src/tomllib/{filename}").as_str())
+}
+
 fn setup_case() -> Case {
     let system = TestSystem::default();
     let fs = system.memory_file_system().clone();
-    let parser_path = SystemPath::new("/src/tomllib/_parser.py");
-    let re_path = SystemPath::new("/src/tomllib/_re.py");
-    fs.write_files([
+
+    let tomllib_filenames = ["__init__.py", "_parser.py", "_re.py", "_types.py"];
+    fs.write_files(tomllib_filenames.iter().map(|filename| {
         (
-            SystemPath::new("/src/tomllib/__init__.py"),
-            get_test_file("__init__.py").code(),
-        ),
-        (parser_path, get_test_file("_parser.py").code()),
-        (re_path, get_test_file("_re.py").code()),
-        (
-            SystemPath::new("/src/tomllib/_types.py"),
-            get_test_file("_types.py").code(),
-        ),
-    ])
+            tomllib_path(filename),
+            get_test_file(filename).code().to_string(),
+        )
+    }))
     .unwrap();
 
     let src_root = SystemPath::new("/src");
@@ -71,11 +69,12 @@ fn setup_case() -> Case {
     .unwrap();
 
     let mut db = RootDatabase::new(metadata, system).unwrap();
-    let parser = system_path_to_file(&db, parser_path).unwrap();
+    let parser = system_path_to_file(&db, tomllib_path("_parser.py")).unwrap();
 
     db.workspace().open_file(&mut db, parser);
 
-    let re = system_path_to_file(&db, re_path).unwrap();
+    let re_path = tomllib_path("_re.py");
+    let re = system_path_to_file(&db, &re_path).unwrap();
 
     Case {
         db,
@@ -112,7 +111,7 @@ fn benchmark_incremental(criterion: &mut Criterion) {
 
                 case.fs
                     .write_file(
-                        case.re_path,
+                        &case.re_path,
                         format!("{}\n# A comment\n", source_text(&case.db, case.re).as_str()),
                     )
                     .unwrap();
