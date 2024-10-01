@@ -221,9 +221,9 @@ fn declarations_ty<'db>(
         first
     };
     if conflicting.is_empty() {
-        DeclaredTypeResult::Ok(declared_ty)
+        Ok(declared_ty)
     } else {
-        DeclaredTypeResult::Err((
+        Err((
             declared_ty,
             [first].into_iter().chain(conflicting).collect(),
         ))
@@ -900,15 +900,73 @@ impl<'db> CallOutcome<'db> {
         }
     }
 
-    /// Get the return type of the call, emitting diagnostics if needed.
+    /// Get the return type of the call, emitting default diagnostics if needed.
     fn unwrap_with_diagnostic<'a>(
         &self,
         db: &'db dyn Db,
         node: ast::AnyNodeRef,
         builder: &'a mut TypeInferenceBuilder<'db>,
     ) -> Type<'db> {
+        match self.return_ty_result(db, node, builder) {
+            Ok(return_ty) => return_ty,
+            Err(NotCallableError::Type {
+                not_callable_ty,
+                return_ty,
+            }) => {
+                builder.add_diagnostic(
+                    node,
+                    "call-non-callable",
+                    format_args!(
+                        "Object of type '{}' is not callable.",
+                        not_callable_ty.display(db)
+                    ),
+                );
+                return_ty
+            }
+            Err(NotCallableError::UnionElement {
+                not_callable_ty,
+                called_ty,
+                return_ty,
+            }) => {
+                builder.add_diagnostic(
+                    node,
+                    "call-non-callable",
+                    format_args!(
+                        "Object of type '{}' is not callable (due to union element '{}').",
+                        called_ty.display(db),
+                        not_callable_ty.display(db),
+                    ),
+                );
+                return_ty
+            }
+            Err(NotCallableError::UnionElements {
+                not_callable_tys,
+                called_ty,
+                return_ty,
+            }) => {
+                builder.add_diagnostic(
+                    node,
+                    "call-non-callable",
+                    format_args!(
+                        "Object of type '{}' is not callable (due to union elements {}).",
+                        called_ty.display(db),
+                        not_callable_tys.display(db),
+                    ),
+                );
+                return_ty
+            }
+        }
+    }
+
+    /// Get the return type of the call as a result.
+    fn return_ty_result<'a>(
+        &self,
+        db: &'db dyn Db,
+        node: ast::AnyNodeRef,
+        builder: &'a mut TypeInferenceBuilder<'db>,
+    ) -> Result<Type<'db>, NotCallableError<'db>> {
         match self {
-            Self::Callable { return_ty } => *return_ty,
+            Self::Callable { return_ty } => Ok(*return_ty),
             Self::RevealType {
                 return_ty,
                 revealed_ty,
@@ -918,19 +976,12 @@ impl<'db> CallOutcome<'db> {
                     "revealed-type",
                     format_args!("Revealed type is '{}'.", revealed_ty.display(db)),
                 );
-                *return_ty
+                Ok(*return_ty)
             }
-            Self::NotCallable { not_callable_ty } => {
-                builder.add_diagnostic(
-                    node,
-                    "call-non-callable",
-                    format_args!(
-                        "Object of type '{}' is not callable.",
-                        not_callable_ty.display(db)
-                    ),
-                );
-                Type::Unknown
-            }
+            Self::NotCallable { not_callable_ty } => Err(NotCallableError::Type {
+                not_callable_ty: *not_callable_ty,
+                return_ty: Type::Unknown,
+            }),
             Self::Union {
                 outcomes,
                 called_ty,
@@ -959,37 +1010,71 @@ impl<'db> CallOutcome<'db> {
                     };
                     union_builder = union_builder.add(return_ty);
                 }
+                let return_ty = union_builder.build();
                 match not_callable[..] {
-                    [] => {}
-                    [elem] => builder.add_diagnostic(
-                        node,
-                        "call-non-callable",
-                        format_args!(
-                            "Object of type '{}' is not callable (due to union element '{}').",
-                            called_ty.display(db),
-                            elem.display(db),
-                        ),
-                    ),
-                    _ if not_callable.len() == outcomes.len() => builder.add_diagnostic(
-                        node,
-                        "call-non-callable",
-                        format_args!(
-                            "Object of type '{}' is not callable.",
-                            called_ty.display(db)
-                        ),
-                    ),
-                    _ => builder.add_diagnostic(
-                        node,
-                        "call-non-callable",
-                        format_args!(
-                            "Object of type '{}' is not callable (due to union elements {}).",
-                            called_ty.display(db),
-                            not_callable.display(db),
-                        ),
-                    ),
+                    [] => Ok(return_ty),
+                    [elem] => Err(NotCallableError::UnionElement {
+                        not_callable_ty: elem,
+                        called_ty: *called_ty,
+                        return_ty,
+                    }),
+                    _ if not_callable.len() == outcomes.len() => Err(NotCallableError::Type {
+                        not_callable_ty: *called_ty,
+                        return_ty,
+                    }),
+                    _ => Err(NotCallableError::UnionElements {
+                        not_callable_tys: not_callable.into_boxed_slice(),
+                        called_ty: *called_ty,
+                        return_ty,
+                    }),
                 }
-                union_builder.build()
             }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum NotCallableError<'db> {
+    /// The type is not callable.
+    Type {
+        not_callable_ty: Type<'db>,
+        return_ty: Type<'db>,
+    },
+    /// A single union element is not callable.
+    UnionElement {
+        not_callable_ty: Type<'db>,
+        called_ty: Type<'db>,
+        return_ty: Type<'db>,
+    },
+    /// Multiple (but not all) union elements are not callable.
+    UnionElements {
+        not_callable_tys: Box<[Type<'db>]>,
+        called_ty: Type<'db>,
+        return_ty: Type<'db>,
+    },
+}
+
+impl<'db> NotCallableError<'db> {
+    /// The return type that should be used when a call is not callable.
+    fn return_ty(&self) -> Type<'db> {
+        match self {
+            Self::Type { return_ty, .. } => *return_ty,
+            Self::UnionElement { return_ty, .. } => *return_ty,
+            Self::UnionElements { return_ty, .. } => *return_ty,
+        }
+    }
+
+    /// The resolved type that was not callable.
+    ///
+    /// For unions, returns the union type itself, which may contain a mix of callable and
+    /// non-callable types.
+    fn called_ty(&self) -> Type<'db> {
+        match self {
+            Self::Type {
+                not_callable_ty, ..
+            } => *not_callable_ty,
+            Self::UnionElement { called_ty, .. } => *called_ty,
+            Self::UnionElements { called_ty, .. } => *called_ty,
         }
     }
 }
