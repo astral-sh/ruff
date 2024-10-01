@@ -50,7 +50,7 @@ file_resolver.exclude = [
 	"venv",
 ]
 file_resolver.extend_exclude = [
-	"crates/ruff_vendored/vendor/",
+	"crates/red_knot_vendored/vendor/",
 	"crates/ruff/resources/",
 	"crates/ruff_linter/resources/",
 	"crates/ruff_python_formatter/resources/",

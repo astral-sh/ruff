@@ -34,7 +34,7 @@ ruff_python_trivia = { path = "crates/ruff_python_trivia" }
 ruff_server = { path = "crates/ruff_server" }
 ruff_source_file = { path = "crates/ruff_source_file" }
 ruff_text_size = { path = "crates/ruff_text_size" }
-ruff_vendored = { path = "crates/ruff_vendored" }
+red_knot_vendored = { path = "crates/red_knot_vendored" }
 ruff_workspace = { path = "crates/ruff_workspace" }
 
 red_knot_python_semantic = { path = "crates/red_knot_python_semantic" }
