@@ -11,6 +11,7 @@ use ruff_benchmark::TestFile;
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::source::source_text;
 use ruff_db::system::{MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem};
+use rustc_hash::FxHashSet;
 
 struct Case {
     db: RootDatabase,
@@ -23,6 +24,7 @@ const TOMLLIB_312_URL: &str = "https://raw.githubusercontent.com/python/cpython/
 
 // The failed import from 'collections.abc' is due to lack of support for 'import *'.
 static EXPECTED_DIAGNOSTICS: &[&str] = &[
+    "/src/tomllib/__init__.py:10:30: Name '__name__' used when not defined.",
     "/src/tomllib/_parser.py:7:29: Module 'collections.abc' has no member 'Iterable'",
     "Line 69 is too long (89 characters)",
     "Use double quotes for strings",
@@ -69,13 +71,15 @@ fn setup_case() -> Case {
     .unwrap();
 
     let mut db = RootDatabase::new(metadata, system).unwrap();
-    let parser = system_path_to_file(&db, tomllib_path("_parser.py")).unwrap();
 
-    db.workspace().open_file(&mut db, parser);
+    let tomllib_files: FxHashSet<File> = tomllib_filenames
+        .iter()
+        .map(|filename| system_path_to_file(&db, tomllib_path(filename)).unwrap())
+        .collect();
+    db.workspace().set_open_files(&mut db, tomllib_files);
 
     let re_path = tomllib_path("_re.py");
     let re = system_path_to_file(&db, &re_path).unwrap();
-
     Case {
         db,
         fs,
@@ -123,7 +127,7 @@ fn benchmark_incremental(criterion: &mut Criterion) {
 
                 db.apply_changes(
                     vec![ChangeEvent::Changed {
-                        path: case.re_path.to_path_buf(),
+                        path: case.re_path.clone(),
                         kind: ChangedKind::FileContent,
                     }],
                     None,
