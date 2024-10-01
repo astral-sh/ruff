@@ -1327,12 +1327,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         node: AnyNodeRef,
         non_subscriptable_ty: Type<'db>,
+        method: &str,
     ) {
         self.add_diagnostic(
             node,
             "non-subscriptable",
             format_args!(
-                "Cannot subscript object of type '{}' with no `__getitem__` method.",
+                "Cannot subscript object of type '{}' with no `{method}` method.",
                 non_subscriptable_ty.display(self.db)
             ),
         );
@@ -2627,10 +2628,16 @@ impl<'db> TypeInferenceBuilder<'db> {
                             .call(self.db, &[slice_ty])
                             .unwrap_with_diagnostic(self.db, value.as_ref().into(), self);
                     }
+
+                    self.non_subscriptable_diagnostic(
+                        (&**value).into(),
+                        value_ty,
+                        "__class_getitem__",
+                    );
+                } else {
+                    self.non_subscriptable_diagnostic((&**value).into(), value_ty, "__getitem__");
                 }
 
-                // Otherwise, emit a diagnostic.
-                self.non_subscriptable_diagnostic((&**value).into(), value_ty);
                 Type::Unknown
             }
         }
@@ -6786,6 +6793,30 @@ mod tests {
             &db,
             "/src/a.py",
             &["Cannot subscript object of type 'NotSubscriptable' with no `__getitem__` method."],
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn subscript_class_getitem_unbound() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+                class NotSubscriptable:
+                    pass
+
+                a = NotSubscriptable[0]
+            ",
+        )?;
+
+        assert_public_ty(&db, "/src/a.py", "a", "Unknown");
+        assert_file_diagnostics(
+            &db,
+            "/src/a.py",
+            &["Cannot subscript object of type 'Literal[NotSubscriptable]' with no `__class_getitem__` method."],
         );
 
         Ok(())
