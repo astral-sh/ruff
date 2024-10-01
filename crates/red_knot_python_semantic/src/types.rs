@@ -616,8 +616,7 @@ impl<'db> Type<'db> {
             Type::Instance(class) => {
                 // Since `__call__` is a dunder, we need to access it as an attribute on the class
                 // rather than the instance (matching runtime semantics).
-                let meta_ty = Type::Class(class);
-                let dunder_call_method = meta_ty.member(db, "__call__");
+                let dunder_call_method = class.class_member(db, "__call__");
                 if dunder_call_method.is_unbound() {
                     CallOutcome::not_callable(self)
                 } else {
