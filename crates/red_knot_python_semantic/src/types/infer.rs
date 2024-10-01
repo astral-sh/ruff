@@ -49,7 +49,7 @@ use crate::semantic_index::SemanticIndex;
 use crate::stdlib::builtins_module_scope;
 use crate::types::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 use crate::types::{
-    bindings_ty, builtins_symbol_ty, declarations_ty, global_symbol_ty, symbol_ty,
+    bindings_ty, builtins_symbol_ty, declarations_ty, global_symbol_lookup, symbol_ty,
     typing_extensions_symbol_ty, BytesLiteralType, ClassType, FunctionKind, FunctionType,
     StringLiteralType, Truthiness, TupleType, Type, TypeArrayDisplay, UnionType,
 };
@@ -2210,7 +2210,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             let ty = if file_scope_id.is_global() {
                 Type::Unbound
             } else {
-                global_symbol_ty(self.db, self.file, name)
+                global_symbol_lookup(self.db, self.file, name)
             };
             // Fallback to builtins (without infinite recursion if we're already in builtins.)
             if ty.may_be_unbound(self.db) && Some(self.scope) != builtins_module_scope(self.db) {
@@ -3016,6 +3016,7 @@ mod tests {
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast::name::Name;
+    use test_case::test_case;
 
     use super::TypeInferenceBuilder;
 
@@ -4759,18 +4760,23 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn conditionally_global_or_builtin() -> anyhow::Result<()> {
+    #[test_case("")]
+    // Tests that we only use the definition of a symbol instead of its declaration when we are
+    // checking module globals without a nonlocal binding.
+    #[test_case(": int"; "with a declaration")]
+    fn conditionally_global_or_builtin(annotation: &'static str) -> anyhow::Result<()> {
         let mut db = setup_db();
 
         db.write_dedented(
             "/src/a.py",
-            "
-            if flag:
-                copyright = 1
-            def f():
-                y = copyright
+            &format!(
+                "
+                if flag:
+                    copyright {annotation} = 1
+                def f():
+                    y = copyright
             ",
+            ),
         )?;
 
         let file = system_path_to_file(&db, "src/a.py").expect("Expected file to exist.");
