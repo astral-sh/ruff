@@ -624,8 +624,7 @@ impl<'db> Type<'db> {
                 union
                     .elements(db)
                     .iter()
-                    .map(|elem| elem.call(db, arg_types))
-                    .collect::<Box<[CallOutcome<'db>]>>(),
+                    .map(|elem| elem.call(db, arg_types)),
             ),
 
             // TODO: intersection types
@@ -664,7 +663,7 @@ impl<'db> Type<'db> {
         if !dunder_iter_method.is_unbound() {
             let CallOutcome::Callable {
                 return_ty: iterator_ty,
-            } = dunder_iter_method.call(db, &[])
+            } = dunder_iter_method.call(db, &[self])
             else {
                 return IterationOutcome::NotIterable {
                     not_iterable_ty: self,
@@ -673,7 +672,7 @@ impl<'db> Type<'db> {
 
             let dunder_next_method = iterator_ty.to_meta_type(db).member(db, "__next__");
             return dunder_next_method
-                .call(db, &[])
+                .call(db, &[self])
                 .return_ty(db)
                 .map(|element_ty| IterationOutcome::Iterable { element_ty })
                 .unwrap_or(IterationOutcome::NotIterable {
@@ -690,7 +689,7 @@ impl<'db> Type<'db> {
         let dunder_get_item_method = iterable_meta_type.member(db, "__getitem__");
 
         dunder_get_item_method
-            .call(db, &[])
+            .call(db, &[self, builtins_symbol_ty(db, "int").to_instance(db)])
             .return_ty(db)
             .map(|element_ty| IterationOutcome::Iterable { element_ty })
             .unwrap_or(IterationOutcome::NotIterable {
@@ -840,11 +839,11 @@ impl<'db> CallOutcome<'db> {
     /// Create a new `CallOutcome::Union` with given wrapped outcomes.
     fn union(
         called_ty: Type<'db>,
-        outcomes: impl Into<Box<[CallOutcome<'db>]>>,
+        outcomes: impl IntoIterator<Item = CallOutcome<'db>>,
     ) -> CallOutcome<'db> {
         CallOutcome::Union {
             called_ty,
-            outcomes: outcomes.into(),
+            outcomes: outcomes.into_iter().collect(),
         }
     }
 
