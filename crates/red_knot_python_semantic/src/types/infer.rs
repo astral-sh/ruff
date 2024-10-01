@@ -504,8 +504,8 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     /// Raise a diagnostic if the given type cannot be divided by zero.
     ///
-    /// Expects the type of the left side of the binary expression.
-    fn check_division_by_zero(&mut self, node: AnyNodeRef, left: Type<'db>) {
+    /// Expects the resolved type of the left side of the binary expression.
+    fn check_division_by_zero(&mut self, expr: &ast::ExprBinOp, left: Type<'db>) {
         match left {
             Type::IntLiteral(_) => {}
             Type::Instance(cls)
@@ -514,12 +514,19 @@ impl<'db> TypeInferenceBuilder<'db> {
             _ => return,
         };
 
+        let (op, by_zero) = match expr.op {
+            ast::Operator::Div => ("divide", "by zero."),
+            ast::Operator::FloorDiv => ("floor divide", "by zero."),
+            ast::Operator::Mod => ("reduce", "modulo zero."),
+            _ => return,
+        };
+
         self.add_diagnostic(
-            node,
+            expr.into(),
             "division-by-zero",
             format_args!(
-                "Cannot divide object of type '{}' by zero.",
-                left.display(self.db),
+                "Cannot {op} object of type '{}' {by_zero}",
+                left.display(self.db)
             ),
         );
     }
@@ -2308,7 +2315,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::IntLiteral(0),
             )
         ) {
-            self.check_division_by_zero(binary.into(), left_ty);
+            self.check_division_by_zero(binary, left_ty);
         }
 
         match (left_ty, right_ty, op) {
@@ -4216,8 +4223,8 @@ mod tests {
             "src/a.py",
             &[
                 "Cannot divide object of type 'Literal[1]' by zero.",
-                "Cannot divide object of type 'Literal[2]' by zero.",
-                "Cannot divide object of type 'Literal[3]' by zero.",
+                "Cannot floor divide object of type 'Literal[2]' by zero.",
+                "Cannot reduce object of type 'Literal[3]' modulo zero.",
                 "Cannot divide object of type 'int' by zero.",
                 "Cannot divide object of type 'float' by zero.",
             ],
