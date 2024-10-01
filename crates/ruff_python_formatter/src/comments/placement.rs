@@ -370,10 +370,10 @@ fn handle_end_of_line_comment_around_body<'a>(
         return CommentPlacement::Default(comment);
     }
 
-    // If it's an end-of-line comment before a body, attach it as a trailing comment
+    // If it's an end-of-line comment before a body, attach it as a dangling comment
     if let Some(preceding) = comment.preceding_node() {
         if let Some(last_child) = preceding.last_child_in_body() {
-            return CommentPlacement::trailing(last_child, comment);
+            return CommentPlacement::dangling(last_child, comment);
         }
     }
 

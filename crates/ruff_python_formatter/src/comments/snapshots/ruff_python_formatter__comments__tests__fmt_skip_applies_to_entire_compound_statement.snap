@@ -9,14 +9,14 @@ expression: comments.debug(test_case.source_code)
         source: `x = 0`,
     }: {
         "leading": [],
-        "dangling": [],
-        "trailing": [
+        "dangling": [
             SourceComment {
                 text: "# fmt: skip",
                 position: EndOfLine,
                 formatted: false,
             },
         ],
+        "trailing": [],
     },
     Node {
         kind: StmtExpr,
@@ -24,14 +24,14 @@ expression: comments.debug(test_case.source_code)
         source: `...`,
     }: {
         "leading": [],
-        "dangling": [],
-        "trailing": [
+        "dangling": [
             SourceComment {
                 text: "# fmt: skip",
                 position: EndOfLine,
                 formatted: false,
             },
         ],
+        "trailing": [],
     },
     Node {
         kind: StmtExpr,
@@ -39,14 +39,14 @@ expression: comments.debug(test_case.source_code)
         source: `...`,
     }: {
         "leading": [],
-        "dangling": [],
-        "trailing": [
+        "dangling": [
             SourceComment {
                 text: "# fmt: skip",
                 position: EndOfLine,
                 formatted: false,
             },
         ],
+        "trailing": [],
     },
     Node {
         kind: StmtExpr,
@@ -54,14 +54,14 @@ expression: comments.debug(test_case.source_code)
         source: `...`,
     }: {
         "leading": [],
-        "dangling": [],
-        "trailing": [
+        "dangling": [
             SourceComment {
                 text: "# fmt: skip",
                 position: EndOfLine,
                 formatted: false,
             },
         ],
+        "trailing": [],
     },
     Node {
         kind: StmtIf,
