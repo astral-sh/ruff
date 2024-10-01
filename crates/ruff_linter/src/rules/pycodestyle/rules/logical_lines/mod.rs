@@ -1,3 +1,4 @@
+pub(crate) use continued_indentation::*;
 pub(crate) use extraneous_whitespace::*;
 pub(crate) use indentation::*;
 pub(crate) use missing_whitespace::*;
@@ -22,6 +23,7 @@ use ruff_source_file::Locator;
 
 use crate::rules::pycodestyle::helpers::is_non_logical_token;
 
+mod continued_indentation;
 mod extraneous_whitespace;
 mod indentation;
 mod missing_whitespace;
@@ -213,6 +215,10 @@ impl<'a> LogicalLine<'a> {
 
     pub(crate) fn first_token(&self) -> Option<&'a LogicalLineToken> {
         self.tokens().first()
+    }
+
+    pub(crate) fn last_token(&self) -> Option<&'a LogicalLineToken> {
+        self.tokens().last()
     }
 
     /// Returns the line's flags
