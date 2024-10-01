@@ -2084,6 +2084,7 @@ dependencies = [
  "hashbrown",
  "insta",
  "ordermap",
+ "red_knot_vendored",
  "ruff_db",
  "ruff_index",
  "ruff_python_ast",
@@ -2092,7 +2093,6 @@ dependencies = [
  "ruff_python_stdlib",
  "ruff_source_file",
  "ruff_text_size",
- "ruff_vendored",
  "rustc-hash 2.0.0",
  "salsa",
  "smallvec",
@@ -2128,6 +2128,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "red_knot_vendored"
+version = "0.0.0"
+dependencies = [
+ "once_cell",
+ "path-slash",
+ "ruff_db",
+ "walkdir",
+ "zip",
+]
+
+[[package]]
 name = "red_knot_wasm"
 version = "0.0.0"
 dependencies = [
@@ -2152,11 +2163,11 @@ dependencies = [
  "notify",
  "rayon",
  "red_knot_python_semantic",
+ "red_knot_vendored",
  "ruff_cache",
  "ruff_db",
  "ruff_python_ast",
  "ruff_text_size",
- "ruff_vendored",
  "rustc-hash 2.0.0",
  "salsa",
  "tempfile",
@@ -2788,17 +2799,6 @@ dependencies = [
  "serde",
  "serde_test",
  "static_assertions",
-]
-
-[[package]]
-name = "ruff_vendored"
-version = "0.0.0"
-dependencies = [
- "once_cell",
- "path-slash",
- "ruff_db",
- "walkdir",
- "zip",
 ]
 
 [[package]]

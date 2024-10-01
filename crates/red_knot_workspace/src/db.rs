@@ -124,7 +124,7 @@ impl SemanticDb for RootDatabase {
 #[salsa::db]
 impl SourceDb for RootDatabase {
     fn vendored(&self) -> &VendoredFileSystem {
-        ruff_vendored::file_system()
+        red_knot_vendored::file_system()
     }
 
     fn system(&self) -> &dyn System {
@@ -183,7 +183,7 @@ pub(crate) mod tests {
             Self {
                 storage: salsa::Storage::default(),
                 system: TestSystem::default(),
-                vendored: ruff_vendored::file_system().clone(),
+                vendored: red_knot_vendored::file_system().clone(),
                 files: Files::default(),
                 events: Arc::default(),
             }

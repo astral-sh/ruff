@@ -2,7 +2,7 @@ fail_fast: true
 
 exclude: |
   (?x)^(
-    crates/ruff_vendored/vendor/.*|
+    crates/red_knot_vendored/vendor/.*|
     crates/red_knot_workspace/resources/.*|
     crates/ruff_linter/resources/.*|
     crates/ruff_linter/src/rules/.*/snapshots/.*|

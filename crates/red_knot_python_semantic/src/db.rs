@@ -32,7 +32,7 @@ pub(crate) mod tests {
             Self {
                 storage: salsa::Storage::default(),
                 system: TestSystem::default(),
-                vendored: ruff_vendored::file_system().clone(),
+                vendored: red_knot_vendored::file_system().clone(),
                 events: std::sync::Arc::default(),
                 files: Files::default(),
             }

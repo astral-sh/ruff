@@ -391,7 +391,7 @@ mod tests {
         let db = TestDb::new();
         let vendored_typeshed_versions = vendored_typeshed_versions(&db);
         let vendored_typeshed_dir =
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../ruff_vendored/vendor/typeshed");
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../red_knot_vendored/vendor/typeshed");
 
         let mut empty_iterator = true;
 

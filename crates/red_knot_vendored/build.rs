@@ -3,7 +3,7 @@
 //!
 //! This script should be automatically run at build time
 //! whenever the script itself changes, or whenever any files
-//! in `crates/ruff_vendored/vendor/typeshed` change.
+//! in `crates/red_knot_vendored/vendor/typeshed` change.
 
 use std::fs::File;
 use std::path::Path;
