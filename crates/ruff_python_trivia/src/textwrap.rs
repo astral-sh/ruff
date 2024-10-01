@@ -437,5 +437,29 @@ mod tests {
             "baz"
         ].join("\n");
         assert_eq!(dedent_to(&x, ""), Some(y));
+
+        let x = [
+            "  # foo",
+            "    # bar",
+            "# baz"
+        ].join("\n");
+        let y = [
+            "  # foo",
+            "  # bar",
+            "# baz"
+        ].join("\n");
+        assert_eq!(dedent_to(&x, "  "), Some(y));
+
+        let x = [
+            "  # foo",
+            "    bar",
+            "      baz"
+        ].join("\n");
+        let y = [
+            "  # foo",
+            "  bar",
+            "    baz"
+        ].join("\n");
+        assert_eq!(dedent_to(&x, "  "), Some(y));
     }
 }
