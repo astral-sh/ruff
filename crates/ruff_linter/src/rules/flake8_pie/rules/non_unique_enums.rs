@@ -62,8 +62,8 @@ pub(crate) fn non_unique_enums(checker: &mut Checker, parent: &Stmt, body: &[Stm
     if !parent.bases().iter().any(|expr| {
         checker
             .semantic()
-            .resolve_call_path(expr)
-            .is_some_and(|call_path| matches!(call_path.as_slice(), ["enum", "Enum"]))
+            .resolve_qualified_name(expr)
+            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["enum", "Enum"]))
     }) {
         return;
     }
@@ -77,8 +77,8 @@ pub(crate) fn non_unique_enums(checker: &mut Checker, parent: &Stmt, body: &[Stm
         if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
             if checker
                 .semantic()
-                .resolve_call_path(func)
-                .is_some_and(|call_path| matches!(call_path.as_slice(), ["enum", "auto"]))
+                .resolve_qualified_name(func)
+                .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["enum", "auto"]))
             {
                 continue;
             }

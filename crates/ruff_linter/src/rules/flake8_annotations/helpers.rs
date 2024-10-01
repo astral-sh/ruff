@@ -5,6 +5,7 @@ use ruff_diagnostics::Edit;
 use ruff_python_ast::helpers::{
     pep_604_union, typing_optional, typing_union, ReturnStatementVisitor,
 };
+use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, ExprContext};
 use ruff_python_semantic::analyze::terminal::Terminal;
@@ -17,10 +18,13 @@ use crate::importer::{ImportRequest, Importer};
 use crate::settings::types::PythonVersion;
 
 /// Return the name of the function, if it's overloaded.
-pub(crate) fn overloaded_name(definition: &Definition, semantic: &SemanticModel) -> Option<String> {
+pub(crate) fn overloaded_name<'a>(
+    definition: &'a Definition,
+    semantic: &SemanticModel,
+) -> Option<&'a str> {
     let function = definition.as_function_def()?;
     if visibility::is_overload(&function.decorator_list, semantic) {
-        Some(function.name.to_string())
+        Some(function.name.as_str())
     } else {
         None
     }
@@ -137,7 +141,7 @@ impl AutoPythonType {
                     )
                     .ok()?;
                 let expr = Expr::Name(ast::ExprName {
-                    id: binding,
+                    id: Name::from(binding),
                     range: TextRange::default(),
                     ctx: ExprContext::Load,
                 });
@@ -178,7 +182,7 @@ impl AutoPythonType {
                                     semantic,
                                 )
                                 .ok()?;
-                            let expr = typing_optional(element, binding);
+                            let expr = typing_optional(element, Name::from(binding));
                             Some((expr, vec![optional_edit]))
                         }
                         _ => {
@@ -195,7 +199,7 @@ impl AutoPythonType {
                                     semantic,
                                 )
                                 .ok()?;
-                            let expr = typing_union(&elements, binding);
+                            let expr = typing_union(&elements, Name::from(binding));
                             Some((expr, vec![union_edit]))
                         }
                     }

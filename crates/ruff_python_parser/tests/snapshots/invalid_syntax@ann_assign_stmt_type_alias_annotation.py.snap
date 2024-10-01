@@ -1,0 +1,110 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/ann_assign_stmt_type_alias_annotation.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..37,
+        body: [
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 0..7,
+                    target: Name(
+                        ExprName {
+                            range: 0..1,
+                            id: Name("a"),
+                            ctx: Store,
+                        },
+                    ),
+                    annotation: Name(
+                        ExprName {
+                            range: 3..7,
+                            id: Name("type"),
+                            ctx: Load,
+                        },
+                    ),
+                    value: None,
+                    simple: true,
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 8..15,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 8..9,
+                                id: Name("X"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: Name(
+                        ExprName {
+                            range: 12..15,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 16..28,
+                    value: Lambda(
+                        ExprLambda {
+                            range: 16..28,
+                            parameters: None,
+                            body: Name(
+                                ExprName {
+                                    range: 24..28,
+                                    id: Name("type"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 29..36,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 29..30,
+                                id: Name("X"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: Name(
+                        ExprName {
+                            range: 33..36,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | a: type X = int
+  |         ^ Syntax Error: Simple statements must be separated by newlines or semicolons
+2 | lambda: type X = int
+  |
+
+
+  |
+1 | a: type X = int
+2 | lambda: type X = int
+  |              ^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |

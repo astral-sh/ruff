@@ -1,27 +1,33 @@
 use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_python_semantic::analyze::visibility;
-use ruff_python_semantic::{Binding, BindingKind, Imported, ScopeKind};
+use ruff_python_semantic::{Binding, BindingKind, Imported, ResolvedReference, ScopeKind};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::fix;
 use crate::rules::{
-    flake8_builtins, flake8_pyi, flake8_type_checking, flake8_unused_arguments, pyflakes, pylint,
-    ruff,
+    flake8_builtins, flake8_pyi, flake8_type_checking, flake8_unused_arguments, pep8_naming,
+    pyflakes, pylint, ruff,
 };
 
 /// Run lint rules over all deferred scopes in the [`SemanticModel`].
 pub(crate) fn deferred_scopes(checker: &mut Checker) {
     if !checker.any_enabled(&[
         Rule::AsyncioDanglingTask,
+        Rule::BadStaticmethodArgument,
+        Rule::BuiltinAttributeShadowing,
         Rule::GlobalVariableNotAssigned,
         Rule::ImportPrivateName,
         Rule::ImportShadowedByLoopVar,
+        Rule::InvalidFirstArgumentNameForClassMethod,
+        Rule::InvalidFirstArgumentNameForMethod,
         Rule::NoSelfUse,
         Rule::RedefinedArgumentFromLocal,
         Rule::RedefinedWhileUnused,
         Rule::RuntimeImportInTypeCheckingBlock,
+        Rule::SingledispatchMethod,
+        Rule::SingledispatchmethodFunction,
         Rule::TooManyLocals,
         Rule::TypingOnlyFirstPartyImport,
         Rule::TypingOnlyStandardLibraryImport,
@@ -29,15 +35,14 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         Rule::UndefinedLocal,
         Rule::UnusedAnnotation,
         Rule::UnusedClassMethodArgument,
-        Rule::BuiltinAttributeShadowing,
         Rule::UnusedFunctionArgument,
         Rule::UnusedImport,
         Rule::UnusedLambdaArgument,
         Rule::UnusedMethodArgument,
         Rule::UnusedPrivateProtocol,
         Rule::UnusedPrivateTypeAlias,
-        Rule::UnusedPrivateTypeVar,
         Rule::UnusedPrivateTypedDict,
+        Rule::UnusedPrivateTypeVar,
         Rule::UnusedStaticMethodArgument,
         Rule::UnusedVariable,
     ]) {
@@ -88,13 +93,29 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         if checker.enabled(Rule::GlobalVariableNotAssigned) {
             for (name, binding_id) in scope.bindings() {
                 let binding = checker.semantic.binding(binding_id);
+                // If the binding is a `global`, then it's a top-level `global` that was never
+                // assigned in the current scope. If it were assigned, the `global` would be
+                // shadowed by the assignment.
                 if binding.kind.is_global() {
-                    diagnostics.push(Diagnostic::new(
-                        pylint::rules::GlobalVariableNotAssigned {
-                            name: (*name).to_string(),
-                        },
-                        binding.range(),
-                    ));
+                    // If the binding was conditionally deleted, it will include a reference within
+                    // a `Del` context, but won't be shadowed by a `BindingKind::Deletion`, as in:
+                    // ```python
+                    // if condition:
+                    //     del var
+                    // ```
+                    if binding
+                        .references
+                        .iter()
+                        .map(|id| checker.semantic.reference(*id))
+                        .all(ResolvedReference::is_load)
+                    {
+                        diagnostics.push(Diagnostic::new(
+                            pylint::rules::GlobalVariableNotAssigned {
+                                name: (*name).to_string(),
+                            },
+                            binding.range(),
+                        ));
+                    }
                 }
             }
         }
@@ -113,6 +134,13 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                     }
                     let shadowed = &checker.semantic.bindings[shadow.shadowed_id()];
                     if !shadowed.kind.is_argument() {
+                        continue;
+                    }
+                    if checker.settings.dummy_variable_rgx.is_match(name) {
+                        continue;
+                    }
+                    let scope = &checker.semantic.scopes[binding.scope];
+                    if scope.kind.is_generator() {
                         continue;
                     }
                     checker.diagnostics.push(Diagnostic::new(
@@ -256,24 +284,28 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                         diagnostic.set_parent(range.start());
                     }
 
-                    if checker.settings.preview.is_enabled() {
+                    // Remove the import if the binding and the shadowed binding are both imports,
+                    // and both point to the same qualified name.
+                    if let Some(shadowed_import) = shadowed.as_any_import() {
                         if let Some(import) = binding.as_any_import() {
-                            if let Some(source) = binding.source {
-                                diagnostic.try_set_fix(|| {
-                                    let statement = checker.semantic().statement(source);
-                                    let parent = checker.semantic().parent_statement(source);
-                                    let edit = fix::edits::remove_unused_imports(
-                                        std::iter::once(import.member_name().as_ref()),
-                                        statement,
-                                        parent,
-                                        checker.locator(),
-                                        checker.stylist(),
-                                        checker.indexer(),
-                                    )?;
-                                    Ok(Fix::safe_edit(edit).isolate(Checker::isolation(
-                                        checker.semantic().parent_statement_id(source),
-                                    )))
-                                });
+                            if shadowed_import.qualified_name() == import.qualified_name() {
+                                if let Some(source) = binding.source {
+                                    diagnostic.try_set_fix(|| {
+                                        let statement = checker.semantic().statement(source);
+                                        let parent = checker.semantic().parent_statement(source);
+                                        let edit = fix::edits::remove_unused_imports(
+                                            std::iter::once(import.member_name().as_ref()),
+                                            statement,
+                                            parent,
+                                            checker.locator(),
+                                            checker.stylist(),
+                                            checker.indexer(),
+                                        )?;
+                                        Ok(Fix::safe_edit(edit).isolate(Checker::isolation(
+                                            checker.semantic().parent_statement_id(source),
+                                        )))
+                                    });
+                                }
                             }
                         }
                     }
@@ -283,17 +315,21 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
             }
         }
 
-        if checker.enabled(Rule::UnusedPrivateTypeVar) {
-            flake8_pyi::rules::unused_private_type_var(checker, scope, &mut diagnostics);
-        }
-        if checker.enabled(Rule::UnusedPrivateProtocol) {
-            flake8_pyi::rules::unused_private_protocol(checker, scope, &mut diagnostics);
-        }
-        if checker.enabled(Rule::UnusedPrivateTypeAlias) {
-            flake8_pyi::rules::unused_private_type_alias(checker, scope, &mut diagnostics);
-        }
-        if checker.enabled(Rule::UnusedPrivateTypedDict) {
-            flake8_pyi::rules::unused_private_typed_dict(checker, scope, &mut diagnostics);
+        if checker.source_type.is_stub()
+            || matches!(scope.kind, ScopeKind::Module | ScopeKind::Function(_))
+        {
+            if checker.enabled(Rule::UnusedPrivateTypeVar) {
+                flake8_pyi::rules::unused_private_type_var(checker, scope, &mut diagnostics);
+            }
+            if checker.enabled(Rule::UnusedPrivateProtocol) {
+                flake8_pyi::rules::unused_private_protocol(checker, scope, &mut diagnostics);
+            }
+            if checker.enabled(Rule::UnusedPrivateTypeAlias) {
+                flake8_pyi::rules::unused_private_type_alias(checker, scope, &mut diagnostics);
+            }
+            if checker.enabled(Rule::UnusedPrivateTypedDict) {
+                flake8_pyi::rules::unused_private_typed_dict(checker, scope, &mut diagnostics);
+            }
         }
 
         if checker.enabled(Rule::AsyncioDanglingTask) {
@@ -386,6 +422,25 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
 
             if checker.enabled(Rule::TooManyLocals) {
                 pylint::rules::too_many_locals(checker, scope, &mut diagnostics);
+            }
+
+            if checker.enabled(Rule::SingledispatchMethod) {
+                pylint::rules::singledispatch_method(checker, scope, &mut diagnostics);
+            }
+
+            if checker.enabled(Rule::SingledispatchmethodFunction) {
+                pylint::rules::singledispatchmethod_function(checker, scope, &mut diagnostics);
+            }
+
+            if checker.enabled(Rule::BadStaticmethodArgument) {
+                pylint::rules::bad_staticmethod_argument(checker, scope, &mut diagnostics);
+            }
+
+            if checker.any_enabled(&[
+                Rule::InvalidFirstArgumentNameForClassMethod,
+                Rule::InvalidFirstArgumentNameForMethod,
+            ]) {
+                pep8_naming::rules::invalid_first_argument_name(checker, scope, &mut diagnostics);
             }
         }
     }

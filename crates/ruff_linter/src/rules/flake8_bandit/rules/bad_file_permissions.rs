@@ -2,9 +2,9 @@ use anyhow::Result;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::CallPath;
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr, Operator};
-use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -60,10 +60,14 @@ enum Reason {
 
 /// S103
 pub(crate) fn bad_file_permissions(checker: &mut Checker, call: &ast::ExprCall) {
+    if !checker.semantic().seen_module(Modules::OS) {
+        return;
+    }
+
     if checker
         .semantic()
-        .resolve_call_path(&call.func)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["os", "chmod"]))
+        .resolve_qualified_name(&call.func)
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["os", "chmod"]))
     {
         if let Some(mode_arg) = call.arguments.find_argument("mode", 1) {
             match parse_mask(mode_arg, checker.semantic()) {
@@ -97,8 +101,8 @@ pub(crate) fn bad_file_permissions(checker: &mut Checker, call: &ast::ExprCall) 
 const WRITE_WORLD: u16 = 0o2;
 const EXECUTE_GROUP: u16 = 0o10;
 
-fn py_stat(call_path: &CallPath) -> Option<u16> {
-    match call_path.as_slice() {
+fn py_stat(qualified_name: &QualifiedName) -> Option<u16> {
+    match qualified_name.segments() {
         ["stat", "ST_MODE"] => Some(0o0),
         ["stat", "S_IFDOOR"] => Some(0o0),
         ["stat", "S_IFPORT"] => Some(0o0),
@@ -151,7 +155,10 @@ fn parse_mask(expr: &Expr, semantic: &SemanticModel) -> Result<Option<u16>> {
             Some(value) => Ok(Some(value)),
             None => anyhow::bail!("int value out of range"),
         },
-        Expr::Attribute(_) => Ok(semantic.resolve_call_path(expr).as_ref().and_then(py_stat)),
+        Expr::Attribute(_) => Ok(semantic
+            .resolve_qualified_name(expr)
+            .as_ref()
+            .and_then(py_stat)),
         Expr::BinOp(ast::ExprBinOp {
             left,
             op,

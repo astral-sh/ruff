@@ -27,6 +27,12 @@ op_gte = lambda x, y: x >= y
 op_is = lambda x, y: x is y
 op_isnot = lambda x, y: x is not y
 op_in = lambda x, y: y in x
+op_itemgetter = lambda x: x[0]
+op_itemgetter = lambda x: (x[0], x[1], x[2])
+op_itemgetter = lambda x: (x[1:], x[2])
+op_itemgetter = lambda x: x[:]
+op_itemgetter = lambda x: x[0, 1]
+op_itemgetter = lambda x: x[(0, 1)]
 
 
 def op_not2(x):
@@ -41,21 +47,49 @@ class Adder:
     def add(x, y):
         return x + y
 
+
 # OK.
-op_add3 = lambda x, y = 1: x + y
+op_add3 = lambda x, y=1: x + y
 op_neg2 = lambda x, y: y - x
 op_notin = lambda x, y: y not in x
 op_and = lambda x, y: y and x
 op_or = lambda x, y: y or x
 op_in = lambda x, y: x in y
+op_itemgetter = lambda x: (1, x[1], x[2])
+op_itemgetter = lambda x: (x.y, x[1], x[2])
+op_itemgetter = lambda x, y: (x[0], y[0])
+op_itemgetter = lambda x, y: (x[0], y[0])
+op_itemgetter = lambda x: ()
+op_itemgetter = lambda x: (*x[0], x[1])
+op_itemgetter = lambda x: (x[0],)
+op_itemgetter = lambda x: x[x]
 
 
 def op_neg3(x, y):
     return y - x
 
-def op_add4(x, y = 1):
+
+def op_add4(x, y=1):
     return x + y
+
 
 def op_add5(x, y):
     print("op_add5")
     return x + y
+
+
+# OK
+class Class:
+    @staticmethod
+    def add(x, y):
+        return x + y
+
+# See https://github.com/astral-sh/ruff/issues/13508
+op_itemgetter = lambda x: x[:, 1]
+op_itemgetter = lambda x: x[1, :]
+
+# With a slice, trivia is dropped
+op_itemgetter = lambda x: x[1,          :]
+
+# Without a slice, trivia is retained
+op_itemgetter = lambda x: x[1,          2]

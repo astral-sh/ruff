@@ -35,10 +35,12 @@ mod tests {
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_8.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_9.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote.py"))]
-    #[test_case(Rule::RuntimeStringUnion, Path::new("TCH006_1.py"))]
-    #[test_case(Rule::RuntimeStringUnion, Path::new("TCH006_2.py"))]
+    #[test_case(Rule::RuntimeStringUnion, Path::new("TCH010_1.py"))]
+    #[test_case(Rule::RuntimeStringUnion, Path::new("TCH010_2.py"))]
     #[test_case(Rule::TypingOnlyFirstPartyImport, Path::new("TCH001.py"))]
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("TCH003.py"))]
+    #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("init_var.py"))]
+    #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("kw_only.py"))]
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("snapshot.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("TCH002.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote.py"))]
@@ -75,7 +77,10 @@ mod tests {
     }
 
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("strict.py"))]
+    #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("init_var.py"))]
+    #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("kw_only.py"))]
     fn strict(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("strict_{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
@@ -86,7 +91,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 

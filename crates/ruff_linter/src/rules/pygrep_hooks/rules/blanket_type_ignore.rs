@@ -5,7 +5,7 @@ use regex::Regex;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_index::Indexer;
+use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 use ruff_text_size::TextSize;
 
@@ -31,7 +31,13 @@ use ruff_text_size::TextSize;
 /// ```
 ///
 /// ## References
-/// - [mypy](https://mypy.readthedocs.io/en/stable/common_issues.html#spurious-errors-and-locally-silencing-the-checker)
+/// Mypy supports a [built-in setting](https://mypy.readthedocs.io/en/stable/error_code_list2.html#check-that-type-ignore-include-an-error-code-ignore-without-code)
+/// to enforce that all `type: ignore` annotations include an error code, akin
+/// to enabling this rule:
+/// ```toml
+/// [tool.mypy]
+/// enable_error_code = ["ignore-without-code"]
+/// ```
 #[violation]
 pub struct BlanketTypeIgnore;
 
@@ -45,11 +51,11 @@ impl Violation for BlanketTypeIgnore {
 /// PGH003
 pub(crate) fn blanket_type_ignore(
     diagnostics: &mut Vec<Diagnostic>,
-    indexer: &Indexer,
+    comment_ranges: &CommentRanges,
     locator: &Locator,
 ) {
-    for range in indexer.comment_ranges() {
-        let line = locator.slice(*range);
+    for range in comment_ranges {
+        let line = locator.slice(range);
 
         // Match, e.g., `# type: ignore` or `# type: ignore[attr-defined]`.
         // See: https://github.com/python/mypy/blob/b43e0d34247a6d1b3b9d9094d184bbfcb9808bb9/mypy/fastparse.py#L248

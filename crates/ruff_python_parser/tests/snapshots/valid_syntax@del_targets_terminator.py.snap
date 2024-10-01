@@ -1,0 +1,113 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/del_targets_terminator.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..29,
+        body: [
+            Delete(
+                StmtDelete {
+                    range: 0..8,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 4..5,
+                                id: Name("a"),
+                                ctx: Del,
+                            },
+                        ),
+                        Name(
+                            ExprName {
+                                range: 7..8,
+                                id: Name("b"),
+                                ctx: Del,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 10..14,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 10..14,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        range: 10..11,
+                                        id: Name("c"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 13..14,
+                                        id: Name("d"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: false,
+                        },
+                    ),
+                },
+            ),
+            Delete(
+                StmtDelete {
+                    range: 15..23,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 19..20,
+                                id: Name("a"),
+                                ctx: Del,
+                            },
+                        ),
+                        Name(
+                            ExprName {
+                                range: 22..23,
+                                id: Name("b"),
+                                ctx: Del,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 24..28,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 24..28,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        range: 24..25,
+                                        id: Name("c"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 27..28,
+                                        id: Name("d"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: false,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

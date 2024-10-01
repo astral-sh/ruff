@@ -1,0 +1,838 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/re_lex_logical_token.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..979,
+        body: [
+            If(
+                StmtIf {
+                    range: 48..59,
+                    test: Call(
+                        ExprCall {
+                            range: 51..59,
+                            func: Name(
+                                ExprName {
+                                    range: 51..55,
+                                    id: Name("call"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 55..59,
+                                args: [
+                                    Name(
+                                        ExprName {
+                                            range: 56..59,
+                                            id: Name("foo"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                    body: [],
+                    elif_else_clauses: [],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 60..79,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("bar"),
+                        range: 64..67,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 67..69,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 75..79,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            If(
+                StmtIf {
+                    range: 113..152,
+                    test: Call(
+                        ExprCall {
+                            range: 116..124,
+                            func: Name(
+                                ExprName {
+                                    range: 116..120,
+                                    id: Name("call"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 120..124,
+                                args: [
+                                    Name(
+                                        ExprName {
+                                            range: 121..124,
+                                            id: Name("foo"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                    body: [
+                        FunctionDef(
+                            StmtFunctionDef {
+                                range: 129..152,
+                                is_async: false,
+                                decorator_list: [],
+                                name: Identifier {
+                                    id: Name("bar"),
+                                    range: 133..136,
+                                },
+                                type_params: None,
+                                parameters: Parameters {
+                                    range: 136..138,
+                                    posonlyargs: [],
+                                    args: [],
+                                    vararg: None,
+                                    kwonlyargs: [],
+                                    kwarg: None,
+                                },
+                                returns: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 148..152,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [],
+                },
+            ),
+            If(
+                StmtIf {
+                    range: 228..269,
+                    test: Call(
+                        ExprCall {
+                            range: 231..239,
+                            func: Name(
+                                ExprName {
+                                    range: 231..235,
+                                    id: Name("call"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 235..239,
+                                args: [
+                                    Name(
+                                        ExprName {
+                                            range: 236..239,
+                                            id: Name("foo"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                    body: [
+                        FunctionDef(
+                            StmtFunctionDef {
+                                range: 246..269,
+                                is_async: false,
+                                decorator_list: [],
+                                name: Identifier {
+                                    id: Name("bar"),
+                                    range: 250..253,
+                                },
+                                type_params: None,
+                                parameters: Parameters {
+                                    range: 253..255,
+                                    posonlyargs: [],
+                                    args: [],
+                                    vararg: None,
+                                    kwonlyargs: [],
+                                    kwarg: None,
+                                },
+                                returns: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 265..269,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [],
+                },
+            ),
+            If(
+                StmtIf {
+                    range: 344..392,
+                    test: Call(
+                        ExprCall {
+                            range: 347..355,
+                            func: Name(
+                                ExprName {
+                                    range: 347..351,
+                                    id: Name("call"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 351..355,
+                                args: [
+                                    Name(
+                                        ExprName {
+                                            range: 352..355,
+                                            id: Name("foo"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                    body: [
+                        FunctionDef(
+                            StmtFunctionDef {
+                                range: 369..392,
+                                is_async: false,
+                                decorator_list: [],
+                                name: Identifier {
+                                    id: Name("bar"),
+                                    range: 373..376,
+                                },
+                                type_params: None,
+                                parameters: Parameters {
+                                    range: 376..378,
+                                    posonlyargs: [],
+                                    args: [],
+                                    vararg: None,
+                                    kwonlyargs: [],
+                                    kwarg: None,
+                                },
+                                returns: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 388..392,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [],
+                },
+            ),
+            If(
+                StmtIf {
+                    range: 453..499,
+                    test: Call(
+                        ExprCall {
+                            range: 456..472,
+                            func: Name(
+                                ExprName {
+                                    range: 456..460,
+                                    id: Name("call"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 460..472,
+                                args: [
+                                    Name(
+                                        ExprName {
+                                            range: 461..464,
+                                            id: Name("foo"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    List(
+                                        ExprList {
+                                            range: 466..471,
+                                            elts: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 467..468,
+                                                        id: Name("a"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        range: 470..471,
+                                                        id: Name("b"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                    body: [
+                        FunctionDef(
+                            StmtFunctionDef {
+                                range: 476..499,
+                                is_async: false,
+                                decorator_list: [],
+                                name: Identifier {
+                                    id: Name("bar"),
+                                    range: 480..483,
+                                },
+                                type_params: None,
+                                parameters: Parameters {
+                                    range: 483..485,
+                                    posonlyargs: [],
+                                    args: [],
+                                    vararg: None,
+                                    kwonlyargs: [],
+                                    kwarg: None,
+                                },
+                                returns: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 495..499,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [],
+                },
+            ),
+            If(
+                StmtIf {
+                    range: 564..611,
+                    test: Call(
+                        ExprCall {
+                            range: 567..583,
+                            func: Name(
+                                ExprName {
+                                    range: 567..571,
+                                    id: Name("call"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 571..583,
+                                args: [
+                                    Name(
+                                        ExprName {
+                                            range: 572..575,
+                                            id: Name("foo"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    List(
+                                        ExprList {
+                                            range: 577..582,
+                                            elts: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 578..579,
+                                                        id: Name("a"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        range: 581..582,
+                                                        id: Name("b"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                    body: [
+                        FunctionDef(
+                            StmtFunctionDef {
+                                range: 588..611,
+                                is_async: false,
+                                decorator_list: [],
+                                name: Identifier {
+                                    id: Name("bar"),
+                                    range: 592..595,
+                                },
+                                type_params: None,
+                                parameters: Parameters {
+                                    range: 595..597,
+                                    posonlyargs: [],
+                                    args: [],
+                                    vararg: None,
+                                    kwonlyargs: [],
+                                    kwarg: None,
+                                },
+                                returns: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 607..611,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [],
+                },
+            ),
+            If(
+                StmtIf {
+                    range: 772..824,
+                    test: Call(
+                        ExprCall {
+                            range: 775..796,
+                            func: Name(
+                                ExprName {
+                                    range: 775..779,
+                                    id: Name("call"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 779..796,
+                                args: [
+                                    Name(
+                                        ExprName {
+                                            range: 780..783,
+                                            id: Name("foo"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    List(
+                                        ExprList {
+                                            range: 785..794,
+                                            elts: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 786..787,
+                                                        id: Name("a"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        range: 793..794,
+                                                        id: Name("b"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                    body: [
+                        FunctionDef(
+                            StmtFunctionDef {
+                                range: 801..824,
+                                is_async: false,
+                                decorator_list: [],
+                                name: Identifier {
+                                    id: Name("bar"),
+                                    range: 805..808,
+                                },
+                                type_params: None,
+                                parameters: Parameters {
+                                    range: 808..810,
+                                    posonlyargs: [],
+                                    args: [],
+                                    vararg: None,
+                                    kwonlyargs: [],
+                                    kwarg: None,
+                                },
+                                returns: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 820..824,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [],
+                },
+            ),
+            If(
+                StmtIf {
+                    range: 887..933,
+                    test: Call(
+                        ExprCall {
+                            range: 890..905,
+                            func: Name(
+                                ExprName {
+                                    range: 890..894,
+                                    id: Name("call"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 894..905,
+                                args: [
+                                    FString(
+                                        ExprFString {
+                                            range: 895..905,
+                                            value: FStringValue {
+                                                inner: Single(
+                                                    FString(
+                                                        FString {
+                                                            range: 895..905,
+                                                            elements: [
+                                                                Literal(
+                                                                    FStringLiteralElement {
+                                                                        range: 897..903,
+                                                                        value: "hello ",
+                                                                    },
+                                                                ),
+                                                                Expression(
+                                                                    FStringExpressionElement {
+                                                                        range: 903..905,
+                                                                        expression: Name(
+                                                                            ExprName {
+                                                                                range: 904..905,
+                                                                                id: Name("x"),
+                                                                                ctx: Load,
+                                                                            },
+                                                                        ),
+                                                                        debug_text: None,
+                                                                        conversion: None,
+                                                                        format_spec: None,
+                                                                    },
+                                                                ),
+                                                            ],
+                                                            flags: FStringFlags {
+                                                                quote_style: Double,
+                                                                prefix: Regular,
+                                                                triple_quoted: false,
+                                                            },
+                                                        },
+                                                    ),
+                                                ),
+                                            },
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                    body: [
+                        FunctionDef(
+                            StmtFunctionDef {
+                                range: 910..933,
+                                is_async: false,
+                                decorator_list: [],
+                                name: Identifier {
+                                    id: Name("bar"),
+                                    range: 914..917,
+                                },
+                                type_params: None,
+                                parameters: Parameters {
+                                    range: 917..919,
+                                    posonlyargs: [],
+                                    args: [],
+                                    vararg: None,
+                                    kwonlyargs: [],
+                                    kwarg: None,
+                                },
+                                returns: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 929..933,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [],
+                },
+            ),
+            If(
+                StmtIf {
+                    range: 936..956,
+                    test: Call(
+                        ExprCall {
+                            range: 939..956,
+                            func: Name(
+                                ExprName {
+                                    range: 939..943,
+                                    id: Name("call"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 943..956,
+                                args: [
+                                    FString(
+                                        ExprFString {
+                                            range: 944..951,
+                                            value: FStringValue {
+                                                inner: Single(
+                                                    FString(
+                                                        FString {
+                                                            range: 944..951,
+                                                            elements: [],
+                                                            flags: FStringFlags {
+                                                                quote_style: Double,
+                                                                prefix: Regular,
+                                                                triple_quoted: false,
+                                                            },
+                                                        },
+                                                    ),
+                                                ),
+                                            },
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                    body: [],
+                    elif_else_clauses: [],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 956..979,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("bar"),
+                        range: 960..963,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 963..965,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 975..979,
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # No indentation before the function definition
+2 | if call(foo
+  |            ^ Syntax Error: Expected ')', found newline
+3 | def bar():
+4 |     pass
+  |
+
+
+  |
+1 | # No indentation before the function definition
+2 | if call(foo
+3 | def bar():
+  | ^^^ Syntax Error: Expected an indented block after `if` statement
+4 |     pass
+  |
+
+
+   |
+ 7 | # Indented function definition
+ 8 | if call(foo
+   |            ^ Syntax Error: Expected ')', found newline
+ 9 |     def bar():
+10 |         pass
+   |
+
+
+   |
+13 | # There are multiple non-logical newlines (blank lines) in the `if` body
+14 | if call(foo
+   |            ^ Syntax Error: Expected ')', found newline
+15 | 
+16 | 
+17 |     def bar():
+   |
+
+
+   |
+21 | # There are trailing whitespaces in the blank line inside the `if` body
+22 | if call(foo
+   |            ^ Syntax Error: Expected ')', found newline
+23 |         
+24 |     def bar():
+25 |         pass
+   |
+
+
+   |
+28 | # The lexer is nested with multiple levels of parentheses
+29 | if call(foo, [a, b
+   |                   ^ Syntax Error: Expected ']', found NonLogicalNewline
+30 |     def bar():
+31 |         pass
+   |
+
+
+   |
+34 | # The outer parenthesis is closed but the inner bracket isn't
+35 | if call(foo, [a, b)
+   |                   ^ Syntax Error: Expected ']', found ')'
+36 |     def bar():
+37 |         pass
+   |
+
+
+   |
+34 | # The outer parenthesis is closed but the inner bracket isn't
+35 | if call(foo, [a, b)
+   |                    ^ Syntax Error: Expected ':', found newline
+36 |     def bar():
+37 |         pass
+   |
+
+
+   |
+41 | # test is to make sure it emits a `NonLogicalNewline` token after `b`.
+42 | if call(foo, [a,
+43 |     b
+   |      ^ Syntax Error: Expected ']', found NonLogicalNewline
+44 | )
+45 |     def bar():
+46 |         pass
+   |
+
+
+   |
+42 | if call(foo, [a,
+43 |     b
+44 | )
+   |  ^ Syntax Error: Expected ':', found newline
+45 |     def bar():
+46 |         pass
+   |
+
+
+   |
+49 | # F-strings uses normal list parsing, so test those as well
+50 | if call(f"hello {x
+   |                    Syntax Error: f-string: unterminated string
+51 |     def bar():
+52 |         pass
+   |
+
+
+   |
+49 | # F-strings uses normal list parsing, so test those as well
+50 | if call(f"hello {x
+51 |     def bar():
+   |     ^^^ Syntax Error: f-string: expecting '}'
+52 |         pass
+   |
+
+
+   |
+49 | # F-strings uses normal list parsing, so test those as well
+50 | if call(f"hello {x
+   |                    Syntax Error: Expected FStringEnd, found Unknown
+51 |     def bar():
+52 |         pass
+   |
+
+
+   |
+55 | if call(f"hello
+   |           ^^^^^ Syntax Error: f-string: unterminated string
+56 |     def bar():
+57 |         pass
+   |
+
+
+   |
+55 | if call(f"hello
+   |                ^ Syntax Error: Expected FStringEnd, found newline
+56 |     def bar():
+57 |         pass
+   |
+
+
+   |
+55 | if call(f"hello
+56 |     def bar():
+   | ^^^^ Syntax Error: Expected ',', found indent
+57 |         pass
+   |
+
+
+   |
+55 | if call(f"hello
+56 |     def bar():
+   |     ^^^ Syntax Error: Expected ')', found 'def'
+57 |         pass
+   |
+
+
+   |
+55 | if call(f"hello
+56 |     def bar():
+57 |         pass
+   |              Syntax Error: Expected a statement
+   |

@@ -55,7 +55,11 @@ impl Debug for DebugComments<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut map = f.debug_map();
 
-        for node in self.comments.keys().sorted_by_key(|key| key.node().start()) {
+        for node in self
+            .comments
+            .keys()
+            .sorted_by_key(|key| (key.node().start(), key.node().end()))
+        {
             map.entry(
                 &NodeKindWithSource {
                     key: *node,
@@ -182,20 +186,20 @@ mod tests {
     use ruff_formatter::SourceCode;
     use ruff_python_ast::AnyNode;
     use ruff_python_ast::{StmtBreak, StmtContinue};
-    use ruff_python_trivia::CommentRanges;
+    use ruff_python_trivia::{CommentLinePosition, CommentRanges};
     use ruff_text_size::{TextRange, TextSize};
 
     use crate::comments::map::MultiMap;
-    use crate::comments::{CommentLinePosition, Comments, CommentsMap, SourceComment};
+    use crate::comments::{Comments, CommentsMap, SourceComment};
 
     #[test]
     fn debug() {
         let continue_statement = AnyNode::from(StmtContinue {
-            range: TextRange::default(),
+            range: TextRange::new(TextSize::new(18), TextSize::new(26)),
         });
 
         let break_statement = AnyNode::from(StmtBreak {
-            range: TextRange::default(),
+            range: TextRange::new(TextSize::new(55), TextSize::new(60)),
         });
 
         let source = r"# leading comment

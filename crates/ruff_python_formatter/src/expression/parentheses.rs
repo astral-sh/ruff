@@ -56,10 +56,19 @@ pub(crate) enum Parenthesize {
     /// Adding parentheses is desired to prevent the comments from wandering.
     IfRequired,
 
-    /// Parenthesizes the expression if the group doesn't fit on a line (e.g., even name expressions are parenthesized), or if
-    /// the expression doesn't break, but _does_ reports that it always requires parentheses in this position (e.g., walrus
-    /// operators in function return annotations).
-    IfBreaksOrIfRequired,
+    /// Same as [`Self::IfBreaks`] except that it uses [`parenthesize_if_expands`] for expressions
+    /// with the layout [`NeedsParentheses::BestFit`] which is used by non-splittable
+    /// expressions like literals, name, and strings.
+    ///
+    /// Use this layout over `IfBreaks` when there's a sequence of `maybe_parenthesize_expression`
+    /// in a single logical-line and you want to break from right-to-left. Use `IfBreaks` for the
+    /// first expression and `IfBreaksParenthesized` for the rest.
+    IfBreaksParenthesized,
+
+    /// Same as [`Self::IfBreaksParenthesized`] but uses [`parenthesize_if_expands`] for nested
+    /// [`maybe_parenthesized_expression`] calls unlike other layouts that always omit parentheses
+    /// when outer parentheses are present.
+    IfBreaksParenthesizedNested,
 }
 
 impl Parenthesize {
@@ -126,7 +135,7 @@ where
     FormatParenthesized {
         left,
         comments: &[],
-        hug: None,
+        hug: false,
         content: Argument::new(content),
         right,
     }
@@ -135,7 +144,7 @@ where
 pub(crate) struct FormatParenthesized<'content, 'ast> {
     left: &'static str,
     comments: &'content [SourceComment],
-    hug: Option<HuggingStyle>,
+    hug: bool,
     content: Argument<'content, PyFormatContext<'ast>>,
     right: &'static str,
 }
@@ -158,10 +167,7 @@ impl<'content, 'ast> FormatParenthesized<'content, 'ast> {
     }
 
     /// Whether to indent the content within the parentheses.
-    pub(crate) fn with_hugging(
-        self,
-        hug: Option<HuggingStyle>,
-    ) -> FormatParenthesized<'content, 'ast> {
+    pub(crate) fn with_hugging(self, hug: bool) -> FormatParenthesized<'content, 'ast> {
         FormatParenthesized { hug, ..self }
     }
 }
@@ -173,30 +179,10 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatParenthesized<'_, 'ast> {
         let indented = format_with(|f| {
             let content = Arguments::from(&self.content);
             if self.comments.is_empty() {
-                match self.hug {
-                    None => group(&soft_block_indent(&content)).fmt(f),
-                    Some(HuggingStyle::Always) => content.fmt(f),
-                    Some(HuggingStyle::IfFirstLineFits) => {
-                        // It's not immediately obvious how the below IR works to only indent the content if the first line exceeds the configured line width.
-                        // The trick is the first group that doesn't wrap `self.content`.
-                        // * The group doesn't wrap `self.content` because we need to assume that `self.content`
-                        //   contains a hard line break and hard-line-breaks always expand the enclosing group.
-                        // * The printer decides that a group fits if its content (in this case a `soft_line_break` that has a width of 0 and is guaranteed to fit)
-                        //   and the content coming after the group in expanded mode (`self.content`) fits on the line.
-                        //   The content coming after fits if the content up to the first soft or hard line break (or the end of the document) fits.
-                        //
-                        // This happens to be right what we want. The first group should add an indent and a soft line break if the content of `self.content`
-                        // up to the first line break exceeds the configured line length, but not otherwise.
-                        let indented = f.group_id("indented_content");
-                        write!(
-                            f,
-                            [
-                                group(&indent(&soft_line_break())).with_group_id(Some(indented)),
-                                indent_if_group_breaks(&content, indented),
-                                if_group_breaks(&soft_line_break()).with_group_id(Some(indented))
-                            ]
-                        )
-                    }
+                if self.hug {
+                    content.fmt(f)
+                } else {
+                    group(&soft_block_indent(&content)).fmt(f)
                 }
             } else {
                 group(&format_args![
@@ -226,20 +212,6 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatParenthesized<'_, 'ast> {
 
         write!(f, [token(self.left), inner, token(self.right)])
     }
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) enum HuggingStyle {
-    /// Always hug the content (never indent).
-    Always,
-
-    /// Hug the content if the content up to the first line break fits into the configured line length. Otherwise indent the content.
-    ///
-    /// This is different from [`HuggingStyle::Always`] in that it doesn't indent if the content contains a hard line break, and the content up to that hard line break fits into the configured line length.
-    ///
-    /// This style is used for formatting multiline strings that, by definition, always break. The idea is to
-    /// only hug a multiline string if its content up to the first line breaks exceeds the configured line length.
-    IfFirstLineFits,
 }
 
 /// Wraps an expression in parentheses only if it still does not fit after expanding all expressions that start or end with
@@ -453,27 +425,25 @@ impl Format<PyFormatContext<'_>> for FormatEmptyParenthesized<'_> {
         debug_assert!(self.comments[end_of_line_split..]
             .iter()
             .all(|comment| comment.line_position().is_own_line()));
-        write!(
-            f,
-            [group(&format_args![
-                token(self.left),
-                // end-of-line comments
-                trailing_comments(&self.comments[..end_of_line_split]),
-                // Avoid unstable formatting with
-                // ```python
-                // x = () - (#
-                // )
-                // ```
-                // Without this the comment would go after the empty tuple first, but still expand
-                // the bin op. In the second formatting pass they are trailing bin op comments
-                // so the bin op collapse. Suboptimally we keep parentheses around the bin op in
-                // either case.
-                (!self.comments[..end_of_line_split].is_empty()).then_some(hard_line_break()),
-                // own line comments, which need to be indented
-                soft_block_indent(&dangling_comments(&self.comments[end_of_line_split..])),
-                token(self.right)
-            ])]
-        )
+        group(&format_args![
+            token(self.left),
+            // end-of-line comments
+            trailing_comments(&self.comments[..end_of_line_split]),
+            // Avoid unstable formatting with
+            // ```python
+            // x = () - (#
+            // )
+            // ```
+            // Without this the comment would go after the empty tuple first, but still expand
+            // the bin op. In the second formatting pass they are trailing bin op comments
+            // so the bin op collapse. Suboptimally we keep parentheses around the bin op in
+            // either case.
+            (!self.comments[..end_of_line_split].is_empty()).then_some(hard_line_break()),
+            // own line comments, which need to be indented
+            soft_block_indent(&dangling_comments(&self.comments[end_of_line_split..])),
+            token(self.right)
+        ])
+        .fmt(f)
     }
 }
 
@@ -488,9 +458,9 @@ mod tests {
     #[test]
     fn test_has_parentheses() {
         let expression = r#"(b().c("")).d()"#;
-        let expr = parse_expression(expression).unwrap();
+        let parsed = parse_expression(expression).unwrap();
         assert!(!is_expression_parenthesized(
-            ExpressionRef::from(&expr),
+            ExpressionRef::from(parsed.expr()),
             &CommentRanges::default(),
             expression
         ));

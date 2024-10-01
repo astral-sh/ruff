@@ -2,17 +2,21 @@
 source: crates/ruff_python_parser/src/lexer.rs
 expression: triple_quoted_eol(MAC_EOL)
 ---
+## Tokens
+```
 [
     (
-        String {
-            value: "\r test string\r ",
-            kind: String,
-            triple_quoted: true,
-        },
+        String(
+            "\r test string\r ",
+        ),
         0..21,
+        TokenFlags(
+            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING,
+        ),
     ),
     (
         Newline,
         21..21,
     ),
 ]
+```

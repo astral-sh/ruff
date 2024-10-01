@@ -1,0 +1,334 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/with_items_parenthesized_missing_comma.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..160,
+        body: [
+            With(
+                StmtWith {
+                    range: 0..23,
+                    is_async: false,
+                    items: [
+                        WithItem {
+                            range: 6..11,
+                            context_expr: Name(
+                                ExprName {
+                                    range: 6..11,
+                                    id: Name("item1"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                        WithItem {
+                            range: 12..17,
+                            context_expr: Name(
+                                ExprName {
+                                    range: 12..17,
+                                    id: Name("item2"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                    ],
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 20..23,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 20..23,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            With(
+                StmtWith {
+                    range: 24..53,
+                    is_async: false,
+                    items: [
+                        WithItem {
+                            range: 30..41,
+                            context_expr: Name(
+                                ExprName {
+                                    range: 30..35,
+                                    id: Name("item1"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: Some(
+                                Name(
+                                    ExprName {
+                                        range: 39..41,
+                                        id: Name("f1"),
+                                        ctx: Store,
+                                    },
+                                ),
+                            ),
+                        },
+                        WithItem {
+                            range: 42..47,
+                            context_expr: Name(
+                                ExprName {
+                                    range: 42..47,
+                                    id: Name("item2"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                    ],
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 50..53,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 50..53,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            With(
+                StmtWith {
+                    range: 54..91,
+                    is_async: false,
+                    items: [
+                        WithItem {
+                            range: 60..65,
+                            context_expr: Name(
+                                ExprName {
+                                    range: 60..65,
+                                    id: Name("item1"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                        WithItem {
+                            range: 67..72,
+                            context_expr: Name(
+                                ExprName {
+                                    range: 67..72,
+                                    id: Name("item2"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                        WithItem {
+                            range: 73..78,
+                            context_expr: Name(
+                                ExprName {
+                                    range: 73..78,
+                                    id: Name("item3"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                        WithItem {
+                            range: 80..85,
+                            context_expr: Name(
+                                ExprName {
+                                    range: 80..85,
+                                    id: Name("item4"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                    ],
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 88..91,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 88..91,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            With(
+                StmtWith {
+                    range: 92..135,
+                    is_async: false,
+                    items: [
+                        WithItem {
+                            range: 98..103,
+                            context_expr: Name(
+                                ExprName {
+                                    range: 98..103,
+                                    id: Name("item1"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                        WithItem {
+                            range: 105..116,
+                            context_expr: Name(
+                                ExprName {
+                                    range: 105..110,
+                                    id: Name("item2"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: Some(
+                                Name(
+                                    ExprName {
+                                        range: 114..116,
+                                        id: Name("f1"),
+                                        ctx: Store,
+                                    },
+                                ),
+                            ),
+                        },
+                        WithItem {
+                            range: 117..122,
+                            context_expr: Name(
+                                ExprName {
+                                    range: 117..122,
+                                    id: Name("item3"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                        WithItem {
+                            range: 124..129,
+                            context_expr: Name(
+                                ExprName {
+                                    range: 124..129,
+                                    id: Name("item4"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                    ],
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 132..135,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 132..135,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            With(
+                StmtWith {
+                    range: 136..159,
+                    is_async: false,
+                    items: [
+                        WithItem {
+                            range: 141..154,
+                            context_expr: Tuple(
+                                ExprTuple {
+                                    range: 141..154,
+                                    elts: [
+                                        Name(
+                                            ExprName {
+                                                range: 142..147,
+                                                id: Name("item1"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        Name(
+                                            ExprName {
+                                                range: 149..154,
+                                                id: Name("item2"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                    parenthesized: true,
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                    ],
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 156..159,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 156..159,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | with (item1 item2): ...
+  |             ^^^^^ Syntax Error: Expected ',', found name
+2 | with (item1 as f1 item2): ...
+3 | with (item1, item2 item3, item4): ...
+  |
+
+
+  |
+1 | with (item1 item2): ...
+2 | with (item1 as f1 item2): ...
+  |                   ^^^^^ Syntax Error: Expected ',', found name
+3 | with (item1, item2 item3, item4): ...
+4 | with (item1, item2 as f1 item3, item4): ...
+  |
+
+
+  |
+1 | with (item1 item2): ...
+2 | with (item1 as f1 item2): ...
+3 | with (item1, item2 item3, item4): ...
+  |                    ^^^^^ Syntax Error: Expected ',', found name
+4 | with (item1, item2 as f1 item3, item4): ...
+5 | with (item1, item2: ...
+  |
+
+
+  |
+2 | with (item1 as f1 item2): ...
+3 | with (item1, item2 item3, item4): ...
+4 | with (item1, item2 as f1 item3, item4): ...
+  |                          ^^^^^ Syntax Error: Expected ',', found name
+5 | with (item1, item2: ...
+  |
+
+
+  |
+3 | with (item1, item2 item3, item4): ...
+4 | with (item1, item2 as f1 item3, item4): ...
+5 | with (item1, item2: ...
+  |                   ^ Syntax Error: Expected ')', found ':'
+  |

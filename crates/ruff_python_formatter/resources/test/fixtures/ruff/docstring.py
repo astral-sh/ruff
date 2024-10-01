@@ -148,7 +148,7 @@ class TabbedIndent:
 		"""check for correct tabbed formatting
 		                            ^^^^^^^^^^
 		Normal indented line
-		  	- autor
+		  	- author
 		"""
 
 

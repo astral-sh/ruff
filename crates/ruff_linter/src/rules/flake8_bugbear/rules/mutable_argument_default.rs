@@ -1,11 +1,13 @@
-use ast::call_path::{from_qualified_name, CallPath};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_docstring_stmt;
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr, Parameter, ParameterWithDefault};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
+use ruff_python_semantic::analyze::function_type::is_stub;
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
+use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{indentation_at_offset, textwrap};
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
@@ -28,7 +30,7 @@ use crate::checkers::ast::Checker;
 ///
 /// Arguments with immutable type annotations will be ignored by this rule.
 /// Types outside of the standard library can be marked as immutable with the
-/// [`flake8-bugbear.extend-immutable-calls`] configuration option.
+/// [`lint.flake8-bugbear.extend-immutable-calls`] configuration option.
 ///
 /// ## Known problems
 /// Mutable argument defaults can be used intentionally to cache computation
@@ -61,7 +63,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## Options
-/// - `flake8-bugbear.extend-immutable-calls`
+/// - `lint.flake8-bugbear.extend-immutable-calls`
 ///
 /// ## References
 /// - [Python documentation: Default Argument Values](https://docs.python.org/3/tutorial/controlflow.html#default-argument-values)
@@ -83,28 +85,22 @@ impl Violation for MutableArgumentDefault {
 
 /// B006
 pub(crate) fn mutable_argument_default(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
-    // Scan in reverse order to right-align zip().
     for ParameterWithDefault {
         parameter,
         default,
         range: _,
-    } in function_def
-        .parameters
-        .posonlyargs
-        .iter()
-        .chain(&function_def.parameters.args)
-        .chain(&function_def.parameters.kwonlyargs)
+    } in function_def.parameters.iter_non_variadic_params()
     {
         let Some(default) = default else {
             continue;
         };
 
-        let extend_immutable_calls: Vec<CallPath> = checker
+        let extend_immutable_calls: Vec<QualifiedName> = checker
             .settings
             .flake8_bugbear
             .extend_immutable_calls
             .iter()
-            .map(|target| from_qualified_name(target))
+            .map(|target| QualifiedName::from_dotted_name(target))
             .collect();
 
         if is_mutable_expr(default, checker.semantic())
@@ -119,6 +115,7 @@ pub(crate) fn mutable_argument_default(checker: &mut Checker, function_def: &ast
                 function_def,
                 parameter,
                 default,
+                checker.semantic(),
                 checker.locator(),
                 checker.stylist(),
                 checker.indexer(),
@@ -133,10 +130,12 @@ pub(crate) fn mutable_argument_default(checker: &mut Checker, function_def: &ast
 
 /// Generate a [`Fix`] to move a mutable argument default initialization
 /// into the function body.
+#[allow(clippy::too_many_arguments)]
 fn move_initialization(
     function_def: &ast::StmtFunctionDef,
     parameter: &Parameter,
     default: &Expr,
+    semantic: &SemanticModel,
     locator: &Locator,
     stylist: &Stylist,
     indexer: &Indexer,
@@ -152,6 +151,11 @@ fn move_initialization(
 
     // Set the default argument value to `None`.
     let default_edit = Edit::range_replacement("None".to_string(), default.range());
+
+    // If the function is a stub, this is the only necessary edit.
+    if is_stub(function_def, semantic) {
+        return Some(Fix::unsafe_edit(default_edit));
+    }
 
     // Add an `if`, to set the argument to its original value if still `None`.
     let mut content = String::new();

@@ -1,40 +1,47 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{Expr, Parameters};
+use ruff_python_ast::{AnyParameterRef, Expr, Parameters};
 use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for union annotations that contain redundant numeric types (e.g.,
-/// `int | float`).
+/// Checks for parameter annotations that contain redundant unions between
+/// builtin numeric types (e.g., `int | float`).
 ///
 /// ## Why is this bad?
-/// In Python, `int` is a subtype of `float`, and `float` is a subtype of
-/// `complex`. As such, a union that includes both `int` and `float` is
-/// redundant, as it is equivalent to a union that only includes `float`.
+/// The [typing specification] states:
 ///
-/// For more, see [PEP 3141], which defines Python's "numeric tower".
+/// > Python’s numeric types `complex`, `float` and `int` are not subtypes of
+/// > each other, but to support common use cases, the type system contains a
+/// > straightforward shortcut: when an argument is annotated as having type
+/// > `float`, an argument of type `int` is acceptable; similar, for an
+/// > argument annotated as having type `complex`, arguments of type `float` or
+/// > `int` are acceptable.
 ///
-/// Unions with redundant elements are less readable than unions without them.
+/// As such, a union that includes both `int` and `float` is redundant in the
+/// specific context of a parameter annotation, as it is equivalent to a union
+/// that only includes `float`. For readability and clarity, unions should omit
+/// redundant elements.
 ///
 /// ## Example
-/// ```python
-/// def foo(x: float | int) -> None:
-///     ...
+///
+/// ```pyi
+/// def foo(x: float | int | str) -> None: ...
 /// ```
 ///
 /// Use instead:
-/// ```python
-/// def foo(x: float) -> None:
-///     ...
+///
+/// ```pyi
+/// def foo(x: float | str) -> None: ...
 /// ```
 ///
 /// ## References
-/// - [Python documentation: The numeric tower](https://docs.python.org/3/library/numbers.html#the-numeric-tower)
+/// - [The typing specification](https://docs.python.org/3/library/numbers.html#the-numeric-tower)
+/// - [PEP 484: The numeric tower](https://peps.python.org/pep-0484/#the-numeric-tower)
 ///
-/// [PEP 3141]: https://peps.python.org/pep-3141/
+/// [typing specification]: https://typing.readthedocs.io/en/latest/spec/special-types.html#special-cases-for-float-and-complex
 #[violation]
 pub struct RedundantNumericUnion {
     redundancy: Redundancy,
@@ -54,25 +61,7 @@ impl Violation for RedundantNumericUnion {
 
 /// PYI041
 pub(crate) fn redundant_numeric_union(checker: &mut Checker, parameters: &Parameters) {
-    for annotation in parameters
-        .args
-        .iter()
-        .chain(parameters.posonlyargs.iter())
-        .chain(parameters.kwonlyargs.iter())
-        .filter_map(|arg| arg.parameter.annotation.as_ref())
-    {
-        check_annotation(checker, annotation);
-    }
-
-    // If annotations on `args` or `kwargs` are flagged by this rule, the annotations themselves
-    // are not accurate, but check them anyway. It's possible that flagging them will help the user
-    // realize they're incorrect.
-    for annotation in parameters
-        .vararg
-        .iter()
-        .chain(parameters.kwarg.iter())
-        .filter_map(|arg| arg.annotation.as_ref())
-    {
+    for annotation in parameters.iter().filter_map(AnyParameterRef::annotation) {
         check_annotation(checker, annotation);
     }
 }
@@ -89,20 +78,20 @@ fn check_annotation(checker: &mut Checker, annotation: &Expr) {
     let mut has_complex = false;
     let mut has_int = false;
 
-    let mut func = |expr: &Expr, _parent: &Expr| {
-        let Some(call_path) = checker.semantic().resolve_call_path(expr) else {
+    let mut find_numeric_type = |expr: &Expr, _parent: &Expr| {
+        let Some(builtin_type) = checker.semantic().resolve_builtin_symbol(expr) else {
             return;
         };
 
-        match call_path.as_slice() {
-            ["" | "builtins", "int"] => has_int = true,
-            ["" | "builtins", "float"] => has_float = true,
-            ["" | "builtins", "complex"] => has_complex = true,
-            _ => (),
+        match builtin_type {
+            "int" => has_int = true,
+            "float" => has_float = true,
+            "complex" => has_complex = true,
+            _ => {}
         }
     };
 
-    traverse_union(&mut func, checker.semantic(), annotation);
+    traverse_union(&mut find_numeric_type, checker.semantic(), annotation);
 
     if has_complex {
         if has_float {

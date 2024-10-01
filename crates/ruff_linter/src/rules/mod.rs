@@ -1,6 +1,7 @@
 #![allow(clippy::useless_format)]
 pub mod airflow;
 pub mod eradicate;
+pub mod fastapi;
 pub mod flake8_2020;
 pub mod flake8_annotations;
 pub mod flake8_async;
@@ -37,7 +38,6 @@ pub mod flake8_simplify;
 pub mod flake8_slots;
 pub mod flake8_tidy_imports;
 pub mod flake8_todos;
-pub mod flake8_trio;
 pub mod flake8_type_checking;
 pub mod flake8_unused_arguments;
 pub mod flake8_use_pathlib;
@@ -49,6 +49,7 @@ pub mod pandas_vet;
 pub mod pep8_naming;
 pub mod perflint;
 pub mod pycodestyle;
+pub mod pydoclint;
 pub mod pydocstyle;
 pub mod pyflakes;
 pub mod pygrep_hooks;

@@ -1,0 +1,327 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/await/recover.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..284,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 117..130,
+                    value: Await(
+                        ExprAwait {
+                            range: 117..130,
+                            value: Await(
+                                ExprAwait {
+                                    range: 123..130,
+                                    value: Name(
+                                        ExprName {
+                                            range: 129..130,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 154..162,
+                    value: Await(
+                        ExprAwait {
+                            range: 154..162,
+                            value: Starred(
+                                ExprStarred {
+                                    range: 160..162,
+                                    value: Name(
+                                        ExprName {
+                                            range: 161..162,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 163..173,
+                    value: Await(
+                        ExprAwait {
+                            range: 163..173,
+                            value: Starred(
+                                ExprStarred {
+                                    range: 170..172,
+                                    value: Name(
+                                        ExprName {
+                                            range: 171..172,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 214..227,
+                    value: Await(
+                        ExprAwait {
+                            range: 214..227,
+                            value: Yield(
+                                ExprYield {
+                                    range: 220..227,
+                                    value: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 226..227,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 228..245,
+                    value: Await(
+                        ExprAwait {
+                            range: 228..245,
+                            value: Lambda(
+                                ExprLambda {
+                                    range: 234..245,
+                                    parameters: Some(
+                                        Parameters {
+                                            range: 241..242,
+                                            posonlyargs: [],
+                                            args: [
+                                                ParameterWithDefault {
+                                                    range: 241..242,
+                                                    parameter: Parameter {
+                                                        range: 241..242,
+                                                        name: Identifier {
+                                                            id: Name("x"),
+                                                            range: 241..242,
+                                                        },
+                                                        annotation: None,
+                                                    },
+                                                    default: None,
+                                                },
+                                            ],
+                                            vararg: None,
+                                            kwonlyargs: [],
+                                            kwarg: None,
+                                        },
+                                    ),
+                                    body: Name(
+                                        ExprName {
+                                            range: 244..245,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 246..254,
+                    value: Await(
+                        ExprAwait {
+                            range: 246..254,
+                            value: UnaryOp(
+                                ExprUnaryOp {
+                                    range: 252..254,
+                                    op: UAdd,
+                                    operand: Name(
+                                        ExprName {
+                                            range: 253..254,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 255..263,
+                    value: Await(
+                        ExprAwait {
+                            range: 255..263,
+                            value: UnaryOp(
+                                ExprUnaryOp {
+                                    range: 261..263,
+                                    op: USub,
+                                    operand: Name(
+                                        ExprName {
+                                            range: 262..263,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 264..272,
+                    value: Await(
+                        ExprAwait {
+                            range: 264..272,
+                            value: UnaryOp(
+                                ExprUnaryOp {
+                                    range: 270..272,
+                                    op: Invert,
+                                    operand: Name(
+                                        ExprName {
+                                            range: 271..272,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 273..284,
+                    value: Await(
+                        ExprAwait {
+                            range: 273..284,
+                            value: UnaryOp(
+                                ExprUnaryOp {
+                                    range: 279..284,
+                                    op: Not,
+                                    operand: Name(
+                                        ExprName {
+                                            range: 283..284,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+4 | # Nested await
+5 | await await x
+  |       ^^^^^^^ Syntax Error: Await expression cannot be used here
+6 | 
+7 | # Starred expressions
+  |
+
+
+  |
+7 | # Starred expressions
+8 | await *x
+  |       ^^ Syntax Error: Starred expression cannot be used here
+9 | await (*x)
+  |
+
+
+   |
+ 7 | # Starred expressions
+ 8 | await *x
+ 9 | await (*x)
+   |        ^^ Syntax Error: Starred expression cannot be used here
+10 | 
+11 | # Invalid expression as per precedence
+   |
+
+
+   |
+11 | # Invalid expression as per precedence
+12 | await yield x
+   |       ^^^^^^^ Syntax Error: Yield expression cannot be used here
+13 | await lambda x: x
+14 | await +x
+   |
+
+
+   |
+11 | # Invalid expression as per precedence
+12 | await yield x
+13 | await lambda x: x
+   |       ^^^^^^^^^^^ Syntax Error: Lambda expression cannot be used here
+14 | await +x
+15 | await -x
+   |
+
+
+   |
+12 | await yield x
+13 | await lambda x: x
+14 | await +x
+   |       ^^ Syntax Error: Unary '+' expression cannot be used here
+15 | await -x
+16 | await ~x
+   |
+
+
+   |
+13 | await lambda x: x
+14 | await +x
+15 | await -x
+   |       ^^ Syntax Error: Unary '-' expression cannot be used here
+16 | await ~x
+17 | await not x
+   |
+
+
+   |
+14 | await +x
+15 | await -x
+16 | await ~x
+   |       ^^ Syntax Error: Unary '~' expression cannot be used here
+17 | await not x
+   |
+
+
+   |
+15 | await -x
+16 | await ~x
+17 | await not x
+   |       ^^^^^ Syntax Error: Boolean 'not' expression cannot be used here
+   |

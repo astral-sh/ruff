@@ -1,0 +1,17 @@
+{
+    "settings": {
+        "codeAction": {
+            "disableRuleComment": {
+                "enable": false
+            }
+        },
+        "lint": {
+            "ignore": ["RUF001"],
+            "run": "onSave"
+        },
+        "fixAll": false,
+        "logLevel": "warn",
+        "lineLength": 80,
+        "exclude": ["third_party"]
+    }
+}

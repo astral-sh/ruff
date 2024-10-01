@@ -1,0 +1,16 @@
+{
+    "settings": [
+        {
+            "cwd": "/Users/test/projects/first",
+            "workspace": "file:///Users/test/projects/first"
+        },
+        {
+            "cwd": "/Users/test/projects/second",
+            "workspace": "file:///Users/test/projects/second"
+        }
+    ],
+    "globalSettings": {
+        "cwd": "/",
+        "workspace": "/"
+    }
+}

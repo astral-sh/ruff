@@ -1,6 +1,6 @@
 """I am a very helpful module docstring.
 
-With trailing spaces:      
+With trailing spaces (only removed with unify_docstring_detection on):      
 Lorem ipsum dolor sit amet, consectetur adipiscing elit,
 sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
 Ut enim ad minim veniam,

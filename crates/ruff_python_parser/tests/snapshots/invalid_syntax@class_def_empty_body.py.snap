@@ -1,0 +1,85 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/class_def_empty_body.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..31,
+        body: [
+            ClassDef(
+                StmtClassDef {
+                    range: 0..10,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("Foo"),
+                        range: 6..9,
+                    },
+                    type_params: None,
+                    arguments: None,
+                    body: [],
+                },
+            ),
+            ClassDef(
+                StmtClassDef {
+                    range: 11..23,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("Foo"),
+                        range: 17..20,
+                    },
+                    type_params: None,
+                    arguments: Some(
+                        Arguments {
+                            range: 20..22,
+                            args: [],
+                            keywords: [],
+                        },
+                    ),
+                    body: [],
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 24..30,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 24..25,
+                                id: Name("x"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 28..30,
+                            value: Int(
+                                42,
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | class Foo:
+2 | class Foo():
+  | ^^^^^ Syntax Error: Expected an indented block after `class` definition
+3 | x = 42
+  |
+
+
+  |
+1 | class Foo:
+2 | class Foo():
+3 | x = 42
+  | ^ Syntax Error: Expected an indented block after `class` definition
+  |

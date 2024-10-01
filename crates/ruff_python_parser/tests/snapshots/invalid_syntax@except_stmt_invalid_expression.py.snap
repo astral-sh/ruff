@@ -1,0 +1,125 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/except_stmt_invalid_expression.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..74,
+        body: [
+            Try(
+                StmtTry {
+                    range: 0..38,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 9..13,
+                            },
+                        ),
+                    ],
+                    handlers: [
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 14..38,
+                                type_: Some(
+                                    Yield(
+                                        ExprYield {
+                                            range: 21..28,
+                                            value: Some(
+                                                Name(
+                                                    ExprName {
+                                                        range: 27..28,
+                                                        id: Name("x"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ),
+                                        },
+                                    ),
+                                ),
+                                name: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 34..38,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                    finalbody: [],
+                    is_star: false,
+                },
+            ),
+            Try(
+                StmtTry {
+                    range: 39..73,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 48..52,
+                            },
+                        ),
+                    ],
+                    handlers: [
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 53..73,
+                                type_: Some(
+                                    Starred(
+                                        ExprStarred {
+                                            range: 61..63,
+                                            value: Name(
+                                                ExprName {
+                                                    range: 62..63,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                                name: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 69..73,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                    finalbody: [],
+                    is_star: true,
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | try:
+2 |     pass
+3 | except yield x:
+  |        ^^^^^^^ Syntax Error: Yield expression cannot be used here
+4 |     pass
+5 | try:
+  |
+
+
+  |
+5 | try:
+6 |     pass
+7 | except* *x:
+  |         ^^ Syntax Error: Starred expression cannot be used here
+8 |     pass
+  |

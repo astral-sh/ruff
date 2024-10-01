@@ -90,15 +90,6 @@ impl FormatNodeRule<PatternMatchMapping> for FormatPatternMatchMapping {
             .with_dangling_comments(open_parenthesis_comments)
             .fmt(f)
     }
-
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        // Handled by `fmt_fields`
-        Ok(())
-    }
 }
 
 impl NeedsParentheses for PatternMatchMapping {
@@ -175,9 +166,7 @@ fn find_double_star(pattern: &PatternMatchMapping, source: &str) -> Option<(Text
     } = pattern;
 
     // If there's no `rest` element, there's no `**`.
-    let Some(rest) = rest else {
-        return None;
-    };
+    let rest = rest.as_ref()?;
 
     let mut tokenizer =
         SimpleTokenizer::starts_at(patterns.last().map_or(pattern.start(), Ranged::end), source);

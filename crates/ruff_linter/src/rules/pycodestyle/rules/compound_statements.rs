@@ -1,8 +1,7 @@
 use ruff_notebook::CellOffsets;
 use ruff_python_ast::PySourceType;
-use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::Tok;
-use ruff_text_size::{TextRange, TextSize};
+use ruff_python_parser::{TokenIterWithContext, TokenKind, Tokens};
+use ruff_text_size::{Ranged, TextSize};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
@@ -100,7 +99,7 @@ impl AlwaysFixableViolation for UselessSemicolon {
 /// E701, E702, E703
 pub(crate) fn compound_statements(
     diagnostics: &mut Vec<Diagnostic>,
-    lxr: &[LexResult],
+    tokens: &Tokens,
     locator: &Locator,
     indexer: &Indexer,
     source_type: PySourceType,
@@ -126,74 +125,54 @@ pub(crate) fn compound_statements(
     // This is used to allow `class C: ...`-style definitions in stubs.
     let mut allow_ellipsis = false;
 
-    // Track the bracket depth.
-    let mut par_count = 0u32;
-    let mut sqb_count = 0u32;
-    let mut brace_count = 0u32;
-
     // Track indentation.
     let mut indent = 0u32;
 
-    // Keep the token iterator to perform lookaheads.
-    let mut tokens = lxr.iter().flatten();
+    // Use an iterator to allow passing it around.
+    let mut token_iter = tokens.iter_with_context();
 
-    while let Some(&(ref tok, range)) = tokens.next() {
-        match tok {
-            Tok::Lpar => {
-                par_count = par_count.saturating_add(1);
-            }
-            Tok::Rpar => {
-                par_count = par_count.saturating_sub(1);
-            }
-            Tok::Lsqb => {
-                sqb_count = sqb_count.saturating_add(1);
-            }
-            Tok::Rsqb => {
-                sqb_count = sqb_count.saturating_sub(1);
-            }
-            Tok::Lbrace => {
-                brace_count = brace_count.saturating_add(1);
-            }
-            Tok::Rbrace => {
-                brace_count = brace_count.saturating_sub(1);
-            }
-            Tok::Ellipsis => {
+    loop {
+        let Some(token) = token_iter.next() else {
+            break;
+        };
+
+        match token.kind() {
+            TokenKind::Ellipsis => {
                 if allow_ellipsis {
                     allow_ellipsis = false;
                     continue;
                 }
             }
-            Tok::Indent => {
+            TokenKind::Indent => {
                 indent = indent.saturating_add(1);
             }
-            Tok::Dedent => {
+            TokenKind::Dedent => {
                 indent = indent.saturating_sub(1);
             }
             _ => {}
         }
 
-        if par_count > 0 || sqb_count > 0 || brace_count > 0 {
+        if token_iter.in_parenthesized_context() {
             continue;
         }
 
-        match tok {
-            Tok::Newline => {
-                if let Some((start, end)) = semi {
+        match token.kind() {
+            TokenKind::Newline => {
+                if let Some(range) = semi {
                     if !(source_type.is_ipynb()
                         && indent == 0
                         && cell_offsets
-                            .and_then(|cell_offsets| cell_offsets.containing_range(range.start()))
+                            .and_then(|cell_offsets| cell_offsets.containing_range(token.start()))
                             .is_some_and(|cell_range| {
-                                !has_non_trivia_tokens_till(tokens.clone(), cell_range.end())
+                                !has_non_trivia_tokens_till(token_iter.clone(), cell_range.end())
                             }))
                     {
-                        let mut diagnostic =
-                            Diagnostic::new(UselessSemicolon, TextRange::new(start, end));
+                        let mut diagnostic = Diagnostic::new(UselessSemicolon, range);
                         diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
                             indexer
-                                .preceded_by_continuations(start, locator)
-                                .unwrap_or(start),
-                            end,
+                                .preceded_by_continuations(range.start(), locator)
+                                .unwrap_or(range.start()),
+                            range.end(),
                         )));
                         diagnostics.push(diagnostic);
                     }
@@ -215,7 +194,7 @@ pub(crate) fn compound_statements(
                 while_ = None;
                 with = None;
             }
-            Tok::Colon => {
+            TokenKind::Colon => {
                 if case.is_some()
                     || class.is_some()
                     || elif.is_some()
@@ -229,34 +208,31 @@ pub(crate) fn compound_statements(
                     || while_.is_some()
                     || with.is_some()
                 {
-                    colon = Some((range.start(), range.end()));
+                    colon = Some(token.range());
 
                     // Allow `class C: ...`-style definitions.
                     allow_ellipsis = true;
                 }
             }
-            Tok::Semi => {
-                semi = Some((range.start(), range.end()));
+            TokenKind::Semi => {
+                semi = Some(token.range());
                 allow_ellipsis = false;
             }
-            Tok::Comment(..) | Tok::Indent | Tok::Dedent | Tok::NonLogicalNewline => {}
+            TokenKind::Comment
+            | TokenKind::Indent
+            | TokenKind::Dedent
+            | TokenKind::NonLogicalNewline => {}
             _ => {
-                if let Some((start, end)) = semi {
-                    diagnostics.push(Diagnostic::new(
-                        MultipleStatementsOnOneLineSemicolon,
-                        TextRange::new(start, end),
-                    ));
+                if let Some(range) = semi {
+                    diagnostics.push(Diagnostic::new(MultipleStatementsOnOneLineSemicolon, range));
 
                     // Reset.
                     semi = None;
                     allow_ellipsis = false;
                 }
 
-                if let Some((start, end)) = colon {
-                    diagnostics.push(Diagnostic::new(
-                        MultipleStatementsOnOneLineColon,
-                        TextRange::new(start, end),
-                    ));
+                if let Some(range) = colon {
+                    diagnostics.push(Diagnostic::new(MultipleStatementsOnOneLineColon, range));
 
                     // Reset.
                     colon = None;
@@ -277,8 +253,8 @@ pub(crate) fn compound_statements(
             }
         }
 
-        match tok {
-            Tok::Lambda => {
+        match token.kind() {
+            TokenKind::Lambda => {
                 // Reset.
                 colon = None;
                 case = None;
@@ -294,41 +270,41 @@ pub(crate) fn compound_statements(
                 while_ = None;
                 with = None;
             }
-            Tok::Case => {
-                case = Some((range.start(), range.end()));
+            TokenKind::Case => {
+                case = Some(token.range());
             }
-            Tok::If => {
-                if_ = Some((range.start(), range.end()));
+            TokenKind::If => {
+                if_ = Some(token.range());
             }
-            Tok::While => {
-                while_ = Some((range.start(), range.end()));
+            TokenKind::While => {
+                while_ = Some(token.range());
             }
-            Tok::For => {
-                for_ = Some((range.start(), range.end()));
+            TokenKind::For => {
+                for_ = Some(token.range());
             }
-            Tok::Try => {
-                try_ = Some((range.start(), range.end()));
+            TokenKind::Try => {
+                try_ = Some(token.range());
             }
-            Tok::Except => {
-                except = Some((range.start(), range.end()));
+            TokenKind::Except => {
+                except = Some(token.range());
             }
-            Tok::Finally => {
-                finally = Some((range.start(), range.end()));
+            TokenKind::Finally => {
+                finally = Some(token.range());
             }
-            Tok::Elif => {
-                elif = Some((range.start(), range.end()));
+            TokenKind::Elif => {
+                elif = Some(token.range());
             }
-            Tok::Else => {
-                else_ = Some((range.start(), range.end()));
+            TokenKind::Else => {
+                else_ = Some(token.range());
             }
-            Tok::Class => {
-                class = Some((range.start(), range.end()));
+            TokenKind::Class => {
+                class = Some(token.range());
             }
-            Tok::With => {
-                with = Some((range.start(), range.end()));
+            TokenKind::With => {
+                with = Some(token.range());
             }
-            Tok::Match => {
-                match_ = Some((range.start(), range.end()));
+            TokenKind::Match => {
+                match_ = Some(token.range());
             }
             _ => {}
         };
@@ -337,17 +313,17 @@ pub(crate) fn compound_statements(
 
 /// Returns `true` if there are any non-trivia tokens from the given token
 /// iterator till the given end offset.
-fn has_non_trivia_tokens_till<'a>(
-    tokens: impl Iterator<Item = &'a (Tok, TextRange)>,
-    cell_end: TextSize,
-) -> bool {
-    for &(ref tok, tok_range) in tokens {
-        if tok_range.start() >= cell_end {
+fn has_non_trivia_tokens_till(token_iter: TokenIterWithContext<'_>, cell_end: TextSize) -> bool {
+    for token in token_iter {
+        if token.start() >= cell_end {
             return false;
         }
         if !matches!(
-            tok,
-            Tok::Newline | Tok::Comment(_) | Tok::EndOfFile | Tok::NonLogicalNewline
+            token.kind(),
+            TokenKind::Newline
+                | TokenKind::Comment
+                | TokenKind::EndOfFile
+                | TokenKind::NonLogicalNewline
         ) {
             return true;
         }

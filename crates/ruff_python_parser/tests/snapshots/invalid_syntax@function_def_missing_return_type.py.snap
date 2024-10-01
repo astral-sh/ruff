@@ -1,0 +1,54 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/function_def_missing_return_type.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..19,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 0..18,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 4..7,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 7..9,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 15..18,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 15..18,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | def foo() -> : ...
+  |              ^ Syntax Error: Expected an expression
+  |

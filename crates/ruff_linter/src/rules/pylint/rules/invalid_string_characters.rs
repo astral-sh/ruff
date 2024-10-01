@@ -4,7 +4,7 @@ use ruff_diagnostics::AlwaysFixableViolation;
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_parser::Tok;
+use ruff_python_parser::TokenKind;
 use ruff_source_file::Locator;
 
 /// ## What it does
@@ -57,7 +57,7 @@ impl AlwaysFixableViolation for InvalidCharacterBackspace {
 ///
 /// Use instead:
 /// ```python
-/// x = "\x1A"
+/// x = "\x1a"
 /// ```
 #[violation]
 pub struct InvalidCharacterSub;
@@ -90,7 +90,7 @@ impl AlwaysFixableViolation for InvalidCharacterSub {
 ///
 /// Use instead:
 /// ```python
-/// x = "\x1B"
+/// x = "\x1b"
 /// ```
 #[violation]
 pub struct InvalidCharacterEsc;
@@ -155,7 +155,7 @@ impl AlwaysFixableViolation for InvalidCharacterNul {
 ///
 /// Use instead:
 /// ```python
-/// x = "Dear Sir\u200B/\u200BMadam"  # zero width space
+/// x = "Dear Sir\u200b/\u200bMadam"  # zero width space
 /// ```
 #[violation]
 pub struct InvalidCharacterZeroWidthSpace;
@@ -174,14 +174,14 @@ impl AlwaysFixableViolation for InvalidCharacterZeroWidthSpace {
 /// PLE2510, PLE2512, PLE2513, PLE2514, PLE2515
 pub(crate) fn invalid_string_characters(
     diagnostics: &mut Vec<Diagnostic>,
-    tok: &Tok,
+    token: TokenKind,
     range: TextRange,
     locator: &Locator,
 ) {
-    let text = match tok {
+    let text = match token {
         // We can't use the `value` field since it's decoded and e.g. for f-strings removed a curly
         // brace that escaped another curly brace, which would gives us wrong column information.
-        Tok::String { .. } | Tok::FStringMiddle { .. } => locator.slice(range),
+        TokenKind::String | TokenKind::FStringMiddle => locator.slice(range),
         _ => return,
     };
 

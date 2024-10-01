@@ -1,21 +1,26 @@
 use std::ops::Add;
 
-use ruff_python_ast::{self as ast, ElifElseClause, Expr, Stmt};
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use anyhow::Result;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, FixAvailability, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-
 use ruff_python_ast::helpers::{is_const_false, is_const_true};
 use ruff_python_ast::stmt_if::elif_else_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
+use ruff_python_ast::{self as ast, Decorator, ElifElseClause, Expr, Stmt};
+use ruff_python_codegen::Stylist;
+use ruff_python_index::Indexer;
+use ruff_python_semantic::analyze::visibility::is_property;
 use ruff_python_semantic::SemanticModel;
-use ruff_python_trivia::is_python_whitespace;
+use ruff_python_trivia::{is_python_whitespace, SimpleTokenKind, SimpleTokenizer};
+use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits;
+use crate::fix::edits::adjust_indentation;
 use crate::registry::{AsRule, Rule};
 use crate::rules::flake8_return::helpers::end_of_last_statement;
 
@@ -147,7 +152,7 @@ impl AlwaysFixableViolation for ImplicitReturn {
 /// assigned variable.
 ///
 /// ## Why is this bad?
-/// The variable assignment is not necessary as the value can be returned
+/// The variable assignment is not necessary, as the value can be returned
 /// directly.
 ///
 /// ## Example
@@ -210,10 +215,16 @@ pub struct SuperfluousElseReturn {
 }
 
 impl Violation for SuperfluousElseReturn {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
         let SuperfluousElseReturn { branch } = self;
         format!("Unnecessary `{branch}` after `return` statement")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let SuperfluousElseReturn { branch } = self;
+        Some(format!("Remove unnecessary `{branch}`"))
     }
 }
 
@@ -248,10 +259,16 @@ pub struct SuperfluousElseRaise {
 }
 
 impl Violation for SuperfluousElseRaise {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
         let SuperfluousElseRaise { branch } = self;
         format!("Unnecessary `{branch}` after `raise` statement")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let SuperfluousElseRaise { branch } = self;
+        Some(format!("Remove unnecessary `{branch}`"))
     }
 }
 
@@ -288,10 +305,16 @@ pub struct SuperfluousElseContinue {
 }
 
 impl Violation for SuperfluousElseContinue {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
         let SuperfluousElseContinue { branch } = self;
         format!("Unnecessary `{branch}` after `continue` statement")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let SuperfluousElseContinue { branch } = self;
+        Some(format!("Remove unnecessary `{branch}`"))
     }
 }
 
@@ -328,15 +351,21 @@ pub struct SuperfluousElseBreak {
 }
 
 impl Violation for SuperfluousElseBreak {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
         let SuperfluousElseBreak { branch } = self;
         format!("Unnecessary `{branch}` after `break` statement")
     }
+
+    fn fix_title(&self) -> Option<String> {
+        let SuperfluousElseBreak { branch } = self;
+        Some(format!("Remove unnecessary `{branch}`"))
+    }
 }
 
 /// RET501
-fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {
+fn unnecessary_return_none(checker: &mut Checker, decorator_list: &[Decorator], stack: &Stack) {
     for stmt in &stack.returns {
         let Some(expr) = stmt.value.as_deref() else {
             continue;
@@ -344,7 +373,17 @@ fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {
         if !expr.is_none_literal_expr() {
             continue;
         }
-        let mut diagnostic = Diagnostic::new(UnnecessaryReturnNone, stmt.range);
+
+        // Skip property functions
+        if is_property(
+            decorator_list,
+            checker.settings.pydocstyle.property_decorators(),
+            checker.semantic(),
+        ) {
+            return;
+        }
+
+        let mut diagnostic = Diagnostic::new(UnnecessaryReturnNone, stmt.range());
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             "return".to_string(),
             stmt.range(),
@@ -359,44 +398,98 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
         if stmt.value.is_some() {
             continue;
         }
-        let mut diagnostic = Diagnostic::new(ImplicitReturnValue, stmt.range);
+        let mut diagnostic = Diagnostic::new(ImplicitReturnValue, stmt.range());
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             "return None".to_string(),
-            stmt.range,
+            stmt.range(),
         )));
         checker.diagnostics.push(diagnostic);
     }
 }
 
-/// Return `true` if the `func` is a known function that never returns.
+/// Return `true` if the `func` appears to be non-returning.
 fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
-    semantic.resolve_call_path(func).is_some_and(|call_path| {
-        matches!(
-            call_path.as_slice(),
-            ["" | "builtins" | "sys" | "_thread" | "pytest", "exit"]
-                | ["" | "builtins", "quit"]
-                | ["os" | "posix", "_exit" | "abort"]
-                | ["_winapi", "ExitProcess"]
-                | ["pytest", "fail" | "skip" | "xfail"]
-        ) || semantic.match_typing_call_path(&call_path, "assert_never")
-    })
+    // First, look for known functions that never return from the standard library and popular
+    // libraries.
+    if semantic
+        .resolve_qualified_name(func)
+        .is_some_and(|qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                ["" | "builtins" | "sys" | "_thread" | "pytest", "exit"]
+                    | ["" | "builtins", "quit"]
+                    | ["os" | "posix", "_exit" | "abort"]
+                    | ["_winapi", "ExitProcess"]
+                    | ["pytest", "fail" | "skip" | "xfail"]
+            ) || semantic.match_typing_qualified_name(&qualified_name, "assert_never")
+        })
+    {
+        return true;
+    }
+
+    // Second, look for `NoReturn` annotations on the return type.
+    let Some(func_binding) = semantic.lookup_attribute(func) else {
+        return false;
+    };
+    let Some(node_id) = semantic.binding(func_binding).source else {
+        return false;
+    };
+
+    let Stmt::FunctionDef(ast::StmtFunctionDef { returns, .. }) = semantic.statement(node_id)
+    else {
+        return false;
+    };
+
+    let Some(returns) = returns.as_ref() else {
+        return false;
+    };
+
+    let Some(qualified_name) = semantic.resolve_qualified_name(returns) else {
+        return false;
+    };
+
+    semantic.match_typing_qualified_name(&qualified_name, "NoReturn")
 }
 
-/// RET503
-fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
+fn add_return_none(checker: &mut Checker, stmt: &Stmt, range: TextRange) {
+    let mut diagnostic = Diagnostic::new(ImplicitReturn, range);
+    if let Some(indent) = indentation(checker.locator(), stmt) {
+        let mut content = String::new();
+        content.push_str(checker.stylist().line_ending().as_str());
+        content.push_str(indent);
+        content.push_str("return None");
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
+            content,
+            end_of_last_statement(stmt, checker.locator()),
+        )));
+    }
+    checker.diagnostics.push(diagnostic);
+}
+
+/// Returns a list of all implicit returns in the given statement.
+///
+/// Note: The function should be refactored to `has_implicit_return` with an early return (when seeing the first implicit return)
+/// when removing the preview gating.
+fn implicit_returns<'a>(checker: &Checker, stmt: &'a Stmt) -> Vec<&'a Stmt> {
     match stmt {
         Stmt::If(ast::StmtIf {
             body,
             elif_else_clauses,
             ..
         }) => {
-            if let Some(last_stmt) = body.last() {
-                implicit_return(checker, last_stmt);
-            }
+            let mut implicit_stmts = body
+                .last()
+                .map(|last| implicit_returns(checker, last))
+                .unwrap_or_default();
+
             for clause in elif_else_clauses {
-                if let Some(last_stmt) = clause.body.last() {
-                    implicit_return(checker, last_stmt);
-                }
+                implicit_stmts.extend(
+                    clause
+                        .body
+                        .last()
+                        .iter()
+                        .flat_map(|last| implicit_returns(checker, last)),
+                );
             }
 
             // Check if we don't have an else clause
@@ -404,72 +497,64 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                 elif_else_clauses.last(),
                 None | Some(ast::ElifElseClause { test: Some(_), .. })
             ) {
-                let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());
-                if let Some(indent) = indentation(checker.locator(), stmt) {
-                    let mut content = String::new();
-                    content.push_str(checker.stylist().line_ending().as_str());
-                    content.push_str(indent);
-                    content.push_str("return None");
-                    diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
-                        content,
-                        end_of_last_statement(stmt, checker.locator()),
-                    )));
-                }
-                checker.diagnostics.push(diagnostic);
+                implicit_stmts.push(stmt);
             }
+            implicit_stmts
         }
-        Stmt::Assert(ast::StmtAssert { test, .. }) if is_const_false(test) => {}
-        Stmt::While(ast::StmtWhile { test, .. }) if is_const_true(test) => {}
+        Stmt::Assert(ast::StmtAssert { test, .. }) if is_const_false(test) => vec![],
+        Stmt::While(ast::StmtWhile { test, .. }) if is_const_true(test) => vec![],
         Stmt::For(ast::StmtFor { orelse, .. }) | Stmt::While(ast::StmtWhile { orelse, .. }) => {
             if let Some(last_stmt) = orelse.last() {
-                implicit_return(checker, last_stmt);
+                implicit_returns(checker, last_stmt)
             } else {
-                let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());
-                if let Some(indent) = indentation(checker.locator(), stmt) {
-                    let mut content = String::new();
-                    content.push_str(checker.stylist().line_ending().as_str());
-                    content.push_str(indent);
-                    content.push_str("return None");
-                    diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
-                        content,
-                        end_of_last_statement(stmt, checker.locator()),
-                    )));
-                }
-                checker.diagnostics.push(diagnostic);
+                vec![stmt]
             }
         }
         Stmt::Match(ast::StmtMatch { cases, .. }) => {
+            let mut implicit_stmts = vec![];
             for case in cases {
-                if let Some(last_stmt) = case.body.last() {
-                    implicit_return(checker, last_stmt);
-                }
+                implicit_stmts.extend(
+                    case.body
+                        .last()
+                        .into_iter()
+                        .flat_map(|last_stmt| implicit_returns(checker, last_stmt)),
+                );
             }
+            implicit_stmts
         }
-        Stmt::With(ast::StmtWith { body, .. }) => {
-            if let Some(last_stmt) = body.last() {
-                implicit_return(checker, last_stmt);
-            }
-        }
-        Stmt::Return(_) | Stmt::Raise(_) | Stmt::Try(_) => {}
+        Stmt::With(ast::StmtWith { body, .. }) => body
+            .last()
+            .map(|last_stmt| implicit_returns(checker, last_stmt))
+            .unwrap_or_default(),
+        Stmt::Return(_) | Stmt::Raise(_) | Stmt::Try(_) => vec![],
         Stmt::Expr(ast::StmtExpr { value, .. })
             if matches!(
                 value.as_ref(),
                 Expr::Call(ast::ExprCall { func, ..  })
                     if is_noreturn_func(func, checker.semantic())
-            ) => {}
+            ) =>
+        {
+            vec![]
+        }
         _ => {
-            let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());
-            if let Some(indent) = indentation(checker.locator(), stmt) {
-                let mut content = String::new();
-                content.push_str(checker.stylist().line_ending().as_str());
-                content.push_str(indent);
-                content.push_str("return None");
-                diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
-                    content,
-                    end_of_last_statement(stmt, checker.locator()),
-                )));
-            }
-            checker.diagnostics.push(diagnostic);
+            vec![stmt]
+        }
+    }
+}
+
+/// RET503
+fn implicit_return(checker: &mut Checker, function_def: &ast::StmtFunctionDef, stmt: &Stmt) {
+    let implicit_stmts = implicit_returns(checker, stmt);
+
+    if implicit_stmts.is_empty() {
+        return;
+    }
+
+    if checker.settings.preview.is_enabled() {
+        add_return_none(checker, stmt, function_def.range());
+    } else {
+        for implicit_stmt in implicit_stmts {
+            add_return_none(checker, implicit_stmt, implicit_stmt.range());
         }
     }
 }
@@ -509,6 +594,12 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
             continue;
         }
 
+        // Ignore variables that have an annotation defined elsewhere.
+        if stack.annotations.contains(assigned_id.as_str()) {
+            continue;
+        }
+
+        // Ignore `nonlocal` and `global` variables.
         if stack.non_locals.contains(assigned_id.as_str()) {
             continue;
         }
@@ -575,42 +666,77 @@ fn superfluous_else_node(
     };
     for child in if_elif_body {
         if child.is_return_stmt() {
-            let diagnostic = Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 SuperfluousElseReturn { branch },
                 elif_else_range(elif_else, checker.locator().contents())
                     .unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
+                diagnostic.try_set_fix(|| {
+                    remove_else(
+                        elif_else,
+                        checker.locator(),
+                        checker.indexer(),
+                        checker.stylist(),
+                    )
+                });
                 checker.diagnostics.push(diagnostic);
             }
             return true;
         } else if child.is_break_stmt() {
-            let diagnostic = Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 SuperfluousElseBreak { branch },
                 elif_else_range(elif_else, checker.locator().contents())
                     .unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
+                diagnostic.try_set_fix(|| {
+                    remove_else(
+                        elif_else,
+                        checker.locator(),
+                        checker.indexer(),
+                        checker.stylist(),
+                    )
+                });
+
                 checker.diagnostics.push(diagnostic);
             }
             return true;
         } else if child.is_raise_stmt() {
-            let diagnostic = Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 SuperfluousElseRaise { branch },
                 elif_else_range(elif_else, checker.locator().contents())
                     .unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
+                diagnostic.try_set_fix(|| {
+                    remove_else(
+                        elif_else,
+                        checker.locator(),
+                        checker.indexer(),
+                        checker.stylist(),
+                    )
+                });
+
                 checker.diagnostics.push(diagnostic);
             }
             return true;
         } else if child.is_continue_stmt() {
-            let diagnostic = Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 SuperfluousElseContinue { branch },
                 elif_else_range(elif_else, checker.locator().contents())
                     .unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
+                diagnostic.try_set_fix(|| {
+                    remove_else(
+                        elif_else,
+                        checker.locator(),
+                        checker.indexer(),
+                        checker.stylist(),
+                    )
+                });
+
                 checker.diagnostics.push(diagnostic);
             }
             return true;
@@ -627,7 +753,14 @@ fn superfluous_elif_else(checker: &mut Checker, stack: &Stack) {
 }
 
 /// Run all checks from the `flake8-return` plugin.
-pub(crate) fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Expr>) {
+pub(crate) fn function(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
+    let ast::StmtFunctionDef {
+        decorator_list,
+        returns,
+        body,
+        ..
+    } = function_def;
+
     // Find the last statement in the function.
     let Some(last_stmt) = body.last() else {
         // Skip empty functions.
@@ -641,7 +774,7 @@ pub(crate) fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Ex
 
     // Traverse the function body, to collect the stack.
     let stack = {
-        let mut visitor = ReturnVisitor::default();
+        let mut visitor = ReturnVisitor::new(checker.semantic());
         for stmt in body {
             visitor.visit_stmt(stmt);
         }
@@ -673,7 +806,7 @@ pub(crate) fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Ex
             implicit_return_value(checker, &stack);
         }
         if checker.enabled(Rule::ImplicitReturn) {
-            implicit_return(checker, last_stmt);
+            implicit_return(checker, function_def, last_stmt);
         }
 
         if checker.enabled(Rule::UnnecessaryAssign) {
@@ -682,9 +815,89 @@ pub(crate) fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Ex
     } else {
         if checker.enabled(Rule::UnnecessaryReturnNone) {
             // Skip functions that have a return annotation that is not `None`.
-            if returns.map_or(true, Expr::is_none_literal_expr) {
-                unnecessary_return_none(checker, &stack);
+            if returns.as_deref().map_or(true, Expr::is_none_literal_expr) {
+                unnecessary_return_none(checker, decorator_list, &stack);
             }
         }
+    }
+}
+
+/// Generate a [`Fix`] to remove an `else` or `elif` clause.
+fn remove_else(
+    elif_else: &ElifElseClause,
+    locator: &Locator,
+    indexer: &Indexer,
+    stylist: &Stylist,
+) -> Result<Fix> {
+    if elif_else.test.is_some() {
+        // Ex) `elif` -> `if`
+        Ok(Fix::safe_edit(Edit::deletion(
+            elif_else.start(),
+            elif_else.start() + TextSize::from(2),
+        )))
+    } else {
+        // the start of the line where the `else`` is
+        let else_line_start = locator.line_start(elif_else.start());
+
+        // making a tokenizer to find the Colon for the `else`, not always on the same line!
+        let mut else_line_tokenizer =
+            SimpleTokenizer::starts_at(elif_else.start(), locator.contents());
+
+        // find the Colon for the `else`
+        let Some(else_colon) =
+            else_line_tokenizer.find(|token| token.kind == SimpleTokenKind::Colon)
+        else {
+            return Err(anyhow::anyhow!("Cannot find `:` in `else` statement"));
+        };
+
+        // get the indentation of the `else`, since that is the indent level we want to end with
+        let Some(desired_indentation) = indentation(locator, elif_else) else {
+            return Err(anyhow::anyhow!("Compound statement cannot be inlined"));
+        };
+
+        // If the statement is on the same line as the `else`, just remove the `else: `.
+        // Ex) `else: return True` -> `return True`
+        if let Some(first) = elif_else.body.first() {
+            if indexer.preceded_by_multi_statement_line(first, locator) {
+                return Ok(Fix::safe_edit(Edit::deletion(
+                    elif_else.start(),
+                    first.start(),
+                )));
+            }
+        }
+
+        // we're deleting the `else`, and it's Colon, and the rest of the line(s) they're on,
+        // so here we get the last position of the line the Colon is on
+        let else_colon_end = locator.full_line_end(else_colon.end());
+
+        // if there is a comment on the same line as the Colon, let's keep it
+        // and give it the proper indentation once we unindent it
+        let else_comment_after_colon = else_line_tokenizer
+            .find(|token| token.kind.is_comment())
+            .and_then(|token| {
+                if token.kind == SimpleTokenKind::Comment && token.start() < else_colon_end {
+                    return Some(format!(
+                        "{desired_indentation}{}{}",
+                        locator.slice(token),
+                        stylist.line_ending().as_str(),
+                    ));
+                }
+                None
+            })
+            .unwrap_or(String::new());
+
+        let indented = adjust_indentation(
+            TextRange::new(else_colon_end, elif_else.end()),
+            desired_indentation,
+            locator,
+            indexer,
+            stylist,
+        )?;
+
+        Ok(Fix::safe_edit(Edit::replacement(
+            format!("{else_comment_after_colon}{indented}"),
+            else_line_start,
+            elif_else.end(),
+        )))
     }
 }

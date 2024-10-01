@@ -1,0 +1,38 @@
+---
+source: crates/ruff_python_parser/src/parser/tests.rs
+expression: suite
+---
+[
+    Assign(
+        StmtAssign {
+            range: 0..37,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 0..1,
+                        id: Name("x"),
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: StringLiteral(
+                ExprStringLiteral {
+                    range: 4..37,
+                    value: StringLiteralValue {
+                        inner: Single(
+                            StringLiteral {
+                                range: 4..37,
+                                value: "\u{8}another cool trick",
+                                flags: StringLiteralFlags {
+                                    quote_style: Double,
+                                    prefix: Empty,
+                                    triple_quoted: false,
+                                },
+                            },
+                        ),
+                    },
+                },
+            ),
+        },
+    ),
+]

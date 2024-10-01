@@ -1,15 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E712.py:2:11: E712 [*] Comparison to `True` should be `cond is True` or `if cond:`
+E712.py:2:4: E712 [*] Avoid equality comparisons to `True`; use `if res:` for truth checks
   |
 1 | #: E712
 2 | if res == True:
-  |           ^^^^ E712
+  |    ^^^^^^^^^^^ E712
 3 |     pass
 4 | #: E712
   |
-  = help: Replace with `cond is True`
+  = help: Replace with `res`
 
 ℹ Unsafe fix
 1 1 | #: E712
@@ -19,16 +19,16 @@ E712.py:2:11: E712 [*] Comparison to `True` should be `cond is True` or `if cond
 4 4 | #: E712
 5 5 | if res != False:
 
-E712.py:5:11: E712 [*] Comparison to `False` should be `cond is not False` or `if cond:`
+E712.py:5:4: E712 [*] Avoid inequality comparisons to `False`; use `if res:` for truth checks
   |
 3 |     pass
 4 | #: E712
 5 | if res != False:
-  |           ^^^^^ E712
+  |    ^^^^^^^^^^^^ E712
 6 |     pass
 7 | #: E712
   |
-  = help: Replace with `cond is not False`
+  = help: Replace with `res`
 
 ℹ Unsafe fix
 2 2 | if res == True:
@@ -40,16 +40,16 @@ E712.py:5:11: E712 [*] Comparison to `False` should be `cond is not False` or `i
 7 7 | #: E712
 8 8 | if True != res:
 
-E712.py:8:4: E712 [*] Comparison to `True` should be `cond is not True` or `if not cond:`
+E712.py:8:4: E712 [*] Avoid inequality comparisons to `True`; use `if not res:` for false checks
    |
  6 |     pass
  7 | #: E712
  8 | if True != res:
-   |    ^^^^ E712
+   |    ^^^^^^^^^^^ E712
  9 |     pass
 10 | #: E712
    |
-   = help: Replace with `cond is not True`
+   = help: Replace with `not res`
 
 ℹ Unsafe fix
 5 5 | if res != False:
@@ -61,16 +61,16 @@ E712.py:8:4: E712 [*] Comparison to `True` should be `cond is not True` or `if n
 10 10 | #: E712
 11 11 | if False == res:
 
-E712.py:11:4: E712 [*] Comparison to `False` should be `cond is False` or `if not cond:`
+E712.py:11:4: E712 [*] Avoid equality comparisons to `False`; use `if not res:` for false checks
    |
  9 |     pass
 10 | #: E712
 11 | if False == res:
-   |    ^^^^^ E712
+   |    ^^^^^^^^^^^^ E712
 12 |     pass
 13 | #: E712
    |
-   = help: Replace with `cond is False`
+   = help: Replace with `not res`
 
 ℹ Unsafe fix
 8  8  | if True != res:
@@ -82,16 +82,16 @@ E712.py:11:4: E712 [*] Comparison to `False` should be `cond is False` or `if no
 13 13 | #: E712
 14 14 | if res[1] == True:
 
-E712.py:14:14: E712 [*] Comparison to `True` should be `cond is True` or `if cond:`
+E712.py:14:4: E712 [*] Avoid equality comparisons to `True`; use `if res[1]:` for truth checks
    |
 12 |     pass
 13 | #: E712
 14 | if res[1] == True:
-   |              ^^^^ E712
+   |    ^^^^^^^^^^^^^^ E712
 15 |     pass
 16 | #: E712
    |
-   = help: Replace with `cond is True`
+   = help: Replace with `res[1]`
 
 ℹ Unsafe fix
 11 11 | if False == res:
@@ -103,16 +103,16 @@ E712.py:14:14: E712 [*] Comparison to `True` should be `cond is True` or `if con
 16 16 | #: E712
 17 17 | if res[1] != False:
 
-E712.py:17:14: E712 [*] Comparison to `False` should be `cond is not False` or `if cond:`
+E712.py:17:4: E712 [*] Avoid inequality comparisons to `False`; use `if res[1]:` for truth checks
    |
 15 |     pass
 16 | #: E712
 17 | if res[1] != False:
-   |              ^^^^^ E712
+   |    ^^^^^^^^^^^^^^^ E712
 18 |     pass
 19 | #: E712
    |
-   = help: Replace with `cond is not False`
+   = help: Replace with `res[1]`
 
 ℹ Unsafe fix
 14 14 | if res[1] == True:
@@ -124,16 +124,16 @@ E712.py:17:14: E712 [*] Comparison to `False` should be `cond is not False` or `
 19 19 | #: E712
 20 20 | var = 1 if cond == True else -1 if cond == False else cond
 
-E712.py:20:20: E712 [*] Comparison to `True` should be `cond is True` or `if cond:`
+E712.py:20:12: E712 [*] Avoid equality comparisons to `True`; use `if cond:` for truth checks
    |
 18 |     pass
 19 | #: E712
 20 | var = 1 if cond == True else -1 if cond == False else cond
-   |                    ^^^^ E712
+   |            ^^^^^^^^^^^^ E712
 21 | #: E712
 22 | if (True) == TrueElement or x == TrueElement:
    |
-   = help: Replace with `cond is True`
+   = help: Replace with `cond`
 
 ℹ Unsafe fix
 17 17 | if res[1] != False:
@@ -145,16 +145,16 @@ E712.py:20:20: E712 [*] Comparison to `True` should be `cond is True` or `if con
 22 22 | if (True) == TrueElement or x == TrueElement:
 23 23 |     pass
 
-E712.py:20:44: E712 [*] Comparison to `False` should be `cond is False` or `if not cond:`
+E712.py:20:36: E712 [*] Avoid equality comparisons to `False`; use `if not cond:` for false checks
    |
 18 |     pass
 19 | #: E712
 20 | var = 1 if cond == True else -1 if cond == False else cond
-   |                                            ^^^^^ E712
+   |                                    ^^^^^^^^^^^^^ E712
 21 | #: E712
 22 | if (True) == TrueElement or x == TrueElement:
    |
-   = help: Replace with `cond is False`
+   = help: Replace with `not cond`
 
 ℹ Unsafe fix
 17 17 | if res[1] != False:
@@ -166,15 +166,15 @@ E712.py:20:44: E712 [*] Comparison to `False` should be `cond is False` or `if n
 22 22 | if (True) == TrueElement or x == TrueElement:
 23 23 |     pass
 
-E712.py:22:5: E712 [*] Comparison to `True` should be `cond is True` or `if cond:`
+E712.py:22:4: E712 [*] Avoid equality comparisons to `True`; use `if TrueElement:` for truth checks
    |
 20 | var = 1 if cond == True else -1 if cond == False else cond
 21 | #: E712
 22 | if (True) == TrueElement or x == TrueElement:
-   |     ^^^^ E712
+   |    ^^^^^^^^^^^^^^^^^^^^^ E712
 23 |     pass
    |
-   = help: Replace with `cond is True`
+   = help: Replace with `TrueElement`
 
 ℹ Unsafe fix
 19 19 | #: E712
@@ -186,15 +186,15 @@ E712.py:22:5: E712 [*] Comparison to `True` should be `cond is True` or `if cond
 24 24 | 
 25 25 | if res == True != False:
 
-E712.py:25:11: E712 [*] Comparison to `True` should be `cond is True` or `if cond:`
+E712.py:25:4: E712 [*] Avoid equality comparisons to `True` or `False`
    |
 23 |     pass
 24 | 
 25 | if res == True != False:
-   |           ^^^^ E712
+   |    ^^^^^^^^^^^^^^^^^^^^ E712
 26 |     pass
    |
-   = help: Replace with `cond is True`
+   = help: Replace comparison
 
 ℹ Unsafe fix
 22 22 | if (True) == TrueElement or x == TrueElement:
@@ -206,15 +206,15 @@ E712.py:25:11: E712 [*] Comparison to `True` should be `cond is True` or `if con
 27 27 | 
 28 28 | if(True) == TrueElement or x == TrueElement:
 
-E712.py:25:19: E712 [*] Comparison to `False` should be `cond is not False` or `if cond:`
+E712.py:25:4: E712 [*] Avoid equality comparisons to `True` or `False`
    |
 23 |     pass
 24 | 
 25 | if res == True != False:
-   |                   ^^^^^ E712
+   |    ^^^^^^^^^^^^^^^^^^^^ E712
 26 |     pass
    |
-   = help: Replace with `cond is not False`
+   = help: Replace comparison
 
 ℹ Unsafe fix
 22 22 | if (True) == TrueElement or x == TrueElement:
@@ -226,15 +226,15 @@ E712.py:25:19: E712 [*] Comparison to `False` should be `cond is not False` or `
 27 27 | 
 28 28 | if(True) == TrueElement or x == TrueElement:
 
-E712.py:28:4: E712 [*] Comparison to `True` should be `cond is True` or `if cond:`
+E712.py:28:3: E712 [*] Avoid equality comparisons to `True`; use `if TrueElement:` for truth checks
    |
 26 |     pass
 27 | 
 28 | if(True) == TrueElement or x == TrueElement:
-   |    ^^^^ E712
+   |   ^^^^^^^^^^^^^^^^^^^^^ E712
 29 |     pass
    |
-   = help: Replace with `cond is True`
+   = help: Replace with `TrueElement`
 
 ℹ Unsafe fix
 25 25 | if res == True != False:
@@ -246,15 +246,15 @@ E712.py:28:4: E712 [*] Comparison to `True` should be `cond is True` or `if cond
 30 30 | 
 31 31 | if (yield i) == True:
 
-E712.py:31:17: E712 [*] Comparison to `True` should be `cond is True` or `if cond:`
+E712.py:31:4: E712 [*] Avoid equality comparisons to `True`; use `if yield i:` for truth checks
    |
 29 |     pass
 30 | 
 31 | if (yield i) == True:
-   |                 ^^^^ E712
+   |    ^^^^^^^^^^^^^^^^^ E712
 32 |       print("even")
    |
-   = help: Replace with `cond is True`
+   = help: Replace with `yield i`
 
 ℹ Unsafe fix
 28 28 | if(True) == TrueElement or x == TrueElement:
@@ -265,5 +265,3 @@ E712.py:31:17: E712 [*] Comparison to `True` should be `cond is True` or `if con
 32 32 |       print("even")
 33 33 | 
 34 34 | #: Okay
-
-

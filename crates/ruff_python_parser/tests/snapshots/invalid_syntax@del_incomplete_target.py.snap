@@ -1,0 +1,124 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/del_incomplete_target.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..24,
+        body: [
+            Delete(
+                StmtDelete {
+                    range: 0..9,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 4..5,
+                                id: Name("x"),
+                                ctx: Del,
+                            },
+                        ),
+                        Attribute(
+                            ExprAttribute {
+                                range: 7..9,
+                                value: Name(
+                                    ExprName {
+                                        range: 7..8,
+                                        id: Name("y"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                attr: Identifier {
+                                    id: Name(""),
+                                    range: 9..9,
+                                },
+                                ctx: Del,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 10..11,
+                    value: Name(
+                        ExprName {
+                            range: 10..11,
+                            id: Name("z"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Delete(
+                StmtDelete {
+                    range: 12..24,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 16..17,
+                                id: Name("x"),
+                                ctx: Del,
+                            },
+                        ),
+                        Subscript(
+                            ExprSubscript {
+                                range: 19..23,
+                                value: Name(
+                                    ExprName {
+                                        range: 19..20,
+                                        id: Name("y"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                slice: Slice(
+                                    ExprSlice {
+                                        range: 22..23,
+                                        lower: Some(
+                                            Name(
+                                                ExprName {
+                                                    range: 22..23,
+                                                    id: Name("z"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                        upper: Some(
+                                            Name(
+                                                ExprName {
+                                                    range: 23..23,
+                                                    id: Name(""),
+                                                    ctx: Invalid,
+                                                },
+                                            ),
+                                        ),
+                                        step: None,
+                                    },
+                                ),
+                                ctx: Del,
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | del x, y.
+  |          ^ Syntax Error: Expected an identifier
+2 | z
+3 | del x, y[
+4 | z
+  |
+
+
+  |
+3 | del x, y[
+4 | z
+  |

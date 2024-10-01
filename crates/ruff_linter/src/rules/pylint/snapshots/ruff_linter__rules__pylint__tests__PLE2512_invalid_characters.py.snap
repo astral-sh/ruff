@@ -45,8 +45,8 @@ invalid_characters.py:55:25: PLE2512 [*] Invalid unescaped character SUB, use "\
    |
 53 | zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
 54 | 
-55 | nested_fstrings = f'{f'{f''}'}'
-   |                         PLE2512
+55 | nested_fstrings = f'␈{f'{f'␛'}'}'
+   |                          PLE2512
 56 | 
 57 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998106
    |
@@ -56,8 +56,8 @@ invalid_characters.py:55:25: PLE2512 [*] Invalid unescaped character SUB, use "\
 52 52 | zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
 53 53 | zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
 54 54 | 
-55    |-nested_fstrings = f'{f'{f''}'}'
-   55 |+nested_fstrings = f'{f'\x1A{f''}'}'
+55    |-nested_fstrings = f'␈{f'{f'␛'}'}'
+   55 |+nested_fstrings = f'␈{f'\x1A{f'␛'}'}'
 56 56 | 
 57 57 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998106
 58 58 | x = f"""}}ab"""
@@ -68,17 +68,15 @@ invalid_characters.py:58:12: PLE2512 [*] Invalid unescaped character SUB, use "\
 58 | x = f"""}}ab"""
    |             PLE2512
 59 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998256
-60 | x = f"""}}ab"""
+60 | x = f"""}}a␛b"""
    |
    = help: Replace with escape sequence
 
 ℹ Safe fix
-55 55 | nested_fstrings = f'{f'{f''}'}'
+55 55 | nested_fstrings = f'␈{f'{f'␛'}'}'
 56 56 | 
 57 57 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998106
 58    |-x = f"""}}ab"""
    58 |+x = f"""}}a\x1Ab"""
 59 59 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998256
-60 60 | x = f"""}}ab"""
-
-
+60 60 | x = f"""}}a␛b"""

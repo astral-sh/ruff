@@ -1,0 +1,95 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/lambda_default_parameters.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..20,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..20,
+                    value: Lambda(
+                        ExprLambda {
+                            range: 0..20,
+                            parameters: Some(
+                                Parameters {
+                                    range: 7..17,
+                                    posonlyargs: [],
+                                    args: [
+                                        ParameterWithDefault {
+                                            range: 7..8,
+                                            parameter: Parameter {
+                                                range: 7..8,
+                                                name: Identifier {
+                                                    id: Name("a"),
+                                                    range: 7..8,
+                                                },
+                                                annotation: None,
+                                            },
+                                            default: None,
+                                        },
+                                        ParameterWithDefault {
+                                            range: 10..14,
+                                            parameter: Parameter {
+                                                range: 10..11,
+                                                name: Identifier {
+                                                    id: Name("b"),
+                                                    range: 10..11,
+                                                },
+                                                annotation: None,
+                                            },
+                                            default: Some(
+                                                NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 12..14,
+                                                        value: Int(
+                                                            20,
+                                                        ),
+                                                    },
+                                                ),
+                                            ),
+                                        },
+                                        ParameterWithDefault {
+                                            range: 16..17,
+                                            parameter: Parameter {
+                                                range: 16..17,
+                                                name: Identifier {
+                                                    id: Name("c"),
+                                                    range: 16..17,
+                                                },
+                                                annotation: None,
+                                            },
+                                            default: None,
+                                        },
+                                    ],
+                                    vararg: None,
+                                    kwonlyargs: [],
+                                    kwarg: None,
+                                },
+                            ),
+                            body: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 19..20,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | lambda a, b=20, c: 1
+  |                 ^ Syntax Error: Parameter without a default cannot follow a parameter with a default
+  |

@@ -1,0 +1,191 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/while_stmt_invalid_test_expr.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..70,
+        body: [
+            While(
+                StmtWhile {
+                    range: 0..13,
+                    test: Starred(
+                        ExprStarred {
+                            range: 6..8,
+                            value: Name(
+                                ExprName {
+                                    range: 7..8,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 10..13,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 10..13,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+            While(
+                StmtWhile {
+                    range: 14..32,
+                    test: Yield(
+                        ExprYield {
+                            range: 20..27,
+                            value: Some(
+                                Name(
+                                    ExprName {
+                                        range: 26..27,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ),
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 29..32,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 29..32,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+            While(
+                StmtWhile {
+                    range: 33..40,
+                    test: Name(
+                        ExprName {
+                            range: 39..40,
+                            id: Name("a"),
+                            ctx: Load,
+                        },
+                    ),
+                    body: [],
+                    orelse: [],
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 42..48,
+                    target: Name(
+                        ExprName {
+                            range: 42..43,
+                            id: Name("b"),
+                            ctx: Store,
+                        },
+                    ),
+                    annotation: EllipsisLiteral(
+                        ExprEllipsisLiteral {
+                            range: 45..48,
+                        },
+                    ),
+                    value: None,
+                    simple: true,
+                },
+            ),
+            While(
+                StmtWhile {
+                    range: 49..61,
+                    test: Named(
+                        ExprNamed {
+                            range: 55..61,
+                            target: Name(
+                                ExprName {
+                                    range: 55..56,
+                                    id: Name("a"),
+                                    ctx: Store,
+                                },
+                            ),
+                            value: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 60..61,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                    body: [],
+                    orelse: [],
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 63..69,
+                    target: Name(
+                        ExprName {
+                            range: 63..64,
+                            id: Name("b"),
+                            ctx: Store,
+                        },
+                    ),
+                    annotation: EllipsisLiteral(
+                        ExprEllipsisLiteral {
+                            range: 66..69,
+                        },
+                    ),
+                    value: None,
+                    simple: true,
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | while *x: ...
+  |       ^^ Syntax Error: Starred expression cannot be used here
+2 | while yield x: ...
+3 | while a, b: ...
+  |
+
+
+  |
+1 | while *x: ...
+2 | while yield x: ...
+  |       ^^^^^^^ Syntax Error: Yield expression cannot be used here
+3 | while a, b: ...
+4 | while a := 1, b: ...
+  |
+
+
+  |
+1 | while *x: ...
+2 | while yield x: ...
+3 | while a, b: ...
+  |        ^ Syntax Error: Expected ':', found ','
+4 | while a := 1, b: ...
+  |
+
+
+  |
+2 | while yield x: ...
+3 | while a, b: ...
+4 | while a := 1, b: ...
+  |             ^ Syntax Error: Expected ':', found ','
+  |

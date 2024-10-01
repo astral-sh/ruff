@@ -1,0 +1,82 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/set/missing_closing_curly_brace_3.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..144,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 118..123,
+                    value: Set(
+                        ExprSet {
+                            range: 118..123,
+                            elts: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 119..120,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 122..123,
+                                        value: Int(
+                                            2,
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 125..144,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 129..132,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 132..134,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 140..144,
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+2 | # token starts a statement.
+3 | 
+4 | {1, 2
+  |      ^ Syntax Error: Expected '}', found newline
+5 | 
+6 | def foo():
+7 |     pass
+  |

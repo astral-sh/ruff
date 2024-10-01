@@ -1,0 +1,148 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/assert_invalid_test_expr.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..55,
+        body: [
+            Assert(
+                StmtAssert {
+                    range: 0..9,
+                    test: Starred(
+                        ExprStarred {
+                            range: 7..9,
+                            value: Name(
+                                ExprName {
+                                    range: 8..9,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                    msg: None,
+                },
+            ),
+            Assert(
+                StmtAssert {
+                    range: 10..23,
+                    test: Name(
+                        ExprName {
+                            range: 17..23,
+                            id: Name("assert"),
+                            ctx: Load,
+                        },
+                    ),
+                    msg: None,
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 24..25,
+                    value: Name(
+                        ExprName {
+                            range: 24..25,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Assert(
+                StmtAssert {
+                    range: 26..40,
+                    test: Yield(
+                        ExprYield {
+                            range: 33..40,
+                            value: Some(
+                                Name(
+                                    ExprName {
+                                        range: 39..40,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ),
+                        },
+                    ),
+                    msg: None,
+                },
+            ),
+            Assert(
+                StmtAssert {
+                    range: 41..49,
+                    test: Name(
+                        ExprName {
+                            range: 48..49,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                    msg: None,
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 53..54,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 53..54,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | assert *x
+  |        ^^ Syntax Error: Starred expression cannot be used here
+2 | assert assert x
+3 | assert yield x
+  |
+
+
+  |
+1 | assert *x
+2 | assert assert x
+  |        ^^^^^^ Syntax Error: Expected an identifier, but found a keyword 'assert' that cannot be used here
+3 | assert yield x
+4 | assert x := 1
+  |
+
+
+  |
+1 | assert *x
+2 | assert assert x
+  |               ^ Syntax Error: Simple statements must be separated by newlines or semicolons
+3 | assert yield x
+4 | assert x := 1
+  |
+
+
+  |
+1 | assert *x
+2 | assert assert x
+3 | assert yield x
+  |        ^^^^^^^ Syntax Error: Yield expression cannot be used here
+4 | assert x := 1
+  |
+
+
+  |
+2 | assert assert x
+3 | assert yield x
+4 | assert x := 1
+  |          ^^ Syntax Error: Expected a statement
+  |

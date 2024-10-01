@@ -59,7 +59,7 @@ pub(crate) fn bad_open_mode(checker: &mut Checker, call: &ast::ExprCall) {
         return;
     };
 
-    let Some(ast::ExprStringLiteral { value, .. }) = mode.as_string_literal_expr() else {
+    let ast::Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = mode else {
         return;
     };
 
@@ -85,21 +85,22 @@ enum Kind {
 
 /// If a function is a call to `open`, returns the kind of `open` call.
 fn is_open(func: &Expr, semantic: &SemanticModel) -> Option<Kind> {
-    match func {
-        // Ex) `pathlib.Path(...).open(...)`
-        Expr::Attribute(ast::ExprAttribute { attr, value, .. }) if attr.as_str() == "open" => {
-            match value.as_ref() {
-                Expr::Call(ast::ExprCall { func, .. }) => semantic
-                    .resolve_call_path(func)
-                    .is_some_and(|call_path| matches!(call_path.as_slice(), ["pathlib", "Path"]))
-                    .then_some(Kind::Pathlib),
-                _ => None,
-            }
-        }
-        // Ex) `open(...)`
-        Expr::Name(ast::ExprName { id, .. }) => {
-            (id.as_str() == "open" && semantic.is_builtin("open")).then_some(Kind::Builtin)
-        }
+    // Ex) `open(...)`
+    if semantic.match_builtin_expr(func, "open") {
+        return Some(Kind::Builtin);
+    }
+
+    // Ex) `pathlib.Path(...).open(...)`
+    let ast::ExprAttribute { attr, value, .. } = func.as_attribute_expr()?;
+    if attr != "open" {
+        return None;
+    }
+    let ast::ExprCall {
+        func: value_func, ..
+    } = value.as_call_expr()?;
+    let qualified_name = semantic.resolve_qualified_name(value_func)?;
+    match qualified_name.segments() {
+        ["pathlib", "Path"] => Some(Kind::Pathlib),
         _ => None,
     }
 }

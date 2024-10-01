@@ -1,0 +1,31 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+non_slot_assignment.py:6:9: PLE0237 Attribute `surname` is not defined in class's `__slots__`
+  |
+4 |     def __init__(self, name, surname):
+5 |         self.name = name
+6 |         self.surname = surname  # [assigning-non-slot]
+  |         ^^^^^^^^^^^^ PLE0237
+7 |         self.setup()
+  |
+
+non_slot_assignment.py:18:9: PLE0237 Attribute `middle_name` is not defined in class's `__slots__`
+   |
+16 |     def __init__(self, name, middle_name):
+17 |         self.name = name
+18 |         self.middle_name = middle_name  # [assigning-non-slot]
+   |         ^^^^^^^^^^^^^^^^ PLE0237
+19 |         self.setup()
+   |
+
+non_slot_assignment.py:42:9: PLE0237 Attribute `middle_name` is not defined in class's `__slots__`
+   |
+40 |     def __init__(self, name, middle_name):
+41 |         self.name = name
+42 |         self.middle_name = middle_name  # [assigning-non-slot]
+   |         ^^^^^^^^^^^^^^^^ PLE0237
+43 |         self.setup()
+   |
+
+

@@ -5,7 +5,7 @@ use ruff_python_ast::{
 
 use crate::builders::parenthesize_if_expands;
 use crate::comments::{
-    trailing_comments, Comments, LeadingDanglingTrailingComments, SourceComment, SuppressionKind,
+    trailing_comments, Comments, LeadingDanglingTrailingComments, SourceComment,
 };
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::parentheses::{
@@ -16,12 +16,8 @@ use crate::expression::{
     can_omit_optional_parentheses, has_own_parentheses, has_parentheses,
     maybe_parenthesize_expression,
 };
-use crate::prelude::*;
-use crate::preview::{
-    is_parenthesize_long_type_hints_enabled,
-    is_prefer_splitting_right_hand_side_of_assignments_enabled,
-};
 use crate::statement::trailing_semicolon;
+use crate::{has_skip_comment, prelude::*};
 
 #[derive(Default)]
 pub struct FormatStmtAssign;
@@ -44,53 +40,47 @@ impl FormatNodeRule<StmtAssign> for FormatStmtAssign {
             preserve_parentheses: true,
         };
 
-        if is_prefer_splitting_right_hand_side_of_assignments_enabled(f.context()) {
-            // Avoid parenthesizing the value if the last target before the assigned value expands.
-            if let Some((last, head)) = rest.split_last() {
-                format_first.fmt(f)?;
+        // Avoid parenthesizing the value if the last target before the assigned value expands.
+        if let Some((last, head)) = rest.split_last() {
+            format_first.fmt(f)?;
 
-                for target in head {
-                    FormatTargetWithEqualOperator {
-                        target,
-                        preserve_parentheses: false,
-                    }
-                    .fmt(f)?;
-                }
-
-                FormatStatementsLastExpression::RightToLeft {
-                    before_operator: AnyBeforeOperator::Expression(last),
-                    operator: AnyAssignmentOperator::Assign,
-                    value,
-                    statement: item.into(),
+            for target in head {
+                FormatTargetWithEqualOperator {
+                    target,
+                    preserve_parentheses: false,
                 }
                 .fmt(f)?;
             }
-            // Avoid parenthesizing the value for single-target assignments where the
-            // target has its own parentheses (list, dict, tuple, ...) and the target expands.
-            else if has_target_own_parentheses(first, f.context())
-                && !is_expression_parenthesized(
-                    first.into(),
-                    f.context().comments().ranges(),
-                    f.context().source(),
-                )
-            {
-                FormatStatementsLastExpression::RightToLeft {
-                    before_operator: AnyBeforeOperator::Expression(first),
-                    operator: AnyAssignmentOperator::Assign,
-                    value,
-                    statement: item.into(),
-                }
-                .fmt(f)?;
-            }
-            // For single targets that have no split points, parenthesize the value only
-            // if it makes it fit. Otherwise omit the parentheses.
-            else {
-                format_first.fmt(f)?;
-                FormatStatementsLastExpression::left_to_right(value, item).fmt(f)?;
-            }
-        } else {
-            write!(f, [format_first, FormatTargets { targets: rest }])?;
 
+            FormatStatementsLastExpression::RightToLeft {
+                before_operator: AnyBeforeOperator::Expression(last),
+                operator: AnyAssignmentOperator::Assign,
+                value,
+                statement: item.into(),
+            }
+            .fmt(f)?;
+        }
+        // Avoid parenthesizing the value for single-target assignments where the
+        // target has its own parentheses (list, dict, tuple, ...) and the target expands.
+        else if has_target_own_parentheses(first, f.context())
+            && !is_expression_parenthesized(
+                first.into(),
+                f.context().comments().ranges(),
+                f.context().source(),
+            )
+        {
+            FormatStatementsLastExpression::RightToLeft {
+                before_operator: AnyBeforeOperator::Expression(first),
+                operator: AnyAssignmentOperator::Assign,
+                value,
+                statement: item.into(),
+            }
+            .fmt(f)?;
+        }
+        // For single targets that have no split points, parenthesize the value only
+        // if it makes it fit. Otherwise omit the parentheses.
+        else {
+            format_first.fmt(f)?;
             FormatStatementsLastExpression::left_to_right(value, item).fmt(f)?;
         }
 
@@ -110,79 +100,8 @@ impl FormatNodeRule<StmtAssign> for FormatStmtAssign {
         trailing_comments: &[SourceComment],
         context: &PyFormatContext,
     ) -> bool {
-        SuppressionKind::has_skip_comment(trailing_comments, context.source())
+        has_skip_comment(trailing_comments, context.source())
     }
-}
-
-/// Formats the targets so that they split left-to right.
-#[derive(Debug)]
-struct FormatTargets<'a> {
-    targets: &'a [Expr],
-}
-
-impl Format<PyFormatContext<'_>> for FormatTargets<'_> {
-    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        if let Some((first, rest)) = self.targets.split_first() {
-            let comments = f.context().comments();
-
-            let parenthesize = if comments.has_leading(first) || comments.has_trailing(first) {
-                ParenthesizeTarget::Always
-            } else if has_target_own_parentheses(first, f.context()) {
-                ParenthesizeTarget::Never
-            } else {
-                ParenthesizeTarget::IfBreaks
-            };
-
-            let group_id = if parenthesize == ParenthesizeTarget::Never {
-                Some(f.group_id("assignment_parentheses"))
-            } else {
-                None
-            };
-
-            let format_first = format_with(|f: &mut PyFormatter| {
-                let mut f = WithNodeLevel::new(NodeLevel::Expression(group_id), f);
-                match parenthesize {
-                    ParenthesizeTarget::Always => {
-                        write!(f, [first.format().with_options(Parentheses::Always)])
-                    }
-                    ParenthesizeTarget::Never => {
-                        write!(f, [first.format().with_options(Parentheses::Never)])
-                    }
-                    ParenthesizeTarget::IfBreaks => {
-                        write!(
-                            f,
-                            [
-                                if_group_breaks(&token("(")),
-                                soft_block_indent(&first.format().with_options(Parentheses::Never)),
-                                if_group_breaks(&token(")"))
-                            ]
-                        )
-                    }
-                }
-            });
-
-            write!(
-                f,
-                [group(&format_args![
-                    format_first,
-                    space(),
-                    token("="),
-                    space(),
-                    FormatTargets { targets: rest }
-                ])
-                .with_group_id(group_id)]
-            )
-        } else {
-            Ok(())
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ParenthesizeTarget {
-    Always,
-    Never,
-    IfBreaks,
 }
 
 /// Formats a single target with the equal operator.
@@ -693,9 +612,7 @@ impl Format<PyFormatContext<'_>> for AnyBeforeOperator<'_> {
                 }
                 // Never parenthesize targets that come with their own parentheses, e.g. don't parenthesize lists or dictionary literals.
                 else if should_parenthesize_target(expression, f.context()) {
-                    if is_parenthesize_long_type_hints_enabled(f.context())
-                        && can_omit_optional_parentheses(expression, f.context())
-                    {
+                    if can_omit_optional_parentheses(expression, f.context()) {
                         optional_parentheses(&expression.format().with_options(Parentheses::Never))
                             .fmt(f)
                     } else {

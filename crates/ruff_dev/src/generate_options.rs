@@ -1,6 +1,7 @@
 //! Generate a Markdown-compatible listing of configuration options for `pyproject.toml`.
 //!
 //! Used for <https://docs.astral.sh/ruff/settings/>.
+use itertools::Itertools;
 use std::fmt::Write;
 
 use ruff_python_trivia::textwrap;
@@ -9,16 +10,29 @@ use ruff_workspace::options_base::{OptionField, OptionSet, OptionsMetadata, Visi
 
 pub(crate) fn generate() -> String {
     let mut output = String::new();
-    generate_set(&mut output, &Set::Toplevel(Options::metadata()));
+
+    generate_set(
+        &mut output,
+        Set::Toplevel(Options::metadata()),
+        &mut Vec::new(),
+    );
 
     output
 }
 
-fn generate_set(output: &mut String, set: &Set) {
-    if set.level() < 2 {
-        writeln!(output, "### {title}\n", title = set.title()).unwrap();
-    } else {
-        writeln!(output, "#### {title}\n", title = set.title()).unwrap();
+fn generate_set(output: &mut String, set: Set, parents: &mut Vec<Set>) {
+    match &set {
+        Set::Toplevel(_) => {
+            output.push_str("### Top-level\n");
+        }
+        Set::Named { name, .. } => {
+            let title = parents
+                .iter()
+                .filter_map(|set| set.name())
+                .chain(std::iter::once(name.as_str()))
+                .join(".");
+            writeln!(output, "#### `{title}`\n",).unwrap();
+        }
     }
 
     if let Some(documentation) = set.metadata().documentation() {
@@ -35,72 +49,68 @@ fn generate_set(output: &mut String, set: &Set) {
     fields.sort_unstable_by(|(name, _), (name2, _)| name.cmp(name2));
     sets.sort_unstable_by(|(name, _), (name2, _)| name.cmp(name2));
 
+    parents.push(set);
+
     // Generate the fields.
     for (name, field) in &fields {
-        emit_field(output, name, field, set);
+        emit_field(output, name, field, parents.as_slice());
         output.push_str("---\n\n");
     }
 
     // Generate all the sub-sets.
     for (set_name, sub_set) in &sets {
-        generate_set(output, &Set::Named(set_name, *sub_set, set.level() + 1));
+        generate_set(
+            output,
+            Set::Named {
+                name: set_name.to_string(),
+                set: *sub_set,
+            },
+            parents,
+        );
     }
+
+    parents.pop();
 }
 
-enum Set<'a> {
+enum Set {
     Toplevel(OptionSet),
-    Named(&'a str, OptionSet, u32),
+    Named { name: String, set: OptionSet },
 }
 
-impl<'a> Set<'a> {
-    fn name(&self) -> Option<&'a str> {
+impl Set {
+    fn name(&self) -> Option<&str> {
         match self {
             Set::Toplevel(_) => None,
-            Set::Named(name, _, _) => Some(name),
-        }
-    }
-
-    fn title(&self) -> &'a str {
-        match self {
-            Set::Toplevel(_) => "Top-level",
-            Set::Named(name, _, _) => name,
+            Set::Named { name, .. } => Some(name),
         }
     }
 
     fn metadata(&self) -> &OptionSet {
         match self {
             Set::Toplevel(set) => set,
-            Set::Named(_, set, _) => set,
-        }
-    }
-
-    fn level(&self) -> u32 {
-        match self {
-            Set::Toplevel(_) => 0,
-            Set::Named(_, _, level) => *level,
+            Set::Named { set, .. } => set,
         }
     }
 }
 
-fn emit_field(output: &mut String, name: &str, field: &OptionField, parent_set: &Set) {
-    let header_level = if parent_set.level() < 2 {
-        "####"
-    } else {
-        "#####"
-    };
+fn emit_field(output: &mut String, name: &str, field: &OptionField, parents: &[Set]) {
+    let header_level = if parents.is_empty() { "####" } else { "#####" };
+    let parents_anchor = parents.iter().filter_map(|parent| parent.name()).join("_");
 
-    // if there's a set name, we need to add it to the anchor
-    if let Some(set_name) = parent_set.name() {
+    if parents_anchor.is_empty() {
+        output.push_str(&format!(
+            "{header_level} [`{name}`](#{name}) {{: #{name} }}\n"
+        ));
+    } else {
+        output.push_str(&format!(
+            "{header_level} [`{name}`](#{parents_anchor}_{name}) {{: #{parents_anchor}_{name} }}\n"
+        ));
+
         // the anchor used to just be the name, but now it's the group name
         // for backwards compatibility, we need to keep the old anchor
         output.push_str(&format!("<span id=\"{name}\"></span>\n"));
-
-        output.push_str(&format!(
-            "{header_level} [`{name}`](#{set_name}-{name}) {{: #{set_name}-{name} }}\n"
-        ));
-    } else {
-        output.push_str(&format!("{header_level} [`{name}`](#{name})\n"));
     }
+
     output.push('\n');
 
     if let Some(deprecated) = &field.deprecated {
@@ -129,12 +139,12 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, parent_set: 
     output.push_str("**Example usage**:\n\n");
     output.push_str(&format_tab(
         "pyproject.toml",
-        &format_header(field.scope, parent_set, ConfigurationFile::PyprojectToml),
+        &format_header(field.scope, parents, ConfigurationFile::PyprojectToml),
         field.example,
     ));
     output.push_str(&format_tab(
         "ruff.toml",
-        &format_header(field.scope, parent_set, ConfigurationFile::RuffToml),
+        &format_header(field.scope, parents, ConfigurationFile::RuffToml),
         field.example,
     ));
     output.push('\n');
@@ -152,52 +162,22 @@ fn format_tab(tab_name: &str, header: &str, content: &str) -> String {
 /// Format the TOML header for the example usage for a given option.
 ///
 /// For example: `[tool.ruff.format]` or `[tool.ruff.lint.isort]`.
-fn format_header(
-    scope: Option<&str>,
-    parent_set: &Set,
-    configuration: ConfigurationFile,
-) -> String {
-    match configuration {
-        ConfigurationFile::PyprojectToml => {
-            let mut header = if let Some(set_name) = parent_set.name() {
-                if set_name == "format" {
-                    String::from("tool.ruff.format")
-                } else {
-                    format!("tool.ruff.lint.{set_name}")
-                }
-            } else {
-                "tool.ruff".to_string()
-            };
-            if let Some(scope) = scope {
-                if !header.is_empty() {
-                    header.push('.');
-                }
-                header.push_str(scope);
-            }
-            format!("[{header}]")
-        }
-        ConfigurationFile::RuffToml => {
-            let mut header = if let Some(set_name) = parent_set.name() {
-                if set_name == "format" {
-                    String::from("format")
-                } else {
-                    format!("lint.{set_name}")
-                }
-            } else {
-                String::new()
-            };
-            if let Some(scope) = scope {
-                if !header.is_empty() {
-                    header.push('.');
-                }
-                header.push_str(scope);
-            }
-            if header.is_empty() {
-                String::new()
-            } else {
-                format!("[{header}]")
-            }
-        }
+fn format_header(scope: Option<&str>, parents: &[Set], configuration: ConfigurationFile) -> String {
+    let tool_parent = match configuration {
+        ConfigurationFile::PyprojectToml => Some("tool.ruff"),
+        ConfigurationFile::RuffToml => None,
+    };
+
+    let header = tool_parent
+        .into_iter()
+        .chain(parents.iter().filter_map(|parent| parent.name()))
+        .chain(scope)
+        .join(".");
+
+    if header.is_empty() {
+        String::new()
+    } else {
+        format!("[{header}]")
     }
 }
 

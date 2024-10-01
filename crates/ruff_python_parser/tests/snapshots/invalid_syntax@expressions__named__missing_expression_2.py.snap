@@ -1,0 +1,102 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/named/missing_expression_2.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..87,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 61..71,
+                    value: Named(
+                        ExprNamed {
+                            range: 62..71,
+                            target: Name(
+                                ExprName {
+                                    range: 62..63,
+                                    id: Name("x"),
+                                    ctx: Store,
+                                },
+                            ),
+                            value: Name(
+                                ExprName {
+                                    range: 68..71,
+                                    id: Name("def"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 72..87,
+                    target: Call(
+                        ExprCall {
+                            range: 72..77,
+                            func: Name(
+                                ExprName {
+                                    range: 72..75,
+                                    id: Name("foo"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 75..77,
+                                args: [],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                    annotation: Name(
+                        ExprName {
+                            range: 83..87,
+                            id: Name("pass"),
+                            ctx: Load,
+                        },
+                    ),
+                    value: None,
+                    simple: false,
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+3 | (x :=
+4 | 
+5 | def foo():
+  | ^^^ Syntax Error: Expected an identifier, but found a keyword 'def' that cannot be used here
+6 |     pass
+  |
+
+
+  |
+3 | (x :=
+4 | 
+5 | def foo():
+  |     ^^^ Syntax Error: Expected ')', found name
+6 |     pass
+  |
+
+
+  |
+5 | def foo():
+6 |     pass
+  |     ^^^^ Syntax Error: Expected an identifier, but found a keyword 'pass' that cannot be used here
+  |
+
+
+  |
+5 | def foo():
+6 |     pass
+  |          Syntax Error: unexpected EOF while parsing
+  |

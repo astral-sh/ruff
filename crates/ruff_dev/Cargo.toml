@@ -11,27 +11,26 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-ruff = { path = "../ruff" }
-ruff_diagnostics = { path = "../ruff_diagnostics" }
-ruff_formatter = { path = "../ruff_formatter" }
-ruff_linter = { path = "../ruff_linter", features = ["schemars"] }
-ruff_notebook = { path = "../ruff_notebook" }
-ruff_python_ast = { path = "../ruff_python_ast" }
-ruff_python_codegen = { path = "../ruff_python_codegen" }
-ruff_python_formatter = { path = "../ruff_python_formatter" }
-ruff_python_parser = { path = "../ruff_python_parser" }
-ruff_python_stdlib = { path = "../ruff_python_stdlib" }
-ruff_python_trivia = { path = "../ruff_python_trivia" }
-ruff_workspace = { path = "../ruff_workspace", features = ["schemars"]}
+ruff = { workspace = true }
+ruff_diagnostics = { workspace = true }
+ruff_formatter = { workspace = true }
+ruff_linter = { workspace = true, features = ["schemars"] }
+ruff_notebook = { workspace = true }
+ruff_python_ast = { workspace = true }
+ruff_python_codegen = { workspace = true }
+ruff_python_formatter = { workspace = true }
+ruff_python_parser = { workspace = true }
+ruff_python_stdlib = { workspace = true }
+ruff_python_trivia = { workspace = true }
+ruff_workspace = { workspace = true, features = ["schemars"] }
 
 anyhow = { workspace = true }
-clap = { workspace = true }
+clap = { workspace = true, features = ["wrap_help"] }
 ignore = { workspace = true }
 imara-diff = { workspace = true }
 indicatif = { workspace = true }
 itertools = { workspace = true }
 libcst = { workspace = true }
-once_cell = { workspace = true }
 pretty_assertions = { workspace = true }
 rayon = { workspace = true }
 regex = { workspace = true }

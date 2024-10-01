@@ -1,0 +1,90 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/simple_stmts_with_semicolons.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..51,
+        body: [
+            Return(
+                StmtReturn {
+                    range: 0..6,
+                    value: None,
+                },
+            ),
+            Import(
+                StmtImport {
+                    range: 8..16,
+                    names: [
+                        Alias {
+                            range: 15..16,
+                            name: Identifier {
+                                id: Name("a"),
+                                range: 15..16,
+                            },
+                            asname: None,
+                        },
+                    ],
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    range: 18..33,
+                    module: Some(
+                        Identifier {
+                            id: Name("x"),
+                            range: 23..24,
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 32..33,
+                            name: Identifier {
+                                id: Name("y"),
+                                range: 32..33,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 0,
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 35..36,
+                    value: Name(
+                        ExprName {
+                            range: 35..36,
+                            id: Name("z"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 38..50,
+                    name: Name(
+                        ExprName {
+                            range: 43..44,
+                            id: Name("T"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: None,
+                    value: Name(
+                        ExprName {
+                            range: 47..50,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

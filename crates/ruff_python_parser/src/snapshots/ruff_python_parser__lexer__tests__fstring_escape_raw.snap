@@ -2,26 +2,33 @@
 source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_source(source)
 ---
+## Tokens
+```
 [
     (
         FStringStart,
         0..3,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE,
+        ),
     ),
     (
-        FStringMiddle {
-            value: "\\",
-            is_raw: true,
-        },
+        FStringMiddle(
+            "\\",
+        ),
         3..4,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE,
+        ),
     ),
     (
         Lbrace,
         4..5,
     ),
     (
-        Name {
-            name: "x",
-        },
+        Name(
+            Name("x"),
+        ),
         5..6,
     ),
     (
@@ -29,20 +36,22 @@ expression: lex_source(source)
         6..7,
     ),
     (
-        FStringMiddle {
-            value: "\\\"\\",
-            is_raw: true,
-        },
+        FStringMiddle(
+            "\\\"\\",
+        ),
         7..10,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE,
+        ),
     ),
     (
         Lbrace,
         10..11,
     ),
     (
-        Name {
-            name: "x",
-        },
+        Name(
+            Name("x"),
+        ),
         11..12,
     ),
     (
@@ -54,18 +63,24 @@ expression: lex_source(source)
         13..14,
     ),
     (
-        FStringMiddle {
-            value: " \\\"\\\"\\\n end",
-            is_raw: true,
-        },
+        FStringMiddle(
+            " \\\"\\\"\\\n end",
+        ),
         14..25,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE,
+        ),
     ),
     (
         FStringEnd,
         25..26,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE,
+        ),
     ),
     (
         Newline,
         26..26,
     ),
 ]
+```

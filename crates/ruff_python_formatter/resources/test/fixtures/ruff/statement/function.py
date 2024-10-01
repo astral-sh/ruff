@@ -278,6 +278,13 @@ def f42(
 ):
     pass
 
+# Regression test for https://github.com/astral-sh/ruff/issues/10281
+def f43(
+    __bar: str,
+    /,
+    **specifiers: typing.Any,  # noqa: ANN401
+) -> int:
+    return len(specifiers)
 
 # Check trailing commas are permitted in funcdef argument list.
 def f(a, ): pass
@@ -420,3 +427,139 @@ def function_with_one_argument_and_a_keyword_separator(
     *, argument: str
 ) -> ReallyReallyReallyReallyReallyReallyReallyReallyLongName:
     pass
+
+
+# PEP 646 introduced type var tuple in parameter annotation
+# https://peps.python.org/pep-0646/#change-2-args-as-a-typevartuple
+def function_with_variadic_generics(*args: *tuple[int]): ...
+def function_with_variadic_generics(*args: *tuple[int],): ...
+
+# Generic arguments (PEP 695)
+def func[T](lotsoflongargs: T, lotsoflongargs2: T, lotsoflongargs3: T, lotsoflongargs4: T, lotsoflongargs5: T) -> T: ...
+
+
+# Decorators
+@decorator
+# comment
+def foo[S](x: S) -> S: ...
+
+@decorator
+# comment
+def foo(x: S) -> S: ...
+
+@decorator
+# comment
+def foo() -> S: ...
+
+@decorator
+# comment
+@decorator2
+def foo(x: S) -> S: ...
+
+@decorator # comment
+def foo(x: S) -> S: ...
+
+
+# Regression tests for https://github.com/astral-sh/ruff/issues/13369
+def foo(
+    arg: (  # comment with non-return annotation
+        int
+        # comment with non-return annotation
+    ),
+):
+    pass
+
+
+def foo(
+    arg: (  # comment with non-return annotation
+        int
+        | range
+        | memoryview
+        # comment with non-return annotation
+    ),
+):
+    pass
+
+def foo(arg: (
+        int
+        # only after
+)):
+    pass
+
+# Asserts that "incorrectly" placed comments don't *move* by fixing https://github.com/astral-sh/ruff/issues/13369
+def foo(
+    # comment with non-return annotation
+    # comment with non-return annotation
+    arg: (int),
+):
+    pass
+
+
+# Comments between *args and **kwargs
+def args_no_type_annotation(*
+    # comment
+    args): pass
+
+def args_type_annotation(*
+    # comment
+    args: int): pass
+
+def args_trailing_end_of_line_comment(* # comment
+    args): pass
+
+def args_blank_line_comment(*
+
+    # comment
+
+    args): pass
+
+def args_with_leading_parameter_comment(
+    # What comes next are arguments
+    *
+    # with an inline comment
+    args): pass
+
+
+def kargs_no_type_annotation(**
+    # comment
+    kwargs): pass
+
+def kwargs_type_annotation(**
+    # comment
+    kwargs: int): pass
+
+
+def args_many_comments(
+    # before
+    *
+    # between * and name
+    args # trailing args
+    # after name
+    ): pass
+
+
+def args_many_comments_with_type_annotation(
+    # before
+    *
+    # between * and name
+    args # trailing args
+    # before colon
+    :  # after colon
+    # before type
+    int # trailing type
+    # after type
+    ): pass
+
+
+
+def args_with_type_annotations_no_after_colon_comment(
+    # before
+    *
+    # between * and name
+    args # trailing args
+    # before colon
+    :
+    # before type
+    int # trailing type
+    # after type
+    ): pass

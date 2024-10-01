@@ -83,10 +83,12 @@ pub(crate) fn hashlib_digest_hex(checker: &mut Checker, call: &ExprCall) {
         return;
     };
 
-    if checker.semantic().resolve_call_path(func).is_some_and(
-        |call_path: smallvec::SmallVec<[&str; 8]>| {
+    if checker
+        .semantic()
+        .resolve_qualified_name(func)
+        .is_some_and(|qualified_name| {
             matches!(
-                call_path.as_slice(),
+                qualified_name.segments(),
                 [
                     "hashlib",
                     "md5"
@@ -106,8 +108,8 @@ pub(crate) fn hashlib_digest_hex(checker: &mut Checker, call: &ExprCall) {
                         | "_Hash"
                 ]
             )
-        },
-    ) {
+        })
+    {
         let mut diagnostic = Diagnostic::new(HashlibDigestHex, call.range());
         if arguments.is_empty() {
             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(

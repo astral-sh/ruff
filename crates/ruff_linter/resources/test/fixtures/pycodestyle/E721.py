@@ -126,3 +126,20 @@ class Foo:
         # Okay
         if type(value) is str:
             ...
+
+
+import numpy as np
+
+#: Okay
+x.dtype == float
+
+#: Okay
+np.dtype(int) == float
+
+#: E721
+dtype == float
+
+import builtins
+
+if builtins.type(res) == memoryview:  # E721
+    pass

@@ -1,0 +1,38 @@
+[package]
+name = "red_knot_wasm"
+version = "0.0.0"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+description = "WebAssembly bindings for Red Knot"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+doctest = false
+
+[features]
+default = ["console_error_panic_hook"]
+
+[dependencies]
+red_knot_python_semantic = { workspace = true }
+red_knot_workspace = { workspace = true, default-features = false, features = ["deflate"] }
+
+ruff_db = { workspace = true, features = [] }
+ruff_notebook = { workspace = true }
+
+console_error_panic_hook = { workspace = true, optional = true }
+console_log = { workspace = true }
+js-sys = { workspace = true }
+log = { workspace = true }
+wasm-bindgen = { workspace = true }
+
+[dev-dependencies]
+wasm-bindgen-test = { workspace = true }
+
+[lints]
+workspace = true

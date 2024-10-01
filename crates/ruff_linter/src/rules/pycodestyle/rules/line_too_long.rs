@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_index::Indexer;
+use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Line;
 
 use crate::rules::pycodestyle::overlong::Overlong;
@@ -27,9 +27,12 @@ use crate::settings::LinterSettings;
 ///    line-length threshold. That is, a line will not be flagged as
 ///    overlong if a pragma comment _causes_ it to exceed the line length.
 ///    (This behavior aligns with that of the Ruff formatter.)
+/// 4. Ignores SPDX license identifiers and copyright notices
+///    (e.g., `# SPDX-License-Identifier: MIT`), which are machine-readable
+///    and should _not_ wrap over multiple lines.
 ///
-/// If [`pycodestyle.ignore-overlong-task-comments`] is `true`, this rule will
-/// also ignore comments that start with any of the specified [`task-tags`]
+/// If [`lint.pycodestyle.ignore-overlong-task-comments`] is `true`, this rule will
+/// also ignore comments that start with any of the specified [`lint.task-tags`]
 /// (e.g., `# TODO:`).
 ///
 /// ## Example
@@ -60,9 +63,9 @@ use crate::settings::LinterSettings;
 ///
 /// ## Options
 /// - `line-length`
-/// - `task-tags`
-/// - `pycodestyle.ignore-overlong-task-comments`
-/// - `pycodestyle.max-line-length`
+/// - `lint.task-tags`
+/// - `lint.pycodestyle.ignore-overlong-task-comments`
+/// - `lint.pycodestyle.max-line-length`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#maximum-line-length
 #[violation]
@@ -79,14 +82,14 @@ impl Violation for LineTooLong {
 /// E501
 pub(crate) fn line_too_long(
     line: &Line,
-    indexer: &Indexer,
+    comment_ranges: &CommentRanges,
     settings: &LinterSettings,
 ) -> Option<Diagnostic> {
     let limit = settings.pycodestyle.max_line_length;
 
     Overlong::try_from_line(
         line,
-        indexer,
+        comment_ranges,
         limit,
         if settings.pycodestyle.ignore_overlong_task_comments {
             &settings.task_tags

@@ -1,0 +1,10 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F821_5.pyi:4:27: F821 Undefined name `InnerClass`
+  |
+3 | class RandomClass:
+4 |     def bad_func(self) -> InnerClass: ...  # F821
+  |                           ^^^^^^^^^^ F821
+5 |     def good_func(self) -> OuterClass.InnerClass: ...  # Okay
+  |

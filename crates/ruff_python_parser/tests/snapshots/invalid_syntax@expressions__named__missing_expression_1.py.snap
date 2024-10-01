@@ -1,0 +1,47 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/named/missing_expression_1.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..33,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 28..33,
+                    value: Named(
+                        ExprNamed {
+                            range: 29..33,
+                            target: Name(
+                                ExprName {
+                                    range: 29..30,
+                                    id: Name("x"),
+                                    ctx: Store,
+                                },
+                            ),
+                            value: Name(
+                                ExprName {
+                                    range: 33..33,
+                                    id: Name(""),
+                                    ctx: Invalid,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # EOF after the `:=` token
+2 | 
+3 | (x :=
+  |       Syntax Error: unexpected EOF while parsing
+  |

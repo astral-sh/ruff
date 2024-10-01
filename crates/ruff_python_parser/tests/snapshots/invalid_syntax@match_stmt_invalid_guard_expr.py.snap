@@ -1,0 +1,211 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/match_stmt_invalid_guard_expr.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..100,
+        body: [
+            Match(
+                StmtMatch {
+                    range: 0..30,
+                    subject: Name(
+                        ExprName {
+                            range: 6..7,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 13..30,
+                            pattern: MatchAs(
+                                PatternMatchAs {
+                                    range: 18..19,
+                                    pattern: None,
+                                    name: Some(
+                                        Identifier {
+                                            id: Name("y"),
+                                            range: 18..19,
+                                        },
+                                    ),
+                                },
+                            ),
+                            guard: Some(
+                                Starred(
+                                    ExprStarred {
+                                        range: 23..25,
+                                        value: Name(
+                                            ExprName {
+                                                range: 24..25,
+                                                id: Name("a"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ),
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 27..30,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 27..30,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+            Match(
+                StmtMatch {
+                    range: 31..63,
+                    subject: Name(
+                        ExprName {
+                            range: 37..38,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 44..63,
+                            pattern: MatchAs(
+                                PatternMatchAs {
+                                    range: 49..50,
+                                    pattern: None,
+                                    name: Some(
+                                        Identifier {
+                                            id: Name("y"),
+                                            range: 49..50,
+                                        },
+                                    ),
+                                },
+                            ),
+                            guard: Some(
+                                Starred(
+                                    ExprStarred {
+                                        range: 55..57,
+                                        value: Name(
+                                            ExprName {
+                                                range: 56..57,
+                                                id: Name("a"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ),
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 60..63,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 60..63,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+            Match(
+                StmtMatch {
+                    range: 64..99,
+                    subject: Name(
+                        ExprName {
+                            range: 70..71,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 77..99,
+                            pattern: MatchAs(
+                                PatternMatchAs {
+                                    range: 82..83,
+                                    pattern: None,
+                                    name: Some(
+                                        Identifier {
+                                            id: Name("y"),
+                                            range: 82..83,
+                                        },
+                                    ),
+                                },
+                            ),
+                            guard: Some(
+                                Yield(
+                                    ExprYield {
+                                        range: 87..94,
+                                        value: Some(
+                                            Name(
+                                                ExprName {
+                                                    range: 93..94,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            ),
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 96..99,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 96..99,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | match x:
+2 |     case y if *a: ...
+  |               ^^ Syntax Error: Starred expression cannot be used here
+3 | match x:
+4 |     case y if (*a): ...
+  |
+
+
+  |
+2 |     case y if *a: ...
+3 | match x:
+4 |     case y if (*a): ...
+  |                ^^ Syntax Error: Starred expression cannot be used here
+5 | match x:
+6 |     case y if yield x: ...
+  |
+
+
+  |
+4 |     case y if (*a): ...
+5 | match x:
+6 |     case y if yield x: ...
+  |               ^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |

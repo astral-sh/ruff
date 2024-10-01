@@ -1,0 +1,112 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/class_def_unclosed_type_param_list.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..41,
+        body: [
+            ClassDef(
+                StmtClassDef {
+                    range: 0..33,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("Foo"),
+                        range: 6..9,
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 9..17,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 10..12,
+                                        name: Identifier {
+                                            id: Name("T1"),
+                                            range: 10..12,
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                                TypeVarTuple(
+                                    TypeParamTypeVarTuple {
+                                        range: 14..17,
+                                        name: Identifier {
+                                            id: Name("T2"),
+                                            range: 15..17,
+                                        },
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    arguments: Some(
+                        Arguments {
+                            range: 17..23,
+                            args: [
+                                Name(
+                                    ExprName {
+                                        range: 18..19,
+                                        id: Name("a"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 21..22,
+                                        id: Name("b"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            keywords: [],
+                        },
+                    ),
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 29..33,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 34..40,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 34..35,
+                                id: Name("x"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 38..40,
+                            value: Int(
+                                10,
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | class Foo[T1, *T2(a, b):
+  |                  ^ Syntax Error: Expected ']', found '('
+2 |     pass
+3 | x = 10
+  |

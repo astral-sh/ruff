@@ -1,0 +1,143 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/assign_targets_terminator.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..39,
+        body: [
+            Assign(
+                StmtAssign {
+                    range: 0..13,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 0..1,
+                                id: Name("x"),
+                                ctx: Store,
+                            },
+                        ),
+                        Name(
+                            ExprName {
+                                range: 4..5,
+                                id: Name("y"),
+                                ctx: Store,
+                            },
+                        ),
+                        Name(
+                            ExprName {
+                                range: 8..9,
+                                id: Name("z"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 12..13,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 15..19,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 15..19,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        range: 15..16,
+                                        id: Name("a"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 18..19,
+                                        id: Name("b"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: false,
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 20..33,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 20..21,
+                                id: Name("x"),
+                                ctx: Store,
+                            },
+                        ),
+                        Name(
+                            ExprName {
+                                range: 24..25,
+                                id: Name("y"),
+                                ctx: Store,
+                            },
+                        ),
+                        Name(
+                            ExprName {
+                                range: 28..29,
+                                id: Name("z"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 32..33,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 34..38,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 34..38,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        range: 34..35,
+                                        id: Name("a"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 37..38,
+                                        id: Name("b"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: false,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

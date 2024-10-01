@@ -1,0 +1,146 @@
+---
+source: crates/ruff_linter/src/message/sarif.rs
+expression: value
+---
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "runs": [
+    {
+      "results": [
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "[URI]"
+                },
+                "region": {
+                  "endColumn": 10,
+                  "endLine": 1,
+                  "startColumn": 8,
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "`os` imported but unused"
+          },
+          "ruleId": "F401"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "[URI]"
+                },
+                "region": {
+                  "endColumn": 6,
+                  "endLine": 6,
+                  "startColumn": 5,
+                  "startLine": 6
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Local variable `x` is assigned to but never used"
+          },
+          "ruleId": "F841"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "[URI]"
+                },
+                "region": {
+                  "endColumn": 5,
+                  "endLine": 1,
+                  "startColumn": 4,
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Undefined name `a`"
+          },
+          "ruleId": "F821"
+        }
+      ],
+      "tool": {
+        "driver": {
+          "informationUri": "https://github.com/astral-sh/ruff",
+          "name": "ruff",
+          "rules": [
+            {
+              "fullDescription": {
+                "text": "## What it does\nChecks for unused imports.\n\n## Why is this bad?\nUnused imports add a performance overhead at runtime, and risk creating\nimport cycles. They also increase the cognitive load of reading the code.\n\nIf an import statement is used to check for the availability or existence\nof a module, consider using `importlib.util.find_spec` instead.\n\nIf an import statement is used to re-export a symbol as part of a module's\npublic interface, consider using a \"redundant\" import alias, which\ninstructs Ruff (and other tools) to respect the re-export, and avoid\nmarking it as unused, as in:\n\n```python\nfrom module import member as member\n```\n\nAlternatively, you can use `__all__` to declare a symbol as part of the module's\ninterface, as in:\n\n```python\n# __init__.py\nimport some_module\n\n__all__ = [\"some_module\"]\n```\n\n## Fix safety\n\nFixes to remove unused imports are safe, except in `__init__.py` files.\n\nApplying fixes to `__init__.py` files is currently in preview. The fix offered depends on the\ntype of the unused import. Ruff will suggest a safe fix to export first-party imports with\neither a redundant alias or, if already present in the file, an `__all__` entry. If multiple\n`__all__` declarations are present, Ruff will not offer a fix. Ruff will suggest an unsafe fix\nto remove third-party and standard library imports -- the fix is unsafe because the module's\ninterface changes.\n\n## Example\n\n```python\nimport numpy as np  # unused import\n\n\ndef area(radius):\n    return 3.14 * radius**2\n```\n\nUse instead:\n\n```python\ndef area(radius):\n    return 3.14 * radius**2\n```\n\nTo check the availability of a module, use `importlib.util.find_spec`:\n\n```python\nfrom importlib.util import find_spec\n\nif find_spec(\"numpy\") is not None:\n    print(\"numpy is installed\")\nelse:\n    print(\"numpy is not installed\")\n```\n\n## Options\n- `lint.ignore-init-module-imports`\n\n## References\n- [Python documentation: `import`](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)\n- [Python documentation: `importlib.util.find_spec`](https://docs.python.org/3/library/importlib.html#importlib.util.find_spec)\n- [Typing documentation: interface conventions](https://typing.readthedocs.io/en/latest/source/libraries.html#library-interface-public-and-private-symbols)\n"
+              },
+              "help": {
+                "text": "`{name}` imported but unused; consider using `importlib.util.find_spec` to test for availability"
+              },
+              "helpUri": "https://docs.astral.sh/ruff/rules/unused-import",
+              "id": "F401",
+              "properties": {
+                "id": "F401",
+                "kind": "Pyflakes",
+                "name": "unused-import",
+                "problem.severity": "error"
+              },
+              "shortDescription": {
+                "text": "`{name}` imported but unused; consider using `importlib.util.find_spec` to test for availability"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "## What it does\nChecks for uses of undefined names.\n\n## Why is this bad?\nAn undefined name is likely to raise `NameError` at runtime.\n\n## Example\n```python\ndef double():\n    return n * 2  # raises `NameError` if `n` is undefined when `double` is called\n```\n\nUse instead:\n```python\ndef double(n):\n    return n * 2\n```\n\n## Options\n- [`target-version`]: Can be used to configure which symbols Ruff will understand\n  as being available in the `builtins` namespace.\n\n## References\n- [Python documentation: Naming and binding](https://docs.python.org/3/reference/executionmodel.html#naming-and-binding)\n"
+              },
+              "help": {
+                "text": "Undefined name `{name}`. {tip}"
+              },
+              "helpUri": "https://docs.astral.sh/ruff/rules/undefined-name",
+              "id": "F821",
+              "properties": {
+                "id": "F821",
+                "kind": "Pyflakes",
+                "name": "undefined-name",
+                "problem.severity": "error"
+              },
+              "shortDescription": {
+                "text": "Undefined name `{name}`. {tip}"
+              }
+            },
+            {
+              "fullDescription": {
+                "text": "## What it does\nChecks for the presence of unused variables in function scopes.\n\n## Why is this bad?\nA variable that is defined but not used is likely a mistake, and should\nbe removed to avoid confusion.\n\nIf a variable is intentionally defined-but-not-used, it should be\nprefixed with an underscore, or some other value that adheres to the\n[`lint.dummy-variable-rgx`] pattern.\n\nUnder [preview mode](https://docs.astral.sh/ruff/preview), this rule also\ntriggers on unused unpacked assignments (for example, `x, y = foo()`).\n\n## Example\n```python\ndef foo():\n    x = 1\n    y = 2\n    return x\n```\n\nUse instead:\n```python\ndef foo():\n    x = 1\n    return x\n```\n\n## Options\n- `lint.dummy-variable-rgx`\n"
+              },
+              "help": {
+                "text": "Local variable `{name}` is assigned to but never used"
+              },
+              "helpUri": "https://docs.astral.sh/ruff/rules/unused-variable",
+              "id": "F841",
+              "properties": {
+                "id": "F841",
+                "kind": "Pyflakes",
+                "name": "unused-variable",
+                "problem.severity": "error"
+              },
+              "shortDescription": {
+                "text": "Local variable `{name}` is assigned to but never used"
+              }
+            }
+          ],
+          "version": "[VERSION]"
+        }
+      }
+    }
+  ],
+  "version": "2.1.0"
+}

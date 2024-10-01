@@ -1,0 +1,155 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/except_stmt_missing_exception.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..166,
+        body: [
+            Try(
+                StmtTry {
+                    range: 0..37,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 9..13,
+                            },
+                        ),
+                    ],
+                    handlers: [
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 14..37,
+                                type_: None,
+                                name: Some(
+                                    Identifier {
+                                        id: Name("exc"),
+                                        range: 24..27,
+                                    },
+                                ),
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 33..37,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                    finalbody: [],
+                    is_star: false,
+                },
+            ),
+            Try(
+                StmtTry {
+                    range: 92..165,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 101..105,
+                            },
+                        ),
+                    ],
+                    handlers: [
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 106..123,
+                                type_: None,
+                                name: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 119..123,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 124..140,
+                                type_: None,
+                                name: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 136..140,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 141..165,
+                                type_: None,
+                                name: Some(
+                                    Identifier {
+                                        id: Name("exc"),
+                                        range: 152..155,
+                                    },
+                                ),
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 161..165,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                    finalbody: [],
+                    is_star: true,
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | try:
+2 |     pass
+3 | except as exc:
+  |        ^^ Syntax Error: Expected one or more exception types
+4 |     pass
+5 | # If a '*' is present then exception type is required
+  |
+
+
+   |
+ 6 | try:
+ 7 |     pass
+ 8 | except*:
+   |        ^ Syntax Error: Expected one or more exception types
+ 9 |     pass
+10 | except*
+   |
+
+
+   |
+ 8 | except*:
+ 9 |     pass
+10 | except*
+   |        ^ Syntax Error: Expected one or more exception types
+11 |     pass
+12 | except* as exc:
+13 |     pass
+   |
+
+
+   |
+10 | except*
+11 |     pass
+12 | except* as exc:
+   |         ^^ Syntax Error: Expected one or more exception types
+13 |     pass
+   |

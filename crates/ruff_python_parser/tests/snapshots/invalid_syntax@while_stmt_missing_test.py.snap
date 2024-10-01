@@ -1,0 +1,93 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/while_stmt_missing_test.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..30,
+        body: [
+            While(
+                StmtWhile {
+                    range: 0..11,
+                    test: Name(
+                        ExprName {
+                            range: 5..5,
+                            id: Name(""),
+                            ctx: Invalid,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 8..11,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 8..11,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+            While(
+                StmtWhile {
+                    range: 12..29,
+                    test: Name(
+                        ExprName {
+                            range: 17..17,
+                            id: Name(""),
+                            ctx: Invalid,
+                        },
+                    ),
+                    body: [
+                        Assign(
+                            StmtAssign {
+                                range: 24..29,
+                                targets: [
+                                    Name(
+                                        ExprName {
+                                            range: 24..25,
+                                            id: Name("a"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                ],
+                                value: NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 28..29,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | while : ...
+  |       ^ Syntax Error: Expected an expression
+2 | while :
+3 |     a = 1
+  |
+
+
+  |
+1 | while : ...
+2 | while :
+  |       ^ Syntax Error: Expected an expression
+3 |     a = 1
+  |

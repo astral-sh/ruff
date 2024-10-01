@@ -38,7 +38,7 @@ use crate::rules::flake8_tidy_imports::matchers::NameMatchPolicy;
 /// ```
 ///
 /// ## Options
-/// - `flake8-tidy-imports.banned-module-level-imports`
+/// - `lint.flake8-tidy-imports.banned-module-level-imports`
 #[violation]
 pub struct BannedModuleLevelImports {
     name: String,

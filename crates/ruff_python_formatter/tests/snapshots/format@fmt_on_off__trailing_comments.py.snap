@@ -71,8 +71,7 @@ b = 20
 
 
 # formatted
-def test2():
-    ...
+def test2(): ...
 
 
 a = 10
@@ -90,23 +89,6 @@ def test3  ():
     ...
 
 # fmt: on
-```
-
-
-## Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -21,8 +21,7 @@
- 
- 
- # formatted
--def test2():
--    ...
-+def test2(): ...
- 
- 
- a = 10
 ```
 
 

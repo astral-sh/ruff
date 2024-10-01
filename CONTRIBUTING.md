@@ -2,53 +2,19 @@
 
 Welcome! We're happy to have you here. Thank you in advance for your contribution to Ruff.
 
-- [The Basics](#the-basics)
-    - [Prerequisites](#prerequisites)
-    - [Development](#development)
-    - [Project Structure](#project-structure)
-    - [Example: Adding a new lint rule](#example-adding-a-new-lint-rule)
-        - [Rule naming convention](#rule-naming-convention)
-        - [Rule testing: fixtures and snapshots](#rule-testing-fixtures-and-snapshots)
-    - [Example: Adding a new configuration option](#example-adding-a-new-configuration-option)
-- [MkDocs](#mkdocs)
-- [Release Process](#release-process)
-    - [Creating a new release](#creating-a-new-release)
-- [Ecosystem CI](#ecosystem-ci)
-- [Benchmarking and Profiling](#benchmarking-and-profiling)
-    - [CPython Benchmark](#cpython-benchmark)
-    - [Microbenchmarks](#microbenchmarks)
-        - [Benchmark-driven Development](#benchmark-driven-development)
-        - [PR Summary](#pr-summary)
-        - [Tips](#tips)
-    - [Profiling Projects](#profiling-projects)
-        - [Linux](#linux)
-        - [Mac](#mac)
-- [`cargo dev`](#cargo-dev)
-- [Subsystems](#subsystems)
-    - [Compilation Pipeline](#compilation-pipeline)
-
 ## The Basics
 
-Ruff welcomes contributions in the form of Pull Requests.
+Ruff welcomes contributions in the form of pull requests.
 
 For small changes (e.g., bug fixes), feel free to submit a PR.
 
 For larger changes (e.g., new lint rules, new functionality, new configuration options), consider
 creating an [**issue**](https://github.com/astral-sh/ruff/issues) outlining your proposed change.
-You can also join us on [**Discord**](https://discord.gg/c9MhzV8aU5) to discuss your idea with the
+You can also join us on [Discord](https://discord.com/invite/astral-sh) to discuss your idea with the
 community. We've labeled [beginner-friendly tasks](https://github.com/astral-sh/ruff/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
 in the issue tracker, along with [bugs](https://github.com/astral-sh/ruff/issues?q=is%3Aissue+is%3Aopen+label%3Abug)
 and [improvements](https://github.com/astral-sh/ruff/issues?q=is%3Aissue+is%3Aopen+label%3Aaccepted)
 that are ready for contributions.
-
-If you're looking for a place to start, we recommend implementing a new lint rule (see:
-[_Adding a new lint rule_](#example-adding-a-new-lint-rule), which will allow you to learn from and
-pattern-match against the examples in the existing codebase. Many lint rules are inspired by
-existing Python plugins, which can be used as a reference implementation.
-
-As a concrete example: consider taking on one of the rules from the [`flake8-pyi`](https://github.com/astral-sh/ruff/issues/848)
-plugin, and looking to the originating [Python source](https://github.com/PyCQA/flake8-pyi) for
-guidance.
 
 If you have suggestions on how we might improve the contributing documentation, [let us know](https://github.com/astral-sh/ruff/discussions/5693)!
 
@@ -63,7 +29,7 @@ You'll also need [Insta](https://insta.rs/docs/) to update snapshot tests:
 cargo install cargo-insta
 ```
 
-and pre-commit to run some validation checks:
+And you'll need pre-commit to run some validation checks:
 
 ```shell
 pipx install pre-commit  # or `pip install pre-commit` if you have a virtualenv
@@ -75,6 +41,16 @@ when making a commit:
 ```shell
 pre-commit install
 ```
+
+We recommend [nextest](https://nexte.st/) to run Ruff's test suite (via `cargo nextest run`),
+though it's not strictly necessary:
+
+```shell
+cargo install cargo-nextest --locked
+```
+
+Throughout this guide, any usages of `cargo test` can be replaced with `cargo nextest run`,
+if you choose to install `nextest`.
 
 ### Development
 
@@ -93,8 +69,10 @@ RUFF_UPDATE_SCHEMA=1 cargo test  # Rust testing and updating ruff.schema.json
 pre-commit run --all-files --show-diff-on-failure  # Rust and Python formatting, Markdown and Python linting, etc.
 ```
 
-These checks will run on GitHub Actions when you open your Pull Request, but running them locally
+These checks will run on GitHub Actions when you open your pull request, but running them locally
 will save you time and expedite the merge process.
+
+If you're using VS Code, you can also install the recommended [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer) extension to get these checks while editing.
 
 Note that many code changes also require updating the snapshot tests, which is done interactively
 after running `cargo test` like so:
@@ -103,7 +81,14 @@ after running `cargo test` like so:
 cargo insta review
 ```
 
-Your Pull Request will be reviewed by a maintainer, which may involve a few rounds of iteration
+If your pull request relates to a specific lint rule, include the category and rule code in the
+title, as in the following examples:
+
+- \[`flake8-bugbear`\] Avoid false positive for usage after `continue` (`B031`)
+- \[`flake8-simplify`\] Detect implicit `else` cases in `needless-bool` (`SIM103`)
+- \[`pycodestyle`\] Implement `redundant-backslash` (`E502`)
+
+Your pull request will be reviewed by a maintainer, which may involve a few rounds of iteration
 prior to merging.
 
 ### Project Structure
@@ -111,8 +96,8 @@ prior to merging.
 Ruff is structured as a monorepo with a [flat crate structure](https://matklad.github.io/2021/08/22/large-rust-workspaces.html),
 such that all crates are contained in a flat `crates` directory.
 
-The vast majority of the code, including all lint rules, lives in the `ruff` crate (located at
-`crates/ruff_linter`). As a contributor, that's the crate that'll be most relevant to you.
+The vast majority of the code, including all lint rules, lives in the `ruff_linter` crate (located
+at `crates/ruff_linter`). As a contributor, that's the crate that'll be most relevant to you.
 
 At the time of writing, the repository includes the following crates:
 
@@ -185,11 +170,14 @@ and calling out to lint rule analyzer functions as it goes.
 If you need to inspect the AST, you can run `cargo dev print-ast` with a Python file. Grep
 for the `Diagnostic::new` invocations to understand how other, similar rules are implemented.
 
-Once you're satisfied with your code, add tests for your rule. See [rule testing](#rule-testing-fixtures-and-snapshots)
-for more details.
+Once you're satisfied with your code, add tests for your rule
+(see: [rule testing](#rule-testing-fixtures-and-snapshots)), and regenerate the documentation and
+associated assets (like our JSON Schema) with `cargo dev generate-all`.
 
-Finally, regenerate the documentation and other generated assets (like our JSON Schema) with:
-`cargo dev generate-all`.
+Finally, submit a pull request, and include the category, rule name, and rule code in the title, as
+in:
+
+> \[`pycodestyle`\] Implement `redundant-backslash` (`E502`)
 
 #### Rule naming convention
 
@@ -231,7 +219,7 @@ Once you've completed the code for the rule itself, you can define tests with th
     For example, if you're adding a new rule named `E402`, you would run:
 
     ```shell
-    cargo run -p ruff -- check crates/ruff_linter/resources/test/fixtures/pycodestyle/E402.py --no-cache --select E402
+    cargo run -p ruff -- check crates/ruff_linter/resources/test/fixtures/pycodestyle/E402.py --no-cache --preview --select E402
     ```
 
     **Note:** Only a subset of rules are enabled by default. When testing a new rule, ensure that
@@ -263,7 +251,7 @@ These represent, respectively: the schema used to parse the `pyproject.toml` fil
 intermediate representation; and the final, internal representation used to power Ruff.
 
 To add a new configuration option, you'll likely want to modify these latter few files (along with
-`arg.rs`, if appropriate). If you want to pattern-match against an existing example, grep for
+`args.rs`, if appropriate). If you want to pattern-match against an existing example, grep for
 `dummy_variable_rgx`, which defines a regular expression to match against acceptable unused
 variables (e.g., `_`).
 
@@ -302,7 +290,7 @@ To preview any changes to the documentation locally:
     ```
 
 The documentation should then be available locally at
-[http://127.0.0.1:8000/docs/](http://127.0.0.1:8000/docs/).
+[http://127.0.0.1:8000/ruff/](http://127.0.0.1:8000/ruff/).
 
 ## Release Process
 
@@ -315,42 +303,64 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
 
 ### Creating a new release
 
-We use an experimental in-house tool for managing releases.
+1. Install `uv`: `curl -LsSf https://astral.sh/uv/install.sh | sh`
 
-1. Install `rooster`: `pip install git+https://github.com/zanieb/rooster@main`
-1. Run `rooster release`; this command will:
+1. Run `./scripts/release.sh`; this command will:
+
+    - Generate a temporary virtual environment with `rooster`
     - Generate a changelog entry in `CHANGELOG.md`
     - Update versions in `pyproject.toml` and `Cargo.toml`
     - Update references to versions in the `README.md` and documentation
+    - Display contributors for the release
+
 1. The changelog should then be editorialized for consistency
+
     - Often labels will be missing from pull requests they will need to be manually organized into the proper section
     - Changes should be edited to be user-facing descriptions, avoiding internal details
+
 1. Highlight any breaking changes in `BREAKING_CHANGES.md`
+
 1. Run `cargo check`. This should update the lock file with new versions.
+
 1. Create a pull request with the changelog and version updates
+
 1. Merge the PR
-1. Run the [release workflow](https://github.com/astral-sh/ruff/actions/workflows/release.yaml) with:
+
+1. Run the [release workflow](https://github.com/astral-sh/ruff/actions/workflows/release.yml) with:
+
     - The new version number (without starting `v`)
-    - The commit hash of the merged release pull request on `main`
+
 1. The release workflow will do the following:
+
     1. Build all the assets. If this fails (even though we tested in step 4), we haven't tagged or
-        uploaded anything, you can restart after pushing a fix.
+        uploaded anything, you can restart after pushing a fix. If you just need to rerun the build,
+        make sure you're [re-running all the failed
+        jobs](https://docs.github.com/en/actions/managing-workflow-runs/re-running-workflows-and-jobs#re-running-failed-jobs-in-a-workflow) and not just a single failed job.
     1. Upload to PyPI.
     1. Create and push the Git tag (as extracted from `pyproject.toml`). We create the Git tag only
         after building the wheels and uploading to PyPI, since we can't delete or modify the tag ([#4468](https://github.com/astral-sh/ruff/issues/4468)).
     1. Attach artifacts to draft GitHub release
     1. Trigger downstream repositories. This can fail non-catastrophically, as we can run any
         downstream jobs manually if needed.
-1. Publish the GitHub release
-    1. Open the draft release in the GitHub release section
-    1. Copy the changelog for the release into the GitHub release
-        - See previous releases for formatting of section headers
-    1. Generate the contributor list with `rooster contributors` and add to the release notes
+
+1. Verify the GitHub release:
+
+    1. The Changelog should match the content of `CHANGELOG.md`
+    1. Append the contributors from the `scripts/release.sh` script
+
 1. If needed, [update the schemastore](https://github.com/astral-sh/ruff/blob/main/scripts/update_schemastore.py).
+
     1. One can determine if an update is needed when
         `git diff old-version-tag new-version-tag -- ruff.schema.json` returns a non-empty diff.
     1. Once run successfully, you should follow the link in the output to create a PR.
-1. If needed, update the `ruff-lsp` and `ruff-vscode` repositories.
+
+1. If needed, update the [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) and
+    [`ruff-vscode`](https://github.com/astral-sh/ruff-vscode) repositories and follow
+    the release instructions in those repositories. `ruff-lsp` should always be updated
+    before `ruff-vscode`.
+
+    This step is generally not required for a patch release, but should always be done
+    for a minor release.
 
 ## Ecosystem CI
 
@@ -373,6 +383,11 @@ We have several ways of benchmarking and profiling Ruff:
 - Microbenchmarks which run the linter or the formatter on individual files. These run on pull requests.
 - Profiling the linter on either the microbenchmarks or entire projects
 
+> **Note**
+> When running benchmarks, ensure that your CPU is otherwise idle (e.g., close any background
+> applications, like web browsers). You may also want to switch your CPU to a "performance"
+> mode, if it exists, especially when benchmarking short-lived processes.
+
 ### CPython Benchmark
 
 First, clone [CPython](https://github.com/python/cpython). It's a large and diverse Python codebase,
@@ -382,12 +397,18 @@ which makes it a good target for benchmarking.
 git clone --branch 3.10 https://github.com/python/cpython.git crates/ruff_linter/resources/test/cpython
 ```
 
+Install `hyperfine`:
+
+```shell
+cargo install hyperfine
+```
+
 To benchmark the release build:
 
 ```shell
 cargo build --release && hyperfine --warmup 10 \
-  "./target/release/ruff ./crates/ruff_linter/resources/test/cpython/ --no-cache -e" \
-  "./target/release/ruff ./crates/ruff_linter/resources/test/cpython/ -e"
+  "./target/release/ruff check ./crates/ruff_linter/resources/test/cpython/ --no-cache -e" \
+  "./target/release/ruff check ./crates/ruff_linter/resources/test/cpython/ -e"
 
 Benchmark 1: ./target/release/ruff ./crates/ruff_linter/resources/test/cpython/ --no-cache
   Time (mean ± σ):     293.8 ms ±   3.2 ms    [User: 2384.6 ms, System: 90.3 ms]
@@ -406,7 +427,7 @@ To benchmark against the ecosystem's existing tools:
 
 ```shell
 hyperfine --ignore-failure --warmup 5 \
-  "./target/release/ruff ./crates/ruff_linter/resources/test/cpython/ --no-cache" \
+  "./target/release/ruff check ./crates/ruff_linter/resources/test/cpython/ --no-cache" \
   "pyflakes crates/ruff_linter/resources/test/cpython" \
   "autoflake --recursive --expand-star-imports --remove-all-unused-imports --remove-unused-variables --remove-duplicate-keys resources/test/cpython" \
   "pycodestyle crates/ruff_linter/resources/test/cpython" \
@@ -452,7 +473,7 @@ To benchmark a subset of rules, e.g. `LineTooLong` and `DocLineTooLong`:
 
 ```shell
 cargo build --release && hyperfine --warmup 10 \
-  "./target/release/ruff ./crates/ruff_linter/resources/test/cpython/ --no-cache -e --select W505,E501"
+  "./target/release/ruff check ./crates/ruff_linter/resources/test/cpython/ --no-cache -e --select W505,E501"
 ```
 
 You can run `poetry install` from `./scripts/benchmarks` to create a working environment for the
@@ -509,6 +530,8 @@ You can run the benchmarks with
 cargo benchmark
 ```
 
+`cargo benchmark` is an alias for `cargo bench -p ruff_benchmark --bench linter --bench formatter --`
+
 #### Benchmark-driven Development
 
 Ruff uses [Criterion.rs](https://bheisler.github.io/criterion.rs/book/) for benchmarks. You can use
@@ -547,7 +570,7 @@ cargo install critcmp
 
 #### Tips
 
-- Use `cargo bench -p ruff_benchmark <filter>` to only run specific benchmarks. For example: `cargo benchmark lexer`
+- Use `cargo bench -p ruff_benchmark <filter>` to only run specific benchmarks. For example: `cargo bench -p ruff_benchmark lexer`
     to only run the lexer benchmarks.
 - Use `cargo bench -p ruff_benchmark -- --quiet` for a more cleaned up output (without statistical relevance)
 - Use `cargo bench -p ruff_benchmark -- --quick` to get faster results (more prone to noise)
@@ -617,11 +640,11 @@ Otherwise, follow the instructions from the linux section.
 `cargo dev` is a shortcut for `cargo run --package ruff_dev --bin ruff_dev`. You can run some useful
 utils with it:
 
-- `cargo dev print-ast <file>`: Print the AST of a python file using the
-    [RustPython parser](https://github.com/astral-sh/ruff/tree/main/crates/ruff_python_parser) that is
-    mainly used in Ruff. For `if True: pass # comment`, you can see the syntax tree, the byte offsets
-    for start and stop of each node and also how the `:` token, the comment and whitespace are not
-    represented anymore:
+- `cargo dev print-ast <file>`: Print the AST of a python file using Ruff's
+    [Python parser](https://github.com/astral-sh/ruff/tree/main/crates/ruff_python_parser).
+    For `if True: pass # comment`, you can see the syntax tree, the byte offsets for start and
+    stop of each node and also how the `:` token, the comment and whitespace are not represented
+    anymore:
 
 ```text
 [
@@ -794,8 +817,8 @@ To understand Ruff's import categorization system, we first need to define two c
     "project root".)
 - "Package root": The top-most directory defining the Python package that includes a given Python
     file. To find the package root for a given Python file, traverse up its parent directories until
-    you reach a parent directory that doesn't contain an `__init__.py` file (and isn't marked as
-    a [namespace package](https://docs.astral.sh/ruff/settings/#namespace-packages)); take the directory
+    you reach a parent directory that doesn't contain an `__init__.py` file (and isn't in a subtree
+    marked as a [namespace package](https://docs.astral.sh/ruff/settings/#namespace-packages)); take the directory
     just before that, i.e., the first directory in the package.
 
 For example, given:
@@ -884,15 +907,11 @@ There are three ways in which an import can be categorized as "first-party":
     package (e.g., `from foo import bar` or `import foo.bar`), they'll be classified as first-party
     automatically. This check is as simple as comparing the first segment of the current file's
     module path to the first segment of the import.
-1. **Source roots**: Ruff supports a `[src](https://docs.astral.sh/ruff/settings/#src)` setting, which
+1. **Source roots**: Ruff supports a [`src`](https://docs.astral.sh/ruff/settings/#src) setting, which
     sets the directories to scan when identifying first-party imports. The algorithm is
     straightforward: given an import, like `import foo`, iterate over the directories enumerated in
     the `src` setting and, for each directory, check for the existence of a subdirectory `foo` or a
     file `foo.py`.
 
-By default, `src` is set to the project root. In the above example, we'd want to set
-`src = ["./src"]` to ensure that we locate `./my_project/src/foo` and thus categorize `import foo`
-as first-party in `baz.py`. In practice, for this limited example, setting `src = ["./src"]` is
-unnecessary, as all imports within `./my_project/src/foo` would be categorized as first-party via
-the same-package heuristic; but if your project contains multiple packages, you'll want to set `src`
-explicitly.
+By default, `src` is set to the project root, along with `"src"` subdirectory in the project root.
+This ensures that Ruff supports both flat and "src" layouts out of the box.

@@ -78,27 +78,28 @@ impl<'a> PrintQueue<'a> {
 impl<'a> Queue<'a> for PrintQueue<'a> {
     fn pop(&mut self) -> Option<&'a FormatElement> {
         let elements = self.element_slices.last_mut()?;
-        elements.next().or_else(|| {
-            self.element_slices.pop();
-            let elements = self.element_slices.last_mut()?;
-            elements.next()
-        })
+        elements.next().or_else(
+            #[cold]
+            || {
+                self.element_slices.pop();
+                let elements = self.element_slices.last_mut()?;
+                elements.next()
+            },
+        )
     }
 
     fn top_with_interned(&self) -> Option<&'a FormatElement> {
         let mut slices = self.element_slices.iter().rev();
         let slice = slices.next()?;
 
-        match slice.as_slice().first() {
-            Some(element) => Some(element),
-            None => {
-                if let Some(next_elements) = slices.next() {
-                    next_elements.as_slice().first()
-                } else {
-                    None
-                }
-            }
-        }
+        slice.as_slice().first().or_else(
+            #[cold]
+            || {
+                slices
+                    .next()
+                    .and_then(|next_elements| next_elements.as_slice().first())
+            },
+        )
     }
 
     fn extend_back(&mut self, elements: &'a [FormatElement]) {
@@ -146,24 +147,30 @@ impl<'a, 'print> FitsQueue<'a, 'print> {
 
 impl<'a, 'print> Queue<'a> for FitsQueue<'a, 'print> {
     fn pop(&mut self) -> Option<&'a FormatElement> {
-        self.queue.pop().or_else(|| {
-            if let Some(next_slice) = self.rest_elements.next_back() {
-                self.queue.extend_back(next_slice.as_slice());
-                self.queue.pop()
-            } else {
-                None
-            }
-        })
+        self.queue.pop().or_else(
+            #[cold]
+            || {
+                if let Some(next_slice) = self.rest_elements.next_back() {
+                    self.queue.extend_back(next_slice.as_slice());
+                    self.queue.pop()
+                } else {
+                    None
+                }
+            },
+        )
     }
 
     fn top_with_interned(&self) -> Option<&'a FormatElement> {
-        self.queue.top_with_interned().or_else(|| {
-            if let Some(next_elements) = self.rest_elements.as_slice().last() {
-                next_elements.as_slice().first()
-            } else {
-                None
-            }
-        })
+        self.queue.top_with_interned().or_else(
+            #[cold]
+            || {
+                if let Some(next_elements) = self.rest_elements.as_slice().last() {
+                    next_elements.as_slice().first()
+                } else {
+                    None
+                }
+            },
+        )
     }
 
     fn extend_back(&mut self, elements: &'a [FormatElement]) {
@@ -181,27 +188,6 @@ impl<'a, 'print> Queue<'a> for FitsQueue<'a, 'print> {
         })
     }
 }
-
-/// Iterator that calls [`Queue::pop`] until it reaches the end of the document.
-///
-/// The iterator traverses into the content of any [`FormatElement::Interned`].
-pub(super) struct QueueIterator<'a, 'q, Q: Queue<'a>> {
-    queue: &'q mut Q,
-    lifetime: PhantomData<&'a ()>,
-}
-
-impl<'a, Q> Iterator for QueueIterator<'a, '_, Q>
-where
-    Q: Queue<'a>,
-{
-    type Item = &'a FormatElement;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.queue.pop()
-    }
-}
-
-impl<'a, Q> FusedIterator for QueueIterator<'a, '_, Q> where Q: Queue<'a> {}
 
 pub(super) struct QueueContentIterator<'a, 'q, Q: Queue<'a>> {
     queue: &'q mut Q,

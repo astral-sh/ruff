@@ -1,0 +1,94 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/from_import_empty_names.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..48,
+        body: [
+            ImportFrom(
+                StmtImportFrom {
+                    range: 0..13,
+                    module: Some(
+                        Identifier {
+                            id: Name("x"),
+                            range: 5..6,
+                        },
+                    ),
+                    names: [],
+                    level: 0,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    range: 14..30,
+                    module: Some(
+                        Identifier {
+                            id: Name("x"),
+                            range: 19..20,
+                        },
+                    ),
+                    names: [],
+                    level: 0,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    range: 31..47,
+                    module: Some(
+                        Identifier {
+                            id: Name("x"),
+                            range: 36..37,
+                        },
+                    ),
+                    names: [],
+                    level: 0,
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | from x import
+  |              ^ Syntax Error: Expected one or more symbol names after import
+2 | from x import ()
+3 | from x import ,,
+  |
+
+
+  |
+1 | from x import
+2 | from x import ()
+  |                ^ Syntax Error: Expected one or more symbol names after import
+3 | from x import ,,
+  |
+
+
+  |
+1 | from x import
+2 | from x import ()
+3 | from x import ,,
+  |               ^ Syntax Error: Expected an import name
+  |
+
+
+  |
+1 | from x import
+2 | from x import ()
+3 | from x import ,,
+  |                ^ Syntax Error: Expected an import name
+  |
+
+
+  |
+1 | from x import
+2 | from x import ()
+3 | from x import ,,
+  |                 ^ Syntax Error: Expected one or more symbol names after import
+  |

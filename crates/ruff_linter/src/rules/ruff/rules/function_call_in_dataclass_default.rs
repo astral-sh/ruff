@@ -2,8 +2,7 @@ use ruff_python_ast::{self as ast, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::compose_call_path;
-use ruff_python_ast::call_path::{from_qualified_name, CallPath};
+use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_semantic::analyze::typing::is_immutable_func;
 use ruff_text_size::Ranged;
 
@@ -53,7 +52,7 @@ use crate::rules::ruff::rules::helpers::{
 /// ```
 ///
 /// ## Options
-/// - `flake8-bugbear.extend-immutable-calls`
+/// - `lint.flake8-bugbear.extend-immutable-calls`
 #[violation]
 pub struct FunctionCallInDataclassDefaultArgument {
     name: Option<String>,
@@ -80,12 +79,12 @@ pub(crate) fn function_call_in_dataclass_default(
         return;
     }
 
-    let extend_immutable_calls: Vec<CallPath> = checker
+    let extend_immutable_calls: Vec<QualifiedName> = checker
         .settings
         .flake8_bugbear
         .extend_immutable_calls
         .iter()
-        .map(|target| from_qualified_name(target))
+        .map(|target| QualifiedName::from_dotted_name(target))
         .collect();
 
     for statement in &class_def.body {
@@ -103,7 +102,7 @@ pub(crate) fn function_call_in_dataclass_default(
                 {
                     checker.diagnostics.push(Diagnostic::new(
                         FunctionCallInDataclassDefaultArgument {
-                            name: compose_call_path(func),
+                            name: UnqualifiedName::from_expr(func).map(|name| name.to_string()),
                         },
                         expr.range(),
                     ));

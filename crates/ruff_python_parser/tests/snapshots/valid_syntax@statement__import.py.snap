@@ -1,0 +1,129 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/valid/statement/import.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..92,
+        body: [
+            Import(
+                StmtImport {
+                    range: 0..8,
+                    names: [
+                        Alias {
+                            range: 7..8,
+                            name: Identifier {
+                                id: Name("a"),
+                                range: 7..8,
+                            },
+                            asname: None,
+                        },
+                    ],
+                },
+            ),
+            Import(
+                StmtImport {
+                    range: 9..21,
+                    names: [
+                        Alias {
+                            range: 16..21,
+                            name: Identifier {
+                                id: Name("a.b.c"),
+                                range: 16..21,
+                            },
+                            asname: None,
+                        },
+                    ],
+                },
+            ),
+            Import(
+                StmtImport {
+                    range: 22..39,
+                    names: [
+                        Alias {
+                            range: 29..39,
+                            name: Identifier {
+                                id: Name("a.b.c"),
+                                range: 29..34,
+                            },
+                            asname: Some(
+                                Identifier {
+                                    id: Name("d"),
+                                    range: 38..39,
+                                },
+                            ),
+                        },
+                    ],
+                },
+            ),
+            Import(
+                StmtImport {
+                    range: 40..54,
+                    names: [
+                        Alias {
+                            range: 47..48,
+                            name: Identifier {
+                                id: Name("a"),
+                                range: 47..48,
+                            },
+                            asname: None,
+                        },
+                        Alias {
+                            range: 50..51,
+                            name: Identifier {
+                                id: Name("b"),
+                                range: 50..51,
+                            },
+                            asname: None,
+                        },
+                        Alias {
+                            range: 53..54,
+                            name: Identifier {
+                                id: Name("c"),
+                                range: 53..54,
+                            },
+                            asname: None,
+                        },
+                    ],
+                },
+            ),
+            Import(
+                StmtImport {
+                    range: 55..91,
+                    names: [
+                        Alias {
+                            range: 62..74,
+                            name: Identifier {
+                                id: Name("foo.bar"),
+                                range: 62..69,
+                            },
+                            asname: Some(
+                                Identifier {
+                                    id: Name("a"),
+                                    range: 73..74,
+                                },
+                            ),
+                        },
+                        Alias {
+                            range: 76..91,
+                            name: Identifier {
+                                id: Name("a.b.c.d"),
+                                range: 76..83,
+                            },
+                            asname: Some(
+                                Identifier {
+                                    id: Name("abcd"),
+                                    range: 87..91,
+                                },
+                            ),
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```

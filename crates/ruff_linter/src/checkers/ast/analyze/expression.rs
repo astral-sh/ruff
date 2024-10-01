@@ -15,9 +15,8 @@ use crate::rules::{
     flake8_comprehensions, flake8_datetimez, flake8_debugger, flake8_django,
     flake8_future_annotations, flake8_gettext, flake8_implicit_str_concat, flake8_logging,
     flake8_logging_format, flake8_pie, flake8_print, flake8_pyi, flake8_pytest_style, flake8_self,
-    flake8_simplify, flake8_tidy_imports, flake8_trio, flake8_type_checking, flake8_use_pathlib,
-    flynt, numpy, pandas_vet, pep8_naming, pycodestyle, pyflakes, pygrep_hooks, pylint, pyupgrade,
-    refurb, ruff,
+    flake8_simplify, flake8_tidy_imports, flake8_type_checking, flake8_use_pathlib, flynt, numpy,
+    pandas_vet, pep8_naming, pycodestyle, pyflakes, pylint, pyupgrade, refurb, ruff,
 };
 use crate::settings::types::PythonVersion;
 
@@ -33,10 +32,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 if let Some(operator) = typing::to_pep604_operator(value, slice, &checker.semantic)
                 {
                     if checker.enabled(Rule::FutureRewritableTypeAnnotation) {
-                        if !checker.source_type.is_stub()
+                        if !checker.semantic.future_annotations_or_stub()
                             && checker.settings.target_version < PythonVersion::Py310
                             && checker.settings.target_version >= PythonVersion::Py37
-                            && !checker.semantic.future_annotations()
                             && checker.semantic.in_annotation()
                             && !checker.settings.pyupgrade.keep_runtime_typing
                         {
@@ -49,7 +47,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                         if checker.source_type.is_stub()
                             || checker.settings.target_version >= PythonVersion::Py310
                             || (checker.settings.target_version >= PythonVersion::Py37
-                                && checker.semantic.future_annotations()
+                                && checker.semantic.future_annotations_or_stub()
                                 && checker.semantic.in_annotation()
                                 && !checker.settings.pyupgrade.keep_runtime_typing)
                         {
@@ -61,10 +59,11 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
 
             // Ex) list[...]
             if checker.enabled(Rule::FutureRequiredTypeAnnotation) {
-                if !checker.source_type.is_stub()
+                if !checker.semantic.future_annotations_or_stub()
                     && checker.settings.target_version < PythonVersion::Py39
-                    && !checker.semantic.future_annotations()
                     && checker.semantic.in_annotation()
+                    && checker.semantic.in_runtime_evaluated_annotation()
+                    && !checker.semantic.in_string_type_definition()
                     && typing::is_pep585_generic(value, &checker.semantic)
                 {
                     flake8_future_annotations::rules::future_required_type_annotation(
@@ -81,7 +80,6 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 Rule::DuplicateUnionMember,
                 Rule::RedundantLiteralUnion,
                 Rule::UnnecessaryTypeUnion,
-                Rule::NeverUnion,
             ]) {
                 // Avoid duplicate checks if the parent is a union, since these rules already
                 // traverse nested unions.
@@ -101,8 +99,21 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 }
             }
 
+            // Ex) Literal[...]
+            if checker.enabled(Rule::DuplicateLiteralMember) {
+                if !checker.semantic.in_nested_literal() {
+                    flake8_pyi::rules::duplicate_literal_member(checker, expr);
+                }
+            }
+
             if checker.enabled(Rule::NeverUnion) {
                 ruff::rules::never_union(checker, expr);
+            }
+
+            if checker.enabled(Rule::UnnecessaryDefaultTypeArgs) {
+                if checker.settings.target_version >= PythonVersion::Py313 {
+                    pyupgrade::rules::unnecessary_default_type_args(checker, expr);
+                }
             }
 
             if checker.any_enabled(&[
@@ -117,7 +128,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_simplify::rules::use_capital_environment_variables(checker, expr);
             }
             if checker.enabled(Rule::UnnecessaryIterableAllocationForFirstElement) {
-                ruff::rules::unnecessary_iterable_allocation_for_first_element(checker, subscript);
+                ruff::rules::unnecessary_iterable_allocation_for_first_element(checker, expr);
             }
             if checker.enabled(Rule::InvalidIndexType) {
                 ruff::rules::invalid_index_type(checker, subscript);
@@ -128,6 +139,16 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::PotentialIndexError) {
                 pylint::rules::potential_index_error(checker, value, slice);
             }
+            if checker.enabled(Rule::SortedMinMax) {
+                refurb::rules::sorted_min_max(checker, subscript);
+            }
+            if checker.enabled(Rule::FStringNumberFormat) {
+                refurb::rules::fstring_number_format(checker, subscript);
+            }
+
+            if checker.enabled(Rule::IncorrectlyParenthesizedTupleInSubscript) {
+                ruff::rules::subscript_with_parenthesized_tuple(checker, subscript);
+            }
 
             pandas_vet::rules::subscript(checker, value, expr);
         }
@@ -135,6 +156,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             elts,
             ctx,
             range: _,
+            parenthesized: _,
         })
         | Expr::List(ast::ExprList {
             elts,
@@ -186,10 +208,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                             typing::to_pep585_generic(expr, &checker.semantic)
                         {
                             if checker.enabled(Rule::FutureRewritableTypeAnnotation) {
-                                if !checker.source_type.is_stub()
+                                if !checker.semantic.future_annotations_or_stub()
                                     && checker.settings.target_version < PythonVersion::Py39
                                     && checker.settings.target_version >= PythonVersion::Py37
-                                    && !checker.semantic.future_annotations()
                                     && checker.semantic.in_annotation()
                                     && !checker.settings.pyupgrade.keep_runtime_typing
                                 {
@@ -200,7 +221,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                                 if checker.source_type.is_stub()
                                     || checker.settings.target_version >= PythonVersion::Py39
                                     || (checker.settings.target_version >= PythonVersion::Py37
-                                        && checker.semantic.future_annotations()
+                                        && checker.semantic.future_annotations_or_stub()
                                         && checker.semantic.in_annotation()
                                         && !checker.settings.pyupgrade.keep_runtime_typing)
                                 {
@@ -223,14 +244,10 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                         }
                     }
                     if checker.enabled(Rule::MixedCaseVariableInClassScope) {
-                        if let ScopeKind::Class(ast::StmtClassDef { arguments, .. }) =
-                            &checker.semantic.current_scope().kind
+                        if let ScopeKind::Class(class_def) = &checker.semantic.current_scope().kind
                         {
                             pep8_naming::rules::mixed_case_variable_in_class_scope(
-                                checker,
-                                expr,
-                                id,
-                                arguments.as_deref(),
+                                checker, expr, id, class_def,
                             );
                         }
                     }
@@ -242,11 +259,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                         }
                     }
                     if checker.enabled(Rule::AmbiguousVariableName) {
-                        if let Some(diagnostic) =
-                            pycodestyle::rules::ambiguous_variable_name(id, expr.range())
-                        {
-                            checker.diagnostics.push(diagnostic);
-                        }
+                        pycodestyle::rules::ambiguous_variable_name(checker, id, expr.range());
                     }
                     if !checker.semantic.current_scope().kind.is_class() {
                         if checker.enabled(Rule::BuiltinVariableShadowing) {
@@ -254,7 +267,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                         }
                     }
                 }
-                ExprContext::Del => {}
+                _ => {}
             }
             if checker.enabled(Rule::SixPY3) {
                 flake8_2020::rules::name_or_attribute(checker, expr);
@@ -274,10 +287,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             ]) {
                 if let Some(replacement) = typing::to_pep585_generic(expr, &checker.semantic) {
                     if checker.enabled(Rule::FutureRewritableTypeAnnotation) {
-                        if !checker.source_type.is_stub()
+                        if !checker.semantic.future_annotations_or_stub()
                             && checker.settings.target_version < PythonVersion::Py39
                             && checker.settings.target_version >= PythonVersion::Py37
-                            && !checker.semantic.future_annotations()
                             && checker.semantic.in_annotation()
                             && !checker.settings.pyupgrade.keep_runtime_typing
                         {
@@ -290,7 +302,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                         if checker.source_type.is_stub()
                             || checker.settings.target_version >= PythonVersion::Py39
                             || (checker.settings.target_version >= PythonVersion::Py37
-                                && checker.semantic.future_annotations()
+                                && checker.semantic.future_annotations_or_stub()
                                 && checker.semantic.in_annotation()
                                 && !checker.settings.pyupgrade.keep_runtime_typing)
                         {
@@ -320,7 +332,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 numpy::rules::numpy_2_0_deprecation(checker, expr);
             }
             if checker.enabled(Rule::DeprecatedMockImport) {
-                pyupgrade::rules::deprecated_mock_attribute(checker, expr);
+                pyupgrade::rules::deprecated_mock_attribute(checker, attribute);
             }
             if checker.enabled(Rule::SixPY3) {
                 flake8_2020::rules::name_or_attribute(checker, expr);
@@ -337,7 +349,12 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::UndocumentedWarn) {
                 flake8_logging::rules::undocumented_warn(checker, expr);
             }
-            pandas_vet::rules::attr(checker, attribute);
+            if checker.enabled(Rule::PandasUseOfDotValues) {
+                pandas_vet::rules::attr(checker, attribute);
+            }
+            if checker.enabled(Rule::ByteStringUsage) {
+                flake8_pyi::rules::bytestring_attribute(checker, expr);
+            }
         }
         Expr::Call(
             call @ ast::ExprCall {
@@ -425,7 +442,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                                         pyupgrade::rules::format_literals(checker, call, &summary);
                                     }
                                     if checker.enabled(Rule::FString) {
-                                        pyupgrade::rules::f_strings(checker, call, &summary, value);
+                                        pyupgrade::rules::f_strings(checker, call, &summary);
                                     }
                                 }
                             }
@@ -494,11 +511,21 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::BlockingHttpCallInAsyncFunction) {
                 flake8_async::rules::blocking_http_call(checker, call);
             }
-            if checker.enabled(Rule::OpenSleepOrSubprocessInAsyncFunction) {
-                flake8_async::rules::open_sleep_or_subprocess_call(checker, call);
+            if checker.enabled(Rule::BlockingOpenCallInAsyncFunction) {
+                flake8_async::rules::blocking_open_call(checker, call);
             }
-            if checker.enabled(Rule::BlockingOsCallInAsyncFunction) {
-                flake8_async::rules::blocking_os_call(checker, call);
+            if checker.any_enabled(&[
+                Rule::CreateSubprocessInAsyncFunction,
+                Rule::RunProcessInAsyncFunction,
+                Rule::WaitForProcessInAsyncFunction,
+            ]) {
+                flake8_async::rules::blocking_process_invocation(checker, call);
+            }
+            if checker.enabled(Rule::BlockingSleepInAsyncFunction) {
+                flake8_async::rules::blocking_sleep(checker, call);
+            }
+            if checker.enabled(Rule::LongSleepNotForever) {
+                flake8_async::rules::long_sleep_not_forever(checker, call);
             }
             if checker.any_enabled(&[Rule::Print, Rule::PPrint]) {
                 flake8_print::rules::print_call(checker, call);
@@ -558,6 +585,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::NoExplicitStacklevel) {
                 flake8_bugbear::rules::no_explicit_stacklevel(checker, call);
+            }
+            if checker.enabled(Rule::MutableContextvarDefault) {
+                flake8_bugbear::rules::mutable_contextvar_default(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryDictKwargs) {
                 flake8_pie::rules::unnecessary_dict_kwargs(checker, call);
@@ -630,6 +660,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             ]) {
                 flake8_bandit::rules::shell_injection(checker, call);
             }
+            if checker.enabled(Rule::DjangoExtra) {
+                flake8_bandit::rules::django_extra(checker, call);
+            }
             if checker.enabled(Rule::DjangoRawSql) {
                 flake8_bandit::rules::django_raw_sql(checker, call);
             }
@@ -637,14 +670,10 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_bandit::rules::tarfile_unsafe_members(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryGeneratorList) {
-                flake8_comprehensions::rules::unnecessary_generator_list(
-                    checker, expr, func, args, keywords,
-                );
+                flake8_comprehensions::rules::unnecessary_generator_list(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryGeneratorSet) {
-                flake8_comprehensions::rules::unnecessary_generator_set(
-                    checker, expr, func, args, keywords,
-                );
+                flake8_comprehensions::rules::unnecessary_generator_set(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryGeneratorDict) {
                 flake8_comprehensions::rules::unnecessary_generator_dict(
@@ -652,9 +681,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 );
             }
             if checker.enabled(Rule::UnnecessaryListComprehensionSet) {
-                flake8_comprehensions::rules::unnecessary_list_comprehension_set(
-                    checker, expr, func, args, keywords,
-                );
+                flake8_comprehensions::rules::unnecessary_list_comprehension_set(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryListComprehensionDict) {
                 flake8_comprehensions::rules::unnecessary_list_comprehension_dict(
@@ -662,9 +689,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 );
             }
             if checker.enabled(Rule::UnnecessaryLiteralSet) {
-                flake8_comprehensions::rules::unnecessary_literal_set(
-                    checker, expr, func, args, keywords,
-                );
+                flake8_comprehensions::rules::unnecessary_literal_set(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryLiteralDict) {
                 flake8_comprehensions::rules::unnecessary_literal_dict(
@@ -674,27 +699,20 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::UnnecessaryCollectionCall) {
                 flake8_comprehensions::rules::unnecessary_collection_call(
                     checker,
-                    expr,
-                    func,
-                    args,
-                    keywords,
+                    call,
                     &checker.settings.flake8_comprehensions,
                 );
             }
             if checker.enabled(Rule::UnnecessaryLiteralWithinTupleCall) {
                 flake8_comprehensions::rules::unnecessary_literal_within_tuple_call(
-                    checker, expr, func, args, keywords,
+                    checker, expr, call,
                 );
             }
             if checker.enabled(Rule::UnnecessaryLiteralWithinListCall) {
-                flake8_comprehensions::rules::unnecessary_literal_within_list_call(
-                    checker, expr, func, args, keywords,
-                );
+                flake8_comprehensions::rules::unnecessary_literal_within_list_call(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryLiteralWithinDictCall) {
-                flake8_comprehensions::rules::unnecessary_literal_within_dict_call(
-                    checker, expr, func, args, keywords,
-                );
+                flake8_comprehensions::rules::unnecessary_literal_within_dict_call(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryListCall) {
                 flake8_comprehensions::rules::unnecessary_list_call(checker, expr, func, args);
@@ -721,8 +739,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     args,
                 );
             }
-            if checker.enabled(Rule::UnnecessaryComprehensionAnyAll) {
-                flake8_comprehensions::rules::unnecessary_comprehension_any_all(
+            if checker.enabled(Rule::UnnecessaryComprehensionInCall) {
+                flake8_comprehensions::rules::unnecessary_comprehension_in_call(
                     checker, expr, func, args, keywords,
                 );
             }
@@ -772,12 +790,6 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::CallDateFromtimestamp) {
                 flake8_datetimez::rules::call_date_fromtimestamp(checker, func, expr.range());
-            }
-            if checker.enabled(Rule::Eval) {
-                pygrep_hooks::rules::no_eval(checker, func);
-            }
-            if checker.enabled(Rule::DeprecatedLogWarn) {
-                pygrep_hooks::rules::deprecated_log_warn(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryDirectLambdaCall) {
                 pylint::rules::unnecessary_direct_lambda_call(checker, expr, func);
@@ -840,9 +852,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::PytestFailWithoutMessage) {
                 flake8_pytest_style::rules::fail_call(checker, call);
             }
-            if checker.enabled(Rule::PairwiseOverZipped) {
+            if checker.enabled(Rule::ZipInsteadOfPairwise) {
                 if checker.settings.target_version >= PythonVersion::Py310 {
-                    ruff::rules::pairwise_over_zipped(checker, func, args);
+                    ruff::rules::zip_instead_of_pairwise(checker, call);
                 }
             }
             if checker.any_enabled(&[
@@ -867,7 +879,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_simplify::rules::use_capital_environment_variables(checker, expr);
             }
             if checker.enabled(Rule::OpenFileWithContextHandler) {
-                flake8_simplify::rules::open_file_with_context_handler(checker, func);
+                flake8_simplify::rules::open_file_with_context_handler(checker, call);
             }
             if checker.enabled(Rule::DictGetWithNoneDefault) {
                 flake8_simplify::rules::dict_get_with_none_default(checker, expr);
@@ -944,6 +956,12 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::RedundantLogBase) {
                 refurb::rules::redundant_log_base(checker, call);
             }
+            if checker.enabled(Rule::VerboseDecimalConstructor) {
+                refurb::rules::verbose_decimal_constructor(checker, call);
+            }
+            if checker.enabled(Rule::UnnecessaryFromFloat) {
+                refurb::rules::unnecessary_from_float(checker, call);
+            }
             if checker.enabled(Rule::QuadraticListSummation) {
                 ruff::rules::quadratic_list_summation(checker, call);
             }
@@ -963,10 +981,10 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 refurb::rules::no_implicit_cwd(checker, call);
             }
             if checker.enabled(Rule::TrioSyncCall) {
-                flake8_trio::rules::sync_call(checker, call);
+                flake8_async::rules::sync_call(checker, call);
             }
-            if checker.enabled(Rule::TrioZeroSleepCall) {
-                flake8_trio::rules::zero_sleep_call(checker, call);
+            if checker.enabled(Rule::AsyncZeroSleep) {
+                flake8_async::rules::async_zero_sleep(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryDunderCall) {
                 pylint::rules::unnecessary_dunder_call(checker, call);
@@ -982,6 +1000,18 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::UnsortedDunderAll) {
                 ruff::rules::sort_dunder_all_extend_call(checker, call);
+            }
+            if checker.enabled(Rule::DefaultFactoryKwarg) {
+                ruff::rules::default_factory_kwarg(checker, call);
+            }
+            if checker.enabled(Rule::UnnecessaryIterableAllocationForFirstElement) {
+                ruff::rules::unnecessary_iterable_allocation_for_first_element(checker, expr);
+            }
+            if checker.enabled(Rule::DecimalFromFloatLiteral) {
+                ruff::rules::decimal_from_float_literal_syntax(checker, call);
+            }
+            if checker.enabled(Rule::IntOnSlicedStr) {
+                refurb::rules::int_on_sliced_str(checker, call);
             }
         }
         Expr::Dict(dict) => {
@@ -1044,6 +1074,11 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     pyupgrade::rules::unicode_kind_prefix(checker, string_literal);
                 }
             }
+            if checker.enabled(Rule::MissingFStringSyntax) {
+                for string_literal in value.literals() {
+                    ruff::rules::missing_fstring_syntax(checker, string_literal);
+                }
+            }
         }
         Expr::BinOp(ast::ExprBinOp {
             left,
@@ -1054,13 +1089,17 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 pyflakes::rules::invalid_print_syntax(checker, left);
             }
         }
-        Expr::BinOp(ast::ExprBinOp {
-            left,
-            op: Operator::Mod,
-            right,
-            range: _,
-        }) => {
-            if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = left.as_ref() {
+        Expr::BinOp(
+            bin_op @ ast::ExprBinOp {
+                left,
+                op: Operator::Mod,
+                right,
+                range: _,
+            },
+        ) => {
+            if let Expr::StringLiteral(format_string @ ast::ExprStringLiteral { value, .. }) =
+                left.as_ref()
+            {
                 if checker.any_enabled(&[
                     Rule::PercentFormatInvalidFormat,
                     Rule::PercentFormatExpectedMapping,
@@ -1137,13 +1176,17 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     }
                 }
                 if checker.enabled(Rule::PrintfStringFormatting) {
-                    pyupgrade::rules::printf_string_formatting(checker, expr, right);
+                    pyupgrade::rules::printf_string_formatting(checker, bin_op, format_string);
                 }
                 if checker.enabled(Rule::BadStringFormatCharacter) {
-                    pylint::rules::bad_string_format_character::percent(checker, expr);
+                    pylint::rules::bad_string_format_character::percent(
+                        checker,
+                        expr,
+                        format_string,
+                    );
                 }
                 if checker.enabled(Rule::BadStringFormatType) {
-                    pylint::rules::bad_string_format_type(checker, expr, right);
+                    pylint::rules::bad_string_format_type(checker, bin_op, format_string);
                 }
                 if checker.enabled(Rule::HardcodedSQLExpression) {
                     flake8_bandit::rules::hardcoded_sql_expression(checker, expr);
@@ -1154,9 +1197,11 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             op: Operator::Add, ..
         }) => {
             if checker.enabled(Rule::ExplicitStringConcatenation) {
-                if let Some(diagnostic) =
-                    flake8_implicit_str_concat::rules::explicit(expr, checker.locator)
-                {
+                if let Some(diagnostic) = flake8_implicit_str_concat::rules::explicit(
+                    expr,
+                    checker.locator,
+                    checker.settings,
+                ) {
                     checker.diagnostics.push(diagnostic);
                 }
             }
@@ -1173,10 +1218,11 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
         }) => {
             // Ex) `str | None`
             if checker.enabled(Rule::FutureRequiredTypeAnnotation) {
-                if !checker.source_type.is_stub()
+                if !checker.semantic.future_annotations_or_stub()
                     && checker.settings.target_version < PythonVersion::Py310
-                    && !checker.semantic.future_annotations()
                     && checker.semantic.in_annotation()
+                    && checker.semantic.in_runtime_evaluated_annotation()
+                    && !checker.semantic.in_string_type_definition()
                 {
                     flake8_future_annotations::rules::future_required_type_annotation(
                         checker,
@@ -1285,6 +1331,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::MagicValueComparison) {
                 pylint::rules::magic_value_comparison(checker, left, comparators);
             }
+            if checker.enabled(Rule::NanComparison) {
+                pylint::rules::nan_comparison(checker, left, comparators);
+            }
             if checker.enabled(Rule::InDictKeys) {
                 flake8_simplify::rules::key_in_dict_compare(checker, compare);
             }
@@ -1315,15 +1364,20 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 refurb::rules::math_constant(checker, number_literal);
             }
         }
-        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+        Expr::StringLiteral(ast::ExprStringLiteral { value, range: _ }) => {
             if checker.enabled(Rule::UnicodeKindPrefix) {
                 for string_part in value {
                     pyupgrade::rules::unicode_kind_prefix(checker, string_part);
                 }
             }
+            if checker.enabled(Rule::MissingFStringSyntax) {
+                for string_literal in value.as_slice() {
+                    ruff::rules::missing_fstring_syntax(checker, string_literal);
+                }
+            }
         }
-        Expr::IfExp(
-            if_exp @ ast::ExprIfExp {
+        Expr::If(
+            if_exp @ ast::ExprIf {
                 test,
                 body,
                 orelse,
@@ -1346,6 +1400,15 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::IfExprMinMax) {
                 refurb::rules::if_expr_min_max(checker, if_exp);
+            }
+            if checker.enabled(Rule::IfExpInsteadOfOrOperator) {
+                refurb::rules::if_exp_instead_of_or_operator(checker, if_exp);
+            }
+            if checker.enabled(Rule::UselessIfElse) {
+                ruff::rules::useless_if_else(checker, if_exp);
+            }
+            if checker.enabled(Rule::SliceToRemovePrefixOrSuffix) {
+                refurb::rules::slice_to_remove_affix_expr(checker, if_exp);
             }
         }
         Expr::ListComp(
@@ -1422,11 +1485,19 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::UnnecessaryDictIndexLookup) {
                 pylint::rules::unnecessary_dict_index_lookup_comprehension(checker, expr);
             }
+
             if checker.enabled(Rule::UnnecessaryComprehension) {
                 flake8_comprehensions::rules::unnecessary_dict_comprehension(
                     checker, expr, key, value, generators,
                 );
             }
+
+            if checker.enabled(Rule::UnnecessaryDictComprehensionForIterable) {
+                flake8_comprehensions::rules::unnecessary_dict_comprehension_for_iterable(
+                    checker, dict_comp,
+                );
+            }
+
             if checker.enabled(Rule::FunctionUsesLoopVariable) {
                 flake8_bugbear::rules::function_uses_loop_variable(checker, &Node::Expr(expr));
             }
@@ -1436,14 +1507,15 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 }
             }
             if checker.enabled(Rule::StaticKeyDictComprehension) {
-                ruff::rules::static_key_dict_comprehension(checker, dict_comp);
+                flake8_bugbear::rules::static_key_dict_comprehension(checker, dict_comp);
             }
         }
-        Expr::GeneratorExp(
-            generator @ ast::ExprGeneratorExp {
+        Expr::Generator(
+            generator @ ast::ExprGenerator {
                 generators,
                 elt: _,
                 range: _,
+                parenthesized: _,
             },
         ) => {
             if checker.enabled(Rule::UnnecessaryListIndexLookup) {
@@ -1464,15 +1536,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 refurb::rules::reimplemented_starmap(checker, &generator.into());
             }
         }
-        Expr::BoolOp(
-            bool_op @ ast::ExprBoolOp {
-                op,
-                values,
-                range: _,
-            },
-        ) => {
-            if checker.enabled(Rule::RepeatedIsinstanceCalls) {
-                pylint::rules::repeated_isinstance_calls(checker, expr, *op, values);
+        Expr::BoolOp(bool_op) => {
+            if checker.enabled(Rule::BooleanChainedComparison) {
+                pylint::rules::boolean_chained_comparison(checker, bool_op);
             }
             if checker.enabled(Rule::MultipleStartsEndsWith) {
                 flake8_pie::rules::multiple_starts_ends_with(checker, expr);
@@ -1498,9 +1564,6 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::RepeatedEqualityComparison) {
                 pylint::rules::repeated_equality_comparison(checker, bool_op);
             }
-            if checker.enabled(Rule::AndOrTernary) {
-                pylint::rules::and_or_ternary(checker, bool_op);
-            }
             if checker.enabled(Rule::UnnecessaryKeyCheck) {
                 ruff::rules::unnecessary_key_check(checker, expr);
             }
@@ -1508,7 +1571,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 ruff::rules::parenthesize_chained_logical_operators(checker, bool_op);
             }
         }
-        Expr::NamedExpr(..) => {
+        Expr::Named(..) => {
             if checker.enabled(Rule::AssignmentInAssert) {
                 ruff::rules::assignment_in_assert(checker, expr);
             }

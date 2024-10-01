@@ -1,0 +1,95 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/for_stmt_missing_in_keyword.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..24,
+        body: [
+            For(
+                StmtFor {
+                    range: 0..12,
+                    is_async: false,
+                    target: Name(
+                        ExprName {
+                            range: 4..5,
+                            id: Name("a"),
+                            ctx: Store,
+                        },
+                    ),
+                    iter: Name(
+                        ExprName {
+                            range: 6..7,
+                            id: Name("b"),
+                            ctx: Load,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 9..12,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 9..12,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+            For(
+                StmtFor {
+                    range: 13..23,
+                    is_async: false,
+                    target: Name(
+                        ExprName {
+                            range: 17..18,
+                            id: Name("a"),
+                            ctx: Store,
+                        },
+                    ),
+                    iter: Name(
+                        ExprName {
+                            range: 18..18,
+                            id: Name(""),
+                            ctx: Invalid,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 20..23,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 20..23,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | for a b: ...
+  |       ^ Syntax Error: Expected 'in', found name
+2 | for a: ...
+  |
+
+
+  |
+1 | for a b: ...
+2 | for a: ...
+  |      ^ Syntax Error: Expected 'in', found ':'
+  |

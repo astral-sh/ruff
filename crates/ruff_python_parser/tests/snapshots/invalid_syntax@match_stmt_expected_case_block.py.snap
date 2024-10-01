@@ -1,0 +1,134 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/match_stmt_expected_case_block.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..61,
+        body: [
+            Match(
+                StmtMatch {
+                    range: 0..13,
+                    subject: Name(
+                        ExprName {
+                            range: 6..7,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [],
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 13..18,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 13..14,
+                                id: Name("x"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 17..18,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Match(
+                StmtMatch {
+                    range: 19..32,
+                    subject: Name(
+                        ExprName {
+                            range: 25..26,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [],
+                },
+            ),
+            Match(
+                StmtMatch {
+                    range: 32..60,
+                    subject: Name(
+                        ExprName {
+                            range: 38..39,
+                            id: Name("y"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 49..60,
+                            pattern: MatchAs(
+                                PatternMatchAs {
+                                    range: 54..55,
+                                    pattern: None,
+                                    name: None,
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 57..60,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 57..60,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | match x:
+2 |     x = 1
+  |     ^ Syntax Error: Expected `case` block
+3 | match x:
+4 |     match y:
+  |
+
+
+  |
+1 | match x:
+2 |     x = 1
+3 | match x:
+  |  Syntax Error: Expected a statement
+4 |     match y:
+5 |         case _: ...
+  |
+
+
+  |
+2 |     x = 1
+3 | match x:
+4 |     match y:
+  |     ^^^^^ Syntax Error: Expected `case` block
+5 |         case _: ...
+  |
+
+
+  |
+4 |     match y:
+5 |         case _: ...
+  |

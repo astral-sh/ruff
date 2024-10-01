@@ -1,13 +1,12 @@
 use ruff_formatter::FormatRuleWithOptions;
 use ruff_python_ast::{AnyNodeRef, ExprStringLiteral};
 
-use crate::comments::SourceComment;
 use crate::expression::parentheses::{
     in_parentheses_only_group, NeedsParentheses, OptionalParentheses,
 };
 use crate::other::string_literal::{FormatStringLiteral, StringLiteralKind};
 use crate::prelude::*;
-use crate::string::{AnyString, FormatStringContinuation};
+use crate::string::{AnyString, FormatImplicitConcatenatedString};
 
 #[derive(Default)]
 pub struct FormatExprStringLiteral {
@@ -56,18 +55,10 @@ impl FormatNodeRule<ExprStringLiteral> for FormatExprStringLiteral {
                 // ensures that the docstring is a *single* string literal.
                 assert!(!self.kind.is_docstring());
 
-                in_parentheses_only_group(&FormatStringContinuation::new(&AnyString::String(item)))
+                in_parentheses_only_group(&FormatImplicitConcatenatedString::new(item))
             }
             .fmt(f),
         }
-    }
-
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        Ok(())
     }
 }
 

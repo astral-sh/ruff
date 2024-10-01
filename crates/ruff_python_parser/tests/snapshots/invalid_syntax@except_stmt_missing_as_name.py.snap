@@ -1,0 +1,95 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/except_stmt_missing_as_name.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..73,
+        body: [
+            Try(
+                StmtTry {
+                    range: 0..72,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 9..13,
+                            },
+                        ),
+                    ],
+                    handlers: [
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 14..43,
+                                type_: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 21..30,
+                                            id: Name("Exception"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                                name: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 39..43,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 44..72,
+                                type_: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 51..60,
+                                            id: Name("Exception"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                                name: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 68..72,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                    finalbody: [],
+                    is_star: false,
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | try:
+2 |     pass
+3 | except Exception as:
+  |                    ^ Syntax Error: Expected name after `as`
+4 |     pass
+5 | except Exception as
+  |
+
+
+  |
+3 | except Exception as:
+4 |     pass
+5 | except Exception as
+  |                    ^ Syntax Error: Expected name after `as`
+6 |     pass
+  |

@@ -3,10 +3,10 @@ use std::ops::Deref;
 use bitflags::bitflags;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
+use ruff_python_ast::ExprContext;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::context::ExecutionContext;
 use crate::scope::ScopeId;
 use crate::{Exceptions, NodeId, SemanticModelFlags};
 
@@ -18,10 +18,12 @@ pub struct ResolvedReference {
     node_id: Option<NodeId>,
     /// The scope in which the reference is defined.
     scope_id: ScopeId,
-    /// The range of the reference in the source code.
-    range: TextRange,
+    /// The expression context in which the reference occurs (e.g., `Load`, `Store`, `Del`).
+    ctx: ExprContext,
     /// The model state in which the reference occurs.
     flags: SemanticModelFlags,
+    /// The range of the reference in the source code.
+    range: TextRange,
 }
 
 impl ResolvedReference {
@@ -35,13 +37,19 @@ impl ResolvedReference {
         self.scope_id
     }
 
-    /// The [`ExecutionContext`] of the reference.
-    pub const fn context(&self) -> ExecutionContext {
-        if self.flags.intersects(SemanticModelFlags::TYPING_CONTEXT) {
-            ExecutionContext::Typing
-        } else {
-            ExecutionContext::Runtime
-        }
+    /// Return `true` if the reference occurred in a `Load` operation.
+    pub const fn is_load(&self) -> bool {
+        self.ctx.is_load()
+    }
+
+    /// Return `true` if the context is in a typing context.
+    pub const fn in_typing_context(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::TYPING_CONTEXT)
+    }
+
+    /// Return `true` if the context is in a runtime context.
+    pub const fn in_runtime_context(&self) -> bool {
+        !self.flags.intersects(SemanticModelFlags::TYPING_CONTEXT)
     }
 
     /// Return `true` if the context is in a typing-only type annotation.
@@ -85,6 +93,12 @@ impl ResolvedReference {
         self.flags
             .intersects(SemanticModelFlags::TYPE_CHECKING_BLOCK)
     }
+
+    /// Return `true` if the context is in the r.h.s. of an `__all__` definition.
+    pub const fn in_dunder_all_definition(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::DUNDER_ALL_DEFINITION)
+    }
 }
 
 impl Ranged for ResolvedReference {
@@ -108,14 +122,16 @@ impl ResolvedReferences {
         &mut self,
         scope_id: ScopeId,
         node_id: Option<NodeId>,
-        range: TextRange,
+        ctx: ExprContext,
         flags: SemanticModelFlags,
+        range: TextRange,
     ) -> ResolvedReferenceId {
         self.0.push(ResolvedReference {
             node_id,
             scope_id,
-            range,
+            ctx,
             flags,
+            range,
         })
     }
 }

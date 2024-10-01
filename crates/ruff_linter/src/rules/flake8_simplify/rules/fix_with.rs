@@ -67,8 +67,8 @@ pub(crate) fn fix_multiple_with_statements(
 
     outer_with.items.append(&mut inner_with.items);
     if outer_with.lpar.is_none() {
-        outer_with.lpar = inner_with.lpar.clone();
-        outer_with.rpar = inner_with.rpar.clone();
+        outer_with.lpar.clone_from(&inner_with.lpar);
+        outer_with.rpar.clone_from(&inner_with.rpar);
     }
     outer_with.body = inner_with.body.clone();
 

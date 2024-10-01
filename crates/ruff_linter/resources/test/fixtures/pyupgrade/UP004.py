@@ -152,3 +152,9 @@ object = A
 
 class B(object):
     ...
+
+
+import builtins
+
+class Unusual(builtins.object):
+    ...

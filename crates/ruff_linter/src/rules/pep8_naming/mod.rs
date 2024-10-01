@@ -8,11 +8,12 @@ mod tests {
     use std::path::{Path, PathBuf};
 
     use anyhow::Result;
+    use rustc_hash::FxHashMap;
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::rules::pep8_naming;
-    use crate::settings::types::IdentifierPattern;
+    use crate::rules::pep8_naming::settings::IgnoreNames;
+    use crate::rules::{flake8_import_conventions, pep8_naming};
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
@@ -88,6 +89,25 @@ mod tests {
     }
 
     #[test]
+    fn camelcase_imported_as_incorrect_convention() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pep8_naming").join("N817.py").as_path(),
+            &settings::LinterSettings {
+                flake8_import_conventions: flake8_import_conventions::settings::Settings {
+                    aliases: FxHashMap::from_iter([(
+                        "xml.etree.ElementTree".to_string(),
+                        "XET".to_string(),
+                    )]),
+                    ..Default::default()
+                },
+                ..settings::LinterSettings::for_rule(Rule::CamelcaseImportedAsAcronym)
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn classmethod_decorators() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pep8_naming").join("N805.py").as_path(),
@@ -148,12 +168,13 @@ mod tests {
             PathBuf::from_iter(["pep8_naming", "ignore_names", path]).as_path(),
             &settings::LinterSettings {
                 pep8_naming: pep8_naming::settings::Settings {
-                    ignore_names: vec![
-                        IdentifierPattern::new("*allowed*").unwrap(),
-                        IdentifierPattern::new("*Allowed*").unwrap(),
-                        IdentifierPattern::new("*ALLOWED*").unwrap(),
-                        IdentifierPattern::new("BA").unwrap(), // For N817.
-                    ],
+                    ignore_names: IgnoreNames::from_patterns([
+                        "*allowed*".to_string(),
+                        "*Allowed*".to_string(),
+                        "*ALLOWED*".to_string(),
+                        "BA".to_string(), // For N817.
+                    ])
+                    .unwrap(),
                     ..Default::default()
                 },
                 ..settings::LinterSettings::for_rule(rule_code)

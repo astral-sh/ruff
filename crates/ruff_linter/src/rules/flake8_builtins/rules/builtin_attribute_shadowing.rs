@@ -10,8 +10,8 @@ use crate::checkers::ast::Checker;
 use crate::rules::flake8_builtins::helpers::shadows_builtin;
 
 /// ## What it does
-/// Checks for any class attributes or methods that use the same name as a
-/// builtin.
+/// Checks for class attributes and methods that use the same names as
+/// Python builtins.
 ///
 /// ## Why is this bad?
 /// Reusing a builtin name for the name of an attribute increases the
@@ -37,7 +37,7 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// ```
 ///
 /// Builtins can be marked as exceptions to this rule via the
-/// [`flake8-builtins.builtins-ignorelist`] configuration option, or
+/// [`lint.flake8-builtins.builtins-ignorelist`] configuration option, or
 /// converted to the appropriate dunder method. Methods decorated with
 /// `@typing.override` or `@typing_extensions.override` are also
 /// ignored.
@@ -55,7 +55,7 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// ```
 ///
 /// ## Options
-/// - `flake8-builtins.builtins-ignorelist`
+/// - `lint.flake8-builtins.builtins-ignorelist`
 #[violation]
 pub struct BuiltinAttributeShadowing {
     kind: Kind,
@@ -98,8 +98,9 @@ pub(crate) fn builtin_attribute_shadowing(
 
         if shadows_builtin(
             name,
-            &checker.settings.flake8_builtins.builtins_ignorelist,
             checker.source_type,
+            &checker.settings.flake8_builtins.builtins_ignorelist,
+            checker.settings.target_version,
         ) {
             // Ignore explicit overrides.
             if class_def.decorator_list.iter().any(|decorator| {

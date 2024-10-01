@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
-use crate::codes::RuleCodePrefix;
 use crate::codes::RuleIter;
+use crate::codes::{RuleCodePrefix, RuleGroup};
 use crate::registry::{Linter, Rule, RuleNamespace};
 use crate::rule_redirects::get_redirect;
 use crate::settings::types::PreviewMode;
@@ -15,9 +15,6 @@ use crate::settings::types::PreviewMode;
 pub enum RuleSelector {
     /// Select all rules (includes rules in preview if enabled)
     All,
-    /// Legacy category to select all rules in the "nursery" which predated preview mode
-    #[deprecated(note = "The nursery was replaced with 'preview mode' which has no selector")]
-    Nursery,
     /// Legacy category to select both the `mccabe` and `flake8-comprehensions` linters
     /// via a single selector.
     C,
@@ -44,14 +41,27 @@ impl From<Linter> for RuleSelector {
     }
 }
 
+impl Ord for RuleSelector {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        // TODO(zanieb): We ought to put "ALL" and "Linter" selectors
+        // above those that are rule specific but it's not critical for now
+        self.prefix_and_code().cmp(&other.prefix_and_code())
+    }
+}
+
+impl PartialOrd for RuleSelector {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 impl FromStr for RuleSelector {
     type Err = ParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // **Changes should be reflected in `parse_no_redirect` as well**
         match s {
             "ALL" => Ok(Self::All),
-            #[allow(deprecated)]
-            "NURSERY" => Ok(Self::Nursery),
             "C" => Ok(Self::C),
             "T" => Ok(Self::T),
             _ => {
@@ -67,7 +77,6 @@ impl FromStr for RuleSelector {
                     return Ok(Self::Linter(linter));
                 }
 
-                // Does the selector select a single rule?
                 let prefix = RuleCodePrefix::parse(&linter, code)
                     .map_err(|_| ParseError::Unknown(s.to_string()))?;
 
@@ -116,8 +125,6 @@ impl RuleSelector {
     pub fn prefix_and_code(&self) -> (&'static str, &'static str) {
         match self {
             RuleSelector::All => ("", "ALL"),
-            #[allow(deprecated)]
-            RuleSelector::Nursery => ("", "NURSERY"),
             RuleSelector::C => ("", "C"),
             RuleSelector::T => ("", "T"),
             RuleSelector::Prefix { prefix, .. } | RuleSelector::Rule { prefix, .. } => {
@@ -172,15 +179,11 @@ impl Visitor<'_> for SelectorVisitor {
 }
 
 impl RuleSelector {
-    /// Return all matching rules, regardless of whether they're in preview.
+    /// Return all matching rules, regardless of rule group filters like preview and deprecated.
     pub fn all_rules(&self) -> impl Iterator<Item = Rule> + '_ {
         match self {
             RuleSelector::All => RuleSelectorIter::All(Rule::iter()),
 
-            #[allow(deprecated)]
-            RuleSelector::Nursery => {
-                RuleSelectorIter::Nursery(Rule::iter().filter(Rule::is_nursery))
-            }
             RuleSelector::C => RuleSelectorIter::Chain(
                 Linter::Flake8Comprehensions
                     .rules()
@@ -198,26 +201,38 @@ impl RuleSelector {
         }
     }
 
-    /// Returns rules matching the selector, taking into account preview options enabled.
+    /// Returns rules matching the selector, taking into account rule groups like preview and deprecated.
     pub fn rules<'a>(&'a self, preview: &PreviewOptions) -> impl Iterator<Item = Rule> + 'a {
         let preview_enabled = preview.mode.is_enabled();
         let preview_require_explicit = preview.require_explicit;
-        #[allow(deprecated)]
+
         self.all_rules().filter(move |rule| {
-            // Always include rules that are not in preview or the nursery
-            !(rule.is_preview() || rule.is_nursery())
-            // Backwards compatibility allows selection of nursery rules by exact code or dedicated group
-            || ((matches!(self, RuleSelector::Rule { .. }) || matches!(self, RuleSelector::Nursery { .. })) && rule.is_nursery())
-            // Enabling preview includes all preview or nursery rules unless explicit selection
-            // is turned on
-            || (preview_enabled && (matches!(self, RuleSelector::Rule { .. }) || !preview_require_explicit))
+            match rule.group() {
+                // Always include stable rules
+                RuleGroup::Stable => true,
+                // Enabling preview includes all preview rules unless explicit selection is turned on
+                RuleGroup::Preview => {
+                    preview_enabled && (self.is_exact() || !preview_require_explicit)
+                }
+                // Deprecated rules are excluded in preview mode and with 'All' option unless explicitly selected
+                RuleGroup::Deprecated => {
+                    (!preview_enabled || self.is_exact())
+                        && !matches!(self, RuleSelector::All { .. })
+                }
+                // Removed rules are included if explicitly selected but will error downstream
+                RuleGroup::Removed => self.is_exact(),
+            }
         })
+    }
+
+    /// Returns true if this selector is exact i.e. selects a single rule by code
+    pub fn is_exact(&self) -> bool {
+        matches!(self, Self::Rule { .. })
     }
 }
 
 pub enum RuleSelectorIter {
     All(RuleIter),
-    Nursery(std::iter::Filter<RuleIter, fn(&Rule) -> bool>),
     Chain(std::iter::Chain<std::vec::IntoIter<Rule>, std::vec::IntoIter<Rule>>),
     Vec(std::vec::IntoIter<Rule>),
 }
@@ -228,7 +243,6 @@ impl Iterator for RuleSelectorIter {
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             RuleSelectorIter::All(iter) => iter.next(),
-            RuleSelectorIter::Nursery(iter) => iter.next(),
             RuleSelectorIter::Chain(iter) => iter.next(),
             RuleSelectorIter::Vec(iter) => iter.next(),
         }
@@ -265,9 +279,8 @@ mod schema {
                 instance_type: Some(InstanceType::String.into()),
                 enum_values: Some(
                     [
-                        // Include the non-standard "ALL" and "NURSERY" selectors.
+                        // Include the non-standard "ALL" selectors.
                         "ALL".to_string(),
-                        "NURSERY".to_string(),
                         // Include the legacy "C" and "T" selectors.
                         "C".to_string(),
                         "T".to_string(),
@@ -289,6 +302,26 @@ mod schema {
                                 (!prefix.is_empty()).then(|| prefix.to_string())
                             })),
                     )
+                    .filter(|p| {
+                        // Exclude any prefixes where all of the rules are removed
+                        if let Ok(Self::Rule { prefix, .. } | Self::Prefix { prefix, .. }) =
+                            RuleSelector::parse_no_redirect(p)
+                        {
+                            !prefix.rules().all(|rule| rule.is_removed())
+                        } else {
+                            true
+                        }
+                    })
+                    .filter(|_rule| {
+                        // Filter out all test-only rules
+                        #[cfg(any(feature = "test-rules", test))]
+                        #[allow(clippy::used_underscore_binding)]
+                        if _rule.starts_with("RUF9") {
+                            return false;
+                        }
+
+                        true
+                    })
                     .sorted()
                     .map(Value::String)
                     .collect(),
@@ -303,8 +336,6 @@ impl RuleSelector {
     pub fn specificity(&self) -> Specificity {
         match self {
             RuleSelector::All => Specificity::All,
-            #[allow(deprecated)]
-            RuleSelector::Nursery => Specificity::All,
             RuleSelector::T => Specificity::LinterGroup,
             RuleSelector::C => Specificity::LinterGroup,
             RuleSelector::Linter(..) => Specificity::Linter,
@@ -317,6 +348,39 @@ impl RuleSelector {
                     3 => Specificity::Prefix3Chars,
                     4 => Specificity::Prefix4Chars,
                     _ => panic!("RuleSelector::specificity doesn't yet support codes with so many characters"),
+                }
+            }
+        }
+    }
+
+    /// Parse [`RuleSelector`] from a string; but do not follow redirects.
+    pub fn parse_no_redirect(s: &str) -> Result<Self, ParseError> {
+        // **Changes should be reflected in `from_str` as well**
+        match s {
+            "ALL" => Ok(Self::All),
+            "C" => Ok(Self::C),
+            "T" => Ok(Self::T),
+            _ => {
+                let (linter, code) =
+                    Linter::parse_code(s).ok_or_else(|| ParseError::Unknown(s.to_string()))?;
+
+                if code.is_empty() {
+                    return Ok(Self::Linter(linter));
+                }
+
+                let prefix = RuleCodePrefix::parse(&linter, code)
+                    .map_err(|_| ParseError::Unknown(s.to_string()))?;
+
+                if is_single_rule_selector(&prefix) {
+                    Ok(Self::Rule {
+                        prefix,
+                        redirected_from: None,
+                    })
+                } else {
+                    Ok(Self::Prefix {
+                        prefix,
+                        redirected_from: None,
+                    })
                 }
             }
         }

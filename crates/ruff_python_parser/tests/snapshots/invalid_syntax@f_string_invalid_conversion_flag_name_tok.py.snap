@@ -1,0 +1,62 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/f_string_invalid_conversion_flag_name_tok.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..9,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..8,
+                    value: FString(
+                        ExprFString {
+                            range: 0..8,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 0..8,
+                                            elements: [
+                                                Expression(
+                                                    FStringExpressionElement {
+                                                        range: 2..7,
+                                                        expression: Name(
+                                                            ExprName {
+                                                                range: 3..4,
+                                                                id: Name("x"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | f"{x!z}"
+  |      ^ Syntax Error: f-string: invalid conversion character
+  |

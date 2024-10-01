@@ -1,0 +1,106 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/if_stmt_invalid_elif_test_expr.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..56,
+        body: [
+            If(
+                StmtIf {
+                    range: 0..55,
+                    test: Name(
+                        ExprName {
+                            range: 3..4,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 10..14,
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [
+                        ElifElseClause {
+                            range: 15..32,
+                            test: Some(
+                                Starred(
+                                    ExprStarred {
+                                        range: 20..22,
+                                        value: Name(
+                                            ExprName {
+                                                range: 21..22,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ),
+                            body: [
+                                Pass(
+                                    StmtPass {
+                                        range: 28..32,
+                                    },
+                                ),
+                            ],
+                        },
+                        ElifElseClause {
+                            range: 33..55,
+                            test: Some(
+                                Yield(
+                                    ExprYield {
+                                        range: 38..45,
+                                        value: Some(
+                                            Name(
+                                                ExprName {
+                                                    range: 44..45,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            ),
+                            body: [
+                                Pass(
+                                    StmtPass {
+                                        range: 51..55,
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | if x:
+2 |     pass
+3 | elif *x:
+  |      ^^ Syntax Error: Starred expression cannot be used here
+4 |     pass
+5 | elif yield x:
+  |
+
+
+  |
+3 | elif *x:
+4 |     pass
+5 | elif yield x:
+  |      ^^^^^^^ Syntax Error: Yield expression cannot be used here
+6 |     pass
+  |

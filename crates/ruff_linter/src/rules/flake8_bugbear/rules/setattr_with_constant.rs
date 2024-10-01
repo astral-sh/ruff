@@ -68,12 +68,6 @@ pub(crate) fn setattr_with_constant(
     func: &Expr,
     args: &[Expr],
 ) {
-    let Expr::Name(ast::ExprName { id, .. }) = func else {
-        return;
-    };
-    if id != "setattr" {
-        return;
-    }
     let [obj, name, value] = args else {
         return;
     };
@@ -89,7 +83,7 @@ pub(crate) fn setattr_with_constant(
     if is_mangled_private(name.to_str()) {
         return;
     }
-    if !checker.semantic().is_builtin("setattr") {
+    if !checker.semantic().match_builtin_expr(func, "setattr") {
         return;
     }
 

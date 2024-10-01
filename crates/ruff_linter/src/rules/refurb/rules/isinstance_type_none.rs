@@ -48,19 +48,15 @@ impl Violation for IsinstanceTypeNone {
 
 /// FURB168
 pub(crate) fn isinstance_type_none(checker: &mut Checker, call: &ast::ExprCall) {
-    let Expr::Name(ast::ExprName { id, .. }) = call.func.as_ref() else {
-        return;
-    };
-    if id.as_str() != "isinstance" {
-        return;
-    }
-    if !checker.semantic().is_builtin(id) {
-        return;
-    }
     let Some(types) = call.arguments.find_positional(1) else {
         return;
     };
-
+    if !checker
+        .semantic()
+        .match_builtin_expr(&call.func, "isinstance")
+    {
+        return;
+    }
     if is_none(types) {
         let Some(Expr::Name(ast::ExprName {
             id: object_name, ..
@@ -70,7 +66,7 @@ pub(crate) fn isinstance_type_none(checker: &mut Checker, call: &ast::ExprCall) 
         };
         let mut diagnostic = Diagnostic::new(IsinstanceTypeNone, call.range());
         let replacement =
-            generate_none_identity_comparison(object_name, false, checker.generator());
+            generate_none_identity_comparison(object_name.clone(), false, checker.generator());
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             pad(replacement, call.range(), checker.locator()),
             call.range(),
@@ -102,7 +98,7 @@ fn is_none(expr: &Expr) -> bool {
             }
 
             // Ex) `(type(None),)`
-            Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().all(|elt| inner(elt, false)),
+            Expr::Tuple(tuple) => tuple.iter().all(|element| inner(element, false)),
 
             // Ex) `type(None) | type(None)`
             Expr::BinOp(ast::ExprBinOp {

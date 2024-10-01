@@ -4,7 +4,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::fix::edits::pad;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::compose_call_path;
+use ruff_python_ast::name::{Name, UnqualifiedName};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
@@ -59,75 +59,74 @@ impl AlwaysFixableViolation for TimeoutErrorAlias {
 
 /// Return `true` if an [`Expr`] is an alias of `TimeoutError`.
 fn is_alias(expr: &Expr, semantic: &SemanticModel, target_version: PythonVersion) -> bool {
-    semantic.resolve_call_path(expr).is_some_and(|call_path| {
-        if target_version >= PythonVersion::Py311 {
-            matches!(
-                call_path.as_slice(),
-                ["socket", "timeout"] | ["asyncio", "TimeoutError"]
-            )
-        } else {
-            // N.B. This lint is only invoked for Python 3.10+. We assume
-            // as much here since otherwise socket.timeout would be an unsafe
-            // fix in Python <3.10. We add an assert to make this assumption
-            // explicit.
-            assert!(
-                target_version >= PythonVersion::Py310,
-                "lint should only be used for Python 3.10+",
-            );
-            matches!(call_path.as_slice(), ["socket", "timeout"])
-        }
-    })
-}
-
-/// Return `true` if an [`Expr`] is `TimeoutError`.
-fn is_timeout_error(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
-        .resolve_call_path(expr)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["", "TimeoutError"]))
+        .resolve_qualified_name(expr)
+        .is_some_and(|qualified_name| {
+            if target_version >= PythonVersion::Py311 {
+                matches!(
+                    qualified_name.segments(),
+                    ["socket", "timeout"] | ["asyncio", "TimeoutError"]
+                )
+            } else {
+                // N.B. This lint is only invoked for Python 3.10+. We assume
+                // as much here since otherwise socket.timeout would be an unsafe
+                // fix in Python <3.10. We add an assert to make this assumption
+                // explicit.
+                assert!(
+                    target_version >= PythonVersion::Py310,
+                    "lint should only be used for Python 3.10+",
+                );
+                matches!(qualified_name.segments(), ["socket", "timeout"])
+            }
+        })
 }
 
 /// Create a [`Diagnostic`] for a single target, like an [`Expr::Name`].
 fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
     let mut diagnostic = Diagnostic::new(
         TimeoutErrorAlias {
-            name: compose_call_path(target),
+            name: UnqualifiedName::from_expr(target).map(|name| name.to_string()),
         },
         target.range(),
     );
-    if checker.semantic().is_builtin("TimeoutError") {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            "TimeoutError".to_string(),
-            target.range(),
-        )));
-    }
+    diagnostic.try_set_fix(|| {
+        let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
+            "TimeoutError",
+            target.start(),
+            checker.semantic(),
+        )?;
+        Ok(Fix::safe_edits(
+            Edit::range_replacement(binding, target.range()),
+            import_edit,
+        ))
+    });
     checker.diagnostics.push(diagnostic);
 }
 
 /// Create a [`Diagnostic`] for a tuple of expressions.
 fn tuple_diagnostic(checker: &mut Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]) {
     let mut diagnostic = Diagnostic::new(TimeoutErrorAlias { name: None }, tuple.range());
-    if checker.semantic().is_builtin("TimeoutError") {
+    let semantic = checker.semantic();
+    if semantic.has_builtin_binding("TimeoutError") {
         // Filter out any `TimeoutErrors` aliases.
         let mut remaining: Vec<Expr> = tuple
-            .elts
             .iter()
-            .filter_map(|elt| {
-                if aliases.contains(&elt) {
+            .filter_map(|element| {
+                if aliases.contains(&element) {
                     None
                 } else {
-                    Some(elt.clone())
+                    Some(element.clone())
                 }
             })
             .collect();
 
         // If `TimeoutError` itself isn't already in the tuple, add it.
         if tuple
-            .elts
             .iter()
-            .all(|elt| !is_timeout_error(elt, checker.semantic()))
+            .all(|element| !semantic.match_builtin_expr(element, "TimeoutError"))
         {
             let node = ast::ExprName {
-                id: "TimeoutError".into(),
+                id: Name::new_static("TimeoutError"),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
             };
@@ -141,6 +140,7 @@ fn tuple_diagnostic(checker: &mut Checker, tuple: &ast::ExprTuple, aliases: &[&E
                 elts: remaining,
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
+                parenthesized: true,
             };
             format!("({})", checker.generator().expr(&node.into()))
         };
@@ -169,9 +169,9 @@ pub(crate) fn timeout_error_alias_handlers(checker: &mut Checker, handlers: &[Ex
             Expr::Tuple(tuple) => {
                 // List of aliases to replace with `TimeoutError`.
                 let mut aliases: Vec<&Expr> = vec![];
-                for elt in &tuple.elts {
-                    if is_alias(elt, checker.semantic(), checker.settings.target_version) {
-                        aliases.push(elt);
+                for element in tuple {
+                    if is_alias(element, checker.semantic(), checker.settings.target_version) {
+                        aliases.push(element);
                     }
                 }
                 if !aliases.is_empty() {

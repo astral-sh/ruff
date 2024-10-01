@@ -1,5 +1,5 @@
 use ruff_formatter::write;
-use ruff_python_ast::{Decorator, StmtClassDef};
+use ruff_python_ast::{Decorator, NodeKind, StmtClassDef};
 use ruff_python_trivia::lines_after_ignoring_end_of_line_trivia;
 use ruff_text_size::Ranged;
 
@@ -55,7 +55,7 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
         // newline between the comment and the node, but we _require_ two newlines. If there are
         // _no_ newlines between the comment and the node, we don't insert _any_ newlines; if there
         // are more than two, then `leading_comments` will preserve the correct number of newlines.
-        empty_lines_after_leading_comments(f, comments.leading(item)).fmt(f)?;
+        empty_lines_after_leading_comments(comments.leading(item)).fmt(f)?;
 
         write!(
             f,
@@ -132,7 +132,7 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
                         Ok(())
                     }),
                 ),
-                clause_body(body, trailing_definition_comments).with_kind(SuiteKind::Class),
+                clause_body(body, SuiteKind::Class, trailing_definition_comments),
             ]
         )?;
 
@@ -152,15 +152,9 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
         //
         // # comment
         // ```
-        empty_lines_before_trailing_comments(f, comments.trailing(item)).fmt(f)
-    }
+        empty_lines_before_trailing_comments(comments.trailing(item), NodeKind::StmtClassDef)
+            .fmt(f)?;
 
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        // handled in fmt_fields
         Ok(())
     }
 }

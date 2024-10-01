@@ -1,0 +1,160 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/type_alias_invalid_value_expr.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..67,
+        body: [
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 0..11,
+                    name: Name(
+                        ExprName {
+                            range: 5..6,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: None,
+                    value: Starred(
+                        ExprStarred {
+                            range: 9..11,
+                            value: Name(
+                                ExprName {
+                                    range: 10..11,
+                                    id: Name("y"),
+                                    ctx: Load,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 12..28,
+                    name: Name(
+                        ExprName {
+                            range: 17..18,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: None,
+                    value: Yield(
+                        ExprYield {
+                            range: 21..28,
+                            value: Some(
+                                Name(
+                                    ExprName {
+                                        range: 27..28,
+                                        id: Name("y"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ),
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 29..50,
+                    name: Name(
+                        ExprName {
+                            range: 34..35,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: None,
+                    value: YieldFrom(
+                        ExprYieldFrom {
+                            range: 38..50,
+                            value: Name(
+                                ExprName {
+                                    range: 49..50,
+                                    id: Name("y"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 51..61,
+                    name: Name(
+                        ExprName {
+                            range: 56..57,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: None,
+                    value: Name(
+                        ExprName {
+                            range: 60..61,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 65..66,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 65..66,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | type x = *y
+  |          ^^ Syntax Error: Starred expression cannot be used here
+2 | type x = yield y
+3 | type x = yield from y
+  |
+
+
+  |
+1 | type x = *y
+2 | type x = yield y
+  |          ^^^^^^^ Syntax Error: Yield expression cannot be used here
+3 | type x = yield from y
+4 | type x = x := 1
+  |
+
+
+  |
+1 | type x = *y
+2 | type x = yield y
+3 | type x = yield from y
+  |          ^^^^^^^^^^^^ Syntax Error: Yield expression cannot be used here
+4 | type x = x := 1
+  |
+
+
+  |
+2 | type x = yield y
+3 | type x = yield from y
+4 | type x = x := 1
+  |            ^^ Syntax Error: Expected a statement
+  |

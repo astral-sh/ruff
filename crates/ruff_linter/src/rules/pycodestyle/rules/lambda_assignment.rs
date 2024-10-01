@@ -1,14 +1,13 @@
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{
     self as ast, Expr, Identifier, Parameter, ParameterWithDefault, Parameters, Stmt,
 };
-use ruff_text_size::{Ranged, TextRange};
-
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, violation};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{has_leading_content, has_trailing_content, leading_indentation};
 use ruff_source_file::UniversalNewlines;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 
@@ -106,12 +105,17 @@ pub(crate) fn lambda_assignment(
             }
         }
 
-        // If the assignment is in a class body, it might not be safe to replace it because the
-        // assignment might be carrying a type annotation that will be used by some package like
-        // dataclasses, which wouldn't consider the rewritten function definition to be
-        // equivalent. Even if it _doesn't_ have an annotation, rewriting safely would require
-        // making this a static method.
-        // See: https://github.com/astral-sh/ruff/issues/3046
+        // If the assignment is a class attribute (with an annotation), ignore it.
+        //
+        // This is most common for, e.g., dataclasses and Pydantic models. Those libraries will
+        // treat the lambda as an assignable field, and the use of a lambda is almost certainly
+        // intentional.
+        if annotation.is_some() && checker.semantic().current_scope().kind.is_class() {
+            return;
+        }
+
+        // Otherwise, if the assignment is in a class body, flag it, but use a display-only fix.
+        // Rewriting safely would require making this a static method.
         //
         // Similarly, if the lambda is shadowing a variable in the current scope,
         // rewriting it as a function declaration may break type-checking.
@@ -153,10 +157,15 @@ fn extract_types(annotation: &Expr, semantic: &SemanticModel) -> Option<(Vec<Exp
         return None;
     };
 
-    if !semantic.resolve_call_path(value).is_some_and(|call_path| {
-        matches!(call_path.as_slice(), ["collections", "abc", "Callable"])
-            || semantic.match_typing_call_path(&call_path, "Callable")
-    }) {
+    if !semantic
+        .resolve_qualified_name(value)
+        .is_some_and(|qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                ["collections", "abc", "Callable"]
+            ) || semantic.match_typing_qualified_name(&qualified_name, "Callable")
+        })
+    {
         return None;
     }
 
@@ -174,6 +183,7 @@ fn extract_types(annotation: &Expr, semantic: &SemanticModel) -> Option<(Vec<Exp
     Some((params, return_type))
 }
 
+/// Generate a function definition from a `lambda` expression.
 fn function(
     name: &str,
     parameters: Option<&Parameters>,
@@ -186,13 +196,11 @@ fn function(
         value: Some(Box::new(body.clone())),
         range: TextRange::default(),
     });
-    let parameters = parameters
-        .cloned()
-        .unwrap_or_else(|| Parameters::empty(TextRange::default()));
+    let parameters = parameters.cloned().unwrap_or_default();
     if let Some(annotation) = annotation {
         if let Some((arg_types, return_type)) = extract_types(annotation, semantic) {
-            // A `lambda` expression can only have positional and positional-only
-            // arguments. The order is always positional-only first, then positional.
+            // A `lambda` expression can only have positional-only and positional-or-keyword
+            // arguments. The order is always positional-only first, then positional-or-keyword.
             let new_posonlyargs = parameters
                 .posonlyargs
                 .iter()

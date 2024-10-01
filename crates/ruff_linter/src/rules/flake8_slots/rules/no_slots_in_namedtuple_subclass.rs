@@ -1,17 +1,16 @@
-use ruff_python_ast as ast;
-use ruff_python_ast::{Arguments, Expr, StmtClassDef};
+use std::fmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::Stmt;
+use ruff_python_ast::{self as ast, identifier::Identifier, Arguments, Expr, Stmt, StmtClassDef};
+use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_slots::rules::helpers::has_slots;
 
 /// ## What it does
-/// Checks for subclasses of `collections.namedtuple` that lack a `__slots__`
-/// definition.
+/// Checks for subclasses of `collections.namedtuple` or `typing.NamedTuple`
+/// that lack a `__slots__` definition.
 ///
 /// ## Why is this bad?
 /// In Python, the `__slots__` attribute allows you to explicitly define the
@@ -48,12 +47,28 @@ use crate::rules::flake8_slots::rules::helpers::has_slots;
 /// ## References
 /// - [Python documentation: `__slots__`](https://docs.python.org/3/reference/datamodel.html#slots)
 #[violation]
-pub struct NoSlotsInNamedtupleSubclass;
+pub struct NoSlotsInNamedtupleSubclass(NamedTupleKind);
 
 impl Violation for NoSlotsInNamedtupleSubclass {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Subclasses of `collections.namedtuple()` should define `__slots__`")
+        let NoSlotsInNamedtupleSubclass(namedtuple_kind) = self;
+        format!("Subclasses of {namedtuple_kind} should define `__slots__`")
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+enum NamedTupleKind {
+    Collections,
+    Typing,
+}
+
+impl fmt::Display for NamedTupleKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Collections => "`collections.namedtuple()`",
+            Self::Typing => "call-based `typing.NamedTuple()`",
+        })
     }
 }
 
@@ -67,20 +82,35 @@ pub(crate) fn no_slots_in_namedtuple_subclass(
         return;
     };
 
-    if bases.iter().any(|base| {
-        let Expr::Call(ast::ExprCall { func, .. }) = base else {
-            return false;
-        };
-        checker
-            .semantic()
-            .resolve_call_path(func)
-            .is_some_and(|call_path| matches!(call_path.as_slice(), ["collections", "namedtuple"]))
-    }) {
+    if let Some(namedtuple_kind) = namedtuple_base(bases, checker.semantic()) {
         if !has_slots(&class.body) {
             checker.diagnostics.push(Diagnostic::new(
-                NoSlotsInNamedtupleSubclass,
+                NoSlotsInNamedtupleSubclass(namedtuple_kind),
                 stmt.identifier(),
             ));
         }
     }
+}
+
+/// If the class's bases consist solely of named tuples, return the kind of named tuple
+/// (either `collections.namedtuple()`, or `typing.NamedTuple()`). Otherwise, return `None`.
+fn namedtuple_base(bases: &[Expr], semantic: &SemanticModel) -> Option<NamedTupleKind> {
+    let mut kind = None;
+    for base in bases {
+        if let Expr::Call(ast::ExprCall { func, .. }) = base {
+            // Ex) `collections.namedtuple()`
+            let qualified_name = semantic.resolve_qualified_name(func)?;
+            match qualified_name.segments() {
+                ["collections", "namedtuple"] => kind = kind.or(Some(NamedTupleKind::Collections)),
+                ["typing", "NamedTuple"] => kind = kind.or(Some(NamedTupleKind::Typing)),
+                // Ex) `enum.Enum`
+                _ => return None,
+            }
+        } else if !semantic.match_builtin_expr(base, "object") {
+            // Allow inheriting from `object`.
+
+            return None;
+        }
+    }
+    kind
 }

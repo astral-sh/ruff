@@ -30,7 +30,7 @@ use ruff_text_size::Ranged;
 /// ```
 ///
 /// ## Options
-/// - `flake8-import-conventions.banned-from`
+/// - `lint.flake8-import-conventions.banned-from`
 #[violation]
 pub struct BannedImportFrom {
     name: String,

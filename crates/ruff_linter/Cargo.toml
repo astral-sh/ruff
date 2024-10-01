@@ -1,6 +1,6 @@
 [package]
 name = "ruff_linter"
-version = "0.1.14"
+version = "0.6.8"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -13,21 +13,20 @@ license = { workspace = true }
 [lib]
 
 [dependencies]
-ruff_cache = { path = "../ruff_cache" }
-ruff_diagnostics = { path = "../ruff_diagnostics", features = ["serde"] }
-ruff_index = { path = "../ruff_index" }
-ruff_notebook = { path = "../ruff_notebook" }
-ruff_macros = { path = "../ruff_macros" }
-ruff_python_ast = { path = "../ruff_python_ast", features = ["serde"] }
-ruff_python_codegen = { path = "../ruff_python_codegen" }
-ruff_python_index = { path = "../ruff_python_index" }
-ruff_python_literal = { path = "../ruff_python_literal" }
-ruff_python_semantic = { path = "../ruff_python_semantic" }
-ruff_python_stdlib = { path = "../ruff_python_stdlib" }
-ruff_python_trivia = { path = "../ruff_python_trivia" }
-ruff_python_parser = { path = "../ruff_python_parser" }
-ruff_source_file = { path = "../ruff_source_file", features = ["serde"] }
-ruff_text_size = { path = "../ruff_text_size" }
+ruff_cache = { workspace = true }
+ruff_diagnostics = { workspace = true, features = ["serde"] }
+ruff_notebook = { workspace = true }
+ruff_macros = { workspace = true }
+ruff_python_ast = { workspace = true, features = ["serde", "cache"] }
+ruff_python_codegen = { workspace = true }
+ruff_python_index = { workspace = true }
+ruff_python_literal = { workspace = true }
+ruff_python_semantic = { workspace = true }
+ruff_python_stdlib = { workspace = true }
+ruff_python_trivia = { workspace = true }
+ruff_python_parser = { workspace = true }
+ruff_source_file = { workspace = true, features = ["serde"] }
+ruff_text_size = { workspace = true }
 
 aho-corasick = { workspace = true }
 annotate-snippets = { workspace = true, features = ["color"] }
@@ -57,10 +56,8 @@ pep440_rs = { workspace = true, features = ["serde"] }
 pyproject-toml = { workspace = true }
 quick-junit = { workspace = true }
 regex = { workspace = true }
-result-like = { workspace = true }
 rustc-hash = { workspace = true }
 schemars = { workspace = true, optional = true }
-semver = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 similar = { workspace = true }
@@ -72,19 +69,20 @@ toml = { workspace = true }
 typed-arena = { workspace = true }
 unicode-width = { workspace = true }
 unicode_names2 = { workspace = true }
+unicode-normalization = { workspace = true }
 url = { workspace = true }
 
 [dev-dependencies]
-insta = { workspace = true }
-pretty_assertions = { workspace = true }
+insta = { workspace = true, features = ["filters", "json", "redactions"] }
 test-case = { workspace = true }
 # Disable colored output in tests
 colored = { workspace = true, features = ["no-color"] }
-tempfile = { workspace = true }
 
 [features]
 default = []
-schemars = ["dep:schemars"]
+schemars = ["dep:schemars", "ruff_python_ast/schemars"]
+# Enables rules for internal integration tests
+test-rules = []
 
 [lints]
 workspace = true

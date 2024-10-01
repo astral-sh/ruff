@@ -4,10 +4,8 @@ use anyhow::{anyhow, Result};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr, PySourceType};
-use ruff_python_parser::{lexer, AsMode};
-use ruff_python_semantic::SemanticModel;
-use ruff_source_file::Locator;
+use ruff_python_ast::{self as ast, Expr};
+use ruff_python_parser::{TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -63,26 +61,34 @@ impl AlwaysFixableViolation for RedundantOpenModes {
 
 /// UP015
 pub(crate) fn redundant_open_modes(checker: &mut Checker, call: &ast::ExprCall) {
-    if !is_open_builtin(call.func.as_ref(), checker.semantic()) {
+    if !checker
+        .semantic()
+        .resolve_qualified_name(&call.func)
+        .is_some_and(|qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                ["" | "builtins" | "aiofiles", "open"]
+            )
+        })
+    {
         return;
     }
 
     match call.arguments.find_argument("mode", 1) {
         None => {
             if !call.arguments.is_empty() {
-                if let Some(keyword) = call.arguments.find_keyword(MODE_KEYWORD_ARGUMENT) {
+                if let Some(keyword) = call.arguments.find_keyword("mode") {
                     if let Expr::StringLiteral(ast::ExprStringLiteral {
                         value: mode_param_value,
                         ..
                     }) = &keyword.value
                     {
                         if let Ok(mode) = OpenMode::from_str(mode_param_value.to_str()) {
-                            checker.diagnostics.push(create_check(
+                            checker.diagnostics.push(create_diagnostic(
                                 call,
                                 &keyword.value,
                                 mode.replacement_value(),
-                                checker.locator(),
-                                checker.source_type,
+                                checker.tokens(),
                             ));
                         }
                     }
@@ -92,28 +98,16 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, call: &ast::ExprCall) 
         Some(mode_param) => {
             if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &mode_param {
                 if let Ok(mode) = OpenMode::from_str(value.to_str()) {
-                    checker.diagnostics.push(create_check(
+                    checker.diagnostics.push(create_diagnostic(
                         call,
                         mode_param,
                         mode.replacement_value(),
-                        checker.locator(),
-                        checker.source_type,
+                        checker.tokens(),
                     ));
                 }
             }
         }
     }
-}
-
-const OPEN_FUNC_NAME: &str = "open";
-const MODE_KEYWORD_ARGUMENT: &str = "mode";
-
-/// Returns `true` if the given `call` is a call to the `open` builtin.
-fn is_open_builtin(func: &Expr, semantic: &SemanticModel) -> bool {
-    let Some(ast::ExprName { id, .. }) = func.as_name_expr() else {
-        return false;
-    };
-    id.as_str() == OPEN_FUNC_NAME && semantic.is_builtin(id)
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -158,18 +152,17 @@ impl OpenMode {
     }
 }
 
-fn create_check<T: Ranged>(
-    expr: &T,
+fn create_diagnostic(
+    call: &ast::ExprCall,
     mode_param: &Expr,
     replacement_value: Option<&str>,
-    locator: &Locator,
-    source_type: PySourceType,
+    tokens: &Tokens,
 ) -> Diagnostic {
     let mut diagnostic = Diagnostic::new(
         RedundantOpenModes {
             replacement: replacement_value.map(ToString::to_string),
         },
-        expr.range(),
+        call.range(),
     );
 
     if let Some(content) = replacement_value {
@@ -178,52 +171,53 @@ fn create_check<T: Ranged>(
             mode_param.range(),
         )));
     } else {
-        diagnostic.try_set_fix(|| {
-            create_remove_param_fix(locator, expr, mode_param, source_type).map(Fix::safe_edit)
-        });
+        diagnostic
+            .try_set_fix(|| create_remove_param_fix(call, mode_param, tokens).map(Fix::safe_edit));
     }
 
     diagnostic
 }
 
-fn create_remove_param_fix<T: Ranged>(
-    locator: &Locator,
-    expr: &T,
+fn create_remove_param_fix(
+    call: &ast::ExprCall,
     mode_param: &Expr,
-    source_type: PySourceType,
+    tokens: &Tokens,
 ) -> Result<Edit> {
-    let content = locator.slice(expr);
     // Find the last comma before mode_param and create a deletion fix
     // starting from the comma and ending after mode_param.
     let mut fix_start: Option<TextSize> = None;
     let mut fix_end: Option<TextSize> = None;
     let mut is_first_arg: bool = false;
     let mut delete_first_arg: bool = false;
-    for (tok, range) in lexer::lex_starts_at(content, source_type.as_mode(), expr.start()).flatten()
-    {
-        if range.start() == mode_param.start() {
+
+    for token in tokens.in_range(call.range()) {
+        if token.start() == mode_param.start() {
             if is_first_arg {
                 delete_first_arg = true;
                 continue;
             }
-            fix_end = Some(range.end());
+            fix_end = Some(token.end());
             break;
         }
-        if delete_first_arg && tok.is_name() {
-            fix_end = Some(range.start());
-            break;
-        }
-        if tok.is_lpar() {
-            is_first_arg = true;
-            fix_start = Some(range.end());
-        }
-        if tok.is_comma() {
-            is_first_arg = false;
-            if !delete_first_arg {
-                fix_start = Some(range.start());
+        match token.kind() {
+            TokenKind::Name if delete_first_arg => {
+                fix_end = Some(token.start());
+                break;
             }
+            TokenKind::Lpar => {
+                is_first_arg = true;
+                fix_start = Some(token.end());
+            }
+            TokenKind::Comma => {
+                is_first_arg = false;
+                if !delete_first_arg {
+                    fix_start = Some(token.start());
+                }
+            }
+            _ => {}
         }
     }
+
     match (fix_start, fix_end) {
         (Some(start), Some(end)) => Ok(Edit::deletion(start, end)),
         _ => Err(anyhow::anyhow!(

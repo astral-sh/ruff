@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_python_parser/src/string.rs
-expression: parse_ast
+expression: suite
 ---
 [
     Expr(
@@ -21,7 +21,7 @@ expression: parse_ast
                                                 expression: Name(
                                                     ExprName {
                                                         range: 3..6,
-                                                        id: "foo",
+                                                        id: Name("foo"),
                                                         ctx: Load,
                                                     },
                                                 ),
@@ -42,7 +42,11 @@ expression: parse_ast
                                                                                     StringLiteral {
                                                                                         range: 8..10,
                                                                                         value: "",
-                                                                                        unicode: false,
+                                                                                        flags: StringLiteralFlags {
+                                                                                            quote_style: Single,
+                                                                                            prefix: Empty,
+                                                                                            triple_quoted: false,
+                                                                                        },
                                                                                     },
                                                                                 ),
                                                                             },
@@ -59,6 +63,11 @@ expression: parse_ast
                                             },
                                         ),
                                     ],
+                                    flags: FStringFlags {
+                                        quote_style: Double,
+                                        prefix: Regular,
+                                        triple_quoted: false,
+                                    },
                                 },
                             ),
                         ),

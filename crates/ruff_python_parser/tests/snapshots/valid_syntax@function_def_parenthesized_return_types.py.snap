@@ -1,0 +1,122 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/function_def_parenthesized_return_types.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..54,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 0..24,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 4..7,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 7..9,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: Some(
+                        Tuple(
+                            ExprTuple {
+                                range: 13..19,
+                                elts: [
+                                    Name(
+                                        ExprName {
+                                            range: 14..17,
+                                            id: Name("int"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                ctx: Load,
+                                parenthesized: true,
+                            },
+                        ),
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 21..24,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 21..24,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 25..53,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 29..32,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 32..34,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: Some(
+                        Tuple(
+                            ExprTuple {
+                                range: 38..48,
+                                elts: [
+                                    Name(
+                                        ExprName {
+                                            range: 39..42,
+                                            id: Name("int"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            range: 44..47,
+                                            id: Name("str"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                ctx: Load,
+                                parenthesized: true,
+                            },
+                        ),
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 50..53,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 50..53,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```

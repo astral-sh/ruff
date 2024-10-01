@@ -166,4 +166,20 @@ PT014.py:44:11: PT014 [*] Duplicate of test case at index 0 in `@pytest_mark.par
 46 45 | )
 47 46 | def test_error_parentheses_trailing_comma(x):
 
+PT014.py:56:53: PT014 [*] Duplicate of test case at index 0 in `@pytest_mark.parametrize`
+   |
+56 | @pytest.mark.parametrize('data, spec', [(1.0, 1.0), (1.0, 1.0)])
+   |                                                     ^^^^^^^^^^ PT014
+57 | def test_numbers(data, spec):
+58 |     ...
+   |
+   = help: Remove duplicate test case
 
+ℹ Unsafe fix
+53 53 |     ...
+54 54 | 
+55 55 | 
+56    |-@pytest.mark.parametrize('data, spec', [(1.0, 1.0), (1.0, 1.0)])
+   56 |+@pytest.mark.parametrize('data, spec', [(1.0, 1.0)])
+57 57 | def test_numbers(data, spec):
+58 58 |     ...

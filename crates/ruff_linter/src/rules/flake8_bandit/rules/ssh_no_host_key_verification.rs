@@ -11,7 +11,7 @@ use crate::checkers::ast::Checker;
 /// Checks for uses of policies disabling SSH verification in Paramiko.
 ///
 /// ## Why is this bad?
-/// By default, Paramiko checks the identity of remote host when establishing
+/// By default, Paramiko checks the identity of the remote host when establishing
 /// an SSH connection. Disabling the verification might lead to the client
 /// connecting to a malicious host, without the client knowing.
 ///
@@ -60,10 +60,10 @@ pub(crate) fn ssh_no_host_key_verification(checker: &mut Checker, call: &ExprCal
     // Detect either, e.g., `paramiko.client.AutoAddPolicy` or `paramiko.client.AutoAddPolicy()`.
     if !checker
         .semantic()
-        .resolve_call_path(map_callable(policy_argument))
-        .is_some_and(|call_path| {
+        .resolve_qualified_name(map_callable(policy_argument))
+        .is_some_and(|qualified_name| {
             matches!(
-                call_path.as_slice(),
+                qualified_name.segments(),
                 ["paramiko", "client", "AutoAddPolicy" | "WarningPolicy"]
                     | ["paramiko", "AutoAddPolicy" | "WarningPolicy"]
             )
@@ -72,9 +72,9 @@ pub(crate) fn ssh_no_host_key_verification(checker: &mut Checker, call: &ExprCal
         return;
     }
 
-    if typing::resolve_assignment(value, checker.semantic()).is_some_and(|call_path| {
+    if typing::resolve_assignment(value, checker.semantic()).is_some_and(|qualified_name| {
         matches!(
-            call_path.as_slice(),
+            qualified_name.segments(),
             ["paramiko", "client", "SSHClient"] | ["paramiko", "SSHClient"]
         )
     }) {

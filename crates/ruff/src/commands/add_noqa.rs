@@ -10,19 +10,21 @@ use ruff_linter::linter::add_noqa_to_path;
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
-use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig, ResolvedFile};
+use ruff_workspace::resolver::{
+    match_exclusion, python_files_in_path, PyprojectConfig, ResolvedFile,
+};
 
-use crate::args::CliOverrides;
+use crate::args::ConfigArguments;
 
 /// Add `noqa` directives to a collection of files.
 pub(crate) fn add_noqa(
     files: &[PathBuf],
     pyproject_config: &PyprojectConfig,
-    overrides: &CliOverrides,
+    config_arguments: &ConfigArguments,
 ) -> Result<usize> {
     // Collect all the files to check.
     let start = Instant::now();
-    let (paths, resolver) = python_files_in_path(files, pyproject_config, overrides)?;
+    let (paths, resolver) = python_files_in_path(files, pyproject_config, config_arguments)?;
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
@@ -57,6 +59,15 @@ pub(crate) fn add_noqa(
                 .and_then(|parent| package_roots.get(parent))
                 .and_then(|package| *package);
             let settings = resolver.resolve(path);
+            if (settings.file_resolver.force_exclude || !resolved_file.is_root())
+                && match_exclusion(
+                    resolved_file.path(),
+                    resolved_file.file_name(),
+                    &settings.linter.exclude,
+                )
+            {
+                return None;
+            }
             let source_kind = match SourceKind::from_path(path, source_type) {
                 Ok(Some(source_kind)) => source_kind,
                 Ok(None) => return None,

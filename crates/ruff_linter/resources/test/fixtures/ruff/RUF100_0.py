@@ -26,10 +26,10 @@ def f() -> None:
 
     # fmt: off
     # Invalid - no space before #
-    d = 1# noqa: E501
+    d = 1  # noqa: E501
 
     # Invalid - many spaces before #
-    d = 1                       # noqa: E501
+    d = 1  # noqa: E501
     # fmt: on
 
 
@@ -100,3 +100,32 @@ def f():
 
     Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
     """  # noqa
+
+
+def f():
+    # Invalid - nonexistent error code with multibyte character
+    d = 1  # noqa: F841, E50
+    e = 1  # noqa: E50
+
+
+def f():
+    # Disabled - check redirects are reported correctly
+    eval(command)  # noqa: PGH001
+
+
+# Check duplicate code detection
+def f():
+    x = 2  # noqa: F841, F841, X200
+
+    y = 2 == bar  # noqa: SIM300, F841, SIM300, SIM300
+
+    z = 2  # noqa: F841 F841  F841, F841, F841
+
+    return
+
+
+# Allow code redirects
+x = eval(command)  # noqa: PGH001, S307
+x = eval(command)  # noqa: S307, PGH001, S307, S307, S307
+x = eval(command)  # noqa: PGH001, S307, PGH001
+x = eval(command)  # noqa: PGH001, S307, PGH001, S307

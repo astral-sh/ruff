@@ -1,0 +1,82 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/if/missing_test_expr_1.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..64,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 53..57,
+                    value: If(
+                        ExprIf {
+                            range: 53..57,
+                            test: Name(
+                                ExprName {
+                                    range: 57..57,
+                                    id: Name(""),
+                                    ctx: Invalid,
+                                },
+                            ),
+                            body: Name(
+                                ExprName {
+                                    range: 53..54,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            orelse: Name(
+                                ExprName {
+                                    range: 57..57,
+                                    id: Name(""),
+                                    ctx: Invalid,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 59..64,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 59..64,
+                            left: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 59..60,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                            op: Add,
+                            right: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 63..64,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # Missing test expression, followed by an expression
+2 | x if
+  |     ^ Syntax Error: Expected an expression
+3 | 
+4 | 1 + 1
+  |

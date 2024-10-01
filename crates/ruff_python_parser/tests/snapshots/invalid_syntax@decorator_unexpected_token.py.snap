@@ -1,0 +1,85 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/decorator_unexpected_token.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..34,
+        body: [
+            With(
+                StmtWith {
+                    range: 5..22,
+                    is_async: true,
+                    items: [
+                        WithItem {
+                            range: 16..17,
+                            context_expr: Name(
+                                ExprName {
+                                    range: 16..17,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                    ],
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 19..22,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 19..22,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 28..33,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 28..29,
+                                id: Name("x"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 32..33,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | @foo
+2 | async with x: ...
+  | ^^^^^ Syntax Error: Expected class, function definition or async function definition after decorator
+3 | @foo
+4 | x = 1
+  |
+
+
+  |
+2 | async with x: ...
+3 | @foo
+4 | x = 1
+  | ^ Syntax Error: Expected class, function definition or async function definition after decorator
+  |

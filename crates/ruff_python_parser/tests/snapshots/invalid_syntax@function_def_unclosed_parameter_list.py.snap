@@ -1,0 +1,233 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/function_def_unclosed_parameter_list.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..74,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 0..18,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 4..7,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 7..18,
+                        posonlyargs: [],
+                        args: [
+                            ParameterWithDefault {
+                                range: 8..14,
+                                parameter: Parameter {
+                                    range: 8..14,
+                                    name: Identifier {
+                                        id: Name("a"),
+                                        range: 8..9,
+                                    },
+                                    annotation: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 11..14,
+                                                id: Name("int"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 16..18,
+                                parameter: Parameter {
+                                    range: 16..18,
+                                    name: Identifier {
+                                        id: Name("b"),
+                                        range: 16..17,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 19..43,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 23..26,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 26..28,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Return(
+                            StmtReturn {
+                                range: 34..43,
+                                value: Some(
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 41..43,
+                                            value: Int(
+                                                42,
+                                            ),
+                                        },
+                                    ),
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 44..74,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 48..51,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 51..74,
+                        posonlyargs: [],
+                        args: [
+                            ParameterWithDefault {
+                                range: 52..58,
+                                parameter: Parameter {
+                                    range: 52..58,
+                                    name: Identifier {
+                                        id: Name("a"),
+                                        range: 52..53,
+                                    },
+                                    annotation: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 55..58,
+                                                id: Name("int"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 60..66,
+                                parameter: Parameter {
+                                    range: 60..66,
+                                    name: Identifier {
+                                        id: Name("b"),
+                                        range: 60..61,
+                                    },
+                                    annotation: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 63..66,
+                                                id: Name("str"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 67..73,
+                                parameter: Parameter {
+                                    range: 67..68,
+                                    name: Identifier {
+                                        id: Name("x"),
+                                        range: 67..68,
+                                    },
+                                    annotation: None,
+                                },
+                                default: Some(
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 71..73,
+                                            value: Int(
+                                                10,
+                                            ),
+                                        },
+                                    ),
+                                ),
+                            },
+                        ],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | def foo(a: int, b:
+2 | def foo():
+  | ^^^ Syntax Error: Expected an expression
+3 |     return 42
+4 | def foo(a: int, b: str
+  |
+
+
+  |
+1 | def foo(a: int, b:
+  |                   ^ Syntax Error: Expected ')', found newline
+2 | def foo():
+3 |     return 42
+4 | def foo(a: int, b: str
+  |
+
+
+  |
+1 | def foo(a: int, b:
+2 | def foo():
+  | ^^^ Syntax Error: Expected an indented block after function definition
+3 |     return 42
+4 | def foo(a: int, b: str
+  |
+
+
+  |
+3 |     return 42
+4 | def foo(a: int, b: str
+5 | x = 10
+  | ^ Syntax Error: Expected ',', found name
+  |
+
+
+  |
+4 | def foo(a: int, b: str
+5 | x = 10
+  |

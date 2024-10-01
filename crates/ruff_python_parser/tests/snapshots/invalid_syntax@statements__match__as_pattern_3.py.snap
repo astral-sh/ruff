@@ -1,0 +1,154 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/statements/match/as_pattern_3.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..136,
+        body: [
+            Match(
+                StmtMatch {
+                    range: 0..120,
+                    subject: Name(
+                        ExprName {
+                            range: 6..13,
+                            id: Name("subject"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 103..120,
+                            pattern: MatchClass(
+                                PatternMatchClass {
+                                    range: 108..117,
+                                    cls: Dict(
+                                        ExprDict {
+                                            range: 108..109,
+                                            items: [],
+                                        },
+                                    ),
+                                    arguments: PatternArguments {
+                                        range: 109..117,
+                                        patterns: [
+                                            MatchAs(
+                                                PatternMatchAs {
+                                                    range: 110..116,
+                                                    pattern: Some(
+                                                        MatchAs(
+                                                            PatternMatchAs {
+                                                                range: 110..111,
+                                                                pattern: None,
+                                                                name: Some(
+                                                                    Identifier {
+                                                                        id: Name("x"),
+                                                                        range: 110..111,
+                                                                    },
+                                                                ),
+                                                            },
+                                                        ),
+                                                    ),
+                                                    name: Some(
+                                                        Identifier {
+                                                            id: Name("y"),
+                                                            range: 115..116,
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                        keywords: [],
+                                    },
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 119..120,
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 119..120,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+            Pass(
+                StmtPass {
+                    range: 131..135,
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+2 |     #     Not in the mapping start token set, so the list parsing bails
+3 |     #     v
+4 |     case {(x as y): 1}:
+  |           ^ Syntax Error: Expected '}', found '('
+5 |         pass
+  |
+
+
+  |
+2 |     #     Not in the mapping start token set, so the list parsing bails
+3 |     #     v
+4 |     case {(x as y): 1}:
+  |          ^ Syntax Error: Invalid value for a class pattern
+5 |         pass
+  |
+
+
+  |
+2 |     #     Not in the mapping start token set, so the list parsing bails
+3 |     #     v
+4 |     case {(x as y): 1}:
+  |                      ^ Syntax Error: Expected newline, found '}'
+5 |         pass
+  |
+
+
+  |
+2 |     #     Not in the mapping start token set, so the list parsing bails
+3 |     #     v
+4 |     case {(x as y): 1}:
+  |                       ^ Syntax Error: Expected a statement
+5 |         pass
+  |
+
+
+  |
+2 |     #     Not in the mapping start token set, so the list parsing bails
+3 |     #     v
+4 |     case {(x as y): 1}:
+  |                        ^ Syntax Error: Expected a statement
+5 |         pass
+  |
+
+
+  |
+3 |     #     v
+4 |     case {(x as y): 1}:
+5 |         pass
+  | ^^^^^^^^ Syntax Error: Unexpected indentation
+  |
+
+
+  |
+4 |     case {(x as y): 1}:
+5 |         pass
+  |

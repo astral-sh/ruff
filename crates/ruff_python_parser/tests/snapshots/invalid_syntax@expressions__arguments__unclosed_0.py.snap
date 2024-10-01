@@ -1,0 +1,74 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/arguments/unclosed_0.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..26,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..5,
+                    value: Call(
+                        ExprCall {
+                            range: 0..5,
+                            func: Name(
+                                ExprName {
+                                    range: 0..4,
+                                    id: Name("call"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 4..5,
+                                args: [],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 7..26,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 11..14,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 14..16,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 22..26,
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | call(
+  |      ^ Syntax Error: Expected ')', found newline
+2 | 
+3 | def foo():
+4 |     pass
+  |

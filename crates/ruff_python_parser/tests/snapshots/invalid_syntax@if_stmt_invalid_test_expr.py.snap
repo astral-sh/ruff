@@ -1,0 +1,132 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/if_stmt_invalid_test_expr.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..48,
+        body: [
+            If(
+                StmtIf {
+                    range: 0..10,
+                    test: Starred(
+                        ExprStarred {
+                            range: 3..5,
+                            value: Name(
+                                ExprName {
+                                    range: 4..5,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 7..10,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 7..10,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [],
+                },
+            ),
+            If(
+                StmtIf {
+                    range: 11..26,
+                    test: Yield(
+                        ExprYield {
+                            range: 14..21,
+                            value: Some(
+                                Name(
+                                    ExprName {
+                                        range: 20..21,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ),
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 23..26,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 23..26,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [],
+                },
+            ),
+            If(
+                StmtIf {
+                    range: 27..47,
+                    test: YieldFrom(
+                        ExprYieldFrom {
+                            range: 30..42,
+                            value: Name(
+                                ExprName {
+                                    range: 41..42,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 44..47,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 44..47,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | if *x: ...
+  |    ^^ Syntax Error: Starred expression cannot be used here
+2 | if yield x: ...
+3 | if yield from x: ...
+  |
+
+
+  |
+1 | if *x: ...
+2 | if yield x: ...
+  |    ^^^^^^^ Syntax Error: Yield expression cannot be used here
+3 | if yield from x: ...
+  |
+
+
+  |
+1 | if *x: ...
+2 | if yield x: ...
+3 | if yield from x: ...
+  |    ^^^^^^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |

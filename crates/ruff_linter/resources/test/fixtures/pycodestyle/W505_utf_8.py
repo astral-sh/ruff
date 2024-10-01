@@ -10,7 +10,7 @@ def f1():
     # Here's a standalone comment that's over theß9💣2ℝ.
 
     x = 2
-    # Another standalone that is preceded by a newline and indent toke and is over theß9💣2ℝ.
+    # Another standalone that is preceded by a newline and indent token and is over theß9💣2ℝ.
 
     print("Here's a string that's over theß9💣2ℝ, but it's not a ß9💣2ℝing.")
 

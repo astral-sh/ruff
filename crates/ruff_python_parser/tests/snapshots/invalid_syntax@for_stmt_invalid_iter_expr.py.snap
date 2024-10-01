@@ -1,0 +1,183 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/for_stmt_invalid_iter_expr.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..71,
+        body: [
+            For(
+                StmtFor {
+                    range: 0..22,
+                    is_async: false,
+                    target: Name(
+                        ExprName {
+                            range: 4..5,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    iter: Starred(
+                        ExprStarred {
+                            range: 9..17,
+                            value: BoolOp(
+                                ExprBoolOp {
+                                    range: 10..17,
+                                    op: And,
+                                    values: [
+                                        Name(
+                                            ExprName {
+                                                range: 10..11,
+                                                id: Name("a"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        Name(
+                                            ExprName {
+                                                range: 16..17,
+                                                id: Name("b"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 19..22,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 19..22,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+            For(
+                StmtFor {
+                    range: 23..44,
+                    is_async: false,
+                    target: Name(
+                        ExprName {
+                            range: 27..28,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    iter: Yield(
+                        ExprYield {
+                            range: 32..39,
+                            value: Some(
+                                Name(
+                                    ExprName {
+                                        range: 38..39,
+                                        id: Name("a"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ),
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 41..44,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 41..44,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+            For(
+                StmtFor {
+                    range: 45..60,
+                    is_async: false,
+                    target: Name(
+                        ExprName {
+                            range: 49..55,
+                            id: Name("target"),
+                            ctx: Store,
+                        },
+                    ),
+                    iter: Name(
+                        ExprName {
+                            range: 59..60,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                    body: [],
+                    orelse: [],
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 64..70,
+                    target: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 64..65,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                    annotation: EllipsisLiteral(
+                        ExprEllipsisLiteral {
+                            range: 67..70,
+                        },
+                    ),
+                    value: None,
+                    simple: false,
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | for x in *a and b: ...
+  |           ^^^^^^^ Syntax Error: Boolean expression cannot be used here
+2 | for x in yield a: ...
+3 | for target in x := 1: ...
+  |
+
+
+  |
+1 | for x in *a and b: ...
+2 | for x in yield a: ...
+  |          ^^^^^^^ Syntax Error: Yield expression cannot be used here
+3 | for target in x := 1: ...
+  |
+
+
+  |
+1 | for x in *a and b: ...
+2 | for x in yield a: ...
+3 | for target in x := 1: ...
+  |                 ^^ Syntax Error: Expected ':', found ':='
+  |
+
+
+  |
+1 | for x in *a and b: ...
+2 | for x in yield a: ...
+3 | for target in x := 1: ...
+  |                    ^ Syntax Error: Invalid annotated assignment target
+  |

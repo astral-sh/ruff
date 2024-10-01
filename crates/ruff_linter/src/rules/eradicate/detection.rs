@@ -1,14 +1,16 @@
 /// See: [eradicate.py](https://github.com/myint/eradicate/blob/98f199940979c94447a461d50d27862b118b282d/eradicate.py)
 use aho_corasick::AhoCorasick;
+use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::{Regex, RegexSet};
 
-use ruff_python_parser::parse_suite;
+use ruff_python_parser::parse_module;
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
+use ruff_text_size::TextSize;
 
 static CODE_INDICATORS: Lazy<AhoCorasick> = Lazy::new(|| {
     AhoCorasick::new([
-        "(", ")", "[", "]", "{", "}", ":", "=", "%", "print", "return", "break", "continue",
-        "import",
+        "(", ")", "[", "]", "{", "}", ":", "=", "%", "return", "break", "continue", "import",
     ])
     .unwrap()
 });
@@ -24,7 +26,7 @@ static HASH_NUMBER: Lazy<Regex> = Lazy::new(|| Regex::new(r"#\d").unwrap());
 static POSITIVE_CASES: Lazy<RegexSet> = Lazy::new(|| {
     RegexSet::new([
         // Keywords
-        r"^(?:elif\s+.*\s*:|else\s*:|try\s*:|finally\s*:|except\s+.*\s*:)$",
+        r"^(?:elif\s+.*\s*:.*|else\s*:.*|try\s*:.*|finally\s*:.*|except.*:.*|case\s+.*\s*:.*)$",
         // Partial dictionary
         r#"^['"]\w+['"]\s*:.+[,{]\s*(#.*)?$"#,
         // Multiline assignment
@@ -41,6 +43,14 @@ pub(crate) fn comment_contains_code(line: &str, task_tags: &[String]) -> bool {
 
     // Fast path: if none of the indicators are present, the line is not code.
     if !CODE_INDICATORS.is_match(line) {
+        return false;
+    }
+
+    // Fast path: if the comment contains consecutive identifiers, we know it won't parse.
+    let tokenizer = SimpleTokenizer::starts_at(TextSize::default(), line).skip_trivia();
+    if tokenizer.tuple_windows().any(|(first, second)| {
+        first.kind == SimpleTokenKind::Name && second.kind == SimpleTokenKind::Name
+    }) {
         return false;
     }
 
@@ -74,7 +84,7 @@ pub(crate) fn comment_contains_code(line: &str, task_tags: &[String]) -> bool {
     }
 
     // Finally, compile the source code.
-    parse_suite(line).is_ok()
+    parse_module(line).is_ok()
 }
 
 #[cfg(test)]
@@ -123,9 +133,10 @@ mod tests {
 
     #[test]
     fn comment_contains_code_with_print() {
-        assert!(comment_contains_code("#print", &[]));
         assert!(comment_contains_code("#print(1)", &[]));
 
+        assert!(!comment_contains_code("#print", &[]));
+        assert!(!comment_contains_code("#print 1", &[]));
         assert!(!comment_contains_code("#to print", &[]));
     }
 
@@ -137,6 +148,27 @@ mod tests {
     }
 
     #[test]
+    fn comment_contains_code_single_line() {
+        assert!(comment_contains_code("# case 1: print()", &[]));
+        assert!(comment_contains_code("# try: get(1, 2, 3)", &[]));
+        assert!(comment_contains_code("# else: print()", &[]));
+        assert!(comment_contains_code("# elif x == 10: print()", &[]));
+        assert!(comment_contains_code(
+            "# except Exception as e: print(e)",
+            &[]
+        ));
+        assert!(comment_contains_code("# except: print()", &[]));
+        assert!(comment_contains_code("# finally: close_handle()", &[]));
+
+        assert!(!comment_contains_code("# try: use cache", &[]));
+        assert!(!comment_contains_code("# else: we should return", &[]));
+        assert!(!comment_contains_code(
+            "# call function except: without cache",
+            &[]
+        ));
+    }
+
+    #[test]
     fn comment_contains_code_with_multiline() {
         assert!(comment_contains_code("#else:", &[]));
         assert!(comment_contains_code("#  else  :  ", &[]));
@@ -144,11 +176,15 @@ mod tests {
         assert!(comment_contains_code("#elif True:", &[]));
         assert!(comment_contains_code("#x = foo(", &[]));
         assert!(comment_contains_code("#except Exception:", &[]));
+        assert!(comment_contains_code("# case 1:", &[]));
+        assert!(comment_contains_code("#case 1:", &[]));
+        assert!(comment_contains_code("# try:", &[]));
 
         assert!(!comment_contains_code("# this is = to that :(", &[]));
         assert!(!comment_contains_code("#else", &[]));
         assert!(!comment_contains_code("#or else:", &[]));
         assert!(!comment_contains_code("#else True:", &[]));
+        assert!(!comment_contains_code("# in that case:", &[]));
 
         // Unpacking assignments
         assert!(comment_contains_code(

@@ -1,8 +1,8 @@
 [project]
 name = "scripts"
 version = "0.0.1"
-dependencies = ["sphinx"]
-requires-python = ">=3.8"
+dependencies = ["stdlibs"]
+requires-python = ">=3.11"
 
 [tool.black]
 line-length = 88
@@ -11,17 +11,25 @@ line-length = 88
 line-length = 88
 
 [tool.ruff.lint]
-select = ["ALL"]
+select = [
+  "E",   # pycodestyle (error)
+  "F",   # pyflakes
+  "B",   # bugbear
+  "B9",
+  "C4",  # flake8-comprehensions
+  "SIM", # flake8-simplify
+  "I",   # isort
+  "UP",  # pyupgrade
+  "PIE", # flake8-pie
+  "PGH", # pygrep-hooks
+  "PYI", # flake8-pyi
+  "RUF",
+]
+
 ignore = [
-  "C901",  # McCabe complexity
-  "D",     # pydocstyle
-  "PL",    # pylint
-  "S",     # bandit
-  "G",     # flake8-logging
-  "T",     # flake8-print
-  "FBT",   # flake8-boolean-trap
-  "PERF",  # perflint
-  "ANN401",
+  # only relevant if you run a script with `python -0`,
+  # which seems unlikely for any of the scripts in this directory
+  "B011"
 ]
 
 [tool.ruff.lint.isort]

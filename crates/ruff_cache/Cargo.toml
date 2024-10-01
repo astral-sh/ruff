@@ -11,15 +11,15 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-itertools = { workspace = true }
 glob = { workspace = true }
 globset = { workspace = true }
+itertools = { workspace = true }
 regex = { workspace = true }
 filetime = { workspace = true }
 seahash = { workspace = true }
 
 [dev-dependencies]
-ruff_macros = { path = "../ruff_macros" }
+ruff_macros = { workspace = true }
 
 [lints]
 workspace = true

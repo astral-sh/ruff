@@ -6,7 +6,7 @@ use ruff_formatter::{
 };
 use ruff_python_ast as ast;
 use ruff_python_ast::parenthesize::parentheses_iterator;
-use ruff_python_ast::visitor::preorder::{walk_expr, PreorderVisitor};
+use ruff_python_ast::visitor::source_order::{walk_expr, SourceOrderVisitor};
 use ruff_python_ast::{AnyNodeRef, Expr, ExpressionRef, Operator};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
@@ -14,16 +14,15 @@ use ruff_text_size::Ranged;
 use crate::builders::parenthesize_if_expands;
 use crate::comments::{leading_comments, trailing_comments, LeadingDanglingTrailingComments};
 use crate::context::{NodeLevel, WithNodeLevel};
-use crate::expression::expr_generator_exp::is_generator_parenthesized;
 use crate::expression::parentheses::{
-    is_expression_parenthesized, optional_parentheses, parenthesized, HuggingStyle,
-    NeedsParentheses, OptionalParentheses, Parentheses, Parenthesize,
+    is_expression_parenthesized, optional_parentheses, parenthesized, NeedsParentheses,
+    OptionalParentheses, Parentheses, Parenthesize,
 };
 use crate::prelude::*;
 use crate::preview::{
-    is_hug_parens_with_braces_and_square_brackets_enabled, is_multiline_string_handling_enabled,
+    is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled,
+    is_hug_parens_with_braces_and_square_brackets_enabled,
 };
-use crate::string::AnyString;
 
 mod binary_like;
 pub(crate) mod expr_attribute;
@@ -38,14 +37,14 @@ pub(crate) mod expr_dict;
 pub(crate) mod expr_dict_comp;
 pub(crate) mod expr_ellipsis_literal;
 pub(crate) mod expr_f_string;
-pub(crate) mod expr_generator_exp;
-pub(crate) mod expr_if_exp;
+pub(crate) mod expr_generator;
+pub(crate) mod expr_if;
 pub(crate) mod expr_ipy_escape_command;
 pub(crate) mod expr_lambda;
 pub(crate) mod expr_list;
 pub(crate) mod expr_list_comp;
 pub(crate) mod expr_name;
-pub(crate) mod expr_named_expr;
+pub(crate) mod expr_named;
 pub(crate) mod expr_none_literal;
 pub(crate) mod expr_number_literal;
 pub(crate) mod expr_set;
@@ -81,17 +80,17 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
 
         let format_expr = format_with(|f| match expression {
             Expr::BoolOp(expr) => expr.format().fmt(f),
-            Expr::NamedExpr(expr) => expr.format().fmt(f),
+            Expr::Named(expr) => expr.format().fmt(f),
             Expr::BinOp(expr) => expr.format().fmt(f),
             Expr::UnaryOp(expr) => expr.format().fmt(f),
             Expr::Lambda(expr) => expr.format().fmt(f),
-            Expr::IfExp(expr) => expr.format().fmt(f),
+            Expr::If(expr) => expr.format().fmt(f),
             Expr::Dict(expr) => expr.format().fmt(f),
             Expr::Set(expr) => expr.format().fmt(f),
             Expr::ListComp(expr) => expr.format().fmt(f),
             Expr::SetComp(expr) => expr.format().fmt(f),
             Expr::DictComp(expr) => expr.format().fmt(f),
-            Expr::GeneratorExp(expr) => expr.format().fmt(f),
+            Expr::Generator(expr) => expr.format().fmt(f),
             Expr::Await(expr) => expr.format().fmt(f),
             Expr::Yield(expr) => expr.format().fmt(f),
             Expr::YieldFrom(expr) => expr.format().fmt(f),
@@ -269,17 +268,17 @@ fn format_with_parentheses_comments(
 
     let fmt_fields = format_with(|f| match expression {
         Expr::BoolOp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::NamedExpr(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::Named(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::BinOp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::UnaryOp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::Lambda(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::IfExp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::If(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::Dict(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::Set(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::ListComp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::SetComp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::DictComp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::GeneratorExp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::Generator(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::Await(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::Yield(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::YieldFrom(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
@@ -307,33 +306,28 @@ fn format_with_parentheses_comments(
     // Custom FormatNodeRule::fmt variant that only formats the inner comments
     let format_node_rule_fmt = format_with(|f| {
         // No need to handle suppression comments, those are statement only
-        leading_comments(leading_inner).fmt(f)?;
-
-        let is_source_map_enabled = f.options().source_map_generation().is_enabled();
-
-        if is_source_map_enabled {
-            source_position(expression.start()).fmt(f)?;
-        }
-
-        fmt_fields.fmt(f)?;
-
-        if is_source_map_enabled {
-            source_position(expression.end()).fmt(f)?;
-        }
-
-        trailing_comments(trailing_inner).fmt(f)
+        write!(
+            f,
+            [
+                leading_comments(leading_inner),
+                fmt_fields,
+                trailing_comments(trailing_inner)
+            ]
+        )
     });
 
     // The actual parenthesized formatting
-    parenthesized("(", &format_node_rule_fmt, ")")
-        .with_dangling_comments(parentheses_comment)
-        .fmt(f)?;
-    trailing_comments(trailing_outer).fmt(f)?;
-
-    Ok(())
+    write!(
+        f,
+        [
+            parenthesized("(", &format_node_rule_fmt, ")")
+                .with_dangling_comments(parentheses_comment),
+            trailing_comments(trailing_outer)
+        ]
+    )
 }
 
-/// Wraps an expression in an optional parentheses except if its [`NeedsParentheses::needs_parentheses`] implementation
+/// Wraps an expression in optional parentheses except if its [`NeedsParentheses::needs_parentheses`] implementation
 /// indicates that it is okay to omit the parentheses. For example, parentheses can always be omitted for lists,
 /// because they already bring their own parentheses.
 pub(crate) fn maybe_parenthesize_expression<'a, T>(
@@ -391,23 +385,38 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
             OptionalParentheses::Always => OptionalParentheses::Always,
             // The reason to add parentheses is to avoid a syntax error when breaking an expression over multiple lines.
             // Therefore, it is unnecessary to add an additional pair of parentheses if an outer expression
-            // is parenthesized.
-            _ if f.context().node_level().is_parenthesized() => OptionalParentheses::Never,
+            // is parenthesized. Unless, it's the `Parenthesize::IfBreaksParenthesizedNested` layout
+            // where parenthesizing nested `maybe_parenthesized_expression` is explicitly desired.
+            _ if f.context().node_level().is_parenthesized() => {
+                if !is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled(
+                    f.context(),
+                ) {
+                    OptionalParentheses::Never
+                } else if matches!(parenthesize, Parenthesize::IfBreaksParenthesizedNested) {
+                    return parenthesize_if_expands(
+                        &expression.format().with_options(Parentheses::Never),
+                    )
+                    .with_indent(!is_expression_huggable(expression, f.context()))
+                    .fmt(f);
+                } else {
+                    return expression.format().with_options(Parentheses::Never).fmt(f);
+                }
+            }
             needs_parentheses => needs_parentheses,
         };
 
         match needs_parentheses {
             OptionalParentheses::Multiline => match parenthesize {
-                Parenthesize::IfBreaksOrIfRequired => {
+
+                Parenthesize::IfBreaksParenthesized | Parenthesize::IfBreaksParenthesizedNested if !is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled(f.context()) => {
                     parenthesize_if_expands(&expression.format().with_options(Parentheses::Never))
                         .fmt(f)
                 }
-
                 Parenthesize::IfRequired => {
                     expression.format().with_options(Parentheses::Never).fmt(f)
                 }
 
-                Parenthesize::Optional | Parenthesize::IfBreaks => {
+                Parenthesize::Optional | Parenthesize::IfBreaks | Parenthesize::IfBreaksParenthesized | Parenthesize::IfBreaksParenthesizedNested => {
                     if can_omit_optional_parentheses(expression, f.context()) {
                         optional_parentheses(&expression.format().with_options(Parentheses::Never))
                             .fmt(f)
@@ -420,7 +429,7 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                 }
             },
             OptionalParentheses::BestFit => match parenthesize {
-                Parenthesize::IfBreaksOrIfRequired => {
+                Parenthesize::IfBreaksParenthesized | Parenthesize::IfBreaksParenthesizedNested => {
                     parenthesize_if_expands(&expression.format().with_options(Parentheses::Never))
                         .fmt(f)
                 }
@@ -444,13 +453,13 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                 }
             },
             OptionalParentheses::Never => match parenthesize {
-                Parenthesize::IfBreaksOrIfRequired => {
+                Parenthesize::IfBreaksParenthesized |  Parenthesize::IfBreaksParenthesizedNested if !is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled(f.context()) => {
                     parenthesize_if_expands(&expression.format().with_options(Parentheses::Never))
-                        .with_indent(is_expression_huggable(expression, f.context()).is_none())
+                        .with_indent(!is_expression_huggable(expression, f.context()))
                         .fmt(f)
                 }
 
-                Parenthesize::Optional | Parenthesize::IfBreaks | Parenthesize::IfRequired => {
+                Parenthesize::Optional | Parenthesize::IfBreaks | Parenthesize::IfRequired | Parenthesize::IfBreaksParenthesized |  Parenthesize::IfBreaksParenthesizedNested => {
                     expression.format().with_options(Parentheses::Never).fmt(f)
                 }
             },
@@ -470,17 +479,17 @@ impl NeedsParentheses for Expr {
     ) -> OptionalParentheses {
         match self {
             Expr::BoolOp(expr) => expr.needs_parentheses(parent, context),
-            Expr::NamedExpr(expr) => expr.needs_parentheses(parent, context),
+            Expr::Named(expr) => expr.needs_parentheses(parent, context),
             Expr::BinOp(expr) => expr.needs_parentheses(parent, context),
             Expr::UnaryOp(expr) => expr.needs_parentheses(parent, context),
             Expr::Lambda(expr) => expr.needs_parentheses(parent, context),
-            Expr::IfExp(expr) => expr.needs_parentheses(parent, context),
+            Expr::If(expr) => expr.needs_parentheses(parent, context),
             Expr::Dict(expr) => expr.needs_parentheses(parent, context),
             Expr::Set(expr) => expr.needs_parentheses(parent, context),
             Expr::ListComp(expr) => expr.needs_parentheses(parent, context),
             Expr::SetComp(expr) => expr.needs_parentheses(parent, context),
             Expr::DictComp(expr) => expr.needs_parentheses(parent, context),
-            Expr::GeneratorExp(expr) => expr.needs_parentheses(parent, context),
+            Expr::Generator(expr) => expr.needs_parentheses(parent, context),
             Expr::Await(expr) => expr.needs_parentheses(parent, context),
             Expr::Yield(expr) => expr.needs_parentheses(parent, context),
             Expr::YieldFrom(expr) => expr.needs_parentheses(parent, context),
@@ -669,15 +678,16 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 return;
             }
 
-            Expr::Tuple(tuple) if tuple.is_parenthesized(self.context.source()) => {
+            Expr::Tuple(ast::ExprTuple {
+                parenthesized: true,
+                ..
+            }) => {
                 self.any_parenthesized_expressions = true;
                 // The values are always parenthesized, don't visit.
                 return;
             }
 
-            Expr::GeneratorExp(generator)
-                if is_generator_parenthesized(generator, self.context.source()) =>
-            {
+            Expr::Generator(generator) if generator.parenthesized => {
                 self.any_parenthesized_expressions = true;
                 // The values are always parenthesized, don't visit.
                 return;
@@ -701,7 +711,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 range: _,
             }) => self.update_max_precedence(OperatorPrecedence::from(*op)),
 
-            Expr::IfExp(_) => {
+            Expr::If(_) => {
                 // + 1 for the if and one for the else
                 self.update_max_precedence_with_count(OperatorPrecedence::Conditional, 2);
             }
@@ -771,7 +781,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             }
 
             // Non terminal nodes that don't have a termination token.
-            Expr::NamedExpr(_) | Expr::GeneratorExp(_) | Expr::Tuple(_) => {}
+            Expr::Named(_) | Expr::Generator(_) | Expr::Tuple(_) => {}
 
             // Expressions with sub expressions but a preceding token
             // Mark this expression as first expression and not the sub expression.
@@ -814,7 +824,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
     }
 }
 
-impl<'input> PreorderVisitor<'input> for CanOmitOptionalParenthesesVisitor<'input> {
+impl<'input> SourceOrderVisitor<'input> for CanOmitOptionalParenthesesVisitor<'input> {
     fn visit_expr(&mut self, expr: &'input Expr) {
         self.last = Some(expr);
 
@@ -1043,11 +1053,7 @@ pub(crate) fn has_own_parentheses(
             Some(OwnParentheses::NonEmpty)
         }
 
-        Expr::GeneratorExp(generator)
-            if is_generator_parenthesized(generator, context.source()) =>
-        {
-            Some(OwnParentheses::NonEmpty)
-        }
+        Expr::Generator(generator) if generator.parenthesized => Some(OwnParentheses::NonEmpty),
 
         // These expressions must contain _some_ child or trivia token in order to be non-empty.
         Expr::List(ast::ExprList { elts, .. }) | Expr::Set(ast::ExprSet { elts, .. }) => {
@@ -1058,16 +1064,21 @@ pub(crate) fn has_own_parentheses(
             }
         }
 
-        Expr::Tuple(tuple) if tuple.is_parenthesized(context.source()) => {
-            if !tuple.elts.is_empty() || context.comments().has_dangling(AnyNodeRef::from(expr)) {
+        Expr::Tuple(
+            tuple @ ast::ExprTuple {
+                parenthesized: true,
+                ..
+            },
+        ) => {
+            if !tuple.is_empty() || context.comments().has_dangling(AnyNodeRef::from(expr)) {
                 Some(OwnParentheses::NonEmpty)
             } else {
                 Some(OwnParentheses::Empty)
             }
         }
 
-        Expr::Dict(ast::ExprDict { keys, .. }) => {
-            if !keys.is_empty() || context.comments().has_dangling(AnyNodeRef::from(expr)) {
+        Expr::Dict(ast::ExprDict { items, .. }) => {
+            if !items.is_empty() || context.comments().has_dangling(AnyNodeRef::from(expr)) {
                 Some(OwnParentheses::NonEmpty)
             } else {
                 Some(OwnParentheses::Empty)
@@ -1112,10 +1123,7 @@ pub(crate) fn has_own_parentheses(
 ///     ]
 /// )
 /// ```
-pub(crate) fn is_expression_huggable(
-    expr: &Expr,
-    context: &PyFormatContext,
-) -> Option<HuggingStyle> {
+pub(crate) fn is_expression_huggable(expr: &Expr, context: &PyFormatContext) -> bool {
     match expr {
         Expr::Tuple(_)
         | Expr::List(_)
@@ -1123,22 +1131,17 @@ pub(crate) fn is_expression_huggable(
         | Expr::Dict(_)
         | Expr::ListComp(_)
         | Expr::SetComp(_)
-        | Expr::DictComp(_) => is_hug_parens_with_braces_and_square_brackets_enabled(context)
-            .then_some(HuggingStyle::Always),
+        | Expr::DictComp(_) => is_hug_parens_with_braces_and_square_brackets_enabled(context),
 
         Expr::Starred(ast::ExprStarred { value, .. }) => is_expression_huggable(value, context),
 
-        Expr::StringLiteral(string) => is_huggable_string(AnyString::String(string), context),
-        Expr::BytesLiteral(bytes) => is_huggable_string(AnyString::Bytes(bytes), context),
-        Expr::FString(fstring) => is_huggable_string(AnyString::FString(fstring), context),
-
         Expr::BoolOp(_)
-        | Expr::NamedExpr(_)
+        | Expr::Named(_)
         | Expr::BinOp(_)
         | Expr::UnaryOp(_)
         | Expr::Lambda(_)
-        | Expr::IfExp(_)
-        | Expr::GeneratorExp(_)
+        | Expr::If(_)
+        | Expr::Generator(_)
         | Expr::Await(_)
         | Expr::Yield(_)
         | Expr::YieldFrom(_)
@@ -1152,20 +1155,10 @@ pub(crate) fn is_expression_huggable(
         | Expr::NumberLiteral(_)
         | Expr::BooleanLiteral(_)
         | Expr::NoneLiteral(_)
-        | Expr::EllipsisLiteral(_) => None,
-    }
-}
-
-/// Returns `true` if `string` is a multiline string that is not implicitly concatenated.
-fn is_huggable_string(string: AnyString, context: &PyFormatContext) -> Option<HuggingStyle> {
-    if !is_multiline_string_handling_enabled(context) {
-        return None;
-    }
-
-    if !string.is_implicit_concatenated() && string.is_multiline(context.source()) {
-        Some(HuggingStyle::IfFirstLineFits)
-    } else {
-        None
+        | Expr::StringLiteral(_)
+        | Expr::BytesLiteral(_)
+        | Expr::FString(_)
+        | Expr::EllipsisLiteral(_) => false,
     }
 }
 
@@ -1218,7 +1211,7 @@ impl From<Operator> for OperatorPrecedence {
 pub(crate) fn is_splittable_expression(expr: &Expr, context: &PyFormatContext) -> bool {
     match expr {
         // Single token expressions. They never have any split points.
-        Expr::NamedExpr(_)
+        Expr::Named(_)
         | Expr::Name(_)
         | Expr::NumberLiteral(_)
         | Expr::BooleanLiteral(_)
@@ -1231,8 +1224,8 @@ pub(crate) fn is_splittable_expression(expr: &Expr, context: &PyFormatContext) -
         Expr::Compare(_)
         | Expr::BinOp(_)
         | Expr::BoolOp(_)
-        | Expr::IfExp(_)
-        | Expr::GeneratorExp(_)
+        | Expr::If(_)
+        | Expr::Generator(_)
         | Expr::Subscript(_)
         | Expr::Await(_)
         | Expr::ListComp(_)
@@ -1241,10 +1234,10 @@ pub(crate) fn is_splittable_expression(expr: &Expr, context: &PyFormatContext) -
         | Expr::YieldFrom(_) => true,
 
         // Sequence types can split if they contain at least one element.
-        Expr::Tuple(tuple) => !tuple.elts.is_empty(),
-        Expr::Dict(dict) => !dict.values.is_empty(),
-        Expr::Set(set) => !set.elts.is_empty(),
-        Expr::List(list) => !list.elts.is_empty(),
+        Expr::Tuple(tuple) => !tuple.is_empty(),
+        Expr::Dict(dict) => !dict.is_empty(),
+        Expr::Set(set) => !set.is_empty(),
+        Expr::List(list) => !list.is_empty(),
 
         Expr::UnaryOp(unary) => is_splittable_expression(unary.operand.as_ref(), context),
         Expr::Yield(ast::ExprYield { value, .. }) => value.is_some(),

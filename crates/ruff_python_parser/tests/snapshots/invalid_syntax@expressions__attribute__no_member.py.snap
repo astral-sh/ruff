@@ -1,0 +1,88 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/attribute/no_member.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..141,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 87..93,
+                    value: Attribute(
+                        ExprAttribute {
+                            range: 87..93,
+                            value: Name(
+                                ExprName {
+                                    range: 87..92,
+                                    id: Name("first"),
+                                    ctx: Load,
+                                },
+                            ),
+                            attr: Identifier {
+                                id: Name(""),
+                                range: 93..93,
+                            },
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 94..100,
+                    value: Name(
+                        ExprName {
+                            range: 94..100,
+                            id: Name("second"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 136..141,
+                    value: Attribute(
+                        ExprAttribute {
+                            range: 136..141,
+                            value: Name(
+                                ExprName {
+                                    range: 136..140,
+                                    id: Name("last"),
+                                    ctx: Load,
+                                },
+                            ),
+                            attr: Identifier {
+                                id: Name(""),
+                                range: 141..141,
+                            },
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # The `second` is a variable on another line and not part of the attribute expression.
+2 | first.
+  |       ^ Syntax Error: Expected an identifier
+3 | second
+4 | 
+5 | # No member access after the dot.
+  |
+
+
+  |
+5 | # No member access after the dot.
+6 | last.
+  |       Syntax Error: Expected an identifier
+  |

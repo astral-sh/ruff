@@ -1,0 +1,87 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/type_alias_incomplete_stmt.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..21,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..4,
+                    value: Name(
+                        ExprName {
+                            range: 0..4,
+                            id: Name("type"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 5..9,
+                    value: Name(
+                        ExprName {
+                            range: 5..9,
+                            id: Name("type"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 10..11,
+                    value: Name(
+                        ExprName {
+                            range: 10..11,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 12..20,
+                    name: Name(
+                        ExprName {
+                            range: 17..18,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: None,
+                    value: Name(
+                        ExprName {
+                            range: 20..20,
+                            id: Name(""),
+                            ctx: Invalid,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | type
+2 | type x
+  |      ^ Syntax Error: Simple statements must be separated by newlines or semicolons
+3 | type x =
+  |
+
+
+  |
+1 | type
+2 | type x
+3 | type x =
+  |         ^ Syntax Error: Expected an expression
+  |

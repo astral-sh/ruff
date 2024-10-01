@@ -2,65 +2,97 @@
 source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_source(source)
 ---
+## Tokens
+```
 [
     (
         FStringStart,
         0..2,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         FStringEnd,
         2..3,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
-        String {
-            value: "",
-            kind: String,
-            triple_quoted: false,
-        },
+        String(
+            "",
+        ),
         4..6,
+        TokenFlags(
+            DOUBLE_QUOTES,
+        ),
     ),
     (
         FStringStart,
         7..9,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         FStringEnd,
         9..10,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         FStringStart,
         11..13,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         FStringEnd,
         13..14,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
-        String {
-            value: "",
-            kind: String,
-            triple_quoted: false,
-        },
+        String(
+            "",
+        ),
         15..17,
     ),
     (
         FStringStart,
         18..22,
+        TokenFlags(
+            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING,
+        ),
     ),
     (
         FStringEnd,
         22..25,
+        TokenFlags(
+            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING,
+        ),
     ),
     (
         FStringStart,
         26..30,
+        TokenFlags(
+            TRIPLE_QUOTED_STRING | F_STRING,
+        ),
     ),
     (
         FStringEnd,
         30..33,
+        TokenFlags(
+            TRIPLE_QUOTED_STRING | F_STRING,
+        ),
     ),
     (
         Newline,
         33..33,
     ),
 ]
+```

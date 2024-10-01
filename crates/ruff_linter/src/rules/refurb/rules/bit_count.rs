@@ -74,7 +74,7 @@ pub(crate) fn bit_count(checker: &mut Checker, call: &ExprCall) {
     if !call.arguments.keywords.is_empty() {
         return;
     };
-    let [arg] = call.arguments.args.as_slice() else {
+    let [arg] = &*call.arguments.args else {
         return;
     };
 
@@ -97,21 +97,17 @@ pub(crate) fn bit_count(checker: &mut Checker, call: &ExprCall) {
         return;
     };
 
-    // Ensure that we're performing a `bin(...)`.
-    if !checker
-        .semantic()
-        .resolve_call_path(func)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["" | "builtins", "bin"]))
-    {
-        return;
-    }
-
     if !arguments.keywords.is_empty() {
         return;
     };
-    let [arg] = arguments.args.as_slice() else {
+    let [arg] = &*arguments.args else {
         return;
     };
+
+    // Ensure that we're performing a `bin(...)`.
+    if !checker.semantic().match_builtin_expr(func, "bin") {
+        return;
+    }
 
     // Extract, e.g., `x` in `bin(x)`.
     let literal_text = checker.locator().slice(arg);
@@ -136,8 +132,8 @@ pub(crate) fn bit_count(checker: &mut Checker, call: &ExprCall) {
         | Expr::UnaryOp(_)
         | Expr::BinOp(_)
         | Expr::BoolOp(_)
-        | Expr::IfExp(_)
-        | Expr::NamedExpr(_)
+        | Expr::If(_)
+        | Expr::Named(_)
         | Expr::Lambda(_)
         | Expr::Slice(_)
         | Expr::Yield(_)
@@ -146,7 +142,7 @@ pub(crate) fn bit_count(checker: &mut Checker, call: &ExprCall) {
         | Expr::List(_)
         | Expr::Compare(_)
         | Expr::Tuple(_)
-        | Expr::GeneratorExp(_)
+        | Expr::Generator(_)
         | Expr::IpyEscapeCommand(_) => true,
 
         Expr::Call(_)

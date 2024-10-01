@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -14,15 +14,15 @@ use crate::fix::edits::{remove_argument, Parentheses};
 /// be omitted from the list of base classes.
 ///
 /// ## Example
+///
 /// ```python
-/// class Foo(object):
-///     ...
+/// class Foo(object): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// class Foo:
-///     ...
+/// class Foo: ...
 /// ```
 ///
 /// ## References
@@ -50,14 +50,8 @@ pub(crate) fn useless_object_inheritance(checker: &mut Checker, class_def: &ast:
         return;
     };
 
-    for base in &arguments.args {
-        let Expr::Name(ast::ExprName { id, .. }) = base else {
-            continue;
-        };
-        if id != "object" {
-            continue;
-        }
-        if !checker.semantic().is_builtin("object") {
+    for base in &*arguments.args {
+        if !checker.semantic().match_builtin_expr(base, "object") {
             continue;
         }
 

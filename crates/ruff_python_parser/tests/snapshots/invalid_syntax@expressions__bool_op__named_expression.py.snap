@@ -1,0 +1,107 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/bool_op/named_expression.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..24,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..7,
+                    value: BoolOp(
+                        ExprBoolOp {
+                            range: 0..7,
+                            op: And,
+                            values: [
+                                Name(
+                                    ExprName {
+                                        range: 0..1,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 6..7,
+                                        id: Name("a"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 11..12,
+                    value: Name(
+                        ExprName {
+                            range: 11..12,
+                            id: Name("b"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 13..19,
+                    value: BoolOp(
+                        ExprBoolOp {
+                            range: 13..19,
+                            op: Or,
+                            values: [
+                                Name(
+                                    ExprName {
+                                        range: 13..14,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 18..19,
+                                        id: Name("a"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 23..24,
+                    value: Name(
+                        ExprName {
+                            range: 23..24,
+                            id: Name("b"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | x and a := b
+  |         ^^ Syntax Error: Expected a statement
+2 | x or a := b
+  |
+
+
+  |
+1 | x and a := b
+2 | x or a := b
+  |        ^^ Syntax Error: Expected a statement
+  |

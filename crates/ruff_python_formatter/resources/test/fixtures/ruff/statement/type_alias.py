@@ -1,11 +1,15 @@
 # basic usage
-
 type X = int
 type X = int | str
 type X = int | "ForwardRefY"
 type X[T] = T | list[X[T]]  # recursive
 type X[T] = int
 type X[T] = list[T] | set[T]
+type X[T=int]=int
+type X[T:int=int]=int
+type X[**P=int]=int
+type X[*Ts=int]=int
+type X[*Ts=*int]=int
 type X[T, *Ts, **P] = (T, Ts, P)
 type X[T: int, *Ts, **P] = (T, Ts, P)
 type X[T: (int, str), *Ts, **P] = (T, Ts, P)
@@ -49,6 +53,18 @@ type X \
     [T] = T
 type X[T] \
     = T
+type X[T
+    ] = T
+
+# bounds and defaults with multiline definitions
+type X[T
+    :int ] = int
+type X[T:
+    int] = int
+type X[T
+       = int] = int
+type X[T=
+    int] = int
 
 # type leading comment
 type X = ( # trailing open paren comment
@@ -94,3 +110,43 @@ type bounds_single_line[T: (aaaaaaaaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbb, cccc
 type bounds_arguments_on_their_own_line[T: (aaaaaaaaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbb, ccccccccccc, ddddddddddddd, eeeeeee)] = T
 type bounds_argument_per_line[T: (aaaaaaaaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbb, ccccccccccccccccc, ddddddddddddd, eeeeeeeeeeeeeeee, ffffffffffff)] = T
 type bounds_trailing_comma[T: (a, b,)] = T
+
+# bounds plus comments
+type comment_before_colon[T # comment
+    : int] = T
+type comment_after_colon[T: # comment
+                         int] = T
+type comment_on_its_own_line[T
+    # comment
+    :
+    # another comment
+    int
+    # why not another
+    ] = T
+
+# type variable defaults
+type defaults_single_line[T= (aaaaaaaaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbb, ccccccccccccccccc)] = T
+type defaults_on_their_own_line[T= (aaaaaaaaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbb, ccccccccccc, ddddddddddddd, eeeeeee)] = T
+type defaults_one_per_line[T= (aaaaaaaaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbb, ccccccccccccccccc, ddddddddddddd, eeeeeeeeeeeeeeee, ffffffffffff)] = T
+type defaults_trailing_comma[T= (a, b,)] = T
+
+# defaults plus comments
+type comment_before_colon[T # comment
+    = int] = T
+type comment_after_colon[T    = # comment
+                         int] = T
+type comment_on_its_own_line[T
+    # comment
+    =
+    # another comment
+    int
+    # why not another
+    ] = T
+type after_star[*Ts = *
+    # comment
+    int] = int
+
+# both bounds and defaults
+type bound_and_default[T:int=int] = int
+type long_bound_short_default[T: (aaaaaaaaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbb, ccccccccccc, ddddddddddddd, eeeeeee)=a]=int
+type short_bound_long_default[T:a= (aaaaaaaaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbb, ccccccccccc, ddddddddddddd, eeeeeee)]=int

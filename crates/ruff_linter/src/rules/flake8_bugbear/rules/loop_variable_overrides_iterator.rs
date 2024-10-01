@@ -79,11 +79,8 @@ struct NameFinder<'a> {
     names: FxHashMap<&'a str, &'a Expr>,
 }
 
-impl<'a, 'b> Visitor<'b> for NameFinder<'a>
-where
-    'b: 'a,
-{
-    fn visit_expr(&mut self, expr: &'b Expr) {
+impl<'a> Visitor<'a> for NameFinder<'a> {
+    fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
             Expr::Name(ast::ExprName { id, .. }) => {
                 self.names.insert(id, expr);
@@ -91,7 +88,7 @@ where
             Expr::ListComp(ast::ExprListComp { generators, .. })
             | Expr::DictComp(ast::ExprDictComp { generators, .. })
             | Expr::SetComp(ast::ExprSetComp { generators, .. })
-            | Expr::GeneratorExp(ast::ExprGeneratorExp { generators, .. }) => {
+            | Expr::Generator(ast::ExprGenerator { generators, .. }) => {
                 for comp in generators {
                     self.visit_expr(&comp.iter);
                 }
@@ -108,11 +105,7 @@ where
                         parameter,
                         default: _,
                         range: _,
-                    } in parameters
-                        .posonlyargs
-                        .iter()
-                        .chain(&parameters.args)
-                        .chain(&parameters.kwonlyargs)
+                    } in parameters.iter_non_variadic_params()
                     {
                         self.names.remove(parameter.name.as_str());
                     }

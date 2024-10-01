@@ -1,0 +1,45 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/dotted_name_normalized_spaces.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..32,
+        body: [
+            Import(
+                StmtImport {
+                    range: 0..12,
+                    names: [
+                        Alias {
+                            range: 7..12,
+                            name: Identifier {
+                                id: Name("a.b.c"),
+                                range: 7..12,
+                            },
+                            asname: None,
+                        },
+                    ],
+                },
+            ),
+            Import(
+                StmtImport {
+                    range: 13..31,
+                    names: [
+                        Alias {
+                            range: 20..31,
+                            name: Identifier {
+                                id: Name("a.b.c"),
+                                range: 20..31,
+                            },
+                            asname: None,
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```

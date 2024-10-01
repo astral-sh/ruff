@@ -1,0 +1,62 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/if_stmt_empty_body.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..15,
+        body: [
+            If(
+                StmtIf {
+                    range: 0..8,
+                    test: BooleanLiteral(
+                        ExprBooleanLiteral {
+                            range: 3..7,
+                            value: true,
+                        },
+                    ),
+                    body: [],
+                    elif_else_clauses: [],
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 9..14,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 9..14,
+                            left: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 9..10,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                            op: Add,
+                            right: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 13..14,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | if True:
+2 | 1 + 1
+  | ^ Syntax Error: Expected an indented block after `if` statement
+  |

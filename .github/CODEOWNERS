@@ -5,5 +5,17 @@
 # - The '*' pattern is global owners.
 # - Order is important. The last matching pattern has the most precedence.
 
-# Jupyter
-/crates/ruff_linter/src/jupyter/ @dhruvmanila
+/crates/ruff_notebook/ @dhruvmanila
+/crates/ruff_formatter/ @MichaReiser
+/crates/ruff_python_formatter/ @MichaReiser
+/crates/ruff_python_parser/ @MichaReiser @dhruvmanila
+
+# flake8-pyi
+/crates/ruff_linter/src/rules/flake8_pyi/ @AlexWaygood
+
+# Script for fuzzing the parser
+/scripts/fuzz-parser/ @AlexWaygood
+
+# red-knot
+/crates/red_knot* @carljm @MichaReiser @AlexWaygood
+/crates/ruff_db/ @carljm @MichaReiser @AlexWaygood

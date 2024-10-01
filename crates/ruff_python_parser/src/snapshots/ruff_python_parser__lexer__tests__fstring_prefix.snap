@@ -2,89 +2,152 @@
 source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_source(source)
 ---
+## Tokens
+```
 [
     (
         FStringStart,
         0..2,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         FStringEnd,
         2..3,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         FStringStart,
         4..6,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         FStringEnd,
         6..7,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         FStringStart,
         8..11,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE,
+        ),
     ),
     (
         FStringEnd,
         11..12,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE,
+        ),
     ),
     (
         FStringStart,
         13..16,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE,
+        ),
     ),
     (
         FStringEnd,
         16..17,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE,
+        ),
     ),
     (
         FStringStart,
         18..21,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING | RAW_STRING_UPPERCASE,
+        ),
     ),
     (
         FStringEnd,
         21..22,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING | RAW_STRING_UPPERCASE,
+        ),
     ),
     (
         FStringStart,
         23..26,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING | RAW_STRING_UPPERCASE,
+        ),
     ),
     (
         FStringEnd,
         26..27,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING | RAW_STRING_UPPERCASE,
+        ),
     ),
     (
         FStringStart,
         28..31,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE,
+        ),
     ),
     (
         FStringEnd,
         31..32,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE,
+        ),
     ),
     (
         FStringStart,
         33..36,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE,
+        ),
     ),
     (
         FStringEnd,
         36..37,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE,
+        ),
     ),
     (
         FStringStart,
         38..41,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING | RAW_STRING_UPPERCASE,
+        ),
     ),
     (
         FStringEnd,
         41..42,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING | RAW_STRING_UPPERCASE,
+        ),
     ),
     (
         FStringStart,
         43..46,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING | RAW_STRING_UPPERCASE,
+        ),
     ),
     (
         FStringEnd,
         46..47,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING | RAW_STRING_UPPERCASE,
+        ),
     ),
     (
         Newline,
         47..47,
     ),
 ]
+```

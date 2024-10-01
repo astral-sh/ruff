@@ -9,10 +9,10 @@ use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
 /// ## What it does
-/// Checks for negative comparison using `not {foo} in {bar}`.
+/// Checks for membership tests using `not {element} in {collection}`.
 ///
 /// ## Why is this bad?
-/// Negative comparison should be done using `not in`.
+/// Testing membership with `{element} not in {collection}` is more readable.
 ///
 /// ## Example
 /// ```python
@@ -42,10 +42,11 @@ impl AlwaysFixableViolation for NotInTest {
 }
 
 /// ## What it does
-/// Checks for negative comparison using `not {foo} is {bar}`.
+/// Checks for identity comparisons using `not {foo} is {bar}`.
 ///
 /// ## Why is this bad?
-/// Negative comparison should be done using `is not`.
+/// According to [PEP8], testing for an object's identity with `is not` is more
+/// readable.
 ///
 /// ## Example
 /// ```python
@@ -60,6 +61,8 @@ impl AlwaysFixableViolation for NotInTest {
 ///     pass
 /// Z = X.B is not Y
 /// ```
+///
+/// [PEP8]: https://peps.python.org/pep-0008/#programming-recommendations
 #[violation]
 pub struct NotIsTest;
 
@@ -90,7 +93,7 @@ pub(crate) fn not_tests(checker: &mut Checker, unary_op: &ast::ExprUnaryOp) {
         return;
     };
 
-    match ops.as_slice() {
+    match &**ops {
         [CmpOp::In] => {
             if checker.enabled(Rule::NotInTest) {
                 let mut diagnostic = Diagnostic::new(NotInTest, unary_op.operand.range());
@@ -101,7 +104,7 @@ pub(crate) fn not_tests(checker: &mut Checker, unary_op: &ast::ExprUnaryOp) {
                             &[CmpOp::NotIn],
                             comparators,
                             unary_op.into(),
-                            checker.indexer().comment_ranges(),
+                            checker.comment_ranges(),
                             checker.locator(),
                         ),
                         unary_op.range(),
@@ -122,7 +125,7 @@ pub(crate) fn not_tests(checker: &mut Checker, unary_op: &ast::ExprUnaryOp) {
                             &[CmpOp::IsNot],
                             comparators,
                             unary_op.into(),
-                            checker.indexer().comment_ranges(),
+                            checker.comment_ranges(),
                             checker.locator(),
                         ),
                         unary_op.range(),

@@ -6,16 +6,18 @@
 use std::error::Error;
 
 use anyhow::Result;
-use libcst_native::{ImportAlias, Name, NameOrAttribute};
-use ruff_python_ast::{self as ast, PySourceType, Stmt};
-use ruff_text_size::{Ranged, TextSize};
+use libcst_native::{ImportAlias, Name as cstName, NameOrAttribute};
 
 use ruff_diagnostics::Edit;
-use ruff_python_ast::imports::{AnyImport, Import, ImportFrom};
+use ruff_python_ast::{self as ast, ModModule, Stmt};
 use ruff_python_codegen::Stylist;
-use ruff_python_semantic::{ImportedName, SemanticModel};
+use ruff_python_parser::{Parsed, Tokens};
+use ruff_python_semantic::{
+    ImportedName, MemberNameImport, ModuleNameImport, NameImport, SemanticModel,
+};
 use ruff_python_trivia::textwrap::indent;
 use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextSize};
 
 use crate::cst::matchers::{match_aliases, match_import_from, match_statement};
 use crate::fix;
@@ -27,6 +29,8 @@ mod insertion;
 pub(crate) struct Importer<'a> {
     /// The Python AST to which we are adding imports.
     python_ast: &'a [Stmt],
+    /// The tokens representing the Python AST.
+    tokens: &'a Tokens,
     /// The [`Locator`] for the Python AST.
     locator: &'a Locator<'a>,
     /// The [`Stylist`] for the Python AST.
@@ -39,12 +43,13 @@ pub(crate) struct Importer<'a> {
 
 impl<'a> Importer<'a> {
     pub(crate) fn new(
-        python_ast: &'a [Stmt],
+        parsed: &'a Parsed<ModModule>,
         locator: &'a Locator<'a>,
         stylist: &'a Stylist<'a>,
     ) -> Self {
         Self {
-            python_ast,
+            python_ast: parsed.suite(),
+            tokens: parsed.tokens(),
             locator,
             stylist,
             runtime_imports: Vec::default(),
@@ -67,7 +72,7 @@ impl<'a> Importer<'a> {
     /// If there are no existing imports, the new import will be added at the top
     /// of the file. Otherwise, it will be added after the most recent top-level
     /// import statement.
-    pub(crate) fn add_import(&self, import: &AnyImport, at: TextSize) -> Edit {
+    pub(crate) fn add_import(&self, import: &NameImport, at: TextSize) -> Edit {
         let required_import = import.to_string();
         if let Some(stmt) = self.preceding_import(at) {
             // Insert after the last top-level import.
@@ -121,7 +126,6 @@ impl<'a> Importer<'a> {
         import: &ImportedMembers,
         at: TextSize,
         semantic: &SemanticModel,
-        source_type: PySourceType,
     ) -> Result<TypingImportEdit> {
         // Generate the modified import statement.
         let content = fix::codemods::retain_imports(
@@ -178,7 +182,7 @@ impl<'a> Importer<'a> {
         // Add the import to a `TYPE_CHECKING` block.
         let add_import_edit = if let Some(block) = self.preceding_type_checking_block(at) {
             // Add the import to the `TYPE_CHECKING` block.
-            self.add_to_type_checking_block(&content, block.start(), source_type)
+            self.add_to_type_checking_block(&content, block.start())
         } else {
             // Add the import to a new `TYPE_CHECKING` block.
             self.add_type_checking_block(
@@ -227,6 +231,31 @@ impl<'a> Importer<'a> {
     ) -> Result<(Edit, String), ResolutionError> {
         self.get_symbol(symbol, at, semantic)?
             .map_or_else(|| self.import_symbol(symbol, at, None, semantic), Ok)
+    }
+
+    /// For a given builtin symbol, determine whether an [`Edit`] is necessary to make the symbol
+    /// available in the current scope. For example, if `zip` has been overridden in the relevant
+    /// scope, the `builtins` module will need to be imported in order for a `Fix` to reference
+    /// `zip`; but otherwise, that won't be necessary.
+    ///
+    /// Returns a two-item tuple. The first item is either `Some(Edit)` (indicating) that an
+    /// edit is necessary to make the symbol available, or `None`, indicating that the symbol has
+    /// not been overridden in the current scope. The second item in the tuple is the bound name
+    /// of the symbol.
+    ///
+    /// Attempts to reuse existing imports when possible.
+    pub(crate) fn get_or_import_builtin_symbol(
+        &self,
+        symbol: &str,
+        at: TextSize,
+        semantic: &SemanticModel,
+    ) -> Result<(Option<Edit>, String), ResolutionError> {
+        if semantic.has_builtin_binding(symbol) {
+            return Ok((None, symbol.to_string()));
+        }
+        let (import_edit, binding) =
+            self.get_or_import_symbol(&ImportRequest::import("builtins", symbol), at, semantic)?;
+        Ok((Some(import_edit), binding))
     }
 
     /// Return the [`ImportedName`] to for existing symbol, if it's present in the given [`SemanticModel`].
@@ -331,8 +360,12 @@ impl<'a> Importer<'a> {
                     // Case 2a: No `functools` import is in scope; thus, we add `import functools`,
                     // and return `"functools.cache"` as the bound name.
                     if semantic.is_available(symbol.module) {
-                        let import_edit =
-                            self.add_import(&AnyImport::Import(Import::module(symbol.module)), at);
+                        let import_edit = self.add_import(
+                            &NameImport::Import(ModuleNameImport::module(
+                                symbol.module.to_string(),
+                            )),
+                            at,
+                        );
                         Ok((
                             import_edit,
                             format!(
@@ -350,9 +383,9 @@ impl<'a> Importer<'a> {
                     // `from functools import cache`, and return `"cache"` as the bound name.
                     if semantic.is_available(symbol.member) {
                         let import_edit = self.add_import(
-                            &AnyImport::ImportFrom(ImportFrom::member(
-                                symbol.module,
-                                symbol.member,
+                            &NameImport::ImportFrom(MemberNameImport::member(
+                                symbol.module.to_string(),
+                                symbol.member.to_string(),
                             )),
                             at,
                         );
@@ -380,7 +413,7 @@ impl<'a> Importer<'a> {
                 range: _,
             }) = stmt
             {
-                if level.map_or(true, |level| level == 0)
+                if *level == 0
                     && name.as_ref().is_some_and(|name| name == module)
                     && names.iter().all(|alias| alias.name.as_str() != "*")
                 {
@@ -397,7 +430,7 @@ impl<'a> Importer<'a> {
         let import_from = match_import_from(&mut statement)?;
         let aliases = match_aliases(import_from)?;
         aliases.push(ImportAlias {
-            name: NameOrAttribute::N(Box::new(Name {
+            name: NameOrAttribute::N(Box::new(cstName {
                 value: member,
                 lpar: vec![],
                 rpar: vec![],
@@ -430,13 +463,8 @@ impl<'a> Importer<'a> {
     }
 
     /// Add an import statement to an existing `TYPE_CHECKING` block.
-    fn add_to_type_checking_block(
-        &self,
-        content: &str,
-        at: TextSize,
-        source_type: PySourceType,
-    ) -> Edit {
-        Insertion::start_of_block(at, self.locator, self.stylist, source_type).into_edit(content)
+    fn add_to_type_checking_block(&self, content: &str, at: TextSize) -> Edit {
+        Insertion::start_of_block(at, self.locator, self.stylist, self.tokens).into_edit(content)
     }
 
     /// Return the import statement that precedes the given position, if any.

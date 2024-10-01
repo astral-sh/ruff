@@ -1,0 +1,8 @@
+# These rules test for intentional "odd" formatting. Using a formatter fixes that
+[E{1,2,3}*.py]
+generated_code = true
+ij_formatter_enabled = false
+
+[W*.py]
+generated_code = true
+ij_formatter_enabled = false

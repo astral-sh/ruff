@@ -60,40 +60,35 @@ impl AlwaysFixableViolation for UnnecessaryCallAroundSorted {
 pub(crate) fn unnecessary_call_around_sorted(
     checker: &mut Checker,
     expr: &Expr,
-    func: &Expr,
+    outer_func: &Expr,
     args: &[Expr],
 ) {
-    let Some(outer) = func.as_name_expr() else {
+    let Some(Expr::Call(ast::ExprCall {
+        func: inner_func, ..
+    })) = args.first()
+    else {
         return;
     };
-    if !matches!(outer.id.as_str(), "list" | "reversed") {
+    let semantic = checker.semantic();
+    let Some(outer_func_name) = semantic.resolve_builtin_symbol(outer_func) else {
+        return;
+    };
+    if !matches!(outer_func_name, "list" | "reversed") {
         return;
     }
-    let Some(arg) = args.first() else {
-        return;
-    };
-    let Expr::Call(ast::ExprCall { func, .. }) = arg else {
-        return;
-    };
-    let Some(inner) = func.as_name_expr() else {
-        return;
-    };
-    if inner.id != "sorted" {
-        return;
-    }
-    if !checker.semantic().is_builtin(&inner.id) || !checker.semantic().is_builtin(&outer.id) {
+    if !semantic.match_builtin_expr(inner_func, "sorted") {
         return;
     }
     let mut diagnostic = Diagnostic::new(
         UnnecessaryCallAroundSorted {
-            func: outer.id.to_string(),
+            func: outer_func_name.to_string(),
         },
         expr.range(),
     );
     diagnostic.try_set_fix(|| {
         Ok(Fix::applicable_edit(
             fixes::fix_unnecessary_call_around_sorted(expr, checker.locator(), checker.stylist())?,
-            if outer.id == "reversed" {
+            if outer_func_name == "reversed" {
                 Applicability::Unsafe
             } else {
                 Applicability::Safe

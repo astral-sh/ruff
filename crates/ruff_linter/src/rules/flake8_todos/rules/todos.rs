@@ -1,6 +1,6 @@
 use once_cell::sync::Lazy;
 use regex::RegexSet;
-use ruff_python_index::Indexer;
+use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
@@ -247,7 +247,7 @@ pub(crate) fn todos(
     diagnostics: &mut Vec<Diagnostic>,
     todo_comments: &[TodoComment],
     locator: &Locator,
-    indexer: &Indexer,
+    comment_ranges: &CommentRanges,
 ) {
     for todo_comment in todo_comments {
         let TodoComment {
@@ -274,12 +274,7 @@ pub(crate) fn todos(
         let mut has_issue_link = false;
         let mut curr_range = range;
 
-        for next_range in indexer
-            .comment_ranges()
-            .iter()
-            .skip(range_index + 1)
-            .copied()
-        {
+        for next_range in comment_ranges.iter().skip(range_index + 1).copied() {
             // Ensure that next_comment_range is in the same multiline comment "block" as
             // comment_range.
             if !locator

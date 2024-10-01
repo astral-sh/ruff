@@ -254,6 +254,12 @@ impl Debug for SourceLocation {
     }
 }
 
+impl std::fmt::Display for SourceLocation {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{row}:{column}", row = self.row, column = self.column)
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum SourceRow {
     /// A row within a cell in a Jupyter Notebook.

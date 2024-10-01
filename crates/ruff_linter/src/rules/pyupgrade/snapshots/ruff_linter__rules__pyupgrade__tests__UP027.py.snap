@@ -110,5 +110,3 @@ UP027.py:10:17: UP027 [*] Replace unpacked list comprehension with a generator e
 14 14 | 
 15 15 | # Should not change
 16 16 | foo = [fn(x) for x in items]
-
-

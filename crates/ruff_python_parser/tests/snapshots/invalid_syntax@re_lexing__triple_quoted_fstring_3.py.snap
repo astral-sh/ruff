@@ -1,0 +1,110 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/re_lexing/triple_quoted_fstring_3.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..262,
+        body: [
+            If(
+                StmtIf {
+                    range: 231..262,
+                    test: Call(
+                        ExprCall {
+                            range: 234..253,
+                            func: Name(
+                                ExprName {
+                                    range: 234..238,
+                                    id: Name("call"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 238..253,
+                                args: [
+                                    FString(
+                                        ExprFString {
+                                            range: 239..253,
+                                            value: FStringValue {
+                                                inner: Single(
+                                                    FString(
+                                                        FString {
+                                                            range: 239..253,
+                                                            elements: [
+                                                                Expression(
+                                                                    FStringExpressionElement {
+                                                                        range: 243..250,
+                                                                        expression: Name(
+                                                                            ExprName {
+                                                                                range: 244..245,
+                                                                                id: Name("x"),
+                                                                                ctx: Load,
+                                                                            },
+                                                                        ),
+                                                                        debug_text: None,
+                                                                        conversion: None,
+                                                                        format_spec: Some(
+                                                                            FStringFormatSpec {
+                                                                                range: 246..250,
+                                                                                elements: [
+                                                                                    Literal(
+                                                                                        FStringLiteralElement {
+                                                                                            range: 246..250,
+                                                                                            value: ".3f\n",
+                                                                                        },
+                                                                                    ),
+                                                                                ],
+                                                                            },
+                                                                        ),
+                                                                    },
+                                                                ),
+                                                            ],
+                                                            flags: FStringFlags {
+                                                                quote_style: Single,
+                                                                prefix: Regular,
+                                                                triple_quoted: true,
+                                                            },
+                                                        },
+                                                    ),
+                                                ),
+                                            },
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 258..262,
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+5 | if call(f'''{x:.3f
+6 | '''
+  | ^^^ Syntax Error: f-string: expecting '}'
+7 |     pass
+  |
+
+
+  |
+5 | if call(f'''{x:.3f
+6 | '''
+  |    ^ Syntax Error: Expected ')', found newline
+7 |     pass
+  |

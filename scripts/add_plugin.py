@@ -8,6 +8,7 @@ Example usage:
         --url https://pypi.org/project/flake8-pie/ \
         --prefix PIE
 """
+
 from __future__ import annotations
 
 import argparse
@@ -47,13 +48,13 @@ mod tests {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("%s").join(path).as_path(),
-            &settings::Settings::for_rule(rule_code),
+            &settings::LinterSettings::for_rule(rule_code),
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 }
-"""
+"""  # noqa: UP031  # Using an f-string here is ugly as all the curly parens need to be escaped
             % dir_name(plugin),
         )
 

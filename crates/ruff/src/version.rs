@@ -70,7 +70,7 @@ pub(crate) fn version() -> VersionInfo {
 
 #[cfg(test)]
 mod tests {
-    use insta::{assert_display_snapshot, assert_json_snapshot};
+    use insta::{assert_json_snapshot, assert_snapshot};
 
     use super::{CommitInfo, VersionInfo};
 
@@ -80,7 +80,7 @@ mod tests {
             version: "0.0.0".to_string(),
             commit_info: None,
         };
-        assert_display_snapshot!(version);
+        assert_snapshot!(version);
     }
 
     #[test]
@@ -95,7 +95,7 @@ mod tests {
                 commits_since_last_tag: 0,
             }),
         };
-        assert_display_snapshot!(version);
+        assert_snapshot!(version);
     }
 
     #[test]
@@ -110,7 +110,7 @@ mod tests {
                 commits_since_last_tag: 24,
             }),
         };
-        assert_display_snapshot!(version);
+        assert_snapshot!(version);
     }
 
     #[test]

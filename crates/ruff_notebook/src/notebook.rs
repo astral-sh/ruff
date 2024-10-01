@@ -19,6 +19,7 @@ use ruff_text_size::TextSize;
 use crate::cell::CellOffsets;
 use crate::index::NotebookIndex;
 use crate::schema::{Cell, RawNotebook, SortAlphabetically, SourceValue};
+use crate::{schema, CellMetadata, RawNotebookMetadata};
 
 /// Run round-trip source code generation on a given Jupyter notebook file path.
 pub fn round_trip(path: &Path) -> anyhow::Result<String> {
@@ -51,7 +52,7 @@ pub enum NotebookError {
     InvalidFormat(i64),
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct Notebook {
     /// Python source code of the notebook.
     ///
@@ -85,7 +86,7 @@ impl Notebook {
         Self::from_reader(Cursor::new(source_code))
     }
 
-    /// Read a Jupyter Notebook from a [`Read`] implementor.
+    /// Read a Jupyter Notebook from a [`Read`] implementer.
     ///
     /// See also the black implementation
     /// <https://github.com/psf/black/blob/69ca0a4c7a365c5f5eea519a90980bab72cab764/src/black/__init__.py#L1017-L1046>
@@ -98,7 +99,7 @@ impl Notebook {
             reader.read_exact(&mut buf).is_ok_and(|()| buf[0] == b'\n')
         });
         reader.rewind()?;
-        let mut raw_notebook: RawNotebook = match serde_json::from_reader(reader.by_ref()) {
+        let raw_notebook: RawNotebook = match serde_json::from_reader(reader.by_ref()) {
             Ok(notebook) => notebook,
             Err(err) => {
                 // Translate the error into a diagnostic
@@ -113,7 +114,13 @@ impl Notebook {
                 });
             }
         };
+        Self::from_raw_notebook(raw_notebook, trailing_newline)
+    }
 
+    pub fn from_raw_notebook(
+        mut raw_notebook: RawNotebook,
+        trailing_newline: bool,
+    ) -> Result<Self, NotebookError> {
         // v4 is what everybody uses
         if raw_notebook.nbformat != 4 {
             // bail because we should have already failed at the json schema stage
@@ -124,7 +131,7 @@ impl Notebook {
             .cells
             .iter()
             .enumerate()
-            .filter(|(_, cell)| cell.is_valid_code_cell())
+            .filter(|(_, cell)| cell.is_valid_python_code_cell())
             .map(|(cell_index, _)| u32::try_from(cell_index).unwrap())
             .collect::<Vec<_>>();
 
@@ -196,6 +203,26 @@ impl Notebook {
             valid_code_cells,
             trailing_newline,
         })
+    }
+
+    /// Creates an empty notebook with a single code cell.
+    pub fn empty() -> Self {
+        Self::from_raw_notebook(
+            RawNotebook {
+                cells: vec![schema::Cell::Code(schema::CodeCell {
+                    execution_count: None,
+                    id: None,
+                    metadata: CellMetadata::default(),
+                    outputs: vec![],
+                    source: schema::SourceValue::String(String::default()),
+                })],
+                metadata: RawNotebookMetadata::default(),
+                nbformat: 4,
+                nbformat_minor: 5,
+            },
+            false,
+        )
+        .unwrap()
     }
 
     /// Update the cell offsets as per the given [`SourceMap`].
@@ -377,16 +404,25 @@ impl Notebook {
         &self.raw.cells
     }
 
-    /// Return `true` if the notebook is a Python notebook, `false` otherwise.
-    pub fn is_python_notebook(&self) -> bool {
-        self.raw
-            .metadata
-            .language_info
-            .as_ref()
-            .map_or(true, |language| language.name == "python")
+    pub fn metadata(&self) -> &RawNotebookMetadata {
+        &self.raw.metadata
     }
 
-    /// Write the notebook back to the given [`Write`] implementor.
+    /// Check if it's a Python notebook.
+    ///
+    /// This is determined by checking the `language_info` or `kernelspec` in the notebook
+    /// metadata. If neither is present, it's assumed to be a Python notebook.
+    pub fn is_python_notebook(&self) -> bool {
+        if let Some(language_info) = self.raw.metadata.language_info.as_ref() {
+            return language_info.name == "python";
+        }
+        if let Some(kernel_spec) = self.raw.metadata.kernelspec.as_ref() {
+            return kernel_spec.language.as_deref() == Some("python");
+        }
+        true
+    }
+
+    /// Write the notebook back to the given [`Write`] implementer.
     pub fn write(&self, writer: &mut dyn Write) -> Result<(), NotebookError> {
         // https://github.com/psf/black/blob/69ca0a4c7a365c5f5eea519a90980bab72cab764/src/black/__init__.py#LL1041
         let formatter = serde_json::ser::PrettyFormatter::with_indent(b" ");
@@ -400,6 +436,14 @@ impl Notebook {
         Ok(())
     }
 }
+
+impl PartialEq for Notebook {
+    fn eq(&self, other: &Self) -> bool {
+        self.trailing_newline == other.trailing_newline && self.raw == other.raw
+    }
+}
+
+impl Eq for Notebook {}
 
 #[cfg(test)]
 mod tests {
@@ -417,18 +461,12 @@ mod tests {
         Path::new("./resources/test/fixtures/jupyter").join(path)
     }
 
-    #[test]
-    fn test_python() -> Result<(), NotebookError> {
-        let notebook = Notebook::from_path(&notebook_path("valid.ipynb"))?;
-        assert!(notebook.is_python_notebook());
-        Ok(())
-    }
-
-    #[test]
-    fn test_r() -> Result<(), NotebookError> {
-        let notebook = Notebook::from_path(&notebook_path("R.ipynb"))?;
-        assert!(!notebook.is_python_notebook());
-        Ok(())
+    #[test_case("valid.ipynb", true)]
+    #[test_case("R.ipynb", false)]
+    #[test_case("kernelspec_language.ipynb", true)]
+    fn is_python_notebook(filename: &str, expected: bool) {
+        let notebook = Notebook::from_path(&notebook_path(filename)).unwrap();
+        assert_eq!(notebook.is_python_notebook(), expected);
     }
 
     #[test]
@@ -447,6 +485,13 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn empty_notebook() {
+        let notebook = Notebook::empty();
+
+        assert_eq!(notebook.source_code(), "\n");
+    }
+
     #[test_case("markdown", false)]
     #[test_case("only_magic", true)]
     #[test_case("code_and_magic", true)]
@@ -454,11 +499,14 @@ mod tests {
     #[test_case("cell_magic", false)]
     #[test_case("valid_cell_magic", true)]
     #[test_case("automagic", false)]
+    #[test_case("automagic_assignment", true)]
     #[test_case("automagics", false)]
     #[test_case("automagic_before_code", false)]
     #[test_case("automagic_after_code", true)]
     #[test_case("unicode_magic_gh9145", true)]
-    fn test_is_valid_code_cell(cell: &str, expected: bool) -> Result<()> {
+    #[test_case("vscode_language_id_python", true)]
+    #[test_case("vscode_language_id_javascript", false)]
+    fn test_is_valid_python_code_cell(cell: &str, expected: bool) -> Result<()> {
         /// Read a Jupyter cell from the `resources/test/fixtures/jupyter/cell` directory.
         fn read_jupyter_cell(path: impl AsRef<Path>) -> Result<Cell> {
             let path = notebook_path("cell").join(path);
@@ -467,7 +515,7 @@ mod tests {
         }
 
         assert_eq!(
-            read_jupyter_cell(format!("{cell}.json"))?.is_valid_code_cell(),
+            read_jupyter_cell(format!("{cell}.json"))?.is_valid_python_code_cell(),
             expected
         );
         Ok(())
@@ -546,5 +594,14 @@ print("after empty cells")
             ]
         );
         Ok(())
+    }
+
+    #[test_case("vscode_language_id.ipynb")]
+    #[test_case("kernelspec_language.ipynb")]
+    fn round_trip(filename: &str) {
+        let path = notebook_path(filename);
+        let expected = std::fs::read_to_string(&path).unwrap();
+        let actual = super::round_trip(&path).unwrap();
+        assert_eq!(actual, expected);
     }
 }

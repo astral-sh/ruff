@@ -211,8 +211,7 @@ def zrevrangebylex(
     start: int | None = None,
     num: int | None = None,
 ) -> (  # type: ignore[override]
-):
-    ...
+): ...
 
 
 def zrevrangebylex(
@@ -224,8 +223,7 @@ def zrevrangebylex(
     num: int | None = None,
 ) -> (  # type: ignore[override]
     # comment
-):
-    ...
+): ...
 
 
 def zrevrangebylex(
@@ -237,8 +235,7 @@ def zrevrangebylex(
     num: int | None = None,
 ) -> (  # type: ignore[override]
     1
-):
-    ...
+): ...
 
 
 def zrevrangebylex(
@@ -251,8 +248,7 @@ def zrevrangebylex(
 ) -> (  # type: ignore[override]
     1,
     2,
-):
-    ...
+): ...
 
 
 def zrevrangebylex(
@@ -264,14 +260,12 @@ def zrevrangebylex(
     num: int | None = None,
 ) -> (  # type: ignore[override]
     (1, 2)
-):
-    ...
+): ...
 
 
 def handleMatch(  # type: ignore[override] # https://github.com/python/mypy/issues/10197
     self, m: Match[str], data: str
-) -> Union[Tuple[None, None, None], Tuple[Element, int, int]]:
-    ...
+) -> Union[Tuple[None, None, None], Tuple[Element, int, int]]: ...
 
 
 def double(
@@ -299,50 +293,44 @@ def double(
 # function arguments break here with a single argument; we do not.)
 def f(
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
-) -> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:
-    ...
+) -> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: ...
 
 
 def f(
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, a
-) -> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:
-    ...
+) -> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: ...
 
 
 def f(
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
-) -> a:
-    ...
+) -> a: ...
 
 
 def f(
     a,
-) -> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:
-    ...
+) -> (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+): ...
 
 
 def f[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa]() -> (
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-):
-    ...
+): ...
 
 
 def f[
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-]() -> a:
-    ...
+]() -> a: ...
 
 
 def f[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
-) -> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:
-    ...
+) -> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: ...
 
 
 def f[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
-) -> a:
-    ...
+) -> a: ...
 
 
 # Breaking return type annotations. Black adds parentheses if the parameters are
@@ -351,137 +339,126 @@ def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
     Set[
         "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
     ]
-):
-    ...
+): ...
 
 
 def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
     Set[
         "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
     ]
-):
-    ...
+): ...
 
 
 def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
     Set[
         "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
     ]
-):
-    ...
+): ...
 
 
 def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
     Set[
         "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
     ]
-):
-    ...
+): ...
 
 
 def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
     x,
 ) -> Set[
     "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-]:
-    ...
+]: ...
 
 
 def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
     x,
 ) -> Set[
     "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-]:
-    ...
+]: ...
 
 
 def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
     *args,
 ) -> Set[
     "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-]:
-    ...
+]: ...
 
 
 def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(  # foo
 ) -> Set[
     "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-]:
-    ...
+]: ...
 
 
 def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
     # bar
 ) -> Set[
     "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-]:
-    ...
+]: ...
 
 
 def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
     xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-):
-    ...
+): ...
 
 
 def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
     xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-):
-    ...
+): ...
 
 
 def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
     x,
-) -> xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx:
-    ...
+) -> xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx: ...
 
 
 def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
     x,
-) -> xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx:
-    ...
+) -> (
+    xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+): ...
 
 
-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> X + Y + foooooooooooooooooooooooooooooooooooo():
-    ...
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
+    X + Y + foooooooooooooooooooooooooooooooooooo()
+): ...
 
 
-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(x) -> X + Y + foooooooooooooooooooooooooooooooooooo():
-    ...
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
+    x,
+) -> X + Y + foooooooooooooooooooooooooooooooooooo(): ...
 
 
 def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
     X and Y and foooooooooooooooooooooooooooooooooooo()
-):
-    ...
+): ...
 
 
 def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
     x,
-) -> X and Y and foooooooooooooooooooooooooooooooooooo():
-    ...
+) -> X and Y and foooooooooooooooooooooooooooooooooooo(): ...
 
 
-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> X | Y | foooooooooooooooooooooooooooooooooooo():
-    ...
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
+    X | Y | foooooooooooooooooooooooooooooooooooo()
+): ...
 
 
-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(x) -> X | Y | foooooooooooooooooooooooooooooooooooo():
-    ...
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
+    x,
+) -> X | Y | foooooooooooooooooooooooooooooooooooo(): ...
 
 
 def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
     X | Y | foooooooooooooooooooooooooooooooooooo()  # comment
-):
-    ...
+): ...
 
 
 def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
     x,
 ) -> (
     X | Y | foooooooooooooooooooooooooooooooooooo()  # comment
-):
-    ...
+): ...
 
 
 def double() -> (
@@ -548,294 +525,63 @@ def process_board_action(
 ```diff
 --- Stable
 +++ Preview
-@@ -7,8 +7,7 @@
-     start: int | None = None,
-     num: int | None = None,
- ) -> (  # type: ignore[override]
--):
--    ...
-+): ...
- 
- 
- def zrevrangebylex(
-@@ -20,8 +19,7 @@
-     num: int | None = None,
- ) -> (  # type: ignore[override]
-     # comment
--):
--    ...
-+): ...
- 
- 
- def zrevrangebylex(
-@@ -33,8 +31,7 @@
-     num: int | None = None,
- ) -> (  # type: ignore[override]
-     1
--):
--    ...
-+): ...
- 
- 
- def zrevrangebylex(
-@@ -47,8 +44,7 @@
- ) -> (  # type: ignore[override]
-     1,
-     2,
--):
--    ...
-+): ...
- 
- 
- def zrevrangebylex(
-@@ -60,14 +56,12 @@
-     num: int | None = None,
- ) -> (  # type: ignore[override]
-     (1, 2)
--):
--    ...
-+): ...
- 
- 
- def handleMatch(  # type: ignore[override] # https://github.com/python/mypy/issues/10197
-     self, m: Match[str], data: str
--) -> Union[Tuple[None, None, None], Tuple[Element, int, int]]:
--    ...
-+) -> Union[Tuple[None, None, None], Tuple[Element, int, int]]: ...
- 
- 
- def double(
-@@ -95,50 +89,44 @@
- # function arguments break here with a single argument; we do not.)
- def f(
-     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
--) -> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:
--    ...
-+) -> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: ...
- 
- 
- def f(
-     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, a
--) -> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:
--    ...
-+) -> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: ...
- 
- 
- def f(
-     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
--) -> a:
--    ...
-+) -> a: ...
- 
- 
- def f(
-     a,
--) -> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:
--    ...
-+) -> (
-+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-+): ...
- 
- 
- def f[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa]() -> (
-     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
--):
--    ...
-+): ...
- 
- 
- def f[
-     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
--]() -> a:
--    ...
-+]() -> a: ...
- 
- 
- def f[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](
-     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
--) -> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:
--    ...
-+) -> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: ...
- 
- 
- def f[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](
-     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
--) -> a:
--    ...
-+) -> a: ...
- 
+@@ -131,32 +131,24 @@
  
  # Breaking return type annotations. Black adds parentheses if the parameters are
-@@ -147,137 +135,126 @@
-     Set[
-         "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-     ]
--):
--    ...
-+): ...
+ # empty; otherwise, it leverages the expressions own parentheses if possible.
+-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
+-    Set[
+-        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+-    ]
+-): ...
++def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
++    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
++]: ...
  
  
- def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
-     Set[
-         "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-     ]
--):
--    ...
-+): ...
+-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
+-    Set[
+-        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+-    ]
+-): ...
++def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
++    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
++]: ...
  
  
- def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
-     Set[
-         "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-     ]
--):
--    ...
-+): ...
+-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
+-    Set[
+-        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+-    ]
+-): ...
++def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
++    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
++]: ...
  
  
- def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
-     Set[
-         "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-     ]
--):
--    ...
-+): ...
- 
- 
- def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
-     x,
- ) -> Set[
-     "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
--]:
--    ...
+-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
+-    Set[
+-        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+-    ]
+-): ...
++def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
++    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 +]: ...
  
  
  def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
-     x,
- ) -> Set[
-     "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
--]:
--    ...
-+]: ...
+@@ -257,11 +249,8 @@
+ ): ...
  
  
- def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
-     *args,
- ) -> Set[
-     "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
--]:
--    ...
-+]: ...
+-def double() -> (
+-    first_item
+-    and foo.bar.baz().bop(
+-        1,
+-    )
++def double() -> first_item and foo.bar.baz().bop(
++    1,
+ ):
+     return 2 * a
  
- 
- def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(  # foo
- ) -> Set[
-     "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
--]:
--    ...
-+]: ...
- 
- 
- def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
-     # bar
- ) -> Set[
-     "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
--]:
--    ...
-+]: ...
- 
- 
- def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
-     xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
--):
--    ...
-+): ...
- 
- 
- def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
-     xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
--):
--    ...
-+): ...
- 
- 
- def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
-     x,
--) -> xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx:
--    ...
-+) -> xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx: ...
- 
- 
- def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
-     x,
--) -> xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx:
--    ...
-+) -> (
-+    xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-+): ...
- 
- 
--def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> X + Y + foooooooooooooooooooooooooooooooooooo():
--    ...
-+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
-+    X + Y + foooooooooooooooooooooooooooooooooooo()
-+): ...
- 
- 
--def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(x) -> X + Y + foooooooooooooooooooooooooooooooooooo():
--    ...
-+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
-+    x,
-+) -> X + Y + foooooooooooooooooooooooooooooooooooo(): ...
- 
- 
- def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
-     X and Y and foooooooooooooooooooooooooooooooooooo()
--):
--    ...
-+): ...
- 
- 
- def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
-     x,
--) -> X and Y and foooooooooooooooooooooooooooooooooooo():
--    ...
-+) -> X and Y and foooooooooooooooooooooooooooooooooooo(): ...
- 
- 
--def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> X | Y | foooooooooooooooooooooooooooooooooooo():
--    ...
-+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
-+    X | Y | foooooooooooooooooooooooooooooooooooo()
-+): ...
- 
- 
--def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(x) -> X | Y | foooooooooooooooooooooooooooooooooooo():
--    ...
-+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
-+    x,
-+) -> X | Y | foooooooooooooooooooooooooooooooooooo(): ...
- 
- 
- def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
-     X | Y | foooooooooooooooooooooooooooooooooooo()  # comment
--):
--    ...
-+): ...
- 
- 
- def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
-     x,
- ) -> (
-     X | Y | foooooooooooooooooooooooooooooooooooo()  # comment
--):
--    ...
-+): ...
- 
- 
- def double() -> (
 ```
-
-
-

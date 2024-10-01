@@ -1,0 +1,138 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/emoji_identifiers.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..64,
+        body: [
+            Assign(
+                StmtAssign {
+                    range: 0..5,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 0..1,
+                                id: Name("a"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: Name(
+                        ExprName {
+                            range: 5..5,
+                            id: Name(""),
+                            ctx: Invalid,
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 32..37,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 32..33,
+                                id: Name("a"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: Name(
+                        ExprName {
+                            range: 37..37,
+                            id: Name(""),
+                            ctx: Invalid,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 42..43,
+                    value: UnaryOp(
+                        ExprUnaryOp {
+                            range: 42..43,
+                            op: UAdd,
+                            operand: Name(
+                                ExprName {
+                                    range: 43..43,
+                                    id: Name(""),
+                                    ctx: Invalid,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | a = (🐶
+  |      ^^ Syntax Error: Got unexpected token 🐶
+2 |     # comment 🐶
+3 | )
+  |
+
+
+  |
+1 | a = (🐶
+2 |     # comment 🐶
+3 | )
+  | ^ Syntax Error: Expected a statement
+4 | 
+5 | a = (🐶 +
+  |
+
+
+  |
+1 | a = (🐶
+2 |     # comment 🐶
+3 | )
+  |  ^ Syntax Error: Expected a statement
+4 | 
+5 | a = (🐶 +
+6 |     # comment
+  |
+
+
+  |
+3 | )
+4 | 
+5 | a = (🐶 +
+  |      ^^ Syntax Error: Got unexpected token 🐶
+6 |     # comment
+7 | 🐶)
+  |
+
+
+  |
+5 | a = (🐶 +
+6 |     # comment
+7 | 🐶)
+  | ^^ Syntax Error: Got unexpected token 🐶
+  |
+
+
+  |
+5 | a = (🐶 +
+6 |     # comment
+7 | 🐶)
+  |   ^ Syntax Error: Expected a statement
+  |
+
+
+  |
+5 | a = (🐶 +
+6 |     # comment
+7 | 🐶)
+  |    ^ Syntax Error: Expected a statement
+  |

@@ -1,0 +1,127 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/if_stmt_misspelled_elif.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..47,
+        body: [
+            If(
+                StmtIf {
+                    range: 0..17,
+                    test: BooleanLiteral(
+                        ExprBooleanLiteral {
+                            range: 3..7,
+                            value: true,
+                        },
+                    ),
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 13..17,
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [],
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 18..22,
+                    target: Name(
+                        ExprName {
+                            range: 18..21,
+                            id: Name("elf"),
+                            ctx: Store,
+                        },
+                    ),
+                    annotation: Name(
+                        ExprName {
+                            range: 22..22,
+                            id: Name(""),
+                            ctx: Invalid,
+                        },
+                    ),
+                    value: None,
+                    simple: true,
+                },
+            ),
+            Pass(
+                StmtPass {
+                    range: 27..31,
+                },
+            ),
+            Pass(
+                StmtPass {
+                    range: 42..46,
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | if True:
+2 |     pass
+3 | elf:
+  |     ^ Syntax Error: Expected an expression
+4 |     pass
+5 | else:
+6 |     pass
+  |
+
+
+  |
+2 |     pass
+3 | elf:
+4 |     pass
+  | ^^^^ Syntax Error: Unexpected indentation
+5 | else:
+6 |     pass
+  |
+
+
+  |
+3 | elf:
+4 |     pass
+5 | else:
+  |  Syntax Error: Expected a statement
+6 |     pass
+  |
+
+
+  |
+3 | elf:
+4 |     pass
+5 | else:
+  |     ^ Syntax Error: Expected a statement
+6 |     pass
+  |
+
+
+  |
+3 | elf:
+4 |     pass
+5 | else:
+  |      ^ Syntax Error: Expected a statement
+6 |     pass
+  |
+
+
+  |
+4 |     pass
+5 | else:
+6 |     pass
+  | ^^^^ Syntax Error: Unexpected indentation
+  |
+
+
+  |
+5 | else:
+6 |     pass
+  |

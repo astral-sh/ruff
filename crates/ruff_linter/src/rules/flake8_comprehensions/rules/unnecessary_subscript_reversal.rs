@@ -44,15 +44,6 @@ pub(crate) fn unnecessary_subscript_reversal(checker: &mut Checker, call: &ast::
     let Some(first_arg) = call.arguments.args.first() else {
         return;
     };
-    let Some(func) = call.func.as_name_expr() else {
-        return;
-    };
-    if !matches!(func.id.as_str(), "reversed" | "set" | "sorted") {
-        return;
-    }
-    if !checker.semantic().is_builtin(&func.id) {
-        return;
-    }
     let Expr::Subscript(ast::ExprSubscript { slice, .. }) = first_arg else {
         return;
     };
@@ -89,9 +80,15 @@ pub(crate) fn unnecessary_subscript_reversal(checker: &mut Checker, call: &ast::
     if *val != 1 {
         return;
     };
+    let Some(function_name) = checker.semantic().resolve_builtin_symbol(&call.func) else {
+        return;
+    };
+    if !matches!(function_name, "reversed" | "set" | "sorted") {
+        return;
+    }
     checker.diagnostics.push(Diagnostic::new(
         UnnecessarySubscriptReversal {
-            func: func.id.to_string(),
+            func: function_name.to_string(),
         },
         call.range(),
     ));

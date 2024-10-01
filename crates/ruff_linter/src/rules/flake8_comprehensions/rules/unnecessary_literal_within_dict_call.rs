@@ -1,14 +1,12 @@
 use std::fmt;
 
-use ruff_python_ast::{Expr, Keyword};
+use ruff_python_ast::{self as ast, Expr};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-
-use crate::rules::flake8_comprehensions::fixes;
 
 use super::helpers;
 
@@ -68,20 +66,16 @@ impl AlwaysFixableViolation for UnnecessaryLiteralWithinDictCall {
 }
 
 /// C418
-pub(crate) fn unnecessary_literal_within_dict_call(
-    checker: &mut Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
-) {
-    if !keywords.is_empty() {
+pub(crate) fn unnecessary_literal_within_dict_call(checker: &mut Checker, call: &ast::ExprCall) {
+    if !call.arguments.keywords.is_empty() {
         return;
     }
-    let Some(argument) = helpers::first_argument_with_matching_function("dict", func, args) else {
+    let Some(argument) =
+        helpers::first_argument_with_matching_function("dict", &call.func, &call.arguments.args)
+    else {
         return;
     };
-    if !checker.semantic().is_builtin("dict") {
+    if !checker.semantic().has_builtin_binding("dict") {
         return;
     }
     let argument_kind = match argument {
@@ -89,15 +83,24 @@ pub(crate) fn unnecessary_literal_within_dict_call(
         Expr::Dict(_) => DictKind::Literal,
         _ => return,
     };
+
     let mut diagnostic = Diagnostic::new(
         UnnecessaryLiteralWithinDictCall {
             kind: argument_kind,
         },
-        expr.range(),
+        call.range(),
     );
-    diagnostic.try_set_fix(|| {
-        fixes::fix_unnecessary_literal_within_dict_call(expr, checker.locator(), checker.stylist())
-            .map(Fix::unsafe_edit)
+
+    // Convert `dict({"a": 1})` to `{"a": 1}`
+    diagnostic.set_fix({
+        // Delete from the start of the call to the start of the argument.
+        let call_start = Edit::deletion(call.start(), argument.start());
+
+        // Delete from the end of the argument to the end of the call.
+        let call_end = Edit::deletion(argument.end(), call.end());
+
+        Fix::unsafe_edits(call_start, [call_end])
     });
+
     checker.diagnostics.push(diagnostic);
 }

@@ -1,0 +1,26 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/range_formatting/comment_only_range.py
+---
+## Input
+```python
+def test  ():
+    <RANGE_START># Some leading comment
+    # that spans multiple lines
+    <RANGE_END>
+    print("Do not format this" )
+
+```
+
+## Output
+```python
+def test  ():
+    # Some leading comment
+    # that spans multiple lines
+
+    print("Do not format this" )
+
+```
+
+
+

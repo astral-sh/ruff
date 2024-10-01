@@ -1,0 +1,62 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/while_stmt_missing_colon.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..40,
+        body: [
+            While(
+                StmtWhile {
+                    range: 0..39,
+                    test: Compare(
+                        ExprCompare {
+                            range: 12..18,
+                            left: Name(
+                                ExprName {
+                                    range: 12..13,
+                                    id: Name("a"),
+                                    ctx: Load,
+                                },
+                            ),
+                            ops: [
+                                Lt,
+                            ],
+                            comparators: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 16..18,
+                                        value: Int(
+                                            30,
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 35..39,
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | while (
+2 |     a < 30 # comment
+3 | )
+  |  ^ Syntax Error: Expected ':', found newline
+4 |     pass
+  |

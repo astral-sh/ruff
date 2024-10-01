@@ -62,22 +62,16 @@ impl Violation for MixedCaseVariableInGlobalScope {
 
 /// N816
 pub(crate) fn mixed_case_variable_in_global_scope(checker: &mut Checker, expr: &Expr, name: &str) {
-    if checker
-        .settings
-        .pep8_naming
-        .ignore_names
-        .iter()
-        .any(|ignore_name| ignore_name.matches(name))
-    {
-        return;
-    }
-
     if !helpers::is_mixed_case(name) {
         return;
     }
 
     let parent = checker.semantic().current_statement();
     if helpers::is_named_tuple_assignment(parent, checker.semantic()) {
+        return;
+    }
+
+    if checker.settings.pep8_naming.ignore_names.matches(name) {
         return;
     }
 

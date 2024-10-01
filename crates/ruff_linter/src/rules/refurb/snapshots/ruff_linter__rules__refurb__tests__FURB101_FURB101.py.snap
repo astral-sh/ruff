@@ -41,56 +41,46 @@ FURB101.py:28:6: FURB101 `open` and `read` should be replaced by `Path("file.txt
 29 |     x = f.read()
    |
 
-FURB101.py:32:6: FURB101 `open` and `read` should be replaced by `Path("file.txt").read_bytes(errors="ignore")`
+FURB101.py:32:6: FURB101 `open` and `read` should be replaced by `Path("file.txt").read_text()`
    |
 31 | # FURB101
-32 | with open("file.txt", errors="ignore", mode="rb") as f:
-   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB101
+32 | with open("file.txt", mode="r") as f:  # noqa: FURB120
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB101
 33 |     x = f.read()
    |
 
-FURB101.py:36:6: FURB101 `open` and `read` should be replaced by `Path("file.txt").read_text()`
+FURB101.py:36:6: FURB101 `open` and `read` should be replaced by `Path(foo()).read_bytes()`
    |
 35 | # FURB101
-36 | with open("file.txt", mode="r") as f:  # noqa: FURB120
-   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB101
-37 |     x = f.read()
-   |
-
-FURB101.py:40:6: FURB101 `open` and `read` should be replaced by `Path(foo()).read_bytes()`
-   |
-39 | # FURB101
-40 | with open(foo(), "rb") as f:
+36 | with open(foo(), "rb") as f:
    |      ^^^^^^^^^^^^^^^^^^^^^^ FURB101
-41 |     # The body of `with` is non-trivial, but the recommendation holds.
-42 |     bar("pre")
+37 |     # The body of `with` is non-trivial, but the recommendation holds.
+38 |     bar("pre")
    |
 
-FURB101.py:48:6: FURB101 `open` and `read` should be replaced by `Path("a.txt").read_text()`
+FURB101.py:44:6: FURB101 `open` and `read` should be replaced by `Path("a.txt").read_text()`
    |
-47 | # FURB101
-48 | with open("a.txt") as a, open("b.txt", "rb") as b:
+43 | # FURB101
+44 | with open("a.txt") as a, open("b.txt", "rb") as b:
    |      ^^^^^^^^^^^^^^^^^^ FURB101
-49 |     x = a.read()
-50 |     y = b.read()
+45 |     x = a.read()
+46 |     y = b.read()
    |
 
-FURB101.py:48:26: FURB101 `open` and `read` should be replaced by `Path("b.txt").read_bytes()`
+FURB101.py:44:26: FURB101 `open` and `read` should be replaced by `Path("b.txt").read_bytes()`
    |
-47 | # FURB101
-48 | with open("a.txt") as a, open("b.txt", "rb") as b:
+43 | # FURB101
+44 | with open("a.txt") as a, open("b.txt", "rb") as b:
    |                          ^^^^^^^^^^^^^^^^^^^^^^^^ FURB101
-49 |     x = a.read()
-50 |     y = b.read()
+45 |     x = a.read()
+46 |     y = b.read()
    |
 
-FURB101.py:53:18: FURB101 `open` and `read` should be replaced by `Path("file.txt").read_text()`
+FURB101.py:49:18: FURB101 `open` and `read` should be replaced by `Path("file.txt").read_text()`
    |
-52 | # FURB101
-53 | with foo() as a, open("file.txt") as b, foo() as c:
+48 | # FURB101
+49 | with foo() as a, open("file.txt") as b, foo() as c:
    |                  ^^^^^^^^^^^^^^^^^^^^^ FURB101
-54 |     # We have other things in here, multiple with items, but
-55 |     # the user reads the whole file and that bit they can replace.
+50 |     # We have other things in here, multiple with items, but
+51 |     # the user reads the whole file and that bit they can replace.
    |
-
-

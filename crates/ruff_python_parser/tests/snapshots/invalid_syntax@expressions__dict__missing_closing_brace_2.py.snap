@@ -1,0 +1,83 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/dict/missing_closing_brace_2.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..27,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..6,
+                    value: Dict(
+                        ExprDict {
+                            range: 0..6,
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 1..2,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 4..5,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 8..27,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 12..15,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 15..17,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 23..27,
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | {x: 1,
+  |       ^ Syntax Error: Expected '}', found newline
+2 | 
+3 | def foo():
+4 |     pass
+  |

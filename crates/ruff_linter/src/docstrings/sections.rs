@@ -5,7 +5,7 @@ use ruff_python_ast::docstrings::{leading_space, leading_words};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use strum_macros::EnumIter;
 
-use ruff_source_file::{Line, UniversalNewlineIterator, UniversalNewlines};
+use ruff_source_file::{Line, NewlineWithTrailingNewline, UniversalNewlines};
 
 use crate::docstrings::styles::SectionStyle;
 use crate::docstrings::{Docstring, DocstringBody};
@@ -130,11 +130,40 @@ impl SectionKind {
             Self::Yields => "Yields",
         }
     }
+
+    /// Returns `true` if a section can contain subsections, as in:
+    /// ```python
+    /// Yields
+    /// ------
+    /// int
+    ///     Description of the anonymous integer return value.
+    /// ```
+    ///
+    /// For NumPy, see: <https://numpydoc.readthedocs.io/en/latest/format.html>
+    ///
+    /// For Google, see: <https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings>
+    pub(crate) fn has_subsections(self) -> bool {
+        matches!(
+            self,
+            Self::Args
+                | Self::Arguments
+                | Self::OtherArgs
+                | Self::OtherParameters
+                | Self::OtherParams
+                | Self::Parameters
+                | Self::Raises
+                | Self::Returns
+                | Self::SeeAlso
+                | Self::Warns
+                | Self::Yields
+        )
+    }
 }
 
 pub(crate) struct SectionContexts<'a> {
     contexts: Vec<SectionContextData>,
     docstring: &'a Docstring<'a>,
+    style: SectionStyle,
 }
 
 impl<'a> SectionContexts<'a> {
@@ -193,7 +222,12 @@ impl<'a> SectionContexts<'a> {
         Self {
             contexts,
             docstring,
+            style,
         }
+    }
+
+    pub(crate) fn style(&self) -> SectionStyle {
+        self.style
     }
 
     pub(crate) fn len(&self) -> usize {
@@ -356,16 +390,19 @@ impl<'a> SectionContext<'a> {
     pub(crate) fn previous_line(&self) -> Option<&'a str> {
         let previous =
             &self.docstring_body.as_str()[TextRange::up_to(self.range_relative().start())];
-        previous.universal_newlines().last().map(|l| l.as_str())
+        previous
+            .universal_newlines()
+            .last()
+            .map(|line| line.as_str())
     }
 
     /// Returns the lines belonging to this section after the summary line.
-    pub(crate) fn following_lines(&self) -> UniversalNewlineIterator<'a> {
+    pub(crate) fn following_lines(&self) -> NewlineWithTrailingNewline<'a> {
         let lines = self.following_lines_str();
-        UniversalNewlineIterator::with_offset(lines, self.offset() + self.data.summary_full_end)
+        NewlineWithTrailingNewline::with_offset(lines, self.offset() + self.data.summary_full_end)
     }
 
-    fn following_lines_str(&self) -> &'a str {
+    pub(crate) fn following_lines_str(&self) -> &'a str {
         &self.docstring_body.as_str()[self.following_range_relative()]
     }
 
@@ -459,13 +496,54 @@ fn is_docstring_section(
     //         args: The arguments to the function.
     //     """
     // ```
+    // Or `parameters` in:
+    // ```python
+    // def func(parameters: tuple[int]):
+    //     """Toggle the gizmo.
+    //
+    //     Parameters:
+    //     -----
+    //     parameters:
+    //         The arguments to the function.
+    //     """
+    // ```
     // However, if the header is an _exact_ match (like `Returns:`, as opposed to `returns:`), then
     // continue to treat it as a section header.
-    if let Some(previous_section) = previous_section {
-        if previous_section.indent_size < indent_size {
+    if section_kind.has_subsections() {
+        if let Some(previous_section) = previous_section {
             let verbatim = &line[TextRange::at(indent_size, section_name_size)];
-            if section_kind.as_str() != verbatim {
-                return false;
+
+            // If the section is more deeply indented, assume it's a subsection, as in:
+            // ```python
+            // def func(args: tuple[int]):
+            //     """Toggle the gizmo.
+            //
+            //     Args:
+            //         args: The arguments to the function.
+            //     """
+            // ```
+            if previous_section.indent_size < indent_size {
+                if section_kind.as_str() != verbatim {
+                    return false;
+                }
+            }
+
+            // If the section isn't underlined, and isn't title-cased, assume it's a subsection,
+            // as in:
+            // ```python
+            // def func(parameters: tuple[int]):
+            //     """Toggle the gizmo.
+            //
+            //     Parameters:
+            //     -----
+            //     parameters:
+            //         The arguments to the function.
+            //     """
+            // ```
+            if !next_line_is_underline && verbatim.chars().next().is_some_and(char::is_lowercase) {
+                if section_kind.as_str() != verbatim {
+                    return false;
+                }
             }
         }
     }

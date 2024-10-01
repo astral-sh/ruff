@@ -1,0 +1,169 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/from_import_dotted_names.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..67,
+        body: [
+            ImportFrom(
+                StmtImportFrom {
+                    range: 0..16,
+                    module: Some(
+                        Identifier {
+                            id: Name("x"),
+                            range: 5..6,
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 14..15,
+                            name: Identifier {
+                                id: Name("a"),
+                                range: 14..15,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 0,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    range: 17..34,
+                    module: Some(
+                        Identifier {
+                            id: Name("x"),
+                            range: 22..23,
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 31..32,
+                            name: Identifier {
+                                id: Name("a"),
+                                range: 31..32,
+                            },
+                            asname: None,
+                        },
+                        Alias {
+                            range: 33..34,
+                            name: Identifier {
+                                id: Name("b"),
+                                range: 33..34,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 0,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    range: 35..66,
+                    module: Some(
+                        Identifier {
+                            id: Name("x"),
+                            range: 40..41,
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 49..50,
+                            name: Identifier {
+                                id: Name("a"),
+                                range: 49..50,
+                            },
+                            asname: None,
+                        },
+                        Alias {
+                            range: 52..53,
+                            name: Identifier {
+                                id: Name("b"),
+                                range: 52..53,
+                            },
+                            asname: None,
+                        },
+                        Alias {
+                            range: 54..55,
+                            name: Identifier {
+                                id: Name("c"),
+                                range: 54..55,
+                            },
+                            asname: None,
+                        },
+                        Alias {
+                            range: 57..58,
+                            name: Identifier {
+                                id: Name("d"),
+                                range: 57..58,
+                            },
+                            asname: None,
+                        },
+                        Alias {
+                            range: 60..61,
+                            name: Identifier {
+                                id: Name("e"),
+                                range: 60..61,
+                            },
+                            asname: None,
+                        },
+                        Alias {
+                            range: 62..63,
+                            name: Identifier {
+                                id: Name("f"),
+                                range: 62..63,
+                            },
+                            asname: None,
+                        },
+                        Alias {
+                            range: 65..66,
+                            name: Identifier {
+                                id: Name("g"),
+                                range: 65..66,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 0,
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | from x import a.
+  |                ^ Syntax Error: Expected ',', found '.'
+2 | from x import a.b
+3 | from x import a, b.c, d, e.f, g
+  |
+
+
+  |
+1 | from x import a.
+2 | from x import a.b
+  |                ^ Syntax Error: Expected ',', found '.'
+3 | from x import a, b.c, d, e.f, g
+  |
+
+
+  |
+1 | from x import a.
+2 | from x import a.b
+3 | from x import a, b.c, d, e.f, g
+  |                   ^ Syntax Error: Expected ',', found '.'
+  |
+
+
+  |
+1 | from x import a.
+2 | from x import a.b
+3 | from x import a, b.c, d, e.f, g
+  |                           ^ Syntax Error: Expected ',', found '.'
+  |

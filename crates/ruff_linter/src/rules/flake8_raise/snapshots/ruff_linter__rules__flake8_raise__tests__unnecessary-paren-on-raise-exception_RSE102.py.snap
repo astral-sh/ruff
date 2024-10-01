@@ -281,4 +281,18 @@ RSE102.py:84:10: RSE102 [*] Unnecessary parentheses on raised exception
 86 86 | # OK
 87 87 | raise ctypes.WinError()
 
+RSE102.py:107:27: RSE102 [*] Unnecessary parentheses on raised exception
+    |
+105 | future = executor.submit(float, "a")
+106 | if future.exception():
+107 |     raise future.Exception()
+    |                           ^^ RSE102
+    |
+    = help: Remove unnecessary parentheses
 
+ℹ Unsafe fix
+104 104 | # RSE102
+105 105 | future = executor.submit(float, "a")
+106 106 | if future.exception():
+107     |-    raise future.Exception()
+    107 |+    raise future.Exception

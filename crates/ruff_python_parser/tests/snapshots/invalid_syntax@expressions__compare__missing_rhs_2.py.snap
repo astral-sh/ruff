@@ -1,0 +1,79 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/compare/missing_rhs_2.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..15,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..8,
+                    value: Compare(
+                        ExprCompare {
+                            range: 0..8,
+                            left: Name(
+                                ExprName {
+                                    range: 0..1,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            ops: [
+                                IsNot,
+                            ],
+                            comparators: [
+                                Name(
+                                    ExprName {
+                                        range: 8..8,
+                                        id: Name(""),
+                                        ctx: Invalid,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 10..15,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 10..15,
+                            left: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 10..11,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                            op: Add,
+                            right: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 14..15,
+                                    value: Int(
+                                        2,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | x is not
+  |         ^ Syntax Error: Expected an expression
+2 | 
+3 | 1 + 2
+  |

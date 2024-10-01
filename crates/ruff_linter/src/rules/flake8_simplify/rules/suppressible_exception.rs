@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::compose_call_path;
 use ruff_python_ast::helpers;
+use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
 use ruff_text_size::Ranged;
 use ruff_text_size::{TextLen, TextRange};
@@ -107,7 +107,7 @@ pub(crate) fn suppressible_exception(
 
     let Some(handler_names) = helpers::extract_handled_exceptions(handlers)
         .into_iter()
-        .map(compose_call_path)
+        .map(|expr| UnqualifiedName::from_expr(expr).map(|name| name.to_string()))
         .collect::<Option<Vec<String>>>()
     else {
         return;
@@ -125,7 +125,10 @@ pub(crate) fn suppressible_exception(
         },
         stmt.range(),
     );
-    if !checker.indexer().has_comments(stmt, checker.locator()) {
+    if !checker
+        .comment_ranges()
+        .has_comments(stmt, checker.locator())
+    {
         diagnostic.try_set_fix(|| {
             // let range = statement_range(stmt, checker.locator(), checker.indexer());
 

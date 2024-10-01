@@ -107,4 +107,22 @@ UP008.py:50:18: UP008 [*] Use `super()` instead of `super(__class__, self)`
 52 52 | 
 53 53 |         outer_argument()
 
+UP008.py:74:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
+   |
+72 | class DataClass:
+73 |     def normal(self):
+74 |         super(DataClass, self).f()  # Error
+   |              ^^^^^^^^^^^^^^^^^ UP008
+75 |         super().f()  # OK
+   |
+   = help: Remove `__super__` parameters
 
+ℹ Unsafe fix
+71 71 | @dataclass
+72 72 | class DataClass:
+73 73 |     def normal(self):
+74    |-        super(DataClass, self).f()  # Error
+   74 |+        super().f()  # Error
+75 75 |         super().f()  # OK
+76 76 | 
+77 77 |

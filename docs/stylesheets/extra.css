@@ -89,6 +89,7 @@
 .md-typeset__table {
   min-width: 100%;
 }
+
 .md-typeset table:not([class]) {
   display: table;
 }
@@ -102,4 +103,20 @@
 [data-md-color-scheme="astral-dark"] div.admonition {
   color: var(--md-code-fg-color);
   background-color: var(--md-code-bg-color);
+}
+
+/* See: https://mkdocstrings.github.io/recipes/#prevent-selection-of-prompts-and-output-in-python-code-blocks */
+.highlight .gp,
+.highlight .go {
+  /* Generic.Prompt, Generic.Output */
+  user-select: none;
+}
+
+/* Styling for anchor link headers */
+.toclink {
+  color: unset !important;
+}
+
+.toclink:hover {
+  color: var(--md-accent-fg-color) !important;
 }

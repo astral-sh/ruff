@@ -19,19 +19,27 @@ use crate::checkers::ast::Checker;
 /// used.
 ///
 /// ## Example
-/// ```python
+///
+/// ```pyi
+/// from typing import TypeAlias
+///
 /// a = b = int
-/// a.b = int
+///
+/// class Klass: ...
+///
+/// Klass.X: TypeAlias = int
 /// ```
 ///
 /// Use instead:
-/// ```python
+///
+/// ```pyi
+/// from typing import TypeAlias
+///
 /// a: TypeAlias = int
 /// b: TypeAlias = int
 ///
-///
-/// class a:
-///     b: int
+/// class Klass:
+///     X: TypeAlias = int
 /// ```
 #[violation]
 pub struct ComplexAssignmentInStub;

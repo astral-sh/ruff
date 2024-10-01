@@ -1,0 +1,74 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/parenthesized/parenthesized.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..125,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 66..70,
+                    value: Starred(
+                        ExprStarred {
+                            range: 67..69,
+                            value: Name(
+                                ExprName {
+                                    range: 68..69,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 119..120,
+                    value: Name(
+                        ExprName {
+                            range: 119..120,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 124..125,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 124..125,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # Starred expression isn't allowed in a parenthesized expression.
+2 | (*x)
+  |  ^^ Syntax Error: Starred expression cannot be used here
+3 | 
+4 | # Unparenthesized named expression is allowed.
+  |
+
+
+  |
+4 | # Unparenthesized named expression is allowed.
+5 | x := 1
+  |   ^^ Syntax Error: Expected a statement
+  |

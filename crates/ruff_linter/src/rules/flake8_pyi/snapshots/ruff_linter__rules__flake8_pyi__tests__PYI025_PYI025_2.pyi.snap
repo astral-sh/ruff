@@ -1,0 +1,34 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+---
+PYI025_2.pyi:3:29: PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
+  |
+1 | """Tests to ensure we correctly rename references inside `__all__`"""
+2 | 
+3 | from collections.abc import Set
+  |                             ^^^ PYI025
+4 | 
+5 | __all__ = ["Set"]
+  |
+  = help: Alias `Set` to `AbstractSet`
+
+ℹ Unsafe fix
+1  1  | """Tests to ensure we correctly rename references inside `__all__`"""
+2  2  | 
+3     |-from collections.abc import Set
+   3  |+from collections.abc import Set as AbstractSet
+4  4  | 
+5     |-__all__ = ["Set"]
+   5  |+__all__ = ["AbstractSet"]
+6  6  | 
+7  7  | if True:
+8     |-    __all__ += [r'''Set''']
+   8  |+    __all__ += ["AbstractSet"]
+9  9  | 
+10 10 | if 1:
+11    |-    __all__ += ["S" "e" "t"]
+   11 |+    __all__ += ["AbstractSet"]
+12 12 | 
+13 13 | if not False:
+14    |-    __all__ += ["Se" 't']
+   14 |+    __all__ += ["AbstractSet"]

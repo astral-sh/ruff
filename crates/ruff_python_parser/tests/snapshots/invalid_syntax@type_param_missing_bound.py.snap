@@ -1,0 +1,114 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/type_param_missing_bound.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..41,
+        body: [
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 0..17,
+                    name: Name(
+                        ExprName {
+                            range: 5..6,
+                            id: Name("X"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 6..11,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 7..9,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 7..8,
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            range: 14..17,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 18..40,
+                    name: Name(
+                        ExprName {
+                            range: 23..24,
+                            id: Name("X"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 24..34,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 25..28,
+                                        name: Identifier {
+                                            id: Name("T1"),
+                                            range: 25..27,
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 31..33,
+                                        name: Identifier {
+                                            id: Name("T2"),
+                                            range: 31..33,
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            range: 37..40,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | type X[T: ] = int
+  |           ^ Syntax Error: Expected an expression
+2 | type X[T1: , T2] = int
+  |
+
+
+  |
+1 | type X[T: ] = int
+2 | type X[T1: , T2] = int
+  |            ^ Syntax Error: Expected an expression
+  |

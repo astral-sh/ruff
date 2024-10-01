@@ -1,0 +1,186 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/arguments/starred.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..64,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..28,
+                    value: Call(
+                        ExprCall {
+                            range: 0..28,
+                            func: Name(
+                                ExprName {
+                                    range: 0..4,
+                                    id: Name("call"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 4..28,
+                                args: [
+                                    Generator(
+                                        ExprGenerator {
+                                            range: 5..27,
+                                            elt: Starred(
+                                                ExprStarred {
+                                                    range: 5..10,
+                                                    value: Name(
+                                                        ExprName {
+                                                            range: 6..10,
+                                                            id: Name("data"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            generators: [
+                                                Comprehension {
+                                                    range: 11..27,
+                                                    target: Name(
+                                                        ExprName {
+                                                            range: 15..19,
+                                                            id: Name("data"),
+                                                            ctx: Store,
+                                                        },
+                                                    ),
+                                                    iter: Name(
+                                                        ExprName {
+                                                            range: 23..27,
+                                                            id: Name("iter"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    ifs: [],
+                                                    is_async: false,
+                                                },
+                                            ],
+                                            parenthesized: false,
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 29..43,
+                    value: Call(
+                        ExprCall {
+                            range: 29..43,
+                            func: Name(
+                                ExprName {
+                                    range: 29..33,
+                                    id: Name("call"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 33..43,
+                                args: [
+                                    Starred(
+                                        ExprStarred {
+                                            range: 34..42,
+                                            value: Yield(
+                                                ExprYield {
+                                                    range: 35..42,
+                                                    value: Some(
+                                                        Name(
+                                                            ExprName {
+                                                                range: 41..42,
+                                                                id: Name("x"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                    ),
+                                                },
+                                            ),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 44..63,
+                    value: Call(
+                        ExprCall {
+                            range: 44..63,
+                            func: Name(
+                                ExprName {
+                                    range: 44..48,
+                                    id: Name("call"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 48..63,
+                                args: [
+                                    Starred(
+                                        ExprStarred {
+                                            range: 49..62,
+                                            value: YieldFrom(
+                                                ExprYieldFrom {
+                                                    range: 50..62,
+                                                    value: Name(
+                                                        ExprName {
+                                                            range: 61..62,
+                                                            id: Name("x"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | call(*data for data in iter)
+  |      ^^^^^ Syntax Error: Iterable unpacking cannot be used in a comprehension
+2 | call(*yield x)
+3 | call(*yield from x)
+  |
+
+
+  |
+1 | call(*data for data in iter)
+2 | call(*yield x)
+  |       ^^^^^^^ Syntax Error: Yield expression cannot be used here
+3 | call(*yield from x)
+  |
+
+
+  |
+1 | call(*data for data in iter)
+2 | call(*yield x)
+3 | call(*yield from x)
+  |       ^^^^^^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |

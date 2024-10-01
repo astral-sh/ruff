@@ -1,0 +1,48 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/async_for_statement.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..30,
+        body: [
+            For(
+                StmtFor {
+                    range: 0..29,
+                    is_async: true,
+                    target: Name(
+                        ExprName {
+                            range: 10..16,
+                            id: Name("target"),
+                            ctx: Store,
+                        },
+                    ),
+                    iter: Name(
+                        ExprName {
+                            range: 20..24,
+                            id: Name("iter"),
+                            ctx: Load,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 26..29,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 26..29,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+        ],
+    },
+)
+```

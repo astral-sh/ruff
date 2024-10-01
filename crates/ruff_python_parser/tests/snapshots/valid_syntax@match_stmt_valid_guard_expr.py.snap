@@ -1,0 +1,281 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/match_stmt_valid_guard_expr.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..158,
+        body: [
+            Match(
+                StmtMatch {
+                    range: 0..34,
+                    subject: Name(
+                        ExprName {
+                            range: 6..7,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 13..34,
+                            pattern: MatchAs(
+                                PatternMatchAs {
+                                    range: 18..19,
+                                    pattern: None,
+                                    name: Some(
+                                        Identifier {
+                                            id: Name("y"),
+                                            range: 18..19,
+                                        },
+                                    ),
+                                },
+                            ),
+                            guard: Some(
+                                Named(
+                                    ExprNamed {
+                                        range: 23..29,
+                                        target: Name(
+                                            ExprName {
+                                                range: 23..24,
+                                                id: Name("a"),
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 28..29,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ),
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 31..34,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 31..34,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+            Match(
+                StmtMatch {
+                    range: 35..79,
+                    subject: Name(
+                        ExprName {
+                            range: 41..42,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 48..79,
+                            pattern: MatchAs(
+                                PatternMatchAs {
+                                    range: 53..54,
+                                    pattern: None,
+                                    name: Some(
+                                        Identifier {
+                                            id: Name("y"),
+                                            range: 53..54,
+                                        },
+                                    ),
+                                },
+                            ),
+                            guard: Some(
+                                If(
+                                    ExprIf {
+                                        range: 58..74,
+                                        test: BooleanLiteral(
+                                            ExprBooleanLiteral {
+                                                range: 63..67,
+                                                value: true,
+                                            },
+                                        ),
+                                        body: Name(
+                                            ExprName {
+                                                range: 58..59,
+                                                id: Name("a"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        orelse: Name(
+                                            ExprName {
+                                                range: 73..74,
+                                                id: Name("b"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ),
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 76..79,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 76..79,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+            Match(
+                StmtMatch {
+                    range: 80..119,
+                    subject: Name(
+                        ExprName {
+                            range: 86..87,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 93..119,
+                            pattern: MatchAs(
+                                PatternMatchAs {
+                                    range: 98..99,
+                                    pattern: None,
+                                    name: Some(
+                                        Identifier {
+                                            id: Name("y"),
+                                            range: 98..99,
+                                        },
+                                    ),
+                                },
+                            ),
+                            guard: Some(
+                                Lambda(
+                                    ExprLambda {
+                                        range: 103..114,
+                                        parameters: Some(
+                                            Parameters {
+                                                range: 110..111,
+                                                posonlyargs: [],
+                                                args: [
+                                                    ParameterWithDefault {
+                                                        range: 110..111,
+                                                        parameter: Parameter {
+                                                            range: 110..111,
+                                                            name: Identifier {
+                                                                id: Name("a"),
+                                                                range: 110..111,
+                                                            },
+                                                            annotation: None,
+                                                        },
+                                                        default: None,
+                                                    },
+                                                ],
+                                                vararg: None,
+                                                kwonlyargs: [],
+                                                kwarg: None,
+                                            },
+                                        ),
+                                        body: Name(
+                                            ExprName {
+                                                range: 113..114,
+                                                id: Name("b"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ),
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 116..119,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 116..119,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+            Match(
+                StmtMatch {
+                    range: 120..157,
+                    subject: Name(
+                        ExprName {
+                            range: 126..127,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 133..157,
+                            pattern: MatchAs(
+                                PatternMatchAs {
+                                    range: 138..139,
+                                    pattern: None,
+                                    name: Some(
+                                        Identifier {
+                                            id: Name("y"),
+                                            range: 138..139,
+                                        },
+                                    ),
+                                },
+                            ),
+                            guard: Some(
+                                Yield(
+                                    ExprYield {
+                                        range: 144..151,
+                                        value: Some(
+                                            Name(
+                                                ExprName {
+                                                    range: 150..151,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            ),
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 154..157,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 154..157,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```

@@ -2,14 +2,14 @@ use ruff_formatter::write;
 use ruff_formatter::FormatRuleWithOptions;
 use ruff_python_ast::ExceptHandlerExceptHandler;
 
-use crate::comments::SourceComment;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
 use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
+use crate::statement::suite::SuiteKind;
 
 #[derive(Copy, Clone, Default)]
-pub enum ExceptHandlerKind {
+pub(crate) enum ExceptHandlerKind {
     #[default]
     Regular,
     Starred,
@@ -17,16 +17,18 @@ pub enum ExceptHandlerKind {
 
 #[derive(Default)]
 pub struct FormatExceptHandlerExceptHandler {
-    except_handler_kind: ExceptHandlerKind,
+    pub(crate) except_handler_kind: ExceptHandlerKind,
+    pub(crate) last_suite_in_statement: bool,
 }
 
 impl FormatRuleWithOptions<ExceptHandlerExceptHandler, PyFormatContext<'_>>
     for FormatExceptHandlerExceptHandler
 {
-    type Options = ExceptHandlerKind;
+    type Options = FormatExceptHandlerExceptHandler;
 
     fn with_options(mut self, options: Self::Options) -> Self {
-        self.except_handler_kind = options;
+        self.except_handler_kind = options.except_handler_kind;
+        self.last_suite_in_statement = options.last_suite_in_statement;
         self
     }
 }
@@ -37,6 +39,7 @@ impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHan
         item: &ExceptHandlerExceptHandler,
         f: &mut PyFormatter,
     ) -> FormatResult<()> {
+        let except_handler_kind = self.except_handler_kind;
         let ExceptHandlerExceptHandler {
             range: _,
             type_,
@@ -58,7 +61,7 @@ impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHan
                             f,
                             [
                                 token("except"),
-                                match self.except_handler_kind {
+                                match except_handler_kind {
                                     ExceptHandlerKind::Regular => None,
                                     ExceptHandlerKind::Starred => Some(token("*")),
                                 }
@@ -85,17 +88,12 @@ impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHan
                         Ok(())
                     }),
                 ),
-                clause_body(body, dangling_comments),
+                clause_body(
+                    body,
+                    SuiteKind::other(self.last_suite_in_statement),
+                    dangling_comments
+                ),
             ]
         )
-    }
-
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        // dangling comments are formatted as part of fmt_fields
-        Ok(())
     }
 }

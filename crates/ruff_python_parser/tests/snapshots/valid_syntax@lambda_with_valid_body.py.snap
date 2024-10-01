@@ -1,0 +1,348 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/lambda_with_valid_body.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..152,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..11,
+                    value: Lambda(
+                        ExprLambda {
+                            range: 0..11,
+                            parameters: Some(
+                                Parameters {
+                                    range: 7..8,
+                                    posonlyargs: [],
+                                    args: [
+                                        ParameterWithDefault {
+                                            range: 7..8,
+                                            parameter: Parameter {
+                                                range: 7..8,
+                                                name: Identifier {
+                                                    id: Name("x"),
+                                                    range: 7..8,
+                                                },
+                                                annotation: None,
+                                            },
+                                            default: None,
+                                        },
+                                    ],
+                                    vararg: None,
+                                    kwonlyargs: [],
+                                    kwarg: None,
+                                },
+                            ),
+                            body: Name(
+                                ExprName {
+                                    range: 10..11,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 12..38,
+                    value: Lambda(
+                        ExprLambda {
+                            range: 12..38,
+                            parameters: Some(
+                                Parameters {
+                                    range: 19..20,
+                                    posonlyargs: [],
+                                    args: [
+                                        ParameterWithDefault {
+                                            range: 19..20,
+                                            parameter: Parameter {
+                                                range: 19..20,
+                                                name: Identifier {
+                                                    id: Name("x"),
+                                                    range: 19..20,
+                                                },
+                                                annotation: None,
+                                            },
+                                            default: None,
+                                        },
+                                    ],
+                                    vararg: None,
+                                    kwonlyargs: [],
+                                    kwarg: None,
+                                },
+                            ),
+                            body: If(
+                                ExprIf {
+                                    range: 22..38,
+                                    test: BooleanLiteral(
+                                        ExprBooleanLiteral {
+                                            range: 27..31,
+                                            value: true,
+                                        },
+                                    ),
+                                    body: Name(
+                                        ExprName {
+                                            range: 22..23,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    orelse: Name(
+                                        ExprName {
+                                            range: 37..38,
+                                            id: Name("y"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 39..56,
+                    value: Lambda(
+                        ExprLambda {
+                            range: 39..56,
+                            parameters: Some(
+                                Parameters {
+                                    range: 46..47,
+                                    posonlyargs: [],
+                                    args: [
+                                        ParameterWithDefault {
+                                            range: 46..47,
+                                            parameter: Parameter {
+                                                range: 46..47,
+                                                name: Identifier {
+                                                    id: Name("x"),
+                                                    range: 46..47,
+                                                },
+                                                annotation: None,
+                                            },
+                                            default: None,
+                                        },
+                                    ],
+                                    vararg: None,
+                                    kwonlyargs: [],
+                                    kwarg: None,
+                                },
+                            ),
+                            body: Await(
+                                ExprAwait {
+                                    range: 49..56,
+                                    value: Name(
+                                        ExprName {
+                                            range: 55..56,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 57..82,
+                    value: Lambda(
+                        ExprLambda {
+                            range: 57..82,
+                            parameters: Some(
+                                Parameters {
+                                    range: 64..65,
+                                    posonlyargs: [],
+                                    args: [
+                                        ParameterWithDefault {
+                                            range: 64..65,
+                                            parameter: Parameter {
+                                                range: 64..65,
+                                                name: Identifier {
+                                                    id: Name("x"),
+                                                    range: 64..65,
+                                                },
+                                                annotation: None,
+                                            },
+                                            default: None,
+                                        },
+                                    ],
+                                    vararg: None,
+                                    kwonlyargs: [],
+                                    kwarg: None,
+                                },
+                            ),
+                            body: Lambda(
+                                ExprLambda {
+                                    range: 67..82,
+                                    parameters: Some(
+                                        Parameters {
+                                            range: 74..75,
+                                            posonlyargs: [],
+                                            args: [
+                                                ParameterWithDefault {
+                                                    range: 74..75,
+                                                    parameter: Parameter {
+                                                        range: 74..75,
+                                                        name: Identifier {
+                                                            id: Name("y"),
+                                                            range: 74..75,
+                                                        },
+                                                        annotation: None,
+                                                    },
+                                                    default: None,
+                                                },
+                                            ],
+                                            vararg: None,
+                                            kwonlyargs: [],
+                                            kwarg: None,
+                                        },
+                                    ),
+                                    body: BinOp(
+                                        ExprBinOp {
+                                            range: 77..82,
+                                            left: Name(
+                                                ExprName {
+                                                    range: 77..78,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            op: Add,
+                                            right: Name(
+                                                ExprName {
+                                                    range: 81..82,
+                                                    id: Name("y"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 83..102,
+                    value: Lambda(
+                        ExprLambda {
+                            range: 83..102,
+                            parameters: Some(
+                                Parameters {
+                                    range: 90..91,
+                                    posonlyargs: [],
+                                    args: [
+                                        ParameterWithDefault {
+                                            range: 90..91,
+                                            parameter: Parameter {
+                                                range: 90..91,
+                                                name: Identifier {
+                                                    id: Name("x"),
+                                                    range: 90..91,
+                                                },
+                                                annotation: None,
+                                            },
+                                            default: None,
+                                        },
+                                    ],
+                                    vararg: None,
+                                    kwonlyargs: [],
+                                    kwarg: None,
+                                },
+                            ),
+                            body: Yield(
+                                ExprYield {
+                                    range: 94..101,
+                                    value: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 100..101,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 136..151,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 136..151,
+                            elts: [
+                                Lambda(
+                                    ExprLambda {
+                                        range: 136..147,
+                                        parameters: Some(
+                                            Parameters {
+                                                range: 143..144,
+                                                posonlyargs: [],
+                                                args: [
+                                                    ParameterWithDefault {
+                                                        range: 143..144,
+                                                        parameter: Parameter {
+                                                            range: 143..144,
+                                                            name: Identifier {
+                                                                id: Name("x"),
+                                                                range: 143..144,
+                                                            },
+                                                            annotation: None,
+                                                        },
+                                                        default: None,
+                                                    },
+                                                ],
+                                                vararg: None,
+                                                kwonlyargs: [],
+                                                kwarg: None,
+                                            },
+                                        ),
+                                        body: Name(
+                                            ExprName {
+                                                range: 146..147,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ),
+                                Starred(
+                                    ExprStarred {
+                                        range: 149..151,
+                                        value: Name(
+                                            ExprName {
+                                                range: 150..151,
+                                                id: Name("y"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: false,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

@@ -1,0 +1,49 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/from_import_no_space.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..30,
+        body: [
+            ImportFrom(
+                StmtImportFrom {
+                    range: 0..13,
+                    module: None,
+                    names: [
+                        Alias {
+                            range: 12..13,
+                            name: Identifier {
+                                id: Name("x"),
+                                range: 12..13,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 1,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    range: 14..29,
+                    module: None,
+                    names: [
+                        Alias {
+                            range: 28..29,
+                            name: Identifier {
+                                id: Name("x"),
+                                range: 28..29,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 3,
+                },
+            ),
+        ],
+    },
+)
+```

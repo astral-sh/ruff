@@ -6,6 +6,7 @@ use itertools::Itertools;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::schema::{Cell, SourceValue};
+use crate::CellMetadata;
 
 impl fmt::Display for SourceValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -23,11 +24,23 @@ impl fmt::Display for SourceValue {
 
 impl Cell {
     /// Return the [`SourceValue`] of the cell.
-    pub(crate) fn source(&self) -> &SourceValue {
+    pub fn source(&self) -> &SourceValue {
         match self {
             Cell::Code(cell) => &cell.source,
             Cell::Markdown(cell) => &cell.source,
             Cell::Raw(cell) => &cell.source,
+        }
+    }
+
+    pub fn is_code_cell(&self) -> bool {
+        matches!(self, Cell::Code(_))
+    }
+
+    pub fn metadata(&self) -> &CellMetadata {
+        match self {
+            Cell::Code(cell) => &cell.metadata,
+            Cell::Markdown(cell) => &cell.metadata,
+            Cell::Raw(cell) => &cell.metadata,
         }
     }
 
@@ -42,11 +55,21 @@ impl Cell {
 
     /// Return `true` if it's a valid code cell.
     ///
-    /// A valid code cell is a cell where the cell type is [`Cell::Code`] and the
-    /// source doesn't contain a cell magic.
-    pub(crate) fn is_valid_code_cell(&self) -> bool {
+    /// A valid code cell is a cell where:
+    /// 1. The cell type is [`Cell::Code`]
+    /// 2. The source doesn't contain a cell magic
+    /// 3. If the language id is set, it should be `python`
+    pub(crate) fn is_valid_python_code_cell(&self) -> bool {
         let source = match self {
-            Cell::Code(cell) => &cell.source,
+            Cell::Code(cell)
+                if cell
+                    .metadata
+                    .vscode
+                    .as_ref()
+                    .map_or(true, |vscode| vscode.language_id == "python") =>
+            {
+                &cell.source
+            }
             _ => return false,
         };
         // Ignore cells containing cell magic as they act on the entire cell
@@ -80,10 +103,11 @@ impl Cell {
         // ```
         //
         // See: https://ipython.readthedocs.io/en/stable/interactive/magics.html
-        if lines
-            .peek()
-            .and_then(|line| line.split_whitespace().next())
-            .is_some_and(|token| {
+        if let Some(line) = lines.peek() {
+            let mut tokens = line.split_whitespace();
+
+            // The first token must be an automagic, like `load_exit`.
+            if tokens.next().is_some_and(|token| {
                 matches!(
                     token,
                     "alias"
@@ -164,9 +188,19 @@ impl Cell {
                         | "xdel"
                         | "xmode"
                 )
-            })
-        {
-            return true;
+            }) {
+                // The second token must _not_ be an operator, like `=` (to avoid false positives).
+                // The assignment operators can never follow an automagic. Some binary operators
+                // _can_, though (e.g., `cd -` is valid), so we omit them.
+                if !tokens.next().is_some_and(|token| {
+                    matches!(
+                        token,
+                        "=" | "+=" | "-=" | "*=" | "/=" | "//=" | "%=" | "**=" | "&=" | "|=" | "^="
+                    )
+                }) {
+                    return true;
+                }
+            }
         }
 
         // Detect cell magics (which operate on multiple lines).

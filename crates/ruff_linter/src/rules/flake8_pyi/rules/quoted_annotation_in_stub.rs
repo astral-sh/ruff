@@ -9,22 +9,25 @@ use crate::checkers::ast::Checker;
 /// Checks for quoted type annotations in stub (`.pyi`) files, which should be avoided.
 ///
 /// ## Why is this bad?
-/// Stub files are evaluated using `annotations` semantics, as if
-/// `from __future__ import annotations` were included in the file. As such,
-/// quotes are never required for type annotations in stub files, and should be
-/// omitted.
+/// Stub files natively support forward references in all contexts, as stubs
+/// are never executed at runtime. (They should be thought of as "data files"
+/// for type checkers and IDEs.) As such, quotes are never required for type
+/// annotations in stub files, and should be omitted.
 ///
 /// ## Example
-/// ```python
-/// def function() -> "int":
-///     ...
+///
+/// ```pyi
+/// def function() -> "int": ...
 /// ```
 ///
 /// Use instead:
-/// ```python
-/// def function() -> int:
-///     ...
+///
+/// ```pyi
+/// def function() -> int: ...
 /// ```
+///
+/// ## References
+/// - [Static Typing with Python: Type Stubs](https://typing.readthedocs.io/en/latest/source/stubs.html)
 #[violation]
 pub struct QuotedAnnotationInStub;
 

@@ -96,10 +96,8 @@ pub(crate) use format::{
     leading_alternate_branch_comments, leading_comments, leading_node_comments, trailing_comments,
 };
 use ruff_formatter::{SourceCode, SourceCodeSlice};
-use ruff_python_ast::visitor::preorder::{PreorderVisitor, TraversalSignal};
 use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::Mod;
-use ruff_python_trivia::{CommentRanges, PythonWhitespace};
+use ruff_python_trivia::{CommentLinePosition, CommentRanges, SuppressionKind};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 pub(crate) use visitor::collect_comments;
@@ -169,73 +167,16 @@ impl SourceComment {
         DebugComment::new(self, source_code)
     }
 
-    pub(crate) fn suppression_kind(&self, source: &str) -> Option<SuppressionKind> {
-        let text = self.slice.text(SourceCode::new(source));
-
-        // Match against `# fmt: on`, `# fmt: off`, `# yapf: disable`, and `# yapf: enable`, which
-        // must be on their own lines.
-        let trimmed = text.strip_prefix('#').unwrap_or(text).trim_whitespace();
-        if let Some(command) = trimmed.strip_prefix("fmt:") {
-            match command.trim_whitespace_start() {
-                "off" => return Some(SuppressionKind::Off),
-                "on" => return Some(SuppressionKind::On),
-                "skip" => return Some(SuppressionKind::Skip),
-                _ => {}
-            }
-        } else if let Some(command) = trimmed.strip_prefix("yapf:") {
-            match command.trim_whitespace_start() {
-                "disable" => return Some(SuppressionKind::Off),
-                "enable" => return Some(SuppressionKind::On),
-                _ => {}
-            }
-        }
-
-        // Search for `# fmt: skip` comments, which can be interspersed with other comments (e.g.,
-        // `# fmt: skip # noqa: E501`).
-        for segment in text.split('#') {
-            let trimmed = segment.trim_whitespace();
-            if let Some(command) = trimmed.strip_prefix("fmt:") {
-                if command.trim_whitespace_start() == "skip" {
-                    return Some(SuppressionKind::Skip);
-                }
-            }
-        }
-
-        None
+    pub(crate) fn is_suppression_off_comment(&self, text: &str) -> bool {
+        SuppressionKind::is_suppression_off(self.text(text), self.line_position)
     }
 
-    /// Returns true if this comment is a `fmt: off` or `yapf: disable` own line suppression comment.
-    pub(crate) fn is_suppression_off_comment(&self, source: &str) -> bool {
-        self.line_position.is_own_line()
-            && matches!(self.suppression_kind(source), Some(SuppressionKind::Off))
+    pub(crate) fn is_suppression_on_comment(&self, text: &str) -> bool {
+        SuppressionKind::is_suppression_on(self.text(text), self.line_position)
     }
 
-    /// Returns true if this comment is a `fmt: on` or `yapf: enable` own line suppression comment.
-    pub(crate) fn is_suppression_on_comment(&self, source: &str) -> bool {
-        self.line_position.is_own_line()
-            && matches!(self.suppression_kind(source), Some(SuppressionKind::On))
-    }
-}
-
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
-pub(crate) enum SuppressionKind {
-    /// A `fmt: off` or `yapf: disable` comment
-    Off,
-    /// A `fmt: on` or `yapf: enable` comment
-    On,
-    /// A `fmt: skip` comment
-    Skip,
-}
-
-impl SuppressionKind {
-    pub(crate) fn has_skip_comment(trailing_comments: &[SourceComment], source: &str) -> bool {
-        trailing_comments.iter().any(|comment| {
-            comment.line_position().is_end_of_line()
-                && matches!(
-                    comment.suppression_kind(source),
-                    Some(SuppressionKind::Skip | SuppressionKind::Off)
-                )
-        })
+    fn text<'a>(&self, text: &'a str) -> &'a str {
+        self.slice.text(SourceCode::new(text))
     }
 }
 
@@ -246,48 +187,6 @@ impl Ranged for SourceComment {
     }
 }
 
-/// The position of a comment in the source text.
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub(crate) enum CommentLinePosition {
-    /// A comment that is on the same line as the preceding token and is separated by at least one line break from the following token.
-    ///
-    /// # Examples
-    ///
-    /// ## End of line
-    ///
-    /// ```python
-    /// a; # comment
-    /// b;
-    /// ```
-    ///
-    /// `# comment` is an end of line comments because it is separated by at least one line break from the following token `b`.
-    /// Comments that not only end, but also start on a new line are [`OwnLine`](CommentLinePosition::OwnLine) comments.
-    EndOfLine,
-
-    /// A Comment that is separated by at least one line break from the preceding token.
-    ///
-    /// # Examples
-    ///
-    /// ```python
-    /// a;
-    /// # comment
-    /// b;
-    /// ```
-    ///
-    /// `# comment` line comments because they are separated by one line break from the preceding token `a`.
-    OwnLine,
-}
-
-impl CommentLinePosition {
-    pub(crate) const fn is_own_line(self) -> bool {
-        matches!(self, CommentLinePosition::OwnLine)
-    }
-
-    pub(crate) const fn is_end_of_line(self) -> bool {
-        matches!(self, CommentLinePosition::EndOfLine)
-    }
-}
-
 type CommentsMap<'a> = MultiMap<NodeRefEqualityKey<'a>, SourceComment>;
 
 /// The comments of a syntax tree stored by node.
@@ -295,9 +194,9 @@ type CommentsMap<'a> = MultiMap<NodeRefEqualityKey<'a>, SourceComment>;
 /// Cloning `comments` is cheap as it only involves bumping a reference counter.
 #[derive(Debug, Clone)]
 pub(crate) struct Comments<'a> {
-    /// The implementation uses an [Rc] so that [Comments] has a lifetime independent from the [crate::Formatter].
-    /// Independent lifetimes are necessary to support the use case where a (formattable object)[crate::Format]
-    /// iterates over all comments, and writes them into the [crate::Formatter] (mutably borrowing the [crate::Formatter] and in turn its context).
+    /// The implementation uses an [Rc] so that [Comments] has a lifetime independent from the [`crate::Formatter`].
+    /// Independent lifetimes are necessary to support the use case where a (formattable object)[`crate::Format`]
+    /// iterates over all comments, and writes them into the [`crate::Formatter`] (mutably borrowing the [`crate::Formatter`] and in turn its context).
     ///
     /// ```block
     /// for leading in f.context().comments().leading_comments(node) {
@@ -347,20 +246,28 @@ impl<'a> Comments<'a> {
 
     /// Extracts the comments from the AST.
     pub(crate) fn from_ast(
-        root: &'a Mod,
+        root: impl Into<AnyNodeRef<'a>>,
         source_code: SourceCode<'a>,
         comment_ranges: &'a CommentRanges,
     ) -> Self {
-        let map = if comment_ranges.is_empty() {
-            CommentsMap::new()
-        } else {
-            let mut builder =
-                CommentsMapBuilder::new(Locator::new(source_code.as_str()), comment_ranges);
-            CommentsVisitor::new(source_code, comment_ranges, &mut builder).visit(root);
-            builder.finish()
-        };
+        fn collect_comments<'a>(
+            root: AnyNodeRef<'a>,
+            source_code: SourceCode<'a>,
+            comment_ranges: &'a CommentRanges,
+        ) -> Comments<'a> {
+            let map = if comment_ranges.is_empty() {
+                CommentsMap::new()
+            } else {
+                let mut builder =
+                    CommentsMapBuilder::new(Locator::new(source_code.as_str()), comment_ranges);
+                CommentsVisitor::new(source_code, comment_ranges, &mut builder).visit(root);
+                builder.finish()
+            };
 
-        Self::new(map, comment_ranges)
+            Comments::new(map, comment_ranges)
+        }
+
+        collect_comments(root.into(), source_code, comment_ranges)
     }
 
     /// Returns `true` if the given `node` has any comments.
@@ -499,6 +406,20 @@ impl<'a> Comments<'a> {
     /// normally if `node` is the first or last node of a suppression range.
     #[cfg(debug_assertions)]
     pub(crate) fn mark_verbatim_node_comments_formatted(&self, node: AnyNodeRef) {
+        use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal};
+
+        struct MarkVerbatimCommentsAsFormattedVisitor<'a>(&'a Comments<'a>);
+
+        impl<'a> SourceOrderVisitor<'a> for MarkVerbatimCommentsAsFormattedVisitor<'a> {
+            fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
+                for comment in self.0.leading_dangling_trailing(node) {
+                    comment.mark_formatted();
+                }
+
+                TraversalSignal::Traverse
+            }
+        }
+
         for dangling in self.dangling(node) {
             dangling.mark_formatted();
         }
@@ -544,16 +465,14 @@ struct CommentsData<'a> {
     comment_ranges: &'a CommentRanges,
 }
 
-struct MarkVerbatimCommentsAsFormattedVisitor<'a>(&'a Comments<'a>);
-
-impl<'a> PreorderVisitor<'a> for MarkVerbatimCommentsAsFormattedVisitor<'a> {
-    fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
-        for comment in self.0.leading_dangling_trailing(node) {
-            comment.mark_formatted();
-        }
-
-        TraversalSignal::Traverse
-    }
+pub(crate) fn has_skip_comment(trailing_comments: &[SourceComment], source: &str) -> bool {
+    trailing_comments.iter().any(|comment| {
+        comment.line_position().is_end_of_line()
+            && matches!(
+                SuppressionKind::from_comment(comment.text(source)),
+                Some(SuppressionKind::Skip | SuppressionKind::Off)
+            )
+    })
 }
 
 #[cfg(test)]
@@ -562,14 +481,13 @@ mod tests {
 
     use ruff_formatter::SourceCode;
     use ruff_python_ast::{Mod, PySourceType};
-    use ruff_python_index::tokens_and_ranges;
-    use ruff_python_parser::{parse_tokens, AsMode};
+    use ruff_python_parser::{parse, AsMode, Parsed};
     use ruff_python_trivia::CommentRanges;
 
     use crate::comments::Comments;
 
     struct CommentsTestCase<'a> {
-        module: Mod,
+        parsed: Parsed<Mod>,
         comment_ranges: CommentRanges,
         source_code: SourceCode<'a>,
     }
@@ -578,20 +496,19 @@ mod tests {
         fn from_code(source: &'a str) -> Self {
             let source_code = SourceCode::new(source);
             let source_type = PySourceType::Python;
-            let (tokens, comment_ranges) =
-                tokens_and_ranges(source, source_type).expect("Expect source to be valid Python");
-            let parsed = parse_tokens(tokens, source, source_type.as_mode())
-                .expect("Expect source to be valid Python");
+            let parsed =
+                parse(source, source_type.as_mode()).expect("Expect source to be valid Python");
+            let comment_ranges = CommentRanges::from(parsed.tokens());
 
             CommentsTestCase {
-                source_code,
-                module: parsed,
+                parsed,
                 comment_ranges,
+                source_code,
             }
         }
 
         fn to_comments(&self) -> Comments {
-            Comments::from_ast(&self.module, self.source_code, &self.comment_ranges)
+            Comments::from_ast(self.parsed.syntax(), self.source_code, &self.comment_ranges)
         }
     }
 

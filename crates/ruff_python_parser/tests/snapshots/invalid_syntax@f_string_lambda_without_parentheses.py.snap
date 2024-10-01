@@ -1,0 +1,114 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/f_string_lambda_without_parentheses.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..17,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..16,
+                    value: FString(
+                        ExprFString {
+                            range: 0..16,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 0..16,
+                                            elements: [
+                                                Expression(
+                                                    FStringExpressionElement {
+                                                        range: 2..12,
+                                                        expression: Lambda(
+                                                            ExprLambda {
+                                                                range: 3..12,
+                                                                parameters: Some(
+                                                                    Parameters {
+                                                                        range: 10..11,
+                                                                        posonlyargs: [],
+                                                                        args: [
+                                                                            ParameterWithDefault {
+                                                                                range: 10..11,
+                                                                                parameter: Parameter {
+                                                                                    range: 10..11,
+                                                                                    name: Identifier {
+                                                                                        id: Name("x"),
+                                                                                        range: 10..11,
+                                                                                    },
+                                                                                    annotation: None,
+                                                                                },
+                                                                                default: None,
+                                                                            },
+                                                                        ],
+                                                                        vararg: None,
+                                                                        kwonlyargs: [],
+                                                                        kwarg: None,
+                                                                    },
+                                                                ),
+                                                                body: Name(
+                                                                    ExprName {
+                                                                        range: 12..12,
+                                                                        id: Name(""),
+                                                                        ctx: Invalid,
+                                                                    },
+                                                                ),
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                                Literal(
+                                                    FStringLiteralElement {
+                                                        range: 12..14,
+                                                        value: " x",
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | f"{lambda x: x}"
+  |             ^^ Syntax Error: Expected an expression
+  |
+
+
+  |
+1 | f"{lambda x: x}"
+  |    ^^^^^^^^^ Syntax Error: f-string: lambda expressions are not allowed without parentheses
+  |
+
+
+  |
+1 | f"{lambda x: x}"
+  |             ^^ Syntax Error: f-string: expecting '}'
+  |
+
+
+  |
+1 | f"{lambda x: x}"
+  |               ^ Syntax Error: Expected an f-string element or the end of the f-string
+  |

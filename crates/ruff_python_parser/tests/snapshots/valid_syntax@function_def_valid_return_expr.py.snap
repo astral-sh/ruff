@@ -1,0 +1,245 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/function_def_valid_return_expr.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..125,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 0..27,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 4..7,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 7..9,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: Some(
+                        BinOp(
+                            ExprBinOp {
+                                range: 13..22,
+                                left: Name(
+                                    ExprName {
+                                        range: 13..16,
+                                        id: Name("int"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                op: BitOr,
+                                right: Name(
+                                    ExprName {
+                                        range: 19..22,
+                                        id: Name("str"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 24..27,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 24..27,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 28..57,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 32..35,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 35..37,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: Some(
+                        Lambda(
+                            ExprLambda {
+                                range: 41..52,
+                                parameters: Some(
+                                    Parameters {
+                                        range: 48..49,
+                                        posonlyargs: [],
+                                        args: [
+                                            ParameterWithDefault {
+                                                range: 48..49,
+                                                parameter: Parameter {
+                                                    range: 48..49,
+                                                    name: Identifier {
+                                                        id: Name("x"),
+                                                        range: 48..49,
+                                                    },
+                                                    annotation: None,
+                                                },
+                                                default: None,
+                                            },
+                                        ],
+                                        vararg: None,
+                                        kwonlyargs: [],
+                                        kwarg: None,
+                                    },
+                                ),
+                                body: Name(
+                                    ExprName {
+                                        range: 51..52,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 54..57,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 54..57,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 58..85,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 62..65,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 65..67,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: Some(
+                        Yield(
+                            ExprYield {
+                                range: 72..79,
+                                value: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 78..79,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ),
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 82..85,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 82..85,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 86..124,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 90..93,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 93..95,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: Some(
+                        If(
+                            ExprIf {
+                                range: 99..119,
+                                test: BooleanLiteral(
+                                    ExprBooleanLiteral {
+                                        range: 106..110,
+                                        value: true,
+                                    },
+                                ),
+                                body: Name(
+                                    ExprName {
+                                        range: 99..102,
+                                        id: Name("int"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                orelse: Name(
+                                    ExprName {
+                                        range: 116..119,
+                                        id: Name("str"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 121..124,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 121..124,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```

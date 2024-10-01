@@ -1,17 +1,25 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
-use std::cell::OnceCell;
+use std::borrow::Cow;
 use std::fmt;
 use std::fmt::Debug;
-use std::ops::Deref;
+use std::iter::FusedIterator;
+use std::ops::{Deref, DerefMut};
 use std::slice::{Iter, IterMut};
+use std::sync::OnceLock;
 
+use bitflags::bitflags;
 use itertools::Itertools;
 
-use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::{int, LiteralExpressionRef};
+use crate::name::Name;
+use crate::{
+    int,
+    str::Quote,
+    str_prefix::{AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix},
+    LiteralExpressionRef,
+};
 
 /// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
@@ -160,7 +168,7 @@ pub enum Stmt {
 pub struct StmtIpyEscapeCommand {
     pub range: TextRange,
     pub kind: IpyEscapeKind,
-    pub value: String,
+    pub value: Box<str>,
 }
 
 impl From<StmtIpyEscapeCommand> for Stmt {
@@ -180,7 +188,7 @@ pub struct StmtFunctionDef {
     pub is_async: bool,
     pub decorator_list: Vec<Decorator>,
     pub name: Identifier,
-    pub type_params: Option<TypeParams>,
+    pub type_params: Option<Box<TypeParams>>,
     pub parameters: Box<Parameters>,
     pub returns: Option<Box<Expr>>,
     pub body: Vec<Stmt>,
@@ -470,7 +478,7 @@ pub struct StmtImportFrom {
     pub range: TextRange,
     pub module: Option<Identifier>,
     pub names: Vec<Alias>,
-    pub level: Option<u32>,
+    pub level: u32,
 }
 
 impl From<StmtImportFrom> for Stmt {
@@ -559,16 +567,16 @@ impl From<StmtContinue> for Stmt {
 pub enum Expr {
     #[is(name = "bool_op_expr")]
     BoolOp(ExprBoolOp),
-    #[is(name = "named_expr_expr")]
-    NamedExpr(ExprNamedExpr),
+    #[is(name = "named_expr")]
+    Named(ExprNamed),
     #[is(name = "bin_op_expr")]
     BinOp(ExprBinOp),
     #[is(name = "unary_op_expr")]
     UnaryOp(ExprUnaryOp),
     #[is(name = "lambda_expr")]
     Lambda(ExprLambda),
-    #[is(name = "if_exp_expr")]
-    IfExp(ExprIfExp),
+    #[is(name = "if_expr")]
+    If(ExprIf),
     #[is(name = "dict_expr")]
     Dict(ExprDict),
     #[is(name = "set_expr")]
@@ -579,8 +587,8 @@ pub enum Expr {
     SetComp(ExprSetComp),
     #[is(name = "dict_comp_expr")]
     DictComp(ExprDictComp),
-    #[is(name = "generator_exp_expr")]
-    GeneratorExp(ExprGeneratorExp),
+    #[is(name = "generator_expr")]
+    Generator(ExprGenerator),
     #[is(name = "await_expr")]
     Await(ExprAwait),
     #[is(name = "yield_expr")]
@@ -671,7 +679,7 @@ impl Expr {
 pub struct ExprIpyEscapeCommand {
     pub range: TextRange,
     pub kind: IpyEscapeKind,
-    pub value: String,
+    pub value: Box<str>,
 }
 
 impl From<ExprIpyEscapeCommand> for Expr {
@@ -696,15 +704,15 @@ impl From<ExprBoolOp> for Expr {
 
 /// See also [NamedExpr](https://docs.python.org/3/library/ast.html#ast.NamedExpr)
 #[derive(Clone, Debug, PartialEq)]
-pub struct ExprNamedExpr {
+pub struct ExprNamed {
     pub range: TextRange,
     pub target: Box<Expr>,
     pub value: Box<Expr>,
 }
 
-impl From<ExprNamedExpr> for Expr {
-    fn from(payload: ExprNamedExpr) -> Self {
-        Expr::NamedExpr(payload)
+impl From<ExprNamed> for Expr {
+    fn from(payload: ExprNamed) -> Self {
+        Expr::Named(payload)
     }
 }
 
@@ -753,16 +761,64 @@ impl From<ExprLambda> for Expr {
 
 /// See also [IfExp](https://docs.python.org/3/library/ast.html#ast.IfExp)
 #[derive(Clone, Debug, PartialEq)]
-pub struct ExprIfExp {
+pub struct ExprIf {
     pub range: TextRange,
     pub test: Box<Expr>,
     pub body: Box<Expr>,
     pub orelse: Box<Expr>,
 }
 
-impl From<ExprIfExp> for Expr {
-    fn from(payload: ExprIfExp) -> Self {
-        Expr::IfExp(payload)
+impl From<ExprIf> for Expr {
+    fn from(payload: ExprIf) -> Self {
+        Expr::If(payload)
+    }
+}
+
+/// Represents an item in a [dictionary literal display][1].
+///
+/// Consider the following Python dictionary literal:
+/// ```python
+/// {key1: value1, **other_dictionary}
+/// ```
+///
+/// In our AST, this would be represented using an `ExprDict` node containing
+/// two `DictItem` nodes inside it:
+/// ```ignore
+/// [
+///     DictItem {
+///         key: Some(Expr::Name(ExprName { id: "key1" })),
+///         value: Expr::Name(ExprName { id: "value1" }),
+///     },
+///     DictItem {
+///         key: None,
+///         value: Expr::Name(ExprName { id: "other_dictionary" }),
+///     }
+/// ]
+/// ```
+///
+/// [1]: https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries
+#[derive(Debug, Clone, PartialEq)]
+pub struct DictItem {
+    pub key: Option<Expr>,
+    pub value: Expr,
+}
+
+impl DictItem {
+    fn key(&self) -> Option<&Expr> {
+        self.key.as_ref()
+    }
+
+    fn value(&self) -> &Expr {
+        &self.value
+    }
+}
+
+impl Ranged for DictItem {
+    fn range(&self) -> TextRange {
+        TextRange::new(
+            self.key.as_ref().map_or(self.value.start(), Ranged::start),
+            self.value.end(),
+        )
     }
 }
 
@@ -770,8 +826,58 @@ impl From<ExprIfExp> for Expr {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprDict {
     pub range: TextRange,
-    pub keys: Vec<Option<Expr>>,
-    pub values: Vec<Expr>,
+    pub items: Vec<DictItem>,
+}
+
+impl ExprDict {
+    /// Returns an `Iterator` over the AST nodes representing the
+    /// dictionary's keys.
+    pub fn iter_keys(&self) -> DictKeyIterator {
+        DictKeyIterator::new(&self.items)
+    }
+
+    /// Returns an `Iterator` over the AST nodes representing the
+    /// dictionary's values.
+    pub fn iter_values(&self) -> DictValueIterator {
+        DictValueIterator::new(&self.items)
+    }
+
+    /// Returns the AST node representing the *n*th key of this
+    /// dictionary.
+    ///
+    /// Panics: If the index `n` is out of bounds.
+    pub fn key(&self, n: usize) -> Option<&Expr> {
+        self.items[n].key()
+    }
+
+    /// Returns the AST node representing the *n*th value of this
+    /// dictionary.
+    ///
+    /// Panics: If the index `n` is out of bounds.
+    pub fn value(&self, n: usize) -> &Expr {
+        self.items[n].value()
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<'_, DictItem> {
+        self.items.iter()
+    }
+
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+}
+
+impl<'a> IntoIterator for &'a ExprDict {
+    type IntoIter = std::slice::Iter<'a, DictItem>;
+    type Item = &'a DictItem;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
 }
 
 impl From<ExprDict> for Expr {
@@ -780,11 +886,118 @@ impl From<ExprDict> for Expr {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct DictKeyIterator<'a> {
+    items: Iter<'a, DictItem>,
+}
+
+impl<'a> DictKeyIterator<'a> {
+    fn new(items: &'a [DictItem]) -> Self {
+        Self {
+            items: items.iter(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl<'a> Iterator for DictKeyIterator<'a> {
+    type Item = Option<&'a Expr>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.items.next().map(DictItem::key)
+    }
+
+    fn last(mut self) -> Option<Self::Item> {
+        self.next_back()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.items.size_hint()
+    }
+}
+
+impl<'a> DoubleEndedIterator for DictKeyIterator<'a> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.items.next_back().map(DictItem::key)
+    }
+}
+
+impl<'a> FusedIterator for DictKeyIterator<'a> {}
+impl<'a> ExactSizeIterator for DictKeyIterator<'a> {}
+
+#[derive(Debug, Clone)]
+pub struct DictValueIterator<'a> {
+    items: Iter<'a, DictItem>,
+}
+
+impl<'a> DictValueIterator<'a> {
+    fn new(items: &'a [DictItem]) -> Self {
+        Self {
+            items: items.iter(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl<'a> Iterator for DictValueIterator<'a> {
+    type Item = &'a Expr;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.items.next().map(DictItem::value)
+    }
+
+    fn last(mut self) -> Option<Self::Item> {
+        self.next_back()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.items.size_hint()
+    }
+}
+
+impl<'a> DoubleEndedIterator for DictValueIterator<'a> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.items.next_back().map(DictItem::value)
+    }
+}
+
+impl<'a> FusedIterator for DictValueIterator<'a> {}
+impl<'a> ExactSizeIterator for DictValueIterator<'a> {}
+
 /// See also [Set](https://docs.python.org/3/library/ast.html#ast.Set)
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprSet {
     pub range: TextRange,
     pub elts: Vec<Expr>,
+}
+
+impl ExprSet {
+    pub fn iter(&self) -> std::slice::Iter<'_, Expr> {
+        self.elts.iter()
+    }
+
+    pub fn len(&self) -> usize {
+        self.elts.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.elts.is_empty()
+    }
+}
+
+impl<'a> IntoIterator for &'a ExprSet {
+    type IntoIter = std::slice::Iter<'a, Expr>;
+    type Item = &'a Expr;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
 }
 
 impl From<ExprSet> for Expr {
@@ -838,15 +1051,16 @@ impl From<ExprDictComp> for Expr {
 
 /// See also [GeneratorExp](https://docs.python.org/3/library/ast.html#ast.GeneratorExp)
 #[derive(Clone, Debug, PartialEq)]
-pub struct ExprGeneratorExp {
+pub struct ExprGenerator {
     pub range: TextRange,
     pub elt: Box<Expr>,
     pub generators: Vec<Comprehension>,
+    pub parenthesized: bool,
 }
 
-impl From<ExprGeneratorExp> for Expr {
-    fn from(payload: ExprGeneratorExp) -> Self {
-        Expr::GeneratorExp(payload)
+impl From<ExprGenerator> for Expr {
+    fn from(payload: ExprGenerator) -> Self {
+        Expr::Generator(payload)
     }
 }
 
@@ -894,8 +1108,8 @@ impl From<ExprYieldFrom> for Expr {
 pub struct ExprCompare {
     pub range: TextRange,
     pub left: Box<Expr>,
-    pub ops: Vec<CmpOp>,
-    pub comparators: Vec<Expr>,
+    pub ops: Box<[CmpOp]>,
+    pub comparators: Box<[Expr]>,
 }
 
 impl From<ExprCompare> for Expr {
@@ -921,7 +1135,7 @@ impl From<ExprCall> for Expr {
 #[derive(Clone, Debug, PartialEq)]
 pub struct FStringFormatSpec {
     pub range: TextRange,
-    pub elements: Vec<FStringElement>,
+    pub elements: FStringElements,
 }
 
 impl Ranged for FStringFormatSpec {
@@ -946,10 +1160,17 @@ impl Ranged for FStringExpressionElement {
     }
 }
 
+/// An `FStringLiteralElement` with an empty `value` is an invalid f-string element.
 #[derive(Clone, Debug, PartialEq)]
 pub struct FStringLiteralElement {
     pub range: TextRange,
-    pub value: String,
+    pub value: Box<str>,
+}
+
+impl FStringLiteralElement {
+    pub fn is_valid(&self) -> bool {
+        !self.value.is_empty()
+    }
 }
 
 impl Ranged for FStringLiteralElement {
@@ -962,7 +1183,7 @@ impl Deref for FStringLiteralElement {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
-        self.value.as_str()
+        &self.value
     }
 }
 
@@ -997,7 +1218,7 @@ impl ConversionFlag {
 pub struct DebugText {
     /// The text between the `{` and the expression node.
     pub leading: String,
-    /// The text between the expression and the conversion, the format_spec, or the `}`, depending on what's present in the source
+    /// The text between the expression and the conversion, the `format_spec`, or the `}`, depending on what's present in the source
     pub trailing: String,
 }
 
@@ -1158,6 +1379,15 @@ pub enum FStringPart {
     FString(FString),
 }
 
+impl FStringPart {
+    pub fn quote_style(&self) -> Quote {
+        match self {
+            Self::Literal(string_literal) => string_literal.flags.quote_style(),
+            Self::FString(f_string) => f_string.flags.quote_style(),
+        }
+    }
+}
+
 impl Ranged for FStringPart {
     fn range(&self) -> TextRange {
         match self {
@@ -1167,11 +1397,176 @@ impl Ranged for FStringPart {
     }
 }
 
+pub trait StringFlags: Copy {
+    /// Does the string use single or double quotes in its opener and closer?
+    fn quote_style(self) -> Quote;
+
+    /// Is the string triple-quoted, i.e.,
+    /// does it begin and end with three consecutive quote characters?
+    fn is_triple_quoted(self) -> bool;
+
+    fn prefix(self) -> AnyStringPrefix;
+
+    /// A `str` representation of the quotes used to start and close.
+    /// This does not include any prefixes the string has in its opener.
+    fn quote_str(self) -> &'static str {
+        if self.is_triple_quoted() {
+            match self.quote_style() {
+                Quote::Single => "'''",
+                Quote::Double => r#"""""#,
+            }
+        } else {
+            match self.quote_style() {
+                Quote::Single => "'",
+                Quote::Double => "\"",
+            }
+        }
+    }
+
+    /// The length of the quotes used to start and close the string.
+    /// This does not include the length of any prefixes the string has
+    /// in its opener.
+    fn quote_len(self) -> TextSize {
+        if self.is_triple_quoted() {
+            TextSize::new(3)
+        } else {
+            TextSize::new(1)
+        }
+    }
+
+    /// The total length of the string's opener,
+    /// i.e., the length of the prefixes plus the length
+    /// of the quotes used to open the string.
+    fn opener_len(self) -> TextSize {
+        self.prefix().as_str().text_len() + self.quote_len()
+    }
+
+    /// The total length of the string's closer.
+    /// This is always equal to `self.quote_len()`,
+    /// but is provided here for symmetry with the `opener_len()` method.
+    fn closer_len(self) -> TextSize {
+        self.quote_len()
+    }
+
+    fn format_string_contents(self, contents: &str) -> String {
+        let prefix = self.prefix();
+        let quote_str = self.quote_str();
+        format!("{prefix}{quote_str}{contents}{quote_str}")
+    }
+}
+
+bitflags! {
+    #[derive(Default, Copy, Clone, PartialEq, Eq, Hash)]
+    struct FStringFlagsInner: u8 {
+        /// The f-string uses double quotes (`"`) for its opener and closer.
+        /// If this flag is not set, the f-string uses single quotes (`'`)
+        /// for its opener and closer.
+        const DOUBLE = 1 << 0;
+
+        /// The f-string is triple-quoted:
+        /// it begins and ends with three consecutive quote characters.
+        /// For example: `f"""{bar}"""`.
+        const TRIPLE_QUOTED = 1 << 1;
+
+        /// The f-string has an `r` prefix, meaning it is a raw f-string
+        /// with a lowercase 'r'. For example: `rf"{bar}"`
+        const R_PREFIX_LOWER = 1 << 2;
+
+        /// The f-string has an `R` prefix, meaning it is a raw f-string
+        /// with an uppercase 'r'. For example: `Rf"{bar}"`.
+        /// See https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#r-strings-and-r-strings
+        /// for why we track the casing of the `r` prefix,
+        /// but not for any other prefix
+        const R_PREFIX_UPPER = 1 << 3;
+    }
+}
+
+/// Flags that can be queried to obtain information
+/// regarding the prefixes and quotes used for an f-string.
+#[derive(Default, Copy, Clone, Eq, PartialEq, Hash)]
+pub struct FStringFlags(FStringFlagsInner);
+
+impl FStringFlags {
+    #[must_use]
+    pub fn with_quote_style(mut self, quote_style: Quote) -> Self {
+        self.0
+            .set(FStringFlagsInner::DOUBLE, quote_style.is_double());
+        self
+    }
+
+    #[must_use]
+    pub fn with_triple_quotes(mut self) -> Self {
+        self.0 |= FStringFlagsInner::TRIPLE_QUOTED;
+        self
+    }
+
+    #[must_use]
+    pub fn with_prefix(mut self, prefix: FStringPrefix) -> Self {
+        match prefix {
+            FStringPrefix::Regular => {
+                Self(self.0 - FStringFlagsInner::R_PREFIX_LOWER - FStringFlagsInner::R_PREFIX_UPPER)
+            }
+            FStringPrefix::Raw { uppercase_r } => {
+                self.0.set(FStringFlagsInner::R_PREFIX_UPPER, uppercase_r);
+                self.0.set(FStringFlagsInner::R_PREFIX_LOWER, !uppercase_r);
+                self
+            }
+        }
+    }
+
+    pub const fn prefix(self) -> FStringPrefix {
+        if self.0.contains(FStringFlagsInner::R_PREFIX_LOWER) {
+            debug_assert!(!self.0.contains(FStringFlagsInner::R_PREFIX_UPPER));
+            FStringPrefix::Raw { uppercase_r: false }
+        } else if self.0.contains(FStringFlagsInner::R_PREFIX_UPPER) {
+            FStringPrefix::Raw { uppercase_r: true }
+        } else {
+            FStringPrefix::Regular
+        }
+    }
+}
+
+impl StringFlags for FStringFlags {
+    /// Return `true` if the f-string is triple-quoted, i.e.,
+    /// it begins and ends with three consecutive quote characters.
+    /// For example: `f"""{bar}"""`
+    fn is_triple_quoted(self) -> bool {
+        self.0.contains(FStringFlagsInner::TRIPLE_QUOTED)
+    }
+
+    /// Return the quoting style (single or double quotes)
+    /// used by the f-string's opener and closer:
+    /// - `f"{"a"}"` -> `QuoteStyle::Double`
+    /// - `f'{"a"}'` -> `QuoteStyle::Single`
+    fn quote_style(self) -> Quote {
+        if self.0.contains(FStringFlagsInner::DOUBLE) {
+            Quote::Double
+        } else {
+            Quote::Single
+        }
+    }
+
+    fn prefix(self) -> AnyStringPrefix {
+        AnyStringPrefix::Format(self.prefix())
+    }
+}
+
+impl fmt::Debug for FStringFlags {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("FStringFlags")
+            .field("quote_style", &self.quote_style())
+            .field("prefix", &self.prefix())
+            .field("triple_quoted", &self.is_triple_quoted())
+            .finish()
+    }
+}
+
 /// An AST node that represents a single f-string which is part of an [`ExprFString`].
 #[derive(Clone, Debug, PartialEq)]
 pub struct FString {
     pub range: TextRange,
-    pub elements: Vec<FStringElement>,
+    pub elements: FStringElements,
+    pub flags: FStringFlags,
 }
 
 impl Ranged for FString {
@@ -1187,6 +1582,66 @@ impl From<FString> for Expr {
             value: FStringValue::single(payload),
         }
         .into()
+    }
+}
+
+/// A newtype wrapper around a list of [`FStringElement`].
+#[derive(Clone, Default, PartialEq)]
+pub struct FStringElements(Vec<FStringElement>);
+
+impl FStringElements {
+    /// Returns an iterator over all the [`FStringLiteralElement`] nodes contained in this f-string.
+    pub fn literals(&self) -> impl Iterator<Item = &FStringLiteralElement> {
+        self.iter().filter_map(|element| element.as_literal())
+    }
+
+    /// Returns an iterator over all the [`FStringExpressionElement`] nodes contained in this f-string.
+    pub fn expressions(&self) -> impl Iterator<Item = &FStringExpressionElement> {
+        self.iter().filter_map(|element| element.as_expression())
+    }
+}
+
+impl From<Vec<FStringElement>> for FStringElements {
+    fn from(elements: Vec<FStringElement>) -> Self {
+        FStringElements(elements)
+    }
+}
+
+impl<'a> IntoIterator for &'a FStringElements {
+    type IntoIter = Iter<'a, FStringElement>;
+    type Item = &'a FStringElement;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut FStringElements {
+    type IntoIter = IterMut<'a, FStringElement>;
+    type Item = &'a mut FStringElement;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
+    }
+}
+
+impl Deref for FStringElements {
+    type Target = [FStringElement];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for FStringElements {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl fmt::Debug for FStringElements {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(&self.0, f)
     }
 }
 
@@ -1251,7 +1706,7 @@ impl StringLiteralValue {
         Self {
             inner: StringLiteralValueInner::Concatenated(ConcatenatedStringLiteral {
                 strings,
-                value: OnceCell::new(),
+                value: OnceLock::new(),
             }),
         }
     }
@@ -1266,7 +1721,9 @@ impl StringLiteralValue {
     /// For an implicitly concatenated string, it returns `true` only if the first
     /// string literal is a unicode string.
     pub fn is_unicode(&self) -> bool {
-        self.iter().next().map_or(false, |part| part.unicode)
+        self.iter()
+            .next()
+            .map_or(false, |part| part.flags.prefix().is_unicode())
     }
 
     /// Returns a slice of all the [`StringLiteral`] parts contained in this value.
@@ -1308,7 +1765,7 @@ impl StringLiteralValue {
     }
 
     /// Returns an iterator over the [`char`]s of each string literal part.
-    pub fn chars(&self) -> impl Iterator<Item = char> + '_ {
+    pub fn chars(&self) -> impl Iterator<Item = char> + Clone + '_ {
         self.iter().flat_map(|part| part.value.chars())
     }
 
@@ -1351,12 +1808,6 @@ impl PartialEq<str> for StringLiteralValue {
     }
 }
 
-impl PartialEq<String> for StringLiteralValue {
-    fn eq(&self, other: &String) -> bool {
-        self == other.as_str()
-    }
-}
-
 impl fmt::Display for StringLiteralValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.to_str())
@@ -1379,13 +1830,154 @@ impl Default for StringLiteralValueInner {
     }
 }
 
+bitflags! {
+    #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+    struct StringLiteralFlagsInner: u8 {
+        /// The string uses double quotes (e.g. `"foo"`).
+        /// If this flag is not set, the string uses single quotes (`'foo'`).
+        const DOUBLE = 1 << 0;
+
+        /// The string is triple-quoted (`"""foo"""`):
+        /// it begins and ends with three consecutive quote characters.
+        const TRIPLE_QUOTED = 1 << 1;
+
+        /// The string has a `u` or `U` prefix, e.g. `u"foo"`.
+        /// While this prefix is a no-op at runtime,
+        /// strings with this prefix can have no other prefixes set;
+        /// it is therefore invalid for this flag to be set
+        /// if `R_PREFIX` is also set.
+        const U_PREFIX = 1 << 2;
+
+        /// The string has an `r` prefix, meaning it is a raw string
+        /// with a lowercase 'r' (e.g. `r"foo\."`).
+        /// It is invalid to set this flag if `U_PREFIX` is also set.
+        const R_PREFIX_LOWER = 1 << 3;
+
+        /// The string has an `R` prefix, meaning it is a raw string
+        /// with an uppercase 'R' (e.g. `R'foo\d'`).
+        /// See https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#r-strings-and-r-strings
+        /// for why we track the casing of the `r` prefix,
+        /// but not for any other prefix
+        const R_PREFIX_UPPER = 1 << 4;
+
+        /// The string was deemed invalid by the parser.
+        const INVALID = 1 << 5;
+    }
+}
+
+/// Flags that can be queried to obtain information
+/// regarding the prefixes and quotes used for a string literal.
+#[derive(Default, Copy, Clone, Eq, PartialEq, Hash)]
+pub struct StringLiteralFlags(StringLiteralFlagsInner);
+
+impl StringLiteralFlags {
+    #[must_use]
+    pub fn with_quote_style(mut self, quote_style: Quote) -> Self {
+        self.0
+            .set(StringLiteralFlagsInner::DOUBLE, quote_style.is_double());
+        self
+    }
+
+    #[must_use]
+    pub fn with_triple_quotes(mut self) -> Self {
+        self.0 |= StringLiteralFlagsInner::TRIPLE_QUOTED;
+        self
+    }
+
+    #[must_use]
+    pub fn with_prefix(self, prefix: StringLiteralPrefix) -> Self {
+        let StringLiteralFlags(flags) = self;
+        match prefix {
+            StringLiteralPrefix::Empty => Self(
+                flags
+                    - StringLiteralFlagsInner::R_PREFIX_LOWER
+                    - StringLiteralFlagsInner::R_PREFIX_UPPER
+                    - StringLiteralFlagsInner::U_PREFIX,
+            ),
+            StringLiteralPrefix::Raw { uppercase: false } => Self(
+                (flags | StringLiteralFlagsInner::R_PREFIX_LOWER)
+                    - StringLiteralFlagsInner::R_PREFIX_UPPER
+                    - StringLiteralFlagsInner::U_PREFIX,
+            ),
+            StringLiteralPrefix::Raw { uppercase: true } => Self(
+                (flags | StringLiteralFlagsInner::R_PREFIX_UPPER)
+                    - StringLiteralFlagsInner::R_PREFIX_LOWER
+                    - StringLiteralFlagsInner::U_PREFIX,
+            ),
+            StringLiteralPrefix::Unicode => Self(
+                (flags | StringLiteralFlagsInner::U_PREFIX)
+                    - StringLiteralFlagsInner::R_PREFIX_LOWER
+                    - StringLiteralFlagsInner::R_PREFIX_UPPER,
+            ),
+        }
+    }
+
+    #[must_use]
+    pub fn with_invalid(mut self) -> Self {
+        self.0 |= StringLiteralFlagsInner::INVALID;
+        self
+    }
+
+    pub const fn prefix(self) -> StringLiteralPrefix {
+        if self.0.contains(StringLiteralFlagsInner::U_PREFIX) {
+            debug_assert!(!self.0.intersects(
+                StringLiteralFlagsInner::R_PREFIX_LOWER
+                    .union(StringLiteralFlagsInner::R_PREFIX_UPPER)
+            ));
+            StringLiteralPrefix::Unicode
+        } else if self.0.contains(StringLiteralFlagsInner::R_PREFIX_LOWER) {
+            debug_assert!(!self.0.contains(StringLiteralFlagsInner::R_PREFIX_UPPER));
+            StringLiteralPrefix::Raw { uppercase: false }
+        } else if self.0.contains(StringLiteralFlagsInner::R_PREFIX_UPPER) {
+            StringLiteralPrefix::Raw { uppercase: true }
+        } else {
+            StringLiteralPrefix::Empty
+        }
+    }
+}
+
+impl StringFlags for StringLiteralFlags {
+    /// Return the quoting style (single or double quotes)
+    /// used by the string's opener and closer:
+    /// - `"a"` -> `QuoteStyle::Double`
+    /// - `'a'` -> `QuoteStyle::Single`
+    fn quote_style(self) -> Quote {
+        if self.0.contains(StringLiteralFlagsInner::DOUBLE) {
+            Quote::Double
+        } else {
+            Quote::Single
+        }
+    }
+
+    /// Return `true` if the string is triple-quoted, i.e.,
+    /// it begins and ends with three consecutive quote characters.
+    /// For example: `"""bar"""`
+    fn is_triple_quoted(self) -> bool {
+        self.0.contains(StringLiteralFlagsInner::TRIPLE_QUOTED)
+    }
+
+    fn prefix(self) -> AnyStringPrefix {
+        AnyStringPrefix::Regular(self.prefix())
+    }
+}
+
+impl fmt::Debug for StringLiteralFlags {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("StringLiteralFlags")
+            .field("quote_style", &self.quote_style())
+            .field("prefix", &self.prefix())
+            .field("triple_quoted", &self.is_triple_quoted())
+            .finish()
+    }
+}
+
 /// An AST node that represents a single string literal which is part of an
 /// [`ExprStringLiteral`].
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct StringLiteral {
     pub range: TextRange,
-    pub value: String,
-    pub unicode: bool,
+    pub value: Box<str>,
+    pub flags: StringLiteralFlags,
 }
 
 impl Ranged for StringLiteral {
@@ -1398,7 +1990,7 @@ impl Deref for StringLiteral {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
-        self.value.as_str()
+        &self.value
     }
 }
 
@@ -1406,6 +1998,15 @@ impl StringLiteral {
     /// Extracts a string slice containing the entire `String`.
     pub fn as_str(&self) -> &str {
         self
+    }
+
+    /// Creates an invalid string literal with the given range.
+    pub fn invalid(range: TextRange) -> Self {
+        Self {
+            range,
+            value: "".into(),
+            flags: StringLiteralFlags::default().with_invalid(),
+        }
     }
 }
 
@@ -1426,14 +2027,16 @@ struct ConcatenatedStringLiteral {
     /// Each string literal that makes up the concatenated string.
     strings: Vec<StringLiteral>,
     /// The concatenated string value.
-    value: OnceCell<String>,
+    value: OnceLock<Box<str>>,
 }
 
 impl ConcatenatedStringLiteral {
     /// Extracts a string slice containing the entire concatenated string.
     fn to_str(&self) -> &str {
-        self.value
-            .get_or_init(|| self.strings.iter().map(StringLiteral::as_str).collect())
+        self.value.get_or_init(|| {
+            let concatenated: String = self.strings.iter().map(StringLiteral::as_str).collect();
+            concatenated.into_boxed_str()
+        })
     }
 }
 
@@ -1550,7 +2153,7 @@ impl BytesLiteralValue {
     }
 
     /// Returns an iterator over the bytes of the concatenated bytes.
-    fn bytes(&self) -> impl Iterator<Item = u8> + '_ {
+    pub fn bytes(&self) -> impl Iterator<Item = u8> + '_ {
         self.iter().flat_map(|part| part.as_slice().iter().copied())
     }
 }
@@ -1584,6 +2187,22 @@ impl PartialEq<[u8]> for BytesLiteralValue {
     }
 }
 
+impl<'a> From<&'a BytesLiteralValue> for Cow<'a, [u8]> {
+    fn from(value: &'a BytesLiteralValue) -> Self {
+        match &value.inner {
+            BytesLiteralValueInner::Single(BytesLiteral {
+                value: bytes_value, ..
+            }) => Cow::from(bytes_value.as_ref()),
+            BytesLiteralValueInner::Concatenated(bytes_literal_vec) => Cow::Owned(
+                bytes_literal_vec
+                    .iter()
+                    .flat_map(|bytes_literal| bytes_literal.value.to_vec())
+                    .collect::<Vec<u8>>(),
+            ),
+        }
+    }
+}
+
 /// An internal representation of [`BytesLiteralValue`].
 #[derive(Clone, Debug, PartialEq)]
 enum BytesLiteralValueInner {
@@ -1600,12 +2219,128 @@ impl Default for BytesLiteralValueInner {
     }
 }
 
+bitflags! {
+    #[derive(Default, Copy, Clone, PartialEq, Eq, Hash)]
+    struct BytesLiteralFlagsInner: u8 {
+        /// The bytestring uses double quotes (e.g. `b"foo"`).
+        /// If this flag is not set, the bytestring uses single quotes (e.g. `b'foo'`).
+        const DOUBLE = 1 << 0;
+
+        /// The bytestring is triple-quoted (e.g. `b"""foo"""`):
+        /// it begins and ends with three consecutive quote characters.
+        const TRIPLE_QUOTED = 1 << 1;
+
+        /// The bytestring has an `r` prefix (e.g. `rb"foo"`),
+        /// meaning it is a raw bytestring with a lowercase 'r'.
+        const R_PREFIX_LOWER = 1 << 2;
+
+        /// The bytestring has an `R` prefix (e.g. `Rb"foo"`),
+        /// meaning it is a raw bytestring with an uppercase 'R'.
+        /// See https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#r-strings-and-r-strings
+        /// for why we track the casing of the `r` prefix, but not for any other prefix
+        const R_PREFIX_UPPER = 1 << 3;
+
+        /// The bytestring was deemed invalid by the parser.
+        const INVALID = 1 << 4;
+    }
+}
+
+/// Flags that can be queried to obtain information
+/// regarding the prefixes and quotes used for a bytes literal.
+#[derive(Default, Copy, Clone, Eq, PartialEq, Hash)]
+pub struct BytesLiteralFlags(BytesLiteralFlagsInner);
+
+impl BytesLiteralFlags {
+    #[must_use]
+    pub fn with_quote_style(mut self, quote_style: Quote) -> Self {
+        self.0
+            .set(BytesLiteralFlagsInner::DOUBLE, quote_style.is_double());
+        self
+    }
+
+    #[must_use]
+    pub fn with_triple_quotes(mut self) -> Self {
+        self.0 |= BytesLiteralFlagsInner::TRIPLE_QUOTED;
+        self
+    }
+
+    #[must_use]
+    pub fn with_prefix(mut self, prefix: ByteStringPrefix) -> Self {
+        match prefix {
+            ByteStringPrefix::Regular => {
+                self.0 -= BytesLiteralFlagsInner::R_PREFIX_LOWER;
+                self.0 -= BytesLiteralFlagsInner::R_PREFIX_UPPER;
+            }
+            ByteStringPrefix::Raw { uppercase_r } => {
+                self.0
+                    .set(BytesLiteralFlagsInner::R_PREFIX_UPPER, uppercase_r);
+                self.0
+                    .set(BytesLiteralFlagsInner::R_PREFIX_LOWER, !uppercase_r);
+            }
+        };
+        self
+    }
+
+    #[must_use]
+    pub fn with_invalid(mut self) -> Self {
+        self.0 |= BytesLiteralFlagsInner::INVALID;
+        self
+    }
+
+    pub const fn prefix(self) -> ByteStringPrefix {
+        if self.0.contains(BytesLiteralFlagsInner::R_PREFIX_LOWER) {
+            debug_assert!(!self.0.contains(BytesLiteralFlagsInner::R_PREFIX_UPPER));
+            ByteStringPrefix::Raw { uppercase_r: false }
+        } else if self.0.contains(BytesLiteralFlagsInner::R_PREFIX_UPPER) {
+            ByteStringPrefix::Raw { uppercase_r: true }
+        } else {
+            ByteStringPrefix::Regular
+        }
+    }
+}
+
+impl StringFlags for BytesLiteralFlags {
+    /// Return `true` if the bytestring is triple-quoted, i.e.,
+    /// it begins and ends with three consecutive quote characters.
+    /// For example: `b"""{bar}"""`
+    fn is_triple_quoted(self) -> bool {
+        self.0.contains(BytesLiteralFlagsInner::TRIPLE_QUOTED)
+    }
+
+    /// Return the quoting style (single or double quotes)
+    /// used by the bytestring's opener and closer:
+    /// - `b"a"` -> `QuoteStyle::Double`
+    /// - `b'a'` -> `QuoteStyle::Single`
+    fn quote_style(self) -> Quote {
+        if self.0.contains(BytesLiteralFlagsInner::DOUBLE) {
+            Quote::Double
+        } else {
+            Quote::Single
+        }
+    }
+
+    fn prefix(self) -> AnyStringPrefix {
+        AnyStringPrefix::Bytes(self.prefix())
+    }
+}
+
+impl fmt::Debug for BytesLiteralFlags {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BytesLiteralFlags")
+            .field("quote_style", &self.quote_style())
+            .field("prefix", &self.prefix())
+            .field("triple_quoted", &self.is_triple_quoted())
+            .finish()
+    }
+}
+
 /// An AST node that represents a single bytes literal which is part of an
 /// [`ExprBytesLiteral`].
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct BytesLiteral {
     pub range: TextRange,
-    pub value: Vec<u8>,
+    pub value: Box<[u8]>,
+    pub flags: BytesLiteralFlags,
 }
 
 impl Ranged for BytesLiteral {
@@ -1618,7 +2353,7 @@ impl Deref for BytesLiteral {
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
-        self.value.as_slice()
+        &self.value
     }
 }
 
@@ -1626,6 +2361,15 @@ impl BytesLiteral {
     /// Extracts a byte slice containing the entire [`BytesLiteral`].
     pub fn as_slice(&self) -> &[u8] {
         self
+    }
+
+    /// Creates a new invalid bytes literal with the given range.
+    pub fn invalid(range: TextRange) -> Self {
+        Self {
+            range,
+            value: Box::new([]),
+            flags: BytesLiteralFlags::default().with_invalid(),
+        }
     }
 }
 
@@ -1636,6 +2380,294 @@ impl From<BytesLiteral> for Expr {
             value: BytesLiteralValue::single(payload),
         }
         .into()
+    }
+}
+
+bitflags! {
+    /// Flags that can be queried to obtain information
+    /// regarding the prefixes and quotes used for a string literal.
+    ///
+    /// Note that not all of these flags can be validly combined -- e.g.,
+    /// it is invalid to combine the `U_PREFIX` flag with any other
+    /// of the `*_PREFIX` flags. As such, the recommended way to set the
+    /// prefix flags is by calling the `as_flags()` method on the
+    /// `StringPrefix` enum.
+    #[derive(Default, Debug, Copy, Clone, PartialEq, Eq, Hash)]
+    struct AnyStringFlagsInner: u8 {
+        /// The string uses double quotes (`"`).
+        /// If this flag is not set, the string uses single quotes (`'`).
+        const DOUBLE = 1 << 0;
+
+        /// The string is triple-quoted:
+        /// it begins and ends with three consecutive quote characters.
+        const TRIPLE_QUOTED = 1 << 1;
+
+        /// The string has a `u` or `U` prefix.
+        /// While this prefix is a no-op at runtime,
+        /// strings with this prefix can have no other prefixes set.
+        const U_PREFIX = 1 << 2;
+
+        /// The string has a `b` or `B` prefix.
+        /// This means that the string is a sequence of `int`s at runtime,
+        /// rather than a sequence of `str`s.
+        /// Strings with this flag can also be raw strings,
+        /// but can have no other prefixes.
+        const B_PREFIX = 1 << 3;
+
+        /// The string has a `f` or `F` prefix, meaning it is an f-string.
+        /// F-strings can also be raw strings,
+        /// but can have no other prefixes.
+        const F_PREFIX = 1 << 4;
+
+        /// The string has an `r` prefix, meaning it is a raw string.
+        /// F-strings and byte-strings can be raw,
+        /// as can strings with no other prefixes.
+        /// U-strings cannot be raw.
+        const R_PREFIX_LOWER = 1 << 5;
+
+        /// The string has an `R` prefix, meaning it is a raw string.
+        /// The casing of the `r`/`R` has no semantic significance at runtime;
+        /// see https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#r-strings-and-r-strings
+        /// for why we track the casing of the `r` prefix,
+        /// but not for any other prefix
+        const R_PREFIX_UPPER = 1 << 6;
+    }
+}
+
+#[derive(Default, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct AnyStringFlags(AnyStringFlagsInner);
+
+impl AnyStringFlags {
+    #[must_use]
+    pub fn with_prefix(mut self, prefix: AnyStringPrefix) -> Self {
+        self.0 |= match prefix {
+            // regular strings
+            AnyStringPrefix::Regular(StringLiteralPrefix::Empty) => AnyStringFlagsInner::empty(),
+            AnyStringPrefix::Regular(StringLiteralPrefix::Unicode) => AnyStringFlagsInner::U_PREFIX,
+            AnyStringPrefix::Regular(StringLiteralPrefix::Raw { uppercase: false }) => {
+                AnyStringFlagsInner::R_PREFIX_LOWER
+            }
+            AnyStringPrefix::Regular(StringLiteralPrefix::Raw { uppercase: true }) => {
+                AnyStringFlagsInner::R_PREFIX_UPPER
+            }
+
+            // bytestrings
+            AnyStringPrefix::Bytes(ByteStringPrefix::Regular) => AnyStringFlagsInner::B_PREFIX,
+            AnyStringPrefix::Bytes(ByteStringPrefix::Raw { uppercase_r: false }) => {
+                AnyStringFlagsInner::B_PREFIX.union(AnyStringFlagsInner::R_PREFIX_LOWER)
+            }
+            AnyStringPrefix::Bytes(ByteStringPrefix::Raw { uppercase_r: true }) => {
+                AnyStringFlagsInner::B_PREFIX.union(AnyStringFlagsInner::R_PREFIX_UPPER)
+            }
+
+            // f-strings
+            AnyStringPrefix::Format(FStringPrefix::Regular) => AnyStringFlagsInner::F_PREFIX,
+            AnyStringPrefix::Format(FStringPrefix::Raw { uppercase_r: false }) => {
+                AnyStringFlagsInner::F_PREFIX.union(AnyStringFlagsInner::R_PREFIX_LOWER)
+            }
+            AnyStringPrefix::Format(FStringPrefix::Raw { uppercase_r: true }) => {
+                AnyStringFlagsInner::F_PREFIX.union(AnyStringFlagsInner::R_PREFIX_UPPER)
+            }
+        };
+        self
+    }
+
+    pub fn new(prefix: AnyStringPrefix, quotes: Quote, triple_quoted: bool) -> Self {
+        let new = Self::default().with_prefix(prefix).with_quote_style(quotes);
+        if triple_quoted {
+            new.with_triple_quotes()
+        } else {
+            new
+        }
+    }
+
+    /// Does the string have a `u` or `U` prefix?
+    pub const fn is_u_string(self) -> bool {
+        self.0.contains(AnyStringFlagsInner::U_PREFIX)
+    }
+
+    /// Does the string have an `r` or `R` prefix?
+    pub const fn is_raw_string(self) -> bool {
+        self.0.intersects(
+            AnyStringFlagsInner::R_PREFIX_LOWER.union(AnyStringFlagsInner::R_PREFIX_UPPER),
+        )
+    }
+
+    /// Does the string have an `f` or `F` prefix?
+    pub const fn is_f_string(self) -> bool {
+        self.0.contains(AnyStringFlagsInner::F_PREFIX)
+    }
+
+    /// Does the string have a `b` or `B` prefix?
+    pub const fn is_byte_string(self) -> bool {
+        self.0.contains(AnyStringFlagsInner::B_PREFIX)
+    }
+
+    #[must_use]
+    pub fn with_quote_style(mut self, quotes: Quote) -> Self {
+        match quotes {
+            Quote::Double => self.0 |= AnyStringFlagsInner::DOUBLE,
+            Quote::Single => self.0 -= AnyStringFlagsInner::DOUBLE,
+        };
+        self
+    }
+
+    #[must_use]
+    pub fn with_triple_quotes(mut self) -> Self {
+        self.0 |= AnyStringFlagsInner::TRIPLE_QUOTED;
+        self
+    }
+}
+
+impl StringFlags for AnyStringFlags {
+    /// Does the string use single or double quotes in its opener and closer?
+    fn quote_style(self) -> Quote {
+        if self.0.contains(AnyStringFlagsInner::DOUBLE) {
+            Quote::Double
+        } else {
+            Quote::Single
+        }
+    }
+
+    /// Is the string triple-quoted, i.e.,
+    /// does it begin and end with three consecutive quote characters?
+    fn is_triple_quoted(self) -> bool {
+        self.0.contains(AnyStringFlagsInner::TRIPLE_QUOTED)
+    }
+
+    fn prefix(self) -> AnyStringPrefix {
+        let AnyStringFlags(flags) = self;
+
+        // f-strings
+        if flags.contains(AnyStringFlagsInner::F_PREFIX) {
+            if flags.contains(AnyStringFlagsInner::R_PREFIX_LOWER) {
+                return AnyStringPrefix::Format(FStringPrefix::Raw { uppercase_r: false });
+            }
+            if flags.contains(AnyStringFlagsInner::R_PREFIX_UPPER) {
+                return AnyStringPrefix::Format(FStringPrefix::Raw { uppercase_r: true });
+            }
+            return AnyStringPrefix::Format(FStringPrefix::Regular);
+        }
+
+        // bytestrings
+        if flags.contains(AnyStringFlagsInner::B_PREFIX) {
+            if flags.contains(AnyStringFlagsInner::R_PREFIX_LOWER) {
+                return AnyStringPrefix::Bytes(ByteStringPrefix::Raw { uppercase_r: false });
+            }
+            if flags.contains(AnyStringFlagsInner::R_PREFIX_UPPER) {
+                return AnyStringPrefix::Bytes(ByteStringPrefix::Raw { uppercase_r: true });
+            }
+            return AnyStringPrefix::Bytes(ByteStringPrefix::Regular);
+        }
+
+        // all other strings
+        if flags.contains(AnyStringFlagsInner::R_PREFIX_LOWER) {
+            return AnyStringPrefix::Regular(StringLiteralPrefix::Raw { uppercase: false });
+        }
+        if flags.contains(AnyStringFlagsInner::R_PREFIX_UPPER) {
+            return AnyStringPrefix::Regular(StringLiteralPrefix::Raw { uppercase: true });
+        }
+        if flags.contains(AnyStringFlagsInner::U_PREFIX) {
+            return AnyStringPrefix::Regular(StringLiteralPrefix::Unicode);
+        }
+        AnyStringPrefix::Regular(StringLiteralPrefix::Empty)
+    }
+}
+
+impl fmt::Debug for AnyStringFlags {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("AnyStringFlags")
+            .field("prefix", &self.prefix())
+            .field("triple_quoted", &self.is_triple_quoted())
+            .field("quote_style", &self.quote_style())
+            .finish()
+    }
+}
+
+impl From<AnyStringFlags> for StringLiteralFlags {
+    fn from(value: AnyStringFlags) -> StringLiteralFlags {
+        let AnyStringPrefix::Regular(prefix) = value.prefix() else {
+            unreachable!(
+                "Should never attempt to convert {} into a regular string",
+                value.prefix()
+            )
+        };
+        let new = StringLiteralFlags::default()
+            .with_quote_style(value.quote_style())
+            .with_prefix(prefix);
+        if value.is_triple_quoted() {
+            new.with_triple_quotes()
+        } else {
+            new
+        }
+    }
+}
+
+impl From<StringLiteralFlags> for AnyStringFlags {
+    fn from(value: StringLiteralFlags) -> Self {
+        Self::new(
+            AnyStringPrefix::Regular(value.prefix()),
+            value.quote_style(),
+            value.is_triple_quoted(),
+        )
+    }
+}
+
+impl From<AnyStringFlags> for BytesLiteralFlags {
+    fn from(value: AnyStringFlags) -> BytesLiteralFlags {
+        let AnyStringPrefix::Bytes(bytestring_prefix) = value.prefix() else {
+            unreachable!(
+                "Should never attempt to convert {} into a bytestring",
+                value.prefix()
+            )
+        };
+        let new = BytesLiteralFlags::default()
+            .with_quote_style(value.quote_style())
+            .with_prefix(bytestring_prefix);
+        if value.is_triple_quoted() {
+            new.with_triple_quotes()
+        } else {
+            new
+        }
+    }
+}
+
+impl From<BytesLiteralFlags> for AnyStringFlags {
+    fn from(value: BytesLiteralFlags) -> Self {
+        Self::new(
+            AnyStringPrefix::Bytes(value.prefix()),
+            value.quote_style(),
+            value.is_triple_quoted(),
+        )
+    }
+}
+
+impl From<AnyStringFlags> for FStringFlags {
+    fn from(value: AnyStringFlags) -> FStringFlags {
+        let AnyStringPrefix::Format(fstring_prefix) = value.prefix() else {
+            unreachable!(
+                "Should never attempt to convert {} into an f-string",
+                value.prefix()
+            )
+        };
+        let new = FStringFlags::default()
+            .with_quote_style(value.quote_style())
+            .with_prefix(fstring_prefix);
+        if value.is_triple_quoted() {
+            new.with_triple_quotes()
+        } else {
+            new
+        }
+    }
+}
+
+impl From<FStringFlags> for AnyStringFlags {
+    fn from(value: FStringFlags) -> Self {
+        Self::new(
+            AnyStringPrefix::Format(value.prefix()),
+            value.quote_style(),
+            value.is_triple_quoted(),
+        )
     }
 }
 
@@ -1764,8 +2796,14 @@ impl From<ExprStarred> for Expr {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprName {
     pub range: TextRange,
-    pub id: String,
+    pub id: Name,
     pub ctx: ExprContext,
+}
+
+impl ExprName {
+    pub fn id(&self) -> &Name {
+        &self.id
+    }
 }
 
 impl From<ExprName> for Expr {
@@ -1782,6 +2820,29 @@ pub struct ExprList {
     pub ctx: ExprContext,
 }
 
+impl ExprList {
+    pub fn iter(&self) -> std::slice::Iter<'_, Expr> {
+        self.elts.iter()
+    }
+
+    pub fn len(&self) -> usize {
+        self.elts.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.elts.is_empty()
+    }
+}
+
+impl<'a> IntoIterator for &'a ExprList {
+    type IntoIter = std::slice::Iter<'a, Expr>;
+    type Item = &'a Expr;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 impl From<ExprList> for Expr {
     fn from(payload: ExprList) -> Self {
         Expr::List(payload)
@@ -1794,42 +2855,37 @@ pub struct ExprTuple {
     pub range: TextRange,
     pub elts: Vec<Expr>,
     pub ctx: ExprContext,
+
+    /// Whether the tuple is parenthesized in the source code.
+    pub parenthesized: bool,
+}
+
+impl ExprTuple {
+    pub fn iter(&self) -> std::slice::Iter<'_, Expr> {
+        self.elts.iter()
+    }
+
+    pub fn len(&self) -> usize {
+        self.elts.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.elts.is_empty()
+    }
+}
+
+impl<'a> IntoIterator for &'a ExprTuple {
+    type IntoIter = std::slice::Iter<'a, Expr>;
+    type Item = &'a Expr;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
 }
 
 impl From<ExprTuple> for Expr {
     fn from(payload: ExprTuple) -> Self {
         Expr::Tuple(payload)
-    }
-}
-
-impl ExprTuple {
-    /// Return `true` if a tuple is parenthesized in the source code.
-    pub fn is_parenthesized(&self, source: &str) -> bool {
-        let Some(elt) = self.elts.first() else {
-            return true;
-        };
-
-        // Count the number of open parentheses between the start of the tuple and the first element.
-        let open_parentheses_count =
-            SimpleTokenizer::new(source, TextRange::new(self.start(), elt.start()))
-                .skip_trivia()
-                .filter(|token| token.kind() == SimpleTokenKind::LParen)
-                .count();
-        if open_parentheses_count == 0 {
-            return false;
-        }
-
-        // Count the number of parentheses between the end of the first element and its trailing comma.
-        let close_parentheses_count =
-            SimpleTokenizer::new(source, TextRange::new(elt.end(), self.end()))
-                .skip_trivia()
-                .take_while(|token| token.kind() != SimpleTokenKind::Comma)
-                .filter(|token| token.kind() == SimpleTokenKind::RParen)
-                .count();
-
-        // If the number of open parentheses is greater than the number of close parentheses, the tuple
-        // is parenthesized.
-        open_parentheses_count > close_parentheses_count
     }
 }
 
@@ -1854,73 +2910,7 @@ pub enum ExprContext {
     Load,
     Store,
     Del,
-}
-impl ExprContext {
-    #[inline]
-    pub const fn load(&self) -> Option<ExprContextLoad> {
-        match self {
-            ExprContext::Load => Some(ExprContextLoad),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn store(&self) -> Option<ExprContextStore> {
-        match self {
-            ExprContext::Store => Some(ExprContextStore),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn del(&self) -> Option<ExprContextDel> {
-        match self {
-            ExprContext::Del => Some(ExprContextDel),
-            _ => None,
-        }
-    }
-}
-
-pub struct ExprContextLoad;
-impl From<ExprContextLoad> for ExprContext {
-    fn from(_: ExprContextLoad) -> Self {
-        ExprContext::Load
-    }
-}
-
-impl std::cmp::PartialEq<ExprContext> for ExprContextLoad {
-    #[inline]
-    fn eq(&self, other: &ExprContext) -> bool {
-        matches!(other, ExprContext::Load)
-    }
-}
-
-pub struct ExprContextStore;
-impl From<ExprContextStore> for ExprContext {
-    fn from(_: ExprContextStore) -> Self {
-        ExprContext::Store
-    }
-}
-
-impl std::cmp::PartialEq<ExprContext> for ExprContextStore {
-    #[inline]
-    fn eq(&self, other: &ExprContext) -> bool {
-        matches!(other, ExprContext::Store)
-    }
-}
-
-pub struct ExprContextDel;
-impl From<ExprContextDel> for ExprContext {
-    fn from(_: ExprContextDel) -> Self {
-        ExprContext::Del
-    }
-}
-
-impl std::cmp::PartialEq<ExprContext> for ExprContextDel {
-    #[inline]
-    fn eq(&self, other: &ExprContext) -> bool {
-        matches!(other, ExprContext::Del)
-    }
+    Invalid,
 }
 
 /// See also [boolop](https://docs.python.org/3/library/ast.html#ast.BoolOp)
@@ -1929,49 +2919,19 @@ pub enum BoolOp {
     And,
     Or,
 }
+
 impl BoolOp {
-    #[inline]
-    pub const fn and(&self) -> Option<BoolOpAnd> {
+    pub const fn as_str(&self) -> &'static str {
         match self {
-            BoolOp::And => Some(BoolOpAnd),
-            BoolOp::Or => None,
-        }
-    }
-
-    #[inline]
-    pub const fn or(&self) -> Option<BoolOpOr> {
-        match self {
-            BoolOp::Or => Some(BoolOpOr),
-            BoolOp::And => None,
+            BoolOp::And => "and",
+            BoolOp::Or => "or",
         }
     }
 }
 
-pub struct BoolOpAnd;
-impl From<BoolOpAnd> for BoolOp {
-    fn from(_: BoolOpAnd) -> Self {
-        BoolOp::And
-    }
-}
-
-impl std::cmp::PartialEq<BoolOp> for BoolOpAnd {
-    #[inline]
-    fn eq(&self, other: &BoolOp) -> bool {
-        matches!(other, BoolOp::And)
-    }
-}
-
-pub struct BoolOpOr;
-impl From<BoolOpOr> for BoolOp {
-    fn from(_: BoolOpOr) -> Self {
-        BoolOp::Or
-    }
-}
-
-impl std::cmp::PartialEq<BoolOp> for BoolOpOr {
-    #[inline]
-    fn eq(&self, other: &BoolOp) -> bool {
-        matches!(other, BoolOp::Or)
+impl fmt::Display for BoolOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
     }
 }
 
@@ -1992,291 +2952,30 @@ pub enum Operator {
     BitAnd,
     FloorDiv,
 }
+
 impl Operator {
-    #[inline]
-    pub const fn operator_add(&self) -> Option<OperatorAdd> {
+    pub const fn as_str(&self) -> &'static str {
         match self {
-            Operator::Add => Some(OperatorAdd),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn operator_sub(&self) -> Option<OperatorSub> {
-        match self {
-            Operator::Sub => Some(OperatorSub),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn operator_mult(&self) -> Option<OperatorMult> {
-        match self {
-            Operator::Mult => Some(OperatorMult),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn operator_mat_mult(&self) -> Option<OperatorMatMult> {
-        match self {
-            Operator::MatMult => Some(OperatorMatMult),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn operator_div(&self) -> Option<OperatorDiv> {
-        match self {
-            Operator::Div => Some(OperatorDiv),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn operator_mod(&self) -> Option<OperatorMod> {
-        match self {
-            Operator::Mod => Some(OperatorMod),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn operator_pow(&self) -> Option<OperatorPow> {
-        match self {
-            Operator::Pow => Some(OperatorPow),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn operator_l_shift(&self) -> Option<OperatorLShift> {
-        match self {
-            Operator::LShift => Some(OperatorLShift),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn operator_r_shift(&self) -> Option<OperatorRShift> {
-        match self {
-            Operator::RShift => Some(OperatorRShift),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn operator_bit_or(&self) -> Option<OperatorBitOr> {
-        match self {
-            Operator::BitOr => Some(OperatorBitOr),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn operator_bit_xor(&self) -> Option<OperatorBitXor> {
-        match self {
-            Operator::BitXor => Some(OperatorBitXor),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn operator_bit_and(&self) -> Option<OperatorBitAnd> {
-        match self {
-            Operator::BitAnd => Some(OperatorBitAnd),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn operator_floor_div(&self) -> Option<OperatorFloorDiv> {
-        match self {
-            Operator::FloorDiv => Some(OperatorFloorDiv),
-            _ => None,
+            Operator::Add => "+",
+            Operator::Sub => "-",
+            Operator::Mult => "*",
+            Operator::MatMult => "@",
+            Operator::Div => "/",
+            Operator::Mod => "%",
+            Operator::Pow => "**",
+            Operator::LShift => "<<",
+            Operator::RShift => ">>",
+            Operator::BitOr => "|",
+            Operator::BitXor => "^",
+            Operator::BitAnd => "&",
+            Operator::FloorDiv => "//",
         }
     }
 }
 
-pub struct OperatorAdd;
-impl From<OperatorAdd> for Operator {
-    fn from(_: OperatorAdd) -> Self {
-        Operator::Add
-    }
-}
-
-impl std::cmp::PartialEq<Operator> for OperatorAdd {
-    #[inline]
-    fn eq(&self, other: &Operator) -> bool {
-        matches!(other, Operator::Add)
-    }
-}
-
-pub struct OperatorSub;
-impl From<OperatorSub> for Operator {
-    fn from(_: OperatorSub) -> Self {
-        Operator::Sub
-    }
-}
-
-impl std::cmp::PartialEq<Operator> for OperatorSub {
-    #[inline]
-    fn eq(&self, other: &Operator) -> bool {
-        matches!(other, Operator::Sub)
-    }
-}
-
-pub struct OperatorMult;
-impl From<OperatorMult> for Operator {
-    fn from(_: OperatorMult) -> Self {
-        Operator::Mult
-    }
-}
-
-impl std::cmp::PartialEq<Operator> for OperatorMult {
-    #[inline]
-    fn eq(&self, other: &Operator) -> bool {
-        matches!(other, Operator::Mult)
-    }
-}
-
-pub struct OperatorMatMult;
-impl From<OperatorMatMult> for Operator {
-    fn from(_: OperatorMatMult) -> Self {
-        Operator::MatMult
-    }
-}
-
-impl std::cmp::PartialEq<Operator> for OperatorMatMult {
-    #[inline]
-    fn eq(&self, other: &Operator) -> bool {
-        matches!(other, Operator::MatMult)
-    }
-}
-
-pub struct OperatorDiv;
-impl From<OperatorDiv> for Operator {
-    fn from(_: OperatorDiv) -> Self {
-        Operator::Div
-    }
-}
-
-impl std::cmp::PartialEq<Operator> for OperatorDiv {
-    #[inline]
-    fn eq(&self, other: &Operator) -> bool {
-        matches!(other, Operator::Div)
-    }
-}
-
-pub struct OperatorMod;
-impl From<OperatorMod> for Operator {
-    fn from(_: OperatorMod) -> Self {
-        Operator::Mod
-    }
-}
-
-impl std::cmp::PartialEq<Operator> for OperatorMod {
-    #[inline]
-    fn eq(&self, other: &Operator) -> bool {
-        matches!(other, Operator::Mod)
-    }
-}
-
-pub struct OperatorPow;
-impl From<OperatorPow> for Operator {
-    fn from(_: OperatorPow) -> Self {
-        Operator::Pow
-    }
-}
-
-impl std::cmp::PartialEq<Operator> for OperatorPow {
-    #[inline]
-    fn eq(&self, other: &Operator) -> bool {
-        matches!(other, Operator::Pow)
-    }
-}
-
-pub struct OperatorLShift;
-impl From<OperatorLShift> for Operator {
-    fn from(_: OperatorLShift) -> Self {
-        Operator::LShift
-    }
-}
-
-impl std::cmp::PartialEq<Operator> for OperatorLShift {
-    #[inline]
-    fn eq(&self, other: &Operator) -> bool {
-        matches!(other, Operator::LShift)
-    }
-}
-
-pub struct OperatorRShift;
-impl From<OperatorRShift> for Operator {
-    fn from(_: OperatorRShift) -> Self {
-        Operator::RShift
-    }
-}
-
-impl std::cmp::PartialEq<Operator> for OperatorRShift {
-    #[inline]
-    fn eq(&self, other: &Operator) -> bool {
-        matches!(other, Operator::RShift)
-    }
-}
-
-pub struct OperatorBitOr;
-impl From<OperatorBitOr> for Operator {
-    fn from(_: OperatorBitOr) -> Self {
-        Operator::BitOr
-    }
-}
-
-impl std::cmp::PartialEq<Operator> for OperatorBitOr {
-    #[inline]
-    fn eq(&self, other: &Operator) -> bool {
-        matches!(other, Operator::BitOr)
-    }
-}
-
-pub struct OperatorBitXor;
-impl From<OperatorBitXor> for Operator {
-    fn from(_: OperatorBitXor) -> Self {
-        Operator::BitXor
-    }
-}
-
-impl std::cmp::PartialEq<Operator> for OperatorBitXor {
-    #[inline]
-    fn eq(&self, other: &Operator) -> bool {
-        matches!(other, Operator::BitXor)
-    }
-}
-
-pub struct OperatorBitAnd;
-impl From<OperatorBitAnd> for Operator {
-    fn from(_: OperatorBitAnd) -> Self {
-        Operator::BitAnd
-    }
-}
-
-impl std::cmp::PartialEq<Operator> for OperatorBitAnd {
-    #[inline]
-    fn eq(&self, other: &Operator) -> bool {
-        matches!(other, Operator::BitAnd)
-    }
-}
-
-pub struct OperatorFloorDiv;
-impl From<OperatorFloorDiv> for Operator {
-    fn from(_: OperatorFloorDiv) -> Self {
-        Operator::FloorDiv
-    }
-}
-
-impl std::cmp::PartialEq<Operator> for OperatorFloorDiv {
-    #[inline]
-    fn eq(&self, other: &Operator) -> bool {
-        matches!(other, Operator::FloorDiv)
+impl fmt::Display for Operator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
     }
 }
 
@@ -2288,93 +2987,21 @@ pub enum UnaryOp {
     UAdd,
     USub,
 }
+
 impl UnaryOp {
-    #[inline]
-    pub const fn invert(&self) -> Option<UnaryOpInvert> {
+    pub const fn as_str(&self) -> &'static str {
         match self {
-            UnaryOp::Invert => Some(UnaryOpInvert),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn not(&self) -> Option<UnaryOpNot> {
-        match self {
-            UnaryOp::Not => Some(UnaryOpNot),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn u_add(&self) -> Option<UnaryOpUAdd> {
-        match self {
-            UnaryOp::UAdd => Some(UnaryOpUAdd),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn u_sub(&self) -> Option<UnaryOpUSub> {
-        match self {
-            UnaryOp::USub => Some(UnaryOpUSub),
-            _ => None,
+            UnaryOp::Invert => "~",
+            UnaryOp::Not => "not",
+            UnaryOp::UAdd => "+",
+            UnaryOp::USub => "-",
         }
     }
 }
 
-pub struct UnaryOpInvert;
-impl From<UnaryOpInvert> for UnaryOp {
-    fn from(_: UnaryOpInvert) -> Self {
-        UnaryOp::Invert
-    }
-}
-
-impl std::cmp::PartialEq<UnaryOp> for UnaryOpInvert {
-    #[inline]
-    fn eq(&self, other: &UnaryOp) -> bool {
-        matches!(other, UnaryOp::Invert)
-    }
-}
-
-pub struct UnaryOpNot;
-impl From<UnaryOpNot> for UnaryOp {
-    fn from(_: UnaryOpNot) -> Self {
-        UnaryOp::Not
-    }
-}
-
-impl std::cmp::PartialEq<UnaryOp> for UnaryOpNot {
-    #[inline]
-    fn eq(&self, other: &UnaryOp) -> bool {
-        matches!(other, UnaryOp::Not)
-    }
-}
-
-pub struct UnaryOpUAdd;
-impl From<UnaryOpUAdd> for UnaryOp {
-    fn from(_: UnaryOpUAdd) -> Self {
-        UnaryOp::UAdd
-    }
-}
-
-impl std::cmp::PartialEq<UnaryOp> for UnaryOpUAdd {
-    #[inline]
-    fn eq(&self, other: &UnaryOp) -> bool {
-        matches!(other, UnaryOp::UAdd)
-    }
-}
-
-pub struct UnaryOpUSub;
-impl From<UnaryOpUSub> for UnaryOp {
-    fn from(_: UnaryOpUSub) -> Self {
-        UnaryOp::USub
-    }
-}
-
-impl std::cmp::PartialEq<UnaryOp> for UnaryOpUSub {
-    #[inline]
-    fn eq(&self, other: &UnaryOp) -> bool {
-        matches!(other, UnaryOp::USub)
+impl fmt::Display for UnaryOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
     }
 }
 
@@ -2392,225 +3019,27 @@ pub enum CmpOp {
     In,
     NotIn,
 }
+
 impl CmpOp {
-    #[inline]
-    pub const fn cmp_op_eq(&self) -> Option<CmpOpEq> {
+    pub const fn as_str(&self) -> &'static str {
         match self {
-            CmpOp::Eq => Some(CmpOpEq),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn cmp_op_not_eq(&self) -> Option<CmpOpNotEq> {
-        match self {
-            CmpOp::NotEq => Some(CmpOpNotEq),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn cmp_op_lt(&self) -> Option<CmpOpLt> {
-        match self {
-            CmpOp::Lt => Some(CmpOpLt),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn cmp_op_lt_e(&self) -> Option<CmpOpLtE> {
-        match self {
-            CmpOp::LtE => Some(CmpOpLtE),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn cmp_op_gt(&self) -> Option<CmpOpGt> {
-        match self {
-            CmpOp::Gt => Some(CmpOpGt),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn cmp_op_gt_e(&self) -> Option<CmpOpGtE> {
-        match self {
-            CmpOp::GtE => Some(CmpOpGtE),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn cmp_op_is(&self) -> Option<CmpOpIs> {
-        match self {
-            CmpOp::Is => Some(CmpOpIs),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn cmp_op_is_not(&self) -> Option<CmpOpIsNot> {
-        match self {
-            CmpOp::IsNot => Some(CmpOpIsNot),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn cmp_op_in(&self) -> Option<CmpOpIn> {
-        match self {
-            CmpOp::In => Some(CmpOpIn),
-            _ => None,
-        }
-    }
-
-    #[inline]
-    pub const fn cmp_op_not_in(&self) -> Option<CmpOpNotIn> {
-        match self {
-            CmpOp::NotIn => Some(CmpOpNotIn),
-            _ => None,
+            CmpOp::Eq => "==",
+            CmpOp::NotEq => "!=",
+            CmpOp::Lt => "<",
+            CmpOp::LtE => "<=",
+            CmpOp::Gt => ">",
+            CmpOp::GtE => ">=",
+            CmpOp::Is => "is",
+            CmpOp::IsNot => "is not",
+            CmpOp::In => "in",
+            CmpOp::NotIn => "not in",
         }
     }
 }
 
-pub struct CmpOpEq;
-impl From<CmpOpEq> for CmpOp {
-    fn from(_: CmpOpEq) -> Self {
-        CmpOp::Eq
-    }
-}
-
-impl std::cmp::PartialEq<CmpOp> for CmpOpEq {
-    #[inline]
-    fn eq(&self, other: &CmpOp) -> bool {
-        matches!(other, CmpOp::Eq)
-    }
-}
-
-pub struct CmpOpNotEq;
-impl From<CmpOpNotEq> for CmpOp {
-    fn from(_: CmpOpNotEq) -> Self {
-        CmpOp::NotEq
-    }
-}
-
-impl std::cmp::PartialEq<CmpOp> for CmpOpNotEq {
-    #[inline]
-    fn eq(&self, other: &CmpOp) -> bool {
-        matches!(other, CmpOp::NotEq)
-    }
-}
-
-pub struct CmpOpLt;
-impl From<CmpOpLt> for CmpOp {
-    fn from(_: CmpOpLt) -> Self {
-        CmpOp::Lt
-    }
-}
-
-impl std::cmp::PartialEq<CmpOp> for CmpOpLt {
-    #[inline]
-    fn eq(&self, other: &CmpOp) -> bool {
-        matches!(other, CmpOp::Lt)
-    }
-}
-
-pub struct CmpOpLtE;
-impl From<CmpOpLtE> for CmpOp {
-    fn from(_: CmpOpLtE) -> Self {
-        CmpOp::LtE
-    }
-}
-
-impl std::cmp::PartialEq<CmpOp> for CmpOpLtE {
-    #[inline]
-    fn eq(&self, other: &CmpOp) -> bool {
-        matches!(other, CmpOp::LtE)
-    }
-}
-
-pub struct CmpOpGt;
-impl From<CmpOpGt> for CmpOp {
-    fn from(_: CmpOpGt) -> Self {
-        CmpOp::Gt
-    }
-}
-
-impl std::cmp::PartialEq<CmpOp> for CmpOpGt {
-    #[inline]
-    fn eq(&self, other: &CmpOp) -> bool {
-        matches!(other, CmpOp::Gt)
-    }
-}
-
-pub struct CmpOpGtE;
-impl From<CmpOpGtE> for CmpOp {
-    fn from(_: CmpOpGtE) -> Self {
-        CmpOp::GtE
-    }
-}
-
-impl std::cmp::PartialEq<CmpOp> for CmpOpGtE {
-    #[inline]
-    fn eq(&self, other: &CmpOp) -> bool {
-        matches!(other, CmpOp::GtE)
-    }
-}
-
-pub struct CmpOpIs;
-impl From<CmpOpIs> for CmpOp {
-    fn from(_: CmpOpIs) -> Self {
-        CmpOp::Is
-    }
-}
-
-impl std::cmp::PartialEq<CmpOp> for CmpOpIs {
-    #[inline]
-    fn eq(&self, other: &CmpOp) -> bool {
-        matches!(other, CmpOp::Is)
-    }
-}
-
-pub struct CmpOpIsNot;
-impl From<CmpOpIsNot> for CmpOp {
-    fn from(_: CmpOpIsNot) -> Self {
-        CmpOp::IsNot
-    }
-}
-
-impl std::cmp::PartialEq<CmpOp> for CmpOpIsNot {
-    #[inline]
-    fn eq(&self, other: &CmpOp) -> bool {
-        matches!(other, CmpOp::IsNot)
-    }
-}
-
-pub struct CmpOpIn;
-impl From<CmpOpIn> for CmpOp {
-    fn from(_: CmpOpIn) -> Self {
-        CmpOp::In
-    }
-}
-
-impl std::cmp::PartialEq<CmpOp> for CmpOpIn {
-    #[inline]
-    fn eq(&self, other: &CmpOp) -> bool {
-        matches!(other, CmpOp::In)
-    }
-}
-
-pub struct CmpOpNotIn;
-impl From<CmpOpNotIn> for CmpOp {
-    fn from(_: CmpOpNotIn) -> Self {
-        CmpOp::NotIn
-    }
-}
-
-impl std::cmp::PartialEq<CmpOp> for CmpOpNotIn {
-    #[inline]
-    fn eq(&self, other: &CmpOp) -> bool {
-        matches!(other, CmpOp::NotIn)
+impl fmt::Display for CmpOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
     }
 }
 
@@ -2697,6 +3126,44 @@ pub enum Pattern {
     MatchStar(PatternMatchStar),
     MatchAs(PatternMatchAs),
     MatchOr(PatternMatchOr),
+}
+
+impl Pattern {
+    /// Checks if the [`Pattern`] is an [irrefutable pattern].
+    ///
+    /// [irrefutable pattern]: https://peps.python.org/pep-0634/#irrefutable-case-blocks
+    pub fn is_irrefutable(&self) -> bool {
+        match self {
+            Pattern::MatchAs(PatternMatchAs { pattern: None, .. }) => true,
+            Pattern::MatchOr(PatternMatchOr { patterns, .. }) => {
+                patterns.iter().any(Pattern::is_irrefutable)
+            }
+            _ => false,
+        }
+    }
+
+    /// Checks if the [`Pattern`] is a [wildcard pattern].
+    ///
+    /// The following are wildcard patterns:
+    /// ```python
+    /// match subject:
+    ///     case _ as x: ...
+    ///     case _ | _: ...
+    ///     case _: ...
+    /// ```
+    ///
+    /// [wildcard pattern]: https://docs.python.org/3/reference/compound_stmts.html#wildcard-patterns
+    pub fn is_wildcard(&self) -> bool {
+        match self {
+            Pattern::MatchAs(PatternMatchAs { pattern, .. }) => {
+                pattern.as_deref().map_or(true, Pattern::is_wildcard)
+            }
+            Pattern::MatchOr(PatternMatchOr { patterns, .. }) => {
+                patterns.iter().all(Pattern::is_wildcard)
+            }
+            _ => false,
+        }
+    }
 }
 
 /// See also [MatchValue](https://docs.python.org/3/library/ast.html#ast.MatchValue)
@@ -2843,6 +3310,7 @@ pub struct TypeParamTypeVar {
     pub range: TextRange,
     pub name: Identifier,
     pub bound: Option<Box<Expr>>,
+    pub default: Option<Box<Expr>>,
 }
 
 impl From<TypeParamTypeVar> for TypeParam {
@@ -2856,6 +3324,7 @@ impl From<TypeParamTypeVar> for TypeParam {
 pub struct TypeParamParamSpec {
     pub range: TextRange,
     pub name: Identifier,
+    pub default: Option<Box<Expr>>,
 }
 
 impl From<TypeParamParamSpec> for TypeParam {
@@ -2869,6 +3338,7 @@ impl From<TypeParamParamSpec> for TypeParam {
 pub struct TypeParamTypeVarTuple {
     pub range: TextRange,
     pub name: Identifier,
+    pub default: Option<Box<Expr>>,
 }
 
 impl From<TypeParamTypeVarTuple> for TypeParam {
@@ -2884,6 +3354,63 @@ pub struct Decorator {
     pub expression: Expr,
 }
 
+/// Enumeration of the two kinds of parameter
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum AnyParameterRef<'a> {
+    /// Variadic parameters cannot have default values,
+    /// e.g. both `*args` and `**kwargs` in the following function:
+    ///
+    /// ```python
+    /// def foo(*args, **kwargs): pass
+    /// ```
+    Variadic(&'a Parameter),
+
+    /// Non-variadic parameters can have default values,
+    /// though they won't necessarily always have them:
+    ///
+    /// ```python
+    /// def bar(a=1, /, b=2, *, c=3): pass
+    /// ```
+    NonVariadic(&'a ParameterWithDefault),
+}
+
+impl<'a> AnyParameterRef<'a> {
+    pub const fn as_parameter(self) -> &'a Parameter {
+        match self {
+            Self::NonVariadic(param) => &param.parameter,
+            Self::Variadic(param) => param,
+        }
+    }
+
+    pub const fn name(self) -> &'a Identifier {
+        &self.as_parameter().name
+    }
+
+    pub const fn is_variadic(self) -> bool {
+        matches!(self, Self::Variadic(_))
+    }
+
+    pub fn annotation(self) -> Option<&'a Expr> {
+        self.as_parameter().annotation.as_deref()
+    }
+
+    pub fn default(self) -> Option<&'a Expr> {
+        match self {
+            Self::NonVariadic(param) => param.default.as_deref(),
+            Self::Variadic(_) => None,
+        }
+    }
+}
+
+impl Ranged for AnyParameterRef<'_> {
+    fn range(&self) -> TextRange {
+        match self {
+            Self::NonVariadic(param) => param.range,
+            Self::Variadic(param) => param.range,
+        }
+    }
+}
+
 /// An alternative type of AST `arguments`. This is ruff_python_parser-friendly and human-friendly definition of function arguments.
 /// This form also has advantage to implement pre-order traverse.
 ///
@@ -2894,7 +3421,7 @@ pub struct Decorator {
 ///
 /// NOTE: This type differs from the original Python AST. See: [arguments](https://docs.python.org/3/library/ast.html#ast.arguments).
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub struct Parameters {
     pub range: TextRange,
     pub posonlyargs: Vec<ParameterWithDefault>,
@@ -2905,37 +3432,56 @@ pub struct Parameters {
 }
 
 impl Parameters {
-    /// Returns the [`ParameterWithDefault`] with the given name, or `None` if no such [`ParameterWithDefault`] exists.
-    pub fn find(&self, name: &str) -> Option<&ParameterWithDefault> {
+    /// Returns an iterator over all non-variadic parameters included in this [`Parameters`] node.
+    ///
+    /// The variadic parameters (`.vararg` and `.kwarg`) can never have default values;
+    /// non-variadic parameters sometimes will.
+    pub fn iter_non_variadic_params(&self) -> impl Iterator<Item = &ParameterWithDefault> {
         self.posonlyargs
             .iter()
             .chain(&self.args)
             .chain(&self.kwonlyargs)
+    }
+
+    /// Returns the [`ParameterWithDefault`] with the given name, or `None` if no such [`ParameterWithDefault`] exists.
+    pub fn find(&self, name: &str) -> Option<&ParameterWithDefault> {
+        self.iter_non_variadic_params()
             .find(|arg| arg.parameter.name.as_str() == name)
     }
 
-    /// Returns `true` if a parameter with the given name included in this [`Parameters`].
+    /// Returns an iterator over all parameters included in this [`Parameters`] node.
+    pub fn iter(&self) -> ParametersIterator {
+        ParametersIterator::new(self)
+    }
+
+    /// Returns the total number of parameters included in this [`Parameters`] node.
+    pub fn len(&self) -> usize {
+        let Parameters {
+            range: _,
+            posonlyargs,
+            args,
+            vararg,
+            kwonlyargs,
+            kwarg,
+        } = self;
+        // Safety: a Python function can have an arbitrary number of parameters,
+        // so theoretically this could be a number that wouldn't fit into a usize,
+        // which would lead to a panic. A Python function with that many parameters
+        // is extremely unlikely outside of generated code, however, and it's even
+        // more unlikely that we'd find a function with that many parameters in a
+        // source-code file <=4GB large (Ruff's maximum).
+        posonlyargs
+            .len()
+            .checked_add(args.len())
+            .and_then(|length| length.checked_add(usize::from(vararg.is_some())))
+            .and_then(|length| length.checked_add(kwonlyargs.len()))
+            .and_then(|length| length.checked_add(usize::from(kwarg.is_some())))
+            .expect("Failed to fit the number of parameters into a usize")
+    }
+
+    /// Returns `true` if a parameter with the given name is included in this [`Parameters`].
     pub fn includes(&self, name: &str) -> bool {
-        if self
-            .posonlyargs
-            .iter()
-            .chain(&self.args)
-            .chain(&self.kwonlyargs)
-            .any(|arg| arg.parameter.name.as_str() == name)
-        {
-            return true;
-        }
-        if let Some(arg) = &self.vararg {
-            if arg.name.as_str() == name {
-                return true;
-            }
-        }
-        if let Some(arg) = &self.kwarg {
-            if arg.name.as_str() == name {
-                return true;
-            }
-        }
-        false
+        self.iter().any(|param| param.name() == name)
     }
 
     /// Returns `true` if the [`Parameters`] is empty.
@@ -2945,6 +3491,136 @@ impl Parameters {
             && self.kwonlyargs.is_empty()
             && self.vararg.is_none()
             && self.kwarg.is_none()
+    }
+}
+
+pub struct ParametersIterator<'a> {
+    posonlyargs: Iter<'a, ParameterWithDefault>,
+    args: Iter<'a, ParameterWithDefault>,
+    vararg: Option<&'a Parameter>,
+    kwonlyargs: Iter<'a, ParameterWithDefault>,
+    kwarg: Option<&'a Parameter>,
+}
+
+impl<'a> ParametersIterator<'a> {
+    fn new(parameters: &'a Parameters) -> Self {
+        let Parameters {
+            range: _,
+            posonlyargs,
+            args,
+            vararg,
+            kwonlyargs,
+            kwarg,
+        } = parameters;
+        Self {
+            posonlyargs: posonlyargs.iter(),
+            args: args.iter(),
+            vararg: vararg.as_deref(),
+            kwonlyargs: kwonlyargs.iter(),
+            kwarg: kwarg.as_deref(),
+        }
+    }
+}
+
+impl<'a> Iterator for ParametersIterator<'a> {
+    type Item = AnyParameterRef<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let ParametersIterator {
+            posonlyargs,
+            args,
+            vararg,
+            kwonlyargs,
+            kwarg,
+        } = self;
+
+        if let Some(param) = posonlyargs.next() {
+            return Some(AnyParameterRef::NonVariadic(param));
+        }
+        if let Some(param) = args.next() {
+            return Some(AnyParameterRef::NonVariadic(param));
+        }
+        if let Some(param) = vararg.take() {
+            return Some(AnyParameterRef::Variadic(param));
+        }
+        if let Some(param) = kwonlyargs.next() {
+            return Some(AnyParameterRef::NonVariadic(param));
+        }
+        kwarg.take().map(AnyParameterRef::Variadic)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let ParametersIterator {
+            posonlyargs,
+            args,
+            vararg,
+            kwonlyargs,
+            kwarg,
+        } = self;
+
+        let posonlyargs_len = posonlyargs.len();
+        let args_len = args.len();
+        let vararg_len = usize::from(vararg.is_some());
+        let kwonlyargs_len = kwonlyargs.len();
+        let kwarg_len = usize::from(kwarg.is_some());
+
+        let lower = posonlyargs_len
+            .saturating_add(args_len)
+            .saturating_add(vararg_len)
+            .saturating_add(kwonlyargs_len)
+            .saturating_add(kwarg_len);
+
+        let upper = posonlyargs_len
+            .checked_add(args_len)
+            .and_then(|length| length.checked_add(vararg_len))
+            .and_then(|length| length.checked_add(kwonlyargs_len))
+            .and_then(|length| length.checked_add(kwarg_len));
+
+        (lower, upper)
+    }
+
+    fn last(mut self) -> Option<Self::Item> {
+        self.next_back()
+    }
+}
+
+impl<'a> DoubleEndedIterator for ParametersIterator<'a> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let ParametersIterator {
+            posonlyargs,
+            args,
+            vararg,
+            kwonlyargs,
+            kwarg,
+        } = self;
+
+        if let Some(param) = kwarg.take() {
+            return Some(AnyParameterRef::Variadic(param));
+        }
+        if let Some(param) = kwonlyargs.next_back() {
+            return Some(AnyParameterRef::NonVariadic(param));
+        }
+        if let Some(param) = vararg.take() {
+            return Some(AnyParameterRef::Variadic(param));
+        }
+        if let Some(param) = args.next_back() {
+            return Some(AnyParameterRef::NonVariadic(param));
+        }
+        posonlyargs.next_back().map(AnyParameterRef::NonVariadic)
+    }
+}
+
+impl<'a> FusedIterator for ParametersIterator<'a> {}
+
+/// We rely on the same invariants outlined in the comment above `Parameters::len()`
+/// in order to implement `ExactSizeIterator` here
+impl<'a> ExactSizeIterator for ParametersIterator<'a> {}
+
+impl<'a> IntoIterator for &'a Parameters {
+    type IntoIter = ParametersIterator<'a>;
+    type Item = AnyParameterRef<'a>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
     }
 }
 
@@ -2985,8 +3661,8 @@ pub struct ParameterWithDefault {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Arguments {
     pub range: TextRange,
-    pub args: Vec<Expr>,
-    pub keywords: Vec<Keyword>,
+    pub args: Box<[Expr]>,
+    pub keywords: Box<[Keyword]>,
 }
 
 /// An entry in the argument list of a function call.
@@ -3117,66 +3793,10 @@ impl Deref for TypeParams {
     }
 }
 
+/// A suite represents a [Vec] of [Stmt].
+///
+/// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-suite>
 pub type Suite = Vec<Stmt>;
-
-impl CmpOp {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            CmpOp::Eq => "==",
-            CmpOp::NotEq => "!=",
-            CmpOp::Lt => "<",
-            CmpOp::LtE => "<=",
-            CmpOp::Gt => ">",
-            CmpOp::GtE => ">=",
-            CmpOp::Is => "is",
-            CmpOp::IsNot => "is not",
-            CmpOp::In => "in",
-            CmpOp::NotIn => "not in",
-        }
-    }
-}
-
-impl Parameters {
-    pub fn empty(range: TextRange) -> Self {
-        Self {
-            range,
-            posonlyargs: Vec::new(),
-            args: Vec::new(),
-            vararg: None,
-            kwonlyargs: Vec::new(),
-            kwarg: None,
-        }
-    }
-}
-
-impl ParameterWithDefault {
-    pub fn as_parameter(&self) -> &Parameter {
-        &self.parameter
-    }
-}
-
-impl Parameters {
-    pub fn defaults(&self) -> impl std::iter::Iterator<Item = &Expr> {
-        self.posonlyargs
-            .iter()
-            .chain(self.args.iter())
-            .filter_map(|arg| arg.default.as_ref().map(std::convert::AsRef::as_ref))
-    }
-
-    #[allow(clippy::type_complexity)]
-    pub fn split_kwonlyargs(&self) -> (Vec<&Parameter>, Vec<(&Parameter, &Expr)>) {
-        let mut args = Vec::new();
-        let mut with_defaults = Vec::new();
-        for arg in &self.kwonlyargs {
-            if let Some(ref default) = arg.default {
-                with_defaults.push((arg.as_parameter(), &**default));
-            } else {
-                args.push(arg.as_parameter());
-            }
-        }
-        (args, with_defaults)
-    }
-}
 
 /// The kind of escape command as defined in [IPython Syntax] in the IPython codebase.
 ///
@@ -3240,20 +3860,6 @@ impl fmt::Display for IpyEscapeKind {
 }
 
 impl IpyEscapeKind {
-    /// Returns the length of the escape kind token.
-    pub fn prefix_len(self) -> TextSize {
-        let len = match self {
-            IpyEscapeKind::Shell
-            | IpyEscapeKind::Magic
-            | IpyEscapeKind::Help
-            | IpyEscapeKind::Quote
-            | IpyEscapeKind::Quote2
-            | IpyEscapeKind::Paren => 1,
-            IpyEscapeKind::ShCap | IpyEscapeKind::Magic2 | IpyEscapeKind::Help2 => 2,
-        };
-        len.into()
-    }
-
     /// Returns `true` if the escape kind is help i.e., `?` or `??`.
     pub const fn is_help(self) -> bool {
         matches!(self, IpyEscapeKind::Help | IpyEscapeKind::Help2)
@@ -3279,19 +3885,34 @@ impl IpyEscapeKind {
     }
 }
 
+/// An `Identifier` with an empty `id` is invalid.
+///
+/// For example, in the following code `id` will be empty.
+/// ```python
+/// def 1():
+///     ...
+/// ```
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Identifier {
-    id: String,
-    range: TextRange,
+    pub id: Name,
+    pub range: TextRange,
 }
 
 impl Identifier {
     #[inline]
-    pub fn new(id: impl Into<String>, range: TextRange) -> Self {
+    pub fn new(id: impl Into<Name>, range: TextRange) -> Self {
         Self {
             id: id.into(),
             range,
         }
+    }
+
+    pub fn id(&self) -> &Name {
+        &self.id
+    }
+
+    pub fn is_valid(&self) -> bool {
+        !self.id.is_empty()
     }
 }
 
@@ -3312,7 +3933,7 @@ impl PartialEq<str> for Identifier {
 impl PartialEq<String> for Identifier {
     #[inline]
     fn eq(&self, other: &String) -> bool {
-        &self.id == other
+        self.id == other
     }
 }
 
@@ -3331,22 +3952,15 @@ impl AsRef<str> for Identifier {
     }
 }
 
-impl AsRef<String> for Identifier {
-    #[inline]
-    fn as_ref(&self) -> &String {
-        &self.id
-    }
-}
-
 impl std::fmt::Display for Identifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Display::fmt(&self.id, f)
     }
 }
 
-impl From<Identifier> for String {
+impl From<Identifier> for Name {
     #[inline]
-    fn from(identifier: Identifier) -> String {
+    fn from(identifier: Identifier) -> Name {
         identifier.id
     }
 }
@@ -3560,7 +4174,7 @@ impl Ranged for crate::nodes::ExprBoolOp {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprNamedExpr {
+impl Ranged for crate::nodes::ExprNamed {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -3580,7 +4194,7 @@ impl Ranged for crate::nodes::ExprLambda {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprIfExp {
+impl Ranged for crate::nodes::ExprIf {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -3610,7 +4224,7 @@ impl Ranged for crate::nodes::ExprDictComp {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprGeneratorExp {
+impl Ranged for crate::nodes::ExprGenerator {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -3689,17 +4303,17 @@ impl Ranged for crate::Expr {
     fn range(&self) -> TextRange {
         match self {
             Self::BoolOp(node) => node.range(),
-            Self::NamedExpr(node) => node.range(),
+            Self::Named(node) => node.range(),
             Self::BinOp(node) => node.range(),
             Self::UnaryOp(node) => node.range(),
             Self::Lambda(node) => node.range(),
-            Self::IfExp(node) => node.range(),
+            Self::If(node) => node.range(),
             Self::Dict(node) => node.range(),
             Self::Set(node) => node.range(),
             Self::ListComp(node) => node.range(),
             Self::SetComp(node) => node.range(),
             Self::DictComp(node) => node.range(),
-            Self::GeneratorExp(node) => node.range(),
+            Self::Generator(node) => node.range(),
             Self::Await(node) => node.range(),
             Self::Yield(node) => node.range(),
             Self::YieldFrom(node) => node.range(),
@@ -3880,18 +4494,55 @@ impl Ranged for crate::nodes::ParameterWithDefault {
     }
 }
 
-#[cfg(target_pointer_width = "64")]
-mod size_assertions {
-    use static_assertions::assert_eq_size;
-
+#[cfg(test)]
+mod tests {
     #[allow(clippy::wildcard_imports)]
     use super::*;
 
-    assert_eq_size!(Stmt, [u8; 144]);
-    assert_eq_size!(StmtFunctionDef, [u8; 144]);
-    assert_eq_size!(StmtClassDef, [u8; 104]);
-    assert_eq_size!(StmtTry, [u8; 112]);
-    assert_eq_size!(Expr, [u8; 80]);
-    assert_eq_size!(Pattern, [u8; 96]);
-    assert_eq_size!(Mod, [u8; 32]);
+    #[test]
+    #[cfg(target_pointer_width = "64")]
+    fn size() {
+        assert!(std::mem::size_of::<Stmt>() <= 120);
+        assert!(std::mem::size_of::<StmtFunctionDef>() <= 120);
+        assert!(std::mem::size_of::<StmtClassDef>() <= 104);
+        assert!(std::mem::size_of::<StmtTry>() <= 112);
+        assert!(std::mem::size_of::<Mod>() <= 32);
+        // 96 for Rustc < 1.76
+        assert!(matches!(std::mem::size_of::<Pattern>(), 88 | 96));
+
+        assert_eq!(std::mem::size_of::<Expr>(), 64);
+        assert_eq!(std::mem::size_of::<ExprAttribute>(), 56);
+        assert_eq!(std::mem::size_of::<ExprAwait>(), 16);
+        assert_eq!(std::mem::size_of::<ExprBinOp>(), 32);
+        assert_eq!(std::mem::size_of::<ExprBoolOp>(), 40);
+        assert_eq!(std::mem::size_of::<ExprBooleanLiteral>(), 12);
+        assert_eq!(std::mem::size_of::<ExprBytesLiteral>(), 40);
+        assert_eq!(std::mem::size_of::<ExprCall>(), 56);
+        assert_eq!(std::mem::size_of::<ExprCompare>(), 48);
+        assert_eq!(std::mem::size_of::<ExprDict>(), 32);
+        assert_eq!(std::mem::size_of::<ExprDictComp>(), 48);
+        assert_eq!(std::mem::size_of::<ExprEllipsisLiteral>(), 8);
+        // 56 for Rustc < 1.76
+        assert!(matches!(std::mem::size_of::<ExprFString>(), 48 | 56));
+        assert_eq!(std::mem::size_of::<ExprGenerator>(), 48);
+        assert_eq!(std::mem::size_of::<ExprIf>(), 32);
+        assert_eq!(std::mem::size_of::<ExprIpyEscapeCommand>(), 32);
+        assert_eq!(std::mem::size_of::<ExprLambda>(), 24);
+        assert_eq!(std::mem::size_of::<ExprList>(), 40);
+        assert_eq!(std::mem::size_of::<ExprListComp>(), 40);
+        assert_eq!(std::mem::size_of::<ExprName>(), 40);
+        assert_eq!(std::mem::size_of::<ExprNamed>(), 24);
+        assert_eq!(std::mem::size_of::<ExprNoneLiteral>(), 8);
+        assert_eq!(std::mem::size_of::<ExprNumberLiteral>(), 32);
+        assert_eq!(std::mem::size_of::<ExprSet>(), 32);
+        assert_eq!(std::mem::size_of::<ExprSetComp>(), 40);
+        assert_eq!(std::mem::size_of::<ExprSlice>(), 32);
+        assert_eq!(std::mem::size_of::<ExprStarred>(), 24);
+        assert_eq!(std::mem::size_of::<ExprStringLiteral>(), 56);
+        assert_eq!(std::mem::size_of::<ExprSubscript>(), 32);
+        assert_eq!(std::mem::size_of::<ExprTuple>(), 40);
+        assert_eq!(std::mem::size_of::<ExprUnaryOp>(), 24);
+        assert_eq!(std::mem::size_of::<ExprYield>(), 16);
+        assert_eq!(std::mem::size_of::<ExprYieldFrom>(), 16);
+    }
 }

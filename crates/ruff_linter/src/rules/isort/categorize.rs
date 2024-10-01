@@ -1,11 +1,10 @@
 use std::collections::BTreeMap;
 use std::fmt;
-use std::hash::BuildHasherDefault;
 use std::path::{Path, PathBuf};
 use std::{fs, iter};
 
 use log::debug;
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 
@@ -80,33 +79,38 @@ enum Reason<'a> {
     Future,
     KnownStandardLibrary,
     SamePackage,
+    #[allow(dead_code)]
     SourceMatch(&'a Path),
     NoMatch,
     UserDefinedSection,
     NoSections,
+    #[allow(dead_code)]
+    DisabledSection(&'a ImportSection),
 }
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn categorize<'a>(
     module_name: &str,
-    level: Option<u32>,
+    is_relative: bool,
     src: &[PathBuf],
     package: Option<&Path>,
     detect_same_package: bool,
     known_modules: &'a KnownModules,
     target_version: PythonVersion,
     no_sections: bool,
+    section_order: &'a [ImportSection],
+    default_section: &'a ImportSection,
 ) -> &'a ImportSection {
     let module_base = module_name.split('.').next().unwrap();
-    let (import_type, reason) = {
-        if matches!(level, None | Some(0)) && module_base == "__future__" {
+    let (mut import_type, mut reason) = {
+        if !is_relative && module_base == "__future__" {
             (&ImportSection::Known(ImportType::Future), Reason::Future)
         } else if no_sections {
             (
                 &ImportSection::Known(ImportType::FirstParty),
                 Reason::NoSections,
             )
-        } else if level.is_some_and(|level| level > 0) {
+        } else if is_relative {
             (
                 &ImportSection::Known(ImportType::LocalFolder),
                 Reason::NonZeroLevel,
@@ -128,18 +132,20 @@ pub(crate) fn categorize<'a>(
                 &ImportSection::Known(ImportType::FirstParty),
                 Reason::SourceMatch(src),
             )
-        } else if matches!(level, None | Some(0)) && module_name == "__main__" {
+        } else if !is_relative && module_name == "__main__" {
             (
                 &ImportSection::Known(ImportType::FirstParty),
                 Reason::KnownFirstParty,
             )
         } else {
-            (
-                &ImportSection::Known(ImportType::ThirdParty),
-                Reason::NoMatch,
-            )
+            (default_section, Reason::NoMatch)
         }
     };
+    // If a value is not in `section_order` then map it to `default_section`.
+    if !section_order.contains(import_type) {
+        reason = Reason::DisabledSection(import_type);
+        import_type = default_section;
+    }
     debug!(
         "Categorized '{}' as {:?} ({:?})",
         module_name, import_type, reason
@@ -176,19 +182,23 @@ pub(crate) fn categorize_imports<'a>(
     known_modules: &'a KnownModules,
     target_version: PythonVersion,
     no_sections: bool,
+    section_order: &'a [ImportSection],
+    default_section: &'a ImportSection,
 ) -> BTreeMap<&'a ImportSection, ImportBlock<'a>> {
     let mut block_by_type: BTreeMap<&ImportSection, ImportBlock> = BTreeMap::default();
     // Categorize `Stmt::Import`.
     for (alias, comments) in block.import {
         let import_type = categorize(
             &alias.module_name(),
-            None,
+            false,
             src,
             package,
             detect_same_package,
             known_modules,
             target_version,
             no_sections,
+            section_order,
+            default_section,
         );
         block_by_type
             .entry(import_type)
@@ -200,13 +210,15 @@ pub(crate) fn categorize_imports<'a>(
     for (import_from, aliases) in block.import_from {
         let classification = categorize(
             &import_from.module_name(),
-            import_from.level,
+            import_from.level > 0,
             src,
             package,
             detect_same_package,
             known_modules,
             target_version,
             no_sections,
+            section_order,
+            default_section,
         );
         block_by_type
             .entry(classification)
@@ -218,13 +230,15 @@ pub(crate) fn categorize_imports<'a>(
     for ((import_from, alias), aliases) in block.import_from_as {
         let classification = categorize(
             &import_from.module_name(),
-            import_from.level,
+            import_from.level > 0,
             src,
             package,
             detect_same_package,
             known_modules,
             target_version,
             no_sections,
+            section_order,
+            default_section,
         );
         block_by_type
             .entry(classification)
@@ -236,13 +250,15 @@ pub(crate) fn categorize_imports<'a>(
     for (import_from, comments) in block.import_from_star {
         let classification = categorize(
             &import_from.module_name(),
-            import_from.level,
+            import_from.level > 0,
             src,
             package,
             detect_same_package,
             known_modules,
             target_version,
             no_sections,
+            section_order,
+            default_section,
         );
         block_by_type
             .entry(classification)
@@ -253,7 +269,7 @@ pub(crate) fn categorize_imports<'a>(
     block_by_type
 }
 
-#[derive(Debug, Default, CacheKey)]
+#[derive(Debug, Clone, Default, CacheKey)]
 pub struct KnownModules {
     /// A map of known modules to their section.
     known: Vec<(glob::Pattern, ImportSection)>,
@@ -299,8 +315,7 @@ impl KnownModules {
             .collect();
 
         // Warn in the case of duplicate modules.
-        let mut seen =
-            FxHashSet::with_capacity_and_hasher(known.len(), BuildHasherDefault::default());
+        let mut seen = FxHashSet::with_capacity_and_hasher(known.len(), FxBuildHasher);
         for (module, _) in &known {
             if !seen.insert(module) {
                 warn_user_once!("One or more modules are part of multiple import sections, including: `{module}`");
@@ -364,26 +379,6 @@ impl KnownModules {
             }
         };
         Some((section, reason))
-    }
-
-    /// Return the list of modules that are known to be of a given type.
-    pub fn modules_for_known_type(
-        &self,
-        import_type: ImportType,
-    ) -> impl Iterator<Item = &glob::Pattern> {
-        self.known
-            .iter()
-            .filter_map(move |(module, known_section)| {
-                if let ImportSection::Known(section) = known_section {
-                    if *section == import_type {
-                        Some(module)
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            })
     }
 
     /// Return the list of user-defined modules, indexed by section.

@@ -71,8 +71,6 @@ for x in (y := [1, 2, 3]):
 async for x in (y := [1, 2, 3]):
     pass
 
-del (x := 1)
-
 try:
     pass
 except (e := Exception):

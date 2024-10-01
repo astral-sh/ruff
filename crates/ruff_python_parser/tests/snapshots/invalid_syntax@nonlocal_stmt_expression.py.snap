@@ -1,0 +1,51 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/nonlocal_stmt_expression.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..15,
+        body: [
+            Nonlocal(
+                StmtNonlocal {
+                    range: 0..10,
+                    names: [
+                        Identifier {
+                            id: Name("x"),
+                            range: 9..10,
+                        },
+                    ],
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 11..14,
+                    value: UnaryOp(
+                        ExprUnaryOp {
+                            range: 11..14,
+                            op: UAdd,
+                            operand: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 13..14,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | nonlocal x + 1
+  |            ^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |

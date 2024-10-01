@@ -24,4 +24,13 @@ PYI049.pyi:34:1: PYI049 Private TypedDict `_UnusedTypedDict3` is never used
 35 | _UsedTypedDict3 = TypedDict("_UsedTypedDict3", {"bar": bytes})
    |
 
+PYI049.pyi:43:11: PYI049 Private TypedDict `_UnusedTypeDict4` is never used
+   |
+41 | # scope (unlike in `.py` files).
+42 | class _CustomClass3:
+43 |     class _UnusedTypeDict4(TypedDict):
+   |           ^^^^^^^^^^^^^^^^ PYI049
+44 |         pass
+   |
+
 

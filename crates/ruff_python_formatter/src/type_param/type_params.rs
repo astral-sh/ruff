@@ -4,7 +4,6 @@ use ruff_python_ast::TypeParams;
 use ruff_text_size::Ranged;
 
 use crate::builders::PyFormatterExtensions;
-use crate::comments::SourceComment;
 use crate::expression::parentheses::parenthesized;
 use crate::prelude::*;
 
@@ -33,14 +32,5 @@ impl FormatNodeRule<TypeParams> for FormatTypeParams {
         parenthesized("[", &items, "]")
             .with_dangling_comments(dangling_comments)
             .fmt(f)
-    }
-
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        // Handled in `fmt_fields`
-        Ok(())
     }
 }

@@ -7,14 +7,14 @@ use ruff_python_ast::{Mod, Stmt};
 // The interface is designed to only export the members relevant for iterating nodes in
 // pre-order.
 #[allow(clippy::wildcard_imports)]
-use ruff_python_ast::visitor::preorder::*;
-use ruff_python_trivia::{is_python_whitespace, CommentRanges};
+use ruff_python_ast::visitor::source_order::*;
+use ruff_python_trivia::{CommentLinePosition, CommentRanges};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::node_key::NodeRefEqualityKey;
 use crate::comments::placement::place_comment;
-use crate::comments::{CommentLinePosition, CommentsMap, SourceComment};
+use crate::comments::{CommentsMap, SourceComment};
 
 /// Collect the preceding, following and enclosing node for each comment without applying
 /// [`place_comment`] for debugging.
@@ -24,7 +24,7 @@ pub(crate) fn collect_comments<'a>(
     comment_ranges: &'a CommentRanges,
 ) -> Vec<DecoratedComment<'a>> {
     let mut collector = CommentsVecBuilder::default();
-    CommentsVisitor::new(source_code, comment_ranges, &mut collector).visit(root);
+    CommentsVisitor::new(source_code, comment_ranges, &mut collector).visit(AnyNodeRef::from(root));
     collector.comments
 }
 
@@ -52,8 +52,12 @@ impl<'a, 'builder> CommentsVisitor<'a, 'builder> {
         }
     }
 
-    pub(super) fn visit(mut self, root: &'a Mod) {
-        self.visit_mod(root);
+    pub(super) fn visit(mut self, root: AnyNodeRef<'a>) {
+        if self.enter_node(root).is_traverse() {
+            root.visit_preorder(&mut self);
+        }
+
+        self.leave_node(root);
     }
 
     // Try to skip the subtree if
@@ -66,7 +70,7 @@ impl<'a, 'builder> CommentsVisitor<'a, 'builder> {
     }
 }
 
-impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast, '_> {
+impl<'ast> SourceOrderVisitor<'ast> for CommentsVisitor<'ast, '_> {
     fn enter_node(&mut self, node: AnyNodeRef<'ast>) -> TraversalSignal {
         let node_range = node.range();
 
@@ -86,7 +90,10 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast, '_> {
                 preceding: self.preceding_node,
                 following: Some(node),
                 parent: self.parents.iter().rev().nth(1).copied(),
-                line_position: text_position(*comment_range, self.source_code),
+                line_position: CommentLinePosition::for_range(
+                    *comment_range,
+                    self.source_code.as_str(),
+                ),
                 slice: self.source_code.slice(*comment_range),
             };
 
@@ -126,7 +133,10 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast, '_> {
                 parent: self.parents.last().copied(),
                 preceding: self.preceding_node,
                 following: None,
-                line_position: text_position(*comment_range, self.source_code),
+                line_position: CommentLinePosition::for_range(
+                    *comment_range,
+                    self.source_code.as_str(),
+                ),
                 slice: self.source_code.slice(*comment_range),
             };
 
@@ -157,22 +167,6 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast, '_> {
             }
         }
     }
-}
-
-fn text_position(comment_range: TextRange, source_code: SourceCode) -> CommentLinePosition {
-    let before = &source_code.as_str()[TextRange::up_to(comment_range.start())];
-
-    for c in before.chars().rev() {
-        match c {
-            '\n' | '\r' => {
-                break;
-            }
-            c if is_python_whitespace(c) => continue,
-            _ => return CommentLinePosition::EndOfLine,
-        }
-    }
-
-    CommentLinePosition::OwnLine
 }
 
 /// A comment decorated with additional information about its surrounding context in the source document.

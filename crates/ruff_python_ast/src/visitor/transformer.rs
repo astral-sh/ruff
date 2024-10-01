@@ -2,7 +2,8 @@ use crate::{
     self as ast, Alias, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension, Decorator,
     ElifElseClause, ExceptHandler, Expr, ExprContext, FString, FStringElement, Keyword, MatchCase,
     Operator, Parameter, Parameters, Pattern, PatternArguments, PatternKeyword, Stmt,
-    StringLiteral, TypeParam, TypeParamTypeVar, TypeParams, UnaryOp, WithItem,
+    StringLiteral, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
+    TypeParams, UnaryOp, WithItem,
 };
 
 /// A trait for transforming ASTs. Visits all nodes in the AST recursively in evaluation-order.
@@ -129,7 +130,7 @@ pub fn walk_stmt<V: Transformer + ?Sized>(visitor: &V, stmt: &mut Stmt) {
                 visitor.visit_type_params(type_params);
             }
             visitor.visit_parameters(parameters);
-            for expr in returns {
+            if let Some(expr) = returns {
                 visitor.visit_annotation(expr);
             }
             visitor.visit_body(body);
@@ -329,7 +330,7 @@ pub fn walk_expr<V: Transformer + ?Sized>(visitor: &V, expr: &mut Expr) {
                 visitor.visit_expr(expr);
             }
         }
-        Expr::NamedExpr(ast::ExprNamedExpr {
+        Expr::Named(ast::ExprNamed {
             target,
             value,
             range: _,
@@ -365,7 +366,7 @@ pub fn walk_expr<V: Transformer + ?Sized>(visitor: &V, expr: &mut Expr) {
             }
             visitor.visit_expr(body);
         }
-        Expr::IfExp(ast::ExprIfExp {
+        Expr::If(ast::ExprIf {
             test,
             body,
             orelse,
@@ -375,16 +376,12 @@ pub fn walk_expr<V: Transformer + ?Sized>(visitor: &V, expr: &mut Expr) {
             visitor.visit_expr(body);
             visitor.visit_expr(orelse);
         }
-        Expr::Dict(ast::ExprDict {
-            keys,
-            values,
-            range: _,
-        }) => {
-            for expr in keys.iter_mut().flatten() {
-                visitor.visit_expr(expr);
-            }
-            for expr in values {
-                visitor.visit_expr(expr);
+        Expr::Dict(ast::ExprDict { items, range: _ }) => {
+            for ast::DictItem { key, value } in items {
+                if let Some(key) = key {
+                    visitor.visit_expr(key);
+                }
+                visitor.visit_expr(value);
             }
         }
         Expr::Set(ast::ExprSet { elts, range: _ }) => {
@@ -424,10 +421,11 @@ pub fn walk_expr<V: Transformer + ?Sized>(visitor: &V, expr: &mut Expr) {
             visitor.visit_expr(key);
             visitor.visit_expr(value);
         }
-        Expr::GeneratorExp(ast::ExprGeneratorExp {
+        Expr::Generator(ast::ExprGenerator {
             elt,
             generators,
             range: _,
+            parenthesized: _,
         }) => {
             for comprehension in generators {
                 visitor.visit_comprehension(comprehension);
@@ -448,10 +446,10 @@ pub fn walk_expr<V: Transformer + ?Sized>(visitor: &V, expr: &mut Expr) {
             range: _,
         }) => {
             visitor.visit_expr(left);
-            for cmp_op in ops {
+            for cmp_op in &mut **ops {
                 visitor.visit_cmp_op(cmp_op);
             }
-            for expr in comparators {
+            for expr in &mut **comparators {
                 visitor.visit_expr(expr);
             }
         }
@@ -528,6 +526,7 @@ pub fn walk_expr<V: Transformer + ?Sized>(visitor: &V, expr: &mut Expr) {
             elts,
             ctx,
             range: _,
+            parenthesized: _,
         }) => {
             for expr in elts {
                 visitor.visit_expr(expr);
@@ -580,10 +579,10 @@ pub fn walk_arguments<V: Transformer + ?Sized>(visitor: &V, arguments: &mut Argu
     // Note that the there might be keywords before the last arg, e.g. in
     // f(*args, a=2, *args2, **kwargs)`, but we follow Python in evaluating first `args` and then
     // `keywords`. See also [Arguments::arguments_source_order`].
-    for arg in &mut arguments.args {
+    for arg in &mut *arguments.args {
         visitor.visit_expr(arg);
     }
-    for keyword in &mut arguments.keywords {
+    for keyword in &mut *arguments.keywords {
         visitor.visit_keyword(keyword);
     }
 }
@@ -650,14 +649,35 @@ pub fn walk_type_param<V: Transformer + ?Sized>(visitor: &V, type_param: &mut Ty
     match type_param {
         TypeParam::TypeVar(TypeParamTypeVar {
             bound,
+            default,
             name: _,
             range: _,
         }) => {
             if let Some(expr) = bound {
                 visitor.visit_expr(expr);
             }
+            if let Some(expr) = default {
+                visitor.visit_expr(expr);
+            }
         }
-        TypeParam::TypeVarTuple(_) | TypeParam::ParamSpec(_) => {}
+        TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
+            default,
+            name: _,
+            range: _,
+        }) => {
+            if let Some(expr) = default {
+                visitor.visit_expr(expr);
+            }
+        }
+        TypeParam::ParamSpec(TypeParamParamSpec {
+            default,
+            name: _,
+            range: _,
+        }) => {
+            if let Some(expr) = default {
+                visitor.visit_expr(expr);
+            }
+        }
     }
 }
 

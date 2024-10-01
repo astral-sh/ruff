@@ -5,7 +5,6 @@ use {
         fmt, iter,
         num::TryFromIntError,
         ops::{Add, AddAssign, Sub, SubAssign},
-        u32,
     },
 };
 
@@ -72,7 +71,7 @@ impl TextSize {
     /// # use ruff_text_size::*;
     /// assert_eq!(TextSize::from(4).to_u32(), 4);
     /// ```
-    pub fn to_u32(&self) -> u32 {
+    pub const fn to_u32(&self) -> u32 {
         self.raw
     }
 
@@ -84,7 +83,7 @@ impl TextSize {
     /// # use ruff_text_size::*;
     /// assert_eq!(TextSize::from(4).to_usize(), 4);
     /// ```
-    pub fn to_usize(&self) -> usize {
+    pub const fn to_usize(&self) -> usize {
         self.raw as usize
     }
 }

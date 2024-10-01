@@ -113,14 +113,10 @@ pub(crate) fn nested_if_statements(
     );
     // The fixer preserves comments in the nested body, but removes comments between
     // the outer and inner if statements.
-    if !checker
-        .indexer()
-        .comment_ranges()
-        .intersects(TextRange::new(
-            nested_if.start(),
-            nested_if.body()[0].start(),
-        ))
-    {
+    if !checker.comment_ranges().intersects(TextRange::new(
+        nested_if.start(),
+        nested_if.body()[0].start(),
+    )) {
         match collapse_nested_if(checker.locator(), checker.stylist(), nested_if) {
             Ok(edit) => {
                 if edit.content().map_or(true, |content| {
@@ -253,8 +249,7 @@ fn is_main_check(expr: &Expr) -> bool {
     {
         if let Expr::Name(ast::ExprName { id, .. }) = left.as_ref() {
             if id == "__name__" {
-                if let [Expr::StringLiteral(ast::ExprStringLiteral { value, .. })] =
-                    comparators.as_slice()
+                if let [Expr::StringLiteral(ast::ExprStringLiteral { value, .. })] = &**comparators
                 {
                     if value == "__main__" {
                         return true;

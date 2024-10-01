@@ -11,14 +11,21 @@ use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
 
 /// ## What it does
-/// Checks for uses of `list(...)[0]` that can be replaced with
-/// `next(iter(...))`.
+/// Checks the following constructs, all of which can be replaced by
+/// `next(iter(...))`:
+///
+/// - `list(...)[0]`
+/// - `tuple(...)[0]`
+/// - `list(i for i in ...)[0]`
+/// - `[i for i in ...][0]`
+/// - `list(...).pop(0)`
 ///
 /// ## Why is this bad?
-/// Calling `list(...)` will create a new list of the entire collection, which
-/// can be very expensive for large collections. If you only need the first
-/// element of the collection, you can use `next(...)` or `next(iter(...)` to
-/// lazily fetch the first element.
+/// Calling e.g. `list(...)` will create a new list of the entire collection,
+/// which can be very expensive for large collections. If you only need the
+/// first element of the collection, you can use `next(...)` or
+/// `next(iter(...)` to lazily fetch the first element. The same is true for
+/// the other constructs.
 ///
 /// ## Example
 /// ```python
@@ -33,14 +40,16 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe, as migrating from `list(...)[0]` to
-/// `next(iter(...))` can change the behavior of your program in two ways:
+/// This rule's fix is marked as unsafe, as migrating from (e.g.) `list(...)[0]`
+/// to `next(iter(...))` can change the behavior of your program in two ways:
 ///
-/// 1. First, `list(...)` will eagerly evaluate the entire collection, while
-///    `next(iter(...))` will only evaluate the first element. As such, any
-///    side effects that occur during iteration will be delayed.
-/// 2. Second, `list(...)[0]` will raise `IndexError` if the collection is
-///    empty, while `next(iter(...))` will raise `StopIteration`.
+/// 1. First, all above-mentioned constructs will eagerly evaluate the entire
+///    collection, while `next(iter(...))` will only evaluate the first
+///    element. As such, any side effects that occur during iteration will be
+///    delayed.
+/// 2. Second, accessing members of a collection via square bracket notation
+///    `[0]` of the `pop()` function will raise `IndexError` if the collection
+///    is empty, while `next(iter(...))` will raise `StopIteration`.
 ///
 /// ## References
 /// - [Iterators and Iterables in Python: Run Efficient Iterations](https://realpython.com/python-iterators-iterables/#when-to-use-an-iterator-in-python)
@@ -67,18 +76,39 @@ impl AlwaysFixableViolation for UnnecessaryIterableAllocationForFirstElement {
 /// RUF015
 pub(crate) fn unnecessary_iterable_allocation_for_first_element(
     checker: &mut Checker,
-    subscript: &ast::ExprSubscript,
+    expr: &Expr,
 ) {
-    let ast::ExprSubscript {
-        value,
-        slice,
-        range,
-        ..
-    } = subscript;
-
-    if !is_head_slice(slice) {
-        return;
-    }
+    let value = match expr {
+        // Ex) `list(x)[0]`
+        Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+            if !is_zero(slice) {
+                return;
+            }
+            value
+        }
+        // Ex) `list(x).pop(0)`
+        Expr::Call(ast::ExprCall {
+            func, arguments, ..
+        }) => {
+            if !arguments.keywords.is_empty() {
+                return;
+            }
+            let [arg] = arguments.args.as_ref() else {
+                return;
+            };
+            if !is_zero(arg) {
+                return;
+            }
+            let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
+                return;
+            };
+            if !matches!(attr.as_str(), "pop") {
+                return;
+            }
+            value
+        }
+        _ => return,
+    };
 
     let Some(target) = match_iteration_target(value, checker.semantic()) else {
         return;
@@ -94,19 +124,19 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(
         UnnecessaryIterableAllocationForFirstElement {
             iterable: SourceCodeSnippet::new(iterable.to_string()),
         },
-        *range,
+        expr.range(),
     );
 
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         format!("next({iterable})"),
-        *range,
+        expr.range(),
     )));
 
     checker.diagnostics.push(diagnostic);
 }
 
 /// Check that the slice [`Expr`] is a slice of the first element (e.g., `x[0]`).
-fn is_head_slice(expr: &Expr) -> bool {
+fn is_zero(expr: &Expr) -> bool {
     matches!(
         expr,
         Expr::NumberLiteral(ast::ExprNumberLiteral {
@@ -140,22 +170,17 @@ fn match_iteration_target(expr: &Expr, semantic: &SemanticModel) -> Option<Itera
             arguments: Arguments { args, .. },
             ..
         }) => {
-            let ast::ExprName { id, .. } = func.as_name_expr()?;
-
-            if !matches!(id.as_str(), "tuple" | "list") {
-                return None;
-            }
-
-            let [arg] = args.as_slice() else {
+            let [arg] = &**args else {
                 return None;
             };
 
-            if !semantic.is_builtin(id.as_str()) {
+            let builtin_function_name = semantic.resolve_builtin_symbol(func)?;
+            if !matches!(builtin_function_name, "tuple" | "list") {
                 return None;
             }
 
             match arg {
-                Expr::GeneratorExp(ast::ExprGeneratorExp {
+                Expr::Generator(ast::ExprGenerator {
                     elt, generators, ..
                 }) => match match_simple_comprehension(elt, generators) {
                     Some(range) => IterationTarget {
@@ -186,7 +211,9 @@ fn match_iteration_target(expr: &Expr, semantic: &SemanticModel) -> Option<Itera
                 },
                 Expr::Call(ast::ExprCall { func, .. }) => IterationTarget {
                     range: arg.range(),
-                    iterable: is_func_builtin_iterator(func, semantic),
+                    iterable: semantic
+                        .resolve_builtin_symbol(func)
+                        .is_some_and(is_iterator),
                 },
                 _ => IterationTarget {
                     range: arg.range(),
@@ -220,8 +247,10 @@ fn match_iteration_target(expr: &Expr, semantic: &SemanticModel) -> Option<Itera
                 return None;
             };
 
-            let iterable = if value.is_call_expr() {
-                is_func_builtin_iterator(&value.as_call_expr()?.func, semantic)
+            let iterable = if let ast::Expr::Call(ast::ExprCall { func, .. }) = &**value {
+                semantic
+                    .resolve_builtin_symbol(func)
+                    .is_some_and(is_iterator)
             } else {
                 false
             };
@@ -259,11 +288,4 @@ fn match_simple_comprehension(elt: &Expr, generators: &[Comprehension]) -> Optio
     }
 
     Some(generator.iter.range())
-}
-
-/// Returns `true` if the function is a builtin iterator.
-fn is_func_builtin_iterator(func: &Expr, semantic: &SemanticModel) -> bool {
-    func.as_name_expr().map_or(false, |func_name| {
-        is_iterator(func_name.id.as_str()) && semantic.is_builtin(func_name.id.as_str())
-    })
 }

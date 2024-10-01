@@ -1,0 +1,219 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/from_import_stmt_terminator.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..97,
+        body: [
+            ImportFrom(
+                StmtImportFrom {
+                    range: 0..20,
+                    module: Some(
+                        Identifier {
+                            id: Name("a"),
+                            range: 5..6,
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 15..16,
+                            name: Identifier {
+                                id: Name("b"),
+                                range: 15..16,
+                            },
+                            asname: None,
+                        },
+                        Alias {
+                            range: 18..19,
+                            name: Identifier {
+                                id: Name("c"),
+                                range: 18..19,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 0,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    range: 21..41,
+                    module: Some(
+                        Identifier {
+                            id: Name("a"),
+                            range: 26..27,
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 36..37,
+                            name: Identifier {
+                                id: Name("b"),
+                                range: 36..37,
+                            },
+                            asname: None,
+                        },
+                        Alias {
+                            range: 39..40,
+                            name: Identifier {
+                                id: Name("c"),
+                                range: 39..40,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 0,
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 43..47,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 43..47,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        range: 43..44,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 46..47,
+                                        id: Name("y"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: false,
+                        },
+                    ),
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    range: 48..66,
+                    module: Some(
+                        Identifier {
+                            id: Name("a"),
+                            range: 53..54,
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 62..63,
+                            name: Identifier {
+                                id: Name("b"),
+                                range: 62..63,
+                            },
+                            asname: None,
+                        },
+                        Alias {
+                            range: 65..66,
+                            name: Identifier {
+                                id: Name("c"),
+                                range: 65..66,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 0,
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 68..72,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 68..72,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        range: 68..69,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 71..72,
+                                        id: Name("y"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: false,
+                        },
+                    ),
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    range: 73..91,
+                    module: Some(
+                        Identifier {
+                            id: Name("a"),
+                            range: 78..79,
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 87..88,
+                            name: Identifier {
+                                id: Name("b"),
+                                range: 87..88,
+                            },
+                            asname: None,
+                        },
+                        Alias {
+                            range: 90..91,
+                            name: Identifier {
+                                id: Name("c"),
+                                range: 90..91,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 0,
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 92..96,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 92..96,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        range: 92..93,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 95..96,
+                                        id: Name("y"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: false,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

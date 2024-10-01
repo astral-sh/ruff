@@ -81,3 +81,11 @@ def foo():
     result = {}
     for idx, name in enumerate(fruit):
         result[name] = idx  # PERF403
+
+
+def foo():
+    from builtins import dict as SneakyDict
+    fruit = ["apple", "pear", "orange"]
+    result = SneakyDict()
+    for idx, name in enumerate(fruit):
+        result[name] = idx  # PERF403

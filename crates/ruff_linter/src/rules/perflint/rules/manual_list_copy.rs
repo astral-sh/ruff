@@ -45,12 +45,16 @@ impl Violation for ManualListCopy {
 }
 
 /// PERF402
-pub(crate) fn manual_list_copy(checker: &mut Checker, target: &Expr, body: &[Stmt]) {
-    let Expr::Name(ast::ExprName { id, .. }) = target else {
+pub(crate) fn manual_list_copy(checker: &mut Checker, for_stmt: &ast::StmtFor) {
+    if for_stmt.is_async {
+        return;
+    }
+
+    let Expr::Name(ast::ExprName { id, .. }) = &*for_stmt.target else {
         return;
     };
 
-    let [stmt] = body else {
+    let [stmt] = &*for_stmt.body else {
         return;
     };
 
@@ -76,7 +80,7 @@ pub(crate) fn manual_list_copy(checker: &mut Checker, target: &Expr, body: &[Stm
         return;
     }
 
-    let [arg] = args.as_slice() else {
+    let [arg] = &**args else {
         return;
     };
 

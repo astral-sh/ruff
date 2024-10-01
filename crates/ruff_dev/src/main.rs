@@ -4,8 +4,8 @@
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use ruff::check;
-use ruff_linter::logging::{set_up_logging, LogLevel};
+use ruff::{args::GlobalConfigArgs, check};
+use ruff_linter::logging::set_up_logging;
 use std::process::ExitCode;
 
 mod format_dev;
@@ -28,6 +28,8 @@ const ROOT_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../");
 struct Args {
     #[command(subcommand)]
     command: Command,
+    #[clap(flatten)]
+    global_options: GlobalConfigArgs,
 }
 
 #[derive(Subcommand)]
@@ -57,8 +59,6 @@ enum Command {
     Repeat {
         #[clap(flatten)]
         args: ruff::args::CheckCommand,
-        #[clap(flatten)]
-        log_level_args: ruff::args::LogLevelArgs,
         /// Run this many times
         #[clap(long)]
         repeat: usize,
@@ -75,9 +75,12 @@ enum Command {
 }
 
 fn main() -> Result<ExitCode> {
-    let args = Args::parse();
+    let Args {
+        command,
+        global_options,
+    } = Args::parse();
     #[allow(clippy::print_stdout)]
-    match args.command {
+    match command {
         Command::GenerateAll(args) => generate_all::main(&args)?,
         Command::GenerateJSONSchema(args) => generate_json_schema::main(&args)?,
         Command::GenerateRulesTable => println!("{}", generate_rules_table::generate()),
@@ -89,14 +92,12 @@ fn main() -> Result<ExitCode> {
         Command::PrintTokens(args) => print_tokens::main(&args)?,
         Command::RoundTrip(args) => round_trip::main(&args)?,
         Command::Repeat {
-            args,
+            args: subcommand_args,
             repeat,
-            log_level_args,
         } => {
-            let log_level = LogLevel::from(&log_level_args);
-            set_up_logging(&log_level)?;
+            set_up_logging(global_options.log_level())?;
             for _ in 0..repeat {
-                check(args.clone(), log_level)?;
+                check(subcommand_args.clone(), global_options.clone())?;
             }
         }
         Command::FormatDev(args) => {

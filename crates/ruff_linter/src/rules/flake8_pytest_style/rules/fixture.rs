@@ -1,14 +1,12 @@
-use std::fmt;
-
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::collect_call_path;
 use ruff_python_ast::identifier::Identifier;
+use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::Decorator;
-use ruff_python_ast::{self as ast, Expr, ParameterWithDefault, Parameters, Stmt};
+use ruff_python_ast::{self as ast, Expr, Parameters, Stmt};
 use ruff_python_semantic::analyze::visibility::is_abstract;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
@@ -20,11 +18,12 @@ use crate::registry::Rule;
 
 use super::helpers::{
     get_mark_decorators, is_pytest_fixture, is_pytest_yield_fixture, keyword_is_literal,
+    Parentheses,
 };
 
 /// ## What it does
 /// Checks for argument-free `@pytest.fixture()` decorators with or without
-/// parentheses, depending on the `flake8-pytest-style.fixture-parentheses`
+/// parentheses, depending on the [`lint.flake8-pytest-style.fixture-parentheses`]
 /// setting.
 ///
 /// ## Why is this bad?
@@ -32,30 +31,32 @@ use super::helpers::{
 /// optional.
 ///
 /// Either removing those unnecessary parentheses _or_ requiring them for all
-/// fixtures is fine, but it's best to be consistent.
+/// fixtures is fine, but it's best to be consistent. The rule defaults to
+/// removing unnecessary parentheses, to match the documentation of the
+/// official pytest projects.
 ///
 /// ## Example
-/// ```python
-/// import pytest
 ///
-///
-/// @pytest.fixture
-/// def my_fixture():
-///     ...
-/// ```
-///
-/// Use instead:
 /// ```python
 /// import pytest
 ///
 ///
 /// @pytest.fixture()
-/// def my_fixture():
-///     ...
+/// def my_fixture(): ...
+/// ```
+///
+/// Use instead:
+///
+/// ```python
+/// import pytest
+///
+///
+/// @pytest.fixture
+/// def my_fixture(): ...
 /// ```
 ///
 /// ## Options
-/// - `flake8-pytest-style.fixture-parentheses`
+/// - `lint.flake8-pytest-style.fixture-parentheses`
 ///
 /// ## References
 /// - [`pytest` documentation: API Reference: Fixtures](https://docs.pytest.org/en/latest/reference/reference.html#fixtures-api)
@@ -89,23 +90,23 @@ impl AlwaysFixableViolation for PytestFixtureIncorrectParenthesesStyle {
 /// fixture configuration.
 ///
 /// ## Example
+///
 /// ```python
 /// import pytest
 ///
 ///
 /// @pytest.fixture("module")
-/// def my_fixture():
-///     ...
+/// def my_fixture(): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// import pytest
 ///
 ///
 /// @pytest.fixture(scope="module")
-/// def my_fixture():
-///     ...
+/// def my_fixture(): ...
 /// ```
 ///
 /// ## References
@@ -130,23 +131,23 @@ impl Violation for PytestFixturePositionalArgs {
 /// `scope="function"` can be omitted, as it is the default.
 ///
 /// ## Example
+///
 /// ```python
 /// import pytest
 ///
 ///
 /// @pytest.fixture(scope="function")
-/// def my_fixture():
-///     ...
+/// def my_fixture(): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// import pytest
 ///
 ///
 /// @pytest.fixture()
-/// def my_fixture():
-///     ...
+/// def my_fixture(): ...
 /// ```
 ///
 /// ## References
@@ -165,6 +166,10 @@ impl AlwaysFixableViolation for PytestExtraneousScopeFunction {
     }
 }
 
+/// ## Deprecation
+/// Marking fixtures that do not return a value with an underscore
+/// isn't a practice recommended by the pytest community.
+///
 /// ## What it does
 /// Checks for `pytest` fixtures that do not return a value, but are not named
 /// with a leading underscore.
@@ -222,6 +227,10 @@ impl Violation for PytestMissingFixtureNameUnderscore {
     }
 }
 
+/// ## Deprecation
+/// Marking fixtures that do not return a value with an underscore
+/// isn't a practice recommended by the pytest community.
+///
 /// ## What it does
 /// Checks for `pytest` fixtures that return a value, but are named with a
 /// leading underscore.
@@ -298,32 +307,30 @@ impl Violation for PytestIncorrectFixtureNameUnderscore {
 /// and avoid the confusion caused by unused arguments.
 ///
 /// ## Example
+///
 /// ```python
 /// import pytest
 ///
 ///
 /// @pytest.fixture
-/// def _patch_something():
-///     ...
+/// def _patch_something(): ...
 ///
 ///
-/// def test_foo(_patch_something):
-///     ...
+/// def test_foo(_patch_something): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// import pytest
 ///
 ///
 /// @pytest.fixture
-/// def _patch_something():
-///     ...
+/// def _patch_something(): ...
 ///
 ///
 /// @pytest.mark.usefixtures("_patch_something")
-/// def test_foo():
-///     ...
+/// def test_foo(): ...
 /// ```
 ///
 /// ## References
@@ -597,21 +604,6 @@ impl AlwaysFixableViolation for PytestUnnecessaryAsyncioMarkOnFixture {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
-enum Parentheses {
-    None,
-    Empty,
-}
-
-impl fmt::Display for Parentheses {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Parentheses::None => fmt.write_str(""),
-            Parentheses::Empty => fmt.write_str("()"),
-        }
-    }
-}
-
 /// Visitor that skips functions
 #[derive(Debug, Default)]
 struct SkipFunctionsVisitor<'a> {
@@ -621,11 +613,8 @@ struct SkipFunctionsVisitor<'a> {
     addfinalizer_call: Option<&'a Expr>,
 }
 
-impl<'a, 'b> Visitor<'b> for SkipFunctionsVisitor<'a>
-where
-    'b: 'a,
-{
-    fn visit_stmt(&mut self, stmt: &'b Stmt) {
+impl<'a> Visitor<'a> for SkipFunctionsVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::Return(ast::StmtReturn { value, range: _ }) => {
                 if value.is_some() {
@@ -637,7 +626,7 @@ where
         }
     }
 
-    fn visit_expr(&mut self, expr: &'b Expr) {
+    fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
             Expr::YieldFrom(_) => {
                 self.has_yield_from = true;
@@ -649,9 +638,9 @@ where
                 }
             }
             Expr::Call(ast::ExprCall { func, .. }) => {
-                if collect_call_path(func).is_some_and(|call_path| {
-                    matches!(call_path.as_slice(), ["request", "addfinalizer"])
-                }) {
+                if UnqualifiedName::from_expr(func)
+                    .is_some_and(|name| matches!(name.segments(), ["request", "addfinalizer"]))
+                {
                     self.addfinalizer_call = Some(expr);
                 };
                 visitor::walk_expr(self, expr);
@@ -844,28 +833,17 @@ fn check_fixture_returns(
 
 /// PT019
 fn check_test_function_args(checker: &mut Checker, parameters: &Parameters) {
-    parameters
-        .posonlyargs
-        .iter()
-        .chain(&parameters.args)
-        .chain(&parameters.kwonlyargs)
-        .for_each(
-            |ParameterWithDefault {
-                 parameter,
-                 default: _,
-                 range: _,
-             }| {
-                let name = &parameter.name;
-                if name.starts_with('_') {
-                    checker.diagnostics.push(Diagnostic::new(
-                        PytestFixtureParamWithoutValue {
-                            name: name.to_string(),
-                        },
-                        parameter.range(),
-                    ));
-                }
-            },
-        );
+    for parameter in parameters.iter_non_variadic_params() {
+        let name = &parameter.parameter.name;
+        if name.starts_with('_') {
+            checker.diagnostics.push(Diagnostic::new(
+                PytestFixtureParamWithoutValue {
+                    name: name.to_string(),
+                },
+                parameter.range(),
+            ));
+        }
+    }
 }
 
 /// PT020
@@ -941,9 +919,7 @@ pub(crate) fn fixture(
             check_fixture_decorator(checker, name, decorator);
         }
 
-        if checker.enabled(Rule::PytestDeprecatedYieldFixture)
-            && checker.settings.flake8_pytest_style.fixture_parentheses
-        {
+        if checker.enabled(Rule::PytestDeprecatedYieldFixture) {
             check_fixture_decorator_name(checker, decorator);
         }
 

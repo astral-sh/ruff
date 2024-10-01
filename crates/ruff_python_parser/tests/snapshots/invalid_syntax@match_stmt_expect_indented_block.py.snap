@@ -1,0 +1,65 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/match_stmt_expect_indented_block.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..23,
+        body: [
+            Match(
+                StmtMatch {
+                    range: 0..22,
+                    subject: Name(
+                        ExprName {
+                            range: 6..9,
+                            id: Name("foo"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 11..22,
+                            pattern: MatchAs(
+                                PatternMatchAs {
+                                    range: 16..17,
+                                    pattern: None,
+                                    name: None,
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 19..22,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 19..22,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | match foo:
+2 | case _: ...
+  | ^^^^ Syntax Error: Expected an indented block after `match` statement
+  |
+
+
+  |
+1 | match foo:
+2 | case _: ...
+  |

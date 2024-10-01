@@ -1,10 +1,10 @@
 use ruff_formatter::write;
 use ruff_python_ast::{Expr, StmtReturn};
 
-use crate::comments::{SourceComment, SuppressionKind};
+use crate::comments::SourceComment;
 use crate::expression::expr_tuple::TupleParentheses;
-use crate::prelude::*;
 use crate::statement::stmt_assign::FormatStatementsLastExpression;
+use crate::{has_skip_comment, prelude::*};
 
 #[derive(Default)]
 pub struct FormatStmtReturn;
@@ -45,6 +45,6 @@ impl FormatNodeRule<StmtReturn> for FormatStmtReturn {
         trailing_comments: &[SourceComment],
         context: &PyFormatContext,
     ) -> bool {
-        SuppressionKind::has_skip_comment(trailing_comments, context.source())
+        has_skip_comment(trailing_comments, context.source())
     }
 }

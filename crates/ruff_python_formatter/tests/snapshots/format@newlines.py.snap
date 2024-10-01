@@ -255,6 +255,68 @@ if True:
     print()
 
 
+if True:
+    def a():
+        return 1
+else:
+    pass
+
+if True:
+    # fmt: off
+    def a():
+        return 1
+    # fmt: on
+else:
+    pass
+
+match True:
+    case 1:
+        def a():
+            return 1
+    case 1:
+        def a():
+            return 1
+
+try:
+    def a():
+        return 1
+except RuntimeError:
+    def a():
+        return 1
+
+try:
+    def a():
+        return 1
+finally:
+    def a():
+        return 1
+
+try:
+    def a():
+        return 1
+except RuntimeError:
+    def a():
+        return 1
+except ZeroDivisionError:
+    def a():
+        return 1
+else:
+    def a():
+        return 1
+finally:
+    def a():
+        return 1
+
+if raw:
+    def show_file(lines):
+        for line in lines:
+            pass
+            # Trailing comment not on function or class
+
+else:
+    pass
+
+
 # NOTE: Please keep this the last block in this file. This tests that we don't insert
 # empty line(s) at the end of the file due to nested function
 if True:
@@ -530,13 +592,11 @@ print("below nested functions")
 class Path:
     if sys.version_info >= (3, 11):
 
-        def joinpath(self):
-            ...
+        def joinpath(self): ...
 
     # The .open method comes from pathlib.pyi and should be kept in sync.
     @overload
-    def open(self):
-        ...
+    def open(self): ...
 
 
 def fakehttp():
@@ -560,6 +620,85 @@ if True:
     print()
 
 
+if True:
+
+    def a():
+        return 1
+else:
+    pass
+
+if True:
+    # fmt: off
+    def a():
+        return 1
+    # fmt: on
+else:
+    pass
+
+match True:
+    case 1:
+
+        def a():
+            return 1
+    case 1:
+
+        def a():
+            return 1
+
+
+try:
+
+    def a():
+        return 1
+except RuntimeError:
+
+    def a():
+        return 1
+
+
+try:
+
+    def a():
+        return 1
+finally:
+
+    def a():
+        return 1
+
+
+try:
+
+    def a():
+        return 1
+except RuntimeError:
+
+    def a():
+        return 1
+except ZeroDivisionError:
+
+    def a():
+        return 1
+else:
+
+    def a():
+        return 1
+finally:
+
+    def a():
+        return 1
+
+
+if raw:
+
+    def show_file(lines):
+        for line in lines:
+            pass
+            # Trailing comment not on function or class
+
+else:
+    pass
+
+
 # NOTE: Please keep this the last block in this file. This tests that we don't insert
 # empty line(s) at the end of the file due to nested function
 if True:
@@ -568,20 +707,14 @@ if True:
         pass
 
 
-def overload1():
-    ...  # trailing comment
+def overload1(): ...  # trailing comment
+def overload1(a: int): ...
 
 
-def overload1(a: int):
-    ...
+def overload2(): ...  # trailing comment
 
 
-def overload2():
-    ...  # trailing comment
-
-
-def overload2(a: int):
-    ...
+def overload2(a: int): ...
 
 
 def overload3():
@@ -589,8 +722,7 @@ def overload3():
     # trailing comment
 
 
-def overload3(a: int):
-    ...
+def overload3(a: int): ...
 
 
 def overload4():
@@ -598,8 +730,7 @@ def overload4():
     # trailing comment
 
 
-def overload4(a: int):
-    ...
+def overload4(a: int): ...
 ```
 
 
@@ -607,65 +738,59 @@ def overload4(a: int):
 ```diff
 --- Stable
 +++ Preview
-@@ -245,13 +245,11 @@
- class Path:
-     if sys.version_info >= (3, 11):
+@@ -277,6 +277,7 @@
  
--        def joinpath(self):
--            ...
-+        def joinpath(self): ...
+     def a():
+         return 1
++
+ else:
+     pass
  
-     # The .open method comes from pathlib.pyi and should be kept in sync.
-     @overload
--    def open(self):
--        ...
-+    def open(self): ...
+@@ -293,6 +294,7 @@
  
+         def a():
+             return 1
++
+     case 1:
  
- def fakehttp():
-@@ -283,20 +281,14 @@
-         pass
+         def a():
+@@ -303,6 +305,7 @@
  
+     def a():
+         return 1
++
+ except RuntimeError:
  
--def overload1():
--    ...  # trailing comment
-+def overload1(): ...  # trailing comment
-+def overload1(a: int): ...
+     def a():
+@@ -313,6 +316,7 @@
  
+     def a():
+         return 1
++
+ finally:
  
--def overload1(a: int):
--    ...
-+def overload2(): ...  # trailing comment
+     def a():
+@@ -323,18 +327,22 @@
  
+     def a():
+         return 1
++
+ except RuntimeError:
  
--def overload2():
--    ...  # trailing comment
--
--
--def overload2(a: int):
--    ...
-+def overload2(a: int): ...
+     def a():
+         return 1
++
+ except ZeroDivisionError:
  
+     def a():
+         return 1
++
+ else:
  
- def overload3():
-@@ -304,8 +296,7 @@
-     # trailing comment
+     def a():
+         return 1
++
+ finally:
  
- 
--def overload3(a: int):
--    ...
-+def overload3(a: int): ...
- 
- 
- def overload4():
-@@ -313,5 +304,4 @@
-     # trailing comment
- 
- 
--def overload4(a: int):
--    ...
-+def overload4(a: int): ...
+     def a():
 ```
-
-
-

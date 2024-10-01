@@ -15,36 +15,58 @@ use crate::checkers::ast::Checker;
 /// `__iter__` methods should always should return an `Iterator` of some kind,
 /// not an `Iterable`.
 ///
-/// In Python, an `Iterator` is an object that has a `__next__` method, which
-/// provides a consistent interface for sequentially processing elements from
-/// a sequence or other iterable object. Meanwhile, an `Iterable` is an object
-/// with an `__iter__` method, which itself returns an `Iterator`.
+/// In Python, an `Iterable` is an object that has an `__iter__` method; an
+/// `Iterator` is an object that has `__iter__` and `__next__` methods. All
+/// `__iter__` methods are expected to return `Iterator`s. Type checkers may
+/// not always recognize an object as being iterable if its `__iter__` method
+/// does not return an `Iterator`.
 ///
 /// Every `Iterator` is an `Iterable`, but not every `Iterable` is an `Iterator`.
-/// By returning an `Iterable` from `__iter__`, you may end up returning an
-/// object that doesn't implement `__next__`, which will cause a `TypeError`
-/// at runtime. For example, returning a `list` from `__iter__` will cause
-/// a `TypeError` when you call `__next__` on it, as a `list` is an `Iterable`,
-/// but not an `Iterator`.
+/// For example, `list` is an `Iterable`, but not an `Iterator`; you can obtain
+/// an iterator over a list's elements by passing the list to `iter()`:
+///
+/// ```pycon
+/// >>> import collections.abc
+/// >>> x = [42]
+/// >>> isinstance(x, collections.abc.Iterable)
+/// True
+/// >>> isinstance(x, collections.abc.Iterator)
+/// False
+/// >>> next(x)
+/// Traceback (most recent call last):
+///  File "<stdin>", line 1, in <module>
+/// TypeError: 'list' object is not an iterator
+/// >>> y = iter(x)
+/// >>> isinstance(y, collections.abc.Iterable)
+/// True
+/// >>> isinstance(y, collections.abc.Iterator)
+/// True
+/// >>> next(y)
+/// 42
+/// ```
+///
+/// Using `Iterable` rather than `Iterator` as a return type for an `__iter__`
+/// methods would imply that you would not necessarily be able to call `next()`
+/// on the returned object, violating the expectations of the interface.
 ///
 /// ## Example
+///
 /// ```python
 /// import collections.abc
 ///
 ///
-/// class Class:
-///     def __iter__(self) -> collections.abc.Iterable[str]:
-///         ...
+/// class Klass:
+///     def __iter__(self) -> collections.abc.Iterable[str]: ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// import collections.abc
 ///
 ///
-/// class Class:
-///     def __iter__(self) -> collections.abc.Iterator[str]:
-///         ...
+/// class Klass:
+///     def __iter__(self) -> collections.abc.Iterator[str]: ...
 /// ```
 #[violation]
 pub struct IterMethodReturnIterable {
@@ -88,16 +110,16 @@ pub(crate) fn iter_method_return_iterable(checker: &mut Checker, definition: &De
 
     if checker
         .semantic()
-        .resolve_call_path(map_subscript(annotation))
-        .is_some_and(|call_path| {
+        .resolve_qualified_name(map_subscript(annotation))
+        .is_some_and(|qualified_name| {
             if is_async {
                 matches!(
-                    call_path.as_slice(),
+                    qualified_name.segments(),
                     ["typing", "AsyncIterable"] | ["collections", "abc", "AsyncIterable"]
                 )
             } else {
                 matches!(
-                    call_path.as_slice(),
+                    qualified_name.segments(),
                     ["typing", "Iterable"] | ["collections", "abc", "Iterable"]
                 )
             }

@@ -1,0 +1,517 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/dict/recover.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..346,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 88..91,
+                    value: Set(
+                        ExprSet {
+                            range: 88..91,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        range: 89..89,
+                                        id: Name(""),
+                                        ctx: Invalid,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 93..105,
+                    value: Dict(
+                        ExprDict {
+                            range: 93..105,
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 94..95,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 97..98,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                },
+                                DictItem {
+                                    key: Some(
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 100..101,
+                                                value: Int(
+                                                    3,
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 103..104,
+                                            value: Int(
+                                                4,
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 107..115,
+                    value: Dict(
+                        ExprDict {
+                            range: 107..115,
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 108..109,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 111..112,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 133..144,
+                    value: Dict(
+                        ExprDict {
+                            range: 133..144,
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 134..135,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 137..138,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                },
+                                DictItem {
+                                    key: Some(
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 139..140,
+                                                value: Int(
+                                                    3,
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 142..143,
+                                            value: Int(
+                                                4,
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 157..162,
+                    value: Dict(
+                        ExprDict {
+                            range: 157..162,
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 158..159,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                    value: Name(
+                                        ExprName {
+                                            range: 160..160,
+                                            id: Name(""),
+                                            ctx: Invalid,
+                                        },
+                                    ),
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 201..205,
+                    value: Dict(
+                        ExprDict {
+                            range: 201..205,
+                            items: [
+                                DictItem {
+                                    key: None,
+                                    value: Name(
+                                        ExprName {
+                                            range: 204..204,
+                                            id: Name(""),
+                                            ctx: Invalid,
+                                        },
+                                    ),
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 206..222,
+                    value: Dict(
+                        ExprDict {
+                            range: 206..222,
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 207..208,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    value: Name(
+                                        ExprName {
+                                            range: 210..211,
+                                            id: Name("y"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                                DictItem {
+                                    key: None,
+                                    value: Name(
+                                        ExprName {
+                                            range: 215..215,
+                                            id: Name(""),
+                                            ctx: Invalid,
+                                        },
+                                    ),
+                                },
+                                DictItem {
+                                    key: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 217..218,
+                                                id: Name("a"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    value: Name(
+                                        ExprName {
+                                            range: 220..221,
+                                            id: Name("b"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 310..330,
+                    value: Dict(
+                        ExprDict {
+                            range: 310..330,
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        Starred(
+                                            ExprStarred {
+                                                range: 311..313,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 312..313,
+                                                        id: Name("x"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    value: Name(
+                                        ExprName {
+                                            range: 315..316,
+                                            id: Name("y"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                                DictItem {
+                                    key: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 318..319,
+                                                id: Name("z"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    value: Name(
+                                        ExprName {
+                                            range: 321..322,
+                                            id: Name("a"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                                DictItem {
+                                    key: Some(
+                                        Starred(
+                                            ExprStarred {
+                                                range: 324..326,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 325..326,
+                                                        id: Name("b"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    value: Name(
+                                        ExprName {
+                                            range: 328..329,
+                                            id: Name("c"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 331..345,
+                    value: Dict(
+                        ExprDict {
+                            range: 331..345,
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 332..333,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    value: Starred(
+                                        ExprStarred {
+                                            range: 335..337,
+                                            value: Name(
+                                                ExprName {
+                                                    range: 336..337,
+                                                    id: Name("y"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                                DictItem {
+                                    key: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 339..340,
+                                                id: Name("z"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    value: Starred(
+                                        ExprStarred {
+                                            range: 342..344,
+                                            value: Name(
+                                                ExprName {
+                                                    range: 343..344,
+                                                    id: Name("a"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # Test cases for dictionary expressions where the parser recovers from a syntax error.
+2 | 
+3 | {,}
+  |  ^ Syntax Error: Expected an expression
+4 | 
+5 | {1: 2,,3: 4}
+  |
+
+
+  |
+3 | {,}
+4 | 
+5 | {1: 2,,3: 4}
+  |       ^ Syntax Error: Expected an expression or a '}'
+6 | 
+7 | {1: 2,,}
+  |
+
+
+  |
+5 | {1: 2,,3: 4}
+6 | 
+7 | {1: 2,,}
+  |       ^ Syntax Error: Expected an expression or a '}'
+8 | 
+9 | # Missing comma
+  |
+
+
+   |
+ 9 | # Missing comma
+10 | {1: 2 3: 4}
+   |       ^ Syntax Error: Expected ',', found int
+11 | 
+12 | # No value
+   |
+
+
+   |
+12 | # No value
+13 | {1: }
+   |     ^ Syntax Error: Expected an expression
+14 | 
+15 | # No value for double star unpacking
+   |
+
+
+   |
+15 | # No value for double star unpacking
+16 | {**}
+   |    ^ Syntax Error: Expected an expression
+17 | {x: y, **, a: b}
+   |
+
+
+   |
+15 | # No value for double star unpacking
+16 | {**}
+17 | {x: y, **, a: b}
+   |          ^ Syntax Error: Expected an expression
+18 | 
+19 | # This is not a double star unpacking
+   |
+
+
+   |
+22 | # Star expression not allowed here
+23 | {*x: y, z: a, *b: c}
+   |  ^^ Syntax Error: Starred expression cannot be used here
+24 | {x: *y, z: *a}
+   |
+
+
+   |
+22 | # Star expression not allowed here
+23 | {*x: y, z: a, *b: c}
+   |               ^^ Syntax Error: Starred expression cannot be used here
+24 | {x: *y, z: *a}
+   |
+
+
+   |
+22 | # Star expression not allowed here
+23 | {*x: y, z: a, *b: c}
+24 | {x: *y, z: *a}
+   |     ^^ Syntax Error: Starred expression cannot be used here
+   |
+
+
+   |
+22 | # Star expression not allowed here
+23 | {*x: y, z: a, *b: c}
+24 | {x: *y, z: *a}
+   |            ^^ Syntax Error: Starred expression cannot be used here
+   |

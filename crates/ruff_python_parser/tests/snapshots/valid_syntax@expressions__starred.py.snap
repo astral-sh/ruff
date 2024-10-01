@@ -1,0 +1,354 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/valid/expressions/starred.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..172,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..2,
+                    value: Starred(
+                        ExprStarred {
+                            range: 0..2,
+                            value: Name(
+                                ExprName {
+                                    range: 1..2,
+                                    id: Name("a"),
+                                    ctx: Load,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 3..11,
+                    value: Starred(
+                        ExprStarred {
+                            range: 3..11,
+                            value: BinOp(
+                                ExprBinOp {
+                                    range: 5..10,
+                                    left: Name(
+                                        ExprName {
+                                            range: 5..6,
+                                            id: Name("a"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    op: Add,
+                                    right: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 9..10,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 12..19,
+                    value: Starred(
+                        ExprStarred {
+                            range: 12..19,
+                            value: Attribute(
+                                ExprAttribute {
+                                    range: 13..19,
+                                    value: Name(
+                                        ExprName {
+                                            range: 13..14,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    attr: Identifier {
+                                        id: Name("attr"),
+                                        range: 15..19,
+                                    },
+                                    ctx: Load,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 21..57,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 21..32,
+                                id: Name("array_slice"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 35..57,
+                            value: Name(
+                                ExprName {
+                                    range: 35..40,
+                                    id: Name("array"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Tuple(
+                                ExprTuple {
+                                    range: 41..56,
+                                    elts: [
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 41..42,
+                                                value: Int(
+                                                    0,
+                                                ),
+                                            },
+                                        ),
+                                        Starred(
+                                            ExprStarred {
+                                                range: 44..52,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 45..52,
+                                                        id: Name("indexes"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        UnaryOp(
+                                            ExprUnaryOp {
+                                                range: 54..56,
+                                                op: USub,
+                                                operand: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 55..56,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                    parenthesized: false,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 58..94,
+                    targets: [
+                        Subscript(
+                            ExprSubscript {
+                                range: 58..80,
+                                value: Name(
+                                    ExprName {
+                                        range: 58..63,
+                                        id: Name("array"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                slice: Tuple(
+                                    ExprTuple {
+                                        range: 64..79,
+                                        elts: [
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 64..65,
+                                                    value: Int(
+                                                        0,
+                                                    ),
+                                                },
+                                            ),
+                                            Starred(
+                                                ExprStarred {
+                                                    range: 67..75,
+                                                    value: Name(
+                                                        ExprName {
+                                                            range: 68..75,
+                                                            id: Name("indexes"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            UnaryOp(
+                                                ExprUnaryOp {
+                                                    range: 77..79,
+                                                    op: USub,
+                                                    operand: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 78..79,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                        ctx: Load,
+                                        parenthesized: false,
+                                    },
+                                ),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: Name(
+                        ExprName {
+                            range: 83..94,
+                            id: Name("array_slice"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 95..140,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 95..140,
+                            value: Name(
+                                ExprName {
+                                    range: 95..100,
+                                    id: Name("array"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Tuple(
+                                ExprTuple {
+                                    range: 101..139,
+                                    elts: [
+                                        Starred(
+                                            ExprStarred {
+                                                range: 101..119,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 102..119,
+                                                        id: Name("indexes_to_select"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        Starred(
+                                            ExprStarred {
+                                                range: 121..139,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 122..139,
+                                                        id: Name("indexes_to_select"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                    parenthesized: false,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 141..171,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 141..171,
+                            value: Name(
+                                ExprName {
+                                    range: 141..146,
+                                    id: Name("array"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Tuple(
+                                ExprTuple {
+                                    range: 147..170,
+                                    elts: [
+                                        Slice(
+                                            ExprSlice {
+                                                range: 147..150,
+                                                lower: Some(
+                                                    NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 147..148,
+                                                            value: Int(
+                                                                3,
+                                                            ),
+                                                        },
+                                                    ),
+                                                ),
+                                                upper: Some(
+                                                    NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 149..150,
+                                                            value: Int(
+                                                                5,
+                                                            ),
+                                                        },
+                                                    ),
+                                                ),
+                                                step: None,
+                                            },
+                                        ),
+                                        Starred(
+                                            ExprStarred {
+                                                range: 152..170,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 153..170,
+                                                        id: Name("indexes_to_select"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                    parenthesized: false,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

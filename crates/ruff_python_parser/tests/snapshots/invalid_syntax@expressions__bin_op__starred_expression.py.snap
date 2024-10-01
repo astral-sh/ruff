@@ -1,0 +1,91 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/bin_op/starred_expression.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..14,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..6,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 0..6,
+                            left: Name(
+                                ExprName {
+                                    range: 0..1,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            op: Add,
+                            right: Starred(
+                                ExprStarred {
+                                    range: 4..6,
+                                    value: Name(
+                                        ExprName {
+                                            range: 5..6,
+                                            id: Name("y"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 7..14,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 7..14,
+                            left: Name(
+                                ExprName {
+                                    range: 7..8,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            op: Pow,
+                            right: Starred(
+                                ExprStarred {
+                                    range: 12..14,
+                                    value: Name(
+                                        ExprName {
+                                            range: 13..14,
+                                            id: Name("y"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | x + *y
+  |     ^^ Syntax Error: Starred expression cannot be used here
+2 | x ** *y
+  |
+
+
+  |
+1 | x + *y
+2 | x ** *y
+  |      ^^ Syntax Error: Starred expression cannot be used here
+  |

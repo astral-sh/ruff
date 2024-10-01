@@ -1,0 +1,237 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/valid/statement/from_import.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..259,
+        body: [
+            ImportFrom(
+                StmtImportFrom {
+                    range: 0..15,
+                    module: Some(
+                        Identifier {
+                            id: Name("a"),
+                            range: 5..6,
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 14..15,
+                            name: Identifier {
+                                id: Name("b"),
+                                range: 14..15,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 0,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    range: 27..42,
+                    module: None,
+                    names: [
+                        Alias {
+                            range: 41..42,
+                            name: Identifier {
+                                id: Name("a"),
+                                range: 41..42,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 1,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    range: 43..85,
+                    module: Some(
+                        Identifier {
+                            id: Name("foo.bar"),
+                            range: 48..55,
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 63..71,
+                            name: Identifier {
+                                id: Name("baz"),
+                                range: 63..66,
+                            },
+                            asname: Some(
+                                Identifier {
+                                    id: Name("b"),
+                                    range: 70..71,
+                                },
+                            ),
+                        },
+                        Alias {
+                            range: 73..85,
+                            name: Identifier {
+                                id: Name("FooBar"),
+                                range: 73..79,
+                            },
+                            asname: Some(
+                                Identifier {
+                                    id: Name("fb"),
+                                    range: 83..85,
+                                },
+                            ),
+                        },
+                    ],
+                    level: 0,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    range: 86..102,
+                    module: Some(
+                        Identifier {
+                            id: Name("a"),
+                            range: 92..93,
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 101..102,
+                            name: Identifier {
+                                id: Name("b"),
+                                range: 101..102,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 1,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    range: 103..120,
+                    module: None,
+                    names: [
+                        Alias {
+                            range: 119..120,
+                            name: Identifier {
+                                id: Name("c"),
+                                range: 119..120,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 3,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    range: 121..161,
+                    module: None,
+                    names: [
+                        Alias {
+                            range: 160..161,
+                            name: Identifier {
+                                id: Name("d"),
+                                range: 160..161,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 26,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    range: 162..207,
+                    module: Some(
+                        Identifier {
+                            id: Name("a.b.c"),
+                            range: 193..198,
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 206..207,
+                            name: Identifier {
+                                id: Name("d"),
+                                range: 206..207,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 26,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    range: 208..242,
+                    module: Some(
+                        Identifier {
+                            id: Name("module"),
+                            range: 213..219,
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 228..229,
+                            name: Identifier {
+                                id: Name("a"),
+                                range: 228..229,
+                            },
+                            asname: None,
+                        },
+                        Alias {
+                            range: 231..237,
+                            name: Identifier {
+                                id: Name("b"),
+                                range: 231..232,
+                            },
+                            asname: Some(
+                                Identifier {
+                                    id: Name("B"),
+                                    range: 236..237,
+                                },
+                            ),
+                        },
+                        Alias {
+                            range: 239..240,
+                            name: Identifier {
+                                id: Name("c"),
+                                range: 239..240,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 0,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    range: 243..258,
+                    module: Some(
+                        Identifier {
+                            id: Name("a"),
+                            range: 248..249,
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 257..258,
+                            name: Identifier {
+                                id: Name("*"),
+                                range: 257..258,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 0,
+                },
+            ),
+        ],
+    },
+)
+```

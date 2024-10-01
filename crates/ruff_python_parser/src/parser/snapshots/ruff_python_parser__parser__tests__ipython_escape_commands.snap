@@ -1,0 +1,399 @@
+---
+source: crates/ruff_python_parser/src/parser/tests.rs
+expression: parsed.syntax()
+---
+Module(
+    ModModule {
+        range: 0..929,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 21..42,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 27..40,
+                            left: Name(
+                                ExprName {
+                                    range: 27..28,
+                                    id: Name("a"),
+                                    ctx: Load,
+                                },
+                            ),
+                            op: Mod,
+                            right: Name(
+                                ExprName {
+                                    range: 39..40,
+                                    id: Name("b"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    range: 66..73,
+                    kind: Help2,
+                    value: "a.foo",
+                },
+            ),
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    range: 74..80,
+                    kind: Help,
+                    value: "a.foo",
+                },
+            ),
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    range: 81..88,
+                    kind: Help,
+                    value: "a.foo",
+                },
+            ),
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    range: 89..100,
+                    kind: Help2,
+                    value: "a.foo()",
+                },
+            ),
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    range: 115..128,
+                    kind: Magic,
+                    value: "timeit a = b",
+                },
+            ),
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    range: 129..147,
+                    kind: Magic,
+                    value: "timeit foo(b) % 3",
+                },
+            ),
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    range: 148..176,
+                    kind: Magic,
+                    value: "alias showPath pwd && ls -a",
+                },
+            ),
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    range: 177..205,
+                    kind: Magic,
+                    value: "timeit a =  foo(b); b = 2",
+                },
+            ),
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    range: 206..226,
+                    kind: Magic,
+                    value: "matplotlib --inline",
+                },
+            ),
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    range: 227..253,
+                    kind: Magic,
+                    value: "matplotlib     --inline",
+                },
+            ),
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    range: 277..309,
+                    kind: Shell,
+                    value: "pwd && ls -a | sed 's/^/\\    /'",
+                },
+            ),
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    range: 310..347,
+                    kind: Shell,
+                    value: "pwd   && ls -a | sed 's/^/\\\\    /'",
+                },
+            ),
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    range: 348..393,
+                    kind: ShCap,
+                    value: "cd /Users/foo/Library/Application\\ Support/",
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 566..626,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 570..573,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 573..575,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Return(
+                            StmtReturn {
+                                range: 581..626,
+                                value: Some(
+                                    Compare(
+                                        ExprCompare {
+                                            range: 598..620,
+                                            left: Name(
+                                                ExprName {
+                                                    range: 598..599,
+                                                    id: Name("a"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            ops: [
+                                                NotEq,
+                                            ],
+                                            comparators: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 619..620,
+                                                        id: Name("b"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                        },
+                                    ),
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    range: 656..664,
+                    kind: Paren,
+                    value: "foo 1 2",
+                },
+            ),
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    range: 665..673,
+                    kind: Quote2,
+                    value: "foo 1 2",
+                },
+            ),
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    range: 674..682,
+                    kind: Quote,
+                    value: "foo 1 2",
+                },
+            ),
+            For(
+                StmtFor {
+                    range: 711..737,
+                    is_async: false,
+                    target: Name(
+                        ExprName {
+                            range: 715..716,
+                            id: Name("a"),
+                            ctx: Store,
+                        },
+                    ),
+                    iter: Call(
+                        ExprCall {
+                            range: 720..728,
+                            func: Name(
+                                ExprName {
+                                    range: 720..725,
+                                    id: Name("range"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 725..728,
+                                args: [
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 726..727,
+                                            value: Int(
+                                                5,
+                                            ),
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                    body: [
+                        IpyEscapeCommand(
+                            StmtIpyEscapeCommand {
+                                range: 734..737,
+                                kind: Shell,
+                                value: "ls",
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 739..748,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 739..741,
+                                id: Name("p1"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: IpyEscapeCommand(
+                        ExprIpyEscapeCommand {
+                            range: 744..748,
+                            kind: Shell,
+                            value: "pwd",
+                        },
+                    ),
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 749..763,
+                    target: Name(
+                        ExprName {
+                            range: 749..751,
+                            id: Name("p2"),
+                            ctx: Store,
+                        },
+                    ),
+                    annotation: Name(
+                        ExprName {
+                            range: 753..756,
+                            id: Name("str"),
+                            ctx: Load,
+                        },
+                    ),
+                    value: Some(
+                        IpyEscapeCommand(
+                            ExprIpyEscapeCommand {
+                                range: 759..763,
+                                kind: Shell,
+                                value: "pwd",
+                            },
+                        ),
+                    ),
+                    simple: true,
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 764..784,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 764..767,
+                                id: Name("foo"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: IpyEscapeCommand(
+                        ExprIpyEscapeCommand {
+                            range: 770..784,
+                            kind: Magic,
+                            value: "foo     bar",
+                        },
+                    ),
+                },
+            ),
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    range: 786..791,
+                    kind: Magic,
+                    value: " foo",
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 792..813,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 792..795,
+                                id: Name("foo"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: IpyEscapeCommand(
+                        ExprIpyEscapeCommand {
+                            range: 798..813,
+                            kind: Magic,
+                            value: "foo  # comment",
+                        },
+                    ),
+                },
+            ),
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    range: 838..842,
+                    kind: Help,
+                    value: "foo",
+                },
+            ),
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    range: 843..852,
+                    kind: Help2,
+                    value: "foo.bar",
+                },
+            ),
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    range: 853..865,
+                    kind: Help,
+                    value: "foo.bar.baz",
+                },
+            ),
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    range: 866..874,
+                    kind: Help2,
+                    value: "foo[0]",
+                },
+            ),
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    range: 875..885,
+                    kind: Help,
+                    value: "foo[0][1]",
+                },
+            ),
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    range: 886..905,
+                    kind: Help2,
+                    value: "foo.bar[0].baz[1]",
+                },
+            ),
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    range: 906..929,
+                    kind: Help2,
+                    value: "foo.bar[0].baz[2].egg",
+                },
+            ),
+        ],
+    },
+)

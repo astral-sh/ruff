@@ -1,0 +1,301 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/params_star_after_slash.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..105,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 0..19,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 4..7,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 7..14,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: Some(
+                            Parameter {
+                                range: 8..10,
+                                name: Identifier {
+                                    id: Name("a"),
+                                    range: 9..10,
+                                },
+                                annotation: None,
+                            },
+                        ),
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 16..19,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 16..19,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 20..48,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 24..27,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 27..43,
+                        posonlyargs: [
+                            ParameterWithDefault {
+                                range: 28..29,
+                                parameter: Parameter {
+                                    range: 28..29,
+                                    name: Identifier {
+                                        id: Name("a"),
+                                        range: 28..29,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        args: [],
+                        vararg: Some(
+                            Parameter {
+                                range: 31..36,
+                                name: Identifier {
+                                    id: Name("args"),
+                                    range: 32..36,
+                                },
+                                annotation: None,
+                            },
+                        ),
+                        kwonlyargs: [
+                            ParameterWithDefault {
+                                range: 38..39,
+                                parameter: Parameter {
+                                    range: 38..39,
+                                    name: Identifier {
+                                        id: Name("b"),
+                                        range: 38..39,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 45..48,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 45..48,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 49..73,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 53..56,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 56..68,
+                        posonlyargs: [
+                            ParameterWithDefault {
+                                range: 57..58,
+                                parameter: Parameter {
+                                    range: 57..58,
+                                    name: Identifier {
+                                        id: Name("a"),
+                                        range: 57..58,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [
+                            ParameterWithDefault {
+                                range: 66..67,
+                                parameter: Parameter {
+                                    range: 66..67,
+                                    name: Identifier {
+                                        id: Name("b"),
+                                        range: 66..67,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 70..73,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 70..73,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 74..104,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 78..81,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 81..99,
+                        posonlyargs: [
+                            ParameterWithDefault {
+                                range: 82..83,
+                                parameter: Parameter {
+                                    range: 82..83,
+                                    name: Identifier {
+                                        id: Name("a"),
+                                        range: 82..83,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [
+                            ParameterWithDefault {
+                                range: 88..89,
+                                parameter: Parameter {
+                                    range: 88..89,
+                                    name: Identifier {
+                                        id: Name("b"),
+                                        range: 88..89,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 91..92,
+                                parameter: Parameter {
+                                    range: 91..92,
+                                    name: Identifier {
+                                        id: Name("c"),
+                                        range: 91..92,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 97..98,
+                                parameter: Parameter {
+                                    range: 97..98,
+                                    name: Identifier {
+                                        id: Name("d"),
+                                        range: 97..98,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 101..104,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 101..104,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | def foo(*a, /): ...
+  |             ^ Syntax Error: '/' parameter must appear before '*' parameter
+2 | def foo(a, *args, b, /): ...
+3 | def foo(a, *, /, b): ...
+  |
+
+
+  |
+1 | def foo(*a, /): ...
+2 | def foo(a, *args, b, /): ...
+  |                      ^ Syntax Error: '/' parameter must appear before '*' parameter
+3 | def foo(a, *, /, b): ...
+4 | def foo(a, *, b, c, /, d): ...
+  |
+
+
+  |
+1 | def foo(*a, /): ...
+2 | def foo(a, *args, b, /): ...
+3 | def foo(a, *, /, b): ...
+  |               ^ Syntax Error: '/' parameter must appear before '*' parameter
+4 | def foo(a, *, b, c, /, d): ...
+  |
+
+
+  |
+2 | def foo(a, *args, b, /): ...
+3 | def foo(a, *, /, b): ...
+4 | def foo(a, *, b, c, /, d): ...
+  |                     ^ Syntax Error: '/' parameter must appear before '*' parameter
+  |

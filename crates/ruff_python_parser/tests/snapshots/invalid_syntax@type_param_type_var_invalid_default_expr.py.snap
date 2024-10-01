@@ -1,0 +1,379 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/type_param_type_var_invalid_default_expr.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..163,
+        body: [
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 0..22,
+                    name: Name(
+                        ExprName {
+                            range: 5..6,
+                            id: Name("X"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 6..16,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 7..15,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 7..8,
+                                        },
+                                        bound: None,
+                                        default: Some(
+                                            Starred(
+                                                ExprStarred {
+                                                    range: 11..15,
+                                                    value: Name(
+                                                        ExprName {
+                                                            range: 12..15,
+                                                            id: Name("int"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            range: 19..22,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 23..48,
+                    name: Name(
+                        ExprName {
+                            range: 28..29,
+                            id: Name("X"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 29..42,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 30..41,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 30..31,
+                                        },
+                                        bound: None,
+                                        default: Some(
+                                            Yield(
+                                                ExprYield {
+                                                    range: 34..41,
+                                                    value: Some(
+                                                        Name(
+                                                            ExprName {
+                                                                range: 40..41,
+                                                                id: Name("x"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                    ),
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            range: 45..48,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 49..76,
+                    name: Name(
+                        ExprName {
+                            range: 54..55,
+                            id: Name("X"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 55..70,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 56..69,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 56..57,
+                                        },
+                                        bound: None,
+                                        default: Some(
+                                            Yield(
+                                                ExprYield {
+                                                    range: 61..68,
+                                                    value: Some(
+                                                        Name(
+                                                            ExprName {
+                                                                range: 67..68,
+                                                                id: Name("x"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                    ),
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            range: 73..76,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 77..107,
+                    name: Name(
+                        ExprName {
+                            range: 82..83,
+                            id: Name("X"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 83..101,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 84..100,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 84..85,
+                                        },
+                                        bound: None,
+                                        default: Some(
+                                            YieldFrom(
+                                                ExprYieldFrom {
+                                                    range: 88..100,
+                                                    value: Name(
+                                                        ExprName {
+                                                            range: 99..100,
+                                                            id: Name("x"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            range: 104..107,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 108..134,
+                    name: Name(
+                        ExprName {
+                            range: 113..114,
+                            id: Name("X"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 114..128,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 115..120,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 115..116,
+                                        },
+                                        bound: None,
+                                        default: Some(
+                                            Name(
+                                                ExprName {
+                                                    range: 119..120,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 124..127,
+                                        name: Identifier {
+                                            id: Name("int"),
+                                            range: 124..127,
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            range: 131..134,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 135..162,
+                    name: Name(
+                        ExprName {
+                            range: 140..141,
+                            id: Name("X"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 141..156,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 142..155,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 142..143,
+                                        },
+                                        bound: Some(
+                                            Name(
+                                                ExprName {
+                                                    range: 145..148,
+                                                    id: Name("int"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                        default: Some(
+                                            Starred(
+                                                ExprStarred {
+                                                    range: 151..155,
+                                                    value: Name(
+                                                        ExprName {
+                                                            range: 152..155,
+                                                            id: Name("int"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            range: 159..162,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | type X[T = *int] = int
+  |            ^^^^ Syntax Error: Starred expression cannot be used here
+2 | type X[T = yield x] = int
+3 | type X[T = (yield x)] = int
+  |
+
+
+  |
+1 | type X[T = *int] = int
+2 | type X[T = yield x] = int
+  |            ^^^^^^^ Syntax Error: Yield expression cannot be used here
+3 | type X[T = (yield x)] = int
+4 | type X[T = yield from x] = int
+  |
+
+
+  |
+2 | type X[T = yield x] = int
+3 | type X[T = (yield x)] = int
+4 | type X[T = yield from x] = int
+  |            ^^^^^^^^^^^^ Syntax Error: Yield expression cannot be used here
+5 | type X[T = x := int] = int
+6 | type X[T: int = *int] = int
+  |
+
+
+  |
+3 | type X[T = (yield x)] = int
+4 | type X[T = yield from x] = int
+5 | type X[T = x := int] = int
+  |              ^^ Syntax Error: Expected ',', found ':='
+6 | type X[T: int = *int] = int
+  |
+
+
+  |
+4 | type X[T = yield from x] = int
+5 | type X[T = x := int] = int
+6 | type X[T: int = *int] = int
+  |                 ^^^^ Syntax Error: Starred expression cannot be used here
+  |

@@ -1,0 +1,91 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/unary/named_expression.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..18,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..2,
+                    value: UnaryOp(
+                        ExprUnaryOp {
+                            range: 0..2,
+                            op: USub,
+                            operand: Name(
+                                ExprName {
+                                    range: 1..2,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 6..7,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 6..7,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 8..13,
+                    value: UnaryOp(
+                        ExprUnaryOp {
+                            range: 8..13,
+                            op: Not,
+                            operand: Name(
+                                ExprName {
+                                    range: 12..13,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 17..18,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 17..18,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | -x := 1
+  |    ^^ Syntax Error: Expected a statement
+2 | not x := 1
+  |
+
+
+  |
+1 | -x := 1
+2 | not x := 1
+  |       ^^ Syntax Error: Expected a statement
+  |

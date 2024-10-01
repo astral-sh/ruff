@@ -1,0 +1,124 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/params_var_positional_with_default.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..30,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 0..23,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 4..7,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 7..17,
+                        posonlyargs: [],
+                        args: [
+                            ParameterWithDefault {
+                                range: 8..9,
+                                parameter: Parameter {
+                                    range: 8..9,
+                                    name: Identifier {
+                                        id: Name("a"),
+                                        range: 8..9,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        vararg: Some(
+                            Parameter {
+                                range: 11..16,
+                                name: Identifier {
+                                    id: Name("args"),
+                                    range: 12..16,
+                                },
+                                annotation: None,
+                            },
+                        ),
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 17..23,
+                                value: Tuple(
+                                    ExprTuple {
+                                        range: 17..23,
+                                        elts: [
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 18..19,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 21..22,
+                                                    value: Int(
+                                                        2,
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                        ctx: Load,
+                                        parenthesized: true,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 26..29,
+                    value: EllipsisLiteral(
+                        ExprEllipsisLiteral {
+                            range: 26..29,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | def foo(a, *args=(1, 2)): ...
+  |                 ^ Syntax Error: Parameter with '*' or '**' cannot have default value
+  |
+
+
+  |
+1 | def foo(a, *args=(1, 2)): ...
+  |                  ^ Syntax Error: Expected ')', found '('
+  |
+
+
+  |
+1 | def foo(a, *args=(1, 2)): ...
+  |                        ^ Syntax Error: Expected newline, found ')'
+  |
+
+
+  |
+1 | def foo(a, *args=(1, 2)): ...
+  |                         ^ Syntax Error: Expected a statement
+  |

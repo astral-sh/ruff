@@ -72,8 +72,7 @@ class Named(t.Protocol):
 
 
 class Factory(t.Protocol):
-    def this_will_be_formatted(self, **kwargs) -> Named:
-        ...
+    def this_will_be_formatted(self, **kwargs) -> Named: ...
 
     # fmt: on
 

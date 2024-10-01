@@ -1,0 +1,136 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/function_def_unparenthesized_return_types.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..50,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 0..22,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 4..7,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 7..9,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: Some(
+                        Tuple(
+                            ExprTuple {
+                                range: 13..17,
+                                elts: [
+                                    Name(
+                                        ExprName {
+                                            range: 13..16,
+                                            id: Name("int"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                ctx: Load,
+                                parenthesized: false,
+                            },
+                        ),
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 19..22,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 19..22,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 23..49,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 27..30,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 30..32,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: Some(
+                        Tuple(
+                            ExprTuple {
+                                range: 36..44,
+                                elts: [
+                                    Name(
+                                        ExprName {
+                                            range: 36..39,
+                                            id: Name("int"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            range: 41..44,
+                                            id: Name("str"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                ctx: Load,
+                                parenthesized: false,
+                            },
+                        ),
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 46..49,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 46..49,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | def foo() -> int,: ...
+  |              ^^^^ Syntax Error: Multiple return types must be parenthesized
+2 | def foo() -> int, str: ...
+  |
+
+
+  |
+1 | def foo() -> int,: ...
+2 | def foo() -> int, str: ...
+  |              ^^^^^^^^ Syntax Error: Multiple return types must be parenthesized
+  |

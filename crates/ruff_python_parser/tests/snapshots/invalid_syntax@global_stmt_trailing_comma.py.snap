@@ -1,0 +1,79 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/global_stmt_trailing_comma.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..32,
+        body: [
+            Global(
+                StmtGlobal {
+                    range: 0..8,
+                    names: [],
+                },
+            ),
+            Global(
+                StmtGlobal {
+                    range: 9..18,
+                    names: [
+                        Identifier {
+                            id: Name("x"),
+                            range: 16..17,
+                        },
+                    ],
+                },
+            ),
+            Global(
+                StmtGlobal {
+                    range: 19..31,
+                    names: [
+                        Identifier {
+                            id: Name("x"),
+                            range: 26..27,
+                        },
+                        Identifier {
+                            id: Name("y"),
+                            range: 29..30,
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | global ,
+  |        ^ Syntax Error: Expected an identifier
+2 | global x,
+3 | global x, y,
+  |
+
+
+  |
+1 | global ,
+  |         ^ Syntax Error: Global statement must have at least one name
+2 | global x,
+3 | global x, y,
+  |
+
+
+  |
+1 | global ,
+2 | global x,
+  |         ^ Syntax Error: Trailing comma not allowed
+3 | global x, y,
+  |
+
+
+  |
+1 | global ,
+2 | global x,
+3 | global x, y,
+  |            ^ Syntax Error: Trailing comma not allowed
+  |

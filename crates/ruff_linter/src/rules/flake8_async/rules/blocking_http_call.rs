@@ -2,7 +2,7 @@ use ruff_python_ast::ExprCall;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::CallPath;
+use ruff_python_ast::name::QualifiedName;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -41,10 +41,11 @@ impl Violation for BlockingHttpCallInAsyncFunction {
     }
 }
 
-fn is_blocking_http_call(call_path: &CallPath) -> bool {
+fn is_blocking_http_call(qualified_name: &QualifiedName) -> bool {
     matches!(
-        call_path.as_slice(),
+        qualified_name.segments(),
         ["urllib", "request", "urlopen"]
+            | ["urllib3", "request"]
             | [
                 "httpx" | "requests",
                 "get"
@@ -60,12 +61,12 @@ fn is_blocking_http_call(call_path: &CallPath) -> bool {
     )
 }
 
-/// ASYNC100
+/// ASYNC210
 pub(crate) fn blocking_http_call(checker: &mut Checker, call: &ExprCall) {
     if checker.semantic().in_async_context() {
         if checker
             .semantic()
-            .resolve_call_path(call.func.as_ref())
+            .resolve_qualified_name(call.func.as_ref())
             .as_ref()
             .is_some_and(is_blocking_http_call)
         {

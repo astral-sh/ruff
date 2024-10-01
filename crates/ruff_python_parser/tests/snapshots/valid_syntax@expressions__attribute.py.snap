@@ -1,0 +1,227 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/valid/expressions/attribute.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..90,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..10,
+                    value: Attribute(
+                        ExprAttribute {
+                            range: 0..10,
+                            value: Name(
+                                ExprName {
+                                    range: 0..5,
+                                    id: Name("value"),
+                                    ctx: Load,
+                                },
+                            ),
+                            attr: Identifier {
+                                id: Name("attr"),
+                                range: 6..10,
+                            },
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 11..23,
+                    value: Call(
+                        ExprCall {
+                            range: 11..23,
+                            func: Attribute(
+                                ExprAttribute {
+                                    range: 11..21,
+                                    value: Name(
+                                        ExprName {
+                                            range: 11..16,
+                                            id: Name("value"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    attr: Identifier {
+                                        id: Name("attr"),
+                                        range: 17..21,
+                                    },
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 21..23,
+                                args: [],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 24..36,
+                    value: Attribute(
+                        ExprAttribute {
+                            range: 24..36,
+                            value: Call(
+                                ExprCall {
+                                    range: 24..31,
+                                    func: Name(
+                                        ExprName {
+                                            range: 24..29,
+                                            id: Name("value"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    arguments: Arguments {
+                                        range: 29..31,
+                                        args: [],
+                                        keywords: [],
+                                    },
+                                },
+                            ),
+                            attr: Identifier {
+                                id: Name("attr"),
+                                range: 32..36,
+                            },
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 37..55,
+                    value: Attribute(
+                        ExprAttribute {
+                            range: 37..55,
+                            value: Call(
+                                ExprCall {
+                                    range: 37..51,
+                                    func: Attribute(
+                                        ExprAttribute {
+                                            range: 37..49,
+                                            value: Call(
+                                                ExprCall {
+                                                    range: 37..44,
+                                                    func: Name(
+                                                        ExprName {
+                                                            range: 37..42,
+                                                            id: Name("value"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    arguments: Arguments {
+                                                        range: 42..44,
+                                                        args: [],
+                                                        keywords: [],
+                                                    },
+                                                },
+                                            ),
+                                            attr: Identifier {
+                                                id: Name("attr"),
+                                                range: 45..49,
+                                            },
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    arguments: Arguments {
+                                        range: 49..51,
+                                        args: [],
+                                        keywords: [],
+                                    },
+                                },
+                            ),
+                            attr: Identifier {
+                                id: Name("foo"),
+                                range: 52..55,
+                            },
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 56..70,
+                    value: Attribute(
+                        ExprAttribute {
+                            range: 56..70,
+                            value: Attribute(
+                                ExprAttribute {
+                                    range: 56..66,
+                                    value: Name(
+                                        ExprName {
+                                            range: 56..61,
+                                            id: Name("value"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    attr: Identifier {
+                                        id: Name("attr"),
+                                        range: 62..66,
+                                    },
+                                    ctx: Load,
+                                },
+                            ),
+                            attr: Identifier {
+                                id: Name("foo"),
+                                range: 67..70,
+                            },
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 71..89,
+                    value: Attribute(
+                        ExprAttribute {
+                            range: 71..89,
+                            value: Call(
+                                ExprCall {
+                                    range: 71..85,
+                                    func: Attribute(
+                                        ExprAttribute {
+                                            range: 71..83,
+                                            value: Name(
+                                                ExprName {
+                                                    range: 72..77,
+                                                    id: Name("value"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            attr: Identifier {
+                                                id: Name("attr"),
+                                                range: 79..83,
+                                            },
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    arguments: Arguments {
+                                        range: 83..85,
+                                        args: [],
+                                        keywords: [],
+                                    },
+                                },
+                            ),
+                            attr: Identifier {
+                                id: Name("foo"),
+                                range: 86..89,
+                            },
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

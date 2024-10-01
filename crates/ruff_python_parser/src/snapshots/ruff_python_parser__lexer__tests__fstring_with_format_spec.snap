@@ -2,19 +2,24 @@
 source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_source(source)
 ---
+## Tokens
+```
 [
     (
         FStringStart,
         0..2,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Lbrace,
         2..3,
     ),
     (
-        Name {
-            name: "foo",
-        },
+        Name(
+            Name("foo"),
+        ),
         3..6,
     ),
     (
@@ -26,20 +31,22 @@ expression: lex_source(source)
         7..8,
     ),
     (
-        FStringMiddle {
-            value: " ",
-            is_raw: false,
-        },
+        FStringMiddle(
+            " ",
+        ),
         8..9,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Lbrace,
         9..10,
     ),
     (
-        Name {
-            name: "x",
-        },
+        Name(
+            Name("x"),
+        ),
         10..11,
     ),
     (
@@ -51,9 +58,9 @@ expression: lex_source(source)
         12..13,
     ),
     (
-        Name {
-            name: "s",
-        },
+        Name(
+            Name("s"),
+        ),
         13..14,
     ),
     (
@@ -61,31 +68,35 @@ expression: lex_source(source)
         14..15,
     ),
     (
-        FStringMiddle {
-            value: ".3f",
-            is_raw: false,
-        },
+        FStringMiddle(
+            ".3f",
+        ),
         15..18,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Rbrace,
         18..19,
     ),
     (
-        FStringMiddle {
-            value: " ",
-            is_raw: false,
-        },
+        FStringMiddle(
+            " ",
+        ),
         19..20,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Lbrace,
         20..21,
     ),
     (
-        Name {
-            name: "x",
-        },
+        Name(
+            Name("x"),
+        ),
         21..22,
     ),
     (
@@ -93,20 +104,22 @@ expression: lex_source(source)
         22..23,
     ),
     (
-        FStringMiddle {
-            value: ".",
-            is_raw: false,
-        },
+        FStringMiddle(
+            ".",
+        ),
         23..24,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Lbrace,
         24..25,
     ),
     (
-        Name {
-            name: "y",
-        },
+        Name(
+            Name("y"),
+        ),
         25..26,
     ),
     (
@@ -114,33 +127,35 @@ expression: lex_source(source)
         26..27,
     ),
     (
-        FStringMiddle {
-            value: "f",
-            is_raw: false,
-        },
+        FStringMiddle(
+            "f",
+        ),
         27..28,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Rbrace,
         28..29,
     ),
     (
-        FStringMiddle {
-            value: " ",
-            is_raw: false,
-        },
+        FStringMiddle(
+            " ",
+        ),
         29..30,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Lbrace,
         30..31,
     ),
     (
-        String {
-            value: "",
-            kind: String,
-            triple_quoted: false,
-        },
+        String(
+            "",
+        ),
         31..33,
     ),
     (
@@ -148,20 +163,22 @@ expression: lex_source(source)
         33..34,
     ),
     (
-        FStringMiddle {
-            value: "*^",
-            is_raw: false,
-        },
+        FStringMiddle(
+            "*^",
+        ),
         34..36,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Lbrace,
         36..37,
     ),
     (
-        Int {
-            value: 1,
-        },
+        Int(
+            1,
+        ),
         37..38,
     ),
     (
@@ -173,9 +190,9 @@ expression: lex_source(source)
         39..40,
     ),
     (
-        Int {
-            value: 1,
-        },
+        Int(
+            1,
+        ),
         40..41,
     ),
     (
@@ -191,20 +208,22 @@ expression: lex_source(source)
         43..44,
     ),
     (
-        FStringMiddle {
-            value: " ",
-            is_raw: false,
-        },
+        FStringMiddle(
+            " ",
+        ),
         44..45,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Lbrace,
         45..46,
     ),
     (
-        Name {
-            name: "x",
-        },
+        Name(
+            Name("x"),
+        ),
         46..47,
     ),
     (
@@ -220,9 +239,9 @@ expression: lex_source(source)
         49..50,
     ),
     (
-        Int {
-            value: 1,
-        },
+        Int(
+            1,
+        ),
         50..51,
     ),
     (
@@ -234,9 +253,9 @@ expression: lex_source(source)
         52..53,
     ),
     (
-        Name {
-            name: "pop",
-        },
+        Name(
+            Name("pop"),
+        ),
         53..56,
     ),
     (
@@ -258,9 +277,13 @@ expression: lex_source(source)
     (
         FStringEnd,
         60..61,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Newline,
         61..61,
     ),
 ]
+```

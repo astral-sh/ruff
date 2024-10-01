@@ -1,0 +1,121 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/no_blank_line_before_docstring.py
+---
+## Input
+
+```python
+def line_before_docstring():
+
+    """Please move me up"""
+
+
+class LineBeforeDocstring:
+
+    """Please move me up"""
+
+
+class EvenIfThereIsAMethodAfter:
+
+    """I'm the docstring"""
+    def method(self):
+        pass
+
+
+class TwoLinesBeforeDocstring:
+
+
+    """I want to be treated the same as if I were closer"""
+
+
+class MultilineDocstringsAsWell:
+
+    """I'm so far
+
+    and on so many lines...
+    """
+
+class SingleQuotedDocstring:
+
+    "I'm a docstring but I don't even get triple quotes."
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -25,5 +25,4 @@
+ 
+ 
+ class SingleQuotedDocstring:
+-
+     "I'm a docstring but I don't even get triple quotes."
+```
+
+## Ruff Output
+
+```python
+def line_before_docstring():
+    """Please move me up"""
+
+
+class LineBeforeDocstring:
+    """Please move me up"""
+
+
+class EvenIfThereIsAMethodAfter:
+    """I'm the docstring"""
+
+    def method(self):
+        pass
+
+
+class TwoLinesBeforeDocstring:
+    """I want to be treated the same as if I were closer"""
+
+
+class MultilineDocstringsAsWell:
+    """I'm so far
+
+    and on so many lines...
+    """
+
+
+class SingleQuotedDocstring:
+    "I'm a docstring but I don't even get triple quotes."
+```
+
+## Black Output
+
+```python
+def line_before_docstring():
+    """Please move me up"""
+
+
+class LineBeforeDocstring:
+    """Please move me up"""
+
+
+class EvenIfThereIsAMethodAfter:
+    """I'm the docstring"""
+
+    def method(self):
+        pass
+
+
+class TwoLinesBeforeDocstring:
+    """I want to be treated the same as if I were closer"""
+
+
+class MultilineDocstringsAsWell:
+    """I'm so far
+
+    and on so many lines...
+    """
+
+
+class SingleQuotedDocstring:
+
+    "I'm a docstring but I don't even get triple quotes."
+```

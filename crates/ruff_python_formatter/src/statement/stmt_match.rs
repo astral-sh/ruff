@@ -1,7 +1,7 @@
 use ruff_formatter::{format_args, write};
 use ruff_python_ast::StmtMatch;
 
-use crate::comments::{leading_alternate_branch_comments, SourceComment};
+use crate::comments::leading_alternate_branch_comments;
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
@@ -48,6 +48,7 @@ impl FormatNodeRule<StmtMatch> for FormatStmtMatch {
         let mut last_case = first;
 
         for case in cases_iter {
+            let last_suite_in_statement = Some(case) == cases.last();
             write!(
                 f,
                 [block_indent(&format_args!(
@@ -55,21 +56,12 @@ impl FormatNodeRule<StmtMatch> for FormatStmtMatch {
                         comments.leading(case),
                         last_case.body.last(),
                     ),
-                    case.format()
+                    case.format().with_options(last_suite_in_statement)
                 ))]
             )?;
             last_case = case;
         }
 
-        Ok(())
-    }
-
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        // Handled as part of `fmt_fields`
         Ok(())
     }
 }

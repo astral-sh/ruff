@@ -1,0 +1,41 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+---
+lines_after_imports.pyi:1:1: I001 [*] Import block is un-sorted or un-formatted
+   |
+ 1 | / from __future__ import annotations
+ 2 | | 
+ 3 | | from typing import Any
+ 4 | | 
+ 5 | | from requests import Session
+ 6 | | 
+ 7 | | from my_first_party import my_first_party_object
+ 8 | | 
+ 9 | | from . import my_local_folder_object
+10 | | 
+11 | | 
+12 | | 
+13 | | class Thing(object):
+   | |_^ I001
+14 |     name: str
+15 |     def __init__(self, name: str):
+   |
+   = help: Organize imports
+
+ℹ Safe fix
+2  2  | 
+3  3  | from typing import Any
+4  4  | 
+5     |-from requests import Session
+6     |-
+7  5  | from my_first_party import my_first_party_object
+   6  |+from requests import Session
+8  7  | 
+9  8  | from . import my_local_folder_object
+10    |-
+11    |-
+12 9  | 
+13 10 | class Thing(object):
+14 11 |   name: str
+
+

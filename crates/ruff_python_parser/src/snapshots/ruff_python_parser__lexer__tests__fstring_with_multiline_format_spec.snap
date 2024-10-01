@@ -2,17 +2,24 @@
 source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_source(source)
 ---
+## Tokens
+```
 [
     (
         FStringStart,
         0..4,
+        TokenFlags(
+            TRIPLE_QUOTED_STRING | F_STRING,
+        ),
     ),
     (
-        FStringMiddle {
-            value: "__",
-            is_raw: false,
-        },
+        FStringMiddle(
+            "__",
+        ),
         4..6,
+        TokenFlags(
+            TRIPLE_QUOTED_STRING | F_STRING,
+        ),
     ),
     (
         Lbrace,
@@ -23,9 +30,9 @@ expression: lex_source(source)
         7..8,
     ),
     (
-        Name {
-            name: "x",
-        },
+        Name(
+            Name("x"),
+        ),
         12..13,
     ),
     (
@@ -33,26 +40,33 @@ expression: lex_source(source)
         13..14,
     ),
     (
-        FStringMiddle {
-            value: "d\n",
-            is_raw: false,
-        },
+        FStringMiddle(
+            "d\n",
+        ),
         14..16,
+        TokenFlags(
+            TRIPLE_QUOTED_STRING | F_STRING,
+        ),
     ),
     (
         Rbrace,
         16..17,
     ),
     (
-        FStringMiddle {
-            value: "__",
-            is_raw: false,
-        },
+        FStringMiddle(
+            "__",
+        ),
         17..19,
+        TokenFlags(
+            TRIPLE_QUOTED_STRING | F_STRING,
+        ),
     ),
     (
         FStringEnd,
         19..22,
+        TokenFlags(
+            TRIPLE_QUOTED_STRING | F_STRING,
+        ),
     ),
     (
         Newline,
@@ -61,13 +75,18 @@ expression: lex_source(source)
     (
         FStringStart,
         23..27,
+        TokenFlags(
+            TRIPLE_QUOTED_STRING | F_STRING,
+        ),
     ),
     (
-        FStringMiddle {
-            value: "__",
-            is_raw: false,
-        },
+        FStringMiddle(
+            "__",
+        ),
         27..29,
+        TokenFlags(
+            TRIPLE_QUOTED_STRING | F_STRING,
+        ),
     ),
     (
         Lbrace,
@@ -78,9 +97,9 @@ expression: lex_source(source)
         30..31,
     ),
     (
-        Name {
-            name: "x",
-        },
+        Name(
+            Name("x"),
+        ),
         35..36,
     ),
     (
@@ -88,26 +107,33 @@ expression: lex_source(source)
         36..37,
     ),
     (
-        FStringMiddle {
-            value: "a\n        b\n          c\n",
-            is_raw: false,
-        },
+        FStringMiddle(
+            "a\n        b\n          c\n",
+        ),
         37..61,
+        TokenFlags(
+            TRIPLE_QUOTED_STRING | F_STRING,
+        ),
     ),
     (
         Rbrace,
         61..62,
     ),
     (
-        FStringMiddle {
-            value: "__",
-            is_raw: false,
-        },
+        FStringMiddle(
+            "__",
+        ),
         62..64,
+        TokenFlags(
+            TRIPLE_QUOTED_STRING | F_STRING,
+        ),
     ),
     (
         FStringEnd,
         64..67,
+        TokenFlags(
+            TRIPLE_QUOTED_STRING | F_STRING,
+        ),
     ),
     (
         Newline,
@@ -116,13 +142,18 @@ expression: lex_source(source)
     (
         FStringStart,
         68..70,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
-        FStringMiddle {
-            value: "__",
-            is_raw: false,
-        },
+        FStringMiddle(
+            "__",
+        ),
         70..72,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         Lbrace,
@@ -133,9 +164,9 @@ expression: lex_source(source)
         73..74,
     ),
     (
-        Name {
-            name: "x",
-        },
+        Name(
+            Name("x"),
+        ),
         78..79,
     ),
     (
@@ -143,11 +174,13 @@ expression: lex_source(source)
         79..80,
     ),
     (
-        FStringMiddle {
-            value: "d",
-            is_raw: false,
-        },
+        FStringMiddle(
+            "d",
+        ),
         80..81,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         NonLogicalNewline,
@@ -158,15 +191,20 @@ expression: lex_source(source)
         82..83,
     ),
     (
-        FStringMiddle {
-            value: "__",
-            is_raw: false,
-        },
+        FStringMiddle(
+            "__",
+        ),
         83..85,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         FStringEnd,
         85..86,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         Newline,
@@ -175,13 +213,18 @@ expression: lex_source(source)
     (
         FStringStart,
         87..89,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
-        FStringMiddle {
-            value: "__",
-            is_raw: false,
-        },
+        FStringMiddle(
+            "__",
+        ),
         89..91,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         Lbrace,
@@ -192,9 +235,9 @@ expression: lex_source(source)
         92..93,
     ),
     (
-        Name {
-            name: "x",
-        },
+        Name(
+            Name("x"),
+        ),
         97..98,
     ),
     (
@@ -202,20 +245,22 @@ expression: lex_source(source)
         98..99,
     ),
     (
-        FStringMiddle {
-            value: "a",
-            is_raw: false,
-        },
+        FStringMiddle(
+            "a",
+        ),
         99..100,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         NonLogicalNewline,
         100..101,
     ),
     (
-        Name {
-            name: "b",
-        },
+        Name(
+            Name("b"),
+        ),
         109..110,
     ),
     (
@@ -227,18 +272,24 @@ expression: lex_source(source)
         111..112,
     ),
     (
-        FStringMiddle {
-            value: "__",
-            is_raw: false,
-        },
+        FStringMiddle(
+            "__",
+        ),
         112..114,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         FStringEnd,
         114..115,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         Newline,
         115..116,
     ),
 ]
+```

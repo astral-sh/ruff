@@ -1,0 +1,135 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/arguments/duplicate_keyword_arguments.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..28,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..28,
+                    value: Call(
+                        ExprCall {
+                            range: 0..28,
+                            func: Name(
+                                ExprName {
+                                    range: 0..3,
+                                    id: Name("foo"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 3..28,
+                                args: [],
+                                keywords: [
+                                    Keyword {
+                                        range: 4..7,
+                                        arg: Some(
+                                            Identifier {
+                                                id: Name("a"),
+                                                range: 4..5,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 6..7,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                    Keyword {
+                                        range: 9..12,
+                                        arg: Some(
+                                            Identifier {
+                                                id: Name("b"),
+                                                range: 9..10,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 11..12,
+                                                value: Int(
+                                                    2,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                    Keyword {
+                                        range: 14..17,
+                                        arg: Some(
+                                            Identifier {
+                                                id: Name("c"),
+                                                range: 14..15,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 16..17,
+                                                value: Int(
+                                                    3,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                    Keyword {
+                                        range: 19..22,
+                                        arg: Some(
+                                            Identifier {
+                                                id: Name("b"),
+                                                range: 19..20,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 21..22,
+                                                value: Int(
+                                                    4,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                    Keyword {
+                                        range: 24..27,
+                                        arg: Some(
+                                            Identifier {
+                                                id: Name("a"),
+                                                range: 24..25,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 26..27,
+                                                value: Int(
+                                                    5,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ],
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | foo(a=1, b=2, c=3, b=4, a=5)
+  |                    ^^^ Syntax Error: Duplicate keyword argument "b"
+  |
+
+
+  |
+1 | foo(a=1, b=2, c=3, b=4, a=5)
+  |                         ^^^ Syntax Error: Duplicate keyword argument "a"
+  |

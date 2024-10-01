@@ -13,12 +13,13 @@ use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::message::{
     AzureEmitter, Emitter, EmitterContext, GithubEmitter, GitlabEmitter, GroupedEmitter,
-    JsonEmitter, JsonLinesEmitter, JunitEmitter, PylintEmitter, SarifEmitter, TextEmitter,
+    JsonEmitter, JsonLinesEmitter, JunitEmitter, Message, MessageKind, PylintEmitter,
+    RdjsonEmitter, SarifEmitter, TextEmitter,
 };
 use ruff_linter::notify_user;
-use ruff_linter::registry::{AsRule, Rule};
+use ruff_linter::registry::Rule;
 use ruff_linter::settings::flags::{self};
-use ruff_linter::settings::types::{SerializationFormat, UnsafeFixes};
+use ruff_linter::settings::types::{OutputFormat, UnsafeFixes};
 
 use crate::diagnostics::{Diagnostics, FixMap};
 
@@ -27,8 +28,6 @@ bitflags! {
     pub(crate) struct Flags: u8 {
         /// Whether to show violations when emitting diagnostics.
         const SHOW_VIOLATIONS = 0b0000_0001;
-        /// Whether to show the source code when emitting diagnostics.
-        const SHOW_SOURCE = 0b000_0010;
         /// Whether to show a summary of the fixed violations when emitting diagnostics.
         const SHOW_FIX_SUMMARY = 0b0000_0100;
         /// Whether to show a diff of each fixed violation when emitting diagnostics.
@@ -37,13 +36,14 @@ bitflags! {
 }
 
 #[derive(Serialize)]
-struct ExpandedStatistics<'a> {
-    code: SerializeRuleAsCode,
-    message: &'a str,
+struct ExpandedStatistics {
+    code: Option<SerializeRuleAsCode>,
+    name: SerializeMessageKindAsTitle,
     count: usize,
     fixable: bool,
 }
 
+#[derive(Copy, Clone)]
 struct SerializeRuleAsCode(Rule);
 
 impl Serialize for SerializeRuleAsCode {
@@ -67,8 +67,31 @@ impl From<Rule> for SerializeRuleAsCode {
     }
 }
 
+struct SerializeMessageKindAsTitle(MessageKind);
+
+impl Serialize for SerializeMessageKindAsTitle {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.0.as_str())
+    }
+}
+
+impl Display for SerializeMessageKindAsTitle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.0.as_str())
+    }
+}
+
+impl From<MessageKind> for SerializeMessageKindAsTitle {
+    fn from(kind: MessageKind) -> Self {
+        Self(kind)
+    }
+}
+
 pub(crate) struct Printer {
-    format: SerializationFormat,
+    format: OutputFormat,
     log_level: LogLevel,
     fix_mode: flags::FixMode,
     unsafe_fixes: UnsafeFixes,
@@ -77,7 +100,7 @@ pub(crate) struct Printer {
 
 impl Printer {
     pub(crate) const fn new(
-        format: SerializationFormat,
+        format: OutputFormat,
         log_level: LogLevel,
         fix_mode: flags::FixMode,
         unsafe_fixes: UnsafeFixes,
@@ -120,21 +143,23 @@ impl Printer {
                 } else if remaining > 0 {
                     let s = if remaining == 1 { "" } else { "s" };
                     writeln!(writer, "Found {remaining} error{s}.")?;
+                } else if remaining == 0 {
+                    writeln!(writer, "All checks passed!")?;
                 }
 
                 if let Some(fixables) = fixables {
                     let fix_prefix = format!("[{}]", "*".cyan());
 
                     if self.unsafe_fixes.is_hint() {
-                        if fixables.applicable > 0 && fixables.unapplicable_unsafe > 0 {
-                            let es = if fixables.unapplicable_unsafe == 1 {
+                        if fixables.applicable > 0 && fixables.inapplicable_unsafe > 0 {
+                            let es = if fixables.inapplicable_unsafe == 1 {
                                 ""
                             } else {
                                 "es"
                             };
                             writeln!(writer,
                                 "{fix_prefix} {} fixable with the `--fix` option ({} hidden fix{es} can be enabled with the `--unsafe-fixes` option).",
-                                fixables.applicable, fixables.unapplicable_unsafe
+                                fixables.applicable, fixables.inapplicable_unsafe
                             )?;
                         } else if fixables.applicable > 0 {
                             // Only applicable fixes
@@ -144,15 +169,15 @@ impl Printer {
                                 fixables.applicable,
                             )?;
                         } else {
-                            // Only unapplicable fixes
-                            let es = if fixables.unapplicable_unsafe == 1 {
+                            // Only inapplicable fixes
+                            let es = if fixables.inapplicable_unsafe == 1 {
                                 ""
                             } else {
                                 "es"
                             };
                             writeln!(writer,
                                 "No fixes available ({} hidden fix{es} can be enabled with the `--unsafe-fixes` option).",
-                                fixables.unapplicable_unsafe
+                                fixables.inapplicable_unsafe
                             )?;
                         }
                     } else {
@@ -169,7 +194,7 @@ impl Printer {
                 // Check if there are unapplied fixes
                 let unapplied = {
                     if let Some(fixables) = fixables {
-                        fixables.unapplicable_unsafe
+                        fixables.inapplicable_unsafe
                     } else {
                         0
                     }
@@ -216,9 +241,13 @@ impl Printer {
         }
 
         if !self.flags.intersects(Flags::SHOW_VIOLATIONS) {
+            #[allow(deprecated)]
             if matches!(
                 self.format,
-                SerializationFormat::Text | SerializationFormat::Grouped
+                OutputFormat::Text
+                    | OutputFormat::Full
+                    | OutputFormat::Concise
+                    | OutputFormat::Grouped
             ) {
                 if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
                     if !diagnostics.fixed.is_empty() {
@@ -236,20 +265,23 @@ impl Printer {
         let fixables = FixableStatistics::try_from(diagnostics, self.unsafe_fixes);
 
         match self.format {
-            SerializationFormat::Json => {
+            OutputFormat::Json => {
                 JsonEmitter.emit(writer, &diagnostics.messages, &context)?;
             }
-            SerializationFormat::JsonLines => {
+            OutputFormat::Rdjson => {
+                RdjsonEmitter.emit(writer, &diagnostics.messages, &context)?;
+            }
+            OutputFormat::JsonLines => {
                 JsonLinesEmitter.emit(writer, &diagnostics.messages, &context)?;
             }
-            SerializationFormat::Junit => {
+            OutputFormat::Junit => {
                 JunitEmitter.emit(writer, &diagnostics.messages, &context)?;
             }
-            SerializationFormat::Text => {
+            OutputFormat::Concise | OutputFormat::Full => {
                 TextEmitter::default()
                     .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
                     .with_show_fix_diff(self.flags.intersects(Flags::SHOW_FIX_DIFF))
-                    .with_show_source(self.flags.intersects(Flags::SHOW_SOURCE))
+                    .with_show_source(self.format == OutputFormat::Full)
                     .with_unsafe_fixes(self.unsafe_fixes)
                     .emit(writer, &diagnostics.messages, &context)?;
 
@@ -263,9 +295,8 @@ impl Printer {
 
                 self.write_summary_text(writer, diagnostics)?;
             }
-            SerializationFormat::Grouped => {
+            OutputFormat::Grouped => {
                 GroupedEmitter::default()
-                    .with_show_source(self.flags.intersects(Flags::SHOW_SOURCE))
                     .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
                     .with_unsafe_fixes(self.unsafe_fixes)
                     .emit(writer, &diagnostics.messages, &context)?;
@@ -279,21 +310,23 @@ impl Printer {
                 }
                 self.write_summary_text(writer, diagnostics)?;
             }
-            SerializationFormat::Github => {
+            OutputFormat::Github => {
                 GithubEmitter.emit(writer, &diagnostics.messages, &context)?;
             }
-            SerializationFormat::Gitlab => {
+            OutputFormat::Gitlab => {
                 GitlabEmitter::default().emit(writer, &diagnostics.messages, &context)?;
             }
-            SerializationFormat::Pylint => {
+            OutputFormat::Pylint => {
                 PylintEmitter.emit(writer, &diagnostics.messages, &context)?;
             }
-            SerializationFormat::Azure => {
+            OutputFormat::Azure => {
                 AzureEmitter.emit(writer, &diagnostics.messages, &context)?;
             }
-            SerializationFormat::Sarif => {
+            OutputFormat::Sarif => {
                 SarifEmitter.emit(writer, &diagnostics.messages, &context)?;
             }
+            #[allow(deprecated)]
+            OutputFormat::Text => unreachable!("Text is deprecated and should have been automatically converted to the default serialization format")
         }
 
         writer.flush()?;
@@ -309,30 +342,23 @@ impl Printer {
         let statistics: Vec<ExpandedStatistics> = diagnostics
             .messages
             .iter()
-            .map(|message| {
-                (
-                    message.kind.rule(),
-                    &message.kind.body,
-                    message.fix.is_some(),
-                )
-            })
-            .sorted()
-            .fold(vec![], |mut acc, (rule, body, fixable)| {
-                if let Some((prev_rule, _, _, count)) = acc.last_mut() {
-                    if *prev_rule == rule {
+            .sorted_by_key(|message| (message.rule(), message.fixable()))
+            .fold(vec![], |mut acc: Vec<(&Message, usize)>, message| {
+                if let Some((prev_message, count)) = acc.last_mut() {
+                    if prev_message.rule() == message.rule() {
                         *count += 1;
                         return acc;
                     }
                 }
-                acc.push((rule, body, fixable, 1));
+                acc.push((message, 1));
                 acc
             })
             .iter()
-            .map(|(rule, message, fixable, count)| ExpandedStatistics {
-                code: (*rule).into(),
-                count: *count,
-                message,
-                fixable: *fixable,
+            .map(|&(message, count)| ExpandedStatistics {
+                code: message.rule().map(std::convert::Into::into),
+                name: message.kind().into(),
+                count,
+                fixable: message.fixable(),
             })
             .sorted_by_key(|statistic| Reverse(statistic.count))
             .collect();
@@ -342,7 +368,8 @@ impl Printer {
         }
 
         match self.format {
-            SerializationFormat::Text => {
+            #[allow(deprecated)]
+            OutputFormat::Text | OutputFormat::Full | OutputFormat::Concise => {
                 // Compute the maximum number of digits in the count and code, for all messages,
                 // to enable pretty-printing.
                 let count_width = num_digits(
@@ -354,7 +381,12 @@ impl Printer {
                 );
                 let code_width = statistics
                     .iter()
-                    .map(|statistic| statistic.code.to_string().len())
+                    .map(|statistic| {
+                        statistic
+                            .code
+                            .map_or_else(String::new, |rule| rule.to_string())
+                            .len()
+                    })
                     .max()
                     .unwrap();
                 let any_fixable = statistics.iter().any(|statistic| statistic.fixable);
@@ -368,7 +400,11 @@ impl Printer {
                         writer,
                         "{:>count_width$}\t{:<code_width$}\t{}{}",
                         statistic.count.to_string().bold(),
-                        statistic.code.to_string().red().bold(),
+                        statistic
+                            .code
+                            .map_or_else(String::new, |rule| rule.to_string())
+                            .red()
+                            .bold(),
                         if any_fixable {
                             if statistic.fixable {
                                 &fixable
@@ -378,12 +414,12 @@ impl Printer {
                         } else {
                             ""
                         },
-                        statistic.message,
+                        statistic.name,
                     )?;
                 }
                 return Ok(());
             }
-            SerializationFormat::Json => {
+            OutputFormat::Json => {
                 writeln!(writer, "{}", serde_json::to_string_pretty(&statistics)?)?;
             }
             _ => {
@@ -403,6 +439,7 @@ impl Printer {
         &self,
         writer: &mut dyn Write,
         diagnostics: &Diagnostics,
+        preview: bool,
     ) -> Result<()> {
         if matches!(self.log_level, LogLevel::Silent) {
             return Ok(());
@@ -430,7 +467,7 @@ impl Printer {
             let context = EmitterContext::new(&diagnostics.notebook_indexes);
             TextEmitter::default()
                 .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
-                .with_show_source(self.flags.intersects(Flags::SHOW_SOURCE))
+                .with_show_source(preview)
                 .with_unsafe_fixes(self.unsafe_fixes)
                 .emit(writer, &diagnostics.messages, &context)?;
         }
@@ -508,33 +545,33 @@ fn print_fix_summary(writer: &mut dyn Write, fixed: &FixMap) -> Result<()> {
 #[derive(Debug)]
 struct FixableStatistics {
     applicable: u32,
-    unapplicable_unsafe: u32,
+    inapplicable_unsafe: u32,
 }
 
 impl FixableStatistics {
     fn try_from(diagnostics: &Diagnostics, unsafe_fixes: UnsafeFixes) -> Option<Self> {
         let mut applicable = 0;
-        let mut unapplicable_unsafe = 0;
+        let mut inapplicable_unsafe = 0;
 
         for message in &diagnostics.messages {
-            if let Some(fix) = &message.fix {
+            if let Some(fix) = message.fix() {
                 if fix.applies(unsafe_fixes.required_applicability()) {
                     applicable += 1;
                 } else {
-                    // Do not include unapplicable fixes at other levels that do not provide an opt-in
+                    // Do not include inapplicable fixes at other levels that do not provide an opt-in
                     if fix.applicability().is_unsafe() {
-                        unapplicable_unsafe += 1;
+                        inapplicable_unsafe += 1;
                     }
                 }
             }
         }
 
-        if applicable == 0 && unapplicable_unsafe == 0 {
+        if applicable == 0 && inapplicable_unsafe == 0 {
             None
         } else {
             Some(Self {
                 applicable,
-                unapplicable_unsafe,
+                inapplicable_unsafe,
             })
         }
     }

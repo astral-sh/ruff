@@ -80,9 +80,7 @@ pub(crate) fn compare_to_hardcoded_password_string(
         .diagnostics
         .extend(comparators.iter().filter_map(|comp| {
             string_literal(comp).filter(|string| !string.is_empty())?;
-            let Some(name) = password_target(left) else {
-                return None;
-            };
+            let name = password_target(left)?;
             Some(Diagnostic::new(
                 HardcodedPasswordString {
                     name: name.to_string(),

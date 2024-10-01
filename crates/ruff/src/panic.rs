@@ -16,7 +16,7 @@ impl std::fmt::Display for PanicError {
 }
 
 thread_local! {
-    static LAST_PANIC: std::cell::Cell<Option<PanicError>> = std::cell::Cell::new(None);
+    static LAST_PANIC: std::cell::Cell<Option<PanicError>> = const { std::cell::Cell::new(None) };
 }
 
 /// [`catch_unwind`](std::panic::catch_unwind) wrapper that sets a custom [`set_hook`](std::panic::set_hook)

@@ -1,14 +1,12 @@
 use std::str::FromStr;
 
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Expr, StringFlags, StringLiteral};
 use ruff_python_literal::cformat::{CFormatPart, CFormatSpec, CFormatStrOrBytes, CFormatString};
-use ruff_python_parser::{lexer, AsMode};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 
 use crate::checkers::ast::Checker;
@@ -171,16 +169,12 @@ fn is_valid_tuple(formats: &[CFormatStrOrBytes<String>], elts: &[Expr]) -> bool 
 }
 
 /// Return `true` if the dictionary values align with the format types.
-fn is_valid_dict(
-    formats: &[CFormatStrOrBytes<String>],
-    keys: &[Option<Expr>],
-    values: &[Expr],
-) -> bool {
+fn is_valid_dict(formats: &[CFormatStrOrBytes<String>], items: &[ast::DictItem]) -> bool {
     let formats = collect_specs(formats);
 
     // If there are more formats that values, the statement is invalid. Avoid
     // checking the values.
-    if formats.len() > values.len() {
+    if formats.len() > items.len() {
         return true;
     }
 
@@ -193,7 +187,7 @@ fn is_valid_dict(
                 .map(|mapping_key| (mapping_key.as_str(), format))
         })
         .collect();
-    for (key, value) in keys.iter().zip(values) {
+    for ast::DictItem { key, value } in items {
         let Some(key) = key else {
             return true;
         };
@@ -216,34 +210,22 @@ fn is_valid_dict(
 }
 
 /// PLE1307
-pub(crate) fn bad_string_format_type(checker: &mut Checker, expr: &Expr, right: &Expr) {
-    // Grab each string segment (in case there's an implicit concatenation).
-    let content = checker.locator().slice(expr);
-    let mut strings: Vec<TextRange> = vec![];
-    for (tok, range) in
-        lexer::lex_starts_at(content, checker.source_type.as_mode(), expr.start()).flatten()
-    {
-        if tok.is_string() {
-            strings.push(range);
-        } else if tok.is_percent() {
-            // Break as soon as we find the modulo symbol.
-            break;
-        }
-    }
-
-    // If there are no string segments, abort.
-    if strings.is_empty() {
-        return;
-    }
-
+pub(crate) fn bad_string_format_type(
+    checker: &mut Checker,
+    bin_op: &ast::ExprBinOp,
+    format_string: &ast::ExprStringLiteral,
+) {
     // Parse each string segment.
     let mut format_strings = vec![];
-    for range in &strings {
-        let string = checker.locator().slice(*range);
-        let (Some(leader), Some(trailer)) = (leading_quote(string), trailing_quote(string)) else {
-            return;
-        };
-        let string = &string[leader.len()..string.len() - trailer.len()];
+    for StringLiteral {
+        value: _,
+        range,
+        flags,
+    } in &format_string.value
+    {
+        let string = checker.locator().slice(range);
+        let string = &string
+            [usize::from(flags.opener_len())..(string.len() - usize::from(flags.closer_len()))];
 
         // Parse the format string (e.g. `"%s"`) into a list of `PercentFormat`.
         if let Ok(format_string) = CFormatString::from_str(string) {
@@ -252,18 +234,14 @@ pub(crate) fn bad_string_format_type(checker: &mut Checker, expr: &Expr, right: 
     }
 
     // Parse the parameters.
-    let is_valid = match right {
+    let is_valid = match &*bin_op.right {
         Expr::Tuple(ast::ExprTuple { elts, .. }) => is_valid_tuple(&format_strings, elts),
-        Expr::Dict(ast::ExprDict {
-            keys,
-            values,
-            range: _,
-        }) => is_valid_dict(&format_strings, keys, values),
-        _ => is_valid_constant(&format_strings, right),
+        Expr::Dict(ast::ExprDict { items, range: _ }) => is_valid_dict(&format_strings, items),
+        _ => is_valid_constant(&format_strings, &bin_op.right),
     };
     if !is_valid {
         checker
             .diagnostics
-            .push(Diagnostic::new(BadStringFormatType, expr.range()));
+            .push(Diagnostic::new(BadStringFormatType, bin_op.range()));
     }
 }

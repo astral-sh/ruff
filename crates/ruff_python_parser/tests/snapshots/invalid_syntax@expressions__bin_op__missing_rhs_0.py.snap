@@ -1,0 +1,76 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/bin_op/missing_rhs_0.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..10,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..3,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 0..3,
+                            left: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 0..1,
+                                    value: Int(
+                                        0,
+                                    ),
+                                },
+                            ),
+                            op: Add,
+                            right: Name(
+                                ExprName {
+                                    range: 3..3,
+                                    id: Name(""),
+                                    ctx: Invalid,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 5..10,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 5..10,
+                            left: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 5..6,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                            op: Add,
+                            right: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 9..10,
+                                    value: Int(
+                                        2,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | 0 +
+  |    ^ Syntax Error: Expected an expression
+2 | 
+3 | 1 + 2
+  |

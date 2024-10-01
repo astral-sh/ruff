@@ -1,0 +1,52 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/unary.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..10,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..5,
+                    value: UnaryOp(
+                        ExprUnaryOp {
+                            range: 0..5,
+                            op: Not,
+                            operand: Name(
+                                ExprName {
+                                    range: 4..5,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 9..10,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 9..10,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | not x := 1
+  |       ^^ Syntax Error: Expected a statement
+  |

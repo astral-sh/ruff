@@ -31,5 +31,27 @@ F901.py:6:11: F901 [*] `raise NotImplemented` should be `raise NotImplementedErr
 5 5 | def g() -> None:
 6   |-    raise NotImplemented
   6 |+    raise NotImplementedError
+7 7 | 
+8 8 | 
+9 9 | def h() -> None:
 
+F901.py:11:11: F901 [*] `raise NotImplemented` should be `raise NotImplementedError`
+   |
+ 9 | def h() -> None:
+10 |     NotImplementedError = "foo"
+11 |     raise NotImplemented
+   |           ^^^^^^^^^^^^^^ F901
+   |
+   = help: Use `raise NotImplementedError`
 
+ℹ Safe fix
+   1  |+import builtins
+1  2  | def f() -> None:
+2  3  |     raise NotImplemented()
+3  4  | 
+--------------------------------------------------------------------------------
+8  9  | 
+9  10 | def h() -> None:
+10 11 |     NotImplementedError = "foo"
+11    |-    raise NotImplemented
+   12 |+    raise builtins.NotImplementedError

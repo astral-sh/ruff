@@ -7,9 +7,14 @@ use std::str;
 
 use anyhow::Result;
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
+use regex::escape;
 use tempfile::TempDir;
 
 const BIN_NAME: &str = "ruff";
+
+fn tempdir_filter(tempdir: &TempDir) -> String {
+    format!(r"{}\\?/?", escape(tempdir.path().to_str().unwrap()))
+}
 
 #[test]
 fn default_options() {
@@ -18,7 +23,7 @@ fn default_options() {
         .arg("-")
         .pass_stdin(r#"
 def foo(arg1, arg2,):
-    print('Should\'t change quotes')
+    print('Shouldn\'t change quotes')
 
 
 if condition:
@@ -33,7 +38,7 @@ if condition:
         arg1,
         arg2,
     ):
-        print("Should't change quotes")
+        print("Shouldn't change quotes")
 
 
     if condition:
@@ -91,6 +96,182 @@ fn format_warn_stdin_filename_with_files() {
 }
 
 #[test]
+fn nonexistent_config_file() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--config", "foo.toml", "."]), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: invalid value 'foo.toml' for '--config <CONFIG_OPTION>'
+
+      tip: A `--config` flag must either be a path to a `.toml` configuration file
+           or a TOML `<KEY> = <VALUE>` pair overriding a specific configuration
+           option
+
+    It looks like you were trying to pass a path to a configuration file.
+    The path `foo.toml` does not point to a configuration file
+
+    For more information, try '--help'.
+    "###);
+}
+
+#[test]
+fn config_override_rejected_if_invalid_toml() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--config", "foo = bar", "."]), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: invalid value 'foo = bar' for '--config <CONFIG_OPTION>'
+
+      tip: A `--config` flag must either be a path to a `.toml` configuration file
+           or a TOML `<KEY> = <VALUE>` pair overriding a specific configuration
+           option
+
+    The supplied argument is not valid TOML:
+
+    TOML parse error at line 1, column 7
+      |
+    1 | foo = bar
+      |       ^
+    invalid string
+    expected `"`, `'`
+
+    For more information, try '--help'.
+    "###);
+}
+
+#[test]
+fn too_many_config_files() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_dot_toml = tempdir.path().join("ruff.toml");
+    let ruff2_dot_toml = tempdir.path().join("ruff2.toml");
+    fs::File::create(&ruff_dot_toml)?;
+    fs::File::create(&ruff2_dot_toml)?;
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .arg("format")
+        .arg("--config")
+        .arg(&ruff_dot_toml)
+        .arg("--config")
+        .arg(&ruff2_dot_toml)
+        .arg("."), @r###"
+            success: false
+            exit_code: 2
+            ----- stdout -----
+
+            ----- stderr -----
+            ruff failed
+              Cause: You cannot specify more than one configuration file on the command line.
+
+              tip: remove either `--config=[TMP]/ruff.toml` or `--config=[TMP]/ruff2.toml`.
+                   For more information, try `--help`.
+
+            "###);
+    });
+    Ok(())
+}
+
+#[test]
+fn config_file_and_isolated() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_dot_toml = tempdir.path().join("ruff.toml");
+    fs::File::create(&ruff_dot_toml)?;
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .arg("format")
+        .arg("--config")
+        .arg(&ruff_dot_toml)
+        .arg("--isolated")
+        .arg("."), @r###"
+        success: false
+        exit_code: 2
+        ----- stdout -----
+
+        ----- stderr -----
+        ruff failed
+          Cause: The argument `--config=[TMP]/ruff.toml` cannot be used with `--isolated`
+
+          tip: You cannot specify a configuration file and also specify `--isolated`,
+               as `--isolated` causes ruff to ignore all configuration files.
+               For more information, try `--help`.
+
+        "###);
+    });
+    Ok(())
+}
+
+#[test]
+fn config_override_via_cli() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(&ruff_toml, "line-length = 100")?;
+    let fixture = r#"
+def foo():
+    print("looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong string")
+
+    "#;
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .arg("format")
+        .arg("--config")
+        .arg(&ruff_toml)
+        // This overrides the long line length set in the config file
+        .args(["--config", "line-length=80"])
+        .arg("-")
+        .pass_stdin(fixture), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    def foo():
+        print(
+            "looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong string"
+        )
+
+    ----- stderr -----
+    "###);
+    Ok(())
+}
+
+#[test]
+fn config_doubly_overridden_via_cli() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(&ruff_toml, "line-length = 70")?;
+    let fixture = r#"
+def foo():
+    print("looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong string")
+
+    "#;
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .arg("format")
+        .arg("--config")
+        .arg(&ruff_toml)
+        // This overrides the long line length set in the config file...
+        .args(["--config", "line-length=80"])
+        // ...but this overrides them both:
+        .args(["--line-length", "100"])
+        .arg("-")
+        .pass_stdin(fixture), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    def foo():
+        print("looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong string")
+
+    ----- stderr -----
+    "###);
+    Ok(())
+}
+
+#[test]
 fn format_options() -> Result<()> {
     let tempdir = TempDir::new()?;
     let ruff_toml = tempdir.path().join("ruff.toml");
@@ -145,18 +326,18 @@ fn docstring_options() -> Result<()> {
     let ruff_toml = tempdir.path().join("ruff.toml");
     fs::write(
         &ruff_toml,
-        r#"
+        r"
 [format]
 docstring-code-format = true
 docstring-code-line-length = 20
-"#,
+",
     )?;
 
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(["format", "--config"])
         .arg(&ruff_toml)
         .arg("-")
-        .pass_stdin(r#"
+        .pass_stdin(r"
 def f(x):
     '''
     Something about `f`. And an example:
@@ -176,59 +357,53 @@ def f(x):
     >>> foo, bar, quux = this_is_a_long_line(lion, hippo, lemur, bear)
     '''
     pass
-"#), @r###"
-success: true
-exit_code: 0
------ stdout -----
-def f(x):
-    """
-    Something about `f`. And an example:
+"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    def f(x):
+        """
+        Something about `f`. And an example:
 
-    .. code-block:: python
+        .. code-block:: python
 
-        (
-            foo,
-            bar,
-            quux,
-        ) = this_is_a_long_line(
-            lion,
-            hippo,
-            lemur,
-            bear,
+            foo, bar, quux = (
+                this_is_a_long_line(
+                    lion,
+                    hippo,
+                    lemur,
+                    bear,
+                )
+            )
+
+        Another example:
+
+        ```py
+        foo, bar, quux = (
+            this_is_a_long_line(
+                lion,
+                hippo,
+                lemur,
+                bear,
+            )
         )
+        ```
 
-    Another example:
+        And another:
 
-    ```py
-    (
-        foo,
-        bar,
-        quux,
-    ) = this_is_a_long_line(
-        lion,
-        hippo,
-        lemur,
-        bear,
-    )
-    ```
+        >>> foo, bar, quux = (
+        ...     this_is_a_long_line(
+        ...         lion,
+        ...         hippo,
+        ...         lemur,
+        ...         bear,
+        ...     )
+        ... )
+        """
+        pass
 
-    And another:
-
-    >>> (
-    ...     foo,
-    ...     bar,
-    ...     quux,
-    ... ) = this_is_a_long_line(
-    ...     lion,
-    ...     hippo,
-    ...     lemur,
-    ...     bear,
-    ... )
-    """
-    pass
-
------ stderr -----
-"###);
+    ----- stderr -----
+    "###);
     Ok(())
 }
 
@@ -334,9 +509,9 @@ fn syntax_error() -> Result<()> {
 
     fs::write(
         tempdir.path().join("main.py"),
-        r#"
+        r"
 from module import =
-"#,
+",
     )?;
 
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
@@ -348,7 +523,7 @@ from module import =
     ----- stdout -----
 
     ----- stderr -----
-    error: Failed to parse main.py:2:20: Unexpected token '='
+    error: Failed to parse main.py:2:20: Expected an import name
     "###);
 
     Ok(())
@@ -508,6 +683,9 @@ if __name__ == '__main__':
         say_hy("dear Ruff contributor")
 
     ----- stderr -----
+    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
+      - 'extend-select' -> 'lint.extend-select'
+      - 'ignore' -> 'lint.ignore'
     "###);
     Ok(())
 }
@@ -546,6 +724,9 @@ if __name__ == '__main__':
         say_hy("dear Ruff contributor")
 
     ----- stderr -----
+    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
+      - 'extend-select' -> 'lint.extend-select'
+      - 'ignore' -> 'lint.ignore'
     "###);
     Ok(())
 }
@@ -604,7 +785,7 @@ if condition:
     	print('Should change quotes')
 
     ----- stderr -----
-    warning: The following rules may cause conflicts when used with the formatter: `COM812`. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding them to the `ignore` configuration.
+    warning: The following rule may cause conflicts when used with the formatter: `COM812`. To avoid unexpected behavior, we recommend disabling this rule, either by removing it from the `select` or `extend-select` configuration, or adding it to the `ignore` configuration.
     "###);
     Ok(())
 }
@@ -631,14 +812,13 @@ tab-size = 2
 if True:
     pass
     "), @r###"
-        success: true
-        exit_code: 0
+        success: false
+        exit_code: 2
         ----- stdout -----
-        if True:
-          pass
 
         ----- stderr -----
-        warning: The `tab-size` option has been renamed to `indent-width` to emphasize that it configures the indentation used by the formatter as well as the tab width. Please update your configuration to use `indent-width = <value>` instead.
+        ruff failed
+          Cause: The `tab-size` option has been renamed to `indent-width` to emphasize that it configures the indentation used by the formatter as well as the tab width. Please update `[RUFF-TOML-PATH]` to use `indent-width = <value>` instead.
         "###);
     });
     Ok(())
@@ -832,6 +1012,48 @@ multiline-quotes = "double"
 [format]
 skip-magic-trailing-comma = false
 quote-style = "single"
+"#,
+    )?;
+
+    let test_path = tempdir.path().join("test.py");
+    fs::write(
+        &test_path,
+        r#"
+def say_hy(name: str):
+        print(f"Hy {name}")"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--no-cache", "--config"])
+        .arg(&ruff_toml)
+        .arg(test_path), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    1 file reformatted
+
+    ----- stderr -----
+    "###);
+    Ok(())
+}
+
+#[test]
+fn valid_linter_options_preserve() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint]
+select = ["Q"]
+
+[lint.flake8-quotes]
+inline-quotes = "single"
+docstring-quotes = "single"
+multiline-quotes = "single"
+
+[format]
+quote-style = "preserve"
 "#,
     )?;
 
@@ -1537,4 +1759,322 @@ include = ["*.ipy"]
     ----- stderr -----
     "###);
     Ok(())
+}
+
+#[test]
+fn range_formatting() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=2:8-2:14"])
+        .arg("-")
+        .pass_stdin(r#"
+def foo(arg1, arg2,):
+    print("Shouldn't format this" )
+
+"#), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    def foo(
+        arg1,
+        arg2,
+    ):
+        print("Shouldn't format this" )
+
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn range_formatting_unicode() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=2:21-3"])
+        .arg("-")
+        .pass_stdin(r#"
+def foo(arg1="👋🏽" ): print("Format this" )
+"#), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    def foo(arg1="👋🏽" ):
+        print("Format this")
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn range_formatting_multiple_files() -> std::io::Result<()> {
+    let tempdir = TempDir::new()?;
+    let file1 = tempdir.path().join("file1.py");
+
+    fs::write(
+        &file1,
+        r#"
+def file1(arg1, arg2,):
+    print("Shouldn't format this" )
+
+"#,
+    )?;
+
+    let file2 = tempdir.path().join("file2.py");
+
+    fs::write(
+        &file2,
+        r#"
+def file2(arg1, arg2,):
+    print("Shouldn't format this" )
+
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--isolated", "--range=1:8-1:15"])
+        .arg(file1)
+        .arg(file2),  @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: The `--range` option is only supported when formatting a single file but the specified paths resolve to 2 files.
+    "###);
+
+    Ok(())
+}
+
+#[test]
+fn range_formatting_out_of_bounds() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=100:40-200:1"])
+        .arg("-")
+        .pass_stdin(r#"
+def foo(arg1, arg2,):
+    print("Shouldn't format this" )
+
+"#), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    def foo(arg1, arg2,):
+        print("Shouldn't format this" )
+
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn range_start_larger_than_end() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=90-50"])
+        .arg("-")
+        .pass_stdin(r#"
+def foo(arg1, arg2,):
+    print("Shouldn't format this" )
+
+"#), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: invalid value '90-50' for '--range <RANGE>': the start position '90:1' is greater than the end position '50:1'.
+        tip: Try switching start and end: '50:1-90:1'
+
+    For more information, try '--help'.
+    "###);
+}
+
+#[test]
+fn range_line_numbers_only() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=2-3"])
+        .arg("-")
+        .pass_stdin(r#"
+def foo(arg1, arg2,):
+    print("Shouldn't format this" )
+
+"#), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    def foo(
+        arg1,
+        arg2,
+    ):
+        print("Shouldn't format this" )
+
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn range_start_only() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=3"])
+        .arg("-")
+        .pass_stdin(r#"
+def foo(arg1, arg2,):
+    print("Should format this" )
+
+"#), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    def foo(arg1, arg2,):
+        print("Should format this")
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn range_end_only() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=-3"])
+        .arg("-")
+        .pass_stdin(r#"
+def foo(arg1, arg2,):
+    print("Should format this" )
+
+"#), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    def foo(
+        arg1,
+        arg2,
+    ):
+        print("Should format this" )
+
+
+    ----- stderr -----
+    "#);
+}
+
+#[test]
+fn range_missing_line() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=1-:20"])
+        .arg("-")
+        .pass_stdin(r#"
+def foo(arg1, arg2,):
+    print("Should format this" )
+
+"#), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: invalid value '1-:20' for '--range <RANGE>': the end line is not a valid number (cannot parse integer from empty string)
+      tip: The format is 'line:column'.
+
+    For more information, try '--help'.
+    "###);
+}
+
+#[test]
+fn zero_line_number() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=0:2"])
+        .arg("-")
+        .pass_stdin(r#"
+def foo(arg1, arg2,):
+    print("Should format this" )
+
+"#), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: invalid value '0:2' for '--range <RANGE>': the start line is 0, but it should be 1 or greater.
+      tip: The line numbers start at 1.
+      tip: Try 1:2 instead.
+
+    For more information, try '--help'.
+    "###);
+}
+
+#[test]
+fn column_and_line_zero() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=0:0"])
+        .arg("-")
+        .pass_stdin(r#"
+def foo(arg1, arg2,):
+    print("Should format this" )
+
+"#), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: invalid value '0:0' for '--range <RANGE>': the start line and column are both 0, but they should be 1 or greater.
+      tip: The line and column numbers start at 1.
+      tip: Try 1:1 instead.
+
+    For more information, try '--help'.
+    "###);
+}
+
+#[test]
+fn range_formatting_notebook() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--isolated", "--no-cache", "--stdin-filename", "main.ipynb", "--range=1-2"])
+        .arg("-")
+        .pass_stdin(r#"
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "ad6f36d9-4b7d-4562-8d00-f15a0f1fbb6d",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "x=1"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3 (ipykernel)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.12.0"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
+"#), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: Failed to format main.ipynb: Range formatting isn't supported for notebooks.
+    "###);
 }

@@ -3,14 +3,14 @@ import random
 
 def foo1():
 
-    print("The newline above me should be deleted!")
+    print("The newline above me should be kept!")
 
 
 def foo2():
 
 
 
-    print("All the newlines above me should be deleted!")
+    print("All the newlines above me should be kept!")
 
 
 def foo3():
@@ -30,31 +30,31 @@ def foo4():
 class Foo:
     def bar(self):
 
-        print("The newline above me should be deleted!")
+        print("The newline above me should be kept!")
 
 
 for i in range(5):
 
-    print(f"{i}) The line above me should be removed!")
+    print(f"{i}) The line above me should be kept!")
 
 
 for i in range(5):
 
 
 
-    print(f"{i}) The lines above me should be removed!")
+    print(f"{i}) The lines above me should be kept!")
 
 
 for i in range(5):
 
     for j in range(7):
 
-        print(f"{i}) The lines above me should be removed!")
+        print(f"{i}) The lines above me should be kept!")
 
 
 if random.randint(0, 3) == 0:
 
-    print("The new line above me is about to be removed!")
+    print("The new line above me will be kept!")
 
 
 if random.randint(0, 3) == 0:
@@ -62,43 +62,45 @@ if random.randint(0, 3) == 0:
 
 
 
-    print("The new lines above me is about to be removed!")
+    print("The new lines above me will be kept!")
 
 
 if random.randint(0, 3) == 0:
+
     if random.uniform(0, 1) > 0.5:
-        print("Two lines above me are about to be removed!")
+
+        print("Two lines above me will be kept!")
 
 
 while True:
 
-    print("The newline above me should be deleted!")
+    print("The newline above me should be kept!")
 
 
 while True:
 
 
 
-    print("The newlines above me should be deleted!")
+    print("The newlines above me should be kept!")
 
 
 while True:
 
     while False:
 
-        print("The newlines above me should be deleted!")
+        print("The newlines above me should be kept!")
 
 
 with open("/path/to/file.txt", mode="w") as file:
 
-    file.write("The new line above me is about to be removed!")
+    file.write("The new line above me will be kept!")
 
 
 with open("/path/to/file.txt", mode="w") as file:
 
 
 
-    file.write("The new lines above me is about to be removed!")
+    file.write("The new lines above me will be kept!")
 
 
 with open("/path/to/file.txt", mode="r") as read_file:

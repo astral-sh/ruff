@@ -9,18 +9,17 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
+
     use crate::settings::types::PreviewMode;
-    use crate::settings::LinterSettings;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
-    #[test_case(Rule::Eval, Path::new("PGH001_0.py"))]
-    #[test_case(Rule::Eval, Path::new("PGH001_1.py"))]
-    #[test_case(Rule::DeprecatedLogWarn, Path::new("PGH002_0.py"))]
-    #[test_case(Rule::DeprecatedLogWarn, Path::new("PGH002_1.py"))]
     #[test_case(Rule::BlanketTypeIgnore, Path::new("PGH003_0.py"))]
     #[test_case(Rule::BlanketTypeIgnore, Path::new("PGH003_1.py"))]
     #[test_case(Rule::BlanketNOQA, Path::new("PGH004_0.py"))]
+    #[test_case(Rule::BlanketNOQA, Path::new("PGH004_1.py"))]
+    #[test_case(Rule::BlanketNOQA, Path::new("PGH004_2.py"))]
+    #[test_case(Rule::BlanketNOQA, Path::new("PGH004_3.py"))]
     #[test_case(Rule::InvalidMockAccess, Path::new("PGH005_0.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
@@ -32,7 +31,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::DeprecatedLogWarn, Path::new("PGH002_1.py"))]
+    #[test_case(Rule::BlanketNOQA, Path::new("PGH004_2.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
@@ -41,9 +40,9 @@ mod tests {
         );
         let diagnostics = test_path(
             Path::new("pygrep_hooks").join(path).as_path(),
-            &LinterSettings {
+            &settings::LinterSettings {
                 preview: PreviewMode::Enabled,
-                ..LinterSettings::for_rule(rule_code)
+                ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
         assert_messages!(snapshot, diagnostics);

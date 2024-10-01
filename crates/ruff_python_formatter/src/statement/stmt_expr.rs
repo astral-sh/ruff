@@ -1,12 +1,12 @@
 use ruff_python_ast as ast;
 use ruff_python_ast::{Expr, Operator, StmtExpr};
 
-use crate::comments::{SourceComment, SuppressionKind};
+use crate::comments::SourceComment;
 
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
-use crate::prelude::*;
 use crate::statement::trailing_semicolon;
+use crate::{has_skip_comment, prelude::*};
 
 #[derive(Default)]
 pub struct FormatStmtExpr;
@@ -36,7 +36,7 @@ impl FormatNodeRule<StmtExpr> for FormatStmtExpr {
         trailing_comments: &[SourceComment],
         context: &PyFormatContext,
     ) -> bool {
-        SuppressionKind::has_skip_comment(trailing_comments, context.source())
+        has_skip_comment(trailing_comments, context.source())
     }
 }
 

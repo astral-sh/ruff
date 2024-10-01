@@ -5,6 +5,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::registry::Rule;
 
 /// ## What it does
 /// Checks for uses of comparators other than `<` and `>=` for
@@ -33,19 +34,17 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// import sys
 ///
-/// if sys.version_info > (3, 8):
-///     ...
+/// if sys.version_info > (3, 8): ...
 /// ```
 ///
 /// Use instead:
-/// ```python
+/// ```pyi
 /// import sys
 ///
-/// if sys.version_info >= (3, 9):
-///     ...
+/// if sys.version_info >= (3, 9): ...
 /// ```
 #[violation]
 pub struct BadVersionInfoComparison;
@@ -57,8 +56,53 @@ impl Violation for BadVersionInfoComparison {
     }
 }
 
-/// PYI006
-pub(crate) fn bad_version_info_comparison(checker: &mut Checker, test: &Expr) {
+/// ## What it does
+/// Checks for if-else statements with `sys.version_info` comparisons that use
+/// `<` comparators.
+///
+/// ## Why is this bad?
+/// As a convention, branches that correspond to newer Python versions should
+/// come first when using `sys.version_info` comparisons. This makes it easier
+/// to understand the desired behavior, which typically corresponds to the
+/// latest Python versions.
+///
+/// ## Example
+///
+/// ```pyi
+/// import sys
+///
+/// if sys.version_info < (3, 10):
+///     def read_data(x, *, preserve_order=True): ...
+///
+/// else:
+///     def read_data(x): ...
+/// ```
+///
+/// Use instead:
+///
+/// ```pyi
+/// if sys.version_info >= (3, 10):
+///     def read_data(x): ...
+///
+/// else:
+///     def read_data(x, *, preserve_order=True): ...
+/// ```
+#[violation]
+pub struct BadVersionInfoOrder;
+
+impl Violation for BadVersionInfoOrder {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Use `>=` when using `if`-`else` with `sys.version_info` comparisons")
+    }
+}
+
+/// PYI006, PYI066
+pub(crate) fn bad_version_info_comparison(
+    checker: &mut Checker,
+    test: &Expr,
+    has_else_clause: bool,
+) {
     let Expr::Compare(ast::ExprCompare {
         left,
         ops,
@@ -69,23 +113,36 @@ pub(crate) fn bad_version_info_comparison(checker: &mut Checker, test: &Expr) {
         return;
     };
 
-    let ([op], [_right]) = (ops.as_slice(), comparators.as_slice()) else {
+    let ([op], [_right]) = (&**ops, &**comparators) else {
         return;
     };
 
     if !checker
         .semantic()
-        .resolve_call_path(left)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["sys", "version_info"]))
+        .resolve_qualified_name(left)
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["sys", "version_info"]))
     {
         return;
     }
 
-    if matches!(op, CmpOp::Lt | CmpOp::GtE) {
+    if matches!(op, CmpOp::GtE) {
+        // No issue to be raised, early exit.
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(BadVersionInfoComparison, test.range()));
+    if matches!(op, CmpOp::Lt) {
+        if checker.enabled(Rule::BadVersionInfoOrder) {
+            if has_else_clause {
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(BadVersionInfoOrder, test.range()));
+            }
+        }
+    } else {
+        if checker.enabled(Rule::BadVersionInfoComparison) {
+            checker
+                .diagnostics
+                .push(Diagnostic::new(BadVersionInfoComparison, test.range()));
+        };
+    }
 }

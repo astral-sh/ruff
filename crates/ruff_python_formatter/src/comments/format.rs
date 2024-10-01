@@ -1,16 +1,16 @@
 use std::borrow::Cow;
 
 use ruff_formatter::{format_args, write, FormatError, FormatOptions, SourceCode};
-use ruff_python_ast::PySourceType;
-use ruff_python_ast::{AnyNodeRef, AstNode};
+use ruff_python_ast::{AnyNodeRef, AstNode, NodeKind, PySourceType};
 use ruff_python_trivia::{
-    is_pragma_comment, lines_after, lines_after_ignoring_trivia, lines_before,
+    is_pragma_comment, lines_after, lines_after_ignoring_trivia, lines_before, CommentLinePosition,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
-use crate::comments::{CommentLinePosition, SourceComment};
+use crate::comments::SourceComment;
 use crate::context::NodeLevel;
 use crate::prelude::*;
+use crate::statement::suite::should_insert_blank_line_after_class_in_stub_file;
 
 /// Formats the leading comments of a node.
 pub(crate) fn leading_node_comments<T>(node: &T) -> FormatLeadingComments
@@ -85,7 +85,11 @@ pub(crate) struct FormatLeadingAlternateBranchComments<'a> {
 
 impl Format<PyFormatContext<'_>> for FormatLeadingAlternateBranchComments<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        if let Some(first_leading) = self.comments.first() {
+        if self.last_node.map_or(false, |preceding| {
+            should_insert_blank_line_after_class_in_stub_file(preceding, None, f.context())
+        }) {
+            write!(f, [empty_line(), leading_comments(self.comments)])?;
+        } else if let Some(first_leading) = self.comments.first() {
             // Leading comments only preserves the lines after the comment but not before.
             // Insert the necessary lines.
             write!(
@@ -160,7 +164,7 @@ impl Format<PyFormatContext<'_>> for FormatTrailingComments<'_> {
                         line_suffix(
                             &format_args![
                                 empty_lines(lines_before_comment),
-                                format_comment(trailing)
+                                format_comment(trailing),
                             ],
                             // Reserving width isn't necessary because we don't split
                             // comments and the empty lines expand any enclosing group.
@@ -425,21 +429,25 @@ pub(crate) struct FormatNormalizedComment<'a> {
 
 impl Format<PyFormatContext<'_>> for FormatNormalizedComment<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext>) -> FormatResult<()> {
+        let write_sourcemap = f.options().source_map_generation().is_enabled();
+
+        write_sourcemap
+            .then_some(source_position(self.range.start()))
+            .fmt(f)?;
+
         match self.comment {
             Cow::Borrowed(borrowed) => {
-                source_text_slice(TextRange::at(self.range.start(), borrowed.text_len())).fmt(f)
+                source_text_slice(TextRange::at(self.range.start(), borrowed.text_len())).fmt(f)?;
             }
 
             Cow::Owned(ref owned) => {
-                write!(
-                    f,
-                    [
-                        text(owned, Some(self.range.start())),
-                        source_position(self.range.end())
-                    ]
-                )
+                text(owned).fmt(f)?;
             }
         }
+
+        write_sourcemap
+            .then_some(source_position(self.range.end()))
+            .fmt(f)
     }
 }
 
@@ -513,21 +521,27 @@ fn strip_comment_prefix(comment_text: &str) -> FormatResult<&str> {
 /// ```
 ///
 /// This builder will insert two empty lines before the comment.
-pub(crate) fn empty_lines_before_trailing_comments<'a>(
-    f: &PyFormatter,
-    comments: &'a [SourceComment],
-) -> FormatEmptyLinesBeforeTrailingComments<'a> {
-    // Black has different rules for stub vs. non-stub and top level vs. indented
-    let empty_lines = match (f.options().source_type(), f.context().node_level()) {
-        (PySourceType::Stub, NodeLevel::TopLevel(_)) => 1,
-        (PySourceType::Stub, _) => 0,
-        (_, NodeLevel::TopLevel(_)) => 2,
-        (_, _) => 1,
-    };
-
+///
+/// # Preview
+///
+/// For preview style, this builder will insert a single empty line after a
+/// class definition in a stub file.
+///
+/// For example, given:
+/// ```python
+/// class Foo:
+///     pass
+/// # comment
+/// ```
+///
+/// This builder will insert a single empty line before the comment.
+pub(crate) fn empty_lines_before_trailing_comments(
+    comments: &[SourceComment],
+    node_kind: NodeKind,
+) -> FormatEmptyLinesBeforeTrailingComments {
     FormatEmptyLinesBeforeTrailingComments {
         comments,
-        empty_lines,
+        node_kind,
     }
 }
 
@@ -535,8 +549,7 @@ pub(crate) fn empty_lines_before_trailing_comments<'a>(
 pub(crate) struct FormatEmptyLinesBeforeTrailingComments<'a> {
     /// The trailing comments of the node.
     comments: &'a [SourceComment],
-    /// The expected number of empty lines before the trailing comments.
-    empty_lines: u32,
+    node_kind: NodeKind,
 }
 
 impl Format<PyFormatContext<'_>> for FormatEmptyLinesBeforeTrailingComments<'_> {
@@ -546,9 +559,17 @@ impl Format<PyFormatContext<'_>> for FormatEmptyLinesBeforeTrailingComments<'_> 
             .iter()
             .find(|comment| comment.line_position().is_own_line())
         {
+            // Black has different rules for stub vs. non-stub and top level vs. indented
+            let empty_lines = match (f.options().source_type(), f.context().node_level()) {
+                (PySourceType::Stub, NodeLevel::TopLevel(_)) => 1,
+                (PySourceType::Stub, _) => u32::from(self.node_kind == NodeKind::StmtClassDef),
+                (_, NodeLevel::TopLevel(_)) => 2,
+                (_, _) => 1,
+            };
+
             let actual = lines_before(comment.start(), f.context().source()).saturating_sub(1);
-            for _ in actual..self.empty_lines {
-                write!(f, [empty_line()])?;
+            for _ in actual..empty_lines {
+                empty_line().fmt(f)?;
             }
         }
         Ok(())
@@ -567,30 +588,16 @@ impl Format<PyFormatContext<'_>> for FormatEmptyLinesBeforeTrailingComments<'_> 
 ///
 /// While `leading_comments` will preserve the existing empty line, this builder will insert an
 /// additional empty line before the comment.
-pub(crate) fn empty_lines_after_leading_comments<'a>(
-    f: &PyFormatter,
-    comments: &'a [SourceComment],
-) -> FormatEmptyLinesAfterLeadingComments<'a> {
-    // Black has different rules for stub vs. non-stub and top level vs. indented
-    let empty_lines = match (f.options().source_type(), f.context().node_level()) {
-        (PySourceType::Stub, NodeLevel::TopLevel(_)) => 1,
-        (PySourceType::Stub, _) => 0,
-        (_, NodeLevel::TopLevel(_)) => 2,
-        (_, _) => 1,
-    };
-
-    FormatEmptyLinesAfterLeadingComments {
-        comments,
-        empty_lines,
-    }
+pub(crate) fn empty_lines_after_leading_comments(
+    comments: &[SourceComment],
+) -> FormatEmptyLinesAfterLeadingComments {
+    FormatEmptyLinesAfterLeadingComments { comments }
 }
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct FormatEmptyLinesAfterLeadingComments<'a> {
     /// The leading comments of the node.
     comments: &'a [SourceComment],
-    /// The expected number of empty lines after the leading comments.
-    empty_lines: u32,
 }
 
 impl Format<PyFormatContext<'_>> for FormatEmptyLinesAfterLeadingComments<'_> {
@@ -601,6 +608,14 @@ impl Format<PyFormatContext<'_>> for FormatEmptyLinesAfterLeadingComments<'_> {
             .rev()
             .find(|comment| comment.line_position().is_own_line())
         {
+            // Black has different rules for stub vs. non-stub and top level vs. indented
+            let empty_lines = match (f.options().source_type(), f.context().node_level()) {
+                (PySourceType::Stub, NodeLevel::TopLevel(_)) => 1,
+                (PySourceType::Stub, _) => 0,
+                (_, NodeLevel::TopLevel(_)) => 2,
+                (_, _) => 1,
+            };
+
             let actual = lines_after(comment.end(), f.context().source()).saturating_sub(1);
             // If there are no empty lines, keep the comment tight to the node.
             if actual == 0 {
@@ -609,12 +624,12 @@ impl Format<PyFormatContext<'_>> for FormatEmptyLinesAfterLeadingComments<'_> {
 
             // If there are more than enough empty lines already, `leading_comments` will
             // trim them as necessary.
-            if actual >= self.empty_lines {
+            if actual >= empty_lines {
                 return Ok(());
             }
 
-            for _ in actual..self.empty_lines {
-                write!(f, [empty_line()])?;
+            for _ in actual..empty_lines {
+                empty_line().fmt(f)?;
             }
         }
         Ok(())

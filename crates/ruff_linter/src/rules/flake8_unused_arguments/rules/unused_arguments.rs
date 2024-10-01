@@ -1,5 +1,3 @@
-use std::iter;
-
 use regex::Regex;
 use ruff_python_ast as ast;
 use ruff_python_ast::{Parameter, Parameters};
@@ -13,7 +11,6 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
-use crate::rules::flake8_unused_arguments::helpers;
 
 /// ## What it does
 /// Checks for the presence of unused arguments in function definitions.
@@ -224,19 +221,20 @@ fn function(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     let args = parameters
-        .posonlyargs
-        .iter()
-        .chain(&parameters.args)
-        .chain(&parameters.kwonlyargs)
+        .iter_non_variadic_params()
         .map(|parameter_with_default| &parameter_with_default.parameter)
         .chain(
-            iter::once::<Option<&Parameter>>(parameters.vararg.as_deref())
-                .flatten()
+            parameters
+                .vararg
+                .as_deref()
+                .into_iter()
                 .skip(usize::from(ignore_variadic_names)),
         )
         .chain(
-            iter::once::<Option<&Parameter>>(parameters.kwarg.as_deref())
-                .flatten()
+            parameters
+                .kwarg
+                .as_deref()
+                .into_iter()
                 .skip(usize::from(ignore_variadic_names)),
         );
     call(
@@ -260,20 +258,21 @@ fn method(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     let args = parameters
-        .posonlyargs
-        .iter()
-        .chain(&parameters.args)
-        .chain(&parameters.kwonlyargs)
+        .iter_non_variadic_params()
         .skip(1)
         .map(|parameter_with_default| &parameter_with_default.parameter)
         .chain(
-            iter::once::<Option<&Parameter>>(parameters.vararg.as_deref())
-                .flatten()
+            parameters
+                .vararg
+                .as_deref()
+                .into_iter()
                 .skip(usize::from(ignore_variadic_names)),
         )
         .chain(
-            iter::once::<Option<&Parameter>>(parameters.kwarg.as_deref())
-                .flatten()
+            parameters
+                .kwarg
+                .as_deref()
+                .into_iter()
                 .skip(usize::from(ignore_variadic_names)),
         );
     call(
@@ -299,7 +298,7 @@ fn call<'a>(
             .get(arg.name.as_str())
             .map(|binding_id| semantic.binding(binding_id))?;
         if binding.kind.is_argument()
-            && !binding.is_used()
+            && binding.is_unused()
             && !dummy_variable_rgx.is_match(arg.name.as_str())
         {
             Some(Diagnostic::new(
@@ -322,18 +321,19 @@ pub(crate) fn unused_arguments(
         return;
     }
 
-    let Some(parent) = &checker.semantic().first_non_type_parent_scope(scope) else {
+    let Some(parent) = checker.semantic().first_non_type_parent_scope(scope) else {
         return;
     };
 
     match &scope.kind {
-        ScopeKind::Function(ast::StmtFunctionDef {
-            name,
-            parameters,
-            body,
-            decorator_list,
-            ..
-        }) => {
+        ScopeKind::Function(
+            function_def @ ast::StmtFunctionDef {
+                name,
+                parameters,
+                decorator_list,
+                ..
+            },
+        ) => {
             match function_type::classify(
                 name,
                 decorator_list,
@@ -344,6 +344,7 @@ pub(crate) fn unused_arguments(
             ) {
                 function_type::FunctionType::Function => {
                     if checker.enabled(Argumentable::Function.rule_code())
+                        && !function_type::is_stub(function_def, checker.semantic())
                         && !visibility::is_overload(decorator_list, checker.semantic())
                     {
                         function(
@@ -362,7 +363,7 @@ pub(crate) fn unused_arguments(
                 }
                 function_type::FunctionType::Method => {
                     if checker.enabled(Argumentable::Method.rule_code())
-                        && !helpers::is_empty(body)
+                        && !function_type::is_stub(function_def, checker.semantic())
                         && (!visibility::is_magic(name)
                             || visibility::is_init(name)
                             || visibility::is_new(name)
@@ -387,7 +388,7 @@ pub(crate) fn unused_arguments(
                 }
                 function_type::FunctionType::ClassMethod => {
                     if checker.enabled(Argumentable::ClassMethod.rule_code())
-                        && !helpers::is_empty(body)
+                        && !function_type::is_stub(function_def, checker.semantic())
                         && (!visibility::is_magic(name)
                             || visibility::is_init(name)
                             || visibility::is_new(name)
@@ -412,7 +413,7 @@ pub(crate) fn unused_arguments(
                 }
                 function_type::FunctionType::StaticMethod => {
                     if checker.enabled(Argumentable::StaticMethod.rule_code())
-                        && !helpers::is_empty(body)
+                        && !function_type::is_stub(function_def, checker.semantic())
                         && (!visibility::is_magic(name)
                             || visibility::is_init(name)
                             || visibility::is_new(name)

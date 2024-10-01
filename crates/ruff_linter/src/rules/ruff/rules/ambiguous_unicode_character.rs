@@ -4,9 +4,11 @@ use bitflags::bitflags;
 
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, StringLike};
 use ruff_source_file::Locator;
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
+use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 use crate::rules::ruff::rules::confusables::confusable;
 use crate::rules::ruff::rules::Context;
@@ -28,7 +30,7 @@ use crate::settings::LinterSettings;
 /// spec recommends `GREEK CAPITAL LETTER OMEGA` over `OHM SIGN`.
 ///
 /// You can omit characters from being flagged as ambiguous via the
-/// [`allowed-confusables`] setting.
+/// [`lint.allowed-confusables`] setting.
 ///
 /// ## Example
 /// ```python
@@ -41,7 +43,7 @@ use crate::settings::LinterSettings;
 /// ```
 ///
 /// ## Options
-/// - `allowed-confusables`
+/// - `lint.allowed-confusables`
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
@@ -81,7 +83,7 @@ impl Violation for AmbiguousUnicodeCharacterString {
 /// spec recommends `GREEK CAPITAL LETTER OMEGA` over `OHM SIGN`.
 ///
 /// You can omit characters from being flagged as ambiguous via the
-/// [`allowed-confusables`] setting.
+/// [`lint.allowed-confusables`] setting.
 ///
 /// ## Example
 /// ```python
@@ -94,7 +96,7 @@ impl Violation for AmbiguousUnicodeCharacterString {
 /// ```
 ///
 /// ## Options
-/// - `allowed-confusables`
+/// - `lint.allowed-confusables`
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
@@ -134,7 +136,7 @@ impl Violation for AmbiguousUnicodeCharacterDocstring {
 /// spec recommends `GREEK CAPITAL LETTER OMEGA` over `OHM SIGN`.
 ///
 /// You can omit characters from being flagged as ambiguous via the
-/// [`allowed-confusables`] setting.
+/// [`lint.allowed-confusables`] setting.
 ///
 /// ## Example
 /// ```python
@@ -147,7 +149,7 @@ impl Violation for AmbiguousUnicodeCharacterDocstring {
 /// ```
 ///
 /// ## Options
-/// - `allowed-confusables`
+/// - `lint.allowed-confusables`
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
@@ -171,16 +173,61 @@ impl Violation for AmbiguousUnicodeCharacterComment {
     }
 }
 
-/// RUF001, RUF002, RUF003
-pub(crate) fn ambiguous_unicode_character(
+/// RUF003
+pub(crate) fn ambiguous_unicode_character_comment(
     diagnostics: &mut Vec<Diagnostic>,
     locator: &Locator,
+    range: TextRange,
+    settings: &LinterSettings,
+) {
+    let text = locator.slice(range);
+    ambiguous_unicode_character(diagnostics, text, range, Context::Comment, settings);
+}
+
+/// RUF001, RUF002
+pub(crate) fn ambiguous_unicode_character_string(checker: &mut Checker, string_like: StringLike) {
+    let context = if checker.semantic().in_pep_257_docstring() {
+        Context::Docstring
+    } else {
+        Context::String
+    };
+
+    for part in string_like.parts() {
+        match part {
+            ast::StringLikePart::String(string_literal) => {
+                let text = checker.locator().slice(string_literal);
+                ambiguous_unicode_character(
+                    &mut checker.diagnostics,
+                    text,
+                    string_literal.range(),
+                    context,
+                    checker.settings,
+                );
+            }
+            ast::StringLikePart::Bytes(_) => {}
+            ast::StringLikePart::FString(f_string) => {
+                for literal in f_string.elements.literals() {
+                    let text = checker.locator().slice(literal);
+                    ambiguous_unicode_character(
+                        &mut checker.diagnostics,
+                        text,
+                        literal.range(),
+                        context,
+                        checker.settings,
+                    );
+                }
+            }
+        }
+    }
+}
+
+fn ambiguous_unicode_character(
+    diagnostics: &mut Vec<Diagnostic>,
+    text: &str,
     range: TextRange,
     context: Context,
     settings: &LinterSettings,
 ) {
-    let text = locator.slice(range);
-
     // Most of the time, we don't need to check for ambiguous unicode characters at all.
     if text.is_ascii() {
         return;

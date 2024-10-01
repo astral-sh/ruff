@@ -1,0 +1,23 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+---
+line_ending_crlf.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+  |
+1 | / from long_module_name import member_one, member_two, member_three, member_four, member_five
+2 | | 
+  | |_^ I001
+  |
+  = help: Organize imports
+
+ℹ Safe fix
+1   |-from long_module_name import member_one, member_two, member_three, member_four, member_five
+  1 |+from long_module_name import (
+  2 |+    member_five,
+  3 |+    member_four,
+  4 |+    member_one,
+  5 |+    member_three,
+  6 |+    member_two,
+  7 |+)
+2 8 | 
+
+

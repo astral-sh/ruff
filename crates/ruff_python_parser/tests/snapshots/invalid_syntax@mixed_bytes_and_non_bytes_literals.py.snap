@@ -1,0 +1,177 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/mixed_bytes_and_non_bytes_literals.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..64,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..17,
+                    value: StringLiteral(
+                        ExprStringLiteral {
+                            range: 0..17,
+                            value: StringLiteralValue {
+                                inner: Concatenated(
+                                    ConcatenatedStringLiteral {
+                                        strings: [
+                                            StringLiteral {
+                                                range: 0..7,
+                                                value: "first",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                },
+                                            },
+                                            StringLiteral {
+                                                range: 8..17,
+                                                value: "",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                },
+                                            },
+                                        ],
+                                        value: "first",
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 18..36,
+                    value: FString(
+                        ExprFString {
+                            range: 18..36,
+                            value: FStringValue {
+                                inner: Concatenated(
+                                    [
+                                        FString(
+                                            FString {
+                                                range: 18..26,
+                                                elements: [
+                                                    Literal(
+                                                        FStringLiteralElement {
+                                                            range: 20..25,
+                                                            value: "first",
+                                                        },
+                                                    ),
+                                                ],
+                                                flags: FStringFlags {
+                                                    quote_style: Single,
+                                                    prefix: Regular,
+                                                    triple_quoted: false,
+                                                },
+                                            },
+                                        ),
+                                        Literal(
+                                            StringLiteral {
+                                                range: 27..36,
+                                                value: "",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                },
+                                            },
+                                        ),
+                                    ],
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 37..63,
+                    value: FString(
+                        ExprFString {
+                            range: 37..63,
+                            value: FStringValue {
+                                inner: Concatenated(
+                                    [
+                                        Literal(
+                                            StringLiteral {
+                                                range: 37..44,
+                                                value: "first",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                },
+                                            },
+                                        ),
+                                        FString(
+                                            FString {
+                                                range: 45..54,
+                                                elements: [
+                                                    Literal(
+                                                        FStringLiteralElement {
+                                                            range: 47..53,
+                                                            value: "second",
+                                                        },
+                                                    ),
+                                                ],
+                                                flags: FStringFlags {
+                                                    quote_style: Single,
+                                                    prefix: Regular,
+                                                    triple_quoted: false,
+                                                },
+                                            },
+                                        ),
+                                        Literal(
+                                            StringLiteral {
+                                                range: 55..63,
+                                                value: "",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                },
+                                            },
+                                        ),
+                                    ],
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | 'first' b'second'
+  | ^^^^^^^^^^^^^^^^^ Syntax Error: Bytes literal cannot be mixed with non-bytes literals
+2 | f'first' b'second'
+3 | 'first' f'second' b'third'
+  |
+
+
+  |
+1 | 'first' b'second'
+2 | f'first' b'second'
+  | ^^^^^^^^^^^^^^^^^^ Syntax Error: Bytes literal cannot be mixed with non-bytes literals
+3 | 'first' f'second' b'third'
+  |
+
+
+  |
+1 | 'first' b'second'
+2 | f'first' b'second'
+3 | 'first' f'second' b'third'
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^ Syntax Error: Bytes literal cannot be mixed with non-bytes literals
+  |

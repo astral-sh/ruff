@@ -1,0 +1,43 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/named/missing_expression_0.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..75,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 71..72,
+                    value: Name(
+                        ExprName {
+                            range: 71..72,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # There are no parentheses, so this isn't parsed as named expression.
+2 | 
+3 | x :=
+  |   ^^ Syntax Error: Expected a statement
+  |
+
+
+  |
+1 | # There are no parentheses, so this isn't parsed as named expression.
+2 | 
+3 | x :=
+  |      Syntax Error: Expected a statement
+  |

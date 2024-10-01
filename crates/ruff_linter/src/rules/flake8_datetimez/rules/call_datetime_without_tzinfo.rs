@@ -1,16 +1,15 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
-use ruff_python_ast::{self as ast, Expr};
-use ruff_text_size::Ranged;
+use ruff_python_ast as ast;
+use ruff_python_semantic::Modules;
 
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_datetimez::rules::helpers::has_non_none_keyword;
 
-use super::helpers;
+use super::helpers::{self, DatetimeModuleAntipattern};
 
 /// ## What it does
-/// Checks for `datetime` instantiations that lack a `tzinfo` argument.
+/// Checks for `datetime` instantiations that do not specify a timezone.
 ///
 /// ## Why is this bad?
 /// `datetime` objects are "naive" by default, in that they do not include
@@ -19,7 +18,8 @@ use super::helpers;
 /// `datetime` objects are preferred, as they represent a specific moment in
 /// time, unlike "naive" objects.
 ///
-/// By providing a `tzinfo` value, a `datetime` can be made timezone-aware.
+/// By providing a non-`None` value for `tzinfo`, a `datetime` can be made
+/// timezone-aware.
 ///
 /// ## Example
 /// ```python
@@ -35,27 +35,43 @@ use super::helpers;
 /// datetime.datetime(2000, 1, 1, 0, 0, 0, tzinfo=datetime.timezone.utc)
 /// ```
 ///
-/// Or, for Python 3.11 and later:
+/// Or, on Python 3.11 and later:
 /// ```python
 /// import datetime
 ///
 /// datetime.datetime(2000, 1, 1, 0, 0, 0, tzinfo=datetime.UTC)
 /// ```
 #[violation]
-pub struct CallDatetimeWithoutTzinfo;
+pub struct CallDatetimeWithoutTzinfo(DatetimeModuleAntipattern);
 
 impl Violation for CallDatetimeWithoutTzinfo {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("The use of `datetime.datetime()` without `tzinfo` argument is not allowed")
+        let CallDatetimeWithoutTzinfo(antipattern) = self;
+        match antipattern {
+            DatetimeModuleAntipattern::NoTzArgumentPassed => {
+                format!("`datetime.datetime()` called without a `tzinfo` argument")
+            }
+            DatetimeModuleAntipattern::NonePassedToTzArgument => {
+                format!("`tzinfo=None` passed to `datetime.datetime()`")
+            }
+        }
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Pass a `datetime.timezone` object to the `tzinfo` parameter".to_string())
     }
 }
 
 pub(crate) fn call_datetime_without_tzinfo(checker: &mut Checker, call: &ast::ExprCall) {
+    if !checker.semantic().seen_module(Modules::DATETIME) {
+        return;
+    }
+
     if !checker
         .semantic()
-        .resolve_call_path(&call.func)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["datetime", "datetime"]))
+        .resolve_qualified_name(&call.func)
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["datetime", "datetime"]))
     {
         return;
     }
@@ -64,23 +80,14 @@ pub(crate) fn call_datetime_without_tzinfo(checker: &mut Checker, call: &ast::Ex
         return;
     }
 
-    // No positional arg: keyword is missing or constant None.
-    if call.arguments.args.len() < 8 && !has_non_none_keyword(&call.arguments, "tzinfo") {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(CallDatetimeWithoutTzinfo, call.range()));
-        return;
-    }
+    let antipattern = match call.arguments.find_argument("tzinfo", 7) {
+        Some(ast::Expr::NoneLiteral(_)) => DatetimeModuleAntipattern::NonePassedToTzArgument,
+        Some(_) => return,
+        None => DatetimeModuleAntipattern::NoTzArgumentPassed,
+    };
 
-    // Positional arg: is constant None.
-    if call
-        .arguments
-        .args
-        .get(7)
-        .is_some_and(Expr::is_none_literal_expr)
-    {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(CallDatetimeWithoutTzinfo, call.range()));
-    }
+    checker.diagnostics.push(Diagnostic::new(
+        CallDatetimeWithoutTzinfo(antipattern),
+        call.range,
+    ));
 }

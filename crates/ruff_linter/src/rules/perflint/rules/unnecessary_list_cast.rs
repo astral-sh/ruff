@@ -1,5 +1,6 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 use ruff_python_semantic::analyze::typing::find_assigned_value;
 use ruff_text_size::TextRange;
@@ -64,15 +65,11 @@ pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr, body: &[
         return;
     };
 
-    let [arg] = args.as_slice() else {
+    let [arg] = &**args else {
         return;
     };
 
-    let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else {
-        return;
-    };
-
-    if !(id == "list" && checker.semantic().is_builtin("list")) {
+    if !checker.semantic().match_builtin_expr(func, "list") {
         return;
     }
 
@@ -98,22 +95,25 @@ pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr, body: &[
             range: iterable_range,
             ..
         }) => {
-            // If the variable is being appended to, don't suggest removing the cast:
-            //
-            // ```python
-            // items = ["foo", "bar"]
-            // for item in list(items):
-            //    items.append("baz")
-            // ```
-            //
-            // Here, removing the `list()` cast would change the behavior of the code.
-            if body.iter().any(|stmt| match_append(stmt, id)) {
-                return;
-            }
             let Some(value) = find_assigned_value(id, checker.semantic()) else {
                 return;
             };
             if matches!(value, Expr::Tuple(_) | Expr::List(_) | Expr::Set(_)) {
+                // If the variable is being modified to, don't suggest removing the cast:
+                //
+                // ```python
+                // items = ["foo", "bar"]
+                // for item in list(items):
+                //    items.append("baz")
+                // ```
+                //
+                // Here, removing the `list()` cast would change the behavior of the code.
+                let mut visitor = MutationVisitor::new(id);
+                visitor.visit_body(body);
+                if visitor.is_mutated {
+                    return;
+                }
+
                 let mut diagnostic = Diagnostic::new(UnnecessaryListCast, *list_range);
                 diagnostic.set_fix(remove_cast(*list_range, *iterable_range));
                 checker.diagnostics.push(diagnostic);
@@ -123,32 +123,99 @@ pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr, body: &[
     }
 }
 
-/// Check if a statement is an `append` call to a given identifier.
-///
-/// For example, `foo.append(bar)` would return `true` if `id` is `foo`.
-fn match_append(stmt: &Stmt, id: &str) -> bool {
-    let Some(ast::StmtExpr { value, .. }) = stmt.as_expr_stmt() else {
-        return false;
-    };
-    let Some(ast::ExprCall { func, .. }) = value.as_call_expr() else {
-        return false;
-    };
-    let Some(ast::ExprAttribute { value, attr, .. }) = func.as_attribute_expr() else {
-        return false;
-    };
-    if attr != "append" {
-        return false;
-    }
-    let Some(ast::ExprName { id: target_id, .. }) = value.as_name_expr() else {
-        return false;
-    };
-    target_id == id
-}
-
 /// Generate a [`Fix`] to remove a `list` cast from an expression.
 fn remove_cast(list_range: TextRange, iterable_range: TextRange) -> Fix {
     Fix::safe_edits(
         Edit::deletion(list_range.start(), iterable_range.start()),
         [Edit::deletion(iterable_range.end(), list_range.end())],
     )
+}
+
+/// A [`StatementVisitor`] that (conservatively) identifies mutations to a variable.
+#[derive(Default)]
+pub(crate) struct MutationVisitor<'a> {
+    pub(crate) target: &'a str,
+    pub(crate) is_mutated: bool,
+}
+
+impl<'a> MutationVisitor<'a> {
+    pub(crate) fn new(target: &'a str) -> Self {
+        Self {
+            target,
+            is_mutated: false,
+        }
+    }
+}
+
+impl<'a> StatementVisitor<'a> for MutationVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+        if match_mutation(stmt, self.target) {
+            self.is_mutated = true;
+        } else {
+            walk_stmt(self, stmt);
+        }
+    }
+}
+
+/// Check if a statement is (probably) a modification to the list assigned to the given identifier.
+///
+/// For example, `foo.append(bar)` would return `true` if `id` is `foo`.
+fn match_mutation(stmt: &Stmt, id: &str) -> bool {
+    match stmt {
+        // Ex) `foo.append(bar)`
+        Stmt::Expr(ast::StmtExpr { value, .. }) => {
+            let Some(ast::ExprCall { func, .. }) = value.as_call_expr() else {
+                return false;
+            };
+            let Some(ast::ExprAttribute { value, attr, .. }) = func.as_attribute_expr() else {
+                return false;
+            };
+            if !matches!(
+                attr.as_str(),
+                "append" | "insert" | "extend" | "remove" | "pop" | "clear" | "reverse" | "sort"
+            ) {
+                return false;
+            }
+            let Some(ast::ExprName { id: target_id, .. }) = value.as_name_expr() else {
+                return false;
+            };
+            target_id == id
+        }
+        // Ex) `foo[0] = bar`
+        Stmt::Assign(ast::StmtAssign { targets, .. }) => targets.iter().any(|target| {
+            if let Some(ast::ExprSubscript { value: target, .. }) = target.as_subscript_expr() {
+                if let Some(ast::ExprName { id: target_id, .. }) = target.as_name_expr() {
+                    return target_id == id;
+                }
+            }
+            false
+        }),
+        // Ex) `foo += bar`
+        Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
+            if let Some(ast::ExprName { id: target_id, .. }) = target.as_name_expr() {
+                target_id == id
+            } else {
+                false
+            }
+        }
+        // Ex) `foo[0]: int = bar`
+        Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
+            if let Some(ast::ExprSubscript { value: target, .. }) = target.as_subscript_expr() {
+                if let Some(ast::ExprName { id: target_id, .. }) = target.as_name_expr() {
+                    return target_id == id;
+                }
+            }
+            false
+        }
+        // Ex) `del foo[0]`
+        Stmt::Delete(ast::StmtDelete { targets, .. }) => targets.iter().any(|target| {
+            if let Some(ast::ExprSubscript { value: target, .. }) = target.as_subscript_expr() {
+                if let Some(ast::ExprName { id: target_id, .. }) = target.as_name_expr() {
+                    return target_id == id;
+                }
+            }
+            false
+        }),
+        _ => false,
+    }
 }

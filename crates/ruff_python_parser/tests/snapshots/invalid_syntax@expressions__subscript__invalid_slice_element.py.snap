@@ -1,0 +1,303 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/subscript/invalid_slice_element.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..133,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..10,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 0..10,
+                            value: Name(
+                                ExprName {
+                                    range: 0..1,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Slice(
+                                ExprSlice {
+                                    range: 2..9,
+                                    lower: Some(
+                                        Named(
+                                            ExprNamed {
+                                                range: 2..8,
+                                                target: Name(
+                                                    ExprName {
+                                                        range: 2..3,
+                                                        id: Name("x"),
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 7..8,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                    upper: None,
+                                    step: None,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 33..39,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 33..39,
+                            value: Name(
+                                ExprName {
+                                    range: 33..34,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Slice(
+                                ExprSlice {
+                                    range: 35..38,
+                                    lower: Some(
+                                        Starred(
+                                            ExprStarred {
+                                                range: 35..37,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 36..37,
+                                                        id: Name("x"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    upper: None,
+                                    step: None,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 40..46,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 40..46,
+                            value: Name(
+                                ExprName {
+                                    range: 40..41,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Slice(
+                                ExprSlice {
+                                    range: 42..45,
+                                    lower: None,
+                                    upper: Some(
+                                        Starred(
+                                            ExprStarred {
+                                                range: 43..45,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 44..45,
+                                                        id: Name("x"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    step: None,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 47..54,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 47..54,
+                            value: Name(
+                                ExprName {
+                                    range: 47..48,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Slice(
+                                ExprSlice {
+                                    range: 49..53,
+                                    lower: None,
+                                    upper: None,
+                                    step: Some(
+                                        Starred(
+                                            ExprStarred {
+                                                range: 51..53,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 52..53,
+                                                        id: Name("x"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 70..73,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 70..73,
+                            value: Name(
+                                ExprName {
+                                    range: 70..71,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Name(
+                                ExprName {
+                                    range: 72..73,
+                                    id: Name(""),
+                                    ctx: Invalid,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 123..133,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 123..133,
+                            value: Name(
+                                ExprName {
+                                    range: 123..124,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Named(
+                                ExprNamed {
+                                    range: 125..132,
+                                    target: Starred(
+                                        ExprStarred {
+                                            range: 125..127,
+                                            value: Name(
+                                                ExprName {
+                                                    range: 126..127,
+                                                    id: Name("x"),
+                                                    ctx: Store,
+                                                },
+                                            ),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 131..132,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | x[x := 1:]
+  |   ^^^^^^ Syntax Error: Unparenthesized named expression cannot be used here
+2 | 
+3 | # Starred expression
+  |
+
+
+  |
+3 | # Starred expression
+4 | x[*x:]
+  |   ^^ Syntax Error: Starred expression cannot be used here
+5 | x[:*x]
+6 | x[::*x]
+  |
+
+
+  |
+3 | # Starred expression
+4 | x[*x:]
+5 | x[:*x]
+  |    ^^ Syntax Error: Starred expression cannot be used here
+6 | x[::*x]
+  |
+
+
+  |
+4 | x[*x:]
+5 | x[:*x]
+6 | x[::*x]
+  |     ^^ Syntax Error: Starred expression cannot be used here
+7 | 
+8 | # Empty slice
+  |
+
+
+   |
+ 8 | # Empty slice
+ 9 | x[]
+   |   ^ Syntax Error: Expected index or slice expression
+10 | 
+11 | # Mixed starred expression and named expression
+   |
+
+
+   |
+11 | # Mixed starred expression and named expression
+12 | x[*x := 1]
+   |   ^^ Syntax Error: Assignment expression target must be an identifier
+   |

@@ -1,0 +1,168 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/compare/invalid_order.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..131,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..10,
+                    value: Compare(
+                        ExprCompare {
+                            range: 0..10,
+                            left: Name(
+                                ExprName {
+                                    range: 0..1,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            ops: [
+                                In,
+                            ],
+                            comparators: [
+                                UnaryOp(
+                                    ExprUnaryOp {
+                                        range: 5..10,
+                                        op: Not,
+                                        operand: Name(
+                                            ExprName {
+                                                range: 9..10,
+                                                id: Name("y"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 35..41,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 35..36,
+                                id: Name("x"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: Compare(
+                        ExprCompare {
+                            range: 38..41,
+                            left: Name(
+                                ExprName {
+                                    range: 38..38,
+                                    id: Name(""),
+                                    ctx: Invalid,
+                                },
+                            ),
+                            ops: [
+                                Gt,
+                            ],
+                            comparators: [
+                                Name(
+                                    ExprName {
+                                        range: 40..41,
+                                        id: Name("y"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 120..121,
+                    value: Name(
+                        ExprName {
+                            range: 120..121,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 122..128,
+                    value: UnaryOp(
+                        ExprUnaryOp {
+                            range: 122..128,
+                            op: Not,
+                            operand: Name(
+                                ExprName {
+                                    range: 126..128,
+                                    id: Name("is"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 129..130,
+                    value: Name(
+                        ExprName {
+                            range: 129..130,
+                            id: Name("y"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | x in not y
+  |      ^^^^^ Syntax Error: Boolean 'not' expression cannot be used here
+2 | 
+3 | # `=>` instead of `>=`
+  |
+
+
+  |
+3 | # `=>` instead of `>=`
+4 | x => y
+  |    ^ Syntax Error: Expected an expression
+5 | 
+6 | # Same here as well, `not` without `in` is considered to be a unary operator
+  |
+
+
+  |
+6 | # Same here as well, `not` without `in` is considered to be a unary operator
+7 | x not is y
+  |   ^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |
+
+
+  |
+6 | # Same here as well, `not` without `in` is considered to be a unary operator
+7 | x not is y
+  |       ^^ Syntax Error: Expected an identifier, but found a keyword 'is' that cannot be used here
+  |
+
+
+  |
+6 | # Same here as well, `not` without `in` is considered to be a unary operator
+7 | x not is y
+  |          ^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |

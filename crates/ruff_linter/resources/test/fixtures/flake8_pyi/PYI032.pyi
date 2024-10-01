@@ -3,8 +3,8 @@ import typing
 
 
 class Bad:
-    def __eq__(self, other: Any) -> bool: ...  # Y032
-    def __ne__(self, other: typing.Any) -> typing.Any: ...  # Y032
+    def __eq__(self, other: Any) -> bool: ...  # PYI032
+    def __ne__(self, other: typing.Any) -> typing.Any: ...  # PYI032
 
 
 class Good:
@@ -22,3 +22,6 @@ class Unannotated:
   def __eq__(self) -> Any: ...
   def __ne__(self) -> bool: ...
 
+class BadStringized:
+   def __eq__(self, other: "Any") -> bool: ...  # PYI032
+   def __ne__(self, other: "Any") -> bool: ...  # PYI032

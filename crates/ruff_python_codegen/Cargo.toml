@@ -11,12 +11,14 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [lib]
+doctest = false
 
 [dependencies]
-ruff_python_ast = { path = "../ruff_python_ast" }
-ruff_python_literal = { path = "../ruff_python_literal" }
-ruff_python_parser = { path = "../ruff_python_parser" }
-ruff_source_file = { path = "../ruff_source_file" }
+ruff_python_ast = { workspace = true }
+ruff_python_literal = { workspace = true }
+ruff_python_parser = { workspace = true }
+ruff_source_file = { workspace = true }
+ruff_text_size = { workspace = true }
 
 once_cell = { workspace = true }
 

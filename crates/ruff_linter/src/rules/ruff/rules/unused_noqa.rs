@@ -5,8 +5,9 @@ use ruff_macros::{derive_message_formats, violation};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct UnusedCodes {
-    pub unknown: Vec<String>,
     pub disabled: Vec<String>,
+    pub duplicated: Vec<String>,
+    pub unknown: Vec<String>,
     pub unmatched: Vec<String>,
 }
 
@@ -36,7 +37,7 @@ pub struct UnusedCodes {
 /// ```
 ///
 /// ## Options
-/// - `external`
+/// - `lint.external`
 ///
 /// ## References
 /// - [Ruff error suppression](https://docs.astral.sh/ruff/linter/#error-suppression)
@@ -67,6 +68,16 @@ impl AlwaysFixableViolation for UnusedNOQA {
                         "non-enabled: {}",
                         codes
                             .disabled
+                            .iter()
+                            .map(|code| format!("`{code}`"))
+                            .join(", ")
+                    ));
+                }
+                if !codes.duplicated.is_empty() {
+                    codes_by_reason.push(format!(
+                        "duplicated: {}",
+                        codes
+                            .duplicated
                             .iter()
                             .map(|code| format!("`{code}`"))
                             .join(", ")

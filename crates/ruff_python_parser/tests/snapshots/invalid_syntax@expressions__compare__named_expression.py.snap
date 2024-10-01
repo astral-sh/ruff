@@ -1,0 +1,130 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/compare/named_expression.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..31,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..10,
+                    value: Compare(
+                        ExprCompare {
+                            range: 0..10,
+                            left: Name(
+                                ExprName {
+                                    range: 0..1,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            ops: [
+                                NotIn,
+                            ],
+                            comparators: [
+                                Name(
+                                    ExprName {
+                                        range: 9..10,
+                                        id: Name("y"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 14..20,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 14..20,
+                            elts: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 15..16,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 18..19,
+                                        value: Int(
+                                            2,
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: true,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 21..26,
+                    value: Compare(
+                        ExprCompare {
+                            range: 21..26,
+                            left: Name(
+                                ExprName {
+                                    range: 21..22,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            ops: [
+                                Gt,
+                            ],
+                            comparators: [
+                                Name(
+                                    ExprName {
+                                        range: 25..26,
+                                        id: Name("y"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 30..31,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 30..31,
+                            value: Int(
+                                2,
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | x not in y := (1, 2)
+  |            ^^ Syntax Error: Expected a statement
+2 | x > y := 2
+  |
+
+
+  |
+1 | x not in y := (1, 2)
+2 | x > y := 2
+  |       ^^ Syntax Error: Expected a statement
+  |

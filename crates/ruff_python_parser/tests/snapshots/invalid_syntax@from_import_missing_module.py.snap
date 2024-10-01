@@ -1,0 +1,54 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/from_import_missing_module.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..19,
+        body: [
+            ImportFrom(
+                StmtImportFrom {
+                    range: 0..4,
+                    module: None,
+                    names: [],
+                    level: 0,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    range: 5..18,
+                    module: None,
+                    names: [
+                        Alias {
+                            range: 17..18,
+                            name: Identifier {
+                                id: Name("x"),
+                                range: 17..18,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 0,
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | from
+  |     ^ Syntax Error: Expected a module name
+2 | from import x
+  |
+
+
+  |
+1 | from
+2 | from import x
+  |      ^^^^^^ Syntax Error: Expected a module name
+  |

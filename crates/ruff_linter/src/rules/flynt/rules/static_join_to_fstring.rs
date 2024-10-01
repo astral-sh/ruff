@@ -1,3 +1,4 @@
+use ast::FStringFlags;
 use itertools::Itertools;
 
 use crate::fix::edits::pad;
@@ -72,7 +73,8 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
                         None
                     }
                 })
-                .join(joiner),
+                .join(joiner)
+                .into_boxed_str(),
             ..ast::StringLiteral::default()
         };
         return Some(node.into());
@@ -94,8 +96,9 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
     }
 
     let node = ast::FString {
-        elements: f_string_elements,
+        elements: f_string_elements.into(),
         range: TextRange::default(),
+        flags: FStringFlags::default(),
     };
     Some(node.into())
 }
@@ -115,7 +118,7 @@ pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner:
     if !keywords.is_empty() {
         return;
     }
-    let [arg] = args.as_slice() else {
+    let [arg] = &**args else {
         return;
     };
 

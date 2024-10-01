@@ -1,0 +1,273 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/lambda_body_with_starred_expr.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..62,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..12,
+                    value: Lambda(
+                        ExprLambda {
+                            range: 0..12,
+                            parameters: Some(
+                                Parameters {
+                                    range: 7..8,
+                                    posonlyargs: [],
+                                    args: [
+                                        ParameterWithDefault {
+                                            range: 7..8,
+                                            parameter: Parameter {
+                                                range: 7..8,
+                                                name: Identifier {
+                                                    id: Name("x"),
+                                                    range: 7..8,
+                                                },
+                                                annotation: None,
+                                            },
+                                            default: None,
+                                        },
+                                    ],
+                                    vararg: None,
+                                    kwonlyargs: [],
+                                    kwarg: None,
+                                },
+                            ),
+                            body: Starred(
+                                ExprStarred {
+                                    range: 10..12,
+                                    value: Name(
+                                        ExprName {
+                                            range: 11..12,
+                                            id: Name("y"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 13..26,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 13..26,
+                            elts: [
+                                Lambda(
+                                    ExprLambda {
+                                        range: 13..25,
+                                        parameters: Some(
+                                            Parameters {
+                                                range: 20..21,
+                                                posonlyargs: [],
+                                                args: [
+                                                    ParameterWithDefault {
+                                                        range: 20..21,
+                                                        parameter: Parameter {
+                                                            range: 20..21,
+                                                            name: Identifier {
+                                                                id: Name("x"),
+                                                                range: 20..21,
+                                                            },
+                                                            annotation: None,
+                                                        },
+                                                        default: None,
+                                                    },
+                                                ],
+                                                vararg: None,
+                                                kwonlyargs: [],
+                                                kwarg: None,
+                                            },
+                                        ),
+                                        body: Starred(
+                                            ExprStarred {
+                                                range: 23..25,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 24..25,
+                                                        id: Name("y"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: false,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 27..42,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 27..42,
+                            elts: [
+                                Lambda(
+                                    ExprLambda {
+                                        range: 27..39,
+                                        parameters: Some(
+                                            Parameters {
+                                                range: 34..35,
+                                                posonlyargs: [],
+                                                args: [
+                                                    ParameterWithDefault {
+                                                        range: 34..35,
+                                                        parameter: Parameter {
+                                                            range: 34..35,
+                                                            name: Identifier {
+                                                                id: Name("x"),
+                                                                range: 34..35,
+                                                            },
+                                                            annotation: None,
+                                                        },
+                                                        default: None,
+                                                    },
+                                                ],
+                                                vararg: None,
+                                                kwonlyargs: [],
+                                                kwarg: None,
+                                            },
+                                        ),
+                                        body: Starred(
+                                            ExprStarred {
+                                                range: 37..39,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 38..39,
+                                                        id: Name("y"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 41..42,
+                                        id: Name("z"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: false,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 43..61,
+                    value: Lambda(
+                        ExprLambda {
+                            range: 43..61,
+                            parameters: Some(
+                                Parameters {
+                                    range: 50..51,
+                                    posonlyargs: [],
+                                    args: [
+                                        ParameterWithDefault {
+                                            range: 50..51,
+                                            parameter: Parameter {
+                                                range: 50..51,
+                                                name: Identifier {
+                                                    id: Name("x"),
+                                                    range: 50..51,
+                                                },
+                                                annotation: None,
+                                            },
+                                            default: None,
+                                        },
+                                    ],
+                                    vararg: None,
+                                    kwonlyargs: [],
+                                    kwarg: None,
+                                },
+                            ),
+                            body: Starred(
+                                ExprStarred {
+                                    range: 53..61,
+                                    value: BoolOp(
+                                        ExprBoolOp {
+                                            range: 54..61,
+                                            op: And,
+                                            values: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 54..55,
+                                                        id: Name("y"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        range: 60..61,
+                                                        id: Name("z"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                        },
+                                    ),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | lambda x: *y
+  |           ^^ Syntax Error: Starred expression cannot be used here
+2 | lambda x: *y,
+3 | lambda x: *y, z
+  |
+
+
+  |
+1 | lambda x: *y
+2 | lambda x: *y,
+  |           ^^ Syntax Error: Starred expression cannot be used here
+3 | lambda x: *y, z
+4 | lambda x: *y and z
+  |
+
+
+  |
+1 | lambda x: *y
+2 | lambda x: *y,
+3 | lambda x: *y, z
+  |           ^^ Syntax Error: Starred expression cannot be used here
+4 | lambda x: *y and z
+  |
+
+
+  |
+2 | lambda x: *y,
+3 | lambda x: *y, z
+4 | lambda x: *y and z
+  |           ^^^^^^^^ Syntax Error: Starred expression cannot be used here
+  |

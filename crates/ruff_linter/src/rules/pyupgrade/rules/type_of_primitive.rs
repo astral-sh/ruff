@@ -58,19 +58,16 @@ pub(crate) fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr,
     let [arg] = args else {
         return;
     };
-    if !checker
-        .semantic()
-        .resolve_call_path(func)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["", "type"]))
-    {
-        return;
-    }
     let Some(primitive) = Primitive::from_expr(arg) else {
         return;
     };
+    let semantic = checker.semantic();
+    if !semantic.match_builtin_expr(func, "type") {
+        return;
+    }
     let mut diagnostic = Diagnostic::new(TypeOfPrimitive { primitive }, expr.range());
     let builtin = primitive.builtin();
-    if checker.semantic().is_builtin(&builtin) {
+    if semantic.has_builtin_binding(&builtin) {
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             pad(primitive.builtin(), expr.range(), checker.locator()),
             expr.range(),

@@ -14,7 +14,11 @@ expression: parse_ast
                             StringLiteral {
                                 range: 0..20,
                                 value: "Hello, world!",
-                                unicode: true,
+                                flags: StringLiteralFlags {
+                                    quote_style: Single,
+                                    prefix: Unicode,
+                                    triple_quoted: true,
+                                },
                             },
                         ),
                     },

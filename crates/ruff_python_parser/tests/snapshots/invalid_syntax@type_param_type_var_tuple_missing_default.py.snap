@@ -1,0 +1,112 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/type_param_type_var_tuple_missing_default.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..44,
+        body: [
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 0..19,
+                    name: Name(
+                        ExprName {
+                            range: 5..6,
+                            id: Name("X"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 6..13,
+                            type_params: [
+                                TypeVarTuple(
+                                    TypeParamTypeVarTuple {
+                                        range: 7..12,
+                                        name: Identifier {
+                                            id: Name("Ts"),
+                                            range: 8..10,
+                                        },
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            range: 16..19,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 20..43,
+                    name: Name(
+                        ExprName {
+                            range: 25..26,
+                            id: Name("X"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 26..37,
+                            type_params: [
+                                TypeVarTuple(
+                                    TypeParamTypeVarTuple {
+                                        range: 27..32,
+                                        name: Identifier {
+                                            id: Name("Ts"),
+                                            range: 28..30,
+                                        },
+                                        default: None,
+                                    },
+                                ),
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 34..36,
+                                        name: Identifier {
+                                            id: Name("T2"),
+                                            range: 34..36,
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            range: 40..43,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | type X[*Ts =] = int
+  |             ^ Syntax Error: Expected an expression
+2 | type X[*Ts =, T2] = int
+  |
+
+
+  |
+1 | type X[*Ts =] = int
+2 | type X[*Ts =, T2] = int
+  |             ^ Syntax Error: Expected an expression
+  |

@@ -1,0 +1,57 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/valid/other/atom.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..73,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..3,
+                    value: EllipsisLiteral(
+                        ExprEllipsisLiteral {
+                            range: 0..3,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 4..8,
+                    value: BooleanLiteral(
+                        ExprBooleanLiteral {
+                            range: 4..8,
+                            value: true,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 9..14,
+                    value: BooleanLiteral(
+                        ExprBooleanLiteral {
+                            range: 9..14,
+                            value: false,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 15..19,
+                    value: NoneLiteral(
+                        ExprNoneLiteral {
+                            range: 15..19,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

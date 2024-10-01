@@ -114,8 +114,7 @@ pub(crate) fn repeated_append(checker: &mut Checker, stmt: &Stmt) {
             // # comment
             // a.append(2)
             // ```
-            if group.is_consecutive && !checker.indexer().comment_ranges().intersects(group.range())
-            {
+            if group.is_consecutive && !checker.comment_ranges().intersects(group.range()) {
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
                     replacement,
                     group.start(),
@@ -280,7 +279,7 @@ fn match_append<'a>(semantic: &'a SemanticModel, stmt: &'a Stmt) -> Option<Appen
     };
 
     // `append` should have just one argument, an element to be added.
-    let [argument] = arguments.args.as_slice() else {
+    let [argument] = &*arguments.args else {
         return None;
     };
 
@@ -347,6 +346,7 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
         elts,
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
+        parenthesized: true,
     };
     // Make `var.extend`.
     // NOTE: receiver is the same for all appends and that's why we can take the first.
@@ -360,8 +360,8 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
     let call = ast::ExprCall {
         func: Box::new(attr.into()),
         arguments: ast::Arguments {
-            args: vec![tuple.into()],
-            keywords: vec![],
+            args: Box::from([tuple.into()]),
+            keywords: Box::from([]),
             range: TextRange::default(),
         },
         range: TextRange::default(),

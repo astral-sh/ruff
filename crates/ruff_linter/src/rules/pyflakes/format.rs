@@ -1,9 +1,9 @@
 //! Implements helper functions for using vendored/format.rs
-use std::convert::TryFrom;
-
+use ruff_python_ast::name::Name;
 use ruff_python_literal::format::{
     FieldName, FieldType, FormatParseError, FormatPart, FormatString, FromTemplate,
 };
+use std::convert::TryFrom;
 
 pub(crate) fn error_to_string(err: &FormatParseError) -> String {
     match err {
@@ -26,7 +26,7 @@ pub(crate) fn error_to_string(err: &FormatParseError) -> String {
 pub(crate) struct FormatSummary {
     pub(crate) autos: Vec<usize>,
     pub(crate) indices: Vec<usize>,
-    pub(crate) keywords: Vec<String>,
+    pub(crate) keywords: Vec<Name>,
     pub(crate) has_nested_parts: bool,
 }
 
@@ -54,7 +54,7 @@ impl TryFrom<&str> for FormatSummary {
             match parsed.field_type {
                 FieldType::Auto => autos.push(autos.len()),
                 FieldType::Index(i) => indices.push(i),
-                FieldType::Keyword(k) => keywords.push(k),
+                FieldType::Keyword(k) => keywords.push(Name::from(k)),
             };
 
             let nested = FormatString::from_str(format_spec)?;
@@ -66,7 +66,7 @@ impl TryFrom<&str> for FormatSummary {
                 match parsed.field_type {
                     FieldType::Auto => autos.push(autos.len()),
                     FieldType::Index(i) => indices.push(i),
-                    FieldType::Keyword(k) => keywords.push(k),
+                    FieldType::Keyword(k) => keywords.push(Name::from(k)),
                 };
                 has_nested_parts = true;
             }

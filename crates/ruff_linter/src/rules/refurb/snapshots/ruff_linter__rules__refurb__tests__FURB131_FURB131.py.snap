@@ -150,4 +150,23 @@ FURB131.py:48:5: FURB131 [*] Prefer `clear` over deleting a full slice
 50 50 |     x = 1
 51 51 | 
 
+FURB131.py:58:1: FURB131 [*] Prefer `clear` over deleting a full slice
+   |
+56 | sneaky = SneakyList()
+57 | # FURB131
+58 | del sneaky[:]
+   | ^^^^^^^^^^^^^ FURB131
+59 | 
+60 | # these should not
+   |
+   = help: Replace with `clear()`
 
+ℹ Unsafe fix
+55 55 | 
+56 56 | sneaky = SneakyList()
+57 57 | # FURB131
+58    |-del sneaky[:]
+   58 |+sneaky.clear()
+59 59 | 
+60 60 | # these should not
+61 61 |

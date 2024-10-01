@@ -223,10 +223,7 @@ impl<'a> ExceptionHandlerVisitor<'a> {
     }
 }
 
-impl<'a, 'b> Visitor<'b> for ExceptionHandlerVisitor<'a>
-where
-    'b: 'a,
-{
+impl<'a> Visitor<'a> for ExceptionHandlerVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::Assert(_) => {
@@ -287,7 +284,7 @@ pub(crate) fn unittest_assertion(
                 // the assertion is part of a larger expression.
                 if checker.semantic().current_statement().is_expr_stmt()
                     && checker.semantic().current_expression_parent().is_none()
-                    && !checker.indexer().comment_ranges().intersects(expr.range())
+                    && !checker.comment_ranges().intersects(expr.range())
                 {
                     if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
@@ -295,7 +292,7 @@ pub(crate) fn unittest_assertion(
                             parenthesized_range(
                                 expr.into(),
                                 checker.semantic().current_statement().into(),
-                                checker.indexer().comment_ranges(),
+                                checker.comment_ranges(),
                                 checker.locator().contents(),
                             )
                             .unwrap_or(expr.range()),
@@ -387,7 +384,10 @@ pub(crate) fn unittest_raises_assertion(
         },
         call.func.range(),
     );
-    if !checker.indexer().has_comments(call, checker.locator()) {
+    if !checker
+        .comment_ranges()
+        .has_comments(call, checker.locator())
+    {
         if let Some(args) = to_pytest_raises_args(checker, attr.as_str(), &call.arguments) {
             diagnostic.try_set_fix(|| {
                 let (import_edit, binding) = checker.importer().get_or_import_symbol(
@@ -411,7 +411,7 @@ fn to_pytest_raises_args<'a>(
 ) -> Option<Cow<'a, str>> {
     let args = match attr {
         "assertRaises" | "failUnlessRaises" => {
-            match (arguments.args.as_slice(), arguments.keywords.as_slice()) {
+            match (&*arguments.args, &*arguments.keywords) {
                 // Ex) `assertRaises(Exception)`
                 ([arg], []) => Cow::Borrowed(checker.locator().slice(arg)),
                 // Ex) `assertRaises(expected_exception=Exception)`
@@ -427,7 +427,7 @@ fn to_pytest_raises_args<'a>(
             }
         }
         "assertRaisesRegex" | "assertRaisesRegexp" => {
-            match (arguments.args.as_slice(), arguments.keywords.as_slice()) {
+            match (&*arguments.args, &*arguments.keywords) {
                 // Ex) `assertRaisesRegex(Exception, regex)`
                 ([arg1, arg2], []) => Cow::Owned(format!(
                     "{}, match={}",
@@ -491,7 +491,7 @@ fn to_pytest_raises_args<'a>(
 
 /// PT015
 pub(crate) fn assert_falsy(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
-    let truthiness = Truthiness::from_expr(test, |id| checker.semantic().is_builtin(id));
+    let truthiness = Truthiness::from_expr(test, |id| checker.semantic().has_builtin_binding(id));
     if matches!(truthiness, Truthiness::False | Truthiness::Falsey) {
         checker
             .diagnostics
@@ -744,7 +744,7 @@ pub(crate) fn composite_condition(
         let mut diagnostic = Diagnostic::new(PytestCompositeAssertion, stmt.range());
         if matches!(composite, CompositionKind::Simple)
             && msg.is_none()
-            && !checker.indexer().comment_ranges().intersects(stmt.range())
+            && !checker.comment_ranges().intersects(stmt.range())
             && !checker
                 .indexer()
                 .in_multi_statement_line(stmt, checker.locator())

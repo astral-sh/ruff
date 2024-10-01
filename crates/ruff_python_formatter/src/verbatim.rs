@@ -1,13 +1,11 @@
 use std::borrow::Cow;
 use std::iter::FusedIterator;
-
-use unicode_width::UnicodeWidthStr;
+use std::slice::Iter;
 
 use ruff_formatter::{write, FormatError};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::Stmt;
-use ruff_python_parser::lexer::{lex_starts_at, LexResult};
-use ruff_python_parser::{Mode, Tok};
+use ruff_python_parser::{self as parser, TokenKind};
 use ruff_python_trivia::lines_before;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -18,6 +16,40 @@ use crate::prelude::*;
 use crate::statement::clause::ClauseHeader;
 use crate::statement::suite::SuiteChildStatement;
 use crate::statement::trailing_semicolon;
+
+/// Returns `true` if the statements coming after `leading_or_trailing_comments` are suppressed.
+///
+/// The result is only correct if called for statement comments in a non-suppressed range.
+///
+/// # Panics
+/// If `leading_or_trailing_comments` contain any range that's outside of `source`.
+pub(crate) fn starts_suppression(
+    leading_or_trailing_comments: &[SourceComment],
+    source: &str,
+) -> bool {
+    let mut iter = CommentRangeIter::outside_suppression(leading_or_trailing_comments, source);
+    // Move the iter to the last element.
+    let _ = iter.by_ref().last();
+
+    matches!(iter.in_suppression, InSuppression::Yes)
+}
+
+/// Returns `true` if the statements coming after `leading_or_trailing_comments` are no longer suppressed.
+///
+/// The result is only correct if called for statement comments in a suppressed range.
+///
+/// # Panics
+/// If `leading_or_trailing_comments` contain any range that's outside of `source`.
+pub(crate) fn ends_suppression(
+    leading_or_trailing_comments: &[SourceComment],
+    source: &str,
+) -> bool {
+    let mut iter = CommentRangeIter::in_suppression(leading_or_trailing_comments, source);
+    // Move the iter to the last element.
+    let _ = iter.by_ref().last();
+
+    !matches!(iter.in_suppression, InSuppression::Yes)
+}
 
 /// Disables formatting for all statements between the `first_suppressed` that has a leading `fmt: off` comment
 /// and the first trailing or leading `fmt: on` comment. The statements are formatted as they appear in the source code.
@@ -691,13 +723,10 @@ struct FormatVerbatimStatementRange {
 
 impl Format<PyFormatContext<'_>> for FormatVerbatimStatementRange {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
-        let lexer = lex_starts_at(
-            &f.context().source()[self.verbatim_range],
-            Mode::Module,
-            self.verbatim_range.start(),
+        let logical_lines = LogicalLinesIter::new(
+            f.context().tokens().in_range(self.verbatim_range).iter(),
+            self.verbatim_range,
         );
-
-        let logical_lines = LogicalLinesIter::new(lexer, self.verbatim_range);
         let mut first = true;
 
         for logical_line in logical_lines {
@@ -718,21 +747,18 @@ impl Format<PyFormatContext<'_>> for FormatVerbatimStatementRange {
                 }
             } else {
                 // Non empty line, write the text of the line
-                verbatim_text(trimmed_line_range).fmt(f)?;
+                write!(
+                    f,
+                    [
+                        source_position(trimmed_line_range.start()),
+                        verbatim_text(trimmed_line_range),
+                        source_position(trimmed_line_range.end())
+                    ]
+                )?;
 
                 // Write the line separator that terminates the line, except if it is the last line (that isn't separated by a hard line break).
                 if logical_line.has_trailing_newline {
-                    // Insert an empty line if the text is non-empty but all characters have a width of zero.
-                    // This is necessary to work around the fact that the Printer omits hard line breaks if the line width is 0.
-                    // The alternative is to "fix" the printer and explicitly track the width and whether the line is empty.
-                    // There's currently no use case for zero-width content outside of the verbatim context (and, form feeds are a Python specific speciality).
-                    // It, therefore, feels wrong to add additional complexity to the very hot `Printer::print_char` function,
-                    // to work around this special case. Therefore, work around the Printer behavior here, in the cold verbatim-formatting.
-                    if f.context().source()[trimmed_line_range].width() == 0 {
-                        empty_line().fmt(f)?;
-                    } else {
-                        hard_line_break().fmt(f)?;
-                    }
+                    hard_line_break().fmt(f)?;
                 }
             }
 
@@ -743,43 +769,47 @@ impl Format<PyFormatContext<'_>> for FormatVerbatimStatementRange {
     }
 }
 
-struct LogicalLinesIter<I> {
-    lexer: I,
+struct LogicalLinesIter<'a> {
+    tokens: Iter<'a, parser::Token>,
     // The end of the last logical line
     last_line_end: TextSize,
     // The position where the content to lex ends.
     content_end: TextSize,
 }
 
-impl<I> LogicalLinesIter<I> {
-    fn new(lexer: I, verbatim_range: TextRange) -> Self {
+impl<'a> LogicalLinesIter<'a> {
+    fn new(tokens: Iter<'a, parser::Token>, verbatim_range: TextRange) -> Self {
         Self {
-            lexer,
+            tokens,
             last_line_end: verbatim_range.start(),
             content_end: verbatim_range.end(),
         }
     }
 }
 
-impl<I> Iterator for LogicalLinesIter<I>
-where
-    I: Iterator<Item = LexResult>,
-{
+impl<'a> Iterator for LogicalLinesIter<'a> {
     type Item = FormatResult<LogicalLine>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut parens = 0u32;
 
         let (content_end, full_end) = loop {
-            match self.lexer.next() {
-                Some(Ok((token, range))) => match token {
-                    Tok::Newline => break (range.start(), range.end()),
+            match self.tokens.next() {
+                Some(token) if token.kind() == TokenKind::Unknown => {
+                    return Some(Err(FormatError::syntax_error(
+                        "Unexpected token when lexing verbatim statement range.",
+                    )))
+                }
+                Some(token) => match token.kind() {
+                    TokenKind::Newline => break (token.start(), token.end()),
                     // Ignore if inside an expression
-                    Tok::NonLogicalNewline if parens == 0 => break (range.start(), range.end()),
-                    Tok::Lbrace | Tok::Lpar | Tok::Lsqb => {
+                    TokenKind::NonLogicalNewline if parens == 0 => {
+                        break (token.start(), token.end())
+                    }
+                    TokenKind::Lbrace | TokenKind::Lpar | TokenKind::Lsqb => {
                         parens = parens.saturating_add(1);
                     }
-                    Tok::Rbrace | Tok::Rpar | Tok::Rsqb => {
+                    TokenKind::Rbrace | TokenKind::Rpar | TokenKind::Rsqb => {
                         parens = parens.saturating_sub(1);
                     }
                     _ => {}
@@ -798,11 +828,6 @@ where
                         None
                     };
                 }
-                Some(Err(_)) => {
-                    return Some(Err(FormatError::syntax_error(
-                        "Unexpected token when lexing verbatim statement range.",
-                    )))
-                }
             }
         };
 
@@ -816,7 +841,7 @@ where
     }
 }
 
-impl<I> FusedIterator for LogicalLinesIter<I> where I: Iterator<Item = LexResult> {}
+impl<'a> FusedIterator for LogicalLinesIter<'a> {}
 
 /// A logical line or a comment (or form feed only) line
 struct LogicalLine {
@@ -832,11 +857,11 @@ impl Ranged for LogicalLine {
     }
 }
 
-struct VerbatimText {
+pub(crate) struct VerbatimText {
     verbatim_range: TextRange,
 }
 
-fn verbatim_text<T>(item: T) -> VerbatimText
+pub(crate) fn verbatim_text<T>(item: T) -> VerbatimText
 where
     T: Ranged,
 {
@@ -855,16 +880,10 @@ impl Format<PyFormatContext<'_>> for VerbatimText {
 
         match normalize_newlines(f.context().locator().slice(self.verbatim_range), ['\r']) {
             Cow::Borrowed(_) => {
-                write!(f, [source_text_slice(self.verbatim_range,)])?;
+                write!(f, [source_text_slice(self.verbatim_range)])?;
             }
             Cow::Owned(cleaned) => {
-                write!(
-                    f,
-                    [
-                        text(&cleaned, Some(self.verbatim_range.start())),
-                        source_position(self.verbatim_range.end())
-                    ]
-                )?;
+                text(&cleaned).fmt(f)?;
             }
         }
 
@@ -923,7 +942,9 @@ impl Format<PyFormatContext<'_>> for FormatSuppressedNode<'_> {
             f,
             [
                 leading_comments(node_comments.leading),
+                source_position(verbatim_range.start()),
                 verbatim_text(verbatim_range),
+                source_position(verbatim_range.end()),
                 trailing_comments(node_comments.trailing)
             ]
         )
@@ -935,8 +956,17 @@ pub(crate) fn write_suppressed_clause_header(
     header: ClauseHeader,
     f: &mut PyFormatter,
 ) -> FormatResult<()> {
+    let range = header.range(f.context().source())?;
+
     // Write the outer comments and format the node as verbatim
-    write!(f, [verbatim_text(header.range(f.context().source())?)])?;
+    write!(
+        f,
+        [
+            source_position(range.start()),
+            verbatim_text(range),
+            source_position(range.end())
+        ]
+    )?;
 
     let comments = f.context().comments();
     header.visit(&mut |child| {

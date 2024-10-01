@@ -24,12 +24,14 @@ use crate::registry::Rule;
 /// For an alternative, see [D211].
 ///
 /// ## Example
+///
 /// ```python
 /// class PhotoMetadata:
 ///     """Metadata about a photo."""
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// class PhotoMetadata:
 ///
@@ -37,7 +39,7 @@ use crate::registry::Rule;
 /// ```
 ///
 /// ## Options
-/// - `pydocstyle.convention`
+/// - `lint.pydocstyle.convention`
 ///
 /// [D211]: https://docs.astral.sh/ruff/rules/blank-line-before-class
 #[violation]
@@ -60,7 +62,7 @@ impl AlwaysFixableViolation for OneBlankLineBeforeClass {
 ///
 /// ## Why is this bad?
 /// [PEP 257] recommends the use of a blank line to separate a class's
-/// docstring its methods.
+/// docstring from its methods.
 ///
 /// This rule may not apply to all projects; its applicability is a matter of
 /// convention. By default, this rule is enabled when using the `google`
@@ -84,7 +86,7 @@ impl AlwaysFixableViolation for OneBlankLineBeforeClass {
 /// ```
 ///
 /// ## Options
-/// - `pydocstyle.convention`
+/// - `lint.pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -121,6 +123,7 @@ impl AlwaysFixableViolation for OneBlankLineAfterClass {
 /// For an alternative, see [D203].
 ///
 /// ## Example
+///
 /// ```python
 /// class PhotoMetadata:
 ///
@@ -128,13 +131,14 @@ impl AlwaysFixableViolation for OneBlankLineAfterClass {
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// class PhotoMetadata:
 ///     """Metadata about a photo."""
 /// ```
 ///
 /// ## Options
-/// - `pydocstyle.convention`
+/// - `lint.pydocstyle.convention`
 ///
 /// [D203]: https://docs.astral.sh/ruff/rules/one-blank-line-before-class
 #[violation]

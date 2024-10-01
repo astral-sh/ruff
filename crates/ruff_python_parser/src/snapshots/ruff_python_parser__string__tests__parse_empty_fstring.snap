@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_python_parser/src/string.rs
-expression: "parse_suite(r#\"f\"\"\"#, \"<test>\").unwrap()"
+expression: "parse_suite(r#\"f\"\"\"#).unwrap()"
 ---
 [
     Expr(
@@ -15,6 +15,11 @@ expression: "parse_suite(r#\"f\"\"\"#, \"<test>\").unwrap()"
                                 FString {
                                     range: 0..3,
                                     elements: [],
+                                    flags: FStringFlags {
+                                        quote_style: Double,
+                                        prefix: Regular,
+                                        triple_quoted: false,
+                                    },
                                 },
                             ),
                         ),

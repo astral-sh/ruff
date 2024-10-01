@@ -2,17 +2,21 @@
 source: crates/ruff_python_parser/src/lexer.rs
 expression: string_continuation_with_eol(WINDOWS_EOL)
 ---
+## Tokens
+```
 [
     (
-        String {
-            value: "abc\\\r\ndef",
-            kind: String,
-            triple_quoted: false,
-        },
+        String(
+            "abc\\\r\ndef",
+        ),
         0..11,
+        TokenFlags(
+            DOUBLE_QUOTES,
+        ),
     ),
     (
         Newline,
         11..11,
     ),
 ]
+```

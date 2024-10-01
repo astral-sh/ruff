@@ -1,0 +1,512 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/valid/expressions/await.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..211,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..7,
+                    value: Await(
+                        ExprAwait {
+                            range: 0..7,
+                            value: Name(
+                                ExprName {
+                                    range: 6..7,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 8..19,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 8..19,
+                            left: Await(
+                                ExprAwait {
+                                    range: 8..15,
+                                    value: Name(
+                                        ExprName {
+                                            range: 14..15,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                            op: Add,
+                            right: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 18..19,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 20..33,
+                    value: BoolOp(
+                        ExprBoolOp {
+                            range: 20..33,
+                            op: And,
+                            values: [
+                                Await(
+                                    ExprAwait {
+                                        range: 20..27,
+                                        value: Name(
+                                            ExprName {
+                                                range: 26..27,
+                                                id: Name("a"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 32..33,
+                                        id: Name("b"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 34..43,
+                    value: Await(
+                        ExprAwait {
+                            range: 34..43,
+                            value: Call(
+                                ExprCall {
+                                    range: 40..43,
+                                    func: Name(
+                                        ExprName {
+                                            range: 40..41,
+                                            id: Name("f"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    arguments: Arguments {
+                                        range: 41..43,
+                                        args: [],
+                                        keywords: [],
+                                    },
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 44..56,
+                    value: Await(
+                        ExprAwait {
+                            range: 44..56,
+                            value: List(
+                                ExprList {
+                                    range: 50..56,
+                                    elts: [
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 51..52,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 54..55,
+                                                value: Int(
+                                                    2,
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 57..69,
+                    value: Await(
+                        ExprAwait {
+                            range: 57..69,
+                            value: Set(
+                                ExprSet {
+                                    range: 63..69,
+                                    elts: [
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 64..65,
+                                                value: Int(
+                                                    3,
+                                                ),
+                                            },
+                                        ),
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 67..68,
+                                                value: Int(
+                                                    4,
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 70..82,
+                    value: Await(
+                        ExprAwait {
+                            range: 70..82,
+                            value: Dict(
+                                ExprDict {
+                                    range: 76..82,
+                                    items: [
+                                        DictItem {
+                                            key: Some(
+                                                Name(
+                                                    ExprName {
+                                                        range: 77..78,
+                                                        id: Name("i"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ),
+                                            value: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 80..81,
+                                                    value: Int(
+                                                        5,
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ],
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 83..93,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 83..93,
+                            elts: [
+                                Await(
+                                    ExprAwait {
+                                        range: 83..90,
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 89..90,
+                                                value: Int(
+                                                    7,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 92..93,
+                                        value: Int(
+                                            8,
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: false,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 94..107,
+                    value: Await(
+                        ExprAwait {
+                            range: 94..107,
+                            value: Tuple(
+                                ExprTuple {
+                                    range: 100..107,
+                                    elts: [
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 101..102,
+                                                value: Int(
+                                                    9,
+                                                ),
+                                            },
+                                        ),
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 104..106,
+                                                value: Int(
+                                                    10,
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                    parenthesized: true,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 108..120,
+                    value: Compare(
+                        ExprCompare {
+                            range: 108..120,
+                            left: Await(
+                                ExprAwait {
+                                    range: 108..115,
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 114..115,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                            ops: [
+                                Eq,
+                            ],
+                            comparators: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 119..120,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 121..146,
+                    value: If(
+                        ExprIf {
+                            range: 121..146,
+                            test: BooleanLiteral(
+                                ExprBooleanLiteral {
+                                    range: 132..136,
+                                    value: true,
+                                },
+                            ),
+                            body: Await(
+                                ExprAwait {
+                                    range: 121..128,
+                                    value: Name(
+                                        ExprName {
+                                            range: 127..128,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                            orelse: NoneLiteral(
+                                ExprNoneLiteral {
+                                    range: 142..146,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 147..158,
+                    value: Await(
+                        ExprAwait {
+                            range: 147..158,
+                            value: Tuple(
+                                ExprTuple {
+                                    range: 153..158,
+                                    elts: [
+                                        Starred(
+                                            ExprStarred {
+                                                range: 154..156,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 155..156,
+                                                        id: Name("x"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                    parenthesized: true,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 159..178,
+                    value: Await(
+                        ExprAwait {
+                            range: 159..178,
+                            value: Lambda(
+                                ExprLambda {
+                                    range: 166..177,
+                                    parameters: Some(
+                                        Parameters {
+                                            range: 173..174,
+                                            posonlyargs: [],
+                                            args: [
+                                                ParameterWithDefault {
+                                                    range: 173..174,
+                                                    parameter: Parameter {
+                                                        range: 173..174,
+                                                        name: Identifier {
+                                                            id: Name("x"),
+                                                            range: 173..174,
+                                                        },
+                                                        annotation: None,
+                                                    },
+                                                    default: None,
+                                                },
+                                            ],
+                                            vararg: None,
+                                            kwonlyargs: [],
+                                            kwarg: None,
+                                        },
+                                    ),
+                                    body: Name(
+                                        ExprName {
+                                            range: 176..177,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 179..192,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 179..192,
+                            left: Await(
+                                ExprAwait {
+                                    range: 179..186,
+                                    value: Name(
+                                        ExprName {
+                                            range: 185..186,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                            op: Pow,
+                            right: UnaryOp(
+                                ExprUnaryOp {
+                                    range: 190..192,
+                                    op: USub,
+                                    operand: Name(
+                                        ExprName {
+                                            range: 191..192,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 193..211,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 193..211,
+                            left: Await(
+                                ExprAwait {
+                                    range: 193..200,
+                                    value: Name(
+                                        ExprName {
+                                            range: 199..200,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                            op: Pow,
+                            right: Await(
+                                ExprAwait {
+                                    range: 204..211,
+                                    value: Name(
+                                        ExprName {
+                                            range: 210..211,
+                                            id: Name("y"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

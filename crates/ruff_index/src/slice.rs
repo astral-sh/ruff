@@ -2,7 +2,7 @@ use crate::vec::IndexVec;
 use crate::Idx;
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
-use std::ops::{Index, IndexMut};
+use std::ops::{Index, IndexMut, Range};
 
 /// A view into contiguous `T`s, indexed by `I` rather than by `usize`.
 #[derive(PartialEq, Eq, Hash)]
@@ -81,6 +81,13 @@ impl<I: Idx, T> IndexSlice<I, T> {
     }
 
     #[inline]
+    pub fn iter_mut_enumerated(
+        &mut self,
+    ) -> impl DoubleEndedIterator<Item = (I, &mut T)> + ExactSizeIterator + '_ {
+        self.raw.iter_mut().enumerate().map(|(n, t)| (I::new(n), t))
+    }
+
+    #[inline]
     pub fn last_index(&self) -> Option<I> {
         self.len().checked_sub(1).map(I::new)
     }
@@ -131,10 +138,26 @@ impl<I: Idx, T> Index<I> for IndexSlice<I, T> {
     }
 }
 
+impl<I: Idx, T> Index<Range<I>> for IndexSlice<I, T> {
+    type Output = [T];
+
+    #[inline]
+    fn index(&self, range: Range<I>) -> &[T] {
+        &self.raw[range.start.index()..range.end.index()]
+    }
+}
+
 impl<I: Idx, T> IndexMut<I> for IndexSlice<I, T> {
     #[inline]
     fn index_mut(&mut self, index: I) -> &mut T {
         &mut self.raw[index.index()]
+    }
+}
+
+impl<I: Idx, T> IndexMut<Range<I>> for IndexSlice<I, T> {
+    #[inline]
+    fn index_mut(&mut self, range: Range<I>) -> &mut [T] {
+        &mut self.raw[range.start.index()..range.end.index()]
     }
 }
 

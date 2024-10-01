@@ -1,0 +1,546 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/statements/match/star_pattern_usage.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..408,
+        body: [
+            Match(
+                StmtMatch {
+                    range: 57..407,
+                    subject: Name(
+                        ExprName {
+                            range: 63..70,
+                            id: Name("subject"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 76..97,
+                            pattern: MatchStar(
+                                PatternMatchStar {
+                                    range: 81..83,
+                                    name: None,
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Pass(
+                                    StmtPass {
+                                        range: 93..97,
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 102..128,
+                            pattern: MatchAs(
+                                PatternMatchAs {
+                                    range: 107..114,
+                                    pattern: Some(
+                                        MatchStar(
+                                            PatternMatchStar {
+                                                range: 107..109,
+                                                name: None,
+                                            },
+                                        ),
+                                    ),
+                                    name: Some(
+                                        Identifier {
+                                            id: Name("x"),
+                                            range: 113..114,
+                                        },
+                                    ),
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Pass(
+                                    StmtPass {
+                                        range: 124..128,
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 133..156,
+                            pattern: MatchStar(
+                                PatternMatchStar {
+                                    range: 138..142,
+                                    name: Some(
+                                        Identifier {
+                                            id: Name("foo"),
+                                            range: 139..142,
+                                        },
+                                    ),
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Pass(
+                                    StmtPass {
+                                        range: 152..156,
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 161..188,
+                            pattern: MatchOr(
+                                PatternMatchOr {
+                                    range: 166..174,
+                                    patterns: [
+                                        MatchStar(
+                                            PatternMatchStar {
+                                                range: 166..170,
+                                                name: Some(
+                                                    Identifier {
+                                                        id: Name("foo"),
+                                                        range: 167..170,
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                        MatchValue(
+                                            PatternMatchValue {
+                                                range: 173..174,
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 173..174,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Pass(
+                                    StmtPass {
+                                        range: 184..188,
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 193..220,
+                            pattern: MatchOr(
+                                PatternMatchOr {
+                                    range: 198..206,
+                                    patterns: [
+                                        MatchValue(
+                                            PatternMatchValue {
+                                                range: 198..199,
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 198..199,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                        MatchStar(
+                                            PatternMatchStar {
+                                                range: 202..206,
+                                                name: Some(
+                                                    Identifier {
+                                                        id: Name("foo"),
+                                                        range: 203..206,
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Pass(
+                                    StmtPass {
+                                        range: 216..220,
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 225..251,
+                            pattern: MatchClass(
+                                PatternMatchClass {
+                                    range: 230..237,
+                                    cls: Name(
+                                        ExprName {
+                                            range: 230..233,
+                                            id: Name("Foo"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    arguments: PatternArguments {
+                                        range: 233..237,
+                                        patterns: [
+                                            MatchStar(
+                                                PatternMatchStar {
+                                                    range: 234..236,
+                                                    name: None,
+                                                },
+                                            ),
+                                        ],
+                                        keywords: [],
+                                    },
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Pass(
+                                    StmtPass {
+                                        range: 247..251,
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 256..284,
+                            pattern: MatchClass(
+                                PatternMatchClass {
+                                    range: 261..270,
+                                    cls: Name(
+                                        ExprName {
+                                            range: 261..264,
+                                            id: Name("Foo"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    arguments: PatternArguments {
+                                        range: 264..270,
+                                        patterns: [],
+                                        keywords: [
+                                            PatternKeyword {
+                                                range: 265..269,
+                                                attr: Identifier {
+                                                    id: Name("x"),
+                                                    range: 265..266,
+                                                },
+                                                pattern: MatchStar(
+                                                    PatternMatchStar {
+                                                        range: 267..269,
+                                                        name: None,
+                                                    },
+                                                ),
+                                            },
+                                        ],
+                                    },
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Pass(
+                                    StmtPass {
+                                        range: 280..284,
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 289..312,
+                            pattern: MatchMapping(
+                                PatternMatchMapping {
+                                    range: 294..298,
+                                    keys: [
+                                        Starred(
+                                            ExprStarred {
+                                                range: 295..297,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 296..297,
+                                                        id: Name("_"),
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                                ctx: Store,
+                                            },
+                                        ),
+                                    ],
+                                    patterns: [
+                                        MatchValue(
+                                            PatternMatchValue {
+                                                range: 297..297,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 297..297,
+                                                        id: Name(""),
+                                                        ctx: Invalid,
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    rest: None,
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Pass(
+                                    StmtPass {
+                                        range: 308..312,
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 317..343,
+                            pattern: MatchMapping(
+                                PatternMatchMapping {
+                                    range: 322..329,
+                                    keys: [
+                                        Starred(
+                                            ExprStarred {
+                                                range: 323..325,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 324..325,
+                                                        id: Name("_"),
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                                ctx: Store,
+                                            },
+                                        ),
+                                    ],
+                                    patterns: [
+                                        MatchValue(
+                                            PatternMatchValue {
+                                                range: 327..328,
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 327..328,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    rest: None,
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Pass(
+                                    StmtPass {
+                                        range: 339..343,
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 348..377,
+                            pattern: MatchMapping(
+                                PatternMatchMapping {
+                                    range: 353..363,
+                                    keys: [
+                                        NoneLiteral(
+                                            ExprNoneLiteral {
+                                                range: 354..358,
+                                            },
+                                        ),
+                                    ],
+                                    patterns: [
+                                        MatchStar(
+                                            PatternMatchStar {
+                                                range: 360..362,
+                                                name: None,
+                                            },
+                                        ),
+                                    ],
+                                    rest: None,
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Pass(
+                                    StmtPass {
+                                        range: 373..377,
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 382..407,
+                            pattern: MatchValue(
+                                PatternMatchValue {
+                                    range: 387..393,
+                                    value: BinOp(
+                                        ExprBinOp {
+                                            range: 387..393,
+                                            left: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 387..388,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                            op: Add,
+                                            right: Starred(
+                                                ExprStarred {
+                                                    range: 391..393,
+                                                    value: Name(
+                                                        ExprName {
+                                                            range: 392..393,
+                                                            id: Name("_"),
+                                                            ctx: Store,
+                                                        },
+                                                    ),
+                                                    ctx: Store,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Pass(
+                                    StmtPass {
+                                        range: 403..407,
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # Star pattern is only allowed inside a sequence pattern
+2 | match subject:
+3 |     case *_:
+  |          ^^ Syntax Error: Star pattern cannot be used here
+4 |         pass
+5 |     case *_ as x:
+  |
+
+
+  |
+3 |     case *_:
+4 |         pass
+5 |     case *_ as x:
+  |          ^^ Syntax Error: Star pattern cannot be used here
+6 |         pass
+7 |     case *foo:
+  |
+
+
+  |
+5 |     case *_ as x:
+6 |         pass
+7 |     case *foo:
+  |          ^^^^ Syntax Error: Star pattern cannot be used here
+8 |         pass
+9 |     case *foo | 1:
+  |
+
+
+   |
+ 7 |     case *foo:
+ 8 |         pass
+ 9 |     case *foo | 1:
+   |          ^^^^ Syntax Error: Star pattern cannot be used here
+10 |         pass
+11 |     case 1 | *foo:
+   |
+
+
+   |
+ 9 |     case *foo | 1:
+10 |         pass
+11 |     case 1 | *foo:
+   |              ^^^^ Syntax Error: Star pattern cannot be used here
+12 |         pass
+13 |     case Foo(*_):
+   |
+
+
+   |
+11 |     case 1 | *foo:
+12 |         pass
+13 |     case Foo(*_):
+   |              ^^ Syntax Error: Star pattern cannot be used here
+14 |         pass
+15 |     case Foo(x=*_):
+   |
+
+
+   |
+13 |     case Foo(*_):
+14 |         pass
+15 |     case Foo(x=*_):
+   |                ^^ Syntax Error: Star pattern cannot be used here
+16 |         pass
+17 |     case {*_}:
+   |
+
+
+   |
+15 |     case Foo(x=*_):
+16 |         pass
+17 |     case {*_}:
+   |           ^^ Syntax Error: Star pattern cannot be used here
+18 |         pass
+19 |     case {*_: 1}:
+   |
+
+
+   |
+15 |     case Foo(x=*_):
+16 |         pass
+17 |     case {*_}:
+   |             ^ Syntax Error: Expected ':', found '}'
+18 |         pass
+19 |     case {*_: 1}:
+   |
+
+
+   |
+17 |     case {*_}:
+18 |         pass
+19 |     case {*_: 1}:
+   |           ^^ Syntax Error: Star pattern cannot be used here
+20 |         pass
+21 |     case {None: *_}:
+   |
+
+
+   |
+19 |     case {*_: 1}:
+20 |         pass
+21 |     case {None: *_}:
+   |                 ^^ Syntax Error: Star pattern cannot be used here
+22 |         pass
+23 |     case 1 + *_:
+   |
+
+
+   |
+21 |     case {None: *_}:
+22 |         pass
+23 |     case 1 + *_:
+   |              ^^ Syntax Error: Star pattern cannot be used here
+24 |         pass
+   |

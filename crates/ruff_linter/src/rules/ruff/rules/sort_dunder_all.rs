@@ -54,8 +54,13 @@ use crate::rules::ruff::rules::sequence_sorting::{
 ///
 /// ## Fix safety
 /// This rule's fix is marked as always being safe, in that
-/// it should never alter the semantics of any Python code.
-/// However, note that for multiline `__all__` definitions
+/// it should very rarely alter the semantics of any Python code.
+/// However, note that (although it's rare) the value of `__all__`
+/// could be read by code elsewhere that depends on the exact
+/// iteration order of the items in `__all__`, in which case this
+/// rule's fix could theoretically cause breakage.
+///
+/// Note also that for multiline `__all__` definitions
 /// that include comments on their own line, it can be hard
 /// to tell where the comments should be moved to when sorting
 /// the contents of `__all__`. While this rule's fix will
@@ -107,7 +112,7 @@ pub(crate) fn sort_dunder_all_extend_call(
         ..
     }: &ast::ExprCall,
 ) {
-    let ([value_passed], []) = (args.as_slice(), keywords.as_slice()) else {
+    let ([value_passed], []) = (&**args, &**keywords) else {
         return;
     };
     let ast::Expr::Attribute(ast::ExprAttribute {
@@ -152,9 +157,18 @@ fn sort_dunder_all(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr) 
 
     let (elts, range, kind) = match node {
         ast::Expr::List(ast::ExprList { elts, range, .. }) => (elts, *range, SequenceKind::List),
-        ast::Expr::Tuple(tuple_node @ ast::ExprTuple { elts, range, .. }) => {
-            (elts, *range, SequenceKind::Tuple(tuple_node))
-        }
+        ast::Expr::Tuple(ast::ExprTuple {
+            elts,
+            range,
+            parenthesized,
+            ..
+        }) => (
+            elts,
+            *range,
+            SequenceKind::Tuple {
+                parenthesized: *parenthesized,
+            },
+        ),
         _ => return,
     };
 
@@ -166,7 +180,7 @@ fn sort_dunder_all(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr) 
     let mut diagnostic = Diagnostic::new(UnsortedDunderAll, range);
 
     if let SortClassification::UnsortedAndMaybeFixable { items } = elts_analysis {
-        if let Some(fix) = create_fix(range, elts, &items, &kind, checker) {
+        if let Some(fix) = create_fix(range, elts, &items, kind, checker) {
             diagnostic.set_fix(fix);
         }
     }
@@ -187,7 +201,7 @@ fn create_fix(
     range: TextRange,
     elts: &[ast::Expr],
     string_items: &[&str],
-    kind: &SequenceKind,
+    kind: SequenceKind,
     checker: &Checker,
 ) -> Option<Fix> {
     let locator = checker.locator();
@@ -208,7 +222,13 @@ fn create_fix(
         // bare minimum of token-processing for single-line `__all__`
         // definitions:
         if is_multiline {
-            let value = MultilineStringSequenceValue::from_source_range(range, kind, locator)?;
+            let value = MultilineStringSequenceValue::from_source_range(
+                range,
+                kind,
+                locator,
+                checker.tokens(),
+                string_items,
+            )?;
             assert_eq!(value.len(), elts.len());
             value.into_sorted_source_code(SORTING_STYLE, locator, checker.stylist())
         } else {

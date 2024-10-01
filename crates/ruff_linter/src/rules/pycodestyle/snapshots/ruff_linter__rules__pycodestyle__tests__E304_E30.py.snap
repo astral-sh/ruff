@@ -1,0 +1,63 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E30.py:765:1: E304 [*] Blank lines found after function decorator (1)
+    |
+763 | @decorator
+764 | 
+765 | def function():
+    | ^^^ E304
+766 |     pass
+767 | # end
+    |
+    = help: Remove extraneous blank line(s)
+
+ℹ Safe fix
+761 761 | 
+762 762 | # E304
+763 763 | @decorator
+764     |-
+765 764 | def function():
+766 765 |     pass
+767 766 | # end
+
+E30.py:774:1: E304 [*] Blank lines found after function decorator (1)
+    |
+773 | # comment    E304 not expected
+774 | def function():
+    | ^^^ E304
+775 |     pass
+776 | # end
+    |
+    = help: Remove extraneous blank line(s)
+
+ℹ Safe fix
+769 769 | 
+770 770 | # E304
+771 771 | @decorator
+772     |-
+773 772 | # comment    E304 not expected
+774 773 | def function():
+775 774 |     pass
+
+E30.py:786:1: E304 [*] Blank lines found after function decorator (2)
+    |
+785 | # second comment  E304 not expected
+786 | def function():
+    | ^^^ E304
+787 |     pass
+788 | # end
+    |
+    = help: Remove extraneous blank line(s)
+
+ℹ Safe fix
+778 778 | 
+779 779 | # E304
+780 780 | @decorator
+781     |-
+782 781 | # comment  E304 not expected
+783     |-
+784     |-
+785 782 | # second comment  E304 not expected
+786 783 | def function():
+787 784 |     pass

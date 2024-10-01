@@ -89,7 +89,7 @@ PIE810.py:10:1: PIE810 [*] Call `startswith` once with a `tuple`
 10 | obj.endswith(foo) or obj.startswith(foo) or obj.startswith("foo")
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PIE810
 11 | 
-12 | # ok
+12 | def func():
    |
    = help: Merge into a single `startswith` call
 
@@ -100,7 +100,47 @@ PIE810.py:10:1: PIE810 [*] Call `startswith` once with a `tuple`
 10    |-obj.endswith(foo) or obj.startswith(foo) or obj.startswith("foo")
    10 |+obj.endswith(foo) or obj.startswith((foo, "foo"))
 11 11 | 
-12 12 | # ok
-13 13 | obj.startswith(("foo",  "bar"))
+12 12 | def func():
+13 13 |     msg = "hello world"
+
+PIE810.py:19:8: PIE810 [*] Call `startswith` once with a `tuple`
+   |
+17 |     z = "w"
+18 | 
+19 |     if msg.startswith(x) or msg.startswith(y) or msg.startswith(z): # Error
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PIE810
+20 |         print("yes") 
+   |
+   = help: Merge into a single `startswith` call
+
+ℹ Unsafe fix
+16 16 |     y = ("h", "e", "l", "l", "o")  
+17 17 |     z = "w"
+18 18 | 
+19    |-    if msg.startswith(x) or msg.startswith(y) or msg.startswith(z): # Error
+   19 |+    if msg.startswith((x, z)) or msg.startswith(y): # Error
+20 20 |         print("yes") 
+21 21 | 
+22 22 | def func():
+
+PIE810.py:25:8: PIE810 [*] Call `startswith` once with a `tuple`
+   |
+23 |     msg = "hello world"
+24 | 
+25 |     if msg.startswith(("h", "e", "l", "l", "o")) or msg.startswith("h") or msg.startswith("w"): # Error
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PIE810
+26 |         print("yes") 
+   |
+   = help: Merge into a single `startswith` call
+
+ℹ Unsafe fix
+22 22 | def func():
+23 23 |     msg = "hello world"
+24 24 | 
+25    |-    if msg.startswith(("h", "e", "l", "l", "o")) or msg.startswith("h") or msg.startswith("w"): # Error
+   25 |+    if msg.startswith(("h", "e", "l", "l", "o", "h", "w")): # Error
+26 26 |         print("yes") 
+27 27 | 
+28 28 | # ok
 
 

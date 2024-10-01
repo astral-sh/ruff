@@ -1,0 +1,90 @@
+---
+source: crates/ruff_linter/src/rules/pydoclint/mod.rs
+---
+DOC501_google.py:46:15: DOC501 Raised exception `FasterThanLightError` missing from docstring
+   |
+44 |         return distance / time
+45 |     except ZeroDivisionError as exc:
+46 |         raise FasterThanLightError from exc
+   |               ^^^^^^^^^^^^^^^^^^^^ DOC501
+   |
+   = help: Add `FasterThanLightError` to the docstring
+
+DOC501_google.py:63:15: DOC501 Raised exception `FasterThanLightError` missing from docstring
+   |
+61 |         return distance / time
+62 |     except ZeroDivisionError as exc:
+63 |         raise FasterThanLightError from exc
+   |               ^^^^^^^^^^^^^^^^^^^^ DOC501
+64 |     except:
+65 |         raise ValueError
+   |
+   = help: Add `FasterThanLightError` to the docstring
+
+DOC501_google.py:65:15: DOC501 Raised exception `ValueError` missing from docstring
+   |
+63 |         raise FasterThanLightError from exc
+64 |     except:
+65 |         raise ValueError
+   |               ^^^^^^^^^^ DOC501
+   |
+   = help: Add `ValueError` to the docstring
+
+DOC501_google.py:115:11: DOC501 Raised exception `AnotherError` missing from docstring
+    |
+113 |         Speed as distance divided by time.
+114 |     """
+115 |     raise AnotherError
+    |           ^^^^^^^^^^^^ DOC501
+    |
+    = help: Add `AnotherError` to the docstring
+
+DOC501_google.py:129:11: DOC501 Raised exception `AnotherError` missing from docstring
+    |
+127 |         Speed as distance divided by time.
+128 |     """
+129 |     raise AnotherError()
+    |           ^^^^^^^^^^^^^^ DOC501
+    |
+    = help: Add `AnotherError` to the docstring
+
+DOC501_google.py:139:11: DOC501 Raised exception `SomeError` missing from docstring
+    |
+137 |         bar: Bar.
+138 |     """
+139 |     raise something.SomeError
+    |           ^^^^^^^^^^^^^^^^^^^ DOC501
+    |
+    = help: Add `SomeError` to the docstring
+
+DOC501_google.py:213:9: DOC501 Raised exception `ZeroDivisionError` missing from docstring
+    |
+211 |     except ZeroDivisionError:
+212 |         print("Oh no, why would you divide something by zero?")
+213 |         raise
+    |         ^^^^^ DOC501
+214 |     except TypeError:
+215 |         print("Not a number? Shame on you!")
+    |
+    = help: Add `ZeroDivisionError` to the docstring
+
+DOC501_google.py:244:15: DOC501 Raised exception `TypeError` missing from docstring
+    |
+242 |     """
+243 |     if True:
+244 |         raise TypeError  # DOC501
+    |               ^^^^^^^^^ DOC501
+245 |     else:
+246 |         raise TypeError  # no DOC501 here because we already emitted a diagnostic for the earlier `raise TypeError`
+    |
+    = help: Add `TypeError` to the docstring
+
+DOC501_google.py:247:11: DOC501 Raised exception `ValueError` missing from docstring
+    |
+245 |     else:
+246 |         raise TypeError  # no DOC501 here because we already emitted a diagnostic for the earlier `raise TypeError`
+247 |     raise ValueError  # DOC501
+    |           ^^^^^^^^^^ DOC501
+248 |     return 42
+    |
+    = help: Add `ValueError` to the docstring

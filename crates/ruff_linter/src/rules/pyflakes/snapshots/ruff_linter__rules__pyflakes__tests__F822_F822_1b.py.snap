@@ -1,0 +1,10 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F822_1b.py:4:31: F822 Undefined name `b` in `__all__`
+  |
+2 | a = 1
+3 | 
+4 | __all__ = builtins.list(["a", "b"])
+  |                               ^^^ F822
+  |

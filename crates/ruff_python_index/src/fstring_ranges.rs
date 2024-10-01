@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
-use ruff_python_parser::Tok;
-use ruff_text_size::{TextRange, TextSize};
+use ruff_python_parser::{Token, TokenKind};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 /// Stores the ranges of all f-strings in a file sorted by [`TextRange::start`].
 /// There can be multiple overlapping ranges for nested f-strings.
@@ -14,6 +14,14 @@ pub struct FStringRanges {
 }
 
 impl FStringRanges {
+    /// Returns `true` if the given range intersects with any f-string range.
+    pub fn intersects(&self, target: TextRange) -> bool {
+        self.raw
+            .values()
+            .take_while(|range| range.start() < target.end())
+            .any(|range| target.intersect(*range).is_some())
+    }
+
     /// Return the [`TextRange`] of the innermost f-string at the given offset.
     pub fn innermost(&self, offset: TextSize) -> Option<TextRange> {
         self.raw
@@ -77,14 +85,14 @@ pub(crate) struct FStringRangesBuilder {
 }
 
 impl FStringRangesBuilder {
-    pub(crate) fn visit_token(&mut self, token: &Tok, range: TextRange) {
-        match token {
-            Tok::FStringStart => {
-                self.start_locations.push(range.start());
+    pub(crate) fn visit_token(&mut self, token: &Token) {
+        match token.kind() {
+            TokenKind::FStringStart => {
+                self.start_locations.push(token.start());
             }
-            Tok::FStringEnd => {
+            TokenKind::FStringEnd => {
                 if let Some(start) = self.start_locations.pop() {
-                    self.raw.insert(start, TextRange::new(start, range.end()));
+                    self.raw.insert(start, TextRange::new(start, token.end()));
                 }
             }
             _ => {}

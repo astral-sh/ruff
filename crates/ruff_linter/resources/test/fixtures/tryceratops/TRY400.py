@@ -3,13 +3,10 @@ Violation:
 Use '.exception' over '.error' inside except blocks
 """
 
-import logging
-import sys
-
-logger = logging.getLogger(__name__)
-
 
 def bad():
+    import logging
+
     try:
         a = 1
     except Exception:
@@ -20,6 +17,10 @@ def bad():
 
 
 def bad():
+    import logging
+
+    logger = logging.getLogger(__name__)
+
     try:
         a = 1
     except Exception:
@@ -50,6 +51,10 @@ def bad():
 
 
 def good():
+    import logging
+
+    logger = logging.getLogger(__name__)
+
     try:
         a = 1
     except Exception:
@@ -64,6 +69,10 @@ def good():
 
 
 def fine():
+    import logging
+
+    logger = logging.getLogger(__name__)
+
     try:
         a = 1
     except Exception:
@@ -71,16 +80,20 @@ def fine():
 
 
 def fine():
+    import logging
+    import sys
+
+    logger = logging.getLogger(__name__)
+
     try:
         a = 1
     except Exception:
         logger.error("Context message here", exc_info=sys.exc_info())
 
 
-from logging import error, exception
-
-
 def bad():
+    from logging import error, exception
+
     try:
         a = 1
     except Exception:
@@ -91,6 +104,8 @@ def bad():
 
 
 def good():
+    from logging import error, exception
+
     try:
         a = 1
     except Exception:
@@ -98,6 +113,8 @@ def good():
 
 
 def fine():
+    from logging import error, exception
+
     try:
         a = 1
     except Exception:
@@ -105,6 +122,9 @@ def fine():
 
 
 def fine():
+    from logging import error, exception
+    import sys
+
     try:
         a = 1
     except Exception:
@@ -112,6 +132,8 @@ def fine():
 
 
 def nested():
+    from logging import error, exception
+
     try:
         a = 1
     except Exception:

@@ -1,5 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::name::Name;
+use ruff_python_ast::traversal;
 use ruff_python_ast::{self as ast, Arguments, ElifElseClause, Expr, ExprContext, Stmt};
 use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
 use ruff_text_size::{Ranged, TextRange};
@@ -15,8 +17,9 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// a falsey condition can be replaced with boolean casts.
 ///
 /// ## Example
+/// Given:
 /// ```python
-/// if foo:
+/// if x > 0:
 ///     return True
 /// else:
 ///     return False
@@ -24,15 +27,27 @@ use crate::fix::snippet::SourceCodeSnippet;
 ///
 /// Use instead:
 /// ```python
-/// return bool(foo)
+/// return x > 0
+/// ```
+///
+/// Or, given:
+/// ```python
+/// if x > 0:
+///     return True
+/// return False
+/// ```
+///
+/// Use instead:
+/// ```python
+/// return x > 0
 /// ```
 ///
 /// ## References
 /// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
 #[violation]
 pub struct NeedlessBool {
-    condition: SourceCodeSnippet,
-    replacement: Option<SourceCodeSnippet>,
+    condition: Option<SourceCodeSnippet>,
+    negate: bool,
 }
 
 impl Violation for NeedlessBool {
@@ -40,21 +55,22 @@ impl Violation for NeedlessBool {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NeedlessBool { condition, .. } = self;
-        if let Some(condition) = condition.full_display() {
+        let NeedlessBool { condition, negate } = self;
+
+        if let Some(condition) = condition.as_ref().and_then(SourceCodeSnippet::full_display) {
             format!("Return the condition `{condition}` directly")
+        } else if *negate {
+            format!("Return the negated condition directly")
         } else {
             format!("Return the condition directly")
         }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let NeedlessBool { replacement, .. } = self;
-        if let Some(replacement) = replacement
-            .as_ref()
-            .and_then(SourceCodeSnippet::full_display)
-        {
-            Some(format!("Replace with `{replacement}`"))
+        let NeedlessBool { condition, .. } = self;
+
+        if let Some(condition) = condition.as_ref().and_then(SourceCodeSnippet::full_display) {
+            Some(format!("Replace with `return {condition}`"))
         } else {
             Some(format!("Inline condition"))
         }
@@ -62,23 +78,41 @@ impl Violation for NeedlessBool {
 }
 
 /// SIM103
-pub(crate) fn needless_bool(checker: &mut Checker, stmt_if: &ast::StmtIf) {
+pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
+    let Stmt::If(stmt_if) = stmt else { return };
     let ast::StmtIf {
         test: if_test,
         body: if_body,
         elif_else_clauses,
-        range: _,
+        ..
     } = stmt_if;
 
     // Extract an `if` or `elif` (that returns) followed by an else (that returns the same value)
     let (if_test, if_body, else_body, range) = match elif_else_clauses.as_slice() {
-        // if-else case
+        // if-else case:
+        // ```python
+        // if x > 0:
+        //     return True
+        // else:
+        //     return False
+        // ```
         [ElifElseClause {
             body: else_body,
             test: None,
             ..
-        }] => (if_test.as_ref(), if_body, else_body, stmt_if.range()),
+        }] => (
+            if_test.as_ref(),
+            if_body,
+            else_body.as_slice(),
+            stmt_if.range(),
+        ),
         // elif-else case
+        // ```python
+        // if x > 0:
+        //     return True
+        // elif x < 0:
+        //     return False
+        // ```
         [.., ElifElseClause {
             body: elif_body,
             test: Some(elif_test),
@@ -90,12 +124,47 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt_if: &ast::StmtIf) {
         }] => (
             elif_test,
             elif_body,
-            else_body,
+            else_body.as_slice(),
             TextRange::new(elif_range.start(), else_range.end()),
         ),
+        // if-implicit-else case:
+        // ```python
+        // if x > 0:
+        //     return True
+        // return False
+        // ```
+        [] => {
+            // Fetching the next sibling is expensive, so do some validation early.
+            if is_one_line_return_bool(if_body).is_none() {
+                return;
+            }
+
+            // Fetch the next sibling statement.
+            let Some(next_stmt) = checker
+                .semantic()
+                .current_statement_parent()
+                .and_then(|parent| traversal::suite(stmt, parent))
+                .and_then(|suite| traversal::next_sibling(stmt, suite))
+            else {
+                return;
+            };
+
+            // If the next sibling is not a return statement, abort.
+            if !next_stmt.is_return_stmt() {
+                return;
+            }
+
+            (
+                if_test.as_ref(),
+                if_body,
+                std::slice::from_ref(next_stmt),
+                TextRange::new(stmt_if.start(), next_stmt.end()),
+            )
+        }
         _ => return,
     };
 
+    // Both branches must be one-liners that return a boolean.
     let (Some(if_return), Some(else_return)) = (
         is_one_line_return_bool(if_body),
         is_one_line_return_bool(else_body),
@@ -128,59 +197,75 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt_if: &ast::StmtIf) {
         return;
     }
 
-    let condition = checker.locator().slice(if_test);
-    let replacement = if checker.indexer().has_comments(&range, checker.locator()) {
+    // Generate the replacement condition.
+    let condition = if checker
+        .comment_ranges()
+        .has_comments(&range, checker.locator())
+    {
         None
     } else {
         // If the return values are inverted, wrap the condition in a `not`.
         if inverted {
-            let node = ast::StmtReturn {
-                value: Some(Box::new(Expr::UnaryOp(ast::ExprUnaryOp {
+            if let Expr::UnaryOp(ast::ExprUnaryOp {
+                op: ast::UnaryOp::Not,
+                operand,
+                ..
+            }) = if_test
+            {
+                Some((**operand).clone())
+            } else {
+                Some(Expr::UnaryOp(ast::ExprUnaryOp {
                     op: ast::UnaryOp::Not,
                     operand: Box::new(if_test.clone()),
                     range: TextRange::default(),
-                }))),
-                range: TextRange::default(),
-            };
-            Some(checker.generator().stmt(&node.into()))
+                }))
+            }
         } else if if_test.is_compare_expr() {
             // If the condition is a comparison, we can replace it with the condition, since we
             // know it's a boolean.
-            let node = ast::StmtReturn {
-                value: Some(Box::new(if_test.clone())),
-                range: TextRange::default(),
-            };
-            Some(checker.generator().stmt(&node.into()))
-        } else if checker.semantic().is_builtin("bool") {
+            Some(if_test.clone())
+        } else if checker.semantic().has_builtin_binding("bool") {
             // Otherwise, we need to wrap the condition in a call to `bool`.
             let func_node = ast::ExprName {
-                id: "bool".into(),
+                id: Name::new_static("bool"),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
             };
-            let value_node = ast::ExprCall {
+            let call_node = ast::ExprCall {
                 func: Box::new(func_node.into()),
                 arguments: Arguments {
-                    args: vec![if_test.clone()],
-                    keywords: vec![],
+                    args: Box::from([if_test.clone()]),
+                    keywords: Box::from([]),
                     range: TextRange::default(),
                 },
                 range: TextRange::default(),
             };
-            let return_node = ast::StmtReturn {
-                value: Some(Box::new(value_node.into())),
-                range: TextRange::default(),
-            };
-            Some(checker.generator().stmt(&return_node.into()))
+            Some(Expr::Call(call_node))
         } else {
             None
         }
     };
 
+    // Generate the replacement `return` statement.
+    let replacement = condition.as_ref().map(|expr| {
+        Stmt::Return(ast::StmtReturn {
+            value: Some(Box::new(expr.clone())),
+            range: TextRange::default(),
+        })
+    });
+
+    // Generate source code.
+    let replacement = replacement
+        .as_ref()
+        .map(|stmt| checker.generator().stmt(stmt));
+    let condition = condition
+        .as_ref()
+        .map(|expr| checker.generator().expr(expr));
+
     let mut diagnostic = Diagnostic::new(
         NeedlessBool {
-            condition: SourceCodeSnippet::from_str(condition),
-            replacement: replacement.clone().map(SourceCodeSnippet::new),
+            condition: condition.map(SourceCodeSnippet::new),
+            negate: inverted,
         },
         range,
     );

@@ -31,4 +31,58 @@ B004.py:5:8: B004 Using `hasattr(x, "__call__")` to test if x is callable is unr
   |
   = help: Replace with `callable()`
 
+B004.py:12:8: B004 [*] Using `hasattr(x, "__call__")` to test if x is callable is unreliable. Use `callable(x)` for consistent results.
+   |
+10 |     import builtins
+11 |     o = object()
+12 |     if builtins.hasattr(o, "__call__"):
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B004
+13 |         print("B U G")
+14 |     if builtins.getattr(o, "__call__", False):
+   |
+   = help: Replace with `callable()`
 
+ℹ Safe fix
+9  9  | def still_a_bug():
+10 10 |     import builtins
+11 11 |     o = object()
+12    |-    if builtins.hasattr(o, "__call__"):
+   12 |+    if callable(o):
+13 13 |         print("B U G")
+14 14 |     if builtins.getattr(o, "__call__", False):
+15 15 |         print("B   U   G")
+
+B004.py:14:8: B004 Using `hasattr(x, "__call__")` to test if x is callable is unreliable. Use `callable(x)` for consistent results.
+   |
+12 |     if builtins.hasattr(o, "__call__"):
+13 |         print("B U G")
+14 |     if builtins.getattr(o, "__call__", False):
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B004
+15 |         print("B   U   G")
+   |
+   = help: Replace with `callable()`
+
+B004.py:24:8: B004 [*] Using `hasattr(x, "__call__")` to test if x is callable is unreliable. Use `callable(x)` for consistent results.
+   |
+22 |         return True
+23 | 
+24 |     if hasattr(o, "__call__"):
+   |        ^^^^^^^^^^^^^^^^^^^^^^ B004
+25 |         print("STILL a bug!")
+   |
+   = help: Replace with `callable()`
+
+ℹ Safe fix
+   1  |+import builtins
+1  2  | def this_is_a_bug():
+2  3  |     o = object()
+3  4  |     if hasattr(o, "__call__"):
+--------------------------------------------------------------------------------
+21 22 |     def callable(x):
+22 23 |         return True
+23 24 | 
+24    |-    if hasattr(o, "__call__"):
+   25 |+    if builtins.callable(o):
+25 26 |         print("STILL a bug!")
+26 27 | 
+27 28 |

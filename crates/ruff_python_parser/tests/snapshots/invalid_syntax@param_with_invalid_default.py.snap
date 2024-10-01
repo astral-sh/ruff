@@ -1,0 +1,220 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/param_with_invalid_default.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..68,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 0..20,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 4..7,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 7..15,
+                        posonlyargs: [],
+                        args: [
+                            ParameterWithDefault {
+                                range: 8..14,
+                                parameter: Parameter {
+                                    range: 8..9,
+                                    name: Identifier {
+                                        id: Name("x"),
+                                        range: 8..9,
+                                    },
+                                    annotation: None,
+                                },
+                                default: Some(
+                                    Starred(
+                                        ExprStarred {
+                                            range: 10..14,
+                                            value: Name(
+                                                ExprName {
+                                                    range: 11..14,
+                                                    id: Name("int"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 17..20,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 17..20,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 21..43,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 25..28,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 28..38,
+                        posonlyargs: [],
+                        args: [
+                            ParameterWithDefault {
+                                range: 29..37,
+                                parameter: Parameter {
+                                    range: 29..30,
+                                    name: Identifier {
+                                        id: Name("x"),
+                                        range: 29..30,
+                                    },
+                                    annotation: None,
+                                },
+                                default: Some(
+                                    Starred(
+                                        ExprStarred {
+                                            range: 32..36,
+                                            value: Name(
+                                                ExprName {
+                                                    range: 33..36,
+                                                    id: Name("int"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 40..43,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 40..43,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 44..67,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 48..51,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 51..62,
+                        posonlyargs: [],
+                        args: [
+                            ParameterWithDefault {
+                                range: 52..61,
+                                parameter: Parameter {
+                                    range: 52..53,
+                                    name: Identifier {
+                                        id: Name("x"),
+                                        range: 52..53,
+                                    },
+                                    annotation: None,
+                                },
+                                default: Some(
+                                    Yield(
+                                        ExprYield {
+                                            range: 54..61,
+                                            value: Some(
+                                                Name(
+                                                    ExprName {
+                                                        range: 60..61,
+                                                        id: Name("y"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ),
+                                        },
+                                    ),
+                                ),
+                            },
+                        ],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 64..67,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 64..67,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | def foo(x=*int): ...
+  |           ^^^^ Syntax Error: Starred expression cannot be used here
+2 | def foo(x=(*int)): ...
+3 | def foo(x=yield y): ...
+  |
+
+
+  |
+1 | def foo(x=*int): ...
+2 | def foo(x=(*int)): ...
+  |            ^^^^ Syntax Error: Starred expression cannot be used here
+3 | def foo(x=yield y): ...
+  |
+
+
+  |
+1 | def foo(x=*int): ...
+2 | def foo(x=(*int)): ...
+3 | def foo(x=yield y): ...
+  |           ^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |

@@ -93,7 +93,7 @@ pub(crate) fn unnecessary_dunder_call(checker: &mut Checker, call: &ast::ExprCal
 
     // Ignore dunder methods used on `super`.
     if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
-        if checker.semantic().is_builtin("super") {
+        if checker.semantic().has_builtin_binding("super") {
             if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                 if id == "super" {
                     return;
@@ -111,9 +111,9 @@ pub(crate) fn unnecessary_dunder_call(checker: &mut Checker, call: &ast::ExprCal
     let mut title: Option<String> = None;
 
     if let Some(dunder) = DunderReplacement::from_method(attr) {
-        match (call.arguments.args.as_slice(), dunder) {
+        match (&*call.arguments.args, dunder) {
             ([], DunderReplacement::Builtin(replacement, message)) => {
-                if !checker.semantic().is_builtin(replacement) {
+                if !checker.semantic().has_builtin_binding(replacement) {
                     return;
                 }
                 fixed = Some(format!(
@@ -124,21 +124,30 @@ pub(crate) fn unnecessary_dunder_call(checker: &mut Checker, call: &ast::ExprCal
                 title = Some(message.to_string());
             }
             ([arg], DunderReplacement::Operator(replacement, message)) => {
-                fixed = Some(format!(
-                    "{} {} {}",
-                    checker.locator().slice(value.as_ref()),
-                    replacement,
-                    checker.locator().slice(arg),
-                ));
+                let value_slice = checker.locator().slice(value.as_ref());
+                let arg_slice = checker.locator().slice(arg);
+
+                if can_be_represented_without_parentheses(arg) {
+                    // if it's something that can reasonably be removed from parentheses,
+                    // we'll do that.
+                    fixed = Some(format!("{value_slice} {replacement} {arg_slice}"));
+                } else {
+                    fixed = Some(format!("{value_slice} {replacement} ({arg_slice})"));
+                }
+
                 title = Some(message.to_string());
             }
             ([arg], DunderReplacement::ROperator(replacement, message)) => {
-                fixed = Some(format!(
-                    "{} {} {}",
-                    checker.locator().slice(arg),
-                    replacement,
-                    checker.locator().slice(value.as_ref()),
-                ));
+                let value_slice = checker.locator().slice(value.as_ref());
+                let arg_slice = checker.locator().slice(arg);
+
+                if arg.is_attribute_expr() || arg.is_name_expr() || arg.is_literal_expr() {
+                    // if it's something that can reasonably be removed from parentheses,
+                    // we'll do that.
+                    fixed = Some(format!("{arg_slice} {replacement} {value_slice}"));
+                } else {
+                    fixed = Some(format!("({arg_slice}) {replacement} {value_slice}"));
+                }
                 title = Some(message.to_string());
             }
             (_, DunderReplacement::MessageOnly(message)) => {
@@ -156,8 +165,25 @@ pub(crate) fn unnecessary_dunder_call(checker: &mut Checker, call: &ast::ExprCal
         call.range(),
     );
 
-    if let Some(fixed) = fixed {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(fixed, call.range())));
+    if let Some(mut fixed) = fixed {
+        // by the looks of it, we don't need to wrap the expression in parens if
+        // it's the only argument to a call expression.
+        // being in any other kind of expression though, we *will* add parens.
+        // e.g. `print(a.__add__(3))` -> `print(a + 3)` instead of `print((a + 3))`
+        // a multiplication expression example: `x = 2 * a.__add__(3)` -> `x = 2 * (a + 3)`
+        let wrap_in_paren = checker
+            .semantic()
+            .current_expression_parent()
+            .is_some_and(|parent| !can_be_represented_without_parentheses(parent));
+
+        if wrap_in_paren {
+            fixed = format!("({fixed})");
+        }
+
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+            fixed,
+            call.range(),
+        )));
     };
 
     checker.diagnostics.push(diagnostic);
@@ -171,9 +197,11 @@ fn allowed_dunder_constants(dunder_method: &str, target_version: PythonVersion) 
             | "__await__"
             | "__class__"
             | "__class_getitem__"
+            | "__delete__"
             | "__dict__"
             | "__doc__"
             | "__exit__"
+            | "__get__"
             | "__getnewargs__"
             | "__getnewargs_ex__"
             | "__getstate__"
@@ -185,6 +213,7 @@ fn allowed_dunder_constants(dunder_method: &str, target_version: PythonVersion) 
             | "__post_init__"
             | "__reduce__"
             | "__reduce_ex__"
+            | "__set__"
             | "__set_name__"
             | "__setstate__"
             | "__sizeof__"
@@ -285,14 +314,12 @@ impl DunderReplacement {
             "__deepcopy__" => Some(Self::MessageOnly("Use `copy.deepcopy()` function")),
             "__del__" => Some(Self::MessageOnly("Use `del` statement")),
             "__delattr__" => Some(Self::MessageOnly("Use `del` statement")),
-            "__delete__" => Some(Self::MessageOnly("Use `del` statement")),
             "__delitem__" => Some(Self::MessageOnly("Use `del` statement")),
             "__divmod__" => Some(Self::MessageOnly("Use `divmod()` builtin")),
             "__format__" => Some(Self::MessageOnly(
                 "Use `format` builtin, format string method, or f-string",
             )),
             "__fspath__" => Some(Self::MessageOnly("Use `os.fspath` function")),
-            "__get__" => Some(Self::MessageOnly("Use `get` method")),
             "__getattr__" => Some(Self::MessageOnly(
                 "Access attribute directly or use getattr built-in function",
             )),
@@ -308,7 +335,6 @@ impl DunderReplacement {
             "__pow__" => Some(Self::MessageOnly("Use ** operator or `pow()` builtin")),
             "__rdivmod__" => Some(Self::MessageOnly("Use `divmod()` builtin")),
             "__rpow__" => Some(Self::MessageOnly("Use ** operator or `pow()` builtin")),
-            "__set__" => Some(Self::MessageOnly("Use subscript assignment")),
             "__setattr__" => Some(Self::MessageOnly(
                 "Mutate attribute directly or use setattr built-in function",
             )),
@@ -331,8 +357,6 @@ fn allow_nested_expression(dunder_name: &str, semantic: &SemanticModel) -> bool 
             "__init__"
                 | "__del__"
                 | "__delattr__"
-                | "__set__"
-                | "__delete__"
                 | "__setitem__"
                 | "__delitem__"
                 | "__iadd__"
@@ -359,4 +383,25 @@ fn in_dunder_method_definition(semantic: &SemanticModel) -> bool {
         };
         func_def.name.starts_with("__") && func_def.name.ends_with("__")
     })
+}
+
+/// Returns `true` if the [`Expr`] can be represented without parentheses.
+fn can_be_represented_without_parentheses(expr: &Expr) -> bool {
+    expr.is_attribute_expr()
+        || expr.is_name_expr()
+        || expr.is_literal_expr()
+        || expr.is_call_expr()
+        || expr.is_lambda_expr()
+        || expr.is_if_expr()
+        || expr.is_generator_expr()
+        || expr.is_subscript_expr()
+        || expr.is_starred_expr()
+        || expr.is_slice_expr()
+        || expr.is_dict_expr()
+        || expr.is_dict_comp_expr()
+        || expr.is_list_expr()
+        || expr.is_list_comp_expr()
+        || expr.is_tuple_expr()
+        || expr.is_set_comp_expr()
+        || expr.is_set_expr()
 }

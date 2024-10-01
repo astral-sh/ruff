@@ -2,26 +2,33 @@
 source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_source(source)
 ---
+## Tokens
+```
 [
     (
         FStringStart,
         0..2,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
-        FStringMiddle {
-            value: "normal ",
-            is_raw: false,
-        },
+        FStringMiddle(
+            "normal ",
+        ),
         2..9,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Lbrace,
         9..10,
     ),
     (
-        Name {
-            name: "foo",
-        },
+        Name(
+            Name("foo"),
+        ),
         10..13,
     ),
     (
@@ -29,20 +36,22 @@ expression: lex_source(source)
         13..14,
     ),
     (
-        FStringMiddle {
-            value: " {another} ",
-            is_raw: false,
-        },
+        FStringMiddle(
+            " {another} ",
+        ),
         14..27,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Lbrace,
         27..28,
     ),
     (
-        Name {
-            name: "bar",
-        },
+        Name(
+            Name("bar"),
+        ),
         28..31,
     ),
     (
@@ -50,20 +59,22 @@ expression: lex_source(source)
         31..32,
     ),
     (
-        FStringMiddle {
-            value: " {",
-            is_raw: false,
-        },
+        FStringMiddle(
+            " {",
+        ),
         32..35,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Lbrace,
         35..36,
     ),
     (
-        Name {
-            name: "three",
-        },
+        Name(
+            Name("three"),
+        ),
         36..41,
     ),
     (
@@ -71,18 +82,24 @@ expression: lex_source(source)
         41..42,
     ),
     (
-        FStringMiddle {
-            value: "}",
-            is_raw: false,
-        },
+        FStringMiddle(
+            "}",
+        ),
         42..44,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         FStringEnd,
         44..45,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Newline,
         45..45,
     ),
 ]
+```

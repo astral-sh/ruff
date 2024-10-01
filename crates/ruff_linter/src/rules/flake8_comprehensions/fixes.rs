@@ -1,16 +1,17 @@
+use std::iter;
+
 use anyhow::{bail, Result};
 use itertools::Itertools;
 use libcst_native::{
-    Arg, AssignEqual, AssignTargetExpression, Call, Comment, CompFor, Dict, DictComp, DictElement,
-    Element, EmptyLine, Expression, GeneratorExp, LeftCurlyBrace, LeftParen, LeftSquareBracket,
-    List, ListComp, Name, ParenthesizableWhitespace, ParenthesizedNode, ParenthesizedWhitespace,
-    RightCurlyBrace, RightParen, RightSquareBracket, Set, SetComp, SimpleString, SimpleWhitespace,
-    TrailingWhitespace, Tuple,
+    Arg, AssignEqual, AssignTargetExpression, Call, Comma, Comment, CompFor, Dict, DictComp,
+    DictElement, Element, EmptyLine, Expression, GeneratorExp, LeftCurlyBrace, LeftParen,
+    LeftSquareBracket, ListComp, Name, ParenthesizableWhitespace, ParenthesizedNode,
+    ParenthesizedWhitespace, RightCurlyBrace, RightParen, RightSquareBracket, SetComp,
+    SimpleString, SimpleWhitespace, TrailingWhitespace, Tuple,
 };
-use std::iter;
 
 use ruff_diagnostics::{Edit, Fix};
-use ruff_python_ast::Expr;
+use ruff_python_ast::{self as ast, Expr};
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::SemanticModel;
 use ruff_source_file::Locator;
@@ -24,76 +25,9 @@ use crate::{
     checkers::ast::Checker,
     cst::matchers::{
         match_arg, match_call, match_call_mut, match_expression, match_generator_exp, match_lambda,
-        match_list_comp, match_name, match_tuple,
+        match_list_comp, match_tuple,
     },
 };
-
-/// (C400) Convert `list(x for x in y)` to `[x for x in y]`.
-pub(crate) fn fix_unnecessary_generator_list(
-    expr: &Expr,
-    locator: &Locator,
-    stylist: &Stylist,
-) -> Result<Edit> {
-    // Expr(Call(GeneratorExp)))) -> Expr(ListComp)))
-    let module_text = locator.slice(expr);
-    let mut tree = match_expression(module_text)?;
-    let call = match_call_mut(&mut tree)?;
-    let arg = match_arg(call)?;
-
-    let generator_exp = match_generator_exp(&arg.value)?;
-
-    tree = Expression::ListComp(Box::new(ListComp {
-        elt: generator_exp.elt.clone(),
-        for_in: generator_exp.for_in.clone(),
-        lbracket: LeftSquareBracket {
-            whitespace_after: call.whitespace_before_args.clone(),
-        },
-        rbracket: RightSquareBracket {
-            whitespace_before: arg.whitespace_after_arg.clone(),
-        },
-        lpar: generator_exp.lpar.clone(),
-        rpar: generator_exp.rpar.clone(),
-    }));
-
-    Ok(Edit::range_replacement(
-        tree.codegen_stylist(stylist),
-        expr.range(),
-    ))
-}
-
-/// (C401) Convert `set(x for x in y)` to `{x for x in y}`.
-pub(crate) fn fix_unnecessary_generator_set(expr: &Expr, checker: &Checker) -> Result<Edit> {
-    let locator = checker.locator();
-    let stylist = checker.stylist();
-
-    // Expr(Call(GeneratorExp)))) -> Expr(SetComp)))
-    let module_text = locator.slice(expr);
-    let mut tree = match_expression(module_text)?;
-    let call = match_call_mut(&mut tree)?;
-    let arg = match_arg(call)?;
-
-    let generator_exp = match_generator_exp(&arg.value)?;
-
-    tree = Expression::SetComp(Box::new(SetComp {
-        elt: generator_exp.elt.clone(),
-        for_in: generator_exp.for_in.clone(),
-        lbrace: LeftCurlyBrace {
-            whitespace_after: call.whitespace_before_args.clone(),
-        },
-        rbrace: RightCurlyBrace {
-            whitespace_before: arg.whitespace_after_arg.clone(),
-        },
-        lpar: generator_exp.lpar.clone(),
-        rpar: generator_exp.rpar.clone(),
-    }));
-
-    let content = tree.codegen_stylist(stylist);
-
-    Ok(Edit::range_replacement(
-        pad_expression(content, expr.range(), checker.locator(), checker.semantic()),
-        expr.range(),
-    ))
-}
 
 /// (C402) Convert `dict((x, x) for x in range(3))` to `{x: x for x in
 /// range(3)}`.
@@ -138,46 +72,6 @@ pub(crate) fn fix_unnecessary_generator_dict(expr: &Expr, checker: &Checker) -> 
         rpar: vec![],
         whitespace_before_colon: ParenthesizableWhitespace::default(),
         whitespace_after_colon: space(),
-    }));
-
-    Ok(Edit::range_replacement(
-        pad_expression(
-            tree.codegen_stylist(stylist),
-            expr.range(),
-            checker.locator(),
-            checker.semantic(),
-        ),
-        expr.range(),
-    ))
-}
-
-/// (C403) Convert `set([x for x in y])` to `{x for x in y}`.
-pub(crate) fn fix_unnecessary_list_comprehension_set(
-    expr: &Expr,
-    checker: &Checker,
-) -> Result<Edit> {
-    let locator = checker.locator();
-    let stylist = checker.stylist();
-    // Expr(Call(ListComp)))) ->
-    // Expr(SetComp)))
-    let module_text = locator.slice(expr);
-    let mut tree = match_expression(module_text)?;
-    let call = match_call_mut(&mut tree)?;
-    let arg = match_arg(call)?;
-
-    let list_comp = match_list_comp(&arg.value)?;
-
-    tree = Expression::SetComp(Box::new(SetComp {
-        elt: list_comp.elt.clone(),
-        for_in: list_comp.for_in.clone(),
-        lbrace: LeftCurlyBrace {
-            whitespace_after: call.whitespace_before_args.clone(),
-        },
-        rbrace: RightCurlyBrace {
-            whitespace_before: arg.whitespace_after_arg.clone(),
-        },
-        lpar: list_comp.lpar.clone(),
-        rpar: list_comp.rpar.clone(),
     }));
 
     Ok(Edit::range_replacement(
@@ -239,95 +133,6 @@ pub(crate) fn fix_unnecessary_list_comprehension_dict(
         lpar: list_comp.lpar.clone(),
         rpar: list_comp.rpar.clone(),
     }));
-
-    Ok(Edit::range_replacement(
-        pad_expression(
-            tree.codegen_stylist(stylist),
-            expr.range(),
-            checker.locator(),
-            checker.semantic(),
-        ),
-        expr.range(),
-    ))
-}
-
-/// Drop a trailing comma from a list of tuple elements.
-fn drop_trailing_comma<'a>(
-    tuple: &Tuple<'a>,
-) -> Result<(
-    Vec<Element<'a>>,
-    ParenthesizableWhitespace<'a>,
-    ParenthesizableWhitespace<'a>,
-)> {
-    let whitespace_after = tuple
-        .lpar
-        .first()
-        .ok_or_else(|| anyhow::anyhow!("Expected at least one set of parentheses"))?
-        .whitespace_after
-        .clone();
-    let whitespace_before = tuple
-        .rpar
-        .first()
-        .ok_or_else(|| anyhow::anyhow!("Expected at least one set of parentheses"))?
-        .whitespace_before
-        .clone();
-
-    let mut elements = tuple.elements.clone();
-    if elements.len() == 1 {
-        if let Some(Element::Simple {
-            value,
-            comma: Some(..),
-            ..
-        }) = elements.last()
-        {
-            if whitespace_before == ParenthesizableWhitespace::default()
-                && whitespace_after == ParenthesizableWhitespace::default()
-            {
-                elements[0] = Element::Simple {
-                    value: value.clone(),
-                    comma: None,
-                };
-            }
-        }
-    }
-
-    Ok((elements, whitespace_after, whitespace_before))
-}
-
-/// (C405) Convert `set((1, 2))` to `{1, 2}`.
-pub(crate) fn fix_unnecessary_literal_set(expr: &Expr, checker: &Checker) -> Result<Edit> {
-    let locator = checker.locator();
-    let stylist = checker.stylist();
-
-    // Expr(Call(List|Tuple)))) -> Expr(Set)))
-    let module_text = locator.slice(expr);
-    let mut tree = match_expression(module_text)?;
-    let call = match_call_mut(&mut tree)?;
-    let arg = match_arg(call)?;
-
-    let (elements, whitespace_after, whitespace_before) = match &arg.value {
-        Expression::Tuple(inner) => drop_trailing_comma(inner)?,
-        Expression::List(inner) => (
-            inner.elements.clone(),
-            inner.lbracket.whitespace_after.clone(),
-            inner.rbracket.whitespace_before.clone(),
-        ),
-        _ => {
-            bail!("Expected Expression::Tuple | Expression::List");
-        }
-    };
-
-    if elements.is_empty() {
-        call.args = vec![];
-    } else {
-        tree = Expression::Set(Box::new(Set {
-            elements,
-            lbrace: LeftCurlyBrace { whitespace_after },
-            rbrace: RightCurlyBrace { whitespace_before },
-            lpar: vec![],
-            rpar: vec![],
-        }));
-    }
 
     Ok(Edit::range_replacement(
         pad_expression(
@@ -408,126 +213,82 @@ pub(crate) fn fix_unnecessary_literal_dict(expr: &Expr, checker: &Checker) -> Re
     ))
 }
 
-/// (C408)
-pub(crate) fn fix_unnecessary_collection_call(expr: &Expr, checker: &Checker) -> Result<Edit> {
-    enum Collection {
-        Tuple,
-        List,
-        Dict,
-    }
-
+/// (C408) Convert `dict(a=1, b=2)` to `{"a": 1, "b": 2}`.
+pub(crate) fn fix_unnecessary_collection_call(
+    expr: &ast::ExprCall,
+    checker: &Checker,
+) -> Result<Edit> {
     let locator = checker.locator();
     let stylist = checker.stylist();
 
-    // Expr(Call("list" | "tuple" | "dict")))) -> Expr(List|Tuple|Dict)
+    // Expr(Call("dict")))) -> Expr(Dict)
     let module_text = locator.slice(expr);
     let mut tree = match_expression(module_text)?;
     let call = match_call(&tree)?;
-    let name = match_name(&call.func)?;
-    let collection = match name.value {
-        "tuple" => Collection::Tuple,
-        "list" => Collection::List,
-        "dict" => Collection::Dict,
-        _ => bail!("Expected 'tuple', 'list', or 'dict'"),
-    };
 
     // Arena allocator used to create formatted strings of sufficient lifetime,
     // below.
     let mut arena: Vec<String> = vec![];
 
-    match collection {
-        Collection::Tuple => {
-            tree = Expression::Tuple(Box::new(Tuple {
-                elements: vec![],
-                lpar: vec![LeftParen::default()],
-                rpar: vec![RightParen::default()],
-            }));
-        }
-        Collection::List => {
-            tree = Expression::List(Box::new(List {
-                elements: vec![],
-                lbracket: LeftSquareBracket::default(),
-                rbracket: RightSquareBracket::default(),
+    let quote = checker.f_string_quote_style().unwrap_or(stylist.quote());
+
+    // Quote each argument.
+    for arg in &call.args {
+        let quoted = format!(
+            "{}{}{}",
+            quote,
+            arg.keyword
+                .as_ref()
+                .expect("Expected dictionary argument to be kwarg")
+                .value,
+            quote,
+        );
+        arena.push(quoted);
+    }
+
+    let elements = call
+        .args
+        .iter()
+        .enumerate()
+        .map(|(i, arg)| DictElement::Simple {
+            key: Expression::SimpleString(Box::new(SimpleString {
+                value: &arena[i],
                 lpar: vec![],
                 rpar: vec![],
-            }));
-        }
-        Collection::Dict => {
-            if call.args.is_empty() {
-                tree = Expression::Dict(Box::new(Dict {
-                    elements: vec![],
-                    lbrace: LeftCurlyBrace::default(),
-                    rbrace: RightCurlyBrace::default(),
-                    lpar: vec![],
-                    rpar: vec![],
-                }));
-            } else {
-                let quote = checker.f_string_quote_style().unwrap_or(stylist.quote());
+            })),
+            value: arg.value.clone(),
+            comma: arg.comma.clone(),
+            whitespace_before_colon: ParenthesizableWhitespace::default(),
+            whitespace_after_colon: ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(
+                " ",
+            )),
+        })
+        .collect();
 
-                // Quote each argument.
-                for arg in &call.args {
-                    let quoted = format!(
-                        "{}{}{}",
-                        quote,
-                        arg.keyword
-                            .as_ref()
-                            .expect("Expected dictionary argument to be kwarg")
-                            .value,
-                        quote,
-                    );
-                    arena.push(quoted);
-                }
-
-                let elements = call
-                    .args
-                    .iter()
-                    .enumerate()
-                    .map(|(i, arg)| DictElement::Simple {
-                        key: Expression::SimpleString(Box::new(SimpleString {
-                            value: &arena[i],
-                            lpar: vec![],
-                            rpar: vec![],
-                        })),
-                        value: arg.value.clone(),
-                        comma: arg.comma.clone(),
-                        whitespace_before_colon: ParenthesizableWhitespace::default(),
-                        whitespace_after_colon: ParenthesizableWhitespace::SimpleWhitespace(
-                            SimpleWhitespace(" "),
-                        ),
-                    })
-                    .collect();
-
-                tree = Expression::Dict(Box::new(Dict {
-                    elements,
-                    lbrace: LeftCurlyBrace {
-                        whitespace_after: call.whitespace_before_args.clone(),
-                    },
-                    rbrace: RightCurlyBrace {
-                        whitespace_before: call
-                            .args
-                            .last()
-                            .expect("Arguments should be non-empty")
-                            .whitespace_after_arg
-                            .clone(),
-                    },
-                    lpar: vec![],
-                    rpar: vec![],
-                }));
-            }
-        }
-    };
+    tree = Expression::Dict(Box::new(Dict {
+        elements,
+        lbrace: LeftCurlyBrace {
+            whitespace_after: call.whitespace_before_args.clone(),
+        },
+        rbrace: RightCurlyBrace {
+            whitespace_before: call
+                .args
+                .last()
+                .expect("Arguments should be non-empty")
+                .whitespace_after_arg
+                .clone(),
+        },
+        lpar: vec![],
+        rpar: vec![],
+    }));
 
     Ok(Edit::range_replacement(
-        if matches!(collection, Collection::Dict) {
-            pad_expression(
-                tree.codegen_stylist(stylist),
-                expr.range(),
-                checker.locator(),
-                checker.semantic(),
-            )
-        } else {
-            tree.codegen_stylist(stylist)
-        },
+        pad_expression(
+            tree.codegen_stylist(stylist),
+            expr.range(),
+            checker.locator(),
+            checker.semantic(),
+        ),
         expr.range(),
     ))
 }
@@ -544,7 +305,7 @@ pub(crate) fn fix_unnecessary_collection_call(expr: &Expr, checker: &Checker) ->
 /// However, this is a syntax error under the f-string grammar. As such,
 /// this method will pad the start and end of an expression as needed to
 /// avoid producing invalid syntax.
-fn pad_expression(
+pub(crate) fn pad_expression(
     content: String,
     range: TextRange,
     locator: &Locator,
@@ -575,106 +336,46 @@ fn pad_expression(
     }
 }
 
-/// (C409) Convert `tuple([1, 2])` to `tuple(1, 2)`
-pub(crate) fn fix_unnecessary_literal_within_tuple_call(
-    expr: &Expr,
+/// Like [`pad_expression`], but only pads the start of the expression.
+pub(crate) fn pad_start(
+    content: &str,
+    range: TextRange,
     locator: &Locator,
-    stylist: &Stylist,
-) -> Result<Edit> {
-    let module_text = locator.slice(expr);
-    let mut tree = match_expression(module_text)?;
-    let call = match_call_mut(&mut tree)?;
-    let arg = match_arg(call)?;
-    let (elements, whitespace_after, whitespace_before) = match &arg.value {
-        Expression::Tuple(inner) => (
-            &inner.elements,
-            &inner
-                .lpar
-                .first()
-                .ok_or_else(|| anyhow::anyhow!("Expected at least one set of parentheses"))?
-                .whitespace_after,
-            &inner
-                .rpar
-                .first()
-                .ok_or_else(|| anyhow::anyhow!("Expected at least one set of parentheses"))?
-                .whitespace_before,
-        ),
-        Expression::List(inner) => (
-            &inner.elements,
-            &inner.lbracket.whitespace_after,
-            &inner.rbracket.whitespace_before,
-        ),
-        _ => {
-            bail!("Expected Expression::Tuple | Expression::List");
-        }
-    };
+    semantic: &SemanticModel,
+) -> String {
+    if !semantic.in_f_string() {
+        return content.into();
+    }
 
-    tree = Expression::Tuple(Box::new(Tuple {
-        elements: elements.clone(),
-        lpar: vec![LeftParen {
-            whitespace_after: whitespace_after.clone(),
-        }],
-        rpar: vec![RightParen {
-            whitespace_before: whitespace_before.clone(),
-        }],
-    }));
-
-    Ok(Edit::range_replacement(
-        tree.codegen_stylist(stylist),
-        expr.range(),
-    ))
+    // If the expression is immediately preceded by an opening brace, then
+    // we need to add a space before the expression.
+    let prefix = locator.up_to(range.start());
+    if matches!(prefix.chars().next_back(), Some('{')) {
+        format!(" {content}")
+    } else {
+        content.into()
+    }
 }
 
-/// (C410) Convert `list([1, 2])` to `[1, 2]`
-pub(crate) fn fix_unnecessary_literal_within_list_call(
-    expr: &Expr,
+/// Like [`pad_expression`], but only pads the end of the expression.
+pub(crate) fn pad_end(
+    content: &str,
+    range: TextRange,
     locator: &Locator,
-    stylist: &Stylist,
-) -> Result<Edit> {
-    let module_text = locator.slice(expr);
-    let mut tree = match_expression(module_text)?;
-    let call = match_call_mut(&mut tree)?;
-    let arg = match_arg(call)?;
-    let (elements, whitespace_after, whitespace_before) = match &arg.value {
-        Expression::Tuple(inner) => (
-            &inner.elements,
-            &inner
-                .lpar
-                .first()
-                .ok_or_else(|| anyhow::anyhow!("Expected at least one set of parentheses"))?
-                .whitespace_after,
-            &inner
-                .rpar
-                .first()
-                .ok_or_else(|| anyhow::anyhow!("Expected at least one set of parentheses"))?
-                .whitespace_before,
-        ),
-        Expression::List(inner) => (
-            &inner.elements,
-            &inner.lbracket.whitespace_after,
-            &inner.rbracket.whitespace_before,
-        ),
-        _ => {
-            bail!("Expected Expression::Tuple | Expression::List");
-        }
-    };
+    semantic: &SemanticModel,
+) -> String {
+    if !semantic.in_f_string() {
+        return content.into();
+    }
 
-    tree = Expression::List(Box::new(List {
-        elements: elements.clone(),
-        lbracket: LeftSquareBracket {
-            whitespace_after: whitespace_after.clone(),
-        },
-        rbracket: RightSquareBracket {
-            whitespace_before: whitespace_before.clone(),
-        },
-        lpar: vec![],
-        rpar: vec![],
-    }));
-
-    Ok(Edit::range_replacement(
-        tree.codegen_stylist(stylist),
-        expr.range(),
-    ))
+    // If the expression is immediately preceded by an opening brace, then
+    // we need to add a space before the expression.
+    let suffix = locator.after(range.end());
+    if matches!(suffix.chars().next(), Some('}')) {
+        format!("{content} ")
+    } else {
+        content.into()
+    }
 }
 
 /// (C411) Convert `list([i * i for i in x])` to `[i * i for i in x]`.
@@ -830,7 +531,7 @@ pub(crate) fn fix_unnecessary_double_cast_or_process(
                 .find(|argument| argument.keyword.is_none())
             {
                 let mut arg = arg.clone();
-                arg.comma = first.comma.clone();
+                arg.comma.clone_from(&first.comma);
                 arg.whitespace_after_arg = first.whitespace_after_arg.clone();
                 iter::once(arg)
                     .chain(rest.iter().cloned())
@@ -1091,27 +792,8 @@ pub(crate) fn fix_unnecessary_map(
     Ok(Edit::range_replacement(content, expr.range()))
 }
 
-/// (C418) Convert `dict({"a": 1})` to `{"a": 1}`
-pub(crate) fn fix_unnecessary_literal_within_dict_call(
-    expr: &Expr,
-    locator: &Locator,
-    stylist: &Stylist,
-) -> Result<Edit> {
-    let module_text = locator.slice(expr);
-    let mut tree = match_expression(module_text)?;
-    let call = match_call_mut(&mut tree)?;
-    let arg = match_arg(call)?;
-
-    tree = arg.value.clone();
-
-    Ok(Edit::range_replacement(
-        tree.codegen_stylist(stylist),
-        expr.range(),
-    ))
-}
-
 /// (C419) Convert `[i for i in a]` into `i for i in a`
-pub(crate) fn fix_unnecessary_comprehension_any_all(
+pub(crate) fn fix_unnecessary_comprehension_in_call(
     expr: &Expr,
     locator: &Locator,
     stylist: &Stylist,
@@ -1255,7 +937,10 @@ pub(crate) fn fix_unnecessary_comprehension_any_all(
     let whitespace_after_arg = match &call.args[0].comma {
         Some(comma) => {
             let whitespace_after_comma = comma.whitespace_after.clone();
-            call.args[0].comma = None;
+            call.args[0].comma = Some(Comma {
+                whitespace_after: ParenthesizableWhitespace::default(),
+                ..comma.clone()
+            });
             whitespace_after_comma
         }
         _ => call.args[0].whitespace_after_arg.clone(),

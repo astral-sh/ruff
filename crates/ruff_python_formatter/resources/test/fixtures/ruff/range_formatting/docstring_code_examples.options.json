@@ -1,0 +1,13 @@
+[
+  {
+    "docstring_code": "enabled",
+    "indent_style": "space",
+    "indent_width": 4
+  },
+  {
+    "docstring_code": "enabled",
+    "docstring_code_line_width": 88,
+    "indent_style": "space",
+    "indent_width": 4
+  }
+]

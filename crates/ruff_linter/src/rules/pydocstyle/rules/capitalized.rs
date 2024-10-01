@@ -59,24 +59,34 @@ pub(crate) fn capitalized(checker: &mut Checker, docstring: &Docstring) {
     }
 
     let body = docstring.body();
-    let Some(first_word) = body.split(' ').next() else {
-        return;
-    };
-
-    // Like pydocstyle, we only support ASCII for now.
-    for char in first_word.chars() {
-        if !char.is_ascii_alphabetic() && char != '\'' {
-            return;
-        }
-    }
+    let first_word = body.split_once(' ').map_or_else(
+        || {
+            // If the docstring is a single word, trim the punctuation marks because
+            // it makes the ASCII test below fail.
+            body.trim_end_matches(['.', '!', '?'])
+        },
+        |(first_word, _)| first_word,
+    );
 
     let mut first_word_chars = first_word.chars();
     let Some(first_char) = first_word_chars.next() else {
         return;
     };
+
+    if !first_char.is_ascii() {
+        return;
+    }
+
     let uppercase_first_char = first_char.to_ascii_uppercase();
     if first_char == uppercase_first_char {
         return;
+    }
+
+    // Like pydocstyle, we only support ASCII for now.
+    for char in first_word.chars().skip(1) {
+        if !char.is_ascii_alphabetic() && char != '\'' {
+            return;
+        }
     }
 
     let capitalized_word = uppercase_first_char.to_string() + first_word_chars.as_str();

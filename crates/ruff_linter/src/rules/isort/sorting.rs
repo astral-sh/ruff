@@ -3,7 +3,7 @@
 use std::{borrow::Cow, cmp::Ordering, cmp::Reverse};
 
 use natord;
-use unicode_width::UnicodeWidthStr;
+use unicode_width::UnicodeWidthChar;
 
 use ruff_python_stdlib::str;
 
@@ -69,6 +69,7 @@ impl<'a> From<String> for NatOrdStr<'a> {
 pub(crate) enum Distance {
     Nearest(u32),
     Furthest(Reverse<u32>),
+    None,
 }
 
 #[derive(Debug, Copy, Clone, PartialOrd, Ord, PartialEq, Eq)]
@@ -96,24 +97,27 @@ impl<'a> ModuleKey<'a> {
     pub(crate) fn from_module(
         name: Option<&'a str>,
         asname: Option<&'a str>,
-        level: Option<u32>,
+        level: u32,
         first_alias: Option<(&'a str, Option<&'a str>)>,
         style: ImportStyle,
         settings: &Settings,
     ) -> Self {
-        let level = level.unwrap_or_default();
-
-        let force_to_top = !name
-            .map(|name| settings.force_to_top.contains(name))
-            .unwrap_or_default(); // `false` < `true` so we get forced to top first
+        let force_to_top = !name.is_some_and(|name| settings.force_to_top.contains(name)); // `false` < `true` so we get forced to top first
 
         let maybe_length = (settings.length_sort
             || (settings.length_sort_straight && style == ImportStyle::Straight))
-            .then_some(name.map(str::width).unwrap_or_default() + level as usize);
+            .then_some(
+                name.map(|name| name.chars().map(|c| c.width().unwrap_or(0)).sum::<usize>())
+                    .unwrap_or_default()
+                    + level as usize,
+            );
 
-        let distance = match settings.relative_imports_order {
-            RelativeImportsOrder::ClosestToFurthest => Distance::Nearest(level),
-            RelativeImportsOrder::FurthestToClosest => Distance::Furthest(Reverse(level)),
+        let distance = match level {
+            0 => Distance::None,
+            _ => match settings.relative_imports_order {
+                RelativeImportsOrder::ClosestToFurthest => Distance::Nearest(level),
+                RelativeImportsOrder::FurthestToClosest => Distance::Furthest(Reverse(level)),
+            },
         };
 
         let maybe_lowercase_name = name.and_then(|name| {
@@ -157,7 +161,9 @@ impl<'a> MemberKey<'a> {
         let member_type = settings
             .order_by_type
             .then_some(member_type(name, settings));
-        let maybe_length = settings.length_sort.then_some(name.width());
+        let maybe_length = settings
+            .length_sort
+            .then(|| name.chars().map(|c| c.width().unwrap_or(0)).sum());
         let maybe_lowercase_name =
             (!settings.case_sensitive).then_some(NatOrdStr(maybe_lowercase(name)));
         let module_name = NatOrdStr::from(name);

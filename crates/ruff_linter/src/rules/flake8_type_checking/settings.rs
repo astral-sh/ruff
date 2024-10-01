@@ -4,7 +4,7 @@ use crate::display_settings;
 use ruff_macros::CacheKey;
 use std::fmt::{Display, Formatter};
 
-#[derive(Debug, CacheKey)]
+#[derive(Debug, Clone, CacheKey)]
 pub struct Settings {
     pub strict: bool,
     pub exempt_modules: Vec<String>,

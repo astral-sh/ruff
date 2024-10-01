@@ -16,7 +16,11 @@ expression: parse_ast
                                     StringLiteral {
                                         range: 0..8,
                                         value: "Hello ",
-                                        unicode: false,
+                                        flags: StringLiteralFlags {
+                                            quote_style: Single,
+                                            prefix: Empty,
+                                            triple_quoted: false,
+                                        },
                                     },
                                 ),
                                 FString(
@@ -40,7 +44,11 @@ expression: parse_ast
                                                                     StringLiteral {
                                                                         range: 17..20,
                                                                         value: "!",
-                                                                        unicode: false,
+                                                                        flags: StringLiteralFlags {
+                                                                            quote_style: Double,
+                                                                            prefix: Empty,
+                                                                            triple_quoted: false,
+                                                                        },
                                                                     },
                                                                 ),
                                                             },
@@ -52,13 +60,22 @@ expression: parse_ast
                                                 },
                                             ),
                                         ],
+                                        flags: FStringFlags {
+                                            quote_style: Single,
+                                            prefix: Regular,
+                                            triple_quoted: false,
+                                        },
                                     },
                                 ),
                                 Literal(
                                     StringLiteral {
                                         range: 23..31,
                                         value: "again!",
-                                        unicode: false,
+                                        flags: StringLiteralFlags {
+                                            quote_style: Single,
+                                            prefix: Empty,
+                                            triple_quoted: false,
+                                        },
                                     },
                                 ),
                             ],

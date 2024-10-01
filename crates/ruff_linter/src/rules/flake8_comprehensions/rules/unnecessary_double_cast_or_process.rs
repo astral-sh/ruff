@@ -70,24 +70,15 @@ impl AlwaysFixableViolation for UnnecessaryDoubleCastOrProcess {
 pub(crate) fn unnecessary_double_cast_or_process(
     checker: &mut Checker,
     expr: &Expr,
-    func: &Expr,
+    outer_func: &Expr,
     args: &[Expr],
     outer_kw: &[Keyword],
 ) {
-    let Some(outer) = func.as_name_expr() else {
-        return;
-    };
-    if !matches!(
-        outer.id.as_str(),
-        "list" | "tuple" | "set" | "reversed" | "sorted"
-    ) {
-        return;
-    }
     let Some(arg) = args.first() else {
         return;
     };
     let Expr::Call(ast::ExprCall {
-        func,
+        func: inner_func,
         arguments: Arguments {
             keywords: inner_kw, ..
         },
@@ -96,16 +87,23 @@ pub(crate) fn unnecessary_double_cast_or_process(
     else {
         return;
     };
-    let Some(inner) = func.as_name_expr() else {
+    let semantic = checker.semantic();
+    let Some(outer_func_name) = semantic.resolve_builtin_symbol(outer_func) else {
         return;
     };
-    if !checker.semantic().is_builtin(&inner.id) || !checker.semantic().is_builtin(&outer.id) {
+    if !matches!(
+        outer_func_name,
+        "list" | "tuple" | "set" | "reversed" | "sorted"
+    ) {
         return;
     }
+    let Some(inner_func_name) = semantic.resolve_builtin_symbol(inner_func) else {
+        return;
+    };
 
     // Avoid collapsing nested `sorted` calls with non-identical keyword arguments
     // (i.e., `key`, `reverse`).
-    if inner.id == "sorted" && outer.id == "sorted" {
+    if inner_func_name == "sorted" && outer_func_name == "sorted" {
         if inner_kw.len() != outer_kw.len() {
             return;
         }
@@ -122,15 +120,15 @@ pub(crate) fn unnecessary_double_cast_or_process(
     // Ex) `list(tuple(...))`
     // Ex) `set(set(...))`
     if matches!(
-        (outer.id.as_str(), inner.id.as_str()),
+        (outer_func_name, inner_func_name),
         ("set" | "sorted", "list" | "tuple" | "reversed" | "sorted")
             | ("set", "set")
             | ("list" | "tuple", "list" | "tuple")
     ) {
         let mut diagnostic = Diagnostic::new(
             UnnecessaryDoubleCastOrProcess {
-                inner: inner.id.to_string(),
-                outer: outer.id.to_string(),
+                inner: inner_func_name.to_string(),
+                outer: outer_func_name.to_string(),
             },
             expr.range(),
         );

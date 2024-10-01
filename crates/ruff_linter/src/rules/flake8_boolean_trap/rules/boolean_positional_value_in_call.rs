@@ -9,28 +9,34 @@ use crate::rules::flake8_boolean_trap::helpers::allow_boolean_trap;
 /// ## What it does
 /// Checks for boolean positional arguments in function calls.
 ///
+/// Some functions are whitelisted by default. To extend the list of allowed calls
+/// configure the [`lint.flake8-boolean-trap.extend-allowed-calls`] option.
+///
 /// ## Why is this bad?
 /// Calling a function with boolean positional arguments is confusing as the
 /// meaning of the boolean value is not clear to the caller, and to future
 /// readers of the code.
 ///
 /// ## Example
+///
 /// ```python
-/// def func(flag: bool) -> None:
-///     ...
+/// def func(flag: bool) -> None: ...
 ///
 ///
 /// func(True)
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// def func(flag: bool) -> None:
-///     ...
+/// def func(flag: bool) -> None: ...
 ///
 ///
 /// func(flag=True)
 /// ```
+///
+/// ## Options
+/// - `lint.flake8-boolean-trap.extend-allowed-calls`
 ///
 /// ## References
 /// - [Python documentation: Calls](https://docs.python.org/3/reference/expressions.html#calls)
@@ -46,7 +52,7 @@ impl Violation for BooleanPositionalValueInCall {
 }
 
 pub(crate) fn boolean_positional_value_in_call(checker: &mut Checker, call: &ast::ExprCall) {
-    if allow_boolean_trap(call) {
+    if allow_boolean_trap(call, checker) {
         return;
     }
     for arg in call

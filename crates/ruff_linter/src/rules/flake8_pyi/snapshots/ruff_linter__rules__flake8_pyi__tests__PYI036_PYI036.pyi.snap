@@ -168,4 +168,48 @@ PYI036.pyi:75:48: PYI036 All keyword-only arguments in `__aexit__` must have a d
    |                                                ^^^^^^^^^^^^^^^ PYI036
    |
 
+PYI036.pyi:89:29: PYI036 The first argument in `__exit__` should be annotated with `object` or `type[BaseException] | None`
+   |
+88 | class BadAllPositionalOnlyArgs:
+89 |     def __exit__(self, typ: type[Exception] | None, exc: BaseException | None, tb: TracebackType | None, /) -> None: ...
+   |                             ^^^^^^^^^^^^^^^^^^^^^^ PYI036
+90 |     async def __aexit__(self, typ: type[BaseException] | None, exc: BaseException | None, tb: TracebackType, /) -> None: ...
+   |
 
+PYI036.pyi:90:95: PYI036 The third argument in `__aexit__` should be annotated with `object` or `types.TracebackType | None`
+   |
+88 | class BadAllPositionalOnlyArgs:
+89 |     def __exit__(self, typ: type[Exception] | None, exc: BaseException | None, tb: TracebackType | None, /) -> None: ...
+90 |     async def __aexit__(self, typ: type[BaseException] | None, exc: BaseException | None, tb: TracebackType, /) -> None: ...
+   |                                                                                               ^^^^^^^^^^^^^ PYI036
+91 | 
+92 | # Definitions not in a class scope can do whatever, we don't care
+   |
+
+PYI036.pyi:159:17: PYI036 Annotations for a three-argument `__exit__` overload (excluding `self`) should either be `None, None, None` or `type[BaseException], BaseException, types.TracebackType`
+    |
+157 |     def __exit__(self, exc_typ: None, exc: None, tb: None) -> None: ...  # Okay
+158 |     @overload
+159 |     def __exit__(self, exc_typ: Exception, exc: Exception, tb: TracebackType) -> None: ...  # PYI036
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI036
+160 | 
+161 | class UnacceptableOverload2:
+    |
+
+PYI036.pyi:163:17: PYI036 Annotations for a three-argument `__exit__` overload (excluding `self`) should either be `None, None, None` or `type[BaseException], BaseException, types.TracebackType`
+    |
+161 | class UnacceptableOverload2:
+162 |     @overload
+163 |     def __exit__(self, exc_typ: type[BaseException] | None, exc: None, tb: None) -> None: ...  # PYI036
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI036
+164 |     @overload
+165 |     def __exit__(self, exc_typ: object, exc: Exception, tb: builtins.TracebackType) -> None: ...  # PYI036
+    |
+
+PYI036.pyi:165:17: PYI036 Annotations for a three-argument `__exit__` overload (excluding `self`) should either be `None, None, None` or `type[BaseException], BaseException, types.TracebackType`
+    |
+163 |     def __exit__(self, exc_typ: type[BaseException] | None, exc: None, tb: None) -> None: ...  # PYI036
+164 |     @overload
+165 |     def __exit__(self, exc_typ: object, exc: Exception, tb: builtins.TracebackType) -> None: ...  # PYI036
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI036
+    |

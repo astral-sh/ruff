@@ -1,0 +1,111 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/f_string_invalid_conversion_flag_other_tok.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..22,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..10,
+                    value: FString(
+                        ExprFString {
+                            range: 0..10,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 0..10,
+                                            elements: [
+                                                Expression(
+                                                    FStringExpressionElement {
+                                                        range: 2..9,
+                                                        expression: Name(
+                                                            ExprName {
+                                                                range: 3..4,
+                                                                id: Name("x"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 11..21,
+                    value: FString(
+                        ExprFString {
+                            range: 11..21,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 11..21,
+                                            elements: [
+                                                Expression(
+                                                    FStringExpressionElement {
+                                                        range: 13..20,
+                                                        expression: Name(
+                                                            ExprName {
+                                                                range: 14..15,
+                                                                id: Name("x"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | f"{x!123}"
+  |      ^^^ Syntax Error: f-string: invalid conversion character
+2 | f"{x!'a'}"
+  |
+
+
+  |
+1 | f"{x!123}"
+2 | f"{x!'a'}"
+  |      ^^^ Syntax Error: f-string: invalid conversion character
+  |

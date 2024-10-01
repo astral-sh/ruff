@@ -1,0 +1,388 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/multiple_clauses_on_same_line.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..258,
+        body: [
+            If(
+                StmtIf {
+                    range: 0..41,
+                    test: BooleanLiteral(
+                        ExprBooleanLiteral {
+                            range: 3..7,
+                            value: true,
+                        },
+                    ),
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 9..13,
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [
+                        ElifElseClause {
+                            range: 14..30,
+                            test: Some(
+                                BooleanLiteral(
+                                    ExprBooleanLiteral {
+                                        range: 19..24,
+                                        value: false,
+                                    },
+                                ),
+                            ),
+                            body: [
+                                Pass(
+                                    StmtPass {
+                                        range: 26..30,
+                                    },
+                                ),
+                            ],
+                        },
+                        ElifElseClause {
+                            range: 31..41,
+                            test: None,
+                            body: [
+                                Pass(
+                                    StmtPass {
+                                        range: 37..41,
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+            If(
+                StmtIf {
+                    range: 42..85,
+                    test: BooleanLiteral(
+                        ExprBooleanLiteral {
+                            range: 45..49,
+                            value: true,
+                        },
+                    ),
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 51..55,
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [
+                        ElifElseClause {
+                            range: 57..73,
+                            test: Some(
+                                BooleanLiteral(
+                                    ExprBooleanLiteral {
+                                        range: 62..67,
+                                        value: false,
+                                    },
+                                ),
+                            ),
+                            body: [
+                                Pass(
+                                    StmtPass {
+                                        range: 69..73,
+                                    },
+                                ),
+                            ],
+                        },
+                        ElifElseClause {
+                            range: 75..85,
+                            test: None,
+                            body: [
+                                Pass(
+                                    StmtPass {
+                                        range: 81..85,
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+            For(
+                StmtFor {
+                    range: 86..117,
+                    is_async: false,
+                    target: Name(
+                        ExprName {
+                            range: 90..91,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    iter: Name(
+                        ExprName {
+                            range: 95..99,
+                            id: Name("iter"),
+                            ctx: Load,
+                        },
+                    ),
+                    body: [
+                        Break(
+                            StmtBreak {
+                                range: 101..106,
+                            },
+                        ),
+                    ],
+                    orelse: [
+                        Pass(
+                            StmtPass {
+                                range: 113..117,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            For(
+                StmtFor {
+                    range: 118..150,
+                    is_async: false,
+                    target: Name(
+                        ExprName {
+                            range: 122..123,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    iter: Name(
+                        ExprName {
+                            range: 127..131,
+                            id: Name("iter"),
+                            ctx: Load,
+                        },
+                    ),
+                    body: [
+                        Break(
+                            StmtBreak {
+                                range: 133..138,
+                            },
+                        ),
+                    ],
+                    orelse: [
+                        Pass(
+                            StmtPass {
+                                range: 146..150,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            Try(
+                StmtTry {
+                    range: 151..202,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 156..160,
+                            },
+                        ),
+                    ],
+                    handlers: [
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 161..177,
+                                type_: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 168..171,
+                                            id: Name("exc"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                                name: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 173..177,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    orelse: [
+                        Pass(
+                            StmtPass {
+                                range: 184..188,
+                            },
+                        ),
+                    ],
+                    finalbody: [
+                        Pass(
+                            StmtPass {
+                                range: 198..202,
+                            },
+                        ),
+                    ],
+                    is_star: false,
+                },
+            ),
+            Try(
+                StmtTry {
+                    range: 203..257,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 208..212,
+                            },
+                        ),
+                    ],
+                    handlers: [
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 214..230,
+                                type_: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 221..224,
+                                            id: Name("exc"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                                name: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 226..230,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    orelse: [
+                        Pass(
+                            StmtPass {
+                                range: 238..242,
+                            },
+                        ),
+                    ],
+                    finalbody: [
+                        Pass(
+                            StmtPass {
+                                range: 253..257,
+                            },
+                        ),
+                    ],
+                    is_star: false,
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | if True: pass elif False: pass else: pass
+  |               ^^^^ Syntax Error: Expected newline, found 'elif'
+2 | if True: pass; elif False: pass; else: pass
+3 | for x in iter: break else: pass
+  |
+
+
+  |
+1 | if True: pass elif False: pass else: pass
+  |                                ^^^^ Syntax Error: Expected newline, found 'else'
+2 | if True: pass; elif False: pass; else: pass
+3 | for x in iter: break else: pass
+  |
+
+
+  |
+1 | if True: pass elif False: pass else: pass
+2 | if True: pass; elif False: pass; else: pass
+  |                ^^^^ Syntax Error: Expected newline, found 'elif'
+3 | for x in iter: break else: pass
+4 | for x in iter: break; else: pass
+  |
+
+
+  |
+1 | if True: pass elif False: pass else: pass
+2 | if True: pass; elif False: pass; else: pass
+  |                                  ^^^^ Syntax Error: Expected newline, found 'else'
+3 | for x in iter: break else: pass
+4 | for x in iter: break; else: pass
+  |
+
+
+  |
+1 | if True: pass elif False: pass else: pass
+2 | if True: pass; elif False: pass; else: pass
+3 | for x in iter: break else: pass
+  |                      ^^^^ Syntax Error: Expected newline, found 'else'
+4 | for x in iter: break; else: pass
+5 | try: pass except exc: pass else: pass finally: pass
+  |
+
+
+  |
+2 | if True: pass; elif False: pass; else: pass
+3 | for x in iter: break else: pass
+4 | for x in iter: break; else: pass
+  |                       ^^^^ Syntax Error: Expected newline, found 'else'
+5 | try: pass except exc: pass else: pass finally: pass
+6 | try: pass; except exc: pass; else: pass; finally: pass
+  |
+
+
+  |
+3 | for x in iter: break else: pass
+4 | for x in iter: break; else: pass
+5 | try: pass except exc: pass else: pass finally: pass
+  |           ^^^^^^ Syntax Error: Expected newline, found 'except'
+6 | try: pass; except exc: pass; else: pass; finally: pass
+  |
+
+
+  |
+3 | for x in iter: break else: pass
+4 | for x in iter: break; else: pass
+5 | try: pass except exc: pass else: pass finally: pass
+  |                            ^^^^ Syntax Error: Expected newline, found 'else'
+6 | try: pass; except exc: pass; else: pass; finally: pass
+  |
+
+
+  |
+3 | for x in iter: break else: pass
+4 | for x in iter: break; else: pass
+5 | try: pass except exc: pass else: pass finally: pass
+  |                                       ^^^^^^^ Syntax Error: Expected newline, found 'finally'
+6 | try: pass; except exc: pass; else: pass; finally: pass
+  |
+
+
+  |
+4 | for x in iter: break; else: pass
+5 | try: pass except exc: pass else: pass finally: pass
+6 | try: pass; except exc: pass; else: pass; finally: pass
+  |            ^^^^^^ Syntax Error: Expected newline, found 'except'
+  |
+
+
+  |
+4 | for x in iter: break; else: pass
+5 | try: pass except exc: pass else: pass finally: pass
+6 | try: pass; except exc: pass; else: pass; finally: pass
+  |                              ^^^^ Syntax Error: Expected newline, found 'else'
+  |
+
+
+  |
+4 | for x in iter: break; else: pass
+5 | try: pass except exc: pass else: pass finally: pass
+6 | try: pass; except exc: pass; else: pass; finally: pass
+  |                                          ^^^^^^^ Syntax Error: Expected newline, found 'finally'
+  |

@@ -1,0 +1,34 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/assert_empty_test.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..7,
+        body: [
+            Assert(
+                StmtAssert {
+                    range: 0..6,
+                    test: Name(
+                        ExprName {
+                            range: 6..6,
+                            id: Name(""),
+                            ctx: Invalid,
+                        },
+                    ),
+                    msg: None,
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | assert
+  |       ^ Syntax Error: Expected an expression
+  |

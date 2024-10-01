@@ -1,0 +1,149 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/bin_op/multiple_ops.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..19,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..3,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 0..3,
+                            left: Name(
+                                ExprName {
+                                    range: 0..1,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            op: Add,
+                            right: UnaryOp(
+                                ExprUnaryOp {
+                                    range: 2..3,
+                                    op: UAdd,
+                                    operand: Name(
+                                        ExprName {
+                                            range: 3..3,
+                                            id: Name(""),
+                                            ctx: Invalid,
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 4..9,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 4..9,
+                            left: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 4..5,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                            op: Add,
+                            right: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 8..9,
+                                    value: Int(
+                                        2,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 10..13,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 10..13,
+                            left: Name(
+                                ExprName {
+                                    range: 10..11,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            op: Sub,
+                            right: UnaryOp(
+                                ExprUnaryOp {
+                                    range: 12..13,
+                                    op: USub,
+                                    operand: Name(
+                                        ExprName {
+                                            range: 13..13,
+                                            id: Name(""),
+                                            ctx: Invalid,
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 14..19,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 14..19,
+                            left: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 14..15,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                            op: Sub,
+                            right: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 18..19,
+                                    value: Int(
+                                        2,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | x++
+  |    ^ Syntax Error: Expected an expression
+2 | 1 + 2
+3 | x--
+4 | 1 - 2
+  |
+
+
+  |
+1 | x++
+2 | 1 + 2
+3 | x--
+  |    ^ Syntax Error: Expected an expression
+4 | 1 - 2
+  |

@@ -1,0 +1,82 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/range_formatting/leading_comments.py
+---
+## Input
+```python
+def test ():
+    print( "hello" )
+    <RANGE_START># leading comment
+    1  + 2
+
+    print( "world" )<RANGE_END>
+
+    print( "unformatted" )
+
+
+print( "Hy" )
+
+
+def test2 ():
+    print( "hello" )
+    # Leading comments don't get formatted. That's why Ruff won't fixup
+    # the indentation here. That's something we might want to explore in the future
+    # leading comment 1<RANGE_START>
+        # leading comment 2
+    1  + 2
+
+    print( "world" )<RANGE_END>
+
+    print( "unformatted" )
+
+def test3 ():
+    <RANGE_START>print( "hello" )
+    # leading comment 1
+        # leading comment 2
+    1  + 2
+
+    print( "world" )<RANGE_END>
+
+    print( "unformatted" )
+```
+
+## Output
+```python
+def test ():
+    print( "hello" )
+    # leading comment
+    1 + 2
+
+    print("world")
+
+    print( "unformatted" )
+
+
+print( "Hy" )
+
+
+def test2 ():
+    print( "hello" )
+    # Leading comments don't get formatted. That's why Ruff won't fixup
+    # the indentation here. That's something we might want to explore in the future
+    # leading comment 1
+    # leading comment 2
+    1 + 2
+
+    print("world")
+
+    print( "unformatted" )
+
+def test3 ():
+    print("hello")
+    # leading comment 1
+    # leading comment 2
+    1 + 2
+
+    print("world")
+
+    print( "unformatted" )
+```
+
+
+

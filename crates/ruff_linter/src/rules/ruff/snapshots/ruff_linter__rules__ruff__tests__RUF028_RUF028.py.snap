@@ -1,0 +1,217 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF028.py:3:9: RUF028 [*] This suppression comment is invalid because it cannot be in an expression, pattern, argument list, or other non-statement
+  |
+1 | def fmt_off_between_lists():
+2 |     test_list = [
+3 |         # fmt: off
+  |         ^^^^^^^^^^ RUF028
+4 |         1,
+5 |         2,
+  |
+  = help: Remove this comment
+
+ℹ Unsafe fix
+1 1 | def fmt_off_between_lists():
+2 2 |     test_list = [
+3   |-        # fmt: off
+4 3 |         1,
+5 4 |         2,
+6 5 |         3,
+
+RUF028.py:12:5: RUF028 [*] This suppression comment is invalid because it cannot be on its own line
+   |
+10 | # note: the second `fmt: skip`` should be OK
+11 | def fmt_skip_on_own_line():
+12 |     # fmt: skip
+   |     ^^^^^^^^^^^ RUF028
+13 |     pass  # fmt: skip
+   |
+   = help: Remove this comment
+
+ℹ Unsafe fix
+9  9  | 
+10 10 | # note: the second `fmt: skip`` should be OK
+11 11 | def fmt_skip_on_own_line():
+12    |-    # fmt: skip
+13 12 |     pass  # fmt: skip
+14 13 | 
+15 14 | 
+
+RUF028.py:17:1: RUF028 [*] This suppression comment is invalid because it cannot be after a decorator
+   |
+16 | @fmt_skip_on_own_line
+17 | # fmt: off
+   | ^^^^^^^^^^ RUF028
+18 | @fmt_off_between_lists
+19 | def fmt_off_between_decorators():
+   |
+   = help: Remove this comment
+
+ℹ Unsafe fix
+14 14 | 
+15 15 | 
+16 16 | @fmt_skip_on_own_line
+17    |-# fmt: off
+18 17 | @fmt_off_between_lists
+19 18 | def fmt_off_between_decorators():
+20 19 |     pass
+
+RUF028.py:24:1: RUF028 [*] This suppression comment is invalid because it cannot be after a decorator
+   |
+23 | @fmt_off_between_decorators
+24 | # fmt: off
+   | ^^^^^^^^^^ RUF028
+25 | class FmtOffBetweenClassDecorators:
+26 |     ...
+   |
+   = help: Remove this comment
+
+ℹ Unsafe fix
+21 21 | 
+22 22 | 
+23 23 | @fmt_off_between_decorators
+24    |-# fmt: off
+25 24 | class FmtOffBetweenClassDecorators:
+26 25 |     ...
+27 26 | 
+
+RUF028.py:33:5: RUF028 [*] This suppression comment is invalid because it cannot be directly above an alternate body
+   |
+31 |     for val in x:
+32 |         print(x)
+33 |     # fmt: off
+   |     ^^^^^^^^^^ RUF028
+34 |     else:
+35 |         print("done")
+   |
+   = help: Remove this comment
+
+ℹ Unsafe fix
+30 30 |     x = [1, 2, 3]
+31 31 |     for val in x:
+32 32 |         print(x)
+33    |-    # fmt: off
+34 33 |     else:
+35 34 |         print("done")
+36 35 |     while False:
+
+RUF028.py:39:5: RUF028 [*] This suppression comment is invalid because it cannot be directly above an alternate body
+   |
+37 |         print("while")
+38 |         # fmt: off
+39 |     # fmt: off
+   |     ^^^^^^^^^^ RUF028
+40 |     else:
+41 |         print("done")
+   |
+   = help: Remove this comment
+
+ℹ Unsafe fix
+36 36 |     while False:
+37 37 |         print("while")
+38 38 |         # fmt: off
+39    |-    # fmt: off
+40 39 |     else:
+41 40 |         print("done")
+42 41 |     if len(x) > 3:
+
+RUF028.py:45:5: RUF028 [*] This suppression comment is invalid because it cannot be directly above an alternate body
+   |
+43 |         print("huh?")
+44 |     # fmt: on
+45 |     # fmt: off
+   |     ^^^^^^^^^^ RUF028
+46 |     else:
+47 |         print("expected")
+   |
+   = help: Remove this comment
+
+ℹ Unsafe fix
+42 42 |     if len(x) > 3:
+43 43 |         print("huh?")
+44 44 |     # fmt: on
+45    |-    # fmt: off
+46 45 |     else:
+47 46 |         print("expected")
+48 47 | 
+
+RUF028.py:52:5: RUF028 [*] This suppression comment is invalid because it cannot be after a decorator
+   |
+50 | class Test:
+51 |     @classmethod
+52 |     # fmt: off
+   |     ^^^^^^^^^^ RUF028
+53 |     def cls_method_a(
+54 |         # fmt: off
+   |
+   = help: Remove this comment
+
+ℹ Unsafe fix
+49 49 | 
+50 50 | class Test:
+51 51 |     @classmethod
+52    |-    # fmt: off
+53 52 |     def cls_method_a(
+54 53 |         # fmt: off
+55 54 |         cls,
+
+RUF028.py:54:9: RUF028 [*] This suppression comment is invalid because it cannot be in an expression, pattern, argument list, or other non-statement
+   |
+52 |     # fmt: off
+53 |     def cls_method_a(
+54 |         # fmt: off
+   |         ^^^^^^^^^^ RUF028
+55 |         cls,
+56 |     ) -> None: # noqa: test # fmt: skip
+   |
+   = help: Remove this comment
+
+ℹ Unsafe fix
+51 51 |     @classmethod
+52 52 |     # fmt: off
+53 53 |     def cls_method_a(
+54    |-        # fmt: off
+55 54 |         cls,
+56 55 |     ) -> None: # noqa: test # fmt: skip
+57 56 |         pass
+
+RUF028.py:62:13: RUF028 [*] This suppression comment is invalid because it cannot be at the end of a line
+   |
+60 | def fmt_on_trailing():
+61 |     # fmt: off
+62 |     val = 5 # fmt: on
+   |             ^^^^^^^^^ RUF028
+63 |     pass # fmt: on
+   |
+   = help: Remove this comment
+
+ℹ Unsafe fix
+59 59 | 
+60 60 | def fmt_on_trailing():
+61 61 |     # fmt: off
+62    |-    val = 5 # fmt: on
+   62 |+    val = 5
+63 63 |     pass # fmt: on
+64 64 | 
+65 65 | 
+
+RUF028.py:63:10: RUF028 [*] This suppression comment is invalid because it cannot be at the end of a line
+   |
+61 |     # fmt: off
+62 |     val = 5 # fmt: on
+63 |     pass # fmt: on
+   |          ^^^^^^^^^ RUF028
+   |
+   = help: Remove this comment
+
+ℹ Unsafe fix
+60 60 | def fmt_on_trailing():
+61 61 |     # fmt: off
+62 62 |     val = 5 # fmt: on
+63    |-    pass # fmt: on
+   63 |+    pass
+64 64 | 
+65 65 | 
+66 66 | # all of these should be fine

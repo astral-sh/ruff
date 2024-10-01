@@ -1,0 +1,45 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/nonlocal_stmt.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..28,
+        body: [
+            Nonlocal(
+                StmtNonlocal {
+                    range: 0..10,
+                    names: [
+                        Identifier {
+                            id: Name("x"),
+                            range: 9..10,
+                        },
+                    ],
+                },
+            ),
+            Nonlocal(
+                StmtNonlocal {
+                    range: 11..27,
+                    names: [
+                        Identifier {
+                            id: Name("x"),
+                            range: 20..21,
+                        },
+                        Identifier {
+                            id: Name("y"),
+                            range: 23..24,
+                        },
+                        Identifier {
+                            id: Name("z"),
+                            range: 26..27,
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```

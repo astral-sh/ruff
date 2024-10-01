@@ -1,0 +1,163 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/params_duplicate_names.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..42,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 0..41,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 4..7,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 7..36,
+                        posonlyargs: [],
+                        args: [
+                            ParameterWithDefault {
+                                range: 8..9,
+                                parameter: Parameter {
+                                    range: 8..9,
+                                    name: Identifier {
+                                        id: Name("a"),
+                                        range: 8..9,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 11..15,
+                                parameter: Parameter {
+                                    range: 11..12,
+                                    name: Identifier {
+                                        id: Name("a"),
+                                        range: 11..12,
+                                    },
+                                    annotation: None,
+                                },
+                                default: Some(
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 13..15,
+                                            value: Int(
+                                                10,
+                                            ),
+                                        },
+                                    ),
+                                ),
+                            },
+                        ],
+                        vararg: Some(
+                            Parameter {
+                                range: 17..19,
+                                name: Identifier {
+                                    id: Name("a"),
+                                    range: 18..19,
+                                },
+                                annotation: None,
+                            },
+                        ),
+                        kwonlyargs: [
+                            ParameterWithDefault {
+                                range: 21..22,
+                                parameter: Parameter {
+                                    range: 21..22,
+                                    name: Identifier {
+                                        id: Name("a"),
+                                        range: 21..22,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 24..30,
+                                parameter: Parameter {
+                                    range: 24..30,
+                                    name: Identifier {
+                                        id: Name("a"),
+                                        range: 24..25,
+                                    },
+                                    annotation: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 27..30,
+                                                id: Name("str"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                },
+                                default: None,
+                            },
+                        ],
+                        kwarg: Some(
+                            Parameter {
+                                range: 32..35,
+                                name: Identifier {
+                                    id: Name("a"),
+                                    range: 34..35,
+                                },
+                                annotation: None,
+                            },
+                        ),
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 38..41,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 38..41,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | def foo(a, a=10, *a, a, a: str, **a): ...
+  |            ^ Syntax Error: Duplicate parameter "a"
+  |
+
+
+  |
+1 | def foo(a, a=10, *a, a, a: str, **a): ...
+  |                   ^ Syntax Error: Duplicate parameter "a"
+  |
+
+
+  |
+1 | def foo(a, a=10, *a, a, a: str, **a): ...
+  |                      ^ Syntax Error: Duplicate parameter "a"
+  |
+
+
+  |
+1 | def foo(a, a=10, *a, a, a: str, **a): ...
+  |                         ^ Syntax Error: Duplicate parameter "a"
+  |
+
+
+  |
+1 | def foo(a, a=10, *a, a, a: str, **a): ...
+  |                                   ^ Syntax Error: Duplicate parameter "a"
+  |

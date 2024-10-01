@@ -1,0 +1,66 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/unary/no_expression_0.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..10,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..3,
+                    value: UnaryOp(
+                        ExprUnaryOp {
+                            range: 0..3,
+                            op: Not,
+                            operand: Name(
+                                ExprName {
+                                    range: 3..3,
+                                    id: Name(""),
+                                    ctx: Invalid,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 5..10,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 5..10,
+                            left: Name(
+                                ExprName {
+                                    range: 5..6,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            op: Add,
+                            right: Name(
+                                ExprName {
+                                    range: 9..10,
+                                    id: Name("y"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | not
+  |    ^ Syntax Error: Expected an expression
+2 | 
+3 | x + y
+  |

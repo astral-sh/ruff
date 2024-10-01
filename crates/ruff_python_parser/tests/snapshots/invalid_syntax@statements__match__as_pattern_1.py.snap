@@ -1,0 +1,77 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/statements/match/as_pattern_1.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..210,
+        body: [
+            Match(
+                StmtMatch {
+                    range: 0..209,
+                    subject: Name(
+                        ExprName {
+                            range: 6..13,
+                            id: Name("subject"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 140..209,
+                            pattern: MatchValue(
+                                PatternMatchValue {
+                                    range: 145..158,
+                                    value: BinOp(
+                                        ExprBinOp {
+                                            range: 145..158,
+                                            left: Name(
+                                                ExprName {
+                                                    range: 146..152,
+                                                    id: Name(""),
+                                                    ctx: Invalid,
+                                                },
+                                            ),
+                                            op: Add,
+                                            right: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 156..158,
+                                                    value: Complex {
+                                                        real: 0.0,
+                                                        imag: 1.0,
+                                                    },
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Pass(
+                                    StmtPass {
+                                        range: 205..209,
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+3 |     #             complex literal pattern
+4 |     #             v
+5 |     case (x as y) + 1j:
+  |           ^^^^^^ Syntax Error: Expected a real number in complex literal pattern
+6 |     #     ^^^^^^
+7 |     #    as-pattern
+  |

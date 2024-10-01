@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::Expr;
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -9,23 +10,25 @@ use crate::checkers::ast::Checker;
 /// Checks for deprecated NumPy type aliases.
 ///
 /// ## Why is this bad?
-/// NumPy's `np.int` has long been an alias of the builtin `int`. The same
-/// goes for `np.float`, `np.bool`, and others. These aliases exist
-/// primarily for historic reasons, and have been a cause of
-/// frequent confusion for newcomers.
+/// NumPy's `np.int` has long been an alias of the builtin `int`; the same
+/// is true of `np.float` and others. These aliases exist primarily
+/// for historic reasons, and have been a cause of frequent confusion
+/// for newcomers.
 ///
-/// These aliases were been deprecated in 1.20, and removed in 1.24.
+/// These aliases were deprecated in 1.20, and removed in 1.24.
+/// Note, however, that `np.bool` and `np.long` were reintroduced in 2.0 with
+/// different semantics, and are thus omitted from this rule.
 ///
 /// ## Examples
 /// ```python
 /// import numpy as np
 ///
-/// np.bool
+/// np.int
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// bool
+/// int
 /// ```
 #[violation]
 pub struct NumpyDeprecatedTypeAlias {
@@ -49,22 +52,27 @@ impl Violation for NumpyDeprecatedTypeAlias {
 
 /// NPY001
 pub(crate) fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
-    if let Some(type_name) = checker
-        .semantic()
-        .resolve_call_path(expr)
-        .and_then(|call_path| {
-            if matches!(
-                call_path.as_slice(),
-                [
-                    "numpy",
-                    "bool" | "int" | "float" | "complex" | "object" | "str" | "long" | "unicode"
-                ]
-            ) {
-                Some(call_path[1])
-            } else {
-                None
-            }
-        })
+    if !checker.semantic().seen_module(Modules::NUMPY) {
+        return;
+    }
+
+    if let Some(type_name) =
+        checker
+            .semantic()
+            .resolve_qualified_name(expr)
+            .and_then(|qualified_name| {
+                if matches!(
+                    qualified_name.segments(),
+                    [
+                        "numpy",
+                        "int" | "float" | "complex" | "object" | "str" | "unicode"
+                    ]
+                ) {
+                    Some(qualified_name.segments()[1])
+                } else {
+                    None
+                }
+            })
     {
         let mut diagnostic = Diagnostic::new(
             NumpyDeprecatedTypeAlias {
@@ -74,15 +82,17 @@ pub(crate) fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
         );
         let type_name = match type_name {
             "unicode" => "str",
-            "long" => "int",
             _ => type_name,
         };
-        if checker.semantic().is_builtin(type_name) {
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                type_name.to_string(),
-                expr.range(),
-            )));
-        }
+        diagnostic.try_set_fix(|| {
+            let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
+                type_name,
+                expr.start(),
+                checker.semantic(),
+            )?;
+            let binding_edit = Edit::range_replacement(binding, expr.range());
+            Ok(Fix::safe_edits(binding_edit, import_edit))
+        });
         checker.diagnostics.push(diagnostic);
     }
 }

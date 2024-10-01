@@ -363,3 +363,61 @@ def foo():
 def mavko_debari(P_kbar):
     D=0.4853881 + 3.6006116*P - 0.0117368*(P-1.3822)**2
     return D
+
+
+# contextlib suppress in with statement
+import contextlib
+
+
+def foo():
+    x = 2
+    with contextlib.suppress(Exception):
+        x = x + 1
+    return x
+
+
+def foo(data):
+    with open("in.txt") as file_out, contextlib.suppress(IOError):
+        file_out.write(data)
+        data = 10
+    return data
+
+
+def foo(data):
+    with open("in.txt") as file_out:
+        file_out.write(data)
+        with contextlib.suppress(IOError):
+            data = 10
+    return data
+
+
+def foo():
+    y = 1
+    x = 2
+    with contextlib.suppress(Exception):
+        x = 1
+    y = y + 2
+    return y  # RET504
+
+
+def foo():
+    y = 1
+    if y > 0:
+        with contextlib.suppress(Exception):
+            y = 2
+        return y
+
+
+# See: https://github.com/astral-sh/ruff/issues/10732
+def func(a: dict[str, int]) -> list[dict[str, int]]:
+    services: list[dict[str, int]]
+    if "services" in a:
+        services = a["services"]
+        return services
+
+
+# See: https://github.com/astral-sh/ruff/issues/10732
+def func(a: dict[str, int]) -> list[dict[str, int]]:
+    if "services" in a:
+        services = a["services"]
+        return services

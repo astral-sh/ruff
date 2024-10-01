@@ -49,15 +49,13 @@ impl Violation for MultipleImportsOnOneLine {
 pub(crate) fn multiple_imports_on_one_line(checker: &mut Checker, stmt: &Stmt, names: &[Alias]) {
     if names.len() > 1 {
         let mut diagnostic = Diagnostic::new(MultipleImportsOnOneLine, stmt.range());
-        if checker.settings.preview.is_enabled() {
-            diagnostic.set_fix(split_imports(
-                stmt,
-                names,
-                checker.locator(),
-                checker.indexer(),
-                checker.stylist(),
-            ));
-        }
+        diagnostic.set_fix(split_imports(
+            stmt,
+            names,
+            checker.locator(),
+            checker.indexer(),
+            checker.stylist(),
+        ));
         checker.diagnostics.push(diagnostic);
     }
 }

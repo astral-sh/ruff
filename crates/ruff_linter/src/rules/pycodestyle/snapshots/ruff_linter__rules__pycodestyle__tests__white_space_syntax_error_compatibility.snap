@@ -1,0 +1,8 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E2_syntax_error.py:1:10: SyntaxError: Expected an expression
+  |
+1 | a = (1 or)
+  |          ^
+  |

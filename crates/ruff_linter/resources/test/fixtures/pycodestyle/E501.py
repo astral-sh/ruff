@@ -82,3 +82,8 @@ class Bar:
     """
     This is a long sentence that ends with a shortened URL and, therefore, could easily be broken across multiple lines ([source](https://ruff.rs))
     """
+
+
+# OK
+# SPDX-FileCopyrightText: Copyright 2012-2015 Charlie Marsh <very-long-email-address@fake.com>
+# SPDX-License-Identifier: a very long license identifier that exceeds the line length limit

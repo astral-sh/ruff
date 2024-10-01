@@ -3,7 +3,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::Truthiness;
-use ruff_python_ast::{self as ast, Arguments, Expr, Keyword};
+use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -222,7 +222,7 @@ impl Violation for StartProcessWithNoShell {
 ///
 /// ## Why is this bad?
 /// Starting a process with a partial executable path can allow attackers to
-/// execute arbitrary executable by adjusting the `PATH` environment variable.
+/// execute an arbitrary executable by adjusting the `PATH` environment variable.
 /// Consider using a full path to the executable instead.
 ///
 /// ## Example
@@ -296,7 +296,6 @@ pub(crate) fn shell_injection(checker: &mut Checker, call: &ast::ExprCall) {
                 // S602
                 Some(ShellKeyword {
                     truthiness: truthiness @ (Truthiness::True | Truthiness::Truthy),
-                    keyword,
                 }) => {
                     if checker.enabled(Rule::SubprocessPopenWithShellEqualsTrue) {
                         checker.diagnostics.push(Diagnostic::new(
@@ -304,19 +303,18 @@ pub(crate) fn shell_injection(checker: &mut Checker, call: &ast::ExprCall) {
                                 safety: Safety::from(arg),
                                 is_exact: matches!(truthiness, Truthiness::True),
                             },
-                            keyword.range(),
+                            call.func.range(),
                         ));
                     }
                 }
                 // S603
                 Some(ShellKeyword {
                     truthiness: Truthiness::False | Truthiness::Falsey | Truthiness::Unknown,
-                    keyword,
                 }) => {
                     if checker.enabled(Rule::SubprocessWithoutShellEqualsTrue) {
                         checker.diagnostics.push(Diagnostic::new(
                             SubprocessWithoutShellEqualsTrue,
-                            keyword.range(),
+                            call.func.range(),
                         ));
                     }
                 }
@@ -325,7 +323,7 @@ pub(crate) fn shell_injection(checker: &mut Checker, call: &ast::ExprCall) {
                     if checker.enabled(Rule::SubprocessWithoutShellEqualsTrue) {
                         checker.diagnostics.push(Diagnostic::new(
                             SubprocessWithoutShellEqualsTrue,
-                            arg.range(),
+                            call.func.range(),
                         ));
                     }
                 }
@@ -333,7 +331,6 @@ pub(crate) fn shell_injection(checker: &mut Checker, call: &ast::ExprCall) {
         }
     } else if let Some(ShellKeyword {
         truthiness: truthiness @ (Truthiness::True | Truthiness::Truthy),
-        keyword,
     }) = shell_keyword
     {
         // S604
@@ -342,7 +339,7 @@ pub(crate) fn shell_injection(checker: &mut Checker, call: &ast::ExprCall) {
                 CallWithShellEqualsTrue {
                     is_exact: matches!(truthiness, Truthiness::True),
                 },
-                keyword.range(),
+                call.func.range(),
             ));
         }
     }
@@ -355,7 +352,7 @@ pub(crate) fn shell_injection(checker: &mut Checker, call: &ast::ExprCall) {
                     StartProcessWithAShell {
                         safety: Safety::from(arg),
                     },
-                    arg.range(),
+                    call.func.range(),
                 ));
             }
         }
@@ -392,17 +389,15 @@ pub(crate) fn shell_injection(checker: &mut Checker, call: &ast::ExprCall) {
                     Some(CallKind::Subprocess),
                     Some(ShellKeyword {
                         truthiness: Truthiness::True | Truthiness::Truthy,
-                        keyword: _,
                     })
                 )
             )
         {
             if let Some(arg) = call.arguments.args.first() {
                 if is_wildcard_command(arg) {
-                    checker.diagnostics.push(Diagnostic::new(
-                        UnixCommandWildcardInjection,
-                        call.func.range(),
-                    ));
+                    checker
+                        .diagnostics
+                        .push(Diagnostic::new(UnixCommandWildcardInjection, arg.range()));
                 }
             }
         }
@@ -419,8 +414,8 @@ enum CallKind {
 /// Return the [`CallKind`] of the given function call.
 fn get_call_kind(func: &Expr, semantic: &SemanticModel) -> Option<CallKind> {
     semantic
-        .resolve_call_path(func)
-        .and_then(|call_path| match call_path.as_slice() {
+        .resolve_qualified_name(func)
+        .and_then(|qualified_name| match qualified_name.segments() {
             &[module, submodule] => match module {
                 "os" => match submodule {
                     "execl" | "execle" | "execlp" | "execlpe" | "execv" | "execve" | "execvp"
@@ -433,6 +428,7 @@ fn get_call_kind(func: &Expr, semantic: &SemanticModel) -> Option<CallKind> {
                     "Popen" | "call" | "check_call" | "check_output" | "run" => {
                         Some(CallKind::Subprocess)
                     }
+                    "getoutput" | "getstatusoutput" => Some(CallKind::Shell),
                     _ => None,
                 },
                 "popen2" => match submodule {
@@ -450,21 +446,15 @@ fn get_call_kind(func: &Expr, semantic: &SemanticModel) -> Option<CallKind> {
 }
 
 #[derive(Copy, Clone, Debug)]
-struct ShellKeyword<'a> {
+struct ShellKeyword {
     /// Whether the `shell` keyword argument is set and evaluates to `True`.
     truthiness: Truthiness,
-    /// The `shell` keyword argument.
-    keyword: &'a Keyword,
 }
 
 /// Return the `shell` keyword argument to the given function call, if any.
-fn find_shell_keyword<'a>(
-    arguments: &'a Arguments,
-    semantic: &SemanticModel,
-) -> Option<ShellKeyword<'a>> {
+fn find_shell_keyword(arguments: &Arguments, semantic: &SemanticModel) -> Option<ShellKeyword> {
     arguments.find_keyword("shell").map(|keyword| ShellKeyword {
-        truthiness: Truthiness::from_expr(&keyword.value, |id| semantic.is_builtin(id)),
-        keyword,
+        truthiness: Truthiness::from_expr(&keyword.value, |id| semantic.has_builtin_binding(id)),
     })
 }
 
@@ -540,11 +530,11 @@ fn is_partial_path(expr: &Expr) -> bool {
 /// subprocess.Popen(["/usr/local/bin/rsync", "*", "some_where:"], shell=True)
 /// ```
 fn is_wildcard_command(expr: &Expr) -> bool {
-    if let Expr::List(ast::ExprList { elts, .. }) = expr {
+    if let Expr::List(list) = expr {
         let mut has_star = false;
         let mut has_command = false;
-        for elt in elts {
-            if let Some(text) = string_literal(elt) {
+        for item in list {
+            if let Some(text) = string_literal(item) {
                 has_star |= text.contains('*');
                 has_command |= text.contains("chown")
                     || text.contains("chmod")

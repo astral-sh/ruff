@@ -1,10 +1,11 @@
+use std::fmt;
+use std::path::Path;
+use std::str::FromStr;
+
 use ruff_formatter::printer::{LineEnding, PrinterOptions, SourceMapGeneration};
 use ruff_formatter::{FormatOptions, IndentStyle, IndentWidth, LineWidth};
 use ruff_macros::CacheKey;
 use ruff_python_ast::PySourceType;
-use std::fmt;
-use std::path::Path;
-use std::str::FromStr;
 
 /// Resolved options for formatting one individual file. The difference to `FormatterSettings`
 /// is that `FormatterSettings` stores the settings for multiple files (the entire project, a subdirectory, ..)
@@ -202,6 +203,12 @@ impl PyFormatOptions {
         self.preview = preview;
         self
     }
+
+    #[must_use]
+    pub fn with_source_map_generation(mut self, source_map: SourceMapGeneration) -> Self {
+        self.source_map_generation = source_map;
+        self
+    }
 }
 
 impl FormatOptions for PyFormatOptions {
@@ -223,7 +230,6 @@ impl FormatOptions for PyFormatOptions {
             line_width: self.line_width,
             line_ending: self.line_ending,
             indent_style: self.indent_style,
-            source_map_generation: self.source_map_generation,
         }
     }
 }
@@ -240,6 +246,12 @@ pub enum QuoteStyle {
     #[default]
     Double,
     Preserve,
+}
+
+impl QuoteStyle {
+    pub const fn is_preserve(self) -> bool {
+        matches!(self, QuoteStyle::Preserve)
+    }
 }
 
 impl fmt::Display for QuoteStyle {
@@ -367,13 +379,37 @@ impl fmt::Display for DocstringCode {
 #[cfg_attr(feature = "serde", serde(untagged))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum DocstringCodeLineWidth {
+    /// Wrap docstring code examples at a fixed line width.
     Fixed(LineWidth),
+
+    /// Respect the line length limit setting for the surrounding Python code.
     #[default]
     #[cfg_attr(
         feature = "serde",
         serde(deserialize_with = "deserialize_docstring_code_line_width_dynamic")
     )]
+    #[cfg_attr(feature = "schemars", schemars(with = "DynamicSchema"))]
     Dynamic,
+}
+
+/// A dummy type that is used to generate a schema for `DocstringCodeLineWidth::Dynamic`.
+#[cfg(feature = "schemars")]
+struct DynamicSchema;
+
+#[cfg(feature = "schemars")]
+impl schemars::JsonSchema for DynamicSchema {
+    fn schema_name() -> String {
+        "Dynamic".to_string()
+    }
+
+    fn json_schema(_: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        schemars::schema::SchemaObject {
+            instance_type: Some(schemars::schema::InstanceType::String.into()),
+            const_value: Some("dynamic".to_string().into()),
+            ..Default::default()
+        }
+        .into()
+    }
 }
 
 impl fmt::Debug for DocstringCodeLineWidth {
@@ -429,4 +465,14 @@ pub enum PythonVersion {
     Py310,
     Py311,
     Py312,
+    Py313,
+}
+
+impl PythonVersion {
+    /// Return `true` if the current version supports [PEP 701].
+    ///
+    /// [PEP 701]: https://peps.python.org/pep-0701/
+    pub fn supports_pep_701(self) -> bool {
+        self >= Self::Py312
+    }
 }

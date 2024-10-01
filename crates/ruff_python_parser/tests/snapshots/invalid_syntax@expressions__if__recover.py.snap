@@ -1,0 +1,360 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/if/recover.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..215,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 26..43,
+                    value: If(
+                        ExprIf {
+                            range: 26..43,
+                            test: Starred(
+                                ExprStarred {
+                                    range: 31..36,
+                                    value: Name(
+                                        ExprName {
+                                            range: 32..36,
+                                            id: Name("expr"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ctx: Load,
+                                },
+                            ),
+                            body: Name(
+                                ExprName {
+                                    range: 26..27,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            orelse: Name(
+                                ExprName {
+                                    range: 42..43,
+                                    id: Name("y"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 44..67,
+                    value: If(
+                        ExprIf {
+                            range: 44..67,
+                            test: Lambda(
+                                ExprLambda {
+                                    range: 49..60,
+                                    parameters: Some(
+                                        Parameters {
+                                            range: 56..57,
+                                            posonlyargs: [],
+                                            args: [
+                                                ParameterWithDefault {
+                                                    range: 56..57,
+                                                    parameter: Parameter {
+                                                        range: 56..57,
+                                                        name: Identifier {
+                                                            id: Name("x"),
+                                                            range: 56..57,
+                                                        },
+                                                        annotation: None,
+                                                    },
+                                                    default: None,
+                                                },
+                                            ],
+                                            vararg: None,
+                                            kwonlyargs: [],
+                                            kwarg: None,
+                                        },
+                                    ),
+                                    body: Name(
+                                        ExprName {
+                                            range: 59..60,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                            body: Name(
+                                ExprName {
+                                    range: 44..45,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            orelse: Name(
+                                ExprName {
+                                    range: 66..67,
+                                    id: Name("y"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 68..87,
+                    value: If(
+                        ExprIf {
+                            range: 68..87,
+                            test: Yield(
+                                ExprYield {
+                                    range: 73..80,
+                                    value: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 79..80,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                },
+                            ),
+                            body: Name(
+                                ExprName {
+                                    range: 68..69,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            orelse: Name(
+                                ExprName {
+                                    range: 86..87,
+                                    id: Name("y"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 88..112,
+                    value: If(
+                        ExprIf {
+                            range: 88..112,
+                            test: YieldFrom(
+                                ExprYieldFrom {
+                                    range: 93..105,
+                                    value: Name(
+                                        ExprName {
+                                            range: 104..105,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                            body: Name(
+                                ExprName {
+                                    range: 88..89,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            orelse: Name(
+                                ExprName {
+                                    range: 111..112,
+                                    id: Name("y"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 142..164,
+                    value: If(
+                        ExprIf {
+                            range: 142..164,
+                            test: Name(
+                                ExprName {
+                                    range: 147..151,
+                                    id: Name("expr"),
+                                    ctx: Load,
+                                },
+                            ),
+                            body: Name(
+                                ExprName {
+                                    range: 142..143,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            orelse: Starred(
+                                ExprStarred {
+                                    range: 157..164,
+                                    value: Name(
+                                        ExprName {
+                                            range: 158..164,
+                                            id: Name("orelse"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 165..187,
+                    value: If(
+                        ExprIf {
+                            range: 165..187,
+                            test: Name(
+                                ExprName {
+                                    range: 170..174,
+                                    id: Name("expr"),
+                                    ctx: Load,
+                                },
+                            ),
+                            body: Name(
+                                ExprName {
+                                    range: 165..166,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            orelse: Yield(
+                                ExprYield {
+                                    range: 180..187,
+                                    value: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 186..187,
+                                                id: Name("y"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 188..215,
+                    value: If(
+                        ExprIf {
+                            range: 188..215,
+                            test: Name(
+                                ExprName {
+                                    range: 193..197,
+                                    id: Name("expr"),
+                                    ctx: Load,
+                                },
+                            ),
+                            body: Name(
+                                ExprName {
+                                    range: 188..189,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            orelse: YieldFrom(
+                                ExprYieldFrom {
+                                    range: 203..215,
+                                    value: Name(
+                                        ExprName {
+                                            range: 214..215,
+                                            id: Name("y"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # Invalid test expression
+2 | x if *expr else y
+  |      ^^^^^ Syntax Error: Starred expression cannot be used here
+3 | x if lambda x: x else y
+4 | x if yield x else y
+  |
+
+
+  |
+1 | # Invalid test expression
+2 | x if *expr else y
+3 | x if lambda x: x else y
+  |      ^^^^^^^^^^^ Syntax Error: Lambda expression cannot be used here
+4 | x if yield x else y
+5 | x if yield from x else y
+  |
+
+
+  |
+2 | x if *expr else y
+3 | x if lambda x: x else y
+4 | x if yield x else y
+  |      ^^^^^^^ Syntax Error: Yield expression cannot be used here
+5 | x if yield from x else y
+  |
+
+
+  |
+3 | x if lambda x: x else y
+4 | x if yield x else y
+5 | x if yield from x else y
+  |      ^^^^^^^^^^^^ Syntax Error: Yield expression cannot be used here
+6 | 
+7 | # Invalid orelse expression
+  |
+
+
+   |
+ 7 | # Invalid orelse expression
+ 8 | x if expr else *orelse
+   |                ^^^^^^^ Syntax Error: Starred expression cannot be used here
+ 9 | x if expr else yield y
+10 | x if expr else yield from y
+   |
+
+
+   |
+ 7 | # Invalid orelse expression
+ 8 | x if expr else *orelse
+ 9 | x if expr else yield y
+   |                ^^^^^^^ Syntax Error: Yield expression cannot be used here
+10 | x if expr else yield from y
+   |
+
+
+   |
+ 8 | x if expr else *orelse
+ 9 | x if expr else yield y
+10 | x if expr else yield from y
+   |                ^^^^^^^^^^^^ Syntax Error: Yield expression cannot be used here
+   |

@@ -1,0 +1,43 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/list/missing_closing_bracket_0.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..43,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 42..43,
+                    value: List(
+                        ExprList {
+                            range: 42..43,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        range: 43..43,
+                                        id: Name(""),
+                                        ctx: Invalid,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # Missing closing bracket 0: No elements
+2 | 
+3 | [
+  |   Syntax Error: unexpected EOF while parsing
+  |

@@ -4,7 +4,7 @@ use ruff_text_size::{Ranged, TextRange};
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::{compose_call_path, from_qualified_name, CallPath};
+use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_semantic::analyze::typing::{
@@ -23,13 +23,14 @@ use crate::checkers::ast::Checker;
 /// calls to the function, which can lead to unexpected behaviour.
 ///
 /// Calls can be marked as an exception to this rule with the
-/// [`flake8-bugbear.extend-immutable-calls`] configuration option.
+/// [`lint.flake8-bugbear.extend-immutable-calls`] configuration option.
 ///
 /// Arguments with immutable type annotations will be ignored by this rule.
 /// Types outside of the standard library can be marked as immutable with the
-/// [`flake8-bugbear.extend-immutable-calls`] configuration option as well.
+/// [`lint.flake8-bugbear.extend-immutable-calls`] configuration option as well.
 ///
 /// ## Example
+///
 /// ```python
 /// def create_list() -> list[int]:
 ///     return [1, 2, 3]
@@ -41,6 +42,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// def better(arg: list[int] | None = None) -> list[int]:
 ///     if arg is None:
@@ -52,16 +54,16 @@ use crate::checkers::ast::Checker;
 ///
 /// If the use of a singleton is intentional, assign the result call to a
 /// module-level variable, and use that variable in the default argument:
+///
 /// ```python
 /// ERROR = ValueError("Hosts weren't successfully added")
 ///
 ///
-/// def add_host(error: Exception = ERROR) -> None:
-///     ...
+/// def add_host(error: Exception = ERROR) -> None: ...
 /// ```
 ///
 /// ## Options
-/// - `flake8-bugbear.extend-immutable-calls`
+/// - `lint.flake8-bugbear.extend-immutable-calls`
 #[violation]
 pub struct FunctionCallInDefaultArgument {
     name: Option<String>,
@@ -81,12 +83,15 @@ impl Violation for FunctionCallInDefaultArgument {
 
 struct ArgumentDefaultVisitor<'a, 'b> {
     semantic: &'a SemanticModel<'b>,
-    extend_immutable_calls: &'a [CallPath<'b>],
+    extend_immutable_calls: &'a [QualifiedName<'b>],
     diagnostics: Vec<(DiagnosticKind, TextRange)>,
 }
 
 impl<'a, 'b> ArgumentDefaultVisitor<'a, 'b> {
-    fn new(semantic: &'a SemanticModel<'b>, extend_immutable_calls: &'a [CallPath<'b>]) -> Self {
+    fn new(
+        semantic: &'a SemanticModel<'b>,
+        extend_immutable_calls: &'a [QualifiedName<'b>],
+    ) -> Self {
         Self {
             semantic,
             extend_immutable_calls,
@@ -104,7 +109,7 @@ impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
                 {
                     self.diagnostics.push((
                         FunctionCallInDefaultArgument {
-                            name: compose_call_path(func),
+                            name: UnqualifiedName::from_expr(func).map(|name| name.to_string()),
                         }
                         .into(),
                         expr.range(),
@@ -123,12 +128,12 @@ impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
 /// B008
 pub(crate) fn function_call_in_argument_default(checker: &mut Checker, parameters: &Parameters) {
     // Map immutable calls to (module, member) format.
-    let extend_immutable_calls: Vec<CallPath> = checker
+    let extend_immutable_calls: Vec<QualifiedName> = checker
         .settings
         .flake8_bugbear
         .extend_immutable_calls
         .iter()
-        .map(|target| from_qualified_name(target))
+        .map(|target| QualifiedName::from_dotted_name(target))
         .collect();
 
     let mut visitor = ArgumentDefaultVisitor::new(checker.semantic(), &extend_immutable_calls);
@@ -136,11 +141,7 @@ pub(crate) fn function_call_in_argument_default(checker: &mut Checker, parameter
         default,
         parameter,
         range: _,
-    } in parameters
-        .posonlyargs
-        .iter()
-        .chain(&parameters.args)
-        .chain(&parameters.kwonlyargs)
+    } in parameters.iter_non_variadic_params()
     {
         if let Some(expr) = &default {
             if !parameter.annotation.as_ref().is_some_and(|expr| {

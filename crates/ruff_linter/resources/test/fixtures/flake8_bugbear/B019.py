@@ -106,3 +106,21 @@ class Foo:
     @lru_cache()
     def another_called_lru_cached_instance_method(self, y):
         ...
+
+
+import enum
+
+
+class Foo(enum.Enum):
+    ONE = enum.auto()
+    TWO = enum.auto()
+
+    @functools.cache
+    def bar(self, arg: str) -> str:
+        return f"{self} - {arg}"
+
+
+class Metaclass(type):
+    @functools.lru_cache
+    def lru_cached_instance_method_on_metaclass(cls, x: int):
+        ...

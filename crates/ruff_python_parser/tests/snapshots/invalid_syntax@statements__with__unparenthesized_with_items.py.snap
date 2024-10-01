@@ -1,0 +1,361 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/statements/with/unparenthesized_with_items.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..249,
+        body: [
+            With(
+                StmtWith {
+                    range: 86..102,
+                    is_async: false,
+                    items: [
+                        WithItem {
+                            range: 91..95,
+                            context_expr: Name(
+                                ExprName {
+                                    range: 91..95,
+                                    id: Name("item"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                    ],
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 98..102,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            With(
+                StmtWith {
+                    range: 103..124,
+                    is_async: false,
+                    items: [
+                        WithItem {
+                            range: 108..117,
+                            context_expr: Name(
+                                ExprName {
+                                    range: 108..112,
+                                    id: Name("item"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: Some(
+                                Name(
+                                    ExprName {
+                                        range: 116..117,
+                                        id: Name("x"),
+                                        ctx: Store,
+                                    },
+                                ),
+                            ),
+                        },
+                    ],
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 120..124,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            With(
+                StmtWith {
+                    range: 125..141,
+                    is_async: false,
+                    items: [
+                        WithItem {
+                            range: 130..135,
+                            context_expr: Starred(
+                                ExprStarred {
+                                    range: 130..135,
+                                    value: Name(
+                                        ExprName {
+                                            range: 131..135,
+                                            id: Name("item"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                    ],
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 137..141,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            With(
+                StmtWith {
+                    range: 142..163,
+                    is_async: false,
+                    items: [
+                        WithItem {
+                            range: 147..157,
+                            context_expr: Starred(
+                                ExprStarred {
+                                    range: 147..152,
+                                    value: Name(
+                                        ExprName {
+                                            range: 148..152,
+                                            id: Name("item"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: Some(
+                                Name(
+                                    ExprName {
+                                        range: 156..157,
+                                        id: Name("x"),
+                                        ctx: Store,
+                                    },
+                                ),
+                            ),
+                        },
+                    ],
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 159..163,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            With(
+                StmtWith {
+                    range: 164..193,
+                    is_async: false,
+                    items: [
+                        WithItem {
+                            range: 169..175,
+                            context_expr: Starred(
+                                ExprStarred {
+                                    range: 169..175,
+                                    value: Name(
+                                        ExprName {
+                                            range: 170..175,
+                                            id: Name("item1"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                        WithItem {
+                            range: 177..187,
+                            context_expr: Name(
+                                ExprName {
+                                    range: 177..182,
+                                    id: Name("item2"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: Some(
+                                Name(
+                                    ExprName {
+                                        range: 186..187,
+                                        id: Name("f"),
+                                        ctx: Store,
+                                    },
+                                ),
+                            ),
+                        },
+                    ],
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 189..193,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            With(
+                StmtWith {
+                    range: 194..223,
+                    is_async: false,
+                    items: [
+                        WithItem {
+                            range: 199..209,
+                            context_expr: Name(
+                                ExprName {
+                                    range: 199..204,
+                                    id: Name("item1"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: Some(
+                                Name(
+                                    ExprName {
+                                        range: 208..209,
+                                        id: Name("f"),
+                                        ctx: Store,
+                                    },
+                                ),
+                            ),
+                        },
+                        WithItem {
+                            range: 211..217,
+                            context_expr: Starred(
+                                ExprStarred {
+                                    range: 211..217,
+                                    value: Name(
+                                        ExprName {
+                                            range: 212..217,
+                                            id: Name("item2"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                    ],
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 219..223,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            With(
+                StmtWith {
+                    range: 224..249,
+                    is_async: false,
+                    items: [
+                        WithItem {
+                            range: 229..233,
+                            context_expr: Name(
+                                ExprName {
+                                    range: 229..233,
+                                    id: Name("item"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                        WithItem {
+                            range: 237..243,
+                            context_expr: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 237..238,
+                                    value: Int(
+                                        0,
+                                    ),
+                                },
+                            ),
+                            optional_vars: Some(
+                                Name(
+                                    ExprName {
+                                        range: 242..243,
+                                        id: Name("f"),
+                                        ctx: Store,
+                                    },
+                                ),
+                            ),
+                        },
+                    ],
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 245..249,
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # For parenthesized with items test cases, refer to `./ambiguous_lpar_with_items.py`
+2 | 
+3 | with item,: pass
+  |          ^ Syntax Error: Trailing comma not allowed
+4 | with item as x,: pass
+5 | with *item: pass
+  |
+
+
+  |
+3 | with item,: pass
+4 | with item as x,: pass
+  |               ^ Syntax Error: Trailing comma not allowed
+5 | with *item: pass
+6 | with *item as x: pass
+  |
+
+
+  |
+3 | with item,: pass
+4 | with item as x,: pass
+5 | with *item: pass
+  |      ^^^^^ Syntax Error: Starred expression cannot be used here
+6 | with *item as x: pass
+7 | with *item1, item2 as f: pass
+  |
+
+
+  |
+4 | with item as x,: pass
+5 | with *item: pass
+6 | with *item as x: pass
+  |      ^^^^^ Syntax Error: Starred expression cannot be used here
+7 | with *item1, item2 as f: pass
+8 | with item1 as f, *item2: pass
+  |
+
+
+  |
+5 | with *item: pass
+6 | with *item as x: pass
+7 | with *item1, item2 as f: pass
+  |      ^^^^^^ Syntax Error: Starred expression cannot be used here
+8 | with item1 as f, *item2: pass
+9 | with item := 0 as f: pass
+  |
+
+
+  |
+6 | with *item as x: pass
+7 | with *item1, item2 as f: pass
+8 | with item1 as f, *item2: pass
+  |                  ^^^^^^ Syntax Error: Starred expression cannot be used here
+9 | with item := 0 as f: pass
+  |
+
+
+  |
+7 | with *item1, item2 as f: pass
+8 | with item1 as f, *item2: pass
+9 | with item := 0 as f: pass
+  |           ^^ Syntax Error: Expected ',', found ':='
+  |

@@ -1,0 +1,141 @@
+---
+source: crates/ruff_linter/src/rules/refurb/mod.rs
+---
+FURB166.py:3:5: FURB166 [*] Use of `int` with explicit `base=2` after removing prefix
+  |
+1 | # Errors
+2 | 
+3 | _ = int("0b1010"[2:], 2)
+  |     ^^^^^^^^^^^^^^^^^^^^ FURB166
+4 | _ = int("0o777"[2:], 8)
+5 | _ = int("0xFFFF"[2:], 16)
+  |
+  = help: Replace with `base=0`
+
+ℹ Unsafe fix
+1 1 | # Errors
+2 2 | 
+3   |-_ = int("0b1010"[2:], 2)
+  3 |+_ = int("0b1010", 0)
+4 4 | _ = int("0o777"[2:], 8)
+5 5 | _ = int("0xFFFF"[2:], 16)
+6 6 | 
+
+FURB166.py:4:5: FURB166 [*] Use of `int` with explicit `base=8` after removing prefix
+  |
+3 | _ = int("0b1010"[2:], 2)
+4 | _ = int("0o777"[2:], 8)
+  |     ^^^^^^^^^^^^^^^^^^^ FURB166
+5 | _ = int("0xFFFF"[2:], 16)
+  |
+  = help: Replace with `base=0`
+
+ℹ Unsafe fix
+1 1 | # Errors
+2 2 | 
+3 3 | _ = int("0b1010"[2:], 2)
+4   |-_ = int("0o777"[2:], 8)
+  4 |+_ = int("0o777", 0)
+5 5 | _ = int("0xFFFF"[2:], 16)
+6 6 | 
+7 7 | b = "0b11"
+
+FURB166.py:5:5: FURB166 [*] Use of `int` with explicit `base=16` after removing prefix
+  |
+3 | _ = int("0b1010"[2:], 2)
+4 | _ = int("0o777"[2:], 8)
+5 | _ = int("0xFFFF"[2:], 16)
+  |     ^^^^^^^^^^^^^^^^^^^^^ FURB166
+6 | 
+7 | b = "0b11"
+  |
+  = help: Replace with `base=0`
+
+ℹ Unsafe fix
+2 2 | 
+3 3 | _ = int("0b1010"[2:], 2)
+4 4 | _ = int("0o777"[2:], 8)
+5   |-_ = int("0xFFFF"[2:], 16)
+  5 |+_ = int("0xFFFF", 0)
+6 6 | 
+7 7 | b = "0b11"
+8 8 | _ = int(b[2:], 2)
+
+FURB166.py:8:5: FURB166 [*] Use of `int` with explicit `base=2` after removing prefix
+   |
+ 7 | b = "0b11"
+ 8 | _ = int(b[2:], 2)
+   |     ^^^^^^^^^^^^^ FURB166
+ 9 | 
+10 | _ = int("0xFFFF"[2:], base=16)
+   |
+   = help: Replace with `base=0`
+
+ℹ Unsafe fix
+5 5 | _ = int("0xFFFF"[2:], 16)
+6 6 | 
+7 7 | b = "0b11"
+8   |-_ = int(b[2:], 2)
+  8 |+_ = int(b, 0)
+9 9 | 
+10 10 | _ = int("0xFFFF"[2:], base=16)
+11 11 | 
+
+FURB166.py:10:5: FURB166 [*] Use of `int` with explicit `base=16` after removing prefix
+   |
+ 8 | _ = int(b[2:], 2)
+ 9 | 
+10 | _ = int("0xFFFF"[2:], base=16)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB166
+11 | 
+12 | _ = int(b"0xFFFF"[2:], 16)
+   |
+   = help: Replace with `base=0`
+
+ℹ Unsafe fix
+7  7  | b = "0b11"
+8  8  | _ = int(b[2:], 2)
+9  9  | 
+10    |-_ = int("0xFFFF"[2:], base=16)
+   10 |+_ = int("0xFFFF", base=0)
+11 11 | 
+12 12 | _ = int(b"0xFFFF"[2:], 16)
+13 13 | 
+
+FURB166.py:12:5: FURB166 [*] Use of `int` with explicit `base=16` after removing prefix
+   |
+10 | _ = int("0xFFFF"[2:], base=16)
+11 | 
+12 | _ = int(b"0xFFFF"[2:], 16)
+   |     ^^^^^^^^^^^^^^^^^^^^^^ FURB166
+   |
+   = help: Replace with `base=0`
+
+ℹ Unsafe fix
+9  9  | 
+10 10 | _ = int("0xFFFF"[2:], base=16)
+11 11 | 
+12    |-_ = int(b"0xFFFF"[2:], 16)
+   12 |+_ = int(b"0xFFFF", 0)
+13 13 | 
+14 14 | 
+15 15 | def get_str():
+
+FURB166.py:19:5: FURB166 [*] Use of `int` with explicit `base=16` after removing prefix
+   |
+19 | _ = int(get_str()[2:], 16)
+   |     ^^^^^^^^^^^^^^^^^^^^^^ FURB166
+20 | 
+21 | # OK
+   |
+   = help: Replace with `base=0`
+
+ℹ Unsafe fix
+16 16 |     return "0xFFF"
+17 17 | 
+18 18 | 
+19    |-_ = int(get_str()[2:], 16)
+   19 |+_ = int(get_str(), 0)
+20 20 | 
+21 21 | # OK
+22 22 |

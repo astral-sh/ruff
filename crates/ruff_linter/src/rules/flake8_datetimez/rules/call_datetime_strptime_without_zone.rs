@@ -1,10 +1,11 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
-use ruff_text_size::Ranged;
+use ruff_python_semantic::Modules;
 
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_datetimez::rules::helpers::has_non_none_keyword;
+
+use super::helpers::DatetimeModuleAntipattern;
 
 /// ## What it does
 /// Checks for uses of `datetime.datetime.strptime()` that lead to naive
@@ -18,7 +19,7 @@ use crate::rules::flake8_datetimez::rules::helpers::has_non_none_keyword;
 /// always use timezone-aware objects.
 ///
 /// `datetime.datetime.strptime()` without `%z` returns a naive datetime
-/// object. Follow it with `.replace(tzinfo=)` or `.astimezone()`.
+/// object. Follow it with `.replace(tzinfo=<timezone>)` or `.astimezone()`.
 ///
 /// ## Example
 /// ```python
@@ -27,7 +28,7 @@ use crate::rules::flake8_datetimez::rules::helpers::has_non_none_keyword;
 /// datetime.datetime.strptime("2022/01/31", "%Y/%m/%d")
 /// ```
 ///
-/// Instead, use `.replace(tzinfo=)`:
+/// Instead, use `.replace(tzinfo=<timezone>)`:
 /// ```python
 /// import datetime
 ///
@@ -50,69 +51,126 @@ use crate::rules::flake8_datetimez::rules::helpers::has_non_none_keyword;
 /// - [Python documentation: Aware and Naive Objects](https://docs.python.org/3/library/datetime.html#aware-and-naive-objects)
 /// - [Python documentation: `strftime()` and `strptime()` Behavior](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-behavior)
 #[violation]
-pub struct CallDatetimeStrptimeWithoutZone;
+pub struct CallDatetimeStrptimeWithoutZone(DatetimeModuleAntipattern);
 
 impl Violation for CallDatetimeStrptimeWithoutZone {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "The use of `datetime.datetime.strptime()` without %z must be followed by \
-             `.replace(tzinfo=)` or `.astimezone()`"
-        )
+        let CallDatetimeStrptimeWithoutZone(antipattern) = self;
+        match antipattern {
+            DatetimeModuleAntipattern::NoTzArgumentPassed => format!(
+                "Naive datetime constructed using `datetime.datetime.strptime()` without %z"
+            ),
+            DatetimeModuleAntipattern::NonePassedToTzArgument => {
+                format!("`datetime.datetime.strptime(...).replace(tz=None)` used")
+            }
+        }
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let CallDatetimeStrptimeWithoutZone(antipattern) = self;
+        match antipattern {
+            DatetimeModuleAntipattern::NoTzArgumentPassed => Some(
+                "Call `.replace(tzinfo=<timezone>)` or `.astimezone()` \
+                to convert to an aware datetime"
+                    .to_string(),
+            ),
+            DatetimeModuleAntipattern::NonePassedToTzArgument => {
+                Some("Pass a `datetime.timezone` object to the `tzinfo` parameter".to_string())
+            }
+        }
     }
 }
 
 /// DTZ007
 pub(crate) fn call_datetime_strptime_without_zone(checker: &mut Checker, call: &ast::ExprCall) {
+    if !checker.semantic().seen_module(Modules::DATETIME) {
+        return;
+    }
+
     if !checker
         .semantic()
-        .resolve_call_path(&call.func)
-        .is_some_and(|call_path| {
-            matches!(call_path.as_slice(), ["datetime", "datetime", "strptime"])
+        .resolve_qualified_name(&call.func)
+        .is_some_and(|qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                ["datetime", "datetime", "strptime"]
+            )
         })
     {
         return;
     }
 
     // Does the `strptime` call contain a format string with a timezone specifier?
-    if let Some(Expr::StringLiteral(ast::ExprStringLiteral { value: format, .. })) =
-        call.arguments.args.get(1).as_ref()
-    {
-        if format.to_str().contains("%z") {
-            return;
-        }
-    };
-
-    let (Some(grandparent), Some(parent)) = (
-        checker.semantic().current_expression_grandparent(),
-        checker.semantic().current_expression_parent(),
-    ) else {
-        checker.diagnostics.push(Diagnostic::new(
-            CallDatetimeStrptimeWithoutZone,
-            call.range(),
-        ));
-        return;
-    };
-
-    if let Expr::Call(ast::ExprCall { arguments, .. }) = grandparent {
-        if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = parent {
-            let attr = attr.as_str();
-            // Ex) `datetime.strptime(...).astimezone()`
-            if attr == "astimezone" {
-                return;
-            }
-
-            // Ex) `datetime.strptime(...).replace(tzinfo=UTC)`
-            if attr == "replace" {
-                if has_non_none_keyword(arguments, "tzinfo") {
+    if let Some(expr) = call.arguments.args.get(1) {
+        match expr {
+            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+                if value.to_str().contains("%z") {
                     return;
                 }
             }
+            Expr::FString(ast::ExprFString { value, .. }) => {
+                for f_string_part in value {
+                    match f_string_part {
+                        ast::FStringPart::Literal(string) => {
+                            if string.contains("%z") {
+                                return;
+                            }
+                        }
+                        ast::FStringPart::FString(f_string) => {
+                            if f_string
+                                .elements
+                                .literals()
+                                .any(|literal| literal.contains("%z"))
+                            {
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
         }
-    }
+    };
 
-    checker.diagnostics.push(Diagnostic::new(
-        CallDatetimeStrptimeWithoutZone,
-        call.range(),
-    ));
+    let semantic = checker.semantic();
+    if let Some(antipattern) = find_antipattern(
+        semantic.current_expression_grandparent(),
+        semantic.current_expression_parent(),
+    ) {
+        checker.diagnostics.push(Diagnostic::new(
+            CallDatetimeStrptimeWithoutZone(antipattern),
+            call.range,
+        ));
+    }
+}
+
+fn find_antipattern(
+    grandparent: Option<&Expr>,
+    parent: Option<&Expr>,
+) -> Option<DatetimeModuleAntipattern> {
+    let Some(Expr::Call(ast::ExprCall { arguments, .. })) = grandparent else {
+        return Some(DatetimeModuleAntipattern::NoTzArgumentPassed);
+    };
+    let Some(Expr::Attribute(ast::ExprAttribute { attr, .. })) = parent else {
+        return Some(DatetimeModuleAntipattern::NoTzArgumentPassed);
+    };
+    // Ex) `datetime.strptime(...).astimezone()`
+    if attr == "astimezone" {
+        return None;
+    }
+    if attr != "replace" {
+        return Some(DatetimeModuleAntipattern::NoTzArgumentPassed);
+    }
+    match arguments.find_keyword("tzinfo") {
+        // Ex) `datetime.strptime(...).replace(tzinfo=None)`
+        Some(ast::Keyword {
+            value: Expr::NoneLiteral(_),
+            ..
+        }) => Some(DatetimeModuleAntipattern::NonePassedToTzArgument),
+        // Ex) `datetime.strptime(...).replace(tzinfo=...)`
+        Some(_) => None,
+        // Ex) `datetime.strptime(...).replace(...)` with no `tzinfo` argument
+        None => Some(DatetimeModuleAntipattern::NoTzArgumentPassed),
+    }
 }

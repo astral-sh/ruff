@@ -14,7 +14,11 @@ expression: parse_ast
                             StringLiteral {
                                 range: 0..19,
                                 value: "text more text",
-                                unicode: false,
+                                flags: StringLiteralFlags {
+                                    quote_style: Single,
+                                    prefix: Empty,
+                                    triple_quoted: false,
+                                },
                             },
                         ),
                     },

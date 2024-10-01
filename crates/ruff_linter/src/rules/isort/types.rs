@@ -14,7 +14,7 @@ pub(crate) enum TrailingComma {
 #[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Clone)]
 pub(crate) struct ImportFromData<'a> {
     pub(crate) module: Option<&'a str>,
-    pub(crate) level: Option<u32>,
+    pub(crate) level: u32,
 }
 
 #[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
@@ -24,40 +24,56 @@ pub(crate) struct AliasData<'a> {
 }
 
 #[derive(Debug, Default, Clone)]
-pub(crate) struct CommentSet<'a> {
+pub(crate) struct ImportCommentSet<'a> {
     pub(crate) atop: Vec<Cow<'a, str>>,
     pub(crate) inline: Vec<Cow<'a, str>>,
 }
 
-pub(crate) trait Importable {
-    fn module_name(&self) -> String;
-    fn module_base(&self) -> String;
+#[derive(Debug, Default, Clone)]
+pub(crate) struct ImportFromCommentSet<'a> {
+    pub(crate) atop: Vec<Cow<'a, str>>,
+    pub(crate) inline: Vec<Cow<'a, str>>,
+    pub(crate) trailing: Vec<Cow<'a, str>>,
 }
 
-impl Importable for AliasData<'_> {
-    fn module_name(&self) -> String {
-        self.name.to_string()
-    }
+pub(crate) trait Importable<'a> {
+    fn module_name(&self) -> Cow<'a, str>;
 
-    fn module_base(&self) -> String {
-        self.module_name().split('.').next().unwrap().to_string()
+    fn module_base(&self) -> Cow<'a, str> {
+        match self.module_name() {
+            Cow::Borrowed(module_name) => Cow::Borrowed(
+                module_name
+                    .split('.')
+                    .next()
+                    .expect("module to include at least one segment"),
+            ),
+            Cow::Owned(module_name) => Cow::Owned(
+                module_name
+                    .split('.')
+                    .next()
+                    .expect("module to include at least one segment")
+                    .to_owned(),
+            ),
+        }
     }
 }
 
-impl Importable for ImportFromData<'_> {
-    fn module_name(&self) -> String {
+impl<'a> Importable<'a> for AliasData<'a> {
+    fn module_name(&self) -> Cow<'a, str> {
+        Cow::Borrowed(self.name)
+    }
+}
+
+impl<'a> Importable<'a> for ImportFromData<'a> {
+    fn module_name(&self) -> Cow<'a, str> {
         format_import_from(self.level, self.module)
-    }
-
-    fn module_base(&self) -> String {
-        self.module_name().split('.').next().unwrap().to_string()
     }
 }
 
 #[derive(Debug, Default)]
 pub(crate) struct ImportFromStatement<'a> {
-    pub(crate) comments: CommentSet<'a>,
-    pub(crate) aliases: FxHashMap<AliasData<'a>, CommentSet<'a>>,
+    pub(crate) comments: ImportFromCommentSet<'a>,
+    pub(crate) aliases: FxHashMap<AliasData<'a>, ImportFromCommentSet<'a>>,
     pub(crate) trailing_comma: TrailingComma,
 }
 
@@ -65,7 +81,7 @@ pub(crate) struct ImportFromStatement<'a> {
 pub(crate) struct ImportBlock<'a> {
     // Set of (name, asname), used to track regular imports.
     // Ex) `import module`
-    pub(crate) import: FxHashMap<AliasData<'a>, CommentSet<'a>>,
+    pub(crate) import: FxHashMap<AliasData<'a>, ImportCommentSet<'a>>,
     // Map from (module, level) to `AliasData`, used to track 'from' imports.
     // Ex) `from module import member`
     pub(crate) import_from: FxHashMap<ImportFromData<'a>, ImportFromStatement<'a>>,
@@ -78,15 +94,13 @@ pub(crate) struct ImportBlock<'a> {
     pub(crate) import_from_star: FxHashMap<ImportFromData<'a>, ImportFromStatement<'a>>,
 }
 
-type AliasDataWithComments<'a> = (AliasData<'a>, CommentSet<'a>);
-
-type Import<'a> = AliasDataWithComments<'a>;
+type Import<'a> = (AliasData<'a>, ImportCommentSet<'a>);
 
 type ImportFrom<'a> = (
     ImportFromData<'a>,
-    CommentSet<'a>,
+    ImportFromCommentSet<'a>,
     TrailingComma,
-    Vec<AliasDataWithComments<'a>>,
+    Vec<(AliasData<'a>, ImportFromCommentSet<'a>)>,
 );
 
 #[derive(Debug)]

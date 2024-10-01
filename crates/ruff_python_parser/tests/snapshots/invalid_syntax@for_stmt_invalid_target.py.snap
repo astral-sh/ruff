@@ -1,0 +1,463 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/for_stmt_invalid_target.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..154,
+        body: [
+            For(
+                StmtFor {
+                    range: 0..15,
+                    is_async: false,
+                    target: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 4..5,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                    iter: Name(
+                        ExprName {
+                            range: 9..10,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 12..15,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 12..15,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+            For(
+                StmtFor {
+                    range: 16..33,
+                    is_async: false,
+                    target: StringLiteral(
+                        ExprStringLiteral {
+                            range: 20..23,
+                            value: StringLiteralValue {
+                                inner: Single(
+                                    StringLiteral {
+                                        range: 20..23,
+                                        value: "a",
+                                        flags: StringLiteralFlags {
+                                            quote_style: Double,
+                                            prefix: Empty,
+                                            triple_quoted: false,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                    iter: Name(
+                        ExprName {
+                            range: 27..28,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 30..33,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 30..33,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+            For(
+                StmtFor {
+                    range: 34..56,
+                    is_async: false,
+                    target: Starred(
+                        ExprStarred {
+                            range: 38..46,
+                            value: BoolOp(
+                                ExprBoolOp {
+                                    range: 39..46,
+                                    op: And,
+                                    values: [
+                                        Name(
+                                            ExprName {
+                                                range: 39..40,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        Name(
+                                            ExprName {
+                                                range: 45..46,
+                                                id: Name("y"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                            ctx: Store,
+                        },
+                    ),
+                    iter: Name(
+                        ExprName {
+                            range: 50..51,
+                            id: Name("z"),
+                            ctx: Load,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 53..56,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 53..56,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+            For(
+                StmtFor {
+                    range: 57..77,
+                    is_async: false,
+                    target: Starred(
+                        ExprStarred {
+                            range: 61..67,
+                            value: BinOp(
+                                ExprBinOp {
+                                    range: 62..67,
+                                    left: Name(
+                                        ExprName {
+                                            range: 62..63,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    op: BitOr,
+                                    right: Name(
+                                        ExprName {
+                                            range: 66..67,
+                                            id: Name("y"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                            ctx: Store,
+                        },
+                    ),
+                    iter: Name(
+                        ExprName {
+                            range: 71..72,
+                            id: Name("z"),
+                            ctx: Load,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 74..77,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 74..77,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+            For(
+                StmtFor {
+                    range: 78..99,
+                    is_async: false,
+                    target: Await(
+                        ExprAwait {
+                            range: 82..89,
+                            value: Name(
+                                ExprName {
+                                    range: 88..89,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                    iter: Name(
+                        ExprName {
+                            range: 93..94,
+                            id: Name("z"),
+                            ctx: Load,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 96..99,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 96..99,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+            For(
+                StmtFor {
+                    range: 100..121,
+                    is_async: false,
+                    target: Yield(
+                        ExprYield {
+                            range: 104..116,
+                            value: Some(
+                                Compare(
+                                    ExprCompare {
+                                        range: 110..116,
+                                        left: Name(
+                                            ExprName {
+                                                range: 110..111,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ops: [
+                                            In,
+                                        ],
+                                        comparators: [
+                                            Name(
+                                                ExprName {
+                                                    range: 115..116,
+                                                    id: Name("y"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
+                                    },
+                                ),
+                            ),
+                        },
+                    ),
+                    iter: Name(
+                        ExprName {
+                            range: 116..116,
+                            id: Name(""),
+                            ctx: Invalid,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 118..121,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 118..121,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+            For(
+                StmtFor {
+                    range: 122..153,
+                    is_async: false,
+                    target: List(
+                        ExprList {
+                            range: 126..143,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        range: 127..128,
+                                        id: Name("x"),
+                                        ctx: Store,
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 130..131,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 133..134,
+                                        id: Name("y"),
+                                        ctx: Store,
+                                    },
+                                ),
+                                Starred(
+                                    ExprStarred {
+                                        range: 136..142,
+                                        value: List(
+                                            ExprList {
+                                                range: 137..142,
+                                                elts: [
+                                                    StringLiteral(
+                                                        ExprStringLiteral {
+                                                            range: 138..141,
+                                                            value: StringLiteralValue {
+                                                                inner: Single(
+                                                                    StringLiteral {
+                                                                        range: 138..141,
+                                                                        value: "a",
+                                                                        flags: StringLiteralFlags {
+                                                                            quote_style: Double,
+                                                                            prefix: Empty,
+                                                                            triple_quoted: false,
+                                                                        },
+                                                                    },
+                                                                ),
+                                                            },
+                                                        },
+                                                    ),
+                                                ],
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        ctx: Store,
+                                    },
+                                ),
+                            ],
+                            ctx: Store,
+                        },
+                    ),
+                    iter: Name(
+                        ExprName {
+                            range: 147..148,
+                            id: Name("z"),
+                            ctx: Load,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 150..153,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 150..153,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | for 1 in x: ...
+  |     ^ Syntax Error: Invalid assignment target
+2 | for "a" in x: ...
+3 | for *x and y in z: ...
+  |
+
+
+  |
+1 | for 1 in x: ...
+2 | for "a" in x: ...
+  |     ^^^ Syntax Error: Invalid assignment target
+3 | for *x and y in z: ...
+4 | for *x | y in z: ...
+  |
+
+
+  |
+1 | for 1 in x: ...
+2 | for "a" in x: ...
+3 | for *x and y in z: ...
+  |      ^^^^^^^ Syntax Error: Invalid assignment target
+4 | for *x | y in z: ...
+5 | for await x in z: ...
+  |
+
+
+  |
+2 | for "a" in x: ...
+3 | for *x and y in z: ...
+4 | for *x | y in z: ...
+  |      ^^^^^ Syntax Error: Invalid assignment target
+5 | for await x in z: ...
+6 | for yield x in y: ...
+  |
+
+
+  |
+3 | for *x and y in z: ...
+4 | for *x | y in z: ...
+5 | for await x in z: ...
+  |     ^^^^^^^ Syntax Error: Invalid assignment target
+6 | for yield x in y: ...
+7 | for [x, 1, y, *["a"]] in z: ...
+  |
+
+
+  |
+4 | for *x | y in z: ...
+5 | for await x in z: ...
+6 | for yield x in y: ...
+  |     ^^^^^^^^^^^^ Syntax Error: Yield expression cannot be used here
+7 | for [x, 1, y, *["a"]] in z: ...
+  |
+
+
+  |
+4 | for *x | y in z: ...
+5 | for await x in z: ...
+6 | for yield x in y: ...
+  |                 ^ Syntax Error: Expected 'in', found ':'
+7 | for [x, 1, y, *["a"]] in z: ...
+  |
+
+
+  |
+5 | for await x in z: ...
+6 | for yield x in y: ...
+7 | for [x, 1, y, *["a"]] in z: ...
+  |         ^ Syntax Error: Invalid assignment target
+  |
+
+
+  |
+5 | for await x in z: ...
+6 | for yield x in y: ...
+7 | for [x, 1, y, *["a"]] in z: ...
+  |                 ^^^ Syntax Error: Invalid assignment target
+  |

@@ -1,11 +1,12 @@
+use std::borrow::Cow;
+
 use itertools::Itertools;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_index::Indexer;
-use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::Tok;
+use ruff_python_parser::{TokenKind, Tokens};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -59,7 +60,7 @@ impl Violation for SingleLineImplicitStringConcatenation {
 ///
 /// By default, this rule will only trigger if the string literal is
 /// concatenated via a backslash. To disallow implicit string concatenation
-/// altogether, set the [`flake8-implicit-str-concat.allow-multiline`] option
+/// altogether, set the [`lint.flake8-implicit-str-concat.allow-multiline`] option
 /// to `false`.
 ///
 /// ## Example
@@ -77,7 +78,7 @@ impl Violation for SingleLineImplicitStringConcatenation {
 /// ```
 ///
 /// ## Options
-/// - `flake8-implicit-str-concat.allow-multiline`
+/// - `lint.flake8-implicit-str-concat.allow-multiline`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#maximum-line-length
 #[violation]
@@ -93,39 +94,38 @@ impl Violation for MultiLineImplicitStringConcatenation {
 /// ISC001, ISC002
 pub(crate) fn implicit(
     diagnostics: &mut Vec<Diagnostic>,
-    tokens: &[LexResult],
-    settings: &LinterSettings,
+    tokens: &Tokens,
     locator: &Locator,
     indexer: &Indexer,
+    settings: &LinterSettings,
 ) {
-    for ((a_tok, a_range), (b_tok, b_range)) in tokens
+    for (a_token, b_token) in tokens
         .iter()
-        .flatten()
-        .filter(|(tok, _)| {
-            !tok.is_comment()
+        .filter(|token| {
+            token.kind() != TokenKind::Comment
                 && (settings.flake8_implicit_str_concat.allow_multiline
-                    || !tok.is_non_logical_newline())
+                    || token.kind() != TokenKind::NonLogicalNewline)
         })
         .tuple_windows()
     {
-        let (a_range, b_range) = match (a_tok, b_tok) {
-            (Tok::String { .. }, Tok::String { .. }) => (*a_range, *b_range),
-            (Tok::String { .. }, Tok::FStringStart) => {
-                match indexer.fstring_ranges().innermost(b_range.start()) {
-                    Some(b_range) => (*a_range, b_range),
+        let (a_range, b_range) = match (a_token.kind(), b_token.kind()) {
+            (TokenKind::String, TokenKind::String) => (a_token.range(), b_token.range()),
+            (TokenKind::String, TokenKind::FStringStart) => {
+                match indexer.fstring_ranges().innermost(b_token.start()) {
+                    Some(b_range) => (a_token.range(), b_range),
                     None => continue,
                 }
             }
-            (Tok::FStringEnd, Tok::String { .. }) => {
-                match indexer.fstring_ranges().innermost(a_range.start()) {
-                    Some(a_range) => (a_range, *b_range),
+            (TokenKind::FStringEnd, TokenKind::String) => {
+                match indexer.fstring_ranges().innermost(a_token.start()) {
+                    Some(a_range) => (a_range, b_token.range()),
                     None => continue,
                 }
             }
-            (Tok::FStringEnd, Tok::FStringStart) => {
+            (TokenKind::FStringEnd, TokenKind::FStringStart) => {
                 match (
-                    indexer.fstring_ranges().innermost(a_range.start()),
-                    indexer.fstring_ranges().innermost(b_range.start()),
+                    indexer.fstring_ranges().innermost(a_token.start()),
+                    indexer.fstring_ranges().innermost(b_token.start()),
                 ) {
                     (Some(a_range), Some(b_range)) => (a_range, b_range),
                     _ => continue,
@@ -174,8 +174,15 @@ fn concatenate_strings(a_range: TextRange, b_range: TextRange, locator: &Locator
         return None;
     }
 
-    let a_body = &a_text[a_leading_quote.len()..a_text.len() - a_trailing_quote.len()];
+    let mut a_body =
+        Cow::Borrowed(&a_text[a_leading_quote.len()..a_text.len() - a_trailing_quote.len()]);
     let b_body = &b_text[b_leading_quote.len()..b_text.len() - b_trailing_quote.len()];
+
+    if a_leading_quote.find(['r', 'R']).is_none()
+        && matches!(b_body.bytes().next(), Some(b'0'..=b'7'))
+    {
+        normalize_ending_octal(&mut a_body);
+    }
 
     let concatenation = format!("{a_leading_quote}{a_body}{b_body}{a_trailing_quote}");
     let range = TextRange::new(a_range.start(), b_range.end());
@@ -184,4 +191,40 @@ fn concatenate_strings(a_range: TextRange, b_range: TextRange, locator: &Locator
         concatenation,
         range,
     )))
+}
+
+/// Pads an octal at the end of the string
+/// to three digits, if necessary.
+fn normalize_ending_octal(text: &mut Cow<'_, str>) {
+    // Early return for short strings
+    if text.len() < 2 {
+        return;
+    }
+
+    let mut rev_bytes = text.bytes().rev();
+    if let Some(last_byte @ b'0'..=b'7') = rev_bytes.next() {
+        // "\y" -> "\00y"
+        if has_odd_consecutive_backslashes(&mut rev_bytes.clone()) {
+            let prefix = &text[..text.len() - 2];
+            *text = Cow::Owned(format!("{prefix}\\00{}", last_byte as char));
+        }
+        // "\xy" -> "\0xy"
+        else if let Some(penultimate_byte @ b'0'..=b'7') = rev_bytes.next() {
+            if has_odd_consecutive_backslashes(&mut rev_bytes.clone()) {
+                let prefix = &text[..text.len() - 3];
+                *text = Cow::Owned(format!(
+                    "{prefix}\\0{}{}",
+                    penultimate_byte as char, last_byte as char
+                ));
+            }
+        }
+    }
+}
+
+fn has_odd_consecutive_backslashes(mut itr: impl Iterator<Item = u8>) -> bool {
+    let mut odd_backslashes = false;
+    while let Some(b'\\') = itr.next() {
+        odd_backslashes = !odd_backslashes;
+    }
+    odd_backslashes
 }

@@ -1,0 +1,209 @@
+---
+source: crates/ruff_linter/src/rules/refurb/mod.rs
+---
+FURB110.py:1:5: FURB110 [*] Replace ternary `if` expression with `or` operator
+  |
+1 | z = x if x else y  # FURB110
+  |     ^^^^^^^^^^^^^ FURB110
+2 | 
+3 | z = x \
+  |
+  = help: Replace with `or` operator
+
+ℹ Safe fix
+1   |-z = x if x else y  # FURB110
+  1 |+z = x or y  # FURB110
+2 2 | 
+3 3 | z = x \
+4 4 |     if x else y  # FURB110
+
+FURB110.py:3:5: FURB110 [*] Replace ternary `if` expression with `or` operator
+  |
+1 |   z = x if x else y  # FURB110
+2 |   
+3 |   z = x \
+  |  _____^
+4 | |     if x else y  # FURB110
+  | |_______________^ FURB110
+5 |   
+6 |   z = x if x \
+  |
+  = help: Replace with `or` operator
+
+ℹ Safe fix
+1 1 | z = x if x else y  # FURB110
+2 2 | 
+3   |-z = x \
+4   |-    if x else y  # FURB110
+  3 |+z = x or y  # FURB110
+5 4 | 
+6 5 | z = x if x \
+7 6 |     else  \
+
+FURB110.py:6:5: FURB110 [*] Replace ternary `if` expression with `or` operator
+   |
+ 4 |       if x else y  # FURB110
+ 5 |   
+ 6 |   z = x if x \
+   |  _____^
+ 7 | |     else  \
+ 8 | |         y  # FURB110
+   | |_________^ FURB110
+ 9 |   
+10 |   z = x() if x() else y()  # FURB110
+   |
+   = help: Replace with `or` operator
+
+ℹ Safe fix
+3 3 | z = x \
+4 4 |     if x else y  # FURB110
+5 5 | 
+6   |-z = x if x \
+7   |-    else  \
+8   |-        y  # FURB110
+  6 |+z = x or y  # FURB110
+9 7 | 
+10 8 | z = x() if x() else y()  # FURB110
+11 9 | 
+
+FURB110.py:10:5: FURB110 [*] Replace ternary `if` expression with `or` operator
+   |
+ 8 |         y  # FURB110
+ 9 | 
+10 | z = x() if x() else y()  # FURB110
+   |     ^^^^^^^^^^^^^^^^^^^ FURB110
+11 | 
+12 | # FURB110
+   |
+   = help: Replace with `or` operator
+
+ℹ Unsafe fix
+7  7  |     else  \
+8  8  |         y  # FURB110
+9  9  | 
+10    |-z = x() if x() else y()  # FURB110
+   10 |+z = x() or y()  # FURB110
+11 11 | 
+12 12 | # FURB110
+13 13 | z = x if (
+
+FURB110.py:13:5: FURB110 [*] Replace ternary `if` expression with `or` operator
+   |
+12 |   # FURB110
+13 |   z = x if (
+   |  _____^
+14 | |     # Test for x.
+15 | |     x
+16 | | ) else (
+17 | |     # Test for y.
+18 | |     y
+19 | | )
+   | |_^ FURB110
+20 |   
+21 |   # FURB110
+   |
+   = help: Replace with `or` operator
+
+ℹ Safe fix
+10 10 | z = x() if x() else y()  # FURB110
+11 11 | 
+12 12 | # FURB110
+13    |-z = x if (
+   13 |+z = (
+14 14 |     # Test for x.
+15 15 |     x
+16    |-) else (
+   16 |+) or (
+17 17 |     # Test for y.
+18 18 |     y
+19 19 | )
+
+FURB110.py:23:5: FURB110 [*] Replace ternary `if` expression with `or` operator
+   |
+21 |   # FURB110
+22 |   z = (
+23 |       x if (
+   |  _____^
+24 | |         # Test for x.
+25 | |         x
+26 | |     ) else (
+27 | |         # Test for y.
+28 | |         y
+29 | |     )
+   | |_____^ FURB110
+30 |   )
+   |
+   = help: Replace with `or` operator
+
+ℹ Safe fix
+20 20 | 
+21 21 | # FURB110
+22 22 | z = (
+23    |-    x if (
+   23 |+    (
+24 24 |         # Test for x.
+25 25 |         x
+26    |-    ) else (
+   26 |+    ) or (
+27 27 |         # Test for y.
+28 28 |         y
+29 29 |     )
+
+FURB110.py:34:5: FURB110 [*] Replace ternary `if` expression with `or` operator
+   |
+32 |   # FURB110
+33 |   z = (
+34 |       x if
+   |  _____^
+35 | |     # If true, use x.
+36 | |     x
+37 | |     # Otherwise, use y.
+38 | |     else
+39 | |     y
+   | |_____^ FURB110
+40 |   )
+   |
+   = help: Replace with `or` operator
+
+ℹ Safe fix
+31 31 | 
+32 32 | # FURB110
+33 33 | z = (
+34    |-    x if
+35    |-    # If true, use x.
+36    |-    x
+37    |-    # Otherwise, use y.
+38    |-    else
+39    |-    y
+   34 |+    x or y
+40 35 | )
+41 36 | 
+42 37 | # FURB110
+
+FURB110.py:44:5: FURB110 [*] Replace ternary `if` expression with `or` operator
+   |
+42 |   # FURB110
+43 |   z = (
+44 |       x
+   |  _____^
+45 | |     if x
+46 | |     else y
+47 | |     if y > 0
+48 | |     else None
+   | |_____________^ FURB110
+49 |   )
+   |
+   = help: Replace with `or` operator
+
+ℹ Safe fix
+41 41 | 
+42 42 | # FURB110
+43 43 | z = (
+44    |-    x
+45    |-    if x
+46    |-    else y
+   44 |+    x or (y
+47 45 |     if y > 0
+48    |-    else None
+   46 |+    else None)
+49 47 | )

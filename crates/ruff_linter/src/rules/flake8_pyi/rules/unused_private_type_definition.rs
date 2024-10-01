@@ -16,7 +16,7 @@ use crate::checkers::ast::Checker;
 /// should either be used, made public, or removed to avoid confusion.
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// import typing
 /// import typing_extensions
 ///
@@ -45,29 +45,27 @@ impl Violation for UnusedPrivateTypeVar {
 ///
 /// ## Why is this bad?
 /// A private `typing.Protocol` that is defined but not used is likely a
-/// mistake, and should either be used, made public, or removed to avoid
+/// mistake. It should either be used, made public, or removed to avoid
 /// confusion.
 ///
 /// ## Example
-/// ```python
-/// import typing
 ///
+/// ```pyi
+/// import typing
 ///
 /// class _PrivateProtocol(typing.Protocol):
 ///     foo: int
 /// ```
 ///
 /// Use instead:
-/// ```python
-/// import typing
 ///
+/// ```pyi
+/// import typing
 ///
 /// class _PrivateProtocol(typing.Protocol):
 ///     foo: int
 ///
-///
-/// def func(arg: _PrivateProtocol) -> None:
-///     ...
+/// def func(arg: _PrivateProtocol) -> None: ...
 /// ```
 #[violation]
 pub struct UnusedPrivateProtocol {
@@ -83,29 +81,29 @@ impl Violation for UnusedPrivateProtocol {
 }
 
 /// ## What it does
-/// Checks for the presence of unused private `typing.TypeAlias` definitions.
+/// Checks for the presence of unused private type aliases.
 ///
 /// ## Why is this bad?
-/// A private `typing.TypeAlias` that is defined but not used is likely a
-/// mistake, and should either be used, made public, or removed to avoid
+/// A private type alias that is defined but not used is likely a
+/// mistake. It should either be used, made public, or removed to avoid
 /// confusion.
 ///
 /// ## Example
-/// ```python
+///
+/// ```pyi
 /// import typing
 ///
 /// _UnusedTypeAlias: typing.TypeAlias = int
 /// ```
 ///
 /// Use instead:
-/// ```python
+///
+/// ```pyi
 /// import typing
 ///
 /// _UsedTypeAlias: typing.TypeAlias = int
 ///
-///
-/// def func(arg: _UsedTypeAlias) -> _UsedTypeAlias:
-///     ...
+/// def func(arg: _UsedTypeAlias) -> _UsedTypeAlias: ...
 /// ```
 #[violation]
 pub struct UnusedPrivateTypeAlias {
@@ -125,29 +123,27 @@ impl Violation for UnusedPrivateTypeAlias {
 ///
 /// ## Why is this bad?
 /// A private `typing.TypedDict` that is defined but not used is likely a
-/// mistake, and should either be used, made public, or removed to avoid
+/// mistake. It should either be used, made public, or removed to avoid
 /// confusion.
 ///
 /// ## Example
-/// ```python
-/// import typing
 ///
+/// ```pyi
+/// import typing
 ///
 /// class _UnusedPrivateTypedDict(typing.TypedDict):
 ///     foo: list[int]
 /// ```
 ///
 /// Use instead:
-/// ```python
-/// import typing
 ///
+/// ```pyi
+/// import typing
 ///
 /// class _UsedPrivateTypedDict(typing.TypedDict):
 ///     foo: set[str]
 ///
-///
-/// def func(arg: _UsedPrivateTypedDict) -> _UsedPrivateTypedDict:
-///     ...
+/// def func(arg: _UsedPrivateTypedDict) -> _UsedPrivateTypedDict: ...
 /// ```
 #[violation]
 pub struct UnusedPrivateTypedDict {
@@ -195,17 +191,22 @@ pub(crate) fn unused_private_type_var(
         };
 
         let semantic = checker.semantic();
-        let Some(type_var_like_kind) = semantic.resolve_call_path(func).and_then(|call_path| {
-            if semantic.match_typing_call_path(&call_path, "TypeVar") {
-                Some("TypeVar")
-            } else if semantic.match_typing_call_path(&call_path, "ParamSpec") {
-                Some("ParamSpec")
-            } else if semantic.match_typing_call_path(&call_path, "TypeVarTuple") {
-                Some("TypeVarTuple")
-            } else {
-                None
-            }
-        }) else {
+        let Some(type_var_like_kind) =
+            semantic
+                .resolve_qualified_name(func)
+                .and_then(|qualified_name| {
+                    if semantic.match_typing_qualified_name(&qualified_name, "TypeVar") {
+                        Some("TypeVar")
+                    } else if semantic.match_typing_qualified_name(&qualified_name, "ParamSpec") {
+                        Some("ParamSpec")
+                    } else if semantic.match_typing_qualified_name(&qualified_name, "TypeVarTuple")
+                    {
+                        Some("TypeVarTuple")
+                    } else {
+                        None
+                    }
+                })
+        else {
             continue;
         };
 

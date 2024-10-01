@@ -3,26 +3,25 @@
 use std::borrow::Cow;
 use std::fs::File;
 use std::io;
+use std::io::Write;
 use std::ops::{Add, AddAssign};
 use std::path::Path;
 
 use anyhow::{Context, Result};
 use colored::Colorize;
-use log::{debug, error, warn};
+use log::{debug, warn};
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
+use ruff_linter::codes::Rule;
 use ruff_linter::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult, ParseSource};
-use ruff_linter::logging::DisplayParseError;
-use ruff_linter::message::Message;
+use ruff_linter::message::{Message, SyntaxErrorMessage};
 use ruff_linter::pyproject_toml::lint_pyproject_toml;
-use ruff_linter::registry::AsRule;
 use ruff_linter::settings::types::UnsafeFixes;
 use ruff_linter::settings::{flags, LinterSettings};
 use ruff_linter::source_kind::{SourceError, SourceKind};
-use ruff_linter::{fs, IOError, SyntaxError};
+use ruff_linter::{fs, IOError};
 use ruff_notebook::{Notebook, NotebookError, NotebookIndex};
-use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::{PySourceType, SourceType, TomlSourceType};
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::{TextRange, TextSize};
@@ -34,20 +33,17 @@ use crate::cache::{Cache, FileCacheKey, LintCacheData};
 pub(crate) struct Diagnostics {
     pub(crate) messages: Vec<Message>,
     pub(crate) fixed: FixMap,
-    pub(crate) imports: ImportMap,
     pub(crate) notebook_indexes: FxHashMap<String, NotebookIndex>,
 }
 
 impl Diagnostics {
     pub(crate) fn new(
         messages: Vec<Message>,
-        imports: ImportMap,
         notebook_indexes: FxHashMap<String, NotebookIndex>,
     ) -> Self {
         Self {
             messages,
             fixed: FixMap::default(),
-            imports,
             notebook_indexes,
         }
     }
@@ -58,58 +54,61 @@ impl Diagnostics {
         path: Option<&Path>,
         settings: &LinterSettings,
     ) -> Self {
-        let diagnostic = match err {
+        match err {
             // IO errors.
             SourceError::Io(_)
             | SourceError::Notebook(NotebookError::Io(_) | NotebookError::Json(_)) => {
-                Diagnostic::new(
-                    IOError {
-                        message: err.to_string(),
-                    },
-                    TextRange::default(),
-                )
+                if settings.rules.enabled(Rule::IOError) {
+                    let name = path.map_or_else(|| "-".into(), Path::to_string_lossy);
+                    let source_file = SourceFileBuilder::new(name, "").finish();
+                    Self::new(
+                        vec![Message::from_diagnostic(
+                            Diagnostic::new(
+                                IOError {
+                                    message: err.to_string(),
+                                },
+                                TextRange::default(),
+                            ),
+                            source_file,
+                            TextSize::default(),
+                        )],
+                        FxHashMap::default(),
+                    )
+                } else {
+                    match path {
+                        Some(path) => {
+                            warn!(
+                                "{}{}{} {err}",
+                                "Failed to lint ".bold(),
+                                fs::relativize_path(path).bold(),
+                                ":".bold()
+                            );
+                        }
+                        None => {
+                            warn!("{}{} {err}", "Failed to lint".bold(), ":".bold());
+                        }
+                    }
+
+                    Self::default()
+                }
             }
             // Syntax errors.
             SourceError::Notebook(
                 NotebookError::InvalidJson(_)
                 | NotebookError::InvalidSchema(_)
                 | NotebookError::InvalidFormat(_),
-            ) => Diagnostic::new(
-                SyntaxError {
-                    message: err.to_string(),
-                },
-                TextRange::default(),
-            ),
-        };
-
-        if settings.rules.enabled(diagnostic.kind.rule()) {
-            let name = path.map_or_else(|| "-".into(), Path::to_string_lossy);
-            let dummy = SourceFileBuilder::new(name, "").finish();
-            Self::new(
-                vec![Message::from_diagnostic(
-                    diagnostic,
-                    dummy,
-                    TextSize::default(),
-                )],
-                ImportMap::default(),
-                FxHashMap::default(),
-            )
-        } else {
-            match path {
-                Some(path) => {
-                    warn!(
-                        "{}{}{} {err}",
-                        "Failed to lint ".bold(),
-                        fs::relativize_path(path).bold(),
-                        ":".bold()
-                    );
-                }
-                None => {
-                    warn!("{}{} {err}", "Failed to lint".bold(), ":".bold());
-                }
+            ) => {
+                let name = path.map_or_else(|| "-".into(), Path::to_string_lossy);
+                let dummy = SourceFileBuilder::new(name, "").finish();
+                Self::new(
+                    vec![Message::SyntaxError(SyntaxErrorMessage {
+                        message: err.to_string(),
+                        range: TextRange::default(),
+                        file: dummy,
+                    })],
+                    FxHashMap::default(),
+                )
             }
-
-            Self::default()
         }
     }
 }
@@ -126,7 +125,6 @@ impl Add for Diagnostics {
 impl AddAssign for Diagnostics {
     fn add_assign(&mut self, other: Self) {
         self.messages.extend(other.messages);
-        self.imports.extend(other.imports);
         self.fixed += other.fixed;
         self.notebook_indexes.extend(other.notebook_indexes);
     }
@@ -191,7 +189,7 @@ pub(crate) fn lint_path(
 ) -> Result<Diagnostics> {
     // Check the cache.
     let caching = match cache {
-        Some(cache) if noqa.into() => {
+        Some(cache) if noqa.is_enabled() => {
             let relative_path = cache
                 .relative_path(path)
                 .expect("wrong package cache for file");
@@ -266,8 +264,8 @@ pub(crate) fn lint_path(
     // Lint the file.
     let (
         LinterResult {
-            data: (messages, imports),
-            error: parse_error,
+            messages,
+            has_syntax_error: has_error,
         },
         transformed,
         fixed,
@@ -289,10 +287,10 @@ pub(crate) fn lint_path(
                 match fix_mode {
                     flags::FixMode::Apply => transformed.write(&mut File::create(path)?)?,
                     flags::FixMode::Diff => {
-                        source_kind.diff(
-                            transformed.as_ref(),
-                            Some(path),
+                        write!(
                             &mut io::stdout().lock(),
+                            "{}",
+                            source_kind.diff(&transformed, Some(path)).unwrap()
                         )?;
                     }
                     flags::FixMode::Generate => {}
@@ -334,11 +332,9 @@ pub(crate) fn lint_path(
         (result, transformed, fixed)
     };
 
-    let imports = imports.unwrap_or_default();
-
     if let Some((cache, relative_path, key)) = caching {
         // We don't cache parsing errors.
-        if parse_error.is_none() {
+        if !has_error {
             // `FixMode::Apply` and `FixMode::Diff` rely on side-effects (writing to disk,
             // and writing the diff to stdout, respectively). If a file has diagnostics, we
             // need to avoid reading from and writing to the cache in these modes.
@@ -353,19 +349,11 @@ pub(crate) fn lint_path(
                     &key,
                     LintCacheData::from_messages(
                         &messages,
-                        imports.clone(),
                         transformed.as_ipy_notebook().map(Notebook::index).cloned(),
                     ),
                 );
             }
         }
-    }
-
-    if let Some(error) = parse_error {
-        error!(
-            "{}",
-            DisplayParseError::from_source_kind(error, Some(path.to_path_buf()), &transformed)
-        );
     }
 
     let notebook_indexes = if let SourceKind::IpyNotebook(notebook) = transformed {
@@ -377,7 +365,6 @@ pub(crate) fn lint_path(
     Ok(Diagnostics {
         messages,
         fixed: FixMap::from_iter([(fs::relativize_path(path), fixed)]),
-        imports,
         notebook_indexes,
     })
 }
@@ -413,48 +400,66 @@ pub(crate) fn lint_stdin(
     };
 
     // Lint the inputs.
-    let (
-        LinterResult {
-            data: (messages, imports),
-            error: parse_error,
-        },
-        transformed,
-        fixed,
-    ) = if matches!(fix_mode, flags::FixMode::Apply | flags::FixMode::Diff) {
-        if let Ok(FixerResult {
-            result,
-            transformed,
-            fixed,
-        }) = lint_fix(
-            path.unwrap_or_else(|| Path::new("-")),
-            package,
-            noqa,
-            settings.unsafe_fixes,
-            &settings.linter,
-            &source_kind,
-            source_type,
-        ) {
-            match fix_mode {
-                flags::FixMode::Apply => {
-                    // Write the contents to stdout, regardless of whether any errors were fixed.
-                    transformed.write(&mut io::stdout().lock())?;
-                }
-                flags::FixMode::Diff => {
-                    // But only write a diff if it's non-empty.
-                    if !fixed.is_empty() {
-                        source_kind.diff(transformed.as_ref(), path, &mut io::stdout().lock())?;
+    let (LinterResult { messages, .. }, transformed, fixed) =
+        if matches!(fix_mode, flags::FixMode::Apply | flags::FixMode::Diff) {
+            if let Ok(FixerResult {
+                result,
+                transformed,
+                fixed,
+            }) = lint_fix(
+                path.unwrap_or_else(|| Path::new("-")),
+                package,
+                noqa,
+                settings.unsafe_fixes,
+                &settings.linter,
+                &source_kind,
+                source_type,
+            ) {
+                match fix_mode {
+                    flags::FixMode::Apply => {
+                        // Write the contents to stdout, regardless of whether any errors were fixed.
+                        transformed.write(&mut io::stdout().lock())?;
                     }
+                    flags::FixMode::Diff => {
+                        // But only write a diff if it's non-empty.
+                        if !fixed.is_empty() {
+                            write!(
+                                &mut io::stdout().lock(),
+                                "{}",
+                                source_kind.diff(&transformed, path).unwrap()
+                            )?;
+                        }
+                    }
+                    flags::FixMode::Generate => {}
                 }
-                flags::FixMode::Generate => {}
-            }
-            let transformed = if let Cow::Owned(transformed) = transformed {
-                transformed
+                let transformed = if let Cow::Owned(transformed) = transformed {
+                    transformed
+                } else {
+                    source_kind
+                };
+                (result, transformed, fixed)
             } else {
-                source_kind
-            };
-            (result, transformed, fixed)
+                // If we fail to fix, lint the original source code.
+                let result = lint_only(
+                    path.unwrap_or_else(|| Path::new("-")),
+                    package,
+                    &settings.linter,
+                    noqa,
+                    &source_kind,
+                    source_type,
+                    ParseSource::None,
+                );
+
+                // Write the contents to stdout anyway.
+                if fix_mode.is_apply() {
+                    source_kind.write(&mut io::stdout().lock())?;
+                }
+
+                let transformed = source_kind;
+                let fixed = FxHashMap::default();
+                (result, transformed, fixed)
+            }
         } else {
-            // If we fail to fix, lint the original source code.
             let result = lint_only(
                 path.unwrap_or_else(|| Path::new("-")),
                 package,
@@ -464,39 +469,10 @@ pub(crate) fn lint_stdin(
                 source_type,
                 ParseSource::None,
             );
-
-            // Write the contents to stdout anyway.
-            if fix_mode.is_apply() {
-                source_kind.write(&mut io::stdout().lock())?;
-            }
-
             let transformed = source_kind;
             let fixed = FxHashMap::default();
             (result, transformed, fixed)
-        }
-    } else {
-        let result = lint_only(
-            path.unwrap_or_else(|| Path::new("-")),
-            package,
-            &settings.linter,
-            noqa,
-            &source_kind,
-            source_type,
-            ParseSource::None,
-        );
-        let transformed = source_kind;
-        let fixed = FxHashMap::default();
-        (result, transformed, fixed)
-    };
-
-    let imports = imports.unwrap_or_default();
-
-    if let Some(error) = parse_error {
-        error!(
-            "{}",
-            DisplayParseError::from_source_kind(error, path.map(Path::to_path_buf), &transformed)
-        );
-    }
+        };
 
     let notebook_indexes = if let SourceKind::IpyNotebook(notebook) = transformed {
         FxHashMap::from_iter([(
@@ -513,7 +489,6 @@ pub(crate) fn lint_stdin(
             fs::relativize_path(path.unwrap_or_else(|| Path::new("-"))),
             fixed,
         )]),
-        imports,
         notebook_indexes,
     })
 }

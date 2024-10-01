@@ -1,0 +1,126 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/statements/match/as_pattern_2.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..190,
+        body: [
+            Match(
+                StmtMatch {
+                    range: 0..176,
+                    subject: Name(
+                        ExprName {
+                            range: 6..13,
+                            id: Name("subject"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 159..176,
+                            pattern: MatchAs(
+                                PatternMatchAs {
+                                    range: 164..170,
+                                    pattern: Some(
+                                        MatchAs(
+                                            PatternMatchAs {
+                                                range: 164..165,
+                                                pattern: None,
+                                                name: Some(
+                                                    Identifier {
+                                                        id: Name("x"),
+                                                        range: 164..165,
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                    name: Some(
+                                        Identifier {
+                                            id: Name("y"),
+                                            range: 169..170,
+                                        },
+                                    ),
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                AnnAssign(
+                                    StmtAnnAssign {
+                                        range: 171..176,
+                                        target: UnaryOp(
+                                            ExprUnaryOp {
+                                                range: 171..175,
+                                                op: UAdd,
+                                                operand: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 173..175,
+                                                        value: Complex {
+                                                            real: 0.0,
+                                                            imag: 1.0,
+                                                        },
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                        annotation: Name(
+                                            ExprName {
+                                                range: 176..176,
+                                                id: Name(""),
+                                                ctx: Invalid,
+                                            },
+                                        ),
+                                        value: None,
+                                        simple: false,
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+            Pass(
+                StmtPass {
+                    range: 185..189,
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+2 |     # This `as` pattern is unparenthesied so the parser never takes the path
+3 |     # where it might be confused as a complex literal pattern.
+4 |     case x as y + 1j:
+  |                 ^ Syntax Error: Expected ':', found '+'
+5 |         pass
+  |
+
+
+  |
+2 |     # This `as` pattern is unparenthesied so the parser never takes the path
+3 |     # where it might be confused as a complex literal pattern.
+4 |     case x as y + 1j:
+  |                      ^ Syntax Error: Expected an expression
+5 |         pass
+  |
+
+
+  |
+3 |     # where it might be confused as a complex literal pattern.
+4 |     case x as y + 1j:
+5 |         pass
+  | ^^^^^^^^ Syntax Error: Expected dedent, found indent
+  |
+
+
+  |
+4 |     case x as y + 1j:
+5 |         pass
+  |

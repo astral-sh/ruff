@@ -95,7 +95,7 @@ impl<'a> Scope<'a> {
     }
 
     /// Returns a tuple of the name and ID of all bindings defined in this scope.
-    pub fn bindings(&self) -> impl Iterator<Item = (&str, BindingId)> + '_ {
+    pub fn bindings(&self) -> impl Iterator<Item = (&'a str, BindingId)> + '_ {
         self.bindings.iter().map(|(&name, &id)| (name, id))
     }
 
@@ -104,14 +104,6 @@ impl<'a> Scope<'a> {
     pub fn get_all(&self, name: &str) -> impl Iterator<Item = BindingId> + '_ {
         std::iter::successors(self.bindings.get(name).copied(), |id| {
             self.shadowed_bindings.get(id).copied()
-        })
-    }
-
-    /// Like [`Scope::binding_ids`], but returns all bindings that were added to the scope,
-    /// including those that were shadowed by later bindings.
-    pub fn all_binding_ids(&self) -> impl Iterator<Item = BindingId> + '_ {
-        self.bindings.values().copied().flat_map(|id| {
-            std::iter::successors(Some(id), |id| self.shadowed_bindings.get(id).copied())
         })
     }
 
@@ -142,11 +134,6 @@ impl<'a> Scope<'a> {
     /// Returns `true` if this scope contains a star import (e.g., `from sys import *`).
     pub fn uses_star_imports(&self) -> bool {
         !self.star_imports.is_empty()
-    }
-
-    /// Returns an iterator over all star imports (e.g., `from sys import *`) in this scope.
-    pub fn star_imports(&self) -> impl Iterator<Item = &StarImport<'a>> {
-        self.star_imports.iter()
     }
 
     /// Set the globals pointer for this scope.
@@ -185,6 +172,7 @@ pub enum ScopeKind<'a> {
     Function(&'a ast::StmtFunctionDef),
     Generator,
     Module,
+    /// A Python 3.12+ [annotation scope](https://docs.python.org/3/reference/executionmodel.html#annotation-scopes)
     Type,
     Lambda(&'a ast::ExprLambda),
 }
@@ -238,7 +226,7 @@ impl<'a> Scopes<'a> {
     }
 
     /// Returns an iterator over all [`Scope`] ancestors, starting from the given [`ScopeId`].
-    pub fn ancestors(&self, scope_id: ScopeId) -> impl Iterator<Item = &Scope> + '_ {
+    pub fn ancestors(&self, scope_id: ScopeId) -> impl Iterator<Item = &Scope<'a>> + '_ {
         std::iter::successors(Some(&self[scope_id]), |&scope| {
             scope.parent.map(|scope_id| &self[scope_id])
         })

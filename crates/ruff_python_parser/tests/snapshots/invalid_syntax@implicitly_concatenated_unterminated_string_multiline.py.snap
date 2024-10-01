@@ -1,0 +1,243 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/implicitly_concatenated_unterminated_string_multiline.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..85,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..31,
+                    value: FString(
+                        ExprFString {
+                            range: 6..31,
+                            value: FStringValue {
+                                inner: Concatenated(
+                                    [
+                                        Literal(
+                                            StringLiteral {
+                                                range: 6..13,
+                                                value: "hello",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                },
+                                            },
+                                        ),
+                                        FString(
+                                            FString {
+                                                range: 18..31,
+                                                elements: [
+                                                    Literal(
+                                                        FStringLiteralElement {
+                                                            range: 20..26,
+                                                            value: "world ",
+                                                        },
+                                                    ),
+                                                    Expression(
+                                                        FStringExpressionElement {
+                                                            range: 26..29,
+                                                            expression: Name(
+                                                                ExprName {
+                                                                    range: 27..28,
+                                                                    id: Name("x"),
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                            debug_text: None,
+                                                            conversion: None,
+                                                            format_spec: None,
+                                                        },
+                                                    ),
+                                                ],
+                                                flags: FStringFlags {
+                                                    quote_style: Single,
+                                                    prefix: Regular,
+                                                    triple_quoted: false,
+                                                },
+                                            },
+                                        ),
+                                    ],
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 32..37,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 32..37,
+                            left: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 32..33,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                            op: Add,
+                            right: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 36..37,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 38..51,
+                    value: StringLiteral(
+                        ExprStringLiteral {
+                            range: 44..51,
+                            value: StringLiteralValue {
+                                inner: Single(
+                                    StringLiteral {
+                                        range: 44..51,
+                                        value: "first",
+                                        flags: StringLiteralFlags {
+                                            quote_style: Single,
+                                            prefix: Empty,
+                                            triple_quoted: false,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 68..76,
+                    value: FString(
+                        ExprFString {
+                            range: 68..76,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 68..76,
+                                            elements: [
+                                                Literal(
+                                                    FStringLiteralElement {
+                                                        range: 70..75,
+                                                        value: "third",
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Single,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 79..84,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 79..84,
+                            left: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 79..80,
+                                    value: Int(
+                                        2,
+                                    ),
+                                },
+                            ),
+                            op: Add,
+                            right: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 83..84,
+                                    value: Int(
+                                        2,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | (
+2 |     'hello'
+3 |     f'world {x}
+  |                 Syntax Error: f-string: unterminated string
+4 | )
+5 | 1 + 1
+  |
+
+
+  |
+2 |     'hello'
+3 |     f'world {x}
+4 | )
+  | ^ Syntax Error: Expected an f-string element or the end of the f-string
+5 | 1 + 1
+6 | (
+  |
+
+
+  |
+2 |     'hello'
+3 |     f'world {x}
+4 | )
+  |  ^ Syntax Error: Expected FStringEnd, found newline
+5 | 1 + 1
+6 | (
+7 |     'first'
+  |
+
+
+   |
+ 6 | (
+ 7 |     'first'
+ 8 |     'second
+   |     ^^^^^^^ Syntax Error: missing closing quote in string literal
+ 9 |     f'third'
+10 | )
+   |
+
+
+   |
+ 8 |     'second
+ 9 |     f'third'
+10 | )
+   | ^ Syntax Error: Expected a statement
+11 | 2 + 2
+   |
+
+
+   |
+ 8 |     'second
+ 9 |     f'third'
+10 | )
+   |  ^ Syntax Error: Expected a statement
+11 | 2 + 2
+   |

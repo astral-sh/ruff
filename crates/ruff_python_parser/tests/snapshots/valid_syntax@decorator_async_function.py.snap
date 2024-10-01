@@ -1,0 +1,59 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/decorator_async_function.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..32,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 0..31,
+                    is_async: true,
+                    decorator_list: [
+                        Decorator {
+                            range: 0..10,
+                            expression: Name(
+                                ExprName {
+                                    range: 1..10,
+                                    id: Name("decorator"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 21..24,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 24..26,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 28..31,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 28..31,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```

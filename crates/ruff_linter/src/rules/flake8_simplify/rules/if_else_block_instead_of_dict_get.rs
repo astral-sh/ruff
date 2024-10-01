@@ -122,7 +122,7 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &mut Checker, stmt_if: 
     else {
         return;
     };
-    let [test_dict] = test_dict.as_slice() else {
+    let [test_dict] = &**test_dict else {
         return;
     };
     let (expected_var, expected_value, default_var, default_value) = match ops[..] {
@@ -161,7 +161,9 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &mut Checker, stmt_if: 
     }
 
     // Check that the default value is not "complex".
-    if contains_effect(default_value, |id| checker.semantic().is_builtin(id)) {
+    if contains_effect(default_value, |id| {
+        checker.semantic().has_builtin_binding(id)
+    }) {
         return;
     }
 
@@ -176,8 +178,8 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &mut Checker, stmt_if: 
     let node3 = ast::ExprCall {
         func: Box::new(node2.into()),
         arguments: Arguments {
-            args: vec![node1, node],
-            keywords: vec![],
+            args: Box::from([node1, node]),
+            keywords: Box::from([]),
             range: TextRange::default(),
         },
         range: TextRange::default(),
@@ -207,7 +209,10 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &mut Checker, stmt_if: 
         },
         stmt_if.range(),
     );
-    if !checker.indexer().has_comments(stmt_if, checker.locator()) {
+    if !checker
+        .comment_ranges()
+        .has_comments(stmt_if, checker.locator())
+    {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             contents,
             stmt_if.range(),
@@ -224,10 +229,6 @@ pub(crate) fn if_exp_instead_of_dict_get(
     body: &Expr,
     orelse: &Expr,
 ) {
-    if checker.settings.preview.is_disabled() {
-        return;
-    }
-
     let Expr::Compare(ast::ExprCompare {
         left: test_key,
         ops,
@@ -237,11 +238,11 @@ pub(crate) fn if_exp_instead_of_dict_get(
     else {
         return;
     };
-    let [test_dict] = test_dict.as_slice() else {
+    let [test_dict] = &**test_dict else {
         return;
     };
 
-    let (body, default_value) = match ops.as_slice() {
+    let (body, default_value) = match &**ops {
         [CmpOp::In] => (body, orelse),
         [CmpOp::NotIn] => (orelse, body),
         _ => {
@@ -265,7 +266,9 @@ pub(crate) fn if_exp_instead_of_dict_get(
     }
 
     // Check that the default value is not "complex".
-    if contains_effect(default_value, |id| checker.semantic().is_builtin(id)) {
+    if contains_effect(default_value, |id| {
+        checker.semantic().has_builtin_binding(id)
+    }) {
         return;
     }
 
@@ -280,8 +283,8 @@ pub(crate) fn if_exp_instead_of_dict_get(
     let fixed_node = ast::ExprCall {
         func: Box::new(dict_get_node.into()),
         arguments: Arguments {
-            args: vec![dict_key_node, default_value_node],
-            keywords: vec![],
+            args: Box::from([dict_key_node, default_value_node]),
+            keywords: Box::from([]),
             range: TextRange::default(),
         },
         range: TextRange::default(),
@@ -295,7 +298,10 @@ pub(crate) fn if_exp_instead_of_dict_get(
         },
         expr.range(),
     );
-    if !checker.indexer().has_comments(expr, checker.locator()) {
+    if !checker
+        .comment_ranges()
+        .has_comments(expr, checker.locator())
+    {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             contents,
             expr.range(),

@@ -12,13 +12,16 @@ mod tests {
 
     use crate::assert_messages;
     use crate::registry::Rule;
+    use crate::settings::types::PreviewMode;
     use crate::settings::LinterSettings;
     use crate::test::test_path;
 
     #[test_case(Rule::UnnecessaryCallAroundSorted, Path::new("C413.py"))]
     #[test_case(Rule::UnnecessaryCollectionCall, Path::new("C408.py"))]
     #[test_case(Rule::UnnecessaryComprehension, Path::new("C416.py"))]
-    #[test_case(Rule::UnnecessaryComprehensionAnyAll, Path::new("C419.py"))]
+    #[test_case(Rule::UnnecessaryComprehensionInCall, Path::new("C419.py"))]
+    #[test_case(Rule::UnnecessaryComprehensionInCall, Path::new("C419_2.py"))]
+    #[test_case(Rule::UnnecessaryDictComprehensionForIterable, Path::new("C420.py"))]
     #[test_case(Rule::UnnecessaryDoubleCastOrProcess, Path::new("C414.py"))]
     #[test_case(Rule::UnnecessaryGeneratorDict, Path::new("C402.py"))]
     #[test_case(Rule::UnnecessaryGeneratorList, Path::new("C400.py"))]
@@ -38,6 +41,25 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_comprehensions").join(path).as_path(),
             &LinterSettings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::UnnecessaryLiteralWithinTupleCall, Path::new("C409.py"))]
+    #[test_case(Rule::UnnecessaryComprehensionInCall, Path::new("C419_1.py"))]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_comprehensions").join(path).as_path(),
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..LinterSettings::for_rule(rule_code)
+            },
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

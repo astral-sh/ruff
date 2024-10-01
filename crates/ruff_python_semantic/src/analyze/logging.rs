@@ -1,5 +1,5 @@
-use ruff_python_ast::call_path::{collect_call_path, from_qualified_name};
 use ruff_python_ast::helpers::is_const_true;
+use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_ast::{self as ast, Arguments, Expr, Keyword};
 
 use crate::model::SemanticModel;
@@ -25,11 +25,23 @@ pub fn is_logger_candidate(
         return false;
     };
 
+    // If the attribute is an inline instantiation, match against known constructors.
+    if let Expr::Call(ast::ExprCall { func, .. }) = &**value {
+        return semantic
+            .resolve_qualified_name(func)
+            .is_some_and(|qualified_name| {
+                matches!(
+                    qualified_name.segments(),
+                    ["logging", "getLogger" | "Logger"]
+                )
+            });
+    }
+
     // If the symbol was imported from another module, ensure that it's either a user-specified
     // logger object, the `logging` module itself, or `flask.current_app.logger`.
-    if let Some(call_path) = semantic.resolve_call_path(value) {
+    if let Some(qualified_name) = semantic.resolve_qualified_name(value) {
         if matches!(
-            call_path.as_slice(),
+            qualified_name.segments(),
             ["logging"] | ["flask", "current_app", "logger"]
         ) {
             return true;
@@ -37,7 +49,7 @@ pub fn is_logger_candidate(
 
         if logger_objects
             .iter()
-            .any(|logger| from_qualified_name(logger) == call_path)
+            .any(|logger| QualifiedName::from_dotted_name(logger) == qualified_name)
         {
             return true;
         }
@@ -47,8 +59,8 @@ pub fn is_logger_candidate(
 
     // Otherwise, if the symbol was defined in the current module, match against some common
     // logger names.
-    if let Some(call_path) = collect_call_path(value) {
-        if let Some(tail) = call_path.last() {
+    if let Some(name) = UnqualifiedName::from_expr(value) {
+        if let Some(tail) = name.segments().last() {
             if tail.starts_with("log")
                 || tail.ends_with("logger")
                 || tail.ends_with("logging")
@@ -78,8 +90,8 @@ pub fn exc_info<'a>(arguments: &'a Arguments, semantic: &SemanticModel) -> Optio
     if exc_info
         .value
         .as_call_expr()
-        .and_then(|call| semantic.resolve_call_path(&call.func))
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["sys", "exc_info"]))
+        .and_then(|call| semantic.resolve_qualified_name(&call.func))
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["sys", "exc_info"]))
     {
         return Some(exc_info);
     }

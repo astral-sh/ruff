@@ -20,7 +20,7 @@ impl Transformer for Relocator {
             Expr::BoolOp(nodes::ExprBoolOp { range, .. }) => {
                 *range = self.range;
             }
-            Expr::NamedExpr(nodes::ExprNamedExpr { range, .. }) => {
+            Expr::Named(nodes::ExprNamed { range, .. }) => {
                 *range = self.range;
             }
             Expr::BinOp(nodes::ExprBinOp { range, .. }) => {
@@ -32,7 +32,7 @@ impl Transformer for Relocator {
             Expr::Lambda(nodes::ExprLambda { range, .. }) => {
                 *range = self.range;
             }
-            Expr::IfExp(nodes::ExprIfExp { range, .. }) => {
+            Expr::If(nodes::ExprIf { range, .. }) => {
                 *range = self.range;
             }
             Expr::Dict(nodes::ExprDict { range, .. }) => {
@@ -50,7 +50,7 @@ impl Transformer for Relocator {
             Expr::DictComp(nodes::ExprDictComp { range, .. }) => {
                 *range = self.range;
             }
-            Expr::GeneratorExp(nodes::ExprGeneratorExp { range, .. }) => {
+            Expr::Generator(nodes::ExprGenerator { range, .. }) => {
                 *range = self.range;
             }
             Expr::Await(nodes::ExprAwait { range, .. }) => {

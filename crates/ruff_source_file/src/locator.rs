@@ -9,6 +9,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use crate::newlines::find_newline;
 use crate::{LineIndex, OneIndexed, SourceCode, SourceLocation};
 
+#[derive(Debug)]
 pub struct Locator<'a> {
     contents: &'a str,
     index: OnceCell<LineIndex>,
@@ -19,6 +20,13 @@ impl<'a> Locator<'a> {
         Self {
             contents,
             index: OnceCell::new(),
+        }
+    }
+
+    pub const fn with_index(contents: &'a str, index: LineIndex) -> Self {
+        Self {
+            contents,
+            index: OnceCell::with_value(index),
         }
     }
 

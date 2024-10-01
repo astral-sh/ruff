@@ -1,0 +1,53 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/range_formatting/ancestory.py
+---
+## Input
+```python
+def test ():
+    if True:
+        print(<RANGE_START>1 + 2)
+
+    else:
+        print(3 + 4)<RANGE_END>
+
+    print(" Do not format this")
+
+
+
+def test_empty_lines ():
+    if True:
+        print(<RANGE_START>1 + 2)
+
+
+    else:
+        print(3 + 4)<RANGE_END>
+
+    print(" Do not format this")
+```
+
+## Output
+```python
+def test ():
+    if True:
+        print(1 + 2)
+
+    else:
+        print(3 + 4)
+
+    print(" Do not format this")
+
+
+
+def test_empty_lines ():
+    if True:
+        print(1 + 2)
+
+    else:
+        print(3 + 4)
+
+    print(" Do not format this")
+```
+
+
+

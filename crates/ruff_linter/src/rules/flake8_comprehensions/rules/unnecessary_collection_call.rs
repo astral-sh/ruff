@@ -1,11 +1,11 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{Expr, Keyword};
-use ruff_text_size::Ranged;
+use ruff_python_ast as ast;
+use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
-
 use crate::rules::flake8_comprehensions::fixes;
+use crate::rules::flake8_comprehensions::fixes::{pad_end, pad_start};
 use crate::rules::flake8_comprehensions::settings::Settings;
 
 /// ## What it does
@@ -13,7 +13,7 @@ use crate::rules::flake8_comprehensions::settings::Settings;
 /// rewritten as empty literals.
 ///
 /// ## Why is this bad?
-/// It's unnecessary to call e.g., `dict()` as opposed to using an empty
+/// It's unnecessary to call, e.g., `dict()` as opposed to using an empty
 /// literal (`{}`). The former is slower because the name `dict` must be
 /// looked up in the global scope in case it has been rebound.
 ///
@@ -36,6 +36,9 @@ use crate::rules::flake8_comprehensions::settings::Settings;
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as it may occasionally drop comments
 /// when rewriting the call. In most cases, though, comments will be preserved.
+///
+/// ## Options
+/// - `lint.flake8-comprehensions.allow-dict-calls-with-keyword-arguments`
 #[violation]
 pub struct UnnecessaryCollectionCall {
     obj_type: String,
@@ -56,42 +59,85 @@ impl AlwaysFixableViolation for UnnecessaryCollectionCall {
 /// C408
 pub(crate) fn unnecessary_collection_call(
     checker: &mut Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
+    call: &ast::ExprCall,
     settings: &Settings,
 ) {
-    if !args.is_empty() {
+    if !call.arguments.args.is_empty() {
         return;
     }
-    let Some(func) = func.as_name_expr() else {
+    let Some(builtin) = checker.semantic().resolve_builtin_symbol(&call.func) else {
         return;
     };
-    match func.id.as_str() {
+    let collection = match builtin {
         "dict"
-            if keywords.is_empty()
+            if call.arguments.keywords.is_empty()
                 || (!settings.allow_dict_calls_with_keyword_arguments
-                    && keywords.iter().all(|kw| kw.arg.is_some())) =>
+                    && call.arguments.keywords.iter().all(|kw| kw.arg.is_some())) =>
         {
             // `dict()` or `dict(a=1)` (as opposed to `dict(**a)`)
+            Collection::Dict
         }
-        "list" | "tuple" => {
-            // `list()` or `tuple()`
+        "list" if call.arguments.keywords.is_empty() => {
+            // `list()
+            Collection::List
+        }
+        "tuple" if call.arguments.keywords.is_empty() => {
+            // `tuple()`
+            Collection::Tuple
         }
         _ => return,
     };
-    if !checker.semantic().is_builtin(func.id.as_str()) {
-        return;
-    }
+
     let mut diagnostic = Diagnostic::new(
         UnnecessaryCollectionCall {
-            obj_type: func.id.to_string(),
+            obj_type: builtin.to_string(),
         },
-        expr.range(),
+        call.range(),
     );
-    diagnostic.try_set_fix(|| {
-        fixes::fix_unnecessary_collection_call(expr, checker).map(Fix::unsafe_edit)
-    });
+
+    // Convert `dict()` to `{}`.
+    if call.arguments.keywords.is_empty() {
+        diagnostic.set_fix({
+            // Replace from the start of the call to the start of the argument.
+            let call_start = Edit::replacement(
+                match collection {
+                    Collection::Dict => {
+                        pad_start("{", call.range(), checker.locator(), checker.semantic())
+                    }
+                    Collection::List => "[".to_string(),
+                    Collection::Tuple => "(".to_string(),
+                },
+                call.start(),
+                call.arguments.start() + TextSize::from(1),
+            );
+
+            // Replace from the end of the inner list or tuple to the end of the call with `}`.
+            let call_end = Edit::replacement(
+                match collection {
+                    Collection::Dict => {
+                        pad_end("}", call.range(), checker.locator(), checker.semantic())
+                    }
+                    Collection::List => "]".to_string(),
+                    Collection::Tuple => ")".to_string(),
+                },
+                call.arguments.end() - TextSize::from(1),
+                call.end(),
+            );
+
+            Fix::unsafe_edits(call_start, [call_end])
+        });
+    } else {
+        // Convert `dict(a=1, b=2)` to `{"a": 1, "b": 2}`.
+        diagnostic.try_set_fix(|| {
+            fixes::fix_unnecessary_collection_call(call, checker).map(Fix::unsafe_edit)
+        });
+    }
+
     checker.diagnostics.push(diagnostic);
+}
+
+enum Collection {
+    Tuple,
+    List,
+    Dict,
 }

@@ -1,0 +1,74 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/named/missing_expression_4.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..78,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 64..71,
+                    value: Named(
+                        ExprNamed {
+                            range: 65..69,
+                            target: Name(
+                                ExprName {
+                                    range: 65..66,
+                                    id: Name("x"),
+                                    ctx: Store,
+                                },
+                            ),
+                            value: Name(
+                                ExprName {
+                                    range: 69..69,
+                                    id: Name(""),
+                                    ctx: Invalid,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 73..78,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 73..78,
+                            left: Name(
+                                ExprName {
+                                    range: 73..74,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            op: Add,
+                            right: Name(
+                                ExprName {
+                                    range: 77..78,
+                                    id: Name("y"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # No expression on the right side of the assignment expression
+2 | 
+3 | (x := )
+  |       ^ Syntax Error: Expected an expression
+4 | 
+5 | x + y
+  |

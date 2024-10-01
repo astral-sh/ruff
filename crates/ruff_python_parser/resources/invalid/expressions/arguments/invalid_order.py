@@ -1,0 +1,5 @@
+call(**kwargs, x)
+call(x=1, y)
+call(x=1, **kwargs, y)
+call(**kwargs, *args)
+call(**kwargs, (*args))

@@ -1,0 +1,20 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+too_many_nested_blocks.py:2:5: PLR1702 Too many nested blocks (6 > 5)
+   |
+ 1 |   def correct_fruits(fruits) -> bool:
+ 2 |       if len(fruits) > 1:  # PLR1702
+   |  _____^
+ 3 | |         if "apple" in fruits:
+ 4 | |             if "orange" in fruits:
+ 5 | |                 count = fruits["orange"]
+ 6 | |                 if count % 2:
+ 7 | |                     if "kiwi" in fruits:
+ 8 | |                         if count == 2:
+ 9 | |                             return True
+   | |_______________________________________^ PLR1702
+10 |       return False
+   |
+
+

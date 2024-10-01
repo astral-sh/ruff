@@ -1,15 +1,26 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
-FURB177.py:5:5: FURB177 Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
+FURB177.py:5:5: FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
   |
 4 | # Errors
 5 | _ = Path().resolve()
   |     ^^^^^^^^^^^^^^^^ FURB177
 6 | _ = pathlib.Path().resolve()
   |
+  = help: Replace `Path().resolve()` with `Path.cwd()`
 
-FURB177.py:6:5: FURB177 Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
+ℹ Unsafe fix
+2 2 | from pathlib import Path
+3 3 | 
+4 4 | # Errors
+5   |-_ = Path().resolve()
+  5 |+_ = Path.cwd()
+6 6 | _ = pathlib.Path().resolve()
+7 7 | 
+8 8 | _ = Path("").resolve()
+
+FURB177.py:6:5: FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
   |
 4 | # Errors
 5 | _ = Path().resolve()
@@ -18,8 +29,19 @@ FURB177.py:6:5: FURB177 Prefer `Path.cwd()` over `Path().resolve()` for current-
 7 | 
 8 | _ = Path("").resolve()
   |
+  = help: Replace `Path().resolve()` with `Path.cwd()`
 
-FURB177.py:8:5: FURB177 Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
+ℹ Unsafe fix
+3 3 | 
+4 4 | # Errors
+5 5 | _ = Path().resolve()
+6   |-_ = pathlib.Path().resolve()
+  6 |+_ = Path.cwd()
+7 7 | 
+8 8 | _ = Path("").resolve()
+9 9 | _ = pathlib.Path("").resolve()
+
+FURB177.py:8:5: FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
   |
 6 | _ = pathlib.Path().resolve()
 7 | 
@@ -27,8 +49,19 @@ FURB177.py:8:5: FURB177 Prefer `Path.cwd()` over `Path().resolve()` for current-
   |     ^^^^^^^^^^^^^^^^^^ FURB177
 9 | _ = pathlib.Path("").resolve()
   |
+  = help: Replace `Path().resolve()` with `Path.cwd()`
 
-FURB177.py:9:5: FURB177 Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
+ℹ Unsafe fix
+5 5 | _ = Path().resolve()
+6 6 | _ = pathlib.Path().resolve()
+7 7 | 
+8   |-_ = Path("").resolve()
+  8 |+_ = Path.cwd()
+9 9 | _ = pathlib.Path("").resolve()
+10 10 | 
+11 11 | _ = Path(".").resolve()
+
+FURB177.py:9:5: FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
    |
  8 | _ = Path("").resolve()
  9 | _ = pathlib.Path("").resolve()
@@ -36,8 +69,19 @@ FURB177.py:9:5: FURB177 Prefer `Path.cwd()` over `Path().resolve()` for current-
 10 | 
 11 | _ = Path(".").resolve()
    |
+   = help: Replace `Path().resolve()` with `Path.cwd()`
 
-FURB177.py:11:5: FURB177 Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
+ℹ Unsafe fix
+6  6  | _ = pathlib.Path().resolve()
+7  7  | 
+8  8  | _ = Path("").resolve()
+9     |-_ = pathlib.Path("").resolve()
+   9  |+_ = Path.cwd()
+10 10 | 
+11 11 | _ = Path(".").resolve()
+12 12 | _ = pathlib.Path(".").resolve()
+
+FURB177.py:11:5: FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
    |
  9 | _ = pathlib.Path("").resolve()
 10 | 
@@ -45,8 +89,19 @@ FURB177.py:11:5: FURB177 Prefer `Path.cwd()` over `Path().resolve()` for current
    |     ^^^^^^^^^^^^^^^^^^^ FURB177
 12 | _ = pathlib.Path(".").resolve()
    |
+   = help: Replace `Path().resolve()` with `Path.cwd()`
 
-FURB177.py:12:5: FURB177 Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
+ℹ Unsafe fix
+8  8  | _ = Path("").resolve()
+9  9  | _ = pathlib.Path("").resolve()
+10 10 | 
+11    |-_ = Path(".").resolve()
+   11 |+_ = Path.cwd()
+12 12 | _ = pathlib.Path(".").resolve()
+13 13 | 
+14 14 | _ = Path("", **kwargs).resolve()
+
+FURB177.py:12:5: FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
    |
 11 | _ = Path(".").resolve()
 12 | _ = pathlib.Path(".").resolve()
@@ -54,8 +109,19 @@ FURB177.py:12:5: FURB177 Prefer `Path.cwd()` over `Path().resolve()` for current
 13 | 
 14 | _ = Path("", **kwargs).resolve()
    |
+   = help: Replace `Path().resolve()` with `Path.cwd()`
 
-FURB177.py:14:5: FURB177 Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
+ℹ Unsafe fix
+9  9  | _ = pathlib.Path("").resolve()
+10 10 | 
+11 11 | _ = Path(".").resolve()
+12    |-_ = pathlib.Path(".").resolve()
+   12 |+_ = Path.cwd()
+13 13 | 
+14 14 | _ = Path("", **kwargs).resolve()
+15 15 | _ = pathlib.Path("", **kwargs).resolve()
+
+FURB177.py:14:5: FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
    |
 12 | _ = pathlib.Path(".").resolve()
 13 | 
@@ -63,8 +129,19 @@ FURB177.py:14:5: FURB177 Prefer `Path.cwd()` over `Path().resolve()` for current
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB177
 15 | _ = pathlib.Path("", **kwargs).resolve()
    |
+   = help: Replace `Path().resolve()` with `Path.cwd()`
 
-FURB177.py:15:5: FURB177 Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
+ℹ Unsafe fix
+11 11 | _ = Path(".").resolve()
+12 12 | _ = pathlib.Path(".").resolve()
+13 13 | 
+14    |-_ = Path("", **kwargs).resolve()
+   14 |+_ = Path.cwd()
+15 15 | _ = pathlib.Path("", **kwargs).resolve()
+16 16 | 
+17 17 | _ = Path(".", **kwargs).resolve()
+
+FURB177.py:15:5: FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
    |
 14 | _ = Path("", **kwargs).resolve()
 15 | _ = pathlib.Path("", **kwargs).resolve()
@@ -72,8 +149,19 @@ FURB177.py:15:5: FURB177 Prefer `Path.cwd()` over `Path().resolve()` for current
 16 | 
 17 | _ = Path(".", **kwargs).resolve()
    |
+   = help: Replace `Path().resolve()` with `Path.cwd()`
 
-FURB177.py:17:5: FURB177 Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
+ℹ Unsafe fix
+12 12 | _ = pathlib.Path(".").resolve()
+13 13 | 
+14 14 | _ = Path("", **kwargs).resolve()
+15    |-_ = pathlib.Path("", **kwargs).resolve()
+   15 |+_ = Path.cwd()
+16 16 | 
+17 17 | _ = Path(".", **kwargs).resolve()
+18 18 | _ = pathlib.Path(".", **kwargs).resolve()
+
+FURB177.py:17:5: FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
    |
 15 | _ = pathlib.Path("", **kwargs).resolve()
 16 | 
@@ -81,8 +169,19 @@ FURB177.py:17:5: FURB177 Prefer `Path.cwd()` over `Path().resolve()` for current
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB177
 18 | _ = pathlib.Path(".", **kwargs).resolve()
    |
+   = help: Replace `Path().resolve()` with `Path.cwd()`
 
-FURB177.py:18:5: FURB177 Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
+ℹ Unsafe fix
+14 14 | _ = Path("", **kwargs).resolve()
+15 15 | _ = pathlib.Path("", **kwargs).resolve()
+16 16 | 
+17    |-_ = Path(".", **kwargs).resolve()
+   17 |+_ = Path.cwd()
+18 18 | _ = pathlib.Path(".", **kwargs).resolve()
+19 19 | 
+20 20 | # OK
+
+FURB177.py:18:5: FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
    |
 17 | _ = Path(".", **kwargs).resolve()
 18 | _ = pathlib.Path(".", **kwargs).resolve()
@@ -90,5 +189,14 @@ FURB177.py:18:5: FURB177 Prefer `Path.cwd()` over `Path().resolve()` for current
 19 | 
 20 | # OK
    |
+   = help: Replace `Path().resolve()` with `Path.cwd()`
 
-
+ℹ Unsafe fix
+15 15 | _ = pathlib.Path("", **kwargs).resolve()
+16 16 | 
+17 17 | _ = Path(".", **kwargs).resolve()
+18    |-_ = pathlib.Path(".", **kwargs).resolve()
+   18 |+_ = Path.cwd()
+19 19 | 
+20 20 | # OK
+21 21 | _ = Path.cwd()

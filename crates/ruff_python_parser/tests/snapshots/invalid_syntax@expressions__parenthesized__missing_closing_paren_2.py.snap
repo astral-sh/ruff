@@ -1,0 +1,65 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/parenthesized/missing_closing_paren_2.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..146,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 136..146,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 136..146,
+                            elts: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 137..138,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                                BinOp(
+                                    ExprBinOp {
+                                        range: 141..146,
+                                        left: Name(
+                                            ExprName {
+                                                range: 141..142,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        op: Add,
+                                        right: Name(
+                                            ExprName {
+                                                range: 145..146,
+                                                id: Name("y"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: true,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+4 | (1,
+5 | 
+6 | x + y
+  |       Syntax Error: unexpected EOF while parsing
+  |

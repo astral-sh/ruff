@@ -3,20 +3,49 @@ use ruff_python_ast::{Comprehension, Expr};
 use ruff_python_trivia::{find_only_token_in_range, SimpleTokenKind};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::comments::{leading_comments, trailing_comments, SourceComment};
+use crate::comments::{leading_comments, trailing_comments};
 use crate::expression::expr_tuple::TupleParentheses;
+use crate::expression::parentheses::is_expression_parenthesized;
 use crate::prelude::*;
+use crate::preview::is_comprehension_leading_expression_comments_same_line_enabled;
 
 #[derive(Default)]
 pub struct FormatComprehension;
 
 impl FormatNodeRule<Comprehension> for FormatComprehension {
     fn fmt_fields(&self, item: &Comprehension, f: &mut PyFormatter) -> FormatResult<()> {
-        struct Spacer<'a>(&'a Expr);
+        struct Spacer<'a> {
+            expression: &'a Expr,
+            preserve_parentheses: bool,
+        }
 
         impl Format<PyFormatContext<'_>> for Spacer<'_> {
             fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-                if f.context().comments().has_leading(self.0) {
+                let has_leading_comments = f.context().comments().has_leading(self.expression);
+
+                // Don't add a soft line break for parenthesized expressions with a leading comment.
+                // The comments are rendered **inside** the parentheses and adding a softline break
+                // unnecessarily forces the parentheses to be on their own line.
+                // ```python
+                // y = [
+                //    ...
+                //    if
+                //    (
+                //          # See how the `(` gets forced on its own line? We don't want that.
+                //         ...
+                //     )
+                // ]
+                // ```
+                let will_be_parenthesized =
+                    is_comprehension_leading_expression_comments_same_line_enabled(f.context())
+                        && self.preserve_parentheses
+                        && is_expression_parenthesized(
+                            self.expression.into(),
+                            f.context().comments().ranges(),
+                            f.context().source(),
+                        );
+
+                if has_leading_comments && !will_be_parenthesized {
                     soft_line_break_or_space().fmt(f)
                 } else {
                     space().fmt(f)
@@ -68,13 +97,19 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
             [
                 token("for"),
                 trailing_comments(before_target_comments),
-                Spacer(target),
+                Spacer {
+                    expression: target,
+                    preserve_parentheses: !target.is_tuple_expr()
+                },
                 ExprTupleWithoutParentheses(target),
                 in_spacer,
                 leading_comments(before_in_comments),
                 token("in"),
                 trailing_comments(trailing_in_comments),
-                Spacer(iter),
+                Spacer {
+                    expression: iter,
+                    preserve_parentheses: true
+                },
                 iter.format(),
             ]
         )?;
@@ -99,7 +134,10 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
                         leading_comments(own_line_if_comments),
                         token("if"),
                         trailing_comments(end_of_line_if_comments),
-                        Spacer(if_case),
+                        Spacer {
+                            expression: if_case,
+                            preserve_parentheses: true
+                        },
                         if_case.format(),
                     ));
 
@@ -113,15 +151,6 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
 
             write!(f, [soft_line_break_or_space(), joined])?;
         }
-        Ok(())
-    }
-
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        // dangling comments are formatted as part of fmt_fields
         Ok(())
     }
 }

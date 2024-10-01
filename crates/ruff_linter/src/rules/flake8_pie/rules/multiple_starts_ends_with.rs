@@ -3,6 +3,7 @@ use std::iter;
 
 use itertools::Either::{Left, Right};
 
+use ruff_python_semantic::{analyze, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_python_ast::{self as ast, Arguments, BoolOp, Expr, ExprContext, Identifier};
@@ -20,7 +21,7 @@ use crate::checkers::ast::Checker;
 /// ## Why is this bad?
 /// The `startswith` and `endswith` methods accept tuples of prefixes or
 /// suffixes respectively. Passing a tuple of prefixes or suffixes is more
-/// more efficient and readable than calling the method multiple times.
+/// efficient and readable than calling the method multiple times.
 ///
 /// ## Example
 /// ```python
@@ -35,6 +36,14 @@ use crate::checkers::ast::Checker;
 /// if msg.startswith(("Hello", "Hi")):
 ///     print("Greetings!")
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is unsafe, as in some cases, it will be unable to determine
+/// whether the argument to an existing `.startswith` or `.endswith` call is a
+/// tuple. For example, given `msg.startswith(x) or msg.startswith(y)`, if `x`
+/// or `y` is a tuple, and the semantic model is unable to detect it as such,
+/// the rule will suggest `msg.startswith((x, y))`, which will error at
+/// runtime.
 ///
 /// ## References
 /// - [Python documentation: `str.startswith`](https://docs.python.org/3/library/stdtypes.html#str.startswith)
@@ -84,9 +93,13 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
             continue;
         };
 
-        if !(args.len() == 1 && keywords.is_empty()) {
+        if !keywords.is_empty() {
             continue;
         }
+
+        let [arg] = &**args else {
+            continue;
+        };
 
         let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
             continue;
@@ -98,6 +111,13 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
         let Expr::Name(ast::ExprName { id: arg_name, .. }) = value.as_ref() else {
             continue;
         };
+
+        // If the argument is bound to a tuple, skip it, since we don't want to suggest
+        // `startswith((x, y))` where `x` or `y` are tuples. (Tuple literals are okay, since we
+        // inline them below.)
+        if is_bound_to_tuple(arg, checker.semantic()) {
+            continue;
+        }
 
         duplicates
             .entry((attr.as_str(), arg_name.as_str()))
@@ -143,16 +163,17 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                 elts: words
                     .iter()
                     .flat_map(|value| {
-                        if let Expr::Tuple(ast::ExprTuple { elts, .. }) = value {
-                            Left(elts.iter())
+                        if let Expr::Tuple(tuple) = value {
+                            Left(tuple.iter())
                         } else {
                             Right(iter::once(*value))
                         }
                     })
-                    .map(Clone::clone)
+                    .cloned()
                     .collect(),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
+                parenthesized: true,
             });
             let node1 = Expr::Name(ast::ExprName {
                 id: arg_name.into(),
@@ -168,8 +189,8 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
             let node3 = Expr::Call(ast::ExprCall {
                 func: Box::new(node2),
                 arguments: Arguments {
-                    args: vec![node],
-                    keywords: vec![],
+                    args: Box::from([node]),
+                    keywords: Box::from([]),
                     range: TextRange::default(),
                 },
                 range: TextRange::default(),
@@ -201,4 +222,19 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
             checker.diagnostics.push(diagnostic);
         }
     }
+}
+
+/// Returns `true` if the expression definitively resolves to a tuple (e.g., `x` in `x = (1, 2)`).
+fn is_bound_to_tuple(arg: &Expr, semantic: &SemanticModel) -> bool {
+    let Expr::Name(ast::ExprName { id, .. }) = arg else {
+        return false;
+    };
+
+    let Some(binding_id) = semantic.lookup_symbol(id.as_str()) else {
+        return false;
+    };
+
+    let binding = semantic.binding(binding_id);
+
+    analyze::typing::is_tuple(binding, semantic)
 }

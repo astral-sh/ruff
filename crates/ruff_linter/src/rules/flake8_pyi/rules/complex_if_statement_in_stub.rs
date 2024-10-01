@@ -10,26 +10,27 @@ use crate::checkers::ast::Checker;
 /// Checks for `if` statements with complex conditionals in stubs.
 ///
 /// ## Why is this bad?
-/// Stub files support simple conditionals to test for differences in Python
-/// versions and platforms. However, type checkers only understand a limited
-/// subset of these conditionals; complex conditionals may result in false
-/// positives or false negatives.
+/// Type checkers understand simple conditionals to express variations between
+/// different Python versions and platforms. However, complex tests may not be
+/// understood by a type checker, leading to incorrect inferences when they
+/// analyze your code.
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// import sys
 ///
-/// if (2, 7) < sys.version_info < (3, 5):
-///     ...
+/// if (3, 10) <= sys.version_info < (3, 12): ...
 /// ```
 ///
 /// Use instead:
-/// ```python
+/// ```pyi
 /// import sys
 ///
-/// if sys.version_info < (3, 5):
-///     ...
+/// if sys.version_info >= (3, 10) and sys.version_info < (3, 12): ...
 /// ```
+///
+/// ## References
+/// The [typing documentation on stub files](https://typing.readthedocs.io/en/latest/source/stubs.html#version-and-platform-checks)
 #[violation]
 pub struct ComplexIfStatementInStub;
 
@@ -67,9 +68,12 @@ pub(crate) fn complex_if_statement_in_stub(checker: &mut Checker, test: &Expr) {
 
     if checker
         .semantic()
-        .resolve_call_path(left)
-        .is_some_and(|call_path| {
-            matches!(call_path.as_slice(), ["sys", "version_info" | "platform"])
+        .resolve_qualified_name(left)
+        .is_some_and(|qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                ["sys", "version_info" | "platform"]
+            )
         })
     {
         return;

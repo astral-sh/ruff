@@ -18,6 +18,13 @@ with open("/dev/shm/unit/test", "w") as f:
 with open("/foo/bar", "w") as f:
     f.write("def")
 
+# Implicit string concatenation
+with open("/tmp/" "abc", "w") as f:
+    f.write("def")
+
+with open("/tmp/abc" f"/tmp/abc", "w") as f:
+    f.write("def")
+
 # Using `tempfile` module should be ok
 import tempfile
 from tempfile import TemporaryDirectory

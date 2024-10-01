@@ -10,7 +10,7 @@ use ruff_linter::settings::{flags, LinterSettings};
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::{registry::Rule, RuleSelector};
 use ruff_python_ast::PySourceType;
-use ruff_python_parser::{lexer, parse_program_tokens, Mode};
+use ruff_python_parser::parse_module;
 
 #[cfg(target_os = "windows")]
 #[global_allocator]
@@ -27,6 +27,24 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 ))]
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
+// Disable decay after 10s because it can show up as *random* slow allocations
+// in benchmarks. We don't need purging in benchmarks because it isn't important
+// to give unallocated pages back to the OS.
+// https://jemalloc.net/jemalloc.3.html#opt.dirty_decay_ms
+#[cfg(all(
+    not(target_os = "windows"),
+    not(target_os = "openbsd"),
+    any(
+        target_arch = "x86_64",
+        target_arch = "aarch64",
+        target_arch = "powerpc64"
+    )
+))]
+#[allow(non_upper_case_globals)]
+#[export_name = "_rjem_malloc_conf"]
+#[allow(unsafe_code)]
+pub static _rjem_malloc_conf: &[u8] = b"dirty_decay_ms:-1,muzzy_decay_ms:-1\0";
 
 fn create_test_cases() -> Result<Vec<TestCase>, TestFileDownloadError> {
     Ok(vec![
@@ -54,30 +72,29 @@ fn benchmark_linter(mut group: BenchmarkGroup, settings: &LinterSettings) {
             BenchmarkId::from_parameter(case.name()),
             &case,
             |b, case| {
-                // Tokenize the source.
-                let tokens: Vec<_> = lexer::lex(case.code(), Mode::Module).collect();
-
                 // Parse the source.
-                let ast = parse_program_tokens(tokens.clone(), case.code(), false).unwrap();
+                let parsed =
+                    parse_module(case.code()).expect("Input should be a valid Python code");
 
-                b.iter(|| {
-                    let path = case.path();
-                    let result = lint_only(
-                        &path,
-                        None,
-                        settings,
-                        flags::Noqa::Enabled,
-                        &SourceKind::Python(case.code().to_string()),
-                        PySourceType::from(path.as_path()),
-                        ParseSource::Precomputed {
-                            tokens: &tokens,
-                            ast: &ast,
-                        },
-                    );
+                b.iter_batched(
+                    || parsed.clone(),
+                    |parsed| {
+                        let path = case.path();
+                        let result = lint_only(
+                            &path,
+                            None,
+                            settings,
+                            flags::Noqa::Enabled,
+                            &SourceKind::Python(case.code().to_string()),
+                            PySourceType::from(path.as_path()),
+                            ParseSource::Precomputed(parsed),
+                        );
 
-                    // Assert that file contains no parse errors
-                    assert_eq!(result.error, None);
-                });
+                        // Assert that file contains no parse errors
+                        assert!(!result.has_syntax_error);
+                    },
+                    criterion::BatchSize::SmallInput,
+                );
             },
         );
     }

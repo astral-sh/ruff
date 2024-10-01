@@ -1,0 +1,304 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/arguments/invalid_order.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..100,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..17,
+                    value: Call(
+                        ExprCall {
+                            range: 0..17,
+                            func: Name(
+                                ExprName {
+                                    range: 0..4,
+                                    id: Name("call"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 4..17,
+                                args: [
+                                    Name(
+                                        ExprName {
+                                            range: 15..16,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                keywords: [
+                                    Keyword {
+                                        range: 5..13,
+                                        arg: None,
+                                        value: Name(
+                                            ExprName {
+                                                range: 7..13,
+                                                id: Name("kwargs"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 18..30,
+                    value: Call(
+                        ExprCall {
+                            range: 18..30,
+                            func: Name(
+                                ExprName {
+                                    range: 18..22,
+                                    id: Name("call"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 22..30,
+                                args: [
+                                    Name(
+                                        ExprName {
+                                            range: 28..29,
+                                            id: Name("y"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                keywords: [
+                                    Keyword {
+                                        range: 23..26,
+                                        arg: Some(
+                                            Identifier {
+                                                id: Name("x"),
+                                                range: 23..24,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 25..26,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 31..53,
+                    value: Call(
+                        ExprCall {
+                            range: 31..53,
+                            func: Name(
+                                ExprName {
+                                    range: 31..35,
+                                    id: Name("call"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 35..53,
+                                args: [
+                                    Name(
+                                        ExprName {
+                                            range: 51..52,
+                                            id: Name("y"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                keywords: [
+                                    Keyword {
+                                        range: 36..39,
+                                        arg: Some(
+                                            Identifier {
+                                                id: Name("x"),
+                                                range: 36..37,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 38..39,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                    Keyword {
+                                        range: 41..49,
+                                        arg: None,
+                                        value: Name(
+                                            ExprName {
+                                                range: 43..49,
+                                                id: Name("kwargs"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 54..75,
+                    value: Call(
+                        ExprCall {
+                            range: 54..75,
+                            func: Name(
+                                ExprName {
+                                    range: 54..58,
+                                    id: Name("call"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 58..75,
+                                args: [
+                                    Starred(
+                                        ExprStarred {
+                                            range: 69..74,
+                                            value: Name(
+                                                ExprName {
+                                                    range: 70..74,
+                                                    id: Name("args"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                keywords: [
+                                    Keyword {
+                                        range: 59..67,
+                                        arg: None,
+                                        value: Name(
+                                            ExprName {
+                                                range: 61..67,
+                                                id: Name("kwargs"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 76..99,
+                    value: Call(
+                        ExprCall {
+                            range: 76..99,
+                            func: Name(
+                                ExprName {
+                                    range: 76..80,
+                                    id: Name("call"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 80..99,
+                                args: [
+                                    Starred(
+                                        ExprStarred {
+                                            range: 92..97,
+                                            value: Name(
+                                                ExprName {
+                                                    range: 93..97,
+                                                    id: Name("args"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                keywords: [
+                                    Keyword {
+                                        range: 81..89,
+                                        arg: None,
+                                        value: Name(
+                                            ExprName {
+                                                range: 83..89,
+                                                id: Name("kwargs"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ],
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | call(**kwargs, x)
+  |                ^ Syntax Error: Positional argument cannot follow keyword argument unpacking
+2 | call(x=1, y)
+3 | call(x=1, **kwargs, y)
+  |
+
+
+  |
+1 | call(**kwargs, x)
+2 | call(x=1, y)
+  |           ^ Syntax Error: Positional argument cannot follow keyword argument
+3 | call(x=1, **kwargs, y)
+4 | call(**kwargs, *args)
+  |
+
+
+  |
+1 | call(**kwargs, x)
+2 | call(x=1, y)
+3 | call(x=1, **kwargs, y)
+  |                     ^ Syntax Error: Positional argument cannot follow keyword argument unpacking
+4 | call(**kwargs, *args)
+5 | call(**kwargs, (*args))
+  |
+
+
+  |
+2 | call(x=1, y)
+3 | call(x=1, **kwargs, y)
+4 | call(**kwargs, *args)
+  |                ^^^^^ Syntax Error: Iterable argument unpacking cannot follow keyword argument unpacking
+5 | call(**kwargs, (*args))
+  |
+
+
+  |
+3 | call(x=1, **kwargs, y)
+4 | call(**kwargs, *args)
+5 | call(**kwargs, (*args))
+  |                 ^^^^^ Syntax Error: Starred expression cannot be used here
+  |

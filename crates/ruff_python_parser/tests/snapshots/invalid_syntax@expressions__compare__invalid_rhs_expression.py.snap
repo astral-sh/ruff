@@ -1,0 +1,124 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/compare/invalid_rhs_expression.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..34,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..20,
+                    value: Compare(
+                        ExprCompare {
+                            range: 0..20,
+                            left: Name(
+                                ExprName {
+                                    range: 0..1,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            ops: [
+                                NotIn,
+                            ],
+                            comparators: [
+                                Lambda(
+                                    ExprLambda {
+                                        range: 9..20,
+                                        parameters: Some(
+                                            Parameters {
+                                                range: 16..17,
+                                                posonlyargs: [],
+                                                args: [
+                                                    ParameterWithDefault {
+                                                        range: 16..17,
+                                                        parameter: Parameter {
+                                                            range: 16..17,
+                                                            name: Identifier {
+                                                                id: Name("y"),
+                                                                range: 16..17,
+                                                            },
+                                                            annotation: None,
+                                                        },
+                                                        default: None,
+                                                    },
+                                                ],
+                                                vararg: None,
+                                                kwonlyargs: [],
+                                                kwarg: None,
+                                            },
+                                        ),
+                                        body: Name(
+                                            ExprName {
+                                                range: 19..20,
+                                                id: Name("y"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 22..34,
+                    value: Compare(
+                        ExprCompare {
+                            range: 22..34,
+                            left: Name(
+                                ExprName {
+                                    range: 22..23,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            ops: [
+                                Eq,
+                            ],
+                            comparators: [
+                                Yield(
+                                    ExprYield {
+                                        range: 27..34,
+                                        value: Some(
+                                            Name(
+                                                ExprName {
+                                                    range: 33..34,
+                                                    id: Name("y"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | x not in lambda y: y
+  |          ^^^^^^^^^^^ Syntax Error: Lambda expression cannot be used here
+2 | 
+3 | x == yield y
+  |
+
+
+  |
+1 | x not in lambda y: y
+2 | 
+3 | x == yield y
+  |      ^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |

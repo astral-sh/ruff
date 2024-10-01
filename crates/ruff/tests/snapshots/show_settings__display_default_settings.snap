@@ -17,9 +17,8 @@ Settings path: "[BASEPATH]/pyproject.toml"
 cache_dir = "[BASEPATH]/.ruff_cache"
 fix = false
 fix_only = false
-output_format = text
+output_format = full
 show_fixes = false
-show_source = false
 unsafe_fixes = hint
 
 # File Resolver Settings
@@ -45,20 +44,23 @@ file_resolver.exclude = [
 	"__pypackages__",
 	"_build",
 	"buck-out",
-	"build",
 	"dist",
 	"node_modules",
 	"site-packages",
 	"venv",
 ]
 file_resolver.extend_exclude = [
+	"crates/red_knot_python_semantic/vendor/",
+	"crates/ruff/resources/",
 	"crates/ruff_linter/resources/",
 	"crates/ruff_python_formatter/resources/",
+	"crates/ruff_python_parser/resources/",
 ]
 file_resolver.force_exclude = false
 file_resolver.include = [
 	"*.py",
 	"*.pyi",
+	"*.ipynb",
 	"**/pyproject.toml",
 ]
 file_resolver.extend_include = []
@@ -69,128 +71,128 @@ file_resolver.project_root = "[BASEPATH]"
 linter.exclude = []
 linter.project_root = "[BASEPATH]"
 linter.rules.enabled = [
-	MultipleImportsOnOneLine,
-	ModuleImportNotAtTopOfFile,
-	MultipleStatementsOnOneLineColon,
-	MultipleStatementsOnOneLineSemicolon,
-	UselessSemicolon,
-	NoneComparison,
-	TrueFalseComparison,
-	NotInTest,
-	NotIsTest,
-	TypeComparison,
-	BareExcept,
-	LambdaAssignment,
-	AmbiguousVariableName,
-	AmbiguousClassName,
-	AmbiguousFunctionName,
-	IOError,
-	SyntaxError,
-	UnusedImport,
-	ImportShadowedByLoopVar,
-	UndefinedLocalWithImportStar,
-	LateFutureImport,
-	UndefinedLocalWithImportStarUsage,
-	UndefinedLocalWithNestedImportStarUsage,
-	FutureFeatureNotDefined,
-	PercentFormatInvalidFormat,
-	PercentFormatExpectedMapping,
-	PercentFormatExpectedSequence,
-	PercentFormatExtraNamedArguments,
-	PercentFormatMissingArgument,
-	PercentFormatMixedPositionalAndNamed,
-	PercentFormatPositionalCountMismatch,
-	PercentFormatStarRequiresSequence,
-	PercentFormatUnsupportedFormatCharacter,
-	StringDotFormatInvalidFormat,
-	StringDotFormatExtraNamedArguments,
-	StringDotFormatExtraPositionalArguments,
-	StringDotFormatMissingArguments,
-	StringDotFormatMixingAutomatic,
-	FStringMissingPlaceholders,
-	MultiValueRepeatedKeyLiteral,
-	MultiValueRepeatedKeyVariable,
-	ExpressionsInStarAssignment,
-	MultipleStarredExpressions,
-	AssertTuple,
-	IsLiteral,
-	InvalidPrintSyntax,
-	IfTuple,
-	BreakOutsideLoop,
-	ContinueOutsideLoop,
-	YieldOutsideFunction,
-	ReturnOutsideFunction,
-	DefaultExceptNotLast,
-	ForwardAnnotationSyntaxError,
-	RedefinedWhileUnused,
-	UndefinedName,
-	UndefinedExport,
-	UndefinedLocal,
-	UnusedVariable,
-	UnusedAnnotation,
-	RaiseNotImplemented,
+	multiple-imports-on-one-line (E401),
+	module-import-not-at-top-of-file (E402),
+	multiple-statements-on-one-line-colon (E701),
+	multiple-statements-on-one-line-semicolon (E702),
+	useless-semicolon (E703),
+	none-comparison (E711),
+	true-false-comparison (E712),
+	not-in-test (E713),
+	not-is-test (E714),
+	type-comparison (E721),
+	bare-except (E722),
+	lambda-assignment (E731),
+	ambiguous-variable-name (E741),
+	ambiguous-class-name (E742),
+	ambiguous-function-name (E743),
+	io-error (E902),
+	syntax-error (E999),
+	unused-import (F401),
+	import-shadowed-by-loop-var (F402),
+	undefined-local-with-import-star (F403),
+	late-future-import (F404),
+	undefined-local-with-import-star-usage (F405),
+	undefined-local-with-nested-import-star-usage (F406),
+	future-feature-not-defined (F407),
+	percent-format-invalid-format (F501),
+	percent-format-expected-mapping (F502),
+	percent-format-expected-sequence (F503),
+	percent-format-extra-named-arguments (F504),
+	percent-format-missing-argument (F505),
+	percent-format-mixed-positional-and-named (F506),
+	percent-format-positional-count-mismatch (F507),
+	percent-format-star-requires-sequence (F508),
+	percent-format-unsupported-format-character (F509),
+	string-dot-format-invalid-format (F521),
+	string-dot-format-extra-named-arguments (F522),
+	string-dot-format-extra-positional-arguments (F523),
+	string-dot-format-missing-arguments (F524),
+	string-dot-format-mixing-automatic (F525),
+	f-string-missing-placeholders (F541),
+	multi-value-repeated-key-literal (F601),
+	multi-value-repeated-key-variable (F602),
+	expressions-in-star-assignment (F621),
+	multiple-starred-expressions (F622),
+	assert-tuple (F631),
+	is-literal (F632),
+	invalid-print-syntax (F633),
+	if-tuple (F634),
+	break-outside-loop (F701),
+	continue-outside-loop (F702),
+	yield-outside-function (F704),
+	return-outside-function (F706),
+	default-except-not-last (F707),
+	forward-annotation-syntax-error (F722),
+	redefined-while-unused (F811),
+	undefined-name (F821),
+	undefined-export (F822),
+	undefined-local (F823),
+	unused-variable (F841),
+	unused-annotation (F842),
+	raise-not-implemented (F901),
 ]
 linter.rules.should_fix = [
-	MultipleImportsOnOneLine,
-	ModuleImportNotAtTopOfFile,
-	MultipleStatementsOnOneLineColon,
-	MultipleStatementsOnOneLineSemicolon,
-	UselessSemicolon,
-	NoneComparison,
-	TrueFalseComparison,
-	NotInTest,
-	NotIsTest,
-	TypeComparison,
-	BareExcept,
-	LambdaAssignment,
-	AmbiguousVariableName,
-	AmbiguousClassName,
-	AmbiguousFunctionName,
-	IOError,
-	SyntaxError,
-	UnusedImport,
-	ImportShadowedByLoopVar,
-	UndefinedLocalWithImportStar,
-	LateFutureImport,
-	UndefinedLocalWithImportStarUsage,
-	UndefinedLocalWithNestedImportStarUsage,
-	FutureFeatureNotDefined,
-	PercentFormatInvalidFormat,
-	PercentFormatExpectedMapping,
-	PercentFormatExpectedSequence,
-	PercentFormatExtraNamedArguments,
-	PercentFormatMissingArgument,
-	PercentFormatMixedPositionalAndNamed,
-	PercentFormatPositionalCountMismatch,
-	PercentFormatStarRequiresSequence,
-	PercentFormatUnsupportedFormatCharacter,
-	StringDotFormatInvalidFormat,
-	StringDotFormatExtraNamedArguments,
-	StringDotFormatExtraPositionalArguments,
-	StringDotFormatMissingArguments,
-	StringDotFormatMixingAutomatic,
-	FStringMissingPlaceholders,
-	MultiValueRepeatedKeyLiteral,
-	MultiValueRepeatedKeyVariable,
-	ExpressionsInStarAssignment,
-	MultipleStarredExpressions,
-	AssertTuple,
-	IsLiteral,
-	InvalidPrintSyntax,
-	IfTuple,
-	BreakOutsideLoop,
-	ContinueOutsideLoop,
-	YieldOutsideFunction,
-	ReturnOutsideFunction,
-	DefaultExceptNotLast,
-	ForwardAnnotationSyntaxError,
-	RedefinedWhileUnused,
-	UndefinedName,
-	UndefinedExport,
-	UndefinedLocal,
-	UnusedVariable,
-	UnusedAnnotation,
-	RaiseNotImplemented,
+	multiple-imports-on-one-line (E401),
+	module-import-not-at-top-of-file (E402),
+	multiple-statements-on-one-line-colon (E701),
+	multiple-statements-on-one-line-semicolon (E702),
+	useless-semicolon (E703),
+	none-comparison (E711),
+	true-false-comparison (E712),
+	not-in-test (E713),
+	not-is-test (E714),
+	type-comparison (E721),
+	bare-except (E722),
+	lambda-assignment (E731),
+	ambiguous-variable-name (E741),
+	ambiguous-class-name (E742),
+	ambiguous-function-name (E743),
+	io-error (E902),
+	syntax-error (E999),
+	unused-import (F401),
+	import-shadowed-by-loop-var (F402),
+	undefined-local-with-import-star (F403),
+	late-future-import (F404),
+	undefined-local-with-import-star-usage (F405),
+	undefined-local-with-nested-import-star-usage (F406),
+	future-feature-not-defined (F407),
+	percent-format-invalid-format (F501),
+	percent-format-expected-mapping (F502),
+	percent-format-expected-sequence (F503),
+	percent-format-extra-named-arguments (F504),
+	percent-format-missing-argument (F505),
+	percent-format-mixed-positional-and-named (F506),
+	percent-format-positional-count-mismatch (F507),
+	percent-format-star-requires-sequence (F508),
+	percent-format-unsupported-format-character (F509),
+	string-dot-format-invalid-format (F521),
+	string-dot-format-extra-named-arguments (F522),
+	string-dot-format-extra-positional-arguments (F523),
+	string-dot-format-missing-arguments (F524),
+	string-dot-format-mixing-automatic (F525),
+	f-string-missing-placeholders (F541),
+	multi-value-repeated-key-literal (F601),
+	multi-value-repeated-key-variable (F602),
+	expressions-in-star-assignment (F621),
+	multiple-starred-expressions (F622),
+	assert-tuple (F631),
+	is-literal (F632),
+	invalid-print-syntax (F633),
+	if-tuple (F634),
+	break-outside-loop (F701),
+	continue-outside-loop (F702),
+	yield-outside-function (F704),
+	return-outside-function (F706),
+	default-except-not-last (F707),
+	forward-annotation-syntax-error (F722),
+	redefined-while-unused (F811),
+	undefined-name (F821),
+	undefined-export (F822),
+	undefined-local (F823),
+	unused-variable (F841),
+	unused-annotation (F842),
+	raise-not-implemented (F901),
 ]
 linter.per_file_ignores = {}
 linter.safety_table.forced_safe = []
@@ -198,15 +200,18 @@ linter.safety_table.forced_unsafe = []
 linter.target_version = Py37
 linter.preview = disabled
 linter.explicit_preview_rules = false
-linter.extension.mapping = {}
+linter.extension = ExtensionMapping({})
 linter.allowed_confusables = []
 linter.builtins = []
 linter.dummy_variable_rgx = ^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$
 linter.external = []
-linter.ignore_init_module_imports = false
+linter.ignore_init_module_imports = true
 linter.logger_objects = []
 linter.namespace_packages = []
-linter.src = ["[BASEPATH]"]
+linter.src = [
+	"[BASEPATH]",
+	"[BASEPATH]/src",
+]
 linter.tab_size = 4
 linter.line_length = 88
 linter.task_tags = [
@@ -229,9 +234,10 @@ linter.flake8_bandit.hardcoded_tmp_directory = [
 ]
 linter.flake8_bandit.check_typed_exception = false
 linter.flake8_bugbear.extend_immutable_calls = []
+linter.flake8_builtins.builtins_allowed_modules = []
 linter.flake8_builtins.builtins_ignorelist = []
 linter.flake8_comprehensions.allow_dict_calls_with_keyword_arguments = false
-linter.flake8_copyright.notice_rgx = (?i)Copyright\s+(\(C\)\s+)?\d{4}(-\d{4})*
+linter.flake8_copyright.notice_rgx = (?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*
 linter.flake8_copyright.author = none
 linter.flake8_copyright.min_file_size = 0
 linter.flake8_errmsg.max_string_length = 0
@@ -241,10 +247,26 @@ linter.flake8_gettext.functions_names = [
 	ngettext,
 ]
 linter.flake8_implicit_str_concat.allow_multiline = true
-linter.flake8_import_conventions.aliases = {"matplotlib": "mpl", "matplotlib.pyplot": "plt", "pandas": "pd", "seaborn": "sns", "tensorflow": "tf", "networkx": "nx", "plotly.express": "px", "polars": "pl", "numpy": "np", "panel": "pn", "pyarrow": "pa", "altair": "alt", "tkinter": "tk", "holoviews": "hv"}
+linter.flake8_import_conventions.aliases = {
+	altair = alt,
+	holoviews = hv,
+	matplotlib = mpl,
+	matplotlib.pyplot = plt,
+	networkx = nx,
+	numpy = np,
+	pandas = pd,
+	panel = pn,
+	plotly.express = px,
+	polars = pl,
+	pyarrow = pa,
+	seaborn = sns,
+	tensorflow = tf,
+	tkinter = tk,
+	xml.etree.ElementTree = ET,
+}
 linter.flake8_import_conventions.banned_aliases = {}
 linter.flake8_import_conventions.banned_from = []
-linter.flake8_pytest_style.fixture_parentheses = true
+linter.flake8_pytest_style.fixture_parentheses = false
 linter.flake8_pytest_style.parametrize_names_type = tuple
 linter.flake8_pytest_style.parametrize_values_type = list
 linter.flake8_pytest_style.parametrize_values_row_type = tuple
@@ -258,7 +280,7 @@ linter.flake8_pytest_style.raises_require_match_for = [
 	socket.error,
 ]
 linter.flake8_pytest_style.raises_extend_require_match_for = []
-linter.flake8_pytest_style.mark_parentheses = true
+linter.flake8_pytest_style.mark_parentheses = false
 linter.flake8_quotes.inline_quotes = double
 linter.flake8_quotes.multiline_quotes = double
 linter.flake8_quotes.docstring_quotes = double
@@ -311,6 +333,7 @@ linter.isort.section_order = [
 	known { type = first_party },
 	known { type = local_folder },
 ]
+linter.isort.default_section = known { type = third_party }
 linter.isort.no_sections = false
 linter.isort.from_first = false
 linter.isort.length_sort = false
@@ -350,6 +373,7 @@ linter.pylint.max_statements = 50
 linter.pylint.max_public_methods = 20
 linter.pylint.max_locals = 15
 linter.pyupgrade.keep_runtime_typing = false
+linter.ruff.parenthesize_tuple_in_subscript = false
 
 # Formatter Settings
 formatter.exclude = []
@@ -364,5 +388,12 @@ formatter.magic_trailing_comma = respect
 formatter.docstring_code_format = disabled
 formatter.docstring_code_line_width = dynamic
 
------ stderr -----
+# Analyze Settings
+analyze.exclude = []
+analyze.preview = disabled
+analyze.target_version = Py37
+analyze.detect_string_imports = false
+analyze.extension = ExtensionMapping({})
+analyze.include_dependencies = {}
 
+----- stderr -----

@@ -10,23 +10,24 @@ use crate::checkers::ast::Checker;
 /// Checks for non-empty function stub bodies.
 ///
 /// ## Why is this bad?
-/// Stub files are meant to be used as a reference for the interface of a
-/// module, and should not contain any implementation details. Thus, the
-/// body of a stub function should be empty.
+/// Stub files are never executed at runtime; they should be thought of as
+/// "data files" for type checkers or IDEs. Function bodies are redundant
+/// for this purpose.
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// def double(x: int) -> int:
 ///     return x * 2
 /// ```
 ///
 /// Use instead:
-/// ```python
+/// ```pyi
 /// def double(x: int) -> int: ...
 /// ```
 ///
 /// ## References
-/// - [PEP 484 – Type Hints: Stub Files](https://www.python.org/dev/peps/pep-0484/#stub-files)
+/// - [The recommended style for stub functions and methods](https://typing.readthedocs.io/en/latest/source/stubs.html#id6)
+///   in the typing docs.
 #[violation]
 pub struct NonEmptyStubBody;
 

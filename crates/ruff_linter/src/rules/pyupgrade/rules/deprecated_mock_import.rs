@@ -4,19 +4,20 @@ use libcst_native::{
     ImportNames, Name, NameOrAttribute, ParenthesizableWhitespace,
 };
 use log::error;
-use ruff_python_ast::{self as ast, Expr, Stmt};
 
-use crate::fix::codemods::CodegenStylist;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::collect_call_path;
+use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::whitespace::indentation;
+use ruff_python_ast::{self as ast, Stmt};
 use ruff_python_codegen::Stylist;
+use ruff_python_semantic::Modules;
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_import, match_import_from, match_statement};
+use crate::fix::codemods::CodegenStylist;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub(crate) enum MockReference {
@@ -249,23 +250,25 @@ fn format_import_from(
 }
 
 /// UP026
-pub(crate) fn deprecated_mock_attribute(checker: &mut Checker, expr: &Expr) {
-    if let Expr::Attribute(ast::ExprAttribute { value, .. }) = expr {
-        if collect_call_path(value)
-            .is_some_and(|call_path| matches!(call_path.as_slice(), ["mock", "mock"]))
-        {
-            let mut diagnostic = Diagnostic::new(
-                DeprecatedMockImport {
-                    reference_type: MockReference::Attribute,
-                },
-                value.range(),
-            );
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                "mock".to_string(),
-                value.range(),
-            )));
-            checker.diagnostics.push(diagnostic);
-        }
+pub(crate) fn deprecated_mock_attribute(checker: &mut Checker, attribute: &ast::ExprAttribute) {
+    if !checker.semantic().seen_module(Modules::MOCK) {
+        return;
+    }
+
+    if UnqualifiedName::from_expr(&attribute.value)
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["mock", "mock"]))
+    {
+        let mut diagnostic = Diagnostic::new(
+            DeprecatedMockImport {
+                reference_type: MockReference::Attribute,
+            },
+            attribute.value.range(),
+        );
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            "mock".to_string(),
+            attribute.value.range(),
+        )));
+        checker.diagnostics.push(diagnostic);
     }
 }
 
@@ -316,7 +319,7 @@ pub(crate) fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
             level,
             ..
         }) => {
-            if level.is_some_and(|level| level > 0) {
+            if *level > 0 {
                 return;
             }
 

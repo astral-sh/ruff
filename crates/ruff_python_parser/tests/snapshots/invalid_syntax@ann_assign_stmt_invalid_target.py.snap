@@ -1,0 +1,508 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/ann_assign_stmt_invalid_target.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..170,
+        body: [
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 0..18,
+                    target: StringLiteral(
+                        ExprStringLiteral {
+                            range: 0..5,
+                            value: StringLiteralValue {
+                                inner: Single(
+                                    StringLiteral {
+                                        range: 0..5,
+                                        value: "abc",
+                                        flags: StringLiteralFlags {
+                                            quote_style: Double,
+                                            prefix: Empty,
+                                            triple_quoted: false,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                    annotation: Name(
+                        ExprName {
+                            range: 7..10,
+                            id: Name("str"),
+                            ctx: Load,
+                        },
+                    ),
+                    value: Some(
+                        StringLiteral(
+                            ExprStringLiteral {
+                                range: 13..18,
+                                value: StringLiteralValue {
+                                    inner: Single(
+                                        StringLiteral {
+                                            range: 13..18,
+                                            value: "def",
+                                            flags: StringLiteralFlags {
+                                                quote_style: Double,
+                                                prefix: Empty,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                },
+                            },
+                        ),
+                    ),
+                    simple: false,
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 19..37,
+                    target: Call(
+                        ExprCall {
+                            range: 19..25,
+                            func: Name(
+                                ExprName {
+                                    range: 19..23,
+                                    id: Name("call"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 23..25,
+                                args: [],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                    annotation: Name(
+                        ExprName {
+                            range: 27..30,
+                            id: Name("str"),
+                            ctx: Load,
+                        },
+                    ),
+                    value: Some(
+                        StringLiteral(
+                            ExprStringLiteral {
+                                range: 33..37,
+                                value: StringLiteralValue {
+                                    inner: Single(
+                                        StringLiteral {
+                                            range: 33..37,
+                                            value: "no",
+                                            flags: StringLiteralFlags {
+                                                quote_style: Double,
+                                                prefix: Empty,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                },
+                            },
+                        ),
+                    ),
+                    simple: false,
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 38..52,
+                    target: Starred(
+                        ExprStarred {
+                            range: 38..40,
+                            value: Name(
+                                ExprName {
+                                    range: 39..40,
+                                    id: Name("x"),
+                                    ctx: Store,
+                                },
+                            ),
+                            ctx: Store,
+                        },
+                    ),
+                    annotation: Name(
+                        ExprName {
+                            range: 42..45,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                    value: Some(
+                        Tuple(
+                            ExprTuple {
+                                range: 48..52,
+                                elts: [
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 48..49,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 51..52,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                ],
+                                ctx: Load,
+                                parenthesized: false,
+                            },
+                        ),
+                    ),
+                    simple: false,
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 72..83,
+                    target: Tuple(
+                        ExprTuple {
+                            range: 72..74,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        range: 72..73,
+                                        id: Name("x"),
+                                        ctx: Store,
+                                    },
+                                ),
+                            ],
+                            ctx: Store,
+                            parenthesized: false,
+                        },
+                    ),
+                    annotation: Name(
+                        ExprName {
+                            range: 76..79,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                    value: Some(
+                        NumberLiteral(
+                            ExprNumberLiteral {
+                                range: 82..83,
+                                value: Int(
+                                    1,
+                                ),
+                            },
+                        ),
+                    ),
+                    simple: false,
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 84..100,
+                    target: Tuple(
+                        ExprTuple {
+                            range: 84..88,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        range: 84..85,
+                                        id: Name("x"),
+                                        ctx: Store,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 87..88,
+                                        id: Name("y"),
+                                        ctx: Store,
+                                    },
+                                ),
+                            ],
+                            ctx: Store,
+                            parenthesized: false,
+                        },
+                    ),
+                    annotation: Name(
+                        ExprName {
+                            range: 90..93,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                    value: Some(
+                        Tuple(
+                            ExprTuple {
+                                range: 96..100,
+                                elts: [
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 96..97,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 99..100,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                ],
+                                ctx: Load,
+                                parenthesized: false,
+                            },
+                        ),
+                    ),
+                    simple: false,
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 101..119,
+                    target: Tuple(
+                        ExprTuple {
+                            range: 101..107,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        range: 102..103,
+                                        id: Name("x"),
+                                        ctx: Store,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 105..106,
+                                        id: Name("y"),
+                                        ctx: Store,
+                                    },
+                                ),
+                            ],
+                            ctx: Store,
+                            parenthesized: true,
+                        },
+                    ),
+                    annotation: Name(
+                        ExprName {
+                            range: 109..112,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                    value: Some(
+                        Tuple(
+                            ExprTuple {
+                                range: 115..119,
+                                elts: [
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 115..116,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 118..119,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                ],
+                                ctx: Load,
+                                parenthesized: false,
+                            },
+                        ),
+                    ),
+                    simple: false,
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 138..150,
+                    target: List(
+                        ExprList {
+                            range: 138..141,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        range: 139..140,
+                                        id: Name("x"),
+                                        ctx: Store,
+                                    },
+                                ),
+                            ],
+                            ctx: Store,
+                        },
+                    ),
+                    annotation: Name(
+                        ExprName {
+                            range: 143..146,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                    value: Some(
+                        NumberLiteral(
+                            ExprNumberLiteral {
+                                range: 149..150,
+                                value: Int(
+                                    1,
+                                ),
+                            },
+                        ),
+                    ),
+                    simple: false,
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 151..169,
+                    target: List(
+                        ExprList {
+                            range: 151..157,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        range: 152..153,
+                                        id: Name("x"),
+                                        ctx: Store,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 155..156,
+                                        id: Name("y"),
+                                        ctx: Store,
+                                    },
+                                ),
+                            ],
+                            ctx: Store,
+                        },
+                    ),
+                    annotation: Name(
+                        ExprName {
+                            range: 159..162,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                    value: Some(
+                        Tuple(
+                            ExprTuple {
+                                range: 165..169,
+                                elts: [
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 165..166,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 168..169,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                ],
+                                ctx: Load,
+                                parenthesized: false,
+                            },
+                        ),
+                    ),
+                    simple: false,
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | "abc": str = "def"
+  | ^^^^^ Syntax Error: Invalid annotated assignment target
+2 | call(): str = "no"
+3 | *x: int = 1, 2
+  |
+
+
+  |
+1 | "abc": str = "def"
+2 | call(): str = "no"
+  | ^^^^^^ Syntax Error: Invalid annotated assignment target
+3 | *x: int = 1, 2
+4 | # Tuple assignment
+  |
+
+
+  |
+1 | "abc": str = "def"
+2 | call(): str = "no"
+3 | *x: int = 1, 2
+  | ^^ Syntax Error: Invalid annotated assignment target
+4 | # Tuple assignment
+5 | x,: int = 1
+  |
+
+
+  |
+3 | *x: int = 1, 2
+4 | # Tuple assignment
+5 | x,: int = 1
+  | ^^ Syntax Error: Only single target (not tuple) can be annotated
+6 | x, y: int = 1, 2
+7 | (x, y): int = 1, 2
+  |
+
+
+  |
+4 | # Tuple assignment
+5 | x,: int = 1
+6 | x, y: int = 1, 2
+  | ^^^^ Syntax Error: Only single target (not tuple) can be annotated
+7 | (x, y): int = 1, 2
+8 | # List assignment
+  |
+
+
+  |
+5 | x,: int = 1
+6 | x, y: int = 1, 2
+7 | (x, y): int = 1, 2
+  | ^^^^^^ Syntax Error: Only single target (not tuple) can be annotated
+8 | # List assignment
+9 | [x]: int = 1
+  |
+
+
+   |
+ 7 | (x, y): int = 1, 2
+ 8 | # List assignment
+ 9 | [x]: int = 1
+   | ^^^ Syntax Error: Only single target (not list) can be annotated
+10 | [x, y]: int = 1, 2
+   |
+
+
+   |
+ 8 | # List assignment
+ 9 | [x]: int = 1
+10 | [x, y]: int = 1, 2
+   | ^^^^^^ Syntax Error: Only single target (not list) can be annotated
+   |

@@ -1,0 +1,51 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/global_stmt_expression.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..13,
+        body: [
+            Global(
+                StmtGlobal {
+                    range: 0..8,
+                    names: [
+                        Identifier {
+                            id: Name("x"),
+                            range: 7..8,
+                        },
+                    ],
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 9..12,
+                    value: UnaryOp(
+                        ExprUnaryOp {
+                            range: 9..12,
+                            op: UAdd,
+                            operand: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 11..12,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | global x + 1
+  |          ^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |

@@ -2,6 +2,7 @@
 
 use std::ops::Deref;
 
+use ruff_python_ast::str::Quote;
 use ruff_python_ast::{
     self as ast, Alias, ArgOrKeyword, BoolOp, CmpOp, Comprehension, ConversionFlag, DebugText,
     ExceptHandler, Expr, Identifier, MatchCase, Operator, Parameter, Parameters, Pattern,
@@ -12,7 +13,7 @@ use ruff_python_ast::{ParameterWithDefault, TypeParams};
 use ruff_python_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
 use ruff_source_file::LineEnding;
 
-use super::stylist::{Indentation, Quote, Stylist};
+use super::stylist::{Indentation, Stylist};
 
 mod precedence {
     pub(crate) const NAMED_EXPR: u8 = 1;
@@ -150,7 +151,7 @@ impl<'a> Generator<'a> {
     }
 
     fn p_bytes_repr(&mut self, s: &[u8]) {
-        let escape = AsciiEscape::with_preferred_quote(s, self.quote.into());
+        let escape = AsciiEscape::with_preferred_quote(s, self.quote);
         if let Some(len) = escape.layout().len {
             self.buffer.reserve(len);
         }
@@ -158,7 +159,7 @@ impl<'a> Generator<'a> {
     }
 
     fn p_str_repr(&mut self, s: &str) {
-        let escape = UnicodeEscape::with_preferred_quote(s, self.quote.into());
+        let escape = UnicodeEscape::with_preferred_quote(s, self.quote);
         if let Some(len) = escape.layout().len {
             self.buffer.reserve(len);
         }
@@ -481,13 +482,15 @@ impl<'a> Generator<'a> {
                 type_params,
                 value,
             }) => {
-                self.p("type ");
-                self.unparse_expr(name, precedence::MAX);
-                if let Some(type_params) = type_params {
-                    self.unparse_type_params(type_params);
-                }
-                self.p(" = ");
-                self.unparse_expr(value, precedence::ASSIGN);
+                statement!({
+                    self.p("type ");
+                    self.unparse_expr(name, precedence::MAX);
+                    if let Some(type_params) = type_params {
+                        self.unparse_type_params(type_params);
+                    }
+                    self.p(" = ");
+                    self.unparse_expr(value, precedence::ASSIGN);
+                });
             }
             Stmt::Raise(ast::StmtRaise {
                 exc,
@@ -570,7 +573,7 @@ impl<'a> Generator<'a> {
             }) => {
                 statement!({
                     self.p("from ");
-                    if let Some(level) = level {
+                    if *level > 0 {
                         for _ in 0..*level {
                             self.p(".");
                         }
@@ -755,20 +758,37 @@ impl<'a> Generator<'a> {
 
     pub(crate) fn unparse_type_param(&mut self, ast: &TypeParam) {
         match ast {
-            TypeParam::TypeVar(TypeParamTypeVar { name, bound, .. }) => {
+            TypeParam::TypeVar(TypeParamTypeVar {
+                name,
+                bound,
+                default,
+                ..
+            }) => {
                 self.p_id(name);
                 if let Some(expr) = bound {
                     self.p(": ");
                     self.unparse_expr(expr, precedence::MAX);
                 }
+                if let Some(expr) = default {
+                    self.p(" = ");
+                    self.unparse_expr(expr, precedence::MAX);
+                }
             }
-            TypeParam::TypeVarTuple(TypeParamTypeVarTuple { name, .. }) => {
+            TypeParam::TypeVarTuple(TypeParamTypeVarTuple { name, default, .. }) => {
                 self.p("*");
                 self.p_id(name);
+                if let Some(expr) = default {
+                    self.p(" = ");
+                    self.unparse_expr(expr, precedence::MAX);
+                }
             }
-            TypeParam::ParamSpec(TypeParamParamSpec { name, .. }) => {
+            TypeParam::ParamSpec(TypeParamParamSpec { name, default, .. }) => {
                 self.p("**");
                 self.p_id(name);
+                if let Some(expr) = default {
+                    self.p(" = ");
+                    self.unparse_expr(expr, precedence::MAX);
+                }
             }
         }
     }
@@ -811,7 +831,7 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Expr::NamedExpr(ast::ExprNamedExpr {
+            Expr::Named(ast::ExprNamed {
                 target,
                 value,
                 range: _,
@@ -887,7 +907,7 @@ impl<'a> Generator<'a> {
                     self.unparse_expr(body, precedence::LAMBDA);
                 });
             }
-            Expr::IfExp(ast::ExprIfExp {
+            Expr::If(ast::ExprIf {
                 test,
                 body,
                 orelse,
@@ -901,35 +921,31 @@ impl<'a> Generator<'a> {
                     self.unparse_expr(orelse, precedence::IF_EXP);
                 });
             }
-            Expr::Dict(ast::ExprDict {
-                keys,
-                values,
-                range: _,
-            }) => {
+            Expr::Dict(dict) => {
                 self.p("{");
                 let mut first = true;
-                for (k, v) in keys.iter().zip(values) {
+                for ast::DictItem { key, value } in dict {
                     self.p_delim(&mut first, ", ");
-                    if let Some(k) = k {
-                        self.unparse_expr(k, precedence::COMMA);
+                    if let Some(key) = key {
+                        self.unparse_expr(key, precedence::COMMA);
                         self.p(": ");
-                        self.unparse_expr(v, precedence::COMMA);
+                        self.unparse_expr(value, precedence::COMMA);
                     } else {
                         self.p("**");
-                        self.unparse_expr(v, precedence::MAX);
+                        self.unparse_expr(value, precedence::MAX);
                     }
                 }
                 self.p("}");
             }
-            Expr::Set(ast::ExprSet { elts, range: _ }) => {
-                if elts.is_empty() {
+            Expr::Set(set) => {
+                if set.is_empty() {
                     self.p("set()");
                 } else {
                     self.p("{");
                     let mut first = true;
-                    for v in elts {
+                    for item in set {
                         self.p_delim(&mut first, ", ");
-                        self.unparse_expr(v, precedence::COMMA);
+                        self.unparse_expr(item, precedence::COMMA);
                     }
                     self.p("}");
                 }
@@ -967,9 +983,10 @@ impl<'a> Generator<'a> {
                 self.unparse_comp(generators);
                 self.p("}");
             }
-            Expr::GeneratorExp(ast::ExprGeneratorExp {
+            Expr::Generator(ast::ExprGenerator {
                 elt,
                 generators,
+                parenthesized: _,
                 range: _,
             }) => {
                 self.p("(");
@@ -1007,7 +1024,7 @@ impl<'a> Generator<'a> {
                 group_if!(precedence::CMP, {
                     let new_lvl = precedence::CMP + 1;
                     self.unparse_expr(left, new_lvl);
-                    for (op, cmp) in ops.iter().zip(comparators) {
+                    for (op, cmp) in ops.iter().zip(&**comparators) {
                         let op = match op {
                             CmpOp::Eq => " == ",
                             CmpOp::NotEq => " != ",
@@ -1033,13 +1050,14 @@ impl<'a> Generator<'a> {
                 self.unparse_expr(func, precedence::MAX);
                 self.p("(");
                 if let (
-                    [Expr::GeneratorExp(ast::ExprGeneratorExp {
+                    [Expr::Generator(ast::ExprGenerator {
                         elt,
                         generators,
                         range: _,
+                        parenthesized: _,
                     })],
                     [],
-                ) = (arguments.args.as_slice(), arguments.keywords.as_slice())
+                ) = (arguments.args.as_ref(), arguments.keywords.as_ref())
                 {
                     // Ensure that a single generator doesn't get double-parenthesized.
                     self.unparse_expr(elt, precedence::COMMA);
@@ -1146,26 +1164,26 @@ impl<'a> Generator<'a> {
                 self.unparse_expr(value, precedence::MAX);
             }
             Expr::Name(ast::ExprName { id, .. }) => self.p(id.as_str()),
-            Expr::List(ast::ExprList { elts, .. }) => {
+            Expr::List(list) => {
                 self.p("[");
                 let mut first = true;
-                for elt in elts {
+                for item in list {
                     self.p_delim(&mut first, ", ");
-                    self.unparse_expr(elt, precedence::COMMA);
+                    self.unparse_expr(item, precedence::COMMA);
                 }
                 self.p("]");
             }
-            Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                if elts.is_empty() {
+            Expr::Tuple(tuple) => {
+                if tuple.is_empty() {
                     self.p("()");
                 } else {
                     group_if!(precedence::TUPLE, {
                         let mut first = true;
-                        for elt in elts {
+                        for item in tuple {
                             self.p_delim(&mut first, ", ");
-                            self.unparse_expr(elt, precedence::COMMA);
+                            self.unparse_expr(item, precedence::COMMA);
                         }
-                        self.p_if(elts.len() == 1, ",");
+                        self.p_if(tuple.len() == 1, ",");
                     });
                 }
             }
@@ -1265,10 +1283,11 @@ impl<'a> Generator<'a> {
     }
 
     fn unparse_string_literal(&mut self, string_literal: &ast::StringLiteral) {
-        if string_literal.unicode {
+        let ast::StringLiteral { value, flags, .. } = string_literal;
+        if flags.prefix().is_unicode() {
             self.p("u");
         }
-        self.p_str_repr(&string_literal.value);
+        self.p_str_repr(value);
     }
 
     fn unparse_string_literal_value(&mut self, value: &ast::StringLiteralValue) {
@@ -1371,14 +1390,8 @@ impl<'a> Generator<'a> {
             self.unparse_f_string_body(values);
         } else {
             self.p("f");
-            let mut generator = Generator::new(
-                self.indent,
-                match self.quote {
-                    Quote::Single => Quote::Double,
-                    Quote::Double => Quote::Single,
-                },
-                self.line_ending,
-            );
+            let mut generator =
+                Generator::new(self.indent, self.quote.opposite(), self.line_ending);
             generator.unparse_f_string_body(values);
             let body = &generator.buffer;
             self.p_str_repr(body);
@@ -1404,11 +1417,11 @@ impl<'a> Generator<'a> {
 
 #[cfg(test)]
 mod tests {
-    use ruff_python_ast::{Mod, ModModule};
-    use ruff_python_parser::{self, parse_suite, Mode};
+    use ruff_python_ast::{str::Quote, Mod, ModModule};
+    use ruff_python_parser::{self, parse_module, Mode};
     use ruff_source_file::LineEnding;
 
-    use crate::stylist::{Indentation, Quote};
+    use crate::stylist::Indentation;
 
     use super::Generator;
 
@@ -1416,9 +1429,9 @@ mod tests {
         let indentation = Indentation::default();
         let quote = Quote::default();
         let line_ending = LineEnding::default();
-        let stmt = parse_suite(contents).unwrap();
+        let module = parse_module(contents).unwrap();
         let mut generator = Generator::new(&indentation, quote, line_ending);
-        generator.unparse_suite(&stmt);
+        generator.unparse_suite(module.suite());
         generator.generate()
     }
 
@@ -1428,9 +1441,9 @@ mod tests {
         line_ending: LineEnding,
         contents: &str,
     ) -> String {
-        let stmt = parse_suite(contents).unwrap();
+        let module = parse_module(contents).unwrap();
         let mut generator = Generator::new(indentation, quote, line_ending);
-        generator.unparse_suite(&stmt);
+        generator.unparse_suite(module.suite());
         generator.generate()
     }
 
@@ -1438,8 +1451,8 @@ mod tests {
         let indentation = Indentation::default();
         let quote = Quote::default();
         let line_ending = LineEnding::default();
-        let ast = ruff_python_parser::parse(contents, Mode::Ipython).unwrap();
-        let Mod::Module(ModModule { body, .. }) = ast else {
+        let parsed = ruff_python_parser::parse(contents, Mode::Ipython).unwrap();
+        let Mod::Module(ModModule { body, .. }) = parsed.into_syntax() else {
             panic!("Source code didn't return ModModule")
         };
         let [stmt] = body.as_slice() else {
@@ -1624,6 +1637,10 @@ except* Exception as e:
     case 4 as y:
         return y"
         );
+        assert_round_trip!(
+            r"type X = int
+type Y = str"
+        );
         assert_eq!(round_trip(r"x = (1, 2, 3)"), r"x = 1, 2, 3");
         assert_eq!(round_trip(r"-(1) + ~(2) + +(3)"), r"-1 + ~2 + +3");
         assert_round_trip!(
@@ -1678,6 +1695,10 @@ class Foo:
         assert_round_trip!(r"type Foo[T] = list[T]");
         assert_round_trip!(r"type Foo[*Ts] = ...");
         assert_round_trip!(r"type Foo[**P] = ...");
+        assert_round_trip!(r"type Foo[T = int] = list[T]");
+        assert_round_trip!(r"type Foo[*Ts = int] = ...");
+        assert_round_trip!(r"type Foo[*Ts = *int] = ...");
+        assert_round_trip!(r"type Foo[**P = int] = ...");
         assert_round_trip!(r"type Foo[T, U, *Ts, **P] = ...");
         // https://github.com/astral-sh/ruff/issues/6498
         assert_round_trip!(r"f(a=1, *args, **kwargs)");
@@ -1705,6 +1726,7 @@ class Foo:
         assert_round_trip!(r#"f"{ chr(65)  =   !s}""#);
         assert_round_trip!(r#"f"{ chr(65)  =   !r}""#);
         assert_round_trip!(r#"f"{ chr(65)  =   :#x}""#);
+        assert_round_trip!(r#"f"{  ( chr(65)  ) = }""#);
         assert_round_trip!(r#"f"{a=!r:0.05f}""#);
     }
 

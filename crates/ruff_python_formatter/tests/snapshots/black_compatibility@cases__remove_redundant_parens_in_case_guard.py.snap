@@ -1,0 +1,218 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/remove_redundant_parens_in_case_guard.py
+---
+## Input
+
+```python
+match 1:
+    case _ if (True):
+        pass
+
+
+match 1:
+    case _ if (
+        True
+    ):
+        pass
+
+
+match 1:
+    case _ if (
+        # this is a comment
+        True
+    ):
+        pass
+
+
+match 1:
+    case _ if (
+        True
+        # this is a comment
+    ):
+        pass
+
+
+match 1:
+    case _ if (
+        True  # this is a comment
+    ):
+        pass
+
+
+match 1:
+    case _ if (  # this is a comment
+        True
+    ):
+        pass
+
+
+match 1:
+    case _ if (
+        True
+    ):  # this is a comment
+        pass
+
+
+match 1:
+    case _ if (True):  # comment over the line limit unless parens are removed x
+        pass
+
+
+match 1:
+    case _ if (True):  # comment over the line limit and parens should go to next line
+        pass
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -25,12 +25,16 @@
+ 
+ 
+ match 1:
+-    case _ if True:  # this is a comment
++    case _ if (
++        True  # this is a comment
++    ):
+         pass
+ 
+ 
+ match 1:
+-    case _ if True:  # this is a comment
++    case _ if (  # this is a comment
++        True
++    ):
+         pass
+ 
+ 
+@@ -45,7 +49,7 @@
+ 
+ 
+ match 1:
+-    case (
+-        _
+-    ) if True:  # comment over the line limit and parens should go to next line
++    case _ if (
++        True
++    ):  # comment over the line limit and parens should go to next line
+         pass
+```
+
+## Ruff Output
+
+```python
+match 1:
+    case _ if True:
+        pass
+
+
+match 1:
+    case _ if True:
+        pass
+
+
+match 1:
+    case _ if (
+        # this is a comment
+        True
+    ):
+        pass
+
+
+match 1:
+    case _ if (
+        True
+        # this is a comment
+    ):
+        pass
+
+
+match 1:
+    case _ if (
+        True  # this is a comment
+    ):
+        pass
+
+
+match 1:
+    case _ if (  # this is a comment
+        True
+    ):
+        pass
+
+
+match 1:
+    case _ if True:  # this is a comment
+        pass
+
+
+match 1:
+    case _ if True:  # comment over the line limit unless parens are removed x
+        pass
+
+
+match 1:
+    case _ if (
+        True
+    ):  # comment over the line limit and parens should go to next line
+        pass
+```
+
+## Black Output
+
+```python
+match 1:
+    case _ if True:
+        pass
+
+
+match 1:
+    case _ if True:
+        pass
+
+
+match 1:
+    case _ if (
+        # this is a comment
+        True
+    ):
+        pass
+
+
+match 1:
+    case _ if (
+        True
+        # this is a comment
+    ):
+        pass
+
+
+match 1:
+    case _ if True:  # this is a comment
+        pass
+
+
+match 1:
+    case _ if True:  # this is a comment
+        pass
+
+
+match 1:
+    case _ if True:  # this is a comment
+        pass
+
+
+match 1:
+    case _ if True:  # comment over the line limit unless parens are removed x
+        pass
+
+
+match 1:
+    case (
+        _
+    ) if True:  # comment over the line limit and parens should go to next line
+        pass
+```

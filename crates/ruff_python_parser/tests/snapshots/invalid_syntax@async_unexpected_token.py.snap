@@ -1,0 +1,202 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/async_unexpected_token.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..116,
+        body: [
+            ClassDef(
+                StmtClassDef {
+                    range: 6..20,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("Foo"),
+                        range: 12..15,
+                    },
+                    type_params: None,
+                    arguments: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 17..20,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 17..20,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            While(
+                StmtWhile {
+                    range: 27..42,
+                    test: Name(
+                        ExprName {
+                            range: 33..37,
+                            id: Name("test"),
+                            ctx: Load,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 39..42,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 39..42,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 49..54,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 49..50,
+                                id: Name("x"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 53..54,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 61..81,
+                    is_async: true,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 71..74,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 74..76,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 78..81,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 78..81,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            Match(
+                StmtMatch {
+                    range: 88..115,
+                    subject: Name(
+                        ExprName {
+                            range: 94..98,
+                            id: Name("test"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 104..115,
+                            pattern: MatchAs(
+                                PatternMatchAs {
+                                    range: 109..110,
+                                    pattern: None,
+                                    name: None,
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 112..115,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 112..115,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | async class Foo: ...
+  |       ^^^^^ Syntax Error: Expected 'def', 'with' or 'for' to follow 'async', found 'class'
+2 | async while test: ...
+3 | async x = 1
+  |
+
+
+  |
+1 | async class Foo: ...
+2 | async while test: ...
+  |       ^^^^^ Syntax Error: Expected 'def', 'with' or 'for' to follow 'async', found 'while'
+3 | async x = 1
+4 | async async def foo(): ...
+  |
+
+
+  |
+1 | async class Foo: ...
+2 | async while test: ...
+3 | async x = 1
+  |       ^ Syntax Error: Expected 'def', 'with' or 'for' to follow 'async', found name
+4 | async async def foo(): ...
+5 | async match test:
+  |
+
+
+  |
+2 | async while test: ...
+3 | async x = 1
+4 | async async def foo(): ...
+  |       ^^^^^ Syntax Error: Expected 'def', 'with' or 'for' to follow 'async', found 'async'
+5 | async match test:
+6 |     case _: ...
+  |
+
+
+  |
+3 | async x = 1
+4 | async async def foo(): ...
+5 | async match test:
+  |       ^^^^^ Syntax Error: Expected 'def', 'with' or 'for' to follow 'async', found 'match'
+6 |     case _: ...
+  |

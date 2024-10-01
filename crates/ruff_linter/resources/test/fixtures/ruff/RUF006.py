@@ -162,3 +162,26 @@ async def f(x: bool):
         T = asyncio.create_task(asyncio.sleep(1))
     else:
         T = None
+
+
+# Error
+def f():
+    loop = asyncio.new_event_loop()
+    loop.create_task(main()) # Error
+
+# Error
+def f():
+    loop = asyncio.get_event_loop()
+    loop.create_task(main()) # Error
+
+# OK
+def f():
+    global task
+    loop = asyncio.new_event_loop()
+    task = loop.create_task(main()) # Error
+
+# OK
+def f():
+    global task
+    loop = asyncio.get_event_loop()
+    task = loop.create_task(main()) # Error

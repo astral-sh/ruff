@@ -1,14 +1,13 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::{from_qualified_name, CallPath};
+use ruff_python_ast as ast;
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::{self as ast, ParameterWithDefault};
 use ruff_python_semantic::{
     analyze::{function_type, visibility},
     Scope, ScopeId, ScopeKind,
 };
 
-use crate::{checkers::ast::Checker, rules::flake8_unused_arguments::helpers};
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for the presence of unused `self` parameter in methods definitions.
@@ -49,7 +48,9 @@ pub(crate) fn no_self_use(
     scope: &Scope,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    let Some(parent) = &checker.semantic().first_non_type_parent_scope(scope) else {
+    let semantic = checker.semantic();
+
+    let Some(parent) = semantic.first_non_type_parent_scope(scope) else {
         return;
     };
 
@@ -60,7 +61,6 @@ pub(crate) fn no_self_use(
     let ast::StmtFunctionDef {
         name,
         parameters,
-        body,
         decorator_list,
         ..
     } = func;
@@ -70,7 +70,7 @@ pub(crate) fn no_self_use(
             name,
             decorator_list,
             parent,
-            checker.semantic(),
+            semantic,
             &checker.settings.pep8_naming.classmethod_decorators,
             &checker.settings.pep8_naming.staticmethod_decorators,
         ),
@@ -79,20 +79,15 @@ pub(crate) fn no_self_use(
         return;
     }
 
-    let property_decorators = checker
-        .settings
-        .pydocstyle
-        .property_decorators
-        .iter()
-        .map(|decorator| from_qualified_name(decorator))
-        .collect::<Vec<CallPath>>();
+    let extra_property_decorators = checker.settings.pydocstyle.property_decorators();
 
-    if helpers::is_empty(body)
+    if function_type::is_stub(func, semantic)
         || visibility::is_magic(name)
-        || visibility::is_abstract(decorator_list, checker.semantic())
-        || visibility::is_override(decorator_list, checker.semantic())
-        || visibility::is_overload(decorator_list, checker.semantic())
-        || visibility::is_property(decorator_list, &property_decorators, checker.semantic())
+        || visibility::is_abstract(decorator_list, semantic)
+        || visibility::is_override(decorator_list, semantic)
+        || visibility::is_overload(decorator_list, semantic)
+        || visibility::is_property(decorator_list, extra_property_decorators, semantic)
+        || visibility::is_validator(decorator_list, semantic)
     {
         return;
     }
@@ -102,9 +97,8 @@ pub(crate) fn no_self_use(
         .posonlyargs
         .iter()
         .chain(&parameters.args)
-        .chain(&parameters.kwonlyargs)
         .next()
-        .map(ParameterWithDefault::as_parameter)
+        .map(|param| &param.parameter)
     else {
         return;
     };
@@ -115,12 +109,12 @@ pub(crate) fn no_self_use(
 
     // If the method contains a `super` reference, then it should be considered to use self
     // implicitly.
-    if let Some(binding_id) = checker.semantic().global_scope().get("super") {
-        let binding = checker.semantic().binding(binding_id);
+    if let Some(binding_id) = semantic.global_scope().get("super") {
+        let binding = semantic.binding(binding_id);
         if binding.kind.is_builtin() {
             if binding
                 .references()
-                .any(|id| checker.semantic().reference(id).scope_id() == scope_id)
+                .any(|id| semantic.reference(id).scope_id() == scope_id)
             {
                 return;
             }
@@ -129,8 +123,8 @@ pub(crate) fn no_self_use(
 
     if scope
         .get("self")
-        .map(|binding_id| checker.semantic().binding(binding_id))
-        .is_some_and(|binding| binding.kind.is_argument() && !binding.is_used())
+        .map(|binding_id| semantic.binding(binding_id))
+        .is_some_and(|binding| binding.kind.is_argument() && binding.is_unused())
     {
         diagnostics.push(Diagnostic::new(
             NoSelfUse {

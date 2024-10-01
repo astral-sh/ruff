@@ -1,0 +1,111 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/f_string_empty_expression.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..14,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..5,
+                    value: FString(
+                        ExprFString {
+                            range: 0..5,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 0..5,
+                                            elements: [
+                                                Expression(
+                                                    FStringExpressionElement {
+                                                        range: 2..4,
+                                                        expression: Name(
+                                                            ExprName {
+                                                                range: 3..3,
+                                                                id: Name(""),
+                                                                ctx: Invalid,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 6..13,
+                    value: FString(
+                        ExprFString {
+                            range: 6..13,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 6..13,
+                                            elements: [
+                                                Expression(
+                                                    FStringExpressionElement {
+                                                        range: 8..12,
+                                                        expression: Name(
+                                                            ExprName {
+                                                                range: 9..9,
+                                                                id: Name(""),
+                                                                ctx: Invalid,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | f"{}"
+  |    ^ Syntax Error: Expected an expression
+2 | f"{  }"
+  |
+
+
+  |
+1 | f"{}"
+2 | f"{  }"
+  |      ^ Syntax Error: Expected an expression
+  |

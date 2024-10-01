@@ -162,6 +162,7 @@ fn concatenate_expressions(expr: &Expr) -> Option<(Expr, Type)> {
             elts: new_elts,
             ctx: ExprContext::Load,
             range: TextRange::default(),
+            parenthesized: true,
         }
         .into(),
     };
@@ -197,7 +198,10 @@ pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Exp
         },
         expr.range(),
     );
-    if !checker.indexer().has_comments(expr, checker.locator()) {
+    if !checker
+        .comment_ranges()
+        .has_comments(expr, checker.locator())
+    {
         // This suggestion could be unsafe if the non-literal expression in the
         // expression has overridden the `__add__` (or `__radd__`) magic methods.
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(

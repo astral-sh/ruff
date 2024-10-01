@@ -1,0 +1,79 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/nonlocal_stmt_trailing_comma.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..38,
+        body: [
+            Nonlocal(
+                StmtNonlocal {
+                    range: 0..10,
+                    names: [],
+                },
+            ),
+            Nonlocal(
+                StmtNonlocal {
+                    range: 11..22,
+                    names: [
+                        Identifier {
+                            id: Name("x"),
+                            range: 20..21,
+                        },
+                    ],
+                },
+            ),
+            Nonlocal(
+                StmtNonlocal {
+                    range: 23..37,
+                    names: [
+                        Identifier {
+                            id: Name("x"),
+                            range: 32..33,
+                        },
+                        Identifier {
+                            id: Name("y"),
+                            range: 35..36,
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | nonlocal ,
+  |          ^ Syntax Error: Expected an identifier
+2 | nonlocal x,
+3 | nonlocal x, y,
+  |
+
+
+  |
+1 | nonlocal ,
+  |           ^ Syntax Error: Nonlocal statement must have at least one name
+2 | nonlocal x,
+3 | nonlocal x, y,
+  |
+
+
+  |
+1 | nonlocal ,
+2 | nonlocal x,
+  |           ^ Syntax Error: Trailing comma not allowed
+3 | nonlocal x, y,
+  |
+
+
+  |
+1 | nonlocal ,
+2 | nonlocal x,
+3 | nonlocal x, y,
+  |              ^ Syntax Error: Trailing comma not allowed
+  |

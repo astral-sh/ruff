@@ -38,6 +38,20 @@ import os
     }
 
     #[test]
+    fn notice_with_unicode_c() {
+        let diagnostics = test_snippet(
+            r"
+# Copyright © 2023
+
+import os
+"
+            .trim(),
+            &settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice]),
+        );
+        assert_messages!(diagnostics);
+    }
+
+    #[test]
     fn notice_with_caps() {
         let diagnostics = test_snippet(
             r"
@@ -66,10 +80,144 @@ import os
     }
 
     #[test]
+    fn notice_with_comma() {
+        let diagnostics = test_snippet(
+            r"
+# Copyright (C) 2021, 2022
+
+import os
+"
+            .trim(),
+            &settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice]),
+        );
+        assert_messages!(diagnostics);
+    }
+
+    #[test]
     fn valid_author() {
         let diagnostics = test_snippet(
             r"
 # Copyright (C) 2023 Ruff
+
+import os
+"
+            .trim(),
+            &settings::LinterSettings {
+                flake8_copyright: super::settings::Settings {
+                    author: Some("Ruff".to_string()),
+                    ..super::settings::Settings::default()
+                },
+                ..settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice])
+            },
+        );
+        assert_messages!(diagnostics);
+    }
+
+    #[test]
+    fn valid_author_with_dash() {
+        let diagnostics = test_snippet(
+            r"
+# Copyright (C) 2022-2023 Ruff
+
+import os
+"
+            .trim(),
+            &settings::LinterSettings {
+                flake8_copyright: super::settings::Settings {
+                    author: Some("Ruff".to_string()),
+                    ..super::settings::Settings::default()
+                },
+                ..settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice])
+            },
+        );
+        assert_messages!(diagnostics);
+    }
+
+    #[test]
+    fn valid_author_with_dash_invalid_space() {
+        let diagnostics = test_snippet(
+            r"
+# Copyright (C) 2022- 2023 Ruff
+
+import os
+"
+            .trim(),
+            &settings::LinterSettings {
+                flake8_copyright: super::settings::Settings {
+                    author: Some("Ruff".to_string()),
+                    ..super::settings::Settings::default()
+                },
+                ..settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice])
+            },
+        );
+        assert_messages!(diagnostics);
+    }
+
+    #[test]
+    fn valid_author_with_dash_invalid_spaces() {
+        let diagnostics = test_snippet(
+            r"
+# Copyright (C) 2022 - 2023 Ruff
+
+import os
+"
+            .trim(),
+            &settings::LinterSettings {
+                flake8_copyright: super::settings::Settings {
+                    author: Some("Ruff".to_string()),
+                    ..super::settings::Settings::default()
+                },
+                ..settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice])
+            },
+        );
+        assert_messages!(diagnostics);
+    }
+
+    #[test]
+    fn valid_author_with_comma_invalid_no_space() {
+        let diagnostics = test_snippet(
+            r"
+# Copyright (C) 2022,2023 Ruff
+
+import os
+"
+            .trim(),
+            &settings::LinterSettings {
+                flake8_copyright: super::settings::Settings {
+                    author: Some("Ruff".to_string()),
+                    ..super::settings::Settings::default()
+                },
+                ..settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice])
+            },
+        );
+        assert_messages!(diagnostics);
+    }
+
+    #[test]
+    fn valid_author_with_comma_invalid_spaces() {
+        let diagnostics = test_snippet(
+            r"
+# Copyright (C) 2022 , 2023 Ruff
+
+import os
+"
+            .trim(),
+            &settings::LinterSettings {
+                flake8_copyright: super::settings::Settings {
+                    author: Some("Ruff".to_string()),
+                    ..super::settings::Settings::default()
+                },
+                ..settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice])
+            },
+        );
+        assert_messages!(diagnostics);
+    }
+
+    #[test]
+    fn valid_author_with_comma_valid_space() {
+        let diagnostics = test_snippet(
+            r"
+# Copyright (C) 2022, 2023 Ruff
 
 import os
 "
@@ -127,6 +275,36 @@ import os
     fn late_notice() {
         let diagnostics = test_snippet(
             r"
+# Content Content Content Content Content Content Content Content Content Content
+# Content Content Content Content Content Content Content Content Content Content
+# Content Content Content Content Content Content Content Content Content Content
+# Content Content Content Content Content Content Content Content Content Content
+# Content Content Content Content Content Content Content Content Content Content
+# Content Content Content Content Content Content Content Content Content Content
+# Content Content Content Content Content Content Content Content Content Content
+# Content Content Content Content Content Content Content Content Content Content
+# Content Content Content Content Content Content Content Content Content Content
+# Content Content Content Content Content Content Content Content Content Content
+# Content Content Content Content Content Content Content Content Content Content
+# Content Content Content Content Content Content Content Content Content Content
+# Content Content Content Content Content Content Content Content Content Content
+# Content Content Content Content Content Content Content Content Content Content
+# Content Content Content Content Content Content Content Content Content Content
+# Content Content Content Content Content Content Content Content Content Content
+# Content Content Content Content Content Content Content Content Content Content
+# Content Content Content Content Content Content Content Content Content Content
+# Content Content Content Content Content Content Content Content Content Content
+# Content Content Content Content Content Content Content Content Content Content
+# Content Content Content Content Content Content Content Content Content Content
+# Content Content Content Content Content Content Content Content Content Content
+# Content Content Content Content Content Content Content Content Content Content
+# Content Content Content Content Content Content Content Content Content Content
+# Content Content Content Content Content Content Content Content Content Content
+# Content Content Content Content Content Content Content Content Content Content
+# Content Content Content Content Content Content Content Content Content Content
+# Content Content Content Content Content Content Content Content Content Content
+# Content Content Content Content Content Content Content Content Content Content
+# Content Content Content Content Content Content Content Content Content Content
 # Content Content Content Content Content Content Content Content Content Content
 # Content Content Content Content Content Content Content Content Content Content
 # Content Content Content Content Content Content Content Content Content Content

@@ -1,0 +1,140 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/dict/named_expression_0.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..84,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 55..77,
+                    value: Dict(
+                        ExprDict {
+                            range: 55..77,
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        Named(
+                                            ExprNamed {
+                                                range: 56..62,
+                                                target: Name(
+                                                    ExprName {
+                                                        range: 56..57,
+                                                        id: Name("x"),
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 61..62,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                    value: Name(
+                                        ExprName {
+                                            range: 64..65,
+                                            id: Name("y"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                                DictItem {
+                                    key: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 67..68,
+                                                id: Name("z"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    value: Name(
+                                        ExprName {
+                                            range: 68..68,
+                                            id: Name(""),
+                                            ctx: Invalid,
+                                        },
+                                    ),
+                                },
+                                DictItem {
+                                    key: Some(
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 72..73,
+                                                value: Int(
+                                                    2,
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                    value: Name(
+                                        ExprName {
+                                            range: 75..76,
+                                            id: Name("a"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 79..84,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 79..84,
+                            left: Name(
+                                ExprName {
+                                    range: 79..80,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            op: Add,
+                            right: Name(
+                                ExprName {
+                                    range: 83..84,
+                                    id: Name("y"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # Unparenthesized named expression not allowed in key
+2 | 
+3 | {x := 1: y, z := 2: a}
+  |  ^^^^^^ Syntax Error: Unparenthesized named expression cannot be used here
+4 | 
+5 | x + y
+  |
+
+
+  |
+1 | # Unparenthesized named expression not allowed in key
+2 | 
+3 | {x := 1: y, z := 2: a}
+  |               ^^ Syntax Error: Expected ':', found ':='
+4 | 
+5 | x + y
+  |

@@ -1,0 +1,48 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/parenthesized/missing_closing_paren_1.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..137,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 129..137,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 132..137,
+                            left: Name(
+                                ExprName {
+                                    range: 132..133,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            op: Add,
+                            right: Name(
+                                ExprName {
+                                    range: 136..137,
+                                    id: Name("y"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+4 | (
+5 | 
+6 | x + y
+  |       Syntax Error: unexpected EOF while parsing
+  |

@@ -2,26 +2,33 @@
 source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_source(source)
 ---
+## Tokens
+```
 [
     (
         FStringStart,
         0..2,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
-        FStringMiddle {
-            value: "\\",
-            is_raw: false,
-        },
+        FStringMiddle(
+            "\\",
+        ),
         2..3,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         Lbrace,
         3..4,
     ),
     (
-        Name {
-            name: "foo",
-        },
+        Name(
+            Name("foo"),
+        ),
         4..7,
     ),
     (
@@ -31,26 +38,34 @@ expression: lex_source(source)
     (
         FStringEnd,
         8..9,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         FStringStart,
         10..12,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
-        FStringMiddle {
-            value: "\\\\",
-            is_raw: false,
-        },
+        FStringMiddle(
+            "\\\\",
+        ),
         12..14,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         Lbrace,
         14..15,
     ),
     (
-        Name {
-            name: "foo",
-        },
+        Name(
+            Name("foo"),
+        ),
         15..18,
     ),
     (
@@ -60,39 +75,59 @@ expression: lex_source(source)
     (
         FStringEnd,
         19..20,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         FStringStart,
         21..23,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
-        FStringMiddle {
-            value: "\\{foo}",
-            is_raw: false,
-        },
+        FStringMiddle(
+            "\\{foo}",
+        ),
         23..31,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         FStringEnd,
         31..32,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         FStringStart,
         33..35,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
-        FStringMiddle {
-            value: "\\\\{foo}",
-            is_raw: false,
-        },
+        FStringMiddle(
+            "\\\\{foo}",
+        ),
         35..44,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         FStringEnd,
         44..45,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         Newline,
         45..45,
     ),
 ]
+```

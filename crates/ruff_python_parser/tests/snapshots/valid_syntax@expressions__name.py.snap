@@ -1,0 +1,123 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/valid/expressions/name.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..76,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..1,
+                    value: Name(
+                        ExprName {
+                            range: 0..1,
+                            id: Name("_"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 2..5,
+                    value: Name(
+                        ExprName {
+                            range: 3..4,
+                            id: Name("_"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 6..8,
+                    value: Name(
+                        ExprName {
+                            range: 6..8,
+                            id: Name("__"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 9..17,
+                    value: Name(
+                        ExprName {
+                            range: 9..17,
+                            id: Name("__init__"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 18..22,
+                    value: Name(
+                        ExprName {
+                            range: 18..22,
+                            id: Name("name"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 23..29,
+                    value: Name(
+                        ExprName {
+                            range: 24..28,
+                            id: Name("name"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 60..65,
+                    value: Name(
+                        ExprName {
+                            range: 60..65,
+                            id: Name("match"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 66..70,
+                    value: Name(
+                        ExprName {
+                            range: 66..70,
+                            id: Name("case"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 71..75,
+                    value: Name(
+                        ExprName {
+                            range: 71..75,
+                            id: Name("type"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

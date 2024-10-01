@@ -1,0 +1,175 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/decorator_invalid_expression.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..56,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 0..55,
+                    is_async: false,
+                    decorator_list: [
+                        Decorator {
+                            range: 0..3,
+                            expression: Starred(
+                                ExprStarred {
+                                    range: 1..3,
+                                    value: Name(
+                                        ExprName {
+                                            range: 2..3,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                        Decorator {
+                            range: 4..9,
+                            expression: Starred(
+                                ExprStarred {
+                                    range: 6..8,
+                                    value: Name(
+                                        ExprName {
+                                            range: 7..8,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                        Decorator {
+                            range: 10..17,
+                            expression: Starred(
+                                ExprStarred {
+                                    range: 13..15,
+                                    value: Name(
+                                        ExprName {
+                                            range: 14..15,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                        Decorator {
+                            range: 18..26,
+                            expression: Yield(
+                                ExprYield {
+                                    range: 19..26,
+                                    value: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 25..26,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                },
+                            ),
+                        },
+                        Decorator {
+                            range: 27..40,
+                            expression: YieldFrom(
+                                ExprYieldFrom {
+                                    range: 28..40,
+                                    value: Name(
+                                        ExprName {
+                                            range: 39..40,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 45..48,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 48..50,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 52..55,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 52..55,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | @*x
+  |  ^^ Syntax Error: Starred expression cannot be used here
+2 | @(*x)
+3 | @((*x))
+  |
+
+
+  |
+1 | @*x
+2 | @(*x)
+  |   ^^ Syntax Error: Starred expression cannot be used here
+3 | @((*x))
+4 | @yield x
+  |
+
+
+  |
+1 | @*x
+2 | @(*x)
+3 | @((*x))
+  |    ^^ Syntax Error: Starred expression cannot be used here
+4 | @yield x
+5 | @yield from x
+  |
+
+
+  |
+2 | @(*x)
+3 | @((*x))
+4 | @yield x
+  |  ^^^^^^^ Syntax Error: Yield expression cannot be used here
+5 | @yield from x
+6 | def foo(): ...
+  |
+
+
+  |
+3 | @((*x))
+4 | @yield x
+5 | @yield from x
+  |  ^^^^^^^^^^^^ Syntax Error: Yield expression cannot be used here
+6 | def foo(): ...
+  |

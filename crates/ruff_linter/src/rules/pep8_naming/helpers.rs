@@ -1,8 +1,8 @@
 use itertools::Itertools;
-use ruff_python_ast::call_path::collect_call_path;
-use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 
-use ruff_python_semantic::SemanticModel;
+use ruff_python_ast::name::UnqualifiedName;
+use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_semantic::{analyze, SemanticModel};
 use ruff_python_stdlib::str::{is_cased_lowercase, is_cased_uppercase};
 
 pub(super) fn is_camelcase(name: &str) -> bool {
@@ -31,14 +31,20 @@ pub(super) fn is_named_tuple_assignment(stmt: &Stmt, semantic: &SemanticModel) -
     let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
         return false;
     };
-    semantic.resolve_call_path(func).is_some_and(|call_path| {
-        matches!(call_path.as_slice(), ["collections", "namedtuple"])
-            || semantic.match_typing_call_path(&call_path, "NamedTuple")
-    })
+    semantic
+        .resolve_qualified_name(func)
+        .is_some_and(|qualified_name| {
+            matches!(qualified_name.segments(), ["collections", "namedtuple"])
+                || semantic.match_typing_qualified_name(&qualified_name, "NamedTuple")
+        })
 }
 
 /// Returns `true` if the statement is an assignment to a `TypedDict`.
 pub(super) fn is_typed_dict_assignment(stmt: &Stmt, semantic: &SemanticModel) -> bool {
+    if !semantic.seen_typing() {
+        return false;
+    }
+
     let Stmt::Assign(ast::StmtAssign { value, .. }) = stmt else {
         return false;
     };
@@ -50,16 +56,22 @@ pub(super) fn is_typed_dict_assignment(stmt: &Stmt, semantic: &SemanticModel) ->
 
 /// Returns `true` if the statement is an assignment to a `TypeVar` or `NewType`.
 pub(super) fn is_type_var_assignment(stmt: &Stmt, semantic: &SemanticModel) -> bool {
+    if !semantic.seen_typing() {
+        return false;
+    }
+
     let Stmt::Assign(ast::StmtAssign { value, .. }) = stmt else {
         return false;
     };
     let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
         return false;
     };
-    semantic.resolve_call_path(func).is_some_and(|call_path| {
-        semantic.match_typing_call_path(&call_path, "TypeVar")
-            || semantic.match_typing_call_path(&call_path, "NewType")
-    })
+    semantic
+        .resolve_qualified_name(func)
+        .is_some_and(|qualified_name| {
+            semantic.match_typing_qualified_name(&qualified_name, "TypeVar")
+                || semantic.match_typing_qualified_name(&qualified_name, "NewType")
+        })
 }
 
 /// Returns `true` if the statement is an assignment to a `TypeAlias`.
@@ -74,12 +86,13 @@ pub(super) fn is_type_alias_assignment(stmt: &Stmt, semantic: &SemanticModel) ->
 }
 
 /// Returns `true` if the statement is an assignment to a `TypedDict`.
-pub(super) fn is_typed_dict_class(arguments: Option<&Arguments>, semantic: &SemanticModel) -> bool {
-    arguments.is_some_and(|arguments| {
-        arguments
-            .args
-            .iter()
-            .any(|base| semantic.match_typing_expr(base, "TypedDict"))
+pub(super) fn is_typed_dict_class(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
+    if !semantic.seen_typing() {
+        return false;
+    }
+
+    analyze::class::any_qualified_base_class(class_def, semantic, &|qualified_name| {
+        semantic.match_typing_qualified_name(&qualified_name, "TypedDict")
     })
 }
 
@@ -106,8 +119,8 @@ pub(super) fn is_django_model_import(name: &str, stmt: &Stmt, semantic: &Semanti
         }
 
         // Match against, e.g., `apps.get_model("zerver", "Attachment")`.
-        if let Some(call_path) = collect_call_path(func.as_ref()) {
-            if matches!(call_path.as_slice(), [.., "get_model"]) {
+        if let Some(unqualified_name) = UnqualifiedName::from_expr(func.as_ref()) {
+            if matches!(unqualified_name.segments(), [.., "get_model"]) {
                 if let Some(argument) =
                     arguments.find_argument("model_name", arguments.args.len().saturating_sub(1))
                 {
@@ -123,9 +136,9 @@ pub(super) fn is_django_model_import(name: &str, stmt: &Stmt, semantic: &Semanti
         }
 
         // Match against, e.g., `import_string("zerver.models.Attachment")`.
-        if let Some(call_path) = semantic.resolve_call_path(func.as_ref()) {
+        if let Some(qualified_name) = semantic.resolve_qualified_name(func.as_ref()) {
             if matches!(
-                call_path.as_slice(),
+                qualified_name.segments(),
                 ["django", "utils", "module_loading", "import_string"]
             ) {
                 if let Some(argument) = arguments.find_argument("dotted_path", 0) {

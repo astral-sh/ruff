@@ -10,7 +10,7 @@ use crate::checkers::ast::Checker;
 /// Checks for classes with too many public methods
 ///
 /// By default, this rule allows up to 20 public methods, as configured by
-/// the [`pylint.max-public-methods`] option.
+/// the [`lint.pylint.max-public-methods`] option.
 ///
 /// ## Why is this bad?
 /// Classes with many public methods are harder to understand
@@ -19,7 +19,7 @@ use crate::checkers::ast::Checker;
 /// Instead, consider refactoring the class into separate classes.
 ///
 /// ## Example
-/// Assuming that `pylint.max-public-settings` is set to 5:
+/// Assuming that `lint.pylint.max-public-methods` is set to 5:
 /// ```python
 /// class Linter:
 ///     def __init__(self):
@@ -81,7 +81,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## Options
-/// - `pylint.max-public-methods`
+/// - `lint.pylint.max-public-methods`
 #[violation]
 pub struct TooManyPublicMethods {
     methods: usize,

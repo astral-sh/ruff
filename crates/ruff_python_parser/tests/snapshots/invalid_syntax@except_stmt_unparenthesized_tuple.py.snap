@@ -1,0 +1,250 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/except_stmt_unparenthesized_tuple.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..131,
+        body: [
+            Try(
+                StmtTry {
+                    range: 0..64,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 9..13,
+                            },
+                        ),
+                    ],
+                    handlers: [
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 14..35,
+                                type_: Some(
+                                    Tuple(
+                                        ExprTuple {
+                                            range: 21..25,
+                                            elts: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 21..22,
+                                                        id: Name("x"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        range: 24..25,
+                                                        id: Name("y"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                            ctx: Load,
+                                            parenthesized: false,
+                                        },
+                                    ),
+                                ),
+                                name: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 31..35,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 36..64,
+                                type_: Some(
+                                    Tuple(
+                                        ExprTuple {
+                                            range: 43..47,
+                                            elts: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 43..44,
+                                                        id: Name("x"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        range: 46..47,
+                                                        id: Name("y"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                            ctx: Load,
+                                            parenthesized: false,
+                                        },
+                                    ),
+                                ),
+                                name: Some(
+                                    Identifier {
+                                        id: Name("exc"),
+                                        range: 51..54,
+                                    },
+                                ),
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 60..64,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                    finalbody: [],
+                    is_star: false,
+                },
+            ),
+            Try(
+                StmtTry {
+                    range: 65..130,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 74..78,
+                            },
+                        ),
+                    ],
+                    handlers: [
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 79..101,
+                                type_: Some(
+                                    Tuple(
+                                        ExprTuple {
+                                            range: 87..91,
+                                            elts: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 87..88,
+                                                        id: Name("x"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        range: 90..91,
+                                                        id: Name("y"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                            ctx: Load,
+                                            parenthesized: false,
+                                        },
+                                    ),
+                                ),
+                                name: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 97..101,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 102..130,
+                                type_: Some(
+                                    Tuple(
+                                        ExprTuple {
+                                            range: 110..114,
+                                            elts: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 110..111,
+                                                        id: Name("x"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        range: 113..114,
+                                                        id: Name("y"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                            ctx: Load,
+                                            parenthesized: false,
+                                        },
+                                    ),
+                                ),
+                                name: Some(
+                                    Identifier {
+                                        id: Name("eg"),
+                                        range: 118..120,
+                                    },
+                                ),
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 126..130,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                    finalbody: [],
+                    is_star: true,
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | try:
+2 |     pass
+3 | except x, y:
+  |        ^^^^ Syntax Error: Multiple exception types must be parenthesized
+4 |     pass
+5 | except x, y as exc:
+  |
+
+
+  |
+3 | except x, y:
+4 |     pass
+5 | except x, y as exc:
+  |        ^^^^ Syntax Error: Multiple exception types must be parenthesized
+6 |     pass
+7 | try:
+  |
+
+
+   |
+ 7 | try:
+ 8 |     pass
+ 9 | except* x, y:
+   |         ^^^^ Syntax Error: Multiple exception types must be parenthesized
+10 |     pass
+11 | except* x, y as eg:
+   |
+
+
+   |
+ 9 | except* x, y:
+10 |     pass
+11 | except* x, y as eg:
+   |         ^^^^ Syntax Error: Multiple exception types must be parenthesized
+12 |     pass
+   |

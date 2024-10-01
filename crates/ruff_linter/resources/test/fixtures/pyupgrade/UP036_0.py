@@ -179,13 +179,13 @@ if True:
     if sys.version_info > (3, 0): \
     expected_error = []
 
-if sys.version_info < (3,12):
+if sys.version_info < (3,13):
     print("py3")
 
-if sys.version_info <= (3,12):
+if sys.version_info <= (3,13):
     print("py3")
 
-if sys.version_info <= (3,12):
+if sys.version_info <= (3,13):
     print("py3")
 
 if sys.version_info == 10000000:
@@ -197,10 +197,10 @@ if sys.version_info < (3,10000000):
 if sys.version_info <= (3,10000000):
     print("py3")
 
-if sys.version_info > (3,12):
+if sys.version_info > (3,13):
     print("py3")
 
-if sys.version_info >= (3,12):
+if sys.version_info >= (3,13):
     print("py3")
 
 # Slices on `sys.version_info` should be treated equivalently.
@@ -210,8 +210,48 @@ if sys.version_info[:2] >= (3,0):
 if sys.version_info[:3] >= (3,0):
     print("py3")
 
-if sys.version_info[:2] > (3,13):
+if sys.version_info[:2] > (3,14):
     print("py3")
 
-if sys.version_info[:3] > (3,13):
+if sys.version_info[:3] > (3,14):
+    print("py3")
+
+if sys.version_info > (3,0):
+    f"this is\
+    allowed too"
+
+    f"""the indentation on
+    this line is significant"""
+
+    "this is\
+    allowed too"
+
+if sys.version_info[0] == 3:
+    print("py3")
+
+if sys.version_info[0] <= 3:
+    print("py3")
+
+if sys.version_info[0] < 3:
+    print("py3")
+
+if sys.version_info[0] >= 3:
+    print("py3")
+
+if sys.version_info[0] > 3:
+    print("py3")
+
+if sys.version_info[0] == 2:
+    print("py3")
+
+if sys.version_info[0] <= 2:
+    print("py3")
+
+if sys.version_info[0] < 2:
+    print("py3")
+
+if sys.version_info[0] >= 2:
+    print("py3")
+
+if sys.version_info[0] > 2:
     print("py3")

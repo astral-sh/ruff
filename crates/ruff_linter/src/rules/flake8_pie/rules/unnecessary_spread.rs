@@ -49,21 +49,19 @@ impl Violation for UnnecessarySpread {
 pub(crate) fn unnecessary_spread(checker: &mut Checker, dict: &ast::ExprDict) {
     // The first "end" is the start of the dictionary, immediately following the open bracket.
     let mut prev_end = dict.start() + TextSize::from(1);
-    for item in dict.keys.iter().zip(dict.values.iter()) {
-        if let (None, value) = item {
+    for ast::DictItem { key, value } in dict {
+        if key.is_none() {
             // We only care about when the key is None which indicates a spread `**`
             // inside a dict.
             if let Expr::Dict(inner) = value {
                 let mut diagnostic = Diagnostic::new(UnnecessarySpread, value.range());
-                if checker.settings.preview.is_enabled() {
-                    if let Some(fix) = unnecessary_spread_fix(inner, prev_end, checker.locator()) {
-                        diagnostic.set_fix(fix);
-                    }
+                if let Some(fix) = unnecessary_spread_fix(inner, prev_end, checker.locator()) {
+                    diagnostic.set_fix(fix);
                 }
                 checker.diagnostics.push(diagnostic);
             }
         }
-        prev_end = item.1.end();
+        prev_end = value.end();
     }
 }
 
@@ -77,7 +75,7 @@ fn unnecessary_spread_fix(
     let doublestar = SimpleTokenizer::starts_at(prev_end, locator.contents())
         .find(|tok| matches!(tok.kind(), SimpleTokenKind::DoubleStar))?;
 
-    if let Some(last) = dict.values.last() {
+    if let Some(last) = dict.iter_values().last() {
         // Ex) `**{a: 1, b: 2}`
         let mut edits = vec![];
         for tok in SimpleTokenizer::starts_at(last.end(), locator.contents()).skip_trivia() {

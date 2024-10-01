@@ -23,7 +23,7 @@ use crate::settings::types::PythonVersion;
 /// `__future__` annotations are not evaluated at runtime. If your code relies
 /// on runtime type annotations (either directly or via a library like
 /// Pydantic), you can disable this behavior for Python versions prior to 3.10
-/// by setting [`pyupgrade.keep-runtime-typing`] to `true`.
+/// by setting [`lint.pyupgrade.keep-runtime-typing`] to `true`.
 ///
 /// ## Example
 /// ```python
@@ -46,7 +46,7 @@ use crate::settings::types::PythonVersion;
 ///
 /// ## Options
 /// - `target-version`
-/// - `pyupgrade.keep-runtime-typing`
+/// - `lint.pyupgrade.keep-runtime-typing`
 ///
 /// [PEP 604]: https://peps.python.org/pep-0604/
 #[violation]
@@ -78,12 +78,8 @@ pub(crate) fn use_pep604_annotation(
         && !checker.semantic().in_complex_string_type_definition()
         && is_allowed_value(slice);
 
-    let applicability = if checker.settings.preview.is_enabled() {
-        if checker.settings.target_version >= PythonVersion::Py310 {
-            Applicability::Safe
-        } else {
-            Applicability::Unsafe
-        }
+    let applicability = if checker.settings.target_version >= PythonVersion::Py310 {
+        Applicability::Safe
     } else {
         Applicability::Unsafe
     };
@@ -173,13 +169,13 @@ fn is_allowed_value(expr: &Expr) -> bool {
         Expr::BoolOp(_)
         | Expr::BinOp(_)
         | Expr::UnaryOp(_)
-        | Expr::IfExp(_)
+        | Expr::If(_)
         | Expr::Dict(_)
         | Expr::Set(_)
         | Expr::ListComp(_)
         | Expr::SetComp(_)
         | Expr::DictComp(_)
-        | Expr::GeneratorExp(_)
+        | Expr::Generator(_)
         | Expr::Compare(_)
         | Expr::Call(_)
         | Expr::FString(_)
@@ -193,9 +189,9 @@ fn is_allowed_value(expr: &Expr) -> bool {
         | Expr::Subscript(_)
         | Expr::Name(_)
         | Expr::List(_) => true,
-        Expr::Tuple(tuple) => tuple.elts.iter().all(is_allowed_value),
+        Expr::Tuple(tuple) => tuple.iter().all(is_allowed_value),
         // Maybe require parentheses.
-        Expr::NamedExpr(_) => false,
+        Expr::Named(_) => false,
         // Invalid in binary expressions.
         Expr::Await(_)
         | Expr::Lambda(_)

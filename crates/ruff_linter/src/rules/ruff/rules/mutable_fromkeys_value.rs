@@ -1,5 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::typing::is_mutable_expr;
 
@@ -73,21 +74,16 @@ pub(crate) fn mutable_fromkeys_value(checker: &mut Checker, call: &ast::ExprCall
     if attr != "fromkeys" {
         return;
     }
-    let Some(name_expr) = value.as_name_expr() else {
-        return;
-    };
-    if name_expr.id != "dict" {
-        return;
-    }
-    if !checker.semantic().is_builtin("dict") {
+    let semantic = checker.semantic();
+    if !semantic.match_builtin_expr(value, "dict") {
         return;
     }
 
     // Check that the value parameter is a mutable object.
-    let [keys, value] = call.arguments.args.as_slice() else {
+    let [keys, value] = &*call.arguments.args else {
         return;
     };
-    if !is_mutable_expr(value, checker.semantic()) {
+    if !is_mutable_expr(value, semantic) {
         return;
     }
 
@@ -104,7 +100,7 @@ pub(crate) fn mutable_fromkeys_value(checker: &mut Checker, call: &ast::ExprCall
 fn generate_dict_comprehension(keys: &Expr, value: &Expr, generator: Generator) -> String {
     // Construct `key`.
     let key = ast::ExprName {
-        id: "key".to_string(),
+        id: Name::new_static("key"),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
     };

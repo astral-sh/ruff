@@ -1,9 +1,8 @@
-use ruff_python_ast::{self as ast, Decorator, Expr, ParameterWithDefault, Parameters};
-
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::collect_call_path;
+use ruff_python_ast::name::UnqualifiedName;
+use ruff_python_ast::{self as ast, Decorator, Expr, ParameterWithDefault, Parameters};
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
@@ -32,6 +31,7 @@ use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
 /// variants, like `bool | int`.
 ///
 /// ## Example
+///
 /// ```python
 /// from math import ceil, floor
 ///
@@ -45,6 +45,7 @@ use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
 /// ```
 ///
 /// Instead, refactor into separate implementations:
+///
 /// ```python
 /// from math import ceil, floor
 ///
@@ -62,6 +63,7 @@ use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
 /// ```
 ///
 /// Or, refactor to use an `Enum`:
+///
 /// ```python
 /// from enum import Enum
 ///
@@ -71,11 +73,11 @@ use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
 ///     DOWN = 2
 ///
 ///
-/// def round_number(value: float, method: RoundingMethod) -> float:
-///     ...
+/// def round_number(value: float, method: RoundingMethod) -> float: ...
 /// ```
 ///
 /// Or, make the argument a keyword-only argument:
+///
 /// ```python
 /// from math import ceil, floor
 ///
@@ -136,8 +138,8 @@ pub(crate) fn boolean_type_hint_positional_argument(
 
         // Allow Boolean type hints in setters.
         if decorator_list.iter().any(|decorator| {
-            collect_call_path(&decorator.expression)
-                .is_some_and(|call_path| call_path.as_slice() == [name, "setter"])
+            UnqualifiedName::from_expr(&decorator.expression)
+                .is_some_and(|unqualified_name| unqualified_name.segments() == [name, "setter"])
         }) {
             return;
         }
@@ -149,7 +151,7 @@ pub(crate) fn boolean_type_hint_positional_argument(
         }
 
         // If `bool` isn't actually a reference to the `bool` built-in, return.
-        if !checker.semantic().is_builtin("bool") {
+        if !checker.semantic().has_builtin_binding("bool") {
             return;
         }
 
@@ -191,11 +193,15 @@ fn match_annotation_to_complex_bool(annotation: &Expr, semantic: &SemanticModel)
         }
         // Ex) `typing.Union[bool, int]`
         Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
-            let call_path = semantic.resolve_call_path(value);
-            if call_path
-                .as_ref()
-                .is_some_and(|call_path| semantic.match_typing_call_path(call_path, "Union"))
-            {
+            // If the typing modules were never imported, we'll never match below.
+            if !semantic.seen_typing() {
+                return false;
+            }
+
+            let qualified_name = semantic.resolve_qualified_name(value);
+            if qualified_name.as_ref().is_some_and(|qualified_name| {
+                semantic.match_typing_qualified_name(qualified_name, "Union")
+            }) {
                 if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
                     elts.iter()
                         .any(|elt| match_annotation_to_complex_bool(elt, semantic))
@@ -203,10 +209,9 @@ fn match_annotation_to_complex_bool(annotation: &Expr, semantic: &SemanticModel)
                     // Union with a single type is an invalid type annotation
                     false
                 }
-            } else if call_path
-                .as_ref()
-                .is_some_and(|call_path| semantic.match_typing_call_path(call_path, "Optional"))
-            {
+            } else if qualified_name.as_ref().is_some_and(|qualified_name| {
+                semantic.match_typing_qualified_name(qualified_name, "Optional")
+            }) {
                 match_annotation_to_complex_bool(slice, semantic)
             } else {
                 false

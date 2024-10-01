@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::any_over_expr;
+use ruff_python_ast::name::Name;
 use ruff_python_ast::traversal;
 use ruff_python_ast::{
     self as ast, Arguments, CmpOp, Comprehension, Expr, ExprContext, Stmt, UnaryOp,
@@ -17,8 +18,7 @@ use crate::line_width::LineWidthBuilder;
 /// `any` or `all`.
 ///
 /// ## Why is this bad?
-/// Using a builtin function is more concise and readable. Builtins are also
-/// more efficient than `for` loops.
+/// Using a builtin function is more concise and readable.
 ///
 /// ## Example
 /// ```python
@@ -89,7 +89,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
         // Replace with `any`.
         (true, false) => {
             let contents = return_stmt(
-                "any",
+                Name::new_static("any"),
                 loop_.test,
                 loop_.target,
                 loop_.iter,
@@ -113,7 +113,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                 },
                 TextRange::new(stmt.start(), terminal.stmt.end()),
             );
-            if checker.semantic().is_builtin("any") {
+            if checker.semantic().has_builtin_binding("any") {
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
                     contents,
                     stmt.start(),
@@ -140,7 +140,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                     range: _,
                 }) = &loop_.test
                 {
-                    if let ([op], [comparator]) = (ops.as_slice(), comparators.as_slice()) {
+                    if let ([op], [comparator]) = (&**ops, &**comparators) {
                         let op = match op {
                             CmpOp::Eq => CmpOp::NotEq,
                             CmpOp::NotEq => CmpOp::Eq,
@@ -155,8 +155,8 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                         };
                         let node = ast::ExprCompare {
                             left: left.clone(),
-                            ops: vec![op],
-                            comparators: vec![comparator.clone()],
+                            ops: Box::from([op]),
+                            comparators: Box::from([comparator.clone()]),
                             range: TextRange::default(),
                         };
                         node.into()
@@ -177,7 +177,13 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                     node.into()
                 }
             };
-            let contents = return_stmt("all", &test, loop_.target, loop_.iter, checker.generator());
+            let contents = return_stmt(
+                Name::new_static("all"),
+                &test,
+                loop_.target,
+                loop_.iter,
+                checker.generator(),
+            );
 
             // Don't flag if the resulting expression would exceed the maximum line length.
             let line_start = checker.locator().line_start(stmt.start());
@@ -199,7 +205,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                 },
                 TextRange::new(stmt.start(), terminal.stmt.end()),
             );
-            if checker.semantic().is_builtin("all") {
+            if checker.semantic().has_builtin_binding("all") {
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
                     contents,
                     stmt.start(),
@@ -274,10 +280,11 @@ fn match_loop(stmt: &Stmt) -> Option<Loop> {
     if !nested_elif_else_clauses.is_empty() {
         return None;
     }
-    let [Stmt::Return(ast::StmtReturn { value, range: _ })] = nested_body.as_slice() else {
-        return None;
-    };
-    let Some(value) = value else {
+    let [Stmt::Return(ast::StmtReturn {
+        value: Some(value),
+        range: _,
+    })] = nested_body.as_slice()
+    else {
         return None;
     };
     let Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) = value.as_ref() else {
@@ -371,8 +378,8 @@ fn match_sibling_return<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<Termina
 }
 
 /// Generate a return statement for an `any` or `all` builtin comprehension.
-fn return_stmt(id: &str, test: &Expr, target: &Expr, iter: &Expr, generator: Generator) -> String {
-    let node = ast::ExprGeneratorExp {
+fn return_stmt(id: Name, test: &Expr, target: &Expr, iter: &Expr, generator: Generator) -> String {
+    let node = ast::ExprGenerator {
         elt: Box::new(test.clone()),
         generators: vec![Comprehension {
             target: target.clone(),
@@ -382,17 +389,18 @@ fn return_stmt(id: &str, test: &Expr, target: &Expr, iter: &Expr, generator: Gen
             range: TextRange::default(),
         }],
         range: TextRange::default(),
+        parenthesized: false,
     };
     let node1 = ast::ExprName {
-        id: id.into(),
+        id,
         ctx: ExprContext::Load,
         range: TextRange::default(),
     };
     let node2 = ast::ExprCall {
         func: Box::new(node1.into()),
         arguments: Arguments {
-            args: vec![node.into()],
-            keywords: vec![],
+            args: Box::from([node.into()]),
+            keywords: Box::from([]),
             range: TextRange::default(),
         },
         range: TextRange::default(),

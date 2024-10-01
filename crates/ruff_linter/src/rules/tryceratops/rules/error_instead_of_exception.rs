@@ -81,58 +81,60 @@ pub(crate) fn error_instead_of_exception(checker: &mut Checker, handlers: &[Exce
             if matches!(logging_level, LoggingLevel::Error) {
                 if exc_info(&expr.arguments, checker.semantic()).is_none() {
                     let mut diagnostic = Diagnostic::new(ErrorInsteadOfException, expr.range());
-                    if checker.settings.preview.is_enabled() {
-                        match expr.func.as_ref() {
-                            Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
-                                diagnostic.set_fix(Fix::applicable_edit(
-                                    Edit::range_replacement("exception".to_string(), attr.range()),
+
+                    match expr.func.as_ref() {
+                        Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
+                            diagnostic.set_fix(Fix::applicable_edit(
+                                Edit::range_replacement("exception".to_string(), attr.range()),
+                                // When run against `logging.error`, the fix is safe; otherwise,
+                                // the object _may_ not be a logger.
+                                if checker
+                                    .semantic()
+                                    .resolve_qualified_name(expr.func.as_ref())
+                                    .is_some_and(|qualified_name| {
+                                        matches!(qualified_name.segments(), ["logging", "error"])
+                                    })
+                                {
+                                    Applicability::Safe
+                                } else {
+                                    Applicability::Unsafe
+                                },
+                            ));
+                        }
+                        Expr::Name(_) => {
+                            diagnostic.try_set_fix(|| {
+                                let (import_edit, binding) =
+                                    checker.importer().get_or_import_symbol(
+                                        &ImportRequest::import("logging", "exception"),
+                                        expr.start(),
+                                        checker.semantic(),
+                                    )?;
+                                let name_edit = Edit::range_replacement(binding, expr.func.range());
+                                Ok(Fix::applicable_edits(
+                                    import_edit,
+                                    [name_edit],
                                     // When run against `logging.error`, the fix is safe; otherwise,
                                     // the object _may_ not be a logger.
                                     if checker
                                         .semantic()
-                                        .resolve_call_path(expr.func.as_ref())
-                                        .is_some_and(|call_path| {
-                                            matches!(call_path.as_slice(), ["logging", "error"])
+                                        .resolve_qualified_name(expr.func.as_ref())
+                                        .is_some_and(|qualified_name| {
+                                            matches!(
+                                                qualified_name.segments(),
+                                                ["logging", "error"]
+                                            )
                                         })
                                     {
                                         Applicability::Safe
                                     } else {
                                         Applicability::Unsafe
                                     },
-                                ));
-                            }
-                            Expr::Name(_) => {
-                                diagnostic.try_set_fix(|| {
-                                    let (import_edit, binding) =
-                                        checker.importer().get_or_import_symbol(
-                                            &ImportRequest::import("logging", "exception"),
-                                            expr.start(),
-                                            checker.semantic(),
-                                        )?;
-                                    let name_edit =
-                                        Edit::range_replacement(binding, expr.func.range());
-                                    Ok(Fix::applicable_edits(
-                                        import_edit,
-                                        [name_edit],
-                                        // When run against `logging.error`, the fix is safe; otherwise,
-                                        // the object _may_ not be a logger.
-                                        if checker
-                                            .semantic()
-                                            .resolve_call_path(expr.func.as_ref())
-                                            .is_some_and(|call_path| {
-                                                matches!(call_path.as_slice(), ["logging", "error"])
-                                            })
-                                        {
-                                            Applicability::Safe
-                                        } else {
-                                            Applicability::Unsafe
-                                        },
-                                    ))
-                                });
-                            }
-                            _ => {}
+                                ))
+                            });
                         }
+                        _ => {}
                     }
+
                     checker.diagnostics.push(diagnostic);
                 }
             }

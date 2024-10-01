@@ -1,0 +1,133 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/except_stmt_as_name_soft_keyword.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..100,
+        body: [
+            Try(
+                StmtTry {
+                    range: 0..99,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 5..8,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 5..8,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    handlers: [
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 9..39,
+                                type_: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 16..25,
+                                            id: Name("Exception"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                                name: Some(
+                                    Identifier {
+                                        id: Name("match"),
+                                        range: 29..34,
+                                    },
+                                ),
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 36..39,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    range: 36..39,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 40..69,
+                                type_: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 47..56,
+                                            id: Name("Exception"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                                name: Some(
+                                    Identifier {
+                                        id: Name("case"),
+                                        range: 60..64,
+                                    },
+                                ),
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 66..69,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    range: 66..69,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 70..99,
+                                type_: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 77..86,
+                                            id: Name("Exception"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                                name: Some(
+                                    Identifier {
+                                        id: Name("type"),
+                                        range: 90..94,
+                                    },
+                                ),
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 96..99,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    range: 96..99,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                    finalbody: [],
+                    is_star: false,
+                },
+            ),
+        ],
+    },
+)
+```

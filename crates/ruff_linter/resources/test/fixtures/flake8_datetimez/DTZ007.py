@@ -33,3 +33,9 @@ from datetime import datetime
 
 # no replace orastimezone unqualified
 datetime.strptime("something", "something")
+
+# F-strings
+datetime.strptime("something", f"%Y-%m-%dT%H:%M:%S{('.%f' if millis else '')}%z")
+datetime.strptime("something", f"%Y-%m-%d %H:%M:%S%z")
+# F-string is implicitly concatenated to another string
+datetime.strptime("something", f"%Y-%m-%dT%H:%M:%S{('.%f' if millis else '')}" "%z")

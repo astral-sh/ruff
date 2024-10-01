@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 use std::fs::{self, File};
 use std::hash::Hasher;
-use std::io::{self, BufReader, BufWriter, Write};
+use std::io::{self, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
@@ -15,14 +15,14 @@ use rayon::iter::ParallelIterator;
 use rayon::iter::{IntoParallelIterator, ParallelBridge};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
+use tempfile::NamedTempFile;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_diagnostics::{DiagnosticKind, Fix};
-use ruff_linter::message::Message;
+use ruff_linter::message::{DiagnosticMessage, Message};
 use ruff_linter::{warn_user, VERSION};
 use ruff_macros::CacheKey;
 use ruff_notebook::NotebookIndex;
-use ruff_python_ast::imports::ImportMap;
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::{TextRange, TextSize};
 use ruff_workspace::resolver::Resolver;
@@ -165,15 +165,41 @@ impl Cache {
             return Ok(());
         }
 
-        let file = File::create(&self.path)
-            .with_context(|| format!("Failed to create cache file '{}'", self.path.display()))?;
-        let writer = BufWriter::new(file);
-        bincode::serialize_into(writer, &self.package).with_context(|| {
-            format!(
-                "Failed to serialise cache to file '{}'",
-                self.path.display()
-            )
-        })
+        // Write the cache to a temporary file first and then rename it for an "atomic" write.
+        // Protects against data loss if the process is killed during the write and races between different ruff
+        // processes, resulting in a corrupted cache file. https://github.com/astral-sh/ruff/issues/8147#issuecomment-1943345964
+        let mut temp_file =
+            NamedTempFile::new_in(self.path.parent().expect("Write path must have a parent"))
+                .context("Failed to create temporary file")?;
+
+        // Serialize to in-memory buffer because hyperfine benchmark showed that it's faster than
+        // using a `BufWriter` and our cache files are small enough that streaming isn't necessary.
+        let serialized =
+            bincode::serialize(&self.package).context("Failed to serialize cache data")?;
+        temp_file
+            .write_all(&serialized)
+            .context("Failed to write serialized cache to temporary file.")?;
+
+        if let Err(err) = temp_file.persist(&self.path) {
+            // On Windows, writing to the cache file can fail if the file is still open (e.g., if
+            // the user is running Ruff from multiple processes over the same directory).
+            if cfg!(windows) && err.error.kind() == io::ErrorKind::PermissionDenied {
+                warn_user!(
+                    "Failed to write cache file '{}': {}",
+                    self.path.display(),
+                    err.error
+                );
+            } else {
+                return Err(err).with_context(|| {
+                    format!(
+                        "Failed to rename temporary cache file to {}",
+                        self.path.display()
+                    )
+                });
+            }
+        }
+
+        Ok(())
     }
 
     /// Applies the pending changes without storing the cache to disk.
@@ -319,12 +345,14 @@ impl FileCache {
                 let file = SourceFileBuilder::new(path.to_string_lossy(), &*lint.source).finish();
                 lint.messages
                     .iter()
-                    .map(|msg| Message {
-                        kind: msg.kind.clone(),
-                        range: msg.range,
-                        fix: msg.fix.clone(),
-                        file: file.clone(),
-                        noqa_offset: msg.noqa_offset,
+                    .map(|msg| {
+                        Message::Diagnostic(DiagnosticMessage {
+                            kind: msg.kind.clone(),
+                            range: msg.range,
+                            fix: msg.fix.clone(),
+                            file: file.clone(),
+                            noqa_offset: msg.noqa_offset,
+                        })
                     })
                     .collect()
             };
@@ -333,7 +361,7 @@ impl FileCache {
             } else {
                 FxHashMap::default()
             };
-            Diagnostics::new(messages, lint.imports.clone(), notebook_indexes)
+            Diagnostics::new(messages, notebook_indexes)
         })
     }
 }
@@ -360,15 +388,17 @@ pub(crate) fn init(path: &Path) -> Result<()> {
     fs::create_dir_all(path.join(VERSION))?;
 
     // Add the CACHEDIR.TAG.
-    if !cachedir::is_tagged(path)? {
-        cachedir::add_tag(path)?;
-    }
+    cachedir::ensure_tag(path)?;
 
     // Add the .gitignore.
-    let gitignore_path = path.join(".gitignore");
-    if !gitignore_path.exists() {
-        let mut file = fs::File::create(gitignore_path)?;
-        file.write_all(b"*")?;
+    match fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path.join(".gitignore"))
+    {
+        Ok(mut file) => file.write_all(b"# Automatically created by ruff.\n*\n")?,
+        Err(err) if err.kind() == io::ErrorKind::AlreadyExists => (),
+        Err(err) => return Err(err.into()),
     }
 
     Ok(())
@@ -377,7 +407,7 @@ pub(crate) fn init(path: &Path) -> Result<()> {
 #[derive(Deserialize, Debug, Serialize, PartialEq)]
 pub(crate) struct LintCacheData {
     /// Imports made.
-    pub(super) imports: ImportMap,
+    // pub(super) imports: ImportMap,
     /// Diagnostic messages.
     pub(super) messages: Vec<CacheMessage>,
     /// Source code of the file.
@@ -393,22 +423,22 @@ pub(crate) struct LintCacheData {
 impl LintCacheData {
     pub(crate) fn from_messages(
         messages: &[Message],
-        imports: ImportMap,
         notebook_index: Option<NotebookIndex>,
     ) -> Self {
         let source = if let Some(msg) = messages.first() {
-            msg.file.source_text().to_owned()
+            msg.source_file().source_text().to_owned()
         } else {
             String::new() // No messages, no need to keep the source!
         };
 
         let messages = messages
             .iter()
+            .filter_map(|message| message.as_diagnostic_message())
             .map(|msg| {
                 // Make sure that all message use the same source file.
                 assert_eq!(
-                    msg.file,
-                    messages.first().unwrap().file,
+                    &msg.file,
+                    messages.first().unwrap().source_file(),
                     "message uses a different source file"
                 );
                 CacheMessage {
@@ -421,7 +451,6 @@ impl LintCacheData {
             .collect();
 
         Self {
-            imports,
             messages,
             source,
             notebook_index,
@@ -557,6 +586,7 @@ mod tests {
     use test_case::test_case;
 
     use ruff_cache::CACHE_DIR_NAME;
+    use ruff_linter::message::Message;
     use ruff_linter::settings::flags;
     use ruff_linter::settings::types::UnsafeFixes;
     use ruff_python_ast::PySourceType;
@@ -619,11 +649,7 @@ mod tests {
                     UnsafeFixes::Enabled,
                 )
                 .unwrap();
-                if diagnostics
-                    .messages
-                    .iter()
-                    .any(|m| m.kind.name == "SyntaxError")
-                {
+                if diagnostics.messages.iter().any(Message::is_syntax_error) {
                     parse_errors.push(path.clone());
                 }
                 paths.push(path);
@@ -1050,6 +1076,7 @@ mod tests {
                 &self.settings.formatter,
                 PySourceType::Python,
                 FormatMode::Write,
+                None,
                 Some(cache),
             )
         }

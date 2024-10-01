@@ -20,7 +20,7 @@ impl FormatNodeRule<ExprNumberLiteral> for FormatExprNumberLiteral {
 
                 match normalized {
                     Cow::Borrowed(_) => source_text_slice(range).fmt(f),
-                    Cow::Owned(normalized) => text(&normalized, Some(range.start())).fmt(f),
+                    Cow::Owned(normalized) => text(&normalized).fmt(f),
                 }
             }
             Number::Float(_) => {
@@ -30,7 +30,7 @@ impl FormatNodeRule<ExprNumberLiteral> for FormatExprNumberLiteral {
 
                 match normalized {
                     Cow::Borrowed(_) => source_text_slice(range).fmt(f),
-                    Cow::Owned(normalized) => text(&normalized, Some(range.start())).fmt(f),
+                    Cow::Owned(normalized) => text(&normalized).fmt(f),
                 }
             }
             Number::Complex { .. } => {
@@ -43,7 +43,7 @@ impl FormatNodeRule<ExprNumberLiteral> for FormatExprNumberLiteral {
                         source_text_slice(range.sub_end(TextSize::from(1))).fmt(f)?;
                     }
                     Cow::Owned(normalized) => {
-                        text(&normalized, Some(range.start())).fmt(f)?;
+                        text(&normalized).fmt(f)?;
                     }
                 }
 

@@ -3,34 +3,63 @@ use rustc_hash::FxHashSet;
 
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
+use ruff_python_semantic::SemanticModel;
 
 #[derive(Default)]
-pub(super) struct Stack<'a> {
+pub(super) struct Stack<'data> {
     /// The `return` statements in the current function.
-    pub(super) returns: Vec<&'a ast::StmtReturn>,
+    pub(super) returns: Vec<&'data ast::StmtReturn>,
     /// The `elif` or `else` statements in the current function.
-    pub(super) elifs_elses: Vec<(&'a [Stmt], &'a ElifElseClause)>,
+    pub(super) elifs_elses: Vec<(&'data [Stmt], &'data ElifElseClause)>,
     /// The non-local variables in the current function.
-    pub(super) non_locals: FxHashSet<&'a str>,
+    pub(super) non_locals: FxHashSet<&'data str>,
+    /// The annotated variables in the current function.
+    ///
+    /// For example, consider:
+    /// ```python
+    /// x: int
+    ///
+    /// if True:
+    ///    x = foo()
+    ///    return x
+    /// ```
+    ///
+    /// In this case, the annotation on `x` is used to cast the return value
+    /// of `foo()` to an `int`. Removing the `x = foo()` statement would
+    /// change the return type of the function.
+    pub(super) annotations: FxHashSet<&'data str>,
     /// Whether the current function is a generator.
     pub(super) is_generator: bool,
     /// The `assignment`-to-`return` statement pairs in the current function.
     /// TODO(charlie): Remove the extra [`Stmt`] here, which is necessary to support statement
     /// removal for the `return` statement.
-    pub(super) assignment_return: Vec<(&'a ast::StmtAssign, &'a ast::StmtReturn, &'a Stmt)>,
+    pub(super) assignment_return:
+        Vec<(&'data ast::StmtAssign, &'data ast::StmtReturn, &'data Stmt)>,
 }
 
-#[derive(Default)]
-pub(super) struct ReturnVisitor<'a> {
+pub(super) struct ReturnVisitor<'semantic, 'data> {
+    /// The semantic model of the current file.
+    semantic: &'semantic SemanticModel<'data>,
     /// The current stack of nodes.
-    pub(super) stack: Stack<'a>,
+    pub(super) stack: Stack<'data>,
     /// The preceding sibling of the current node.
-    sibling: Option<&'a Stmt>,
+    sibling: Option<&'data Stmt>,
     /// The parent nodes of the current node.
-    parents: Vec<&'a Stmt>,
+    parents: Vec<&'data Stmt>,
 }
 
-impl<'a> Visitor<'a> for ReturnVisitor<'a> {
+impl<'semantic, 'data> ReturnVisitor<'semantic, 'data> {
+    pub(super) fn new(semantic: &'semantic SemanticModel<'data>) -> Self {
+        Self {
+            semantic,
+            stack: Stack::default(),
+            sibling: None,
+            parents: Vec::new(),
+        }
+    }
+}
+
+impl<'semantic, 'a> Visitor<'a> for ReturnVisitor<'semantic, 'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::ClassDef(ast::StmtClassDef { decorator_list, .. }) => {
@@ -72,6 +101,14 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                     .non_locals
                     .extend(names.iter().map(Identifier::as_str));
             }
+            Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
+                // Ex) `x: int`
+                if value.is_none() {
+                    if let Expr::Name(name) = target.as_ref() {
+                        self.stack.annotations.insert(name.id.as_str());
+                    }
+                }
+            }
             Stmt::Return(stmt_return) => {
                 // If the `return` statement is preceded by an `assignment` statement, then the
                 // `assignment` statement may be redundant.
@@ -95,11 +132,17 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                         //         x = f.read()
                         //     return x
                         // ```
-                        Stmt::With(ast::StmtWith { body, .. }) => {
-                            if let Some(stmt_assign) = body.last().and_then(Stmt::as_assign_stmt) {
-                                self.stack
-                                    .assignment_return
-                                    .push((stmt_assign, stmt_return, stmt));
+                        Stmt::With(with) => {
+                            if let Some(stmt_assign) =
+                                with.body.last().and_then(Stmt::as_assign_stmt)
+                            {
+                                if !has_conditional_body(with, self.semantic) {
+                                    self.stack.assignment_return.push((
+                                        stmt_assign,
+                                        stmt_return,
+                                        stmt,
+                                    ));
+                                }
                             }
                         }
                         _ => {}
@@ -141,4 +184,35 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
         visitor::walk_body(self, body);
         self.sibling = sibling;
     }
+}
+
+/// Returns `true` if the [`With`] statement is known to have a conditional body. In other words:
+/// if the [`With`] statement's body may or may not run.
+///
+/// For example, in the following, it's unsafe to inline the `return` into the `with`, since if
+/// `data.decode()` fails, the behavior of the program will differ. (As-is, the function will return
+/// the input `data`; if we inline the `return`, the function will return `None`.)
+///
+/// ```python
+/// def func(data):
+///     with suppress(JSONDecoderError):
+///         data = data.decode()
+///     return data
+/// ```
+fn has_conditional_body(with: &ast::StmtWith, semantic: &SemanticModel) -> bool {
+    with.items.iter().any(|item| {
+        let ast::WithItem {
+            context_expr: Expr::Call(ast::ExprCall { func, .. }),
+            ..
+        } = item
+        else {
+            return false;
+        };
+        if let Some(qualified_name) = semantic.resolve_qualified_name(func) {
+            if qualified_name.segments() == ["contextlib", "suppress"] {
+                return true;
+            }
+        }
+        false
+    })
 }

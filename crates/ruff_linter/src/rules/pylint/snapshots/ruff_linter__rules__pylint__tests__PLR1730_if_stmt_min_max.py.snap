@@ -1,0 +1,486 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+if_stmt_min_max.py:8:1: PLR1730 [*] Replace `if` statement with `value = max(value, 10)`
+   |
+ 7 |   # Positive
+ 8 | / if value < 10:  # [max-instead-of-if]
+ 9 | |     value = 10
+   | |______________^ PLR1730
+10 |   
+11 |   if value <= 10:  # [max-instead-of-if]
+   |
+   = help: Replace with `value = max(value, 10)`
+
+ℹ Safe fix
+5  5  | value3 = 3
+6  6  | 
+7  7  | # Positive
+8     |-if value < 10:  # [max-instead-of-if]
+9     |-    value = 10
+   8  |+value = max(value, 10)
+10 9  | 
+11 10 | if value <= 10:  # [max-instead-of-if]
+12 11 |     value = 10
+
+if_stmt_min_max.py:11:1: PLR1730 [*] Replace `if` statement with `value = max(10, value)`
+   |
+ 9 |       value = 10
+10 |   
+11 | / if value <= 10:  # [max-instead-of-if]
+12 | |     value = 10
+   | |______________^ PLR1730
+13 |   
+14 |   if value < value2:  # [max-instead-of-if]
+   |
+   = help: Replace with `value = max(10, value)`
+
+ℹ Safe fix
+8  8  | if value < 10:  # [max-instead-of-if]
+9  9  |     value = 10
+10 10 | 
+11    |-if value <= 10:  # [max-instead-of-if]
+12    |-    value = 10
+   11 |+value = max(10, value)
+13 12 | 
+14 13 | if value < value2:  # [max-instead-of-if]
+15 14 |     value = value2
+
+if_stmt_min_max.py:14:1: PLR1730 [*] Replace `if` statement with `value = max(value, value2)`
+   |
+12 |       value = 10
+13 |   
+14 | / if value < value2:  # [max-instead-of-if]
+15 | |     value = value2
+   | |__________________^ PLR1730
+16 |   
+17 |   if value > 10:  # [min-instead-of-if]
+   |
+   = help: Replace with `value = max(value, value2)`
+
+ℹ Safe fix
+11 11 | if value <= 10:  # [max-instead-of-if]
+12 12 |     value = 10
+13 13 | 
+14    |-if value < value2:  # [max-instead-of-if]
+15    |-    value = value2
+   14 |+value = max(value, value2)
+16 15 | 
+17 16 | if value > 10:  # [min-instead-of-if]
+18 17 |     value = 10
+
+if_stmt_min_max.py:17:1: PLR1730 [*] Replace `if` statement with `value = min(value, 10)`
+   |
+15 |       value = value2
+16 |   
+17 | / if value > 10:  # [min-instead-of-if]
+18 | |     value = 10
+   | |______________^ PLR1730
+19 |   
+20 |   if value >= 10:  # [min-instead-of-if]
+   |
+   = help: Replace with `value = min(value, 10)`
+
+ℹ Safe fix
+14 14 | if value < value2:  # [max-instead-of-if]
+15 15 |     value = value2
+16 16 | 
+17    |-if value > 10:  # [min-instead-of-if]
+18    |-    value = 10
+   17 |+value = min(value, 10)
+19 18 | 
+20 19 | if value >= 10:  # [min-instead-of-if]
+21 20 |     value = 10
+
+if_stmt_min_max.py:20:1: PLR1730 [*] Replace `if` statement with `value = min(10, value)`
+   |
+18 |       value = 10
+19 |   
+20 | / if value >= 10:  # [min-instead-of-if]
+21 | |     value = 10
+   | |______________^ PLR1730
+22 |   
+23 |   if value > value2:  # [min-instead-of-if]
+   |
+   = help: Replace with `value = min(10, value)`
+
+ℹ Safe fix
+17 17 | if value > 10:  # [min-instead-of-if]
+18 18 |     value = 10
+19 19 | 
+20    |-if value >= 10:  # [min-instead-of-if]
+21    |-    value = 10
+   20 |+value = min(10, value)
+22 21 | 
+23 22 | if value > value2:  # [min-instead-of-if]
+24 23 |     value = value2
+
+if_stmt_min_max.py:23:1: PLR1730 [*] Replace `if` statement with `value = min(value, value2)`
+   |
+21 |       value = 10
+22 |   
+23 | / if value > value2:  # [min-instead-of-if]
+24 | |     value = value2
+   | |__________________^ PLR1730
+   |
+   = help: Replace with `value = min(value, value2)`
+
+ℹ Safe fix
+20 20 | if value >= 10:  # [min-instead-of-if]
+21 21 |     value = 10
+22 22 | 
+23    |-if value > value2:  # [min-instead-of-if]
+24    |-    value = value2
+   23 |+value = min(value, value2)
+25 24 | 
+26 25 | 
+27 26 | class A:
+
+if_stmt_min_max.py:33:1: PLR1730 [*] Replace `if` statement with `A1.value = max(A1.value, 10)`
+   |
+32 |   A1 = A()
+33 | / if A1.value < 10:  # [max-instead-of-if]
+34 | |     A1.value = 10
+   | |_________________^ PLR1730
+35 |   
+36 |   if A1.value > 10:  # [min-instead-of-if]
+   |
+   = help: Replace with `A1.value = max(A1.value, 10)`
+
+ℹ Safe fix
+30 30 | 
+31 31 | 
+32 32 | A1 = A()
+33    |-if A1.value < 10:  # [max-instead-of-if]
+34    |-    A1.value = 10
+   33 |+A1.value = max(A1.value, 10)
+35 34 | 
+36 35 | if A1.value > 10:  # [min-instead-of-if]
+37 36 |     A1.value = 10
+
+if_stmt_min_max.py:36:1: PLR1730 [*] Replace `if` statement with `A1.value = min(A1.value, 10)`
+   |
+34 |       A1.value = 10
+35 |   
+36 | / if A1.value > 10:  # [min-instead-of-if]
+37 | |     A1.value = 10
+   | |_________________^ PLR1730
+   |
+   = help: Replace with `A1.value = min(A1.value, 10)`
+
+ℹ Safe fix
+33 33 | if A1.value < 10:  # [max-instead-of-if]
+34 34 |     A1.value = 10
+35 35 | 
+36    |-if A1.value > 10:  # [min-instead-of-if]
+37    |-    A1.value = 10
+   36 |+A1.value = min(A1.value, 10)
+38 37 | 
+39 38 | 
+40 39 | class AA:
+
+if_stmt_min_max.py:60:1: PLR1730 [*] Replace `if` statement with `A2 = max(A2, A1)`
+   |
+58 |   A2 = AA(3)
+59 |   
+60 | / if A2 < A1:  # [max-instead-of-if]
+61 | |     A2 = A1
+   | |___________^ PLR1730
+62 |   
+63 |   if A2 <= A1:  # [max-instead-of-if]
+   |
+   = help: Replace with `A2 = max(A2, A1)`
+
+ℹ Safe fix
+57 57 | A1 = AA(0)
+58 58 | A2 = AA(3)
+59 59 | 
+60    |-if A2 < A1:  # [max-instead-of-if]
+61    |-    A2 = A1
+   60 |+A2 = max(A2, A1)
+62 61 | 
+63 62 | if A2 <= A1:  # [max-instead-of-if]
+64 63 |     A2 = A1
+
+if_stmt_min_max.py:63:1: PLR1730 [*] Replace `if` statement with `A2 = max(A1, A2)`
+   |
+61 |       A2 = A1
+62 |   
+63 | / if A2 <= A1:  # [max-instead-of-if]
+64 | |     A2 = A1
+   | |___________^ PLR1730
+65 |   
+66 |   if A2 > A1:  # [min-instead-of-if]
+   |
+   = help: Replace with `A2 = max(A1, A2)`
+
+ℹ Safe fix
+60 60 | if A2 < A1:  # [max-instead-of-if]
+61 61 |     A2 = A1
+62 62 | 
+63    |-if A2 <= A1:  # [max-instead-of-if]
+64    |-    A2 = A1
+   63 |+A2 = max(A1, A2)
+65 64 | 
+66 65 | if A2 > A1:  # [min-instead-of-if]
+67 66 |     A2 = A1
+
+if_stmt_min_max.py:66:1: PLR1730 [*] Replace `if` statement with `A2 = min(A2, A1)`
+   |
+64 |       A2 = A1
+65 |   
+66 | / if A2 > A1:  # [min-instead-of-if]
+67 | |     A2 = A1
+   | |___________^ PLR1730
+68 |   
+69 |   if A2 >= A1:  # [min-instead-of-if]
+   |
+   = help: Replace with `A2 = min(A2, A1)`
+
+ℹ Safe fix
+63 63 | if A2 <= A1:  # [max-instead-of-if]
+64 64 |     A2 = A1
+65 65 | 
+66    |-if A2 > A1:  # [min-instead-of-if]
+67    |-    A2 = A1
+   66 |+A2 = min(A2, A1)
+68 67 | 
+69 68 | if A2 >= A1:  # [min-instead-of-if]
+70 69 |     A2 = A1
+
+if_stmt_min_max.py:69:1: PLR1730 [*] Replace `if` statement with `A2 = min(A1, A2)`
+   |
+67 |       A2 = A1
+68 |   
+69 | / if A2 >= A1:  # [min-instead-of-if]
+70 | |     A2 = A1
+   | |___________^ PLR1730
+71 |   
+72 |   # Negative
+   |
+   = help: Replace with `A2 = min(A1, A2)`
+
+ℹ Safe fix
+66 66 | if A2 > A1:  # [min-instead-of-if]
+67 67 |     A2 = A1
+68 68 | 
+69    |-if A2 >= A1:  # [min-instead-of-if]
+70    |-    A2 = A1
+   69 |+A2 = min(A1, A2)
+71 70 | 
+72 71 | # Negative
+73 72 | if value < 10:
+
+if_stmt_min_max.py:132:1: PLR1730 [*] Replace `if` statement with `min` call
+    |
+131 |   # Parenthesized expressions
+132 | / if value.attr > 3:
+133 | |     (
+134 | |         value.
+135 | |         attr
+136 | |     ) = 3
+    | |_________^ PLR1730
+137 |   
+138 |   class Foo:
+    |
+    = help: Replace with `min` call
+
+ℹ Safe fix
+129 129 |     value = 2
+130 130 | 
+131 131 | # Parenthesized expressions
+132     |-if value.attr > 3:
+133     |-    (
+    132 |+(
+134 133 |         value.
+135 134 |         attr
+136     |-    ) = 3
+    135 |+    ) = min(value.attr, 3)
+137 136 | 
+138 137 | class Foo:
+139 138 |     _min = 0
+
+if_stmt_min_max.py:143:9: PLR1730 [*] Replace `if` statement with `self._min = min(value, self._min)`
+    |
+142 |       def foo(self, value) -> None:
+143 |           if value < self._min:
+    |  _________^
+144 | |             self._min = value
+    | |_____________________________^ PLR1730
+145 |           if value > self._max:
+146 |               self._max = value
+    |
+    = help: Replace with `self._min = min(value, self._min)`
+
+ℹ Safe fix
+140 140 |     _max = 0
+141 141 | 
+142 142 |     def foo(self, value) -> None:
+143     |-        if value < self._min:
+144     |-            self._min = value
+    143 |+        self._min = min(value, self._min)
+145 144 |         if value > self._max:
+146 145 |             self._max = value
+147 146 | 
+
+if_stmt_min_max.py:145:9: PLR1730 [*] Replace `if` statement with `self._max = max(value, self._max)`
+    |
+143 |           if value < self._min:
+144 |               self._min = value
+145 |           if value > self._max:
+    |  _________^
+146 | |             self._max = value
+    | |_____________________________^ PLR1730
+147 |   
+148 |           if self._min < value:
+    |
+    = help: Replace with `self._max = max(value, self._max)`
+
+ℹ Safe fix
+142 142 |     def foo(self, value) -> None:
+143 143 |         if value < self._min:
+144 144 |             self._min = value
+145     |-        if value > self._max:
+146     |-            self._max = value
+    145 |+        self._max = max(value, self._max)
+147 146 | 
+148 147 |         if self._min < value:
+149 148 |             self._min = value
+
+if_stmt_min_max.py:148:9: PLR1730 [*] Replace `if` statement with `self._min = max(self._min, value)`
+    |
+146 |               self._max = value
+147 |   
+148 |           if self._min < value:
+    |  _________^
+149 | |             self._min = value
+    | |_____________________________^ PLR1730
+150 |           if self._max > value:
+151 |               self._max = value
+    |
+    = help: Replace with `self._min = max(self._min, value)`
+
+ℹ Safe fix
+145 145 |         if value > self._max:
+146 146 |             self._max = value
+147 147 | 
+148     |-        if self._min < value:
+149     |-            self._min = value
+    148 |+        self._min = max(self._min, value)
+150 149 |         if self._max > value:
+151 150 |             self._max = value
+152 151 | 
+
+if_stmt_min_max.py:150:9: PLR1730 [*] Replace `if` statement with `self._max = min(self._max, value)`
+    |
+148 |           if self._min < value:
+149 |               self._min = value
+150 |           if self._max > value:
+    |  _________^
+151 | |             self._max = value
+    | |_____________________________^ PLR1730
+152 |   
+153 |           if value <= self._min:
+    |
+    = help: Replace with `self._max = min(self._max, value)`
+
+ℹ Safe fix
+147 147 | 
+148 148 |         if self._min < value:
+149 149 |             self._min = value
+150     |-        if self._max > value:
+151     |-            self._max = value
+    150 |+        self._max = min(self._max, value)
+152 151 | 
+153 152 |         if value <= self._min:
+154 153 |             self._min = value
+
+if_stmt_min_max.py:153:9: PLR1730 [*] Replace `if` statement with `self._min = min(self._min, value)`
+    |
+151 |               self._max = value
+152 |   
+153 |           if value <= self._min:
+    |  _________^
+154 | |             self._min = value
+    | |_____________________________^ PLR1730
+155 |           if value >= self._max:
+156 |               self._max = value
+    |
+    = help: Replace with `self._min = min(self._min, value)`
+
+ℹ Safe fix
+150 150 |         if self._max > value:
+151 151 |             self._max = value
+152 152 | 
+153     |-        if value <= self._min:
+154     |-            self._min = value
+    153 |+        self._min = min(self._min, value)
+155 154 |         if value >= self._max:
+156 155 |             self._max = value
+157 156 | 
+
+if_stmt_min_max.py:155:9: PLR1730 [*] Replace `if` statement with `self._max = max(self._max, value)`
+    |
+153 |           if value <= self._min:
+154 |               self._min = value
+155 |           if value >= self._max:
+    |  _________^
+156 | |             self._max = value
+    | |_____________________________^ PLR1730
+157 |   
+158 |           if self._min <= value:
+    |
+    = help: Replace with `self._max = max(self._max, value)`
+
+ℹ Safe fix
+152 152 | 
+153 153 |         if value <= self._min:
+154 154 |             self._min = value
+155     |-        if value >= self._max:
+156     |-            self._max = value
+    155 |+        self._max = max(self._max, value)
+157 156 | 
+158 157 |         if self._min <= value:
+159 158 |             self._min = value
+
+if_stmt_min_max.py:158:9: PLR1730 [*] Replace `if` statement with `self._min = max(value, self._min)`
+    |
+156 |               self._max = value
+157 |   
+158 |           if self._min <= value:
+    |  _________^
+159 | |             self._min = value
+    | |_____________________________^ PLR1730
+160 |           if self._max >= value:
+161 |               self._max = value
+    |
+    = help: Replace with `self._min = max(value, self._min)`
+
+ℹ Safe fix
+155 155 |         if value >= self._max:
+156 156 |             self._max = value
+157 157 | 
+158     |-        if self._min <= value:
+159     |-            self._min = value
+    158 |+        self._min = max(value, self._min)
+160 159 |         if self._max >= value:
+161 160 |             self._max = value
+
+if_stmt_min_max.py:160:9: PLR1730 [*] Replace `if` statement with `self._max = min(value, self._max)`
+    |
+158 |           if self._min <= value:
+159 |               self._min = value
+160 |           if self._max >= value:
+    |  _________^
+161 | |             self._max = value
+    | |_____________________________^ PLR1730
+    |
+    = help: Replace with `self._max = min(value, self._max)`
+
+ℹ Safe fix
+157 157 | 
+158 158 |         if self._min <= value:
+159 159 |             self._min = value
+160     |-        if self._max >= value:
+161     |-            self._max = value
+    160 |+        self._max = min(value, self._max)

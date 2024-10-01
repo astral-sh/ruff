@@ -1,0 +1,90 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/compare/missing_rhs_1.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..71,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 59..60,
+                    value: Name(
+                        ExprName {
+                            range: 59..60,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 61..64,
+                    value: UnaryOp(
+                        ExprUnaryOp {
+                            range: 61..64,
+                            op: Not,
+                            operand: Name(
+                                ExprName {
+                                    range: 64..64,
+                                    id: Name(""),
+                                    ctx: Invalid,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 66..71,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 66..71,
+                            left: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 66..67,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                            op: Add,
+                            right: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 70..71,
+                                    value: Int(
+                                        2,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # Without the `in`, this is considered to be a unary `not`
+2 | x not
+  |   ^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+3 | 
+4 | 1 + 2
+  |
+
+
+  |
+1 | # Without the `in`, this is considered to be a unary `not`
+2 | x not
+  |      ^ Syntax Error: Expected an expression
+3 | 
+4 | 1 + 2
+  |

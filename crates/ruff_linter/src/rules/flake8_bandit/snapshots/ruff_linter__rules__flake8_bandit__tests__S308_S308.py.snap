@@ -1,0 +1,34 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+S308.py:5:12: S308 Use of `mark_safe` may expose cross-site scripting vulnerabilities
+  |
+4 | def some_func():
+5 |     return mark_safe('<script>alert("evil!")</script>')
+  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S308
+  |
+
+S308.py:8:1: S308 Use of `mark_safe` may expose cross-site scripting vulnerabilities
+   |
+ 8 | @mark_safe
+   | ^^^^^^^^^^ S308
+ 9 | def some_func():
+10 |     return '<script>alert("evil!")</script>'
+   |
+
+S308.py:17:12: S308 Use of `mark_safe` may expose cross-site scripting vulnerabilities
+   |
+16 | def some_func():
+17 |     return mark_safe('<script>alert("evil!")</script>')
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S308
+   |
+
+S308.py:20:1: S308 Use of `mark_safe` may expose cross-site scripting vulnerabilities
+   |
+20 | @mark_safe
+   | ^^^^^^^^^^ S308
+21 | def some_func():
+22 |     return '<script>alert("evil!")</script>'
+   |
+
+

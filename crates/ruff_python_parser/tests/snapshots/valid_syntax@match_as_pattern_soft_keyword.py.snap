@@ -1,0 +1,113 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/match_as_pattern_soft_keyword.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..69,
+        body: [
+            Match(
+                StmtMatch {
+                    range: 0..68,
+                    subject: Name(
+                        ExprName {
+                            range: 6..9,
+                            id: Name("foo"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 15..29,
+                            pattern: MatchAs(
+                                PatternMatchAs {
+                                    range: 20..24,
+                                    pattern: None,
+                                    name: Some(
+                                        Identifier {
+                                            id: Name("case"),
+                                            range: 20..24,
+                                        },
+                                    ),
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 26..29,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 26..29,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 34..49,
+                            pattern: MatchAs(
+                                PatternMatchAs {
+                                    range: 39..44,
+                                    pattern: None,
+                                    name: Some(
+                                        Identifier {
+                                            id: Name("match"),
+                                            range: 39..44,
+                                        },
+                                    ),
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 46..49,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 46..49,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 54..68,
+                            pattern: MatchAs(
+                                PatternMatchAs {
+                                    range: 59..63,
+                                    pattern: None,
+                                    name: Some(
+                                        Identifier {
+                                            id: Name("type"),
+                                            range: 59..63,
+                                        },
+                                    ),
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 65..68,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 65..68,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```

@@ -1,0 +1,187 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/compare/starred_expression.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..39,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..7,
+                    value: Compare(
+                        ExprCompare {
+                            range: 0..7,
+                            left: Name(
+                                ExprName {
+                                    range: 0..1,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            ops: [
+                                GtE,
+                            ],
+                            comparators: [
+                                Starred(
+                                    ExprStarred {
+                                        range: 5..7,
+                                        value: Name(
+                                            ExprName {
+                                                range: 6..7,
+                                                id: Name("y"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 8..19,
+                    value: Compare(
+                        ExprCompare {
+                            range: 8..19,
+                            left: Name(
+                                ExprName {
+                                    range: 8..9,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            ops: [
+                                NotIn,
+                            ],
+                            comparators: [
+                                Starred(
+                                    ExprStarred {
+                                        range: 17..19,
+                                        value: Name(
+                                            ExprName {
+                                                range: 18..19,
+                                                id: Name("y"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 21..27,
+                    value: Starred(
+                        ExprStarred {
+                            range: 21..27,
+                            value: Compare(
+                                ExprCompare {
+                                    range: 22..27,
+                                    left: Name(
+                                        ExprName {
+                                            range: 22..23,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ops: [
+                                        Lt,
+                                    ],
+                                    comparators: [
+                                        Name(
+                                            ExprName {
+                                                range: 26..27,
+                                                id: Name("y"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 28..39,
+                    value: Starred(
+                        ExprStarred {
+                            range: 28..39,
+                            value: Compare(
+                                ExprCompare {
+                                    range: 29..39,
+                                    left: Name(
+                                        ExprName {
+                                            range: 29..30,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ops: [
+                                        IsNot,
+                                    ],
+                                    comparators: [
+                                        Name(
+                                            ExprName {
+                                                range: 38..39,
+                                                id: Name("y"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | x >= *y
+  |      ^^ Syntax Error: Starred expression cannot be used here
+2 | x not in *y
+  |
+
+
+  |
+1 | x >= *y
+2 | x not in *y
+  |          ^^ Syntax Error: Starred expression cannot be used here
+3 | 
+4 | *x < y
+  |
+
+
+  |
+2 | x not in *y
+3 | 
+4 | *x < y
+  |  ^^^^^ Syntax Error: Comparison expression cannot be used here
+5 | *x is not y
+  |
+
+
+  |
+4 | *x < y
+5 | *x is not y
+  |  ^^^^^^^^^^ Syntax Error: Comparison expression cannot be used here
+  |

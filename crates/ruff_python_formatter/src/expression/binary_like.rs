@@ -20,8 +20,7 @@ use crate::expression::parentheses::{
 };
 use crate::expression::OperatorPrecedence;
 use crate::prelude::*;
-use crate::preview::is_fix_power_op_line_length_enabled;
-use crate::string::{AnyString, FormatStringContinuation};
+use crate::string::{AnyString, FormatImplicitConcatenatedString};
 
 #[derive(Copy, Clone, Debug)]
 pub(super) enum BinaryLike<'a> {
@@ -395,10 +394,10 @@ impl Format<PyFormatContext<'_>> for BinaryLike<'_> {
                             [
                                 operand.leading_binary_comments().map(leading_comments),
                                 leading_comments(comments.leading(string_constant)),
-                                // Call `FormatStringContinuation` directly to avoid formatting
+                                // Call `FormatImplicitConcatenatedString` directly to avoid formatting
                                 // the implicitly concatenated string with the enclosing group
                                 // because the group is added by the binary like formatting.
-                                FormatStringContinuation::new(&string_constant),
+                                FormatImplicitConcatenatedString::new(string_constant),
                                 trailing_comments(comments.trailing(string_constant)),
                                 operand.trailing_binary_comments().map(trailing_comments),
                                 line_suffix_boundary(),
@@ -414,10 +413,10 @@ impl Format<PyFormatContext<'_>> for BinaryLike<'_> {
                             f,
                             [
                                 leading_comments(comments.leading(string_constant)),
-                                // Call `FormatStringContinuation` directly to avoid formatting
+                                // Call `FormatImplicitConcatenatedString` directly to avoid formatting
                                 // the implicitly concatenated string with the enclosing group
                                 // because the group is added by the binary like formatting.
-                                FormatStringContinuation::new(&string_constant),
+                                FormatImplicitConcatenatedString::new(string_constant),
                                 trailing_comments(comments.trailing(string_constant)),
                             ]
                         )?;
@@ -574,7 +573,8 @@ impl<'a> FlatBinaryExpressionSlice<'a> {
         #[allow(unsafe_code)]
         unsafe {
             // SAFETY: `BinaryChainSlice` has the same layout as a slice because it uses `repr(transparent)`
-            &*(slice as *const [OperandOrOperator<'a>] as *const FlatBinaryExpressionSlice<'a>)
+            &*(std::ptr::from_ref::<[OperandOrOperator<'a>]>(slice)
+                as *const FlatBinaryExpressionSlice<'a>)
         }
     }
 
@@ -722,9 +722,7 @@ impl Format<PyFormatContext<'_>> for FlatBinaryExpressionSlice<'_> {
                 {
                     hard_line_break().fmt(f)?;
                 } else if is_pow {
-                    if is_fix_power_op_line_length_enabled(f.context()) {
-                        in_parentheses_only_if_group_breaks(&space()).fmt(f)?;
-                    }
+                    in_parentheses_only_if_group_breaks(&space()).fmt(f)?;
                 } else {
                     space().fmt(f)?;
                 }

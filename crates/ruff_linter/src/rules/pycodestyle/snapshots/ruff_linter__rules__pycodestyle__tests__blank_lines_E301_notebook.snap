@@ -1,0 +1,22 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E30.ipynb:13:5: E301 [*] Expected 1 blank line, found 0
+   |
+11 |     def method(cls) -> None:
+12 |         pass
+13 |     @classmethod
+   |     ^ E301
+14 |     def cls_method(cls) -> None:
+15 |         pass
+   |
+   = help: Add missing blank line
+
+ℹ Safe fix
+10 10 | 
+11 11 |     def method(cls) -> None:
+12 12 |         pass
+   13 |+
+13 14 |     @classmethod
+14 15 |     def cls_method(cls) -> None:
+15 16 |         pass

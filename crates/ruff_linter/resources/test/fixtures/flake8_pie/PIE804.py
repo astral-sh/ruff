@@ -24,3 +24,7 @@ foo(**{},)
 # Duplicated key names won't be fixed, to avoid syntax errors.
 abc(**{'a': b}, **{'a': c})  # PIE804
 abc(a=1, **{'a': c}, **{'b': c})  # PIE804
+
+# Some values need to be parenthesized.
+abc(foo=1, **{'bar': (bar := 1)})  # PIE804
+abc(foo=1, **{'bar': (yield 1)})  # PIE804

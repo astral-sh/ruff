@@ -1,0 +1,66 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/raw_docstring_no_string_normalization.py
+---
+## Input
+
+```python
+def do_not_touch_this_prefix():
+    R"""There was a bug where docstring prefixes would be normalized even with -S."""
+
+
+def do_not_touch_this_prefix2():
+    FR'There was a bug where docstring prefixes would be normalized even with -S.'
+
+
+def do_not_touch_this_prefix3():
+    u'''There was a bug where docstring prefixes would be normalized even with -S.'''
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -3,8 +3,8 @@
+ 
+ 
+ def do_not_touch_this_prefix2():
+-    FR'There was a bug where docstring prefixes would be normalized even with -S.'
++    Rf"There was a bug where docstring prefixes would be normalized even with -S."
+ 
+ 
+ def do_not_touch_this_prefix3():
+-    u'''There was a bug where docstring prefixes would be normalized even with -S.'''
++    """There was a bug where docstring prefixes would be normalized even with -S."""
+```
+
+## Ruff Output
+
+```python
+def do_not_touch_this_prefix():
+    R"""There was a bug where docstring prefixes would be normalized even with -S."""
+
+
+def do_not_touch_this_prefix2():
+    Rf"There was a bug where docstring prefixes would be normalized even with -S."
+
+
+def do_not_touch_this_prefix3():
+    """There was a bug where docstring prefixes would be normalized even with -S."""
+```
+
+## Black Output
+
+```python
+def do_not_touch_this_prefix():
+    R"""There was a bug where docstring prefixes would be normalized even with -S."""
+
+
+def do_not_touch_this_prefix2():
+    FR'There was a bug where docstring prefixes would be normalized even with -S.'
+
+
+def do_not_touch_this_prefix3():
+    u'''There was a bug where docstring prefixes would be normalized even with -S.'''
+```

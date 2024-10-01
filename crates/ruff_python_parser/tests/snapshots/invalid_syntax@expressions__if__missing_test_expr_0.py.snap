@@ -1,0 +1,84 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/if/missing_test_expr_0.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..76,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 51..55,
+                    value: If(
+                        ExprIf {
+                            range: 51..55,
+                            test: Name(
+                                ExprName {
+                                    range: 55..55,
+                                    id: Name(""),
+                                    ctx: Invalid,
+                                },
+                            ),
+                            body: Name(
+                                ExprName {
+                                    range: 51..52,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            orelse: Name(
+                                ExprName {
+                                    range: 55..55,
+                                    id: Name(""),
+                                    ctx: Invalid,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 57..76,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 61..64,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 64..66,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 72..76,
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # Missing test expression, followed by a statement
+2 | x if
+  |     ^ Syntax Error: Expected an expression
+3 | 
+4 | def foo():
+5 |     pass
+  |

@@ -1,0 +1,58 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/arguments/missing_argument.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..10,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..10,
+                    value: Call(
+                        ExprCall {
+                            range: 0..10,
+                            func: Name(
+                                ExprName {
+                                    range: 0..4,
+                                    id: Name("call"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 4..10,
+                                args: [
+                                    Name(
+                                        ExprName {
+                                            range: 5..6,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            range: 8..9,
+                                            id: Name("y"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | call(x,,y)
+  |        ^ Syntax Error: Expected an expression or a ')'
+  |

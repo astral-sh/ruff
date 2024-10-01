@@ -1,7 +1,6 @@
-use ruff_python_ast::{self as ast, Expr};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::Expr;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -11,8 +10,9 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// In Python 2, the `print` statement can be used with the `>>` syntax to
-/// print to a file-like object. This `print >> sys.stderr` syntax is
-/// deprecated in Python 3.
+/// print to a file-like object. This `print >> sys.stderr` syntax no
+/// longer exists in Python 3, where `print` is only a function, not a
+/// statement.
 ///
 /// Instead, use the `file` keyword argument to the `print` function, the
 /// `sys.stderr.write` function, or the `logging` module.
@@ -58,16 +58,9 @@ impl Violation for InvalidPrintSyntax {
 
 /// F633
 pub(crate) fn invalid_print_syntax(checker: &mut Checker, left: &Expr) {
-    let Expr::Name(ast::ExprName { id, .. }) = &left else {
-        return;
-    };
-    if id != "print" {
-        return;
+    if checker.semantic().match_builtin_expr(left, "print") {
+        checker
+            .diagnostics
+            .push(Diagnostic::new(InvalidPrintSyntax, left.range()));
     }
-    if !checker.semantic().is_builtin("print") {
-        return;
-    };
-    checker
-        .diagnostics
-        .push(Diagnostic::new(InvalidPrintSyntax, left.range()));
 }

@@ -89,18 +89,19 @@ fn check_msg(checker: &mut Checker, msg: &Expr) {
 /// Check contents of the `extra` argument to logging calls.
 fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
     match &extra.value {
-        Expr::Dict(ast::ExprDict { keys, .. }) => {
-            for key in keys {
-                if let Some(key) = &key {
-                    if let Expr::StringLiteral(ast::ExprStringLiteral { value: attr, .. }) = key {
-                        if is_reserved_attr(attr.to_str()) {
-                            checker.diagnostics.push(Diagnostic::new(
-                                LoggingExtraAttrClash(attr.to_string()),
-                                key.range(),
-                            ));
-                        }
-                    }
+        Expr::Dict(dict) => {
+            for invalid_key in dict.iter_keys().filter_map(|key| {
+                let string_key = key?.as_string_literal_expr()?;
+                if is_reserved_attr(string_key.value.to_str()) {
+                    Some(string_key)
+                } else {
+                    None
                 }
+            }) {
+                checker.diagnostics.push(Diagnostic::new(
+                    LoggingExtraAttrClash(invalid_key.value.to_string()),
+                    invalid_key.range(),
+                ));
             }
         }
         Expr::Call(ast::ExprCall {
@@ -108,12 +109,8 @@ fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
             arguments: Arguments { keywords, .. },
             ..
         }) => {
-            if checker
-                .semantic()
-                .resolve_call_path(func)
-                .is_some_and(|call_path| matches!(call_path.as_slice(), ["", "dict"]))
-            {
-                for keyword in keywords {
+            if checker.semantic().match_builtin_expr(func, "dict") {
+                for keyword in &**keywords {
                     if let Some(attr) = &keyword.arg {
                         if is_reserved_attr(attr) {
                             checker.diagnostics.push(Diagnostic::new(
@@ -165,10 +162,13 @@ pub(crate) fn logging_call(checker: &mut Checker, call: &ast::ExprCall) {
             (call_type, attr.range())
         }
         Expr::Name(_) => {
-            let Some(call_path) = checker.semantic().resolve_call_path(call.func.as_ref()) else {
+            let Some(qualified_name) = checker
+                .semantic()
+                .resolve_qualified_name(call.func.as_ref())
+            else {
                 return;
             };
-            let ["logging", attribute] = call_path.as_slice() else {
+            let ["logging", attribute] = qualified_name.segments() else {
                 return;
             };
             let Some(call_type) = LoggingCallType::from_attribute(attribute) else {

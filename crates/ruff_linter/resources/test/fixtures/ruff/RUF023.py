@@ -4,14 +4,14 @@
 
 class Klass:
     __slots__ = ["d", "c", "b", "a"]  # a comment that is untouched
-    __match_args__ = ("d", "c", "b", "a")
+    __slots__ = ("d", "c", "b", "a")
 
     # Quoting style is retained,
     # but unnecessary parens are not
     __slots__: set = {'b', "c", ((('a')))}
     # Trailing commas are also not retained for single-line definitions
     # (but they are in multiline definitions)
-    __match_args__: tuple = ("b", "c", "a",)
+    __slots__: tuple = ("b", "c", "a",)
 
 class Klass2:
     if bool():
@@ -19,7 +19,7 @@ class Klass2:
     else:
         __slots__ = "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
 
-    __match_args__: list[str] = ["the", "three", "little", "pigs"]
+    __slots__: list[str] = ["the", "three", "little", "pigs"]
     __slots__ = ("parenthesized_item"), "in", ("an_unparenthesized_tuple")
     # we use natural sort,
     # not alphabetical sort or "isort-style" sort
@@ -37,7 +37,7 @@ class Klass3:
         # a comment regarding 'a0':
         "a0"
     )
-    __match_args__ = [
+    __slots__ = [
         "d",
         "c",  # a comment regarding 'c'
         "b",
@@ -45,9 +45,9 @@ class Klass3:
         "a"
     ]
 
-##########################################
-# Messier multiline __all__ definitions...
-##########################################
+##################################
+# Messier multiline definitions...
+##################################
 
 class Klass4:
     # comment0
@@ -61,7 +61,7 @@ class Klass4:
     )  # comment6
     # comment7
 
-    __match_args__ = [  # comment0
+    __slots__ = [  # comment0
         # comment1
         # comment2
         "dx", "cx", "bx", "ax"  # comment3
@@ -139,7 +139,7 @@ class SlotUser:
                  'distance': 'measured in kilometers'}
 
 class Klass5:
-    __match_args__ = (
+    __slots__ = (
         "look",
         (
             "a_veeeeeeeeeeeeeeeeeeery_long_parenthesized_item"
@@ -154,20 +154,66 @@ class Klass5:
     )
     __slots__ = ("don't" "care" "about", "__slots__" "with", "concatenated" "strings")
 
+############################################################
+# Trailing-comma edge cases that should be flagged and fixed
+############################################################
+
+class BezierBuilder:
+    __slots__ = ('xp', 'yp',
+                 'canvas',)
+
+class BezierBuilder2:
+    __slots__ = {'xp', 'yp',
+                 'canvas'      ,          }
+
+class BezierBuilder3:
+    __slots__ = ['xp', 'yp',
+                 'canvas'
+
+                 # very strangely placed comment
+
+                 ,
+
+                 # another strangely placed comment
+                 ]
+
+class BezierBuilder4:
+    __slots__ = (
+        "foo"
+        # strange comment 1
+        ,
+        # comment about bar
+        "bar"
+        # strange comment 2
+        ,
+    )
+
+    __slots__ = {"foo", "bar",
+                 "baz", "bingo"
+                 }
+
+
+class VeryDRY:
+    # This should get flagged, *but* the fix is unsafe,
+    # since the `__slots__` binding is used by the `__match_args__` definition
+    __slots__ = ("foo", "bar")
+    __match_args__ = __slots__
+
+
 ###################################
 # These should all not get flagged:
 ###################################
 
 class Klass6:
     __slots__ = ()
-    __match_args__ = []
+    __slots__ = []
     __slots__ = ("single_item",)
-    __match_args__ = (
+    __slots__ = (
         "single_item_multiline",
     )
     __slots__ = {"single_item",}
     __slots__ = {"single_item_no_trailing_comma": "docs for that"}
-    __match_args__ = [
+    __slots__ = [
         "single_item_multiline_no_trailing_comma"
     ]
     __slots__ = ("not_a_tuple_just_a_string")
@@ -184,11 +230,11 @@ class Klass6:
 
 __slots__ = ("b", "a", "e", "d")
 __slots__ = ["b", "a", "e", "d"]
-__match_args__ = ["foo", "bar", "antipasti"]
+__slots__ = ["foo", "bar", "antipasti"]
 
 class Klass6:
     __slots__ = (9, 8, 7)
-    __match_args__ = (  # This is just an empty tuple,
+    __slots__ = (  # This is just an empty tuple,
         # but,
         # it's very well
     )  # documented
@@ -211,10 +257,10 @@ class Klass6:
     __slots__ = [
         ()
     ]
-    __match_args__ = (
+    __slots__ = (
         ()
     )
-    __match_args__ = (
+    __slots__ = (
         []
     )
     __slots__ = (
@@ -223,12 +269,9 @@ class Klass6:
     __slots__ = (
         [],
     )
-    __match_args__ = (
+    __slots__ = (
         "foo", [], "bar"
     )
-    __match_args__ = [
+    __slots__ = [
         "foo", (), "bar"
     ]
-
-    __match_args__ = {"a", "set", "for", "__match_args__", "is invalid"}
-    __match_args__ = {"this": "is", "also": "invalid"}

@@ -1,5 +1,101 @@
 # Breaking Changes
 
+## 0.6.0
+
+- Detect imports in `src` layouts by default for `isort` rules ([#12848](https://github.com/astral-sh/ruff/pull/12848))
+
+- The pytest rules `PT001` and `PT023` now default to omitting the decorator parentheses when there are no arguments ([#12838](https://github.com/astral-sh/ruff/pull/12838)).
+
+- Lint and format Jupyter Notebook by default ([#12878](https://github.com/astral-sh/ruff/pull/12878)).
+
+    You can disable specific rules for notebooks using [`per-file-ignores`](https://docs.astral.sh/ruff/settings/#lint_per-file-ignores):
+
+    ```toml
+    [tool.ruff.lint.per-file-ignores]
+    "*.ipynb" = ["E501"] # disable line-too-long in notebooks
+    ```
+
+    If you'd prefer to either only lint or only format Jupyter Notebook files, you can use the
+    section-specific `exclude` option to do so. For example, the following would only lint Jupyter
+    Notebook files and not format them:
+
+    ```toml
+    [tool.ruff.format]
+    exclude = ["*.ipynb"]
+    ```
+
+    And, conversely, the following would only format Jupyter Notebook files and not lint them:
+
+    ```toml
+    [tool.ruff.lint]
+    exclude = ["*.ipynb"]
+    ```
+
+    You can completely disable Jupyter Notebook support by updating the [`extend-exclude`](https://docs.astral.sh/ruff/settings/#extend-exclude) setting:
+
+    ```toml
+    [tool.ruff]
+    extend-exclude = ["*.ipynb"]
+    ```
+
+## 0.5.0
+
+- Follow the XDG specification to discover user-level configurations on macOS (same as on other Unix platforms)
+- Selecting `ALL` now excludes deprecated rules
+- The released archives now include an extra level of nesting, which can be removed with `--strip-components=1` when untarring.
+- The release artifact's file name no longer includes the version tag. This enables users to install via `/latest` URLs on GitHub.
+
+## 0.3.0
+
+### Ruff 2024.2 style
+
+The formatter now formats code according to the Ruff 2024.2 style guide. Read the [changelog](./CHANGELOG.md#030) for a detailed list of stabilized style changes.
+
+### `isort`: Use one blank line after imports in typing stub files ([#9971](https://github.com/astral-sh/ruff/pull/9971))
+
+Previously, Ruff used one or two blank lines (or the number configured by `isort.lines-after-imports`) after imports in typing stub files (`.pyi` files).
+The [typing style guide for stubs](https://typing.readthedocs.io/en/latest/source/stubs.html#style-guide) recommends using at most 1 blank line for grouping.
+As of this release, `isort` now always uses one blank line after imports in stub files, the same as the formatter.
+
+### `build` is no longer excluded by default ([#10093](https://github.com/astral-sh/ruff/pull/10093))
+
+Ruff maintains a list of directories and files that are excluded by default. This list now consists of the following patterns:
+
+- `.bzr`
+- `.direnv`
+- `.eggs`
+- `.git`
+- `.git-rewrite`
+- `.hg`
+- `.ipynb_checkpoints`
+- `.mypy_cache`
+- `.nox`
+- `.pants.d`
+- `.pyenv`
+- `.pytest_cache`
+- `.pytype`
+- `.ruff_cache`
+- `.svn`
+- `.tox`
+- `.venv`
+- `.vscode`
+- `__pypackages__`
+- `_build`
+- `buck-out`
+- `dist`
+- `node_modules`
+- `site-packages`
+- `venv`
+
+Previously, the `build` directory was included in this list. However, the `build` directory tends to be a not-unpopular directory
+name, and excluding it by default caused confusion. Ruff now no longer excludes `build` except if it is excluded by a `.gitignore` file
+or because it is listed in `extend-exclude`.
+
+### `--format` is no longer a valid `rule` or `linter` command option
+
+Previously, `ruff rule` and `ruff linter` accepted the `--format <FORMAT>` option as an alias for `--output-format`. Ruff no longer
+supports this alias. Please use `ruff rule --output-format <FORMAT>` and `ruff linter --output-format <FORMAT>` instead.
+
 ## 0.1.9
 
 ### `site-packages` is now excluded by default ([#5513](https://github.com/astral-sh/ruff/pull/5513))

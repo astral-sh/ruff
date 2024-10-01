@@ -27,11 +27,11 @@ W505_utf_8.py:10:51: W505 Doc line too long (56 > 50)
 12 |     x = 2
    |
 
-W505_utf_8.py:13:51: W505 Doc line too long (93 > 50)
+W505_utf_8.py:13:51: W505 Doc line too long (94 > 50)
    |
 12 |     x = 2
-13 |     # Another standalone that is preceded by a newline and indent toke and is over theß9💣2ℝ.
-   |                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ W505
+13 |     # Another standalone that is preceded by a newline and indent token and is over theß9💣2ℝ.
+   |                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ W505
 14 | 
 15 |     print("Here's a string that's over theß9💣2ℝ, but it's not a ß9💣2ℝing.")
    |
@@ -58,5 +58,3 @@ W505_utf_8.py:31:50: W505 Doc line too long (85 > 50)
 31 |     It's over theß9💣2ℝ on this line, which isn't the first line in the ß9💣2ℝing."""
    |                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ W505
    |
-
-

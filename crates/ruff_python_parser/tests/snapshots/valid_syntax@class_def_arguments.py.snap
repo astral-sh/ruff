@@ -1,0 +1,69 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/class_def_arguments.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..32,
+        body: [
+            ClassDef(
+                StmtClassDef {
+                    range: 0..14,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("Foo"),
+                        range: 6..9,
+                    },
+                    type_params: None,
+                    arguments: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 11..14,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 11..14,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            ClassDef(
+                StmtClassDef {
+                    range: 15..31,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("Foo"),
+                        range: 21..24,
+                    },
+                    type_params: None,
+                    arguments: Some(
+                        Arguments {
+                            range: 24..26,
+                            args: [],
+                            keywords: [],
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 28..31,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 28..31,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```

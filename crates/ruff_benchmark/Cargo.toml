@@ -13,6 +13,8 @@ license = { workspace = true }
 
 [lib]
 bench = false
+test = false
+doctest = false
 
 [[bench]]
 name = "linter"
@@ -30,21 +32,29 @@ harness = false
 name = "formatter"
 harness = false
 
+[[bench]]
+name = "red_knot"
+harness = false
+
 [dependencies]
+codspeed-criterion-compat = { workspace = true, default-features = false, optional = true }
+criterion = { workspace = true, default-features = false }
 once_cell = { workspace = true }
+rayon = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 url = { workspace = true }
 ureq = { workspace = true }
-criterion = { workspace = true, default-features = false }
-codspeed-criterion-compat = { workspace = true, default-features = false, optional = true}
 
 [dev-dependencies]
-ruff_linter = { path = "../ruff_linter" }
-ruff_python_ast = { path = "../ruff_python_ast" }
-ruff_python_formatter = { path = "../ruff_python_formatter" }
-ruff_python_index = { path = "../ruff_python_index" }
-ruff_python_parser = { path = "../ruff_python_parser" }
+ruff_db = { workspace = true }
+ruff_linter = { workspace = true }
+ruff_python_ast = { workspace = true }
+ruff_python_formatter = { workspace = true }
+ruff_python_parser = { workspace = true }
+ruff_python_trivia = { workspace = true }
+red_knot_python_semantic = { workspace = true }
+red_knot_workspace = { workspace = true }
 
 [lints]
 workspace = true

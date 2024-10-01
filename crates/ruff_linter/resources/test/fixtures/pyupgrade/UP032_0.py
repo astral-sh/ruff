@@ -252,3 +252,20 @@ raise ValueError(
 
 # The dictionary should be parenthesized.
 "{}".format({0: 1}())
+
+# The string shouldn't be converted, since it would require repeating the function call.
+"{x} {x}".format(x=foo())
+"{0} {0}".format(foo())
+
+# The string _should_ be converted, since the function call is repeated in the arguments.
+"{0} {1}".format(foo(), foo())
+
+# The call should be removed, but the string itself should remain.
+''.format(self.project)
+
+# The call should be removed, but the string itself should remain.
+"".format(self.project)
+
+# Not a valid type annotation but this test shouldn't result in a panic.
+# Refer: https://github.com/astral-sh/ruff/issues/11736
+x: "'{} + {}'.format(x, y)"

@@ -1,0 +1,153 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/attribute/multiple_dots.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..46,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..10,
+                    value: Attribute(
+                        ExprAttribute {
+                            range: 0..10,
+                            value: Attribute(
+                                ExprAttribute {
+                                    range: 0..6,
+                                    value: Name(
+                                        ExprName {
+                                            range: 0..5,
+                                            id: Name("extra"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    attr: Identifier {
+                                        id: Name(""),
+                                        range: 6..6,
+                                    },
+                                    ctx: Load,
+                                },
+                            ),
+                            attr: Identifier {
+                                id: Name("dot"),
+                                range: 7..10,
+                            },
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 11..19,
+                    value: Name(
+                        ExprName {
+                            range: 11..19,
+                            id: Name("multiple"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 19..27,
+                    value: Attribute(
+                        ExprAttribute {
+                            range: 19..27,
+                            value: EllipsisLiteral(
+                                ExprEllipsisLiteral {
+                                    range: 19..22,
+                                },
+                            ),
+                            attr: Identifier {
+                                id: Name("dots"),
+                                range: 23..27,
+                            },
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 28..36,
+                    value: Name(
+                        ExprName {
+                            range: 28..36,
+                            id: Name("multiple"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 36..45,
+                    value: Attribute(
+                        ExprAttribute {
+                            range: 36..45,
+                            value: Attribute(
+                                ExprAttribute {
+                                    range: 36..40,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 36..39,
+                                        },
+                                    ),
+                                    attr: Identifier {
+                                        id: Name(""),
+                                        range: 40..40,
+                                    },
+                                    ctx: Load,
+                                },
+                            ),
+                            attr: Identifier {
+                                id: Name("dots"),
+                                range: 41..45,
+                            },
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | extra..dot
+  |       ^ Syntax Error: Expected an identifier
+2 | multiple....dots
+3 | multiple.....dots
+  |
+
+
+  |
+1 | extra..dot
+2 | multiple....dots
+  |         ^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+3 | multiple.....dots
+  |
+
+
+  |
+1 | extra..dot
+2 | multiple....dots
+3 | multiple.....dots
+  |         ^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |
+
+
+  |
+1 | extra..dot
+2 | multiple....dots
+3 | multiple.....dots
+  |             ^ Syntax Error: Expected an identifier
+  |

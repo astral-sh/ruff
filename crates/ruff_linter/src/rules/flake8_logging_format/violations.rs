@@ -30,9 +30,9 @@ use ruff_macros::{derive_message_formats, violation};
 /// - Uses of `flask.current_app.logger` (e.g., `from flask import current_app; current_app.logger.info(...)`).
 /// - Objects whose name starts with `log` or ends with `logger` or `logging`,
 ///   when used in the same file in which they are defined (e.g., `logger = logging.getLogger(); logger.info(...)`).
-/// - Imported objects marked as loggers via the [`logger-objects`] setting, which can be
+/// - Imported objects marked as loggers via the [`lint.logger-objects`] setting, which can be
 ///   used to enforce these rules against shared logger objects (e.g., `from module import logger; logger.info(...)`,
-///   when [`logger-objects`] is set to `["module.logger"]`).
+///   when [`lint.logger-objects`] is set to `["module.logger"]`).
 ///
 /// ## Example
 /// ```python
@@ -68,7 +68,7 @@ use ruff_macros::{derive_message_formats, violation};
 /// ```
 ///
 /// ## Options
-/// - `logger-objects`
+/// - `lint.logger-objects`
 ///
 /// ## References
 /// - [Python documentation: `logging`](https://docs.python.org/3/library/logging.html)
@@ -114,9 +114,9 @@ impl Violation for LoggingStringFormat {
 /// - Uses of `flask.current_app.logger` (e.g., `from flask import current_app; current_app.logger.info(...)`).
 /// - Objects whose name starts with `log` or ends with `logger` or `logging`,
 ///   when used in the same file in which they are defined (e.g., `logger = logging.getLogger(); logger.info(...)`).
-/// - Imported objects marked as loggers via the [`logger-objects`] setting, which can be
+/// - Imported objects marked as loggers via the [`lint.logger-objects`] setting, which can be
 ///   used to enforce these rules against shared logger objects (e.g., `from module import logger; logger.info(...)`,
-///   when [`logger-objects`] is set to `["module.logger"]`).
+///   when [`lint.logger-objects`] is set to `["module.logger"]`).
 ///
 /// ## Example
 /// ```python
@@ -152,7 +152,7 @@ impl Violation for LoggingStringFormat {
 /// ```
 ///
 /// ## Options
-/// - `logger-objects`
+/// - `lint.logger-objects`
 ///
 /// ## References
 /// - [Python documentation: `logging`](https://docs.python.org/3/library/logging.html)
@@ -197,9 +197,9 @@ impl Violation for LoggingPercentFormat {
 /// - Uses of `flask.current_app.logger` (e.g., `from flask import current_app; current_app.logger.info(...)`).
 /// - Objects whose name starts with `log` or ends with `logger` or `logging`,
 ///   when used in the same file in which they are defined (e.g., `logger = logging.getLogger(); logger.info(...)`).
-/// - Imported objects marked as loggers via the [`logger-objects`] setting, which can be
+/// - Imported objects marked as loggers via the [`lint.logger-objects`] setting, which can be
 ///   used to enforce these rules against shared logger objects (e.g., `from module import logger; logger.info(...)`,
-///   when [`logger-objects`] is set to `["module.logger"]`).
+///   when [`lint.logger-objects`] is set to `["module.logger"]`).
 ///
 /// ## Example
 /// ```python
@@ -235,7 +235,7 @@ impl Violation for LoggingPercentFormat {
 /// ```
 ///
 /// ## Options
-/// - `logger-objects`
+/// - `lint.logger-objects`
 ///
 /// ## References
 /// - [Python documentation: `logging`](https://docs.python.org/3/library/logging.html)
@@ -279,9 +279,9 @@ impl Violation for LoggingStringConcat {
 /// - Uses of `flask.current_app.logger` (e.g., `from flask import current_app; current_app.logger.info(...)`).
 /// - Objects whose name starts with `log` or ends with `logger` or `logging`,
 ///   when used in the same file in which they are defined (e.g., `logger = logging.getLogger(); logger.info(...)`).
-/// - Imported objects marked as loggers via the [`logger-objects`] setting, which can be
+/// - Imported objects marked as loggers via the [`lint.logger-objects`] setting, which can be
 ///   used to enforce these rules against shared logger objects (e.g., `from module import logger; logger.info(...)`,
-///   when [`logger-objects`] is set to `["module.logger"]`).
+///   when [`lint.logger-objects`] is set to `["module.logger"]`).
 ///
 /// ## Example
 /// ```python
@@ -317,7 +317,7 @@ impl Violation for LoggingStringConcat {
 /// ```
 ///
 /// ## Options
-/// - `logger-objects`
+/// - `lint.logger-objects`
 ///
 /// ## References
 /// - [Python documentation: `logging`](https://docs.python.org/3/library/logging.html)
@@ -349,9 +349,9 @@ impl Violation for LoggingFString {
 /// - Uses of `flask.current_app.logger` (e.g., `from flask import current_app; current_app.logger.info(...)`).
 /// - Objects whose name starts with `log` or ends with `logger` or `logging`,
 ///   when used in the same file in which they are defined (e.g., `logger = logging.getLogger(); logger.info(...)`).
-/// - Imported objects marked as loggers via the [`logger-objects`] setting, which can be
+/// - Imported objects marked as loggers via the [`lint.logger-objects`] setting, which can be
 ///   used to enforce these rules against shared logger objects (e.g., `from module import logger; logger.info(...)`,
-///   when [`logger-objects`] is set to `["module.logger"]`).
+///   when [`lint.logger-objects`] is set to `["module.logger"]`).
 ///
 /// ## Example
 /// ```python
@@ -368,7 +368,7 @@ impl Violation for LoggingFString {
 /// ```
 ///
 /// ## Options
-/// - `logger-objects`
+/// - `lint.logger-objects`
 ///
 /// ## References
 /// - [Python documentation: `logging.warning`](https://docs.python.org/3/library/logging.html#logging.warning)
@@ -383,7 +383,7 @@ impl AlwaysFixableViolation for LoggingWarn {
     }
 
     fn fix_title(&self) -> String {
-        "Convert to `warn`".to_string()
+        "Convert to `warning`".to_string()
     }
 }
 
@@ -409,9 +409,9 @@ impl AlwaysFixableViolation for LoggingWarn {
 /// - Uses of `flask.current_app.logger` (e.g., `from flask import current_app; current_app.logger.info(...)`).
 /// - Objects whose name starts with `log` or ends with `logger` or `logging`,
 ///   when used in the same file in which they are defined (e.g., `logger = logging.getLogger(); logger.info(...)`).
-/// - Imported objects marked as loggers via the [`logger-objects`] setting, which can be
+/// - Imported objects marked as loggers via the [`lint.logger-objects`] setting, which can be
 ///   used to enforce these rules against shared logger objects (e.g., `from module import logger; logger.info(...)`,
-///   when [`logger-objects`] is set to `["module.logger"]`).
+///   when [`lint.logger-objects`] is set to `["module.logger"]`).
 ///
 /// ## Example
 /// ```python
@@ -436,7 +436,7 @@ impl AlwaysFixableViolation for LoggingWarn {
 /// ```
 ///
 /// ## Options
-/// - `logger-objects`
+/// - `lint.logger-objects`
 ///
 /// ## References
 /// - [Python documentation: LogRecord attributes](https://docs.python.org/3/library/logging.html#logrecord-attributes)
@@ -470,9 +470,9 @@ impl Violation for LoggingExtraAttrClash {
 /// - Uses of `flask.current_app.logger` (e.g., `from flask import current_app; current_app.logger.info(...)`).
 /// - Objects whose name starts with `log` or ends with `logger` or `logging`,
 ///   when used in the same file in which they are defined (e.g., `logger = logging.getLogger(); logger.info(...)`).
-/// - Imported objects marked as loggers via the [`logger-objects`] setting, which can be
+/// - Imported objects marked as loggers via the [`lint.logger-objects`] setting, which can be
 ///   used to enforce these rules against shared logger objects (e.g., `from module import logger; logger.info(...)`,
-///   when [`logger-objects`] is set to `["module.logger"]`).
+///   when [`lint.logger-objects`] is set to `["module.logger"]`).
 ///
 /// ## Example
 /// ```python
@@ -495,7 +495,7 @@ impl Violation for LoggingExtraAttrClash {
 /// ```
 ///
 /// ## Options
-/// - `logger-objects`
+/// - `lint.logger-objects`
 ///
 /// ## References
 /// - [Python documentation: `logging.exception`](https://docs.python.org/3/library/logging.html#logging.exception)
@@ -531,9 +531,9 @@ impl Violation for LoggingExcInfo {
 /// - Uses of `flask.current_app.logger` (e.g., `from flask import current_app; current_app.logger.info(...)`).
 /// - Objects whose name starts with `log` or ends with `logger` or `logging`,
 ///   when used in the same file in which they are defined (e.g., `logger = logging.getLogger(); logger.info(...)`).
-/// - Imported objects marked as loggers via the [`logger-objects`] setting, which can be
+/// - Imported objects marked as loggers via the [`lint.logger-objects`] setting, which can be
 ///   used to enforce these rules against shared logger objects (e.g., `from module import logger; logger.info(...)`,
-///   when [`logger-objects`] is set to `["module.logger"]`).
+///   when [`lint.logger-objects`] is set to `["module.logger"]`).
 ///
 /// ## Example
 /// ```python
@@ -556,7 +556,7 @@ impl Violation for LoggingExcInfo {
 /// ```
 ///
 /// ## Options
-/// - `logger-objects`
+/// - `lint.logger-objects`
 ///
 /// ## References
 /// - [Python documentation: `logging.exception`](https://docs.python.org/3/library/logging.html#logging.exception)

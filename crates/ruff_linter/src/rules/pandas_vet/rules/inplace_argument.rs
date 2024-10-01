@@ -55,8 +55,8 @@ pub(crate) fn inplace_argument(checker: &mut Checker, call: &ast::ExprCall) {
     // If the function was imported from another module, and it's _not_ Pandas, abort.
     if checker
         .semantic()
-        .resolve_call_path(&call.func)
-        .is_some_and(|call_path| !matches!(call_path.as_slice(), ["pandas", ..]))
+        .resolve_qualified_name(&call.func)
+        .is_some_and(|qualified_name| !matches!(qualified_name.segments(), ["pandas", ..]))
     {
         return;
     }
@@ -93,7 +93,7 @@ pub(crate) fn inplace_argument(checker: &mut Checker, call: &ast::ExprCall) {
                         call,
                         keyword,
                         statement,
-                        checker.indexer().comment_ranges(),
+                        checker.comment_ranges(),
                         checker.locator(),
                     ) {
                         diagnostic.set_fix(fix);

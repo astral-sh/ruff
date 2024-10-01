@@ -1,8 +1,7 @@
-use ruff_python_ast::{self as ast, Decorator, Expr, Parameters, Stmt};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::identifier::Identifier;
+use ruff_python_ast::{identifier::Identifier, Decorator, Parameters, Stmt};
+use ruff_python_semantic::analyze::visibility::is_property;
 
 use crate::checkers::ast::Checker;
 
@@ -16,22 +15,21 @@ use crate::checkers::ast::Checker;
 /// desired parameters and call that method instead.
 ///
 /// ## Example
+///
 /// ```python
 /// class Cat:
 ///     @property
-///     def purr(self, volume):
-///         ...
+///     def purr(self, volume): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// class Cat:
 ///     @property
-///     def purr(self):
-///         ...
+///     def purr(self): ...
 ///
-///     def purr_volume(self, volume):
-///         ...
+///     def purr_volume(self, volume): ...
 /// ```
 ///
 /// ## References
@@ -53,21 +51,12 @@ pub(crate) fn property_with_parameters(
     decorator_list: &[Decorator],
     parameters: &Parameters,
 ) {
-    if !decorator_list
-        .iter()
-        .any(|decorator| matches!(&decorator.expression, Expr::Name(ast::ExprName { id, .. }) if id == "property"))
-    {
+    if parameters.len() <= 1 {
         return;
     }
-    if parameters
-        .posonlyargs
-        .iter()
-        .chain(&parameters.args)
-        .chain(&parameters.kwonlyargs)
-        .count()
-        > 1
-        && checker.semantic().is_builtin("property")
-    {
+    let semantic = checker.semantic();
+    let extra_property_decorators = checker.settings.pydocstyle.property_decorators();
+    if is_property(decorator_list, extra_property_decorators, semantic) {
         checker
             .diagnostics
             .push(Diagnostic::new(PropertyWithParameters, stmt.identifier()));

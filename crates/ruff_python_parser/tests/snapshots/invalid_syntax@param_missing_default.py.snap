@@ -1,0 +1,129 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/param_missing_default.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..41,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 0..16,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 4..7,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 7..11,
+                        posonlyargs: [],
+                        args: [
+                            ParameterWithDefault {
+                                range: 8..10,
+                                parameter: Parameter {
+                                    range: 8..9,
+                                    name: Identifier {
+                                        id: Name("x"),
+                                        range: 8..9,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 13..16,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 13..16,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 17..40,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 21..24,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 24..35,
+                        posonlyargs: [],
+                        args: [
+                            ParameterWithDefault {
+                                range: 25..33,
+                                parameter: Parameter {
+                                    range: 25..31,
+                                    name: Identifier {
+                                        id: Name("x"),
+                                        range: 25..26,
+                                    },
+                                    annotation: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 28..31,
+                                                id: Name("int"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                },
+                                default: None,
+                            },
+                        ],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 37..40,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 37..40,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | def foo(x=): ...
+  |           ^ Syntax Error: Expected an expression
+2 | def foo(x: int = ): ...
+  |
+
+
+  |
+1 | def foo(x=): ...
+2 | def foo(x: int = ): ...
+  |                  ^ Syntax Error: Expected an expression
+  |

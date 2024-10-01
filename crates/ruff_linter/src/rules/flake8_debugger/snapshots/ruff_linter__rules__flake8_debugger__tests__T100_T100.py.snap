@@ -55,34 +55,131 @@ T100.py:9:1: T100 Import for `celery.contrib.rdb` found
  8 | from celery.contrib import rdb
  9 | import celery.contrib.rdb
    | ^^^^^^^^^^^^^^^^^^^^^^^^^ T100
-10 | 
-11 | breakpoint()
+10 | from debugpy import wait_for_client
+11 | import debugpy
    |
 
-T100.py:11:1: T100 Trace found: `builtins.breakpoint` used
+T100.py:10:1: T100 Import for `debugpy.wait_for_client` found
+   |
+ 8 | from celery.contrib import rdb
+ 9 | import celery.contrib.rdb
+10 | from debugpy import wait_for_client
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ T100
+11 | import debugpy
+12 | from ptvsd import break_into_debugger
+   |
+
+T100.py:11:1: T100 Import for `debugpy` found
    |
  9 | import celery.contrib.rdb
-10 | 
-11 | breakpoint()
+10 | from debugpy import wait_for_client
+11 | import debugpy
+   | ^^^^^^^^^^^^^^ T100
+12 | from ptvsd import break_into_debugger
+13 | from ptvsd import enable_attach
+   |
+
+T100.py:12:1: T100 Import for `ptvsd.break_into_debugger` found
+   |
+10 | from debugpy import wait_for_client
+11 | import debugpy
+12 | from ptvsd import break_into_debugger
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ T100
+13 | from ptvsd import enable_attach
+14 | from ptvsd import wait_for_attach
+   |
+
+T100.py:14:1: T100 Import for `ptvsd.wait_for_attach` found
+   |
+12 | from ptvsd import break_into_debugger
+13 | from ptvsd import enable_attach
+14 | from ptvsd import wait_for_attach
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ T100
+15 | import ptvsd
+   |
+
+T100.py:15:1: T100 Import for `ptvsd` found
+   |
+13 | from ptvsd import enable_attach
+14 | from ptvsd import wait_for_attach
+15 | import ptvsd
    | ^^^^^^^^^^^^ T100
-12 | st()
-13 | set_trace()
+16 | 
+17 | breakpoint()
    |
 
-T100.py:12:1: T100 Trace found: `pdb.set_trace` used
+T100.py:17:1: T100 Trace found: `builtins.breakpoint` used
    |
-11 | breakpoint()
-12 | st()
+15 | import ptvsd
+16 | 
+17 | breakpoint()
+   | ^^^^^^^^^^^^ T100
+18 | st()
+19 | set_trace()
+   |
+
+T100.py:18:1: T100 Trace found: `pdb.set_trace` used
+   |
+17 | breakpoint()
+18 | st()
    | ^^^^ T100
-13 | set_trace()
+19 | set_trace()
+20 | debugpy.breakpoint()
    |
 
-T100.py:13:1: T100 Trace found: `celery.contrib.rdb.set_trace` used
+T100.py:19:1: T100 Trace found: `celery.contrib.rdb.set_trace` used
    |
-11 | breakpoint()
-12 | st()
-13 | set_trace()
+17 | breakpoint()
+18 | st()
+19 | set_trace()
    | ^^^^^^^^^^^ T100
+20 | debugpy.breakpoint()
+21 | wait_for_client()
    |
 
+T100.py:20:1: T100 Trace found: `debugpy.breakpoint` used
+   |
+18 | st()
+19 | set_trace()
+20 | debugpy.breakpoint()
+   | ^^^^^^^^^^^^^^^^^^^^ T100
+21 | wait_for_client()
+22 | debugpy.listen(1234)
+   |
 
+T100.py:21:1: T100 Trace found: `debugpy.wait_for_client` used
+   |
+19 | set_trace()
+20 | debugpy.breakpoint()
+21 | wait_for_client()
+   | ^^^^^^^^^^^^^^^^^ T100
+22 | debugpy.listen(1234)
+23 | enable_attach()
+   |
+
+T100.py:22:1: T100 Trace found: `debugpy.listen` used
+   |
+20 | debugpy.breakpoint()
+21 | wait_for_client()
+22 | debugpy.listen(1234)
+   | ^^^^^^^^^^^^^^^^^^^^ T100
+23 | enable_attach()
+24 | break_into_debugger()
+   |
+
+T100.py:24:1: T100 Trace found: `ptvsd.break_into_debugger` used
+   |
+22 | debugpy.listen(1234)
+23 | enable_attach()
+24 | break_into_debugger()
+   | ^^^^^^^^^^^^^^^^^^^^^ T100
+25 | wait_for_attach()
+   |
+
+T100.py:25:1: T100 Trace found: `ptvsd.wait_for_attach` used
+   |
+23 | enable_attach()
+24 | break_into_debugger()
+25 | wait_for_attach()
+   | ^^^^^^^^^^^^^^^^^ T100
+   |

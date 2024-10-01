@@ -6,6 +6,7 @@ True and  False
 True  and False
 #: E271
 if   1:
+    pass
 #: E273
 True and		False
 #: E273 E274
@@ -63,3 +64,21 @@ if (a and
 #: Okay
 def f():
 	return 1
+
+# Soft keywords
+
+#: E271
+type  Number = int
+
+#: E273
+type	Number = int
+
+#: E275
+match(foo):
+    case(1):
+        pass
+
+# https://github.com/astral-sh/ruff/issues/12094
+pass;
+
+yield, x

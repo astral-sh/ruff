@@ -1,0 +1,783 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/valid/expressions/subscript.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..266,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..10,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 0..10,
+                            value: Subscript(
+                                ExprSubscript {
+                                    range: 0..7,
+                                    value: Name(
+                                        ExprName {
+                                            range: 0..4,
+                                            id: Name("data"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    slice: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 5..6,
+                                            value: Int(
+                                                0,
+                                            ),
+                                        },
+                                    ),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 8..9,
+                                    value: Int(
+                                        0,
+                                    ),
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 11..21,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 11..21,
+                            value: Name(
+                                ExprName {
+                                    range: 11..15,
+                                    id: Name("data"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Tuple(
+                                ExprTuple {
+                                    range: 16..20,
+                                    elts: [
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 16..17,
+                                                value: Int(
+                                                    0,
+                                                ),
+                                            },
+                                        ),
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 19..20,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                    parenthesized: false,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 22..31,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 22..31,
+                            value: Name(
+                                ExprName {
+                                    range: 22..26,
+                                    id: Name("data"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Tuple(
+                                ExprTuple {
+                                    range: 27..30,
+                                    elts: [
+                                        Slice(
+                                            ExprSlice {
+                                                range: 27..29,
+                                                lower: Some(
+                                                    NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 27..28,
+                                                            value: Int(
+                                                                0,
+                                                            ),
+                                                        },
+                                                    ),
+                                                ),
+                                                upper: None,
+                                                step: None,
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                    parenthesized: false,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 32..43,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 32..43,
+                            value: Name(
+                                ExprName {
+                                    range: 32..36,
+                                    id: Name("data"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Tuple(
+                                ExprTuple {
+                                    range: 37..42,
+                                    elts: [
+                                        Slice(
+                                            ExprSlice {
+                                                range: 37..39,
+                                                lower: Some(
+                                                    NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 37..38,
+                                                            value: Int(
+                                                                0,
+                                                            ),
+                                                        },
+                                                    ),
+                                                ),
+                                                upper: None,
+                                                step: None,
+                                            },
+                                        ),
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 41..42,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                    parenthesized: false,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 44..56,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 44..56,
+                            value: Name(
+                                ExprName {
+                                    range: 44..48,
+                                    id: Name("data"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Tuple(
+                                ExprTuple {
+                                    range: 49..55,
+                                    elts: [
+                                        Slice(
+                                            ExprSlice {
+                                                range: 49..52,
+                                                lower: Some(
+                                                    NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 49..50,
+                                                            value: Int(
+                                                                0,
+                                                            ),
+                                                        },
+                                                    ),
+                                                ),
+                                                upper: Some(
+                                                    NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 51..52,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                ),
+                                                step: None,
+                                            },
+                                        ),
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 54..55,
+                                                value: Int(
+                                                    2,
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                    parenthesized: false,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 57..80,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 57..80,
+                            value: Name(
+                                ExprName {
+                                    range: 57..61,
+                                    id: Name("data"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Tuple(
+                                ExprTuple {
+                                    range: 62..79,
+                                    elts: [
+                                        Slice(
+                                            ExprSlice {
+                                                range: 62..67,
+                                                lower: Some(
+                                                    NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 62..63,
+                                                            value: Int(
+                                                                0,
+                                                            ),
+                                                        },
+                                                    ),
+                                                ),
+                                                upper: Some(
+                                                    NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 64..65,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                ),
+                                                step: Some(
+                                                    NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 66..67,
+                                                            value: Int(
+                                                                2,
+                                                            ),
+                                                        },
+                                                    ),
+                                                ),
+                                            },
+                                        ),
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 69..70,
+                                                value: Int(
+                                                    3,
+                                                ),
+                                            },
+                                        ),
+                                        Slice(
+                                            ExprSlice {
+                                                range: 72..79,
+                                                lower: Some(
+                                                    Name(
+                                                        ExprName {
+                                                            range: 72..73,
+                                                            id: Name("a"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                ),
+                                                upper: Some(
+                                                    BinOp(
+                                                        ExprBinOp {
+                                                            range: 74..79,
+                                                            left: Name(
+                                                                ExprName {
+                                                                    range: 74..75,
+                                                                    id: Name("b"),
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                            op: Add,
+                                                            right: NumberLiteral(
+                                                                ExprNumberLiteral {
+                                                                    range: 78..79,
+                                                                    value: Int(
+                                                                        1,
+                                                                    ),
+                                                                },
+                                                            ),
+                                                        },
+                                                    ),
+                                                ),
+                                                step: None,
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                    parenthesized: false,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 81..93,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 81..93,
+                            value: Name(
+                                ExprName {
+                                    range: 81..85,
+                                    id: Name("data"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Named(
+                                ExprNamed {
+                                    range: 86..92,
+                                    target: Name(
+                                        ExprName {
+                                            range: 86..87,
+                                            id: Name("a"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    value: Name(
+                                        ExprName {
+                                            range: 91..92,
+                                            id: Name("b"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 94..106,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 94..106,
+                            value: Name(
+                                ExprName {
+                                    range: 94..98,
+                                    id: Name("data"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Tuple(
+                                ExprTuple {
+                                    range: 99..105,
+                                    elts: [
+                                        Slice(
+                                            ExprSlice {
+                                                range: 99..100,
+                                                lower: None,
+                                                upper: None,
+                                                step: None,
+                                            },
+                                        ),
+                                        Slice(
+                                            ExprSlice {
+                                                range: 102..105,
+                                                lower: None,
+                                                upper: Some(
+                                                    NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 103..105,
+                                                            value: Int(
+                                                                11,
+                                                            ),
+                                                        },
+                                                    ),
+                                                ),
+                                                step: None,
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                    parenthesized: false,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 107..120,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 107..120,
+                            value: Name(
+                                ExprName {
+                                    range: 107..111,
+                                    id: Name("data"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Tuple(
+                                ExprTuple {
+                                    range: 112..119,
+                                    elts: [
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 112..113,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 115..116,
+                                                value: Int(
+                                                    2,
+                                                ),
+                                            },
+                                        ),
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 118..119,
+                                                value: Int(
+                                                    3,
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                    parenthesized: false,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 121..132,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 121..132,
+                            value: Name(
+                                ExprName {
+                                    range: 121..125,
+                                    id: Name("data"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: UnaryOp(
+                                ExprUnaryOp {
+                                    range: 126..131,
+                                    op: Invert,
+                                    operand: Name(
+                                        ExprName {
+                                            range: 127..131,
+                                            id: Name("flag"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 133..148,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 133..148,
+                            value: Name(
+                                ExprName {
+                                    range: 133..137,
+                                    id: Name("data"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Slice(
+                                ExprSlice {
+                                    range: 138..147,
+                                    lower: Some(
+                                        Named(
+                                            ExprNamed {
+                                                range: 139..145,
+                                                target: Name(
+                                                    ExprName {
+                                                        range: 139..140,
+                                                        id: Name("a"),
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 144..145,
+                                                        value: Int(
+                                                            0,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                    upper: None,
+                                    step: None,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 149..165,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 149..165,
+                            value: Name(
+                                ExprName {
+                                    range: 149..153,
+                                    id: Name("data"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Slice(
+                                ExprSlice {
+                                    range: 154..164,
+                                    lower: Some(
+                                        Named(
+                                            ExprNamed {
+                                                range: 155..161,
+                                                target: Name(
+                                                    ExprName {
+                                                        range: 155..156,
+                                                        id: Name("a"),
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 160..161,
+                                                        value: Int(
+                                                            0,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                    upper: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 163..164,
+                                                id: Name("y"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    step: None,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 226..234,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 226..234,
+                            value: Name(
+                                ExprName {
+                                    range: 226..230,
+                                    id: Name("data"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Tuple(
+                                ExprTuple {
+                                    range: 231..233,
+                                    elts: [
+                                        Starred(
+                                            ExprStarred {
+                                                range: 231..233,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 232..233,
+                                                        id: Name("x"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                    parenthesized: false,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 235..249,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 235..249,
+                            value: Name(
+                                ExprName {
+                                    range: 235..239,
+                                    id: Name("data"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Tuple(
+                                ExprTuple {
+                                    range: 240..248,
+                                    elts: [
+                                        Starred(
+                                            ExprStarred {
+                                                range: 240..248,
+                                                value: BoolOp(
+                                                    ExprBoolOp {
+                                                        range: 241..248,
+                                                        op: And,
+                                                        values: [
+                                                            Name(
+                                                                ExprName {
+                                                                    range: 241..242,
+                                                                    id: Name("x"),
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                            Name(
+                                                                ExprName {
+                                                                    range: 247..248,
+                                                                    id: Name("y"),
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                        ],
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                    parenthesized: false,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 250..265,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 250..265,
+                            value: Name(
+                                ExprName {
+                                    range: 250..254,
+                                    id: Name("data"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Tuple(
+                                ExprTuple {
+                                    range: 255..264,
+                                    elts: [
+                                        Starred(
+                                            ExprStarred {
+                                                range: 255..264,
+                                                value: Named(
+                                                    ExprNamed {
+                                                        range: 257..263,
+                                                        target: Name(
+                                                            ExprName {
+                                                                range: 257..258,
+                                                                id: Name("x"),
+                                                                ctx: Store,
+                                                            },
+                                                        ),
+                                                        value: Name(
+                                                            ExprName {
+                                                                range: 262..263,
+                                                                id: Name("y"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                    parenthesized: false,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

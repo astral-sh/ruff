@@ -99,10 +99,10 @@ fn explicit_with_items(checker: &mut Checker, with_items: &[WithItem]) -> bool {
     };
     checker
         .semantic()
-        .resolve_call_path(&expr_call.func)
-        .is_some_and(|call_path| {
+        .resolve_qualified_name(&expr_call.func)
+        .is_some_and(|qualified_name| {
             matches!(
-                call_path.as_slice(),
+                qualified_name.segments(),
                 ["asyncio", "timeout" | "timeout_at"]
                     | ["anyio", "CancelScope" | "fail_after" | "move_on_after"]
                     | [
@@ -168,7 +168,6 @@ pub(crate) fn multiple_with_statements(
             TextRange::new(with_stmt.start(), colon.end()),
         );
         if !checker
-            .indexer()
             .comment_ranges()
             .intersects(TextRange::new(with_stmt.start(), with_stmt.body[0].start()))
         {

@@ -6,7 +6,8 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for direct uses of lock objects in `with` statements.
+/// Checks for lock objects that are created and immediately discarded in
+/// `with` statements.
 ///
 /// ## Why is this bad?
 /// Creating a lock (via `threading.Lock` or similar) in a `with` statement
@@ -65,10 +66,10 @@ pub(crate) fn useless_with_lock(checker: &mut Checker, with: &ast::StmtWith) {
 
         if !checker
             .semantic()
-            .resolve_call_path(call.func.as_ref())
-            .is_some_and(|call_path| {
+            .resolve_qualified_name(call.func.as_ref())
+            .is_some_and(|qualified_name| {
                 matches!(
-                    call_path.as_slice(),
+                    qualified_name.segments(),
                     [
                         "threading",
                         "Lock" | "RLock" | "Condition" | "Semaphore" | "BoundedSemaphore"

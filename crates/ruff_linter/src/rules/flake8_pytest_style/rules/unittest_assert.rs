@@ -1,11 +1,10 @@
-use std::hash::BuildHasherDefault;
-
 use anyhow::{anyhow, bail, Result};
+use ruff_python_ast::name::Name;
 use ruff_python_ast::{
     self as ast, Arguments, CmpOp, Expr, ExprContext, Identifier, Keyword, Stmt, UnaryOp,
 };
 use ruff_text_size::TextRange;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxBuildHasher, FxHashMap};
 
 /// An enum to represent the different types of assertions present in the
 /// `unittest` module. Note: any variants that can't be replaced with plain
@@ -173,8 +172,8 @@ fn assert(expr: &Expr, msg: Option<&Expr>) -> Stmt {
 fn compare(left: &Expr, cmp_op: CmpOp, right: &Expr) -> Expr {
     Expr::Compare(ast::ExprCompare {
         left: Box::new(left.clone()),
-        ops: vec![cmp_op],
-        comparators: vec![right.clone()],
+        ops: Box::from([cmp_op]),
+        comparators: Box::from([right.clone()]),
         range: TextRange::default(),
     })
 }
@@ -249,10 +248,8 @@ impl UnittestAssert {
         }
 
         // Generate a map from argument name to value.
-        let mut args_map: FxHashMap<&str, &Expr> = FxHashMap::with_capacity_and_hasher(
-            args.len() + keywords.len(),
-            BuildHasherDefault::default(),
-        );
+        let mut args_map: FxHashMap<&str, &Expr> =
+            FxHashMap::with_capacity_and_hasher(args.len() + keywords.len(), FxBuildHasher);
 
         // Process positional arguments.
         for (arg_name, value) in arg_spec.iter().zip(args.iter()) {
@@ -383,15 +380,15 @@ impl UnittestAssert {
                     .ok_or_else(|| anyhow!("Missing argument `cls`"))?;
                 let msg = args.get("msg").copied();
                 let node = ast::ExprName {
-                    id: "isinstance".into(),
+                    id: Name::new_static("isinstance"),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
                 };
                 let node1 = ast::ExprCall {
                     func: Box::new(node.into()),
                     arguments: Arguments {
-                        args: vec![(**obj).clone(), (**cls).clone()],
-                        keywords: vec![],
+                        args: Box::from([(**obj).clone(), (**cls).clone()]),
+                        keywords: Box::from([]),
                         range: TextRange::default(),
                     },
                     range: TextRange::default(),
@@ -421,7 +418,7 @@ impl UnittestAssert {
                     .ok_or_else(|| anyhow!("Missing argument `regex`"))?;
                 let msg = args.get("msg").copied();
                 let node = ast::ExprName {
-                    id: "re".into(),
+                    id: Name::new_static("re"),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
                 };
@@ -434,8 +431,8 @@ impl UnittestAssert {
                 let node2 = ast::ExprCall {
                     func: Box::new(node1.into()),
                     arguments: Arguments {
-                        args: vec![(**regex).clone(), (**text).clone()],
-                        keywords: vec![],
+                        args: Box::from([(**regex).clone(), (**text).clone()]),
+                        keywords: Box::from([]),
                         range: TextRange::default(),
                     },
                     range: TextRange::default(),

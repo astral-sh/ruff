@@ -4,6 +4,7 @@ use ruff_python_parser::TokenKind;
 use ruff_text_size::Ranged;
 
 use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::rules::pycodestyle::helpers::is_non_logical_token;
 use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 
 /// ## What it does
@@ -146,7 +147,9 @@ pub(crate) fn missing_whitespace_around_operator(
     context: &mut LogicalLinesContext,
 ) {
     let mut tokens = line.tokens().iter().peekable();
-    let first_token = tokens.by_ref().find(|token| !token.kind().is_trivia());
+    let first_token = tokens
+        .by_ref()
+        .find(|token| !is_non_logical_token(token.kind()));
     let Some(mut prev_token) = first_token else {
         return;
     };
@@ -159,7 +162,7 @@ pub(crate) fn missing_whitespace_around_operator(
     while let Some(token) = tokens.next() {
         let kind = token.kind();
 
-        if kind.is_trivia() {
+        if is_non_logical_token(kind) {
             continue;
         }
 
@@ -186,7 +189,9 @@ pub(crate) fn missing_whitespace_around_operator(
             );
 
             NeedsSpace::from(!slash_in_func)
-        } else if kind.is_unary() || matches!(kind, TokenKind::Star | TokenKind::DoubleStar) {
+        } else if kind.is_unary_arithmetic_operator()
+            || matches!(kind, TokenKind::Star | TokenKind::DoubleStar)
+        {
             let is_binary = {
                 let prev_kind = prev_token.kind();
 
@@ -196,9 +201,7 @@ pub(crate) fn missing_whitespace_around_operator(
                 matches!(
                     prev_kind,
                     TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace
-                ) || !(prev_kind.is_operator()
-                    || prev_kind.is_keyword()
-                    || prev_kind.is_soft_keyword())
+                ) || !(prev_kind.is_operator() || prev_kind.is_keyword())
             };
 
             if is_binary {
@@ -211,6 +214,21 @@ pub(crate) fn missing_whitespace_around_operator(
             } else {
                 NeedsSpace::No
             }
+        } else if tokens.peek().is_some_and(|token| {
+            matches!(
+                token.kind(),
+                TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace
+            )
+        }) {
+            // There should not be a closing bracket directly after a token, as it is a syntax
+            // error. For example:
+            // ```
+            // 1+)
+            // ```
+            //
+            // However, allow it in order to prevent entering an infinite loop in which E225 adds a
+            // space only for E202 to remove it.
+            NeedsSpace::No
         } else if is_whitespace_needed(kind) {
             NeedsSpace::Yes
         } else {
@@ -219,10 +237,10 @@ pub(crate) fn missing_whitespace_around_operator(
 
         if needs_space != NeedsSpace::No {
             let has_leading_trivia =
-                prev_token.end() < token.start() || prev_token.kind().is_trivia();
+                prev_token.end() < token.start() || is_non_logical_token(prev_token.kind());
 
             let has_trailing_trivia = tokens.peek().map_or(true, |next| {
-                token.end() < next.start() || next.kind().is_trivia()
+                token.end() < next.start() || is_non_logical_token(next.kind())
             });
 
             match (has_leading_trivia, has_trailing_trivia) {

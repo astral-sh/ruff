@@ -18,10 +18,10 @@ use crate::fix::edits::delete_stmt;
 /// equivalent, `object.__str__` and `object.__repr__`, respectively.
 ///
 /// ## Example
-/// ```python
+///
+/// ```pyi
 /// class Foo:
-///     def __repr__(self) -> str:
-///         ...
+///     def __repr__(self) -> str: ...
 /// ```
 #[violation]
 pub struct StrOrReprDefinedInStub {
@@ -78,13 +78,7 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
         return;
     }
 
-    if checker
-        .semantic()
-        .resolve_call_path(returns)
-        .map_or(true, |call_path| {
-            !matches!(call_path.as_slice(), ["" | "builtins", "str"])
-        })
-    {
+    if !checker.semantic().match_builtin_expr(returns, "str") {
         return;
     }
 

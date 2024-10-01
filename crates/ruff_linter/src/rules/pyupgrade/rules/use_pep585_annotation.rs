@@ -2,7 +2,7 @@ use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::compose_call_path;
+use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_semantic::analyze::typing::ModuleMember;
 use ruff_text_size::Ranged;
 
@@ -30,7 +30,7 @@ use crate::settings::types::PythonVersion;
 /// `__future__` annotations are not evaluated at runtime. If your code relies
 /// on runtime type annotations (either directly or via a library like
 /// Pydantic), you can disable this behavior for Python versions prior to 3.9
-/// by setting [`pyupgrade.keep-runtime-typing`] to `true`.
+/// by setting [`lint.pyupgrade.keep-runtime-typing`] to `true`.
 ///
 /// ## Example
 /// ```python
@@ -51,7 +51,7 @@ use crate::settings::types::PythonVersion;
 ///
 /// ## Options
 /// - `target-version`
-/// - `pyupgrade.keep-runtime-typing`
+/// - `lint.pyupgrade.keep-runtime-typing`
 ///
 /// [PEP 585]: https://peps.python.org/pep-0585/
 #[violation]
@@ -81,12 +81,12 @@ pub(crate) fn use_pep585_annotation(
     expr: &Expr,
     replacement: &ModuleMember,
 ) {
-    let Some(from) = compose_call_path(expr) else {
+    let Some(from) = UnqualifiedName::from_expr(expr) else {
         return;
     };
     let mut diagnostic = Diagnostic::new(
         NonPEP585Annotation {
-            from,
+            from: from.to_string(),
             to: replacement.to_string(),
         },
         expr.range(),
@@ -95,20 +95,24 @@ pub(crate) fn use_pep585_annotation(
         match replacement {
             ModuleMember::BuiltIn(name) => {
                 // Built-in type, like `list`.
-                if checker.semantic().is_builtin(name) {
-                    diagnostic.set_fix(Fix::applicable_edit(
-                        Edit::range_replacement((*name).to_string(), expr.range()),
-                        if checker.settings.preview.is_enabled() {
-                            if checker.settings.target_version >= PythonVersion::Py310 {
-                                Applicability::Safe
-                            } else {
-                                Applicability::Unsafe
-                            }
-                        } else {
-                            Applicability::Safe
-                        },
-                    ));
-                }
+                diagnostic.try_set_fix(|| {
+                    let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
+                        name,
+                        expr.start(),
+                        checker.semantic(),
+                    )?;
+                    let binding_edit = Edit::range_replacement(binding, expr.range());
+                    let applicability = if checker.settings.target_version >= PythonVersion::Py310 {
+                        Applicability::Safe
+                    } else {
+                        Applicability::Unsafe
+                    };
+                    Ok(Fix::applicable_edits(
+                        binding_edit,
+                        import_edit,
+                        applicability,
+                    ))
+                });
             }
             ModuleMember::Member(module, member) => {
                 // Imported type, like `collections.deque`.
@@ -122,12 +126,8 @@ pub(crate) fn use_pep585_annotation(
                     Ok(Fix::applicable_edits(
                         import_edit,
                         [reference_edit],
-                        if checker.settings.preview.is_enabled() {
-                            if checker.settings.target_version >= PythonVersion::Py310 {
-                                Applicability::Safe
-                            } else {
-                                Applicability::Unsafe
-                            }
+                        if checker.settings.target_version >= PythonVersion::Py310 {
+                            Applicability::Safe
                         } else {
                             Applicability::Unsafe
                         },

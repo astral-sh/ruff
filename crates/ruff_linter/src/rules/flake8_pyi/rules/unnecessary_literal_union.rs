@@ -11,22 +11,25 @@ use crate::checkers::ast::Checker;
 /// Checks for the presence of multiple literal types in a union.
 ///
 /// ## Why is this bad?
-/// Literal types accept multiple arguments and it is clearer to specify them
-/// as a single literal.
+/// `Literal["foo", 42]` has identical semantics to
+/// `Literal["foo"] | Literal[42]`, but is clearer and more concise.
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// from typing import Literal
 ///
-/// field: Literal[1] | Literal[2]
+/// field: Literal[1] | Literal[2] | str
 /// ```
 ///
 /// Use instead:
-/// ```python
+/// ```pyi
 /// from typing import Literal
 ///
-/// field: Literal[1, 2]
+/// field: Literal[1, 2] | str
 /// ```
+///
+/// ## References
+/// - [Python documentation: `typing.Literal`](https://docs.python.org/3/library/typing.html#typing.Literal)
 #[violation]
 pub struct UnnecessaryLiteralUnion {
     members: Vec<String>,
@@ -67,18 +70,15 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &mut Checker, expr: &'a Exp
                     literal_subscript = Some(value.as_ref());
                 }
 
+                let slice = &**slice;
+
                 // flatten already-unioned literals to later union again
-                if let Expr::Tuple(ast::ExprTuple {
-                    elts,
-                    range: _,
-                    ctx: _,
-                }) = slice.as_ref()
-                {
-                    for expr in elts {
-                        literal_exprs.push(expr);
+                if let Expr::Tuple(tuple) = slice {
+                    for item in tuple {
+                        literal_exprs.push(item);
                     }
                 } else {
-                    literal_exprs.push(slice.as_ref());
+                    literal_exprs.push(slice);
                 }
             }
         } else {
@@ -116,13 +116,14 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &mut Checker, expr: &'a Exp
         expr.range(),
     );
 
-    if checker.settings.preview.is_enabled() {
+    diagnostic.set_fix({
         let literal = Expr::Subscript(ast::ExprSubscript {
             value: Box::new(literal_subscript.clone()),
             slice: Box::new(Expr::Tuple(ast::ExprTuple {
                 elts: literal_exprs.into_iter().cloned().collect(),
                 range: TextRange::default(),
                 ctx: ExprContext::Load,
+                parenthesized: true,
             })),
             range: TextRange::default(),
             ctx: ExprContext::Load,
@@ -130,10 +131,10 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &mut Checker, expr: &'a Exp
 
         if other_exprs.is_empty() {
             // if the union is only literals, we just replace the whole thing with a single literal
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            Fix::safe_edit(Edit::range_replacement(
                 checker.generator().expr(&literal),
                 expr.range(),
-            )));
+            ))
         } else {
             let elts: Vec<Expr> = std::iter::once(literal)
                 .chain(other_exprs.into_iter().cloned())
@@ -148,6 +149,7 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &mut Checker, expr: &'a Exp
                             elts,
                             range: TextRange::default(),
                             ctx: ExprContext::Load,
+                            parenthesized: true,
                         })),
                         range: TextRange::default(),
                         ctx: ExprContext::Load,
@@ -156,12 +158,9 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &mut Checker, expr: &'a Exp
                 checker.generator().expr(&pep_604_union(&elts))
             };
 
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                content,
-                expr.range(),
-            )));
+            Fix::safe_edit(Edit::range_replacement(content, expr.range()))
         }
-    }
+    });
 
     checker.diagnostics.push(diagnostic);
 }

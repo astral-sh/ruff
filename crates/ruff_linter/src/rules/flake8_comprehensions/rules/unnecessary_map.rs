@@ -73,21 +73,17 @@ pub(crate) fn unnecessary_map(
     func: &Expr,
     args: &[Expr],
 ) {
-    let Some(func) = func.as_name_expr() else {
+    let Some(builtin_name) = checker.semantic().resolve_builtin_symbol(func) else {
         return;
     };
 
-    let object_type = match func.id.as_str() {
+    let object_type = match builtin_name {
         "map" => ObjectType::Generator,
         "list" => ObjectType::List,
         "set" => ObjectType::Set,
         "dict" => ObjectType::Dict,
         _ => return,
     };
-
-    if !checker.semantic().is_builtin(&func.id) {
-        return;
-    }
 
     match object_type {
         ObjectType::Generator => {
@@ -111,10 +107,7 @@ pub(crate) fn unnecessary_map(
             if parameters.as_ref().is_some_and(|parameters| {
                 late_binding(parameters, body)
                     || parameters
-                        .posonlyargs
-                        .iter()
-                        .chain(&parameters.args)
-                        .chain(&parameters.kwonlyargs)
+                        .iter_non_variadic_params()
                         .any(|param| param.default.is_some())
                     || parameters.vararg.is_some()
                     || parameters.kwarg.is_some()
@@ -156,10 +149,7 @@ pub(crate) fn unnecessary_map(
             if parameters.as_ref().is_some_and(|parameters| {
                 late_binding(parameters, body)
                     || parameters
-                        .posonlyargs
-                        .iter()
-                        .chain(&parameters.args)
-                        .chain(&parameters.kwonlyargs)
+                        .iter_non_variadic_params()
                         .any(|param| param.default.is_some())
                     || parameters.vararg.is_some()
                     || parameters.kwarg.is_some()
@@ -211,10 +201,7 @@ pub(crate) fn unnecessary_map(
             if parameters.as_ref().is_some_and(|parameters| {
                 late_binding(parameters, body)
                     || parameters
-                        .posonlyargs
-                        .iter()
-                        .chain(&parameters.args)
-                        .chain(&parameters.kwonlyargs)
+                        .iter_non_variadic_params()
                         .any(|param| param.default.is_some())
                     || parameters.vararg.is_some()
                     || parameters.kwarg.is_some()

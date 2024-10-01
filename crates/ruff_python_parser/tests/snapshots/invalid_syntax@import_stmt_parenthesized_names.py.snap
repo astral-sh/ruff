@@ -1,0 +1,81 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/import_stmt_parenthesized_names.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..25,
+        body: [
+            Import(
+                StmtImport {
+                    range: 0..6,
+                    names: [],
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 7..10,
+                    value: Name(
+                        ExprName {
+                            range: 8..9,
+                            id: Name("a"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Import(
+                StmtImport {
+                    range: 11..17,
+                    names: [],
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 18..24,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 18..24,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        range: 19..20,
+                                        id: Name("a"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 22..23,
+                                        id: Name("b"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: true,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | import (a)
+  |        ^ Syntax Error: Expected one or more symbol names after import
+2 | import (a, b)
+  |
+
+
+  |
+1 | import (a)
+2 | import (a, b)
+  |        ^ Syntax Error: Expected one or more symbol names after import
+  |

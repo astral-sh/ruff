@@ -1,0 +1,28 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+bad_staticmethod_argument.py:3:13: PLW0211 First argument of a static method should not be named `self`
+  |
+1 | class Wolf:
+2 |     @staticmethod
+3 |     def eat(self):  # [bad-staticmethod-argument]
+  |             ^^^^ PLW0211
+4 |         pass
+  |
+
+bad_staticmethod_argument.py:15:13: PLW0211 First argument of a static method should not be named `cls`
+   |
+13 | class Sheep:
+14 |     @staticmethod
+15 |     def eat(cls, x, y, z):  # [bad-staticmethod-argument]
+   |             ^^^ PLW0211
+16 |         pass
+   |
+
+bad_staticmethod_argument.py:19:15: PLW0211 First argument of a static method should not be named `self`
+   |
+18 |     @staticmethod
+19 |     def sleep(self, x, y, z):  # [bad-staticmethod-argument]
+   |               ^^^^ PLW0211
+20 |         pass
+   |

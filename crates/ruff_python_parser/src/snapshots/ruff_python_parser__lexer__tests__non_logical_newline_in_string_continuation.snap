@@ -2,6 +2,8 @@
 source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_source(source)
 ---
+## Tokens
+```
 [
     (
         Lpar,
@@ -12,11 +14,9 @@ expression: lex_source(source)
         1..2,
     ),
     (
-        String {
-            value: "a",
-            kind: String,
-            triple_quoted: false,
-        },
+        String(
+            "a",
+        ),
         6..9,
     ),
     (
@@ -24,11 +24,9 @@ expression: lex_source(source)
         9..10,
     ),
     (
-        String {
-            value: "b",
-            kind: String,
-            triple_quoted: false,
-        },
+        String(
+            "b",
+        ),
         14..17,
     ),
     (
@@ -40,19 +38,15 @@ expression: lex_source(source)
         18..19,
     ),
     (
-        String {
-            value: "c",
-            kind: String,
-            triple_quoted: false,
-        },
+        String(
+            "c",
+        ),
         23..26,
     ),
     (
-        String {
-            value: "d",
-            kind: String,
-            triple_quoted: false,
-        },
+        String(
+            "d",
+        ),
         33..36,
     ),
     (
@@ -68,3 +62,4 @@ expression: lex_source(source)
         38..38,
     ),
 ]
+```

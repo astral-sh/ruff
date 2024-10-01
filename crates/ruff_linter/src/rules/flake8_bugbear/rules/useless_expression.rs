@@ -25,6 +25,31 @@ use super::super::helpers::at_last_top_level_expression_in_cell;
 /// ```python
 /// foo = 1 + 1
 /// ```
+///
+/// ## Notebook behavior
+/// For Jupyter Notebooks, this rule is not applied to the last top-level expression in a cell.
+/// This is because it's common to have a notebook cell that ends with an expression,
+/// which will result in the `repr` of the evaluated expression being printed as the cell's output.
+///
+/// ## Known problems
+/// This rule ignores expression types that are commonly used for their side
+/// effects, such as function calls.
+///
+/// However, if a seemingly useless expression (like an attribute access) is
+/// needed to trigger a side effect, consider assigning it to an anonymous
+/// variable, to indicate that the return value is intentionally ignored.
+///
+/// For example, given:
+/// ```python
+/// with errors.ExceptionRaisedContext():
+///     obj.attribute
+/// ```
+///
+/// Use instead:
+/// ```python
+/// with errors.ExceptionRaisedContext():
+///     _ = obj.attribute
+/// ```
 #[violation]
 pub struct UselessExpression {
     kind: Kind,
@@ -61,9 +86,6 @@ pub(crate) fn useless_expression(checker: &mut Checker, value: &Expr) {
         return;
     }
 
-    // For Jupyter Notebooks, ignore the last top-level expression for each cell.
-    // This is because it's common to have a cell that ends with an expression
-    // to display it's value.
     if checker.source_type.is_ipynb()
         && at_last_top_level_expression_in_cell(
             checker.semantic(),
@@ -75,7 +97,7 @@ pub(crate) fn useless_expression(checker: &mut Checker, value: &Expr) {
     }
 
     // Ignore statements that have side effects.
-    if contains_effect(value, |id| checker.semantic().is_builtin(id)) {
+    if contains_effect(value, |id| checker.semantic().has_builtin_binding(id)) {
         // Flag attributes as useless expressions, even if they're attached to calls or other
         // expressions.
         if value.is_attribute_expr() {

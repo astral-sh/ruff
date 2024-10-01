@@ -17,14 +17,13 @@ use ruff_linter::registry::Rule;
 use ruff_linter::settings::types::UnsafeFixes;
 use ruff_linter::settings::{flags, LinterSettings};
 use ruff_linter::{fs, warn_user_once, IOError};
-use ruff_python_ast::imports::ImportMap;
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::{TextRange, TextSize};
 use ruff_workspace::resolver::{
     match_exclusion, python_files_in_path, PyprojectConfig, ResolvedFile,
 };
 
-use crate::args::CliOverrides;
+use crate::args::ConfigArguments;
 use crate::cache::{Cache, PackageCacheMap, PackageCaches};
 use crate::diagnostics::Diagnostics;
 use crate::panic::catch_unwind;
@@ -34,7 +33,7 @@ use crate::panic::catch_unwind;
 pub(crate) fn check(
     files: &[PathBuf],
     pyproject_config: &PyprojectConfig,
-    overrides: &CliOverrides,
+    config_arguments: &ConfigArguments,
     cache: flags::Cache,
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
@@ -42,7 +41,7 @@ pub(crate) fn check(
 ) -> Result<Diagnostics> {
     // Collect all the Python files to check.
     let start = Instant::now();
-    let (paths, resolver) = python_files_in_path(files, pyproject_config, overrides)?;
+    let (paths, resolver) = python_files_in_path(files, pyproject_config, config_arguments)?;
     debug!("Identified files to lint in: {:?}", start.elapsed());
 
     if paths.is_empty() {
@@ -60,7 +59,7 @@ pub(crate) fn check(
     );
 
     // Load the caches.
-    let caches = if bool::from(cache) {
+    let caches = if cache.is_enabled() {
         Some(PackageCacheMap::init(&package_roots, &resolver))
     } else {
         None
@@ -134,7 +133,6 @@ pub(crate) fn check(
                             dummy,
                             TextSize::default(),
                         )],
-                        ImportMap::default(),
                         FxHashMap::default(),
                     )
                 } else {
@@ -233,7 +231,7 @@ mod test {
     use ruff_workspace::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
     use ruff_workspace::Settings;
 
-    use crate::args::CliOverrides;
+    use crate::args::ConfigArguments;
 
     use super::check;
 
@@ -252,6 +250,7 @@ mod test {
         for file in [&pyproject_toml, &python_file, &notebook] {
             fs::OpenOptions::new()
                 .create(true)
+                .truncate(true)
                 .write(true)
                 .mode(0o000)
                 .open(file)?;
@@ -269,10 +268,9 @@ mod test {
 
         // Run
         let diagnostics = check(
-            // Notebooks are not included by default
-            &[tempdir.path().to_path_buf(), notebook],
+            &[tempdir.path().to_path_buf()],
             &pyproject_config,
-            &CliOverrides::default(),
+            &ConfigArguments::default(),
             flags::Cache::Disabled,
             flags::Noqa::Disabled,
             flags::FixMode::Generate,

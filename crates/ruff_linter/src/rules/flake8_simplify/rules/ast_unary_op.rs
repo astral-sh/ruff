@@ -3,6 +3,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::name::Name;
 use ruff_python_semantic::ScopeKind;
 
 use crate::checkers::ast::Checker;
@@ -176,7 +177,7 @@ pub(crate) fn negation_with_equal_op(
     );
     let node = ast::ExprCompare {
         left: left.clone(),
-        ops: vec![CmpOp::NotEq],
+        ops: Box::from([CmpOp::NotEq]),
         comparators: comparators.clone(),
         range: TextRange::default(),
     };
@@ -206,7 +207,7 @@ pub(crate) fn negation_with_not_equal_op(
     else {
         return;
     };
-    if !matches!(&ops[..], [CmpOp::NotEq]) {
+    if !matches!(&**ops, [CmpOp::NotEq]) {
         return;
     }
     if is_exception_check(checker.semantic().current_statement()) {
@@ -231,7 +232,7 @@ pub(crate) fn negation_with_not_equal_op(
     );
     let node = ast::ExprCompare {
         left: left.clone(),
-        ops: vec![CmpOp::Eq],
+        ops: Box::from([CmpOp::Eq]),
         comparators: comparators.clone(),
         range: TextRange::default(),
     };
@@ -270,17 +271,17 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: UnaryOp, o
             checker.locator().slice(operand.as_ref()).to_string(),
             expr.range(),
         )));
-    } else if checker.semantic().is_builtin("bool") {
+    } else if checker.semantic().has_builtin_binding("bool") {
         let node = ast::ExprName {
-            id: "bool".into(),
+            id: Name::new_static("bool"),
             ctx: ExprContext::Load,
             range: TextRange::default(),
         };
         let node1 = ast::ExprCall {
             func: Box::new(node.into()),
             arguments: Arguments {
-                args: vec![*operand.clone()],
-                keywords: vec![],
+                args: Box::from([*operand.clone()]),
+                keywords: Box::from([]),
                 range: TextRange::default(),
             },
             range: TextRange::default(),

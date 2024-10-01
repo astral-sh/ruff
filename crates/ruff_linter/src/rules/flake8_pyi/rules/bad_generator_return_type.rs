@@ -125,10 +125,10 @@ pub(crate) fn bad_generator_return_type(
     // Determine the module from which the existing annotation is imported (e.g., `typing` or
     // `collections.abc`)
     let (method, module, member) = {
-        let Some(call_path) = semantic.resolve_call_path(map_subscript(returns)) else {
+        let Some(qualified_name) = semantic.resolve_qualified_name(map_subscript(returns)) else {
             return;
         };
-        match (name, call_path.as_slice()) {
+        match (name, qualified_name.segments()) {
             ("__iter__", ["typing", "Generator"]) => {
                 (Method::Iter, Module::Typing, Generator::Generator)
             }
@@ -162,12 +162,11 @@ pub(crate) fn bad_generator_return_type(
     // - if not, don't emit the diagnostic
     let yield_type_info = match returns {
         ast::Expr::Subscript(ast::ExprSubscript { slice, .. }) => match slice.as_ref() {
-            ast::Expr::Tuple(slice_tuple @ ast::ExprTuple { .. }) => {
+            ast::Expr::Tuple(slice_tuple) => {
                 if !slice_tuple
-                    .elts
                     .iter()
                     .skip(1)
-                    .all(|elt| is_any_or_none(elt, semantic))
+                    .all(|element| is_any_or_none(element, semantic))
                 {
                     return;
                 }

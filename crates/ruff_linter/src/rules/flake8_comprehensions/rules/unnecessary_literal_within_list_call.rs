@@ -1,11 +1,9 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{Expr, Keyword};
-use ruff_text_size::Ranged;
+use ruff_python_ast::{self as ast, Expr};
+use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
-
-use crate::rules::flake8_comprehensions::fixes;
 
 use super::helpers;
 
@@ -70,20 +68,16 @@ impl AlwaysFixableViolation for UnnecessaryLiteralWithinListCall {
 }
 
 /// C410
-pub(crate) fn unnecessary_literal_within_list_call(
-    checker: &mut Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
-) {
-    if !keywords.is_empty() {
+pub(crate) fn unnecessary_literal_within_list_call(checker: &mut Checker, call: &ast::ExprCall) {
+    if !call.arguments.keywords.is_empty() {
         return;
     }
-    let Some(argument) = helpers::first_argument_with_matching_function("list", func, args) else {
+    let Some(argument) =
+        helpers::first_argument_with_matching_function("list", &call.func, &call.arguments.args)
+    else {
         return;
     };
-    if !checker.semantic().is_builtin("list") {
+    if !checker.semantic().has_builtin_binding("list") {
         return;
     }
     let argument_kind = match argument {
@@ -91,15 +85,43 @@ pub(crate) fn unnecessary_literal_within_list_call(
         Expr::List(_) => "list",
         _ => return,
     };
+
     let mut diagnostic = Diagnostic::new(
         UnnecessaryLiteralWithinListCall {
             literal: argument_kind.to_string(),
         },
-        expr.range(),
+        call.range(),
     );
-    diagnostic.try_set_fix(|| {
-        fixes::fix_unnecessary_literal_within_list_call(expr, checker.locator(), checker.stylist())
-            .map(Fix::unsafe_edit)
+
+    // Convert `list([1, 2])` to `[1, 2]`
+    diagnostic.set_fix({
+        // Delete from the start of the call to the start of the argument.
+        let call_start = Edit::deletion(call.start(), argument.start());
+
+        // Delete from the end of the argument to the end of the call.
+        let call_end = Edit::deletion(argument.end(), call.end());
+
+        // If this is a tuple, we also need to convert the inner argument to a list.
+        if argument.is_tuple_expr() {
+            // Replace `(` with `[`.
+            let argument_start = Edit::replacement(
+                "[".to_string(),
+                argument.start(),
+                argument.start() + TextSize::from(1),
+            );
+
+            // Replace `)` with `]`.
+            let argument_end = Edit::replacement(
+                "]".to_string(),
+                argument.end() - TextSize::from(1),
+                argument.end(),
+            );
+
+            Fix::unsafe_edits(call_start, [argument_start, argument_end, call_end])
+        } else {
+            Fix::unsafe_edits(call_start, [call_end])
+        }
     });
+
     checker.diagnostics.push(diagnostic);
 }

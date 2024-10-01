@@ -1,7 +1,7 @@
-use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::Imported;
-use ruff_python_semantic::{Binding, BindingKind};
+use ruff_python_semantic::{Binding, BindingKind, Scope};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -21,14 +21,25 @@ use crate::renamer::Renamer;
 /// `set` builtin.
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// from collections.abc import Set
 /// ```
 ///
 /// Use instead:
-/// ```python
+/// ```pyi
 /// from collections.abc import Set as AbstractSet
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe for `Set` imports defined at the
+/// top-level of a `.py` module. Top-level symbols are implicitly exported by the
+/// module, and so renaming a top-level symbol may break downstream modules
+/// that import it.
+///
+/// The same is not true for `.pyi` files, where imported symbols are only
+/// re-exported if they are included in `__all__`, use a "redundant"
+/// `import foo as foo` alias, or are imported via a `*` import. As such, the
+/// fix is marked as safe in more cases for `.pyi` files.
 #[violation]
 pub struct UnaliasedCollectionsAbcSetImport;
 
@@ -55,7 +66,10 @@ pub(crate) fn unaliased_collections_abc_set_import(
     let BindingKind::FromImport(import) = &binding.kind else {
         return None;
     };
-    if !matches!(import.call_path(), ["collections", "abc", "Set"]) {
+    if !matches!(
+        import.qualified_name().segments(),
+        ["collections", "abc", "Set"]
+    ) {
         return None;
     }
 
@@ -67,10 +81,41 @@ pub(crate) fn unaliased_collections_abc_set_import(
     let mut diagnostic = Diagnostic::new(UnaliasedCollectionsAbcSetImport, binding.range());
     if checker.semantic().is_available("AbstractSet") {
         diagnostic.try_set_fix(|| {
-            let scope = &checker.semantic().scopes[binding.scope];
-            let (edit, rest) = Renamer::rename(name, "AbstractSet", scope, checker.semantic())?;
-            Ok(Fix::unsafe_edits(edit, rest))
+            let semantic = checker.semantic();
+            let scope = &semantic.scopes[binding.scope];
+            let (edit, rest) =
+                Renamer::rename(name, "AbstractSet", scope, semantic, checker.stylist())?;
+            let applicability = determine_applicability(binding, scope, checker);
+            Ok(Fix::applicable_edits(edit, rest, applicability))
         });
     }
     Some(diagnostic)
+}
+
+fn determine_applicability(binding: &Binding, scope: &Scope, checker: &Checker) -> Applicability {
+    // If it's not in a module scope, the import can't be implicitly re-exported,
+    // so always mark it as safe
+    if !scope.kind.is_module() {
+        return Applicability::Safe;
+    }
+    // If it's not a stub and it's in the module scope, always mark the fix as unsafe
+    if !checker.source_type.is_stub() {
+        return Applicability::Unsafe;
+    }
+    // If the import was `from collections.abc import Set as Set`,
+    // it's being explicitly re-exported: mark the fix as unsafe
+    if binding.is_explicit_export() {
+        return Applicability::Unsafe;
+    }
+    // If it's included in `__all__`, mark the fix as unsafe
+    if binding.references().any(|reference| {
+        checker
+            .semantic()
+            .reference(reference)
+            .in_dunder_all_definition()
+    }) {
+        return Applicability::Unsafe;
+    }
+    // Anything else in a stub, and it's a safe fix:
+    Applicability::Safe
 }

@@ -1,0 +1,64 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/match_stmt_missing_pattern.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..24,
+        body: [
+            Match(
+                StmtMatch {
+                    range: 0..23,
+                    subject: Name(
+                        ExprName {
+                            range: 6..7,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 13..23,
+                            pattern: MatchValue(
+                                PatternMatchValue {
+                                    range: 17..17,
+                                    value: Name(
+                                        ExprName {
+                                            range: 17..17,
+                                            id: Name(""),
+                                            ctx: Invalid,
+                                        },
+                                    ),
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 20..23,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 20..23,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | match x:
+2 |     case : ...
+  |          ^ Syntax Error: Expected a pattern
+  |

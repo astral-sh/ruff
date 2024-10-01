@@ -1,0 +1,10 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F822_0.pyi:4:22: F822 Undefined name `c` in `__all__`
+  |
+2 | b: int  # Considered a binding in a `.pyi` stub file, not in a `.py` runtime file
+3 | 
+4 | __all__ = ["a", "b", "c"]  # c is flagged as missing; b is not
+  |                      ^^^ F822
+  |

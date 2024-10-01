@@ -159,6 +159,20 @@ confusables.py:55:28: RUF001 String contains ambiguous `µ` (MICRO SIGN). Did yo
    |
 55 | assert getattr(Labware(), "µL") == 1.5
    |                            ^ RUF001
+56 | 
+57 | # Implicit string concatenation
    |
 
+confusables.py:58:6: RUF001 String contains ambiguous `𝐁` (MATHEMATICAL BOLD CAPITAL B). Did you mean `B` (LATIN CAPITAL LETTER B)?
+   |
+57 | # Implicit string concatenation
+58 | x = "𝐁ad" f"𝐁ad string"
+   |      ^ RUF001
+   |
 
+confusables.py:58:13: RUF001 String contains ambiguous `𝐁` (MATHEMATICAL BOLD CAPITAL B). Did you mean `B` (LATIN CAPITAL LETTER B)?
+   |
+57 | # Implicit string concatenation
+58 | x = "𝐁ad" f"𝐁ad string"
+   |             ^ RUF001
+   |

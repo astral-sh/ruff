@@ -31,11 +31,9 @@ use crate::checkers::ast::Checker;
 /// ## Fix safety
 /// Given `key in obj.keys()`, `obj` _could_ be a dictionary, or it could be
 /// another type that defines a `.keys()` method. In the latter case, removing
-/// the `.keys()` attribute could lead to a runtime error.
-///
-/// As such, this rule's fixes are marked as unsafe. In [preview], though,
-/// fixes are marked as safe when Ruff can determine that `obj` is a
-/// dictionary.
+/// the `.keys()` attribute could lead to a runtime error. The fix is marked
+/// as safe when the type of `obj` is known to be a dictionary; otherwise, it
+/// is marked as unsafe.
 ///
 /// ## References
 /// - [Python documentation: Mapping Types](https://docs.python.org/3/library/stdtypes.html#mapping-types-dict)
@@ -102,14 +100,14 @@ fn key_in_dict(
     let left_range = parenthesized_range(
         left.into(),
         parent,
-        checker.indexer().comment_ranges(),
+        checker.comment_ranges(),
         checker.locator().contents(),
     )
     .unwrap_or(left.range());
     let right_range = parenthesized_range(
         right.into(),
         parent,
-        checker.indexer().comment_ranges(),
+        checker.comment_ranges(),
         checker.locator().contents(),
     )
     .unwrap_or(right.range());
@@ -127,7 +125,7 @@ fn key_in_dict(
     {
         // The fix is only safe if we know the expression is a dictionary, since other types
         // can define a `.keys()` method.
-        let applicability = if checker.settings.preview.is_enabled() {
+        let applicability = {
             let is_dict = value.as_name_expr().is_some_and(|name| {
                 let Some(binding) = checker
                     .semantic()
@@ -143,8 +141,6 @@ fn key_in_dict(
             } else {
                 Applicability::Unsafe
             }
-        } else {
-            Applicability::Unsafe
         };
 
         // If the `.keys()` is followed by (e.g.) a keyword, we need to insert a space,
@@ -198,7 +194,7 @@ pub(crate) fn key_in_dict_comprehension(checker: &mut Checker, comprehension: &C
 
 /// SIM118 in a comparison.
 pub(crate) fn key_in_dict_compare(checker: &mut Checker, compare: &ast::ExprCompare) {
-    let [op] = compare.ops.as_slice() else {
+    let [op] = &*compare.ops else {
         return;
     };
 
@@ -206,7 +202,7 @@ pub(crate) fn key_in_dict_compare(checker: &mut Checker, compare: &ast::ExprComp
         return;
     }
 
-    let [right] = compare.comparators.as_slice() else {
+    let [right] = &*compare.comparators else {
         return;
     };
 

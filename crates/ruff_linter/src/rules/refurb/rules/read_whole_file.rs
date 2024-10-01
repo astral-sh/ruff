@@ -3,11 +3,12 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::visitor::{self, Visitor};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_codegen::Generator;
-use ruff_python_semantic::{BindingId, ResolvedReference, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
+
+use super::super::helpers::{find_file_opens, FileOpen};
 
 /// ## What it does
 /// Checks for uses of `open` and `read` that can be replaced by `pathlib`
@@ -52,12 +53,17 @@ impl Violation for ReadWholeFile {
 /// FURB101
 pub(crate) fn read_whole_file(checker: &mut Checker, with: &ast::StmtWith) {
     // `async` check here is more of a precaution.
-    if with.is_async || !checker.semantic().is_builtin("open") {
+    if with.is_async {
         return;
     }
 
     // First we go through all the items in the statement and find all `open` operations.
-    let candidates = find_file_opens(with, checker.semantic());
+    let candidates = find_file_opens(
+        with,
+        checker.semantic(),
+        true,
+        checker.settings.target_version,
+    );
     if candidates.is_empty() {
         return;
     }
@@ -83,176 +89,6 @@ pub(crate) fn read_whole_file(checker: &mut Checker, with: &ast::StmtWith) {
         })
         .collect();
     checker.diagnostics.extend(diagnostics);
-}
-
-#[derive(Debug)]
-enum ReadMode {
-    /// "r"  -> `read_text`
-    Text,
-    /// "rb" -> `read_bytes`
-    Bytes,
-}
-
-/// A grab bag struct that joins together every piece of information we need to track
-/// about a file open operation.
-#[derive(Debug)]
-struct FileOpen<'a> {
-    /// With item where the open happens, we use it for the reporting range.
-    item: &'a ast::WithItem,
-    /// Filename expression used as the first argument in `open`, we use it in the diagnostic message.
-    filename: &'a Expr,
-    /// The type of read to choose `read_text` or `read_bytes`.
-    mode: ReadMode,
-    /// Keywords that can be used in the new read call.
-    keywords: Vec<&'a ast::Keyword>,
-    /// We only check `open` operations whose file handles are used exactly once.
-    reference: &'a ResolvedReference,
-}
-
-impl<'a> FileOpen<'a> {
-    /// Determine whether an expression is a reference to the file handle, by comparing
-    /// their ranges. If two expressions have the same range, they must be the same expression.
-    fn is_ref(&self, expr: &Expr) -> bool {
-        expr.range() == self.reference.range()
-    }
-}
-
-/// Find and return all `open` operations in the given `with` statement.
-fn find_file_opens<'a>(
-    with: &'a ast::StmtWith,
-    semantic: &'a SemanticModel<'a>,
-) -> Vec<FileOpen<'a>> {
-    with.items
-        .iter()
-        .filter_map(|item| find_file_open(item, with, semantic))
-        .collect()
-}
-
-/// Find `open` operation in the given `with` item.
-fn find_file_open<'a>(
-    item: &'a ast::WithItem,
-    with: &'a ast::StmtWith,
-    semantic: &'a SemanticModel<'a>,
-) -> Option<FileOpen<'a>> {
-    // We want to match `open(...) as var`.
-    let ast::ExprCall {
-        func,
-        arguments: ast::Arguments { args, keywords, .. },
-        ..
-    } = item.context_expr.as_call_expr()?;
-
-    if func.as_name_expr()?.id != "open" {
-        return None;
-    }
-
-    let var = item.optional_vars.as_deref()?.as_name_expr()?;
-
-    // Ignore calls with `*args` and `**kwargs`. In the exact case of `open(*filename, mode="r")`,
-    // it could be a match; but in all other cases, the call _could_ contain unsupported keyword
-    // arguments, like `buffering`.
-    if args.iter().any(Expr::is_starred_expr)
-        || keywords.iter().any(|keyword| keyword.arg.is_none())
-    {
-        return None;
-    }
-
-    // Match positional arguments, get filename and read mode.
-    let (filename, pos_mode) = match_open_args(args)?;
-
-    // Match keyword arguments, get keyword arguments to forward and possibly read mode.
-    let (keywords, kw_mode) = match_open_keywords(keywords)?;
-
-    // `pos_mode` could've been assigned default value corresponding to "r", while
-    // keyword mode should override that.
-    let mode = kw_mode.unwrap_or(pos_mode);
-
-    // Now we need to find what is this variable bound to...
-    let scope = semantic.current_scope();
-    let bindings: Vec<BindingId> = scope.get_all(var.id.as_str()).collect();
-
-    let binding = bindings
-        .iter()
-        .map(|x| semantic.binding(*x))
-        // We might have many bindings with the same name, but we only care
-        // for the one we are looking at right now.
-        .find(|binding| binding.range() == var.range())?;
-
-    // Since many references can share the same binding, we can limit our attention span
-    // exclusively to the body of the current `with` statement.
-    let references: Vec<&ResolvedReference> = binding
-        .references
-        .iter()
-        .map(|id| semantic.reference(*id))
-        .filter(|reference| with.range().contains_range(reference.range()))
-        .collect();
-
-    // And even with all these restrictions, if the file handle gets used not exactly once,
-    // it doesn't fit the bill.
-    let [reference] = references.as_slice() else {
-        return None;
-    };
-
-    Some(FileOpen {
-        item,
-        filename,
-        mode,
-        keywords,
-        reference,
-    })
-}
-
-/// Match positional arguments. Return expression for the file name and read mode.
-fn match_open_args(args: &[Expr]) -> Option<(&Expr, ReadMode)> {
-    match args {
-        [filename] => Some((filename, ReadMode::Text)),
-        [filename, mode_literal] => match_open_mode(mode_literal).map(|mode| (filename, mode)),
-        // The third positional argument is `buffering` and `read_text` doesn't support it.
-        _ => None,
-    }
-}
-
-/// Match keyword arguments. Return keyword arguments to forward and read mode.
-fn match_open_keywords(
-    keywords: &[ast::Keyword],
-) -> Option<(Vec<&ast::Keyword>, Option<ReadMode>)> {
-    let mut result: Vec<&ast::Keyword> = vec![];
-    let mut mode: Option<ReadMode> = None;
-
-    for keyword in keywords {
-        match keyword.arg.as_ref()?.as_str() {
-            "encoding" | "errors" => result.push(keyword),
-
-            // This might look bizarre, - why do we re-wrap this optional?
-            //
-            // The answer is quite simple, in the result of the current function
-            // mode being `None` is a possible and correct option meaning that there
-            // was NO "mode" keyword argument.
-            //
-            // The result of `match_open_mode` on the other hand is None
-            // in the cases when the mode is not compatible with `read_text`/`read_bytes`.
-            //
-            // So, here we return None from this whole function if the mode
-            // is incompatible.
-            "mode" => mode = Some(match_open_mode(&keyword.value)?),
-
-            // All other keywords cannot be directly forwarded.
-            _ => return None,
-        };
-    }
-    Some((result, mode))
-}
-
-/// Match open mode to see if it is supported.
-fn match_open_mode(mode: &Expr) -> Option<ReadMode> {
-    let ast::ExprStringLiteral { value, .. } = mode.as_string_literal_expr()?;
-    if value.is_implicit_concatenated() {
-        return None;
-    }
-    match value.to_str() {
-        "r" => Some(ReadMode::Text),
-        "rb" => Some(ReadMode::Bytes),
-        _ => None,
-    }
 }
 
 /// AST visitor that matches `open` operations with the corresponding `read` calls.
@@ -305,24 +141,19 @@ fn match_read_call(expr: &Expr) -> Option<&Expr> {
         return None;
     }
 
-    Some(attr.value.as_ref())
+    Some(&*attr.value)
 }
 
-/// Construct the replacement suggestion call.
 fn make_suggestion(open: &FileOpen<'_>, generator: Generator) -> SourceCodeSnippet {
-    let method_name = match open.mode {
-        ReadMode::Text => "read_text",
-        ReadMode::Bytes => "read_bytes",
-    };
     let name = ast::ExprName {
-        id: method_name.to_string(),
+        id: open.mode.pathlib_method(),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
     };
     let call = ast::ExprCall {
         func: Box::new(name.into()),
         arguments: ast::Arguments {
-            args: vec![],
+            args: Box::from([]),
             keywords: open.keywords.iter().copied().cloned().collect(),
             range: TextRange::default(),
         },

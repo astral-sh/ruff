@@ -7,17 +7,17 @@
 //!
 //! * [`Format`]: Implemented by objects that can be formatted.
 //! * [`FormatRule`]: Rule that knows how to format an object of another type. Useful in the situation where
-//!  it's necessary to implement [Format] on an object from another crate. This module defines the
-//!  [`FormatRefWithRule`] and [`FormatOwnedWithRule`] structs to pass an item with its corresponding rule.
+//!    it's necessary to implement [Format] on an object from another crate. This module defines the
+//!    [`FormatRefWithRule`] and [`FormatOwnedWithRule`] structs to pass an item with its corresponding rule.
 //! * [`FormatWithRule`] implemented by objects that know how to format another type. Useful for implementing
-//!  some reusable formatting logic inside of this module if the type itself doesn't implement [Format]
+//!    some reusable formatting logic inside of this module if the type itself doesn't implement [Format]
 //!
 //! ## Formatting Macros
 //!
 //! This crate defines two macros to construct the IR. These are inspired by Rust's `fmt` macros
-//! * [`format!`]: Formats a formatable object
+//! * [`format!`]: Formats a formattable object
 //! * [`format_args!`]: Concatenates a sequence of Format objects.
-//! * [`write!`]: Writes a sequence of formatable objects into an output buffer.
+//! * [`write!`]: Writes a sequence of formattable objects into an output buffer.
 
 mod arguments;
 mod buffer;
@@ -41,7 +41,7 @@ use std::marker::PhantomData;
 use std::num::{NonZeroU16, NonZeroU8, TryFromIntError};
 
 use crate::format_element::document::Document;
-use crate::printer::{Printer, PrinterOptions, SourceMapGeneration};
+use crate::printer::{Printer, PrinterOptions};
 pub use arguments::{Argument, Arguments};
 pub use buffer::{
     Buffer, BufferExtensions, BufferSnapshot, Inspect, RemoveSoftLinesBuffer, VecBuffer,
@@ -53,7 +53,7 @@ pub use crate::diagnostics::{ActualStart, FormatError, InvalidDocumentError, Pri
 pub use format_element::{normalize_newlines, FormatElement, LINE_TERMINATORS};
 pub use group_id::GroupId;
 use ruff_macros::CacheKey;
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Hash, CacheKey)]
 #[cfg_attr(
@@ -269,7 +269,6 @@ impl FormatOptions for SimpleFormatOptions {
             line_width: self.line_width,
             indent_style: self.indent_style,
             indent_width: self.indent_width,
-            source_map_generation: SourceMapGeneration::Enabled,
             ..PrinterOptions::default()
         }
     }
@@ -432,6 +431,128 @@ impl Printed {
     pub fn take_verbatim_ranges(&mut self) -> Vec<TextRange> {
         std::mem::take(&mut self.verbatim_ranges)
     }
+
+    /// Slices the formatted code to the sub-slices that covers the passed `source_range` in `source`.
+    ///
+    /// The implementation uses the source map generated during formatting to find the closest range
+    /// in the formatted document that covers `source_range` or more. The returned slice
+    /// matches the `source_range` exactly (except indent, see below) if the formatter emits [`FormatElement::SourcePosition`] for
+    /// the range's offsets.
+    ///
+    /// ## Indentation
+    /// The indentation before `source_range.start` is replaced with the indentation returned by the formatter
+    /// to fix up incorrectly intended code.
+    ///
+    /// Returns the entire document if the source map is empty.
+    ///
+    /// # Panics
+    /// If `source_range` points to offsets that are not in the bounds of `source`.
+    #[must_use]
+    pub fn slice_range(self, source_range: TextRange, source: &str) -> PrintedRange {
+        let mut start_marker: Option<SourceMarker> = None;
+        let mut end_marker: Option<SourceMarker> = None;
+
+        // Note: The printer can generate multiple source map entries for the same source position.
+        // For example if you have:
+        // * token("a + b")
+        // * `source_position(276)`
+        // * `token(")")`
+        // * `source_position(276)`
+        // *  `hard_line_break`
+        // The printer uses the source position 276 for both the tokens `)` and the `\n` because
+        // there were multiple `source_position` entries in the IR with the same offset.
+        // This can happen if multiple nodes start or end at the same position. A common example
+        // for this are expressions and expression statement that always end at the same offset.
+        //
+        // Warning: Source markers are often emitted sorted by their source position but it's not guaranteed
+        // and depends on the emitted `IR`.
+        // They are only guaranteed to be sorted in increasing order by their destination position.
+        for marker in self.sourcemap {
+            // Take the closest start marker, but skip over start_markers that have the same start.
+            if marker.source <= source_range.start()
+                && !start_marker.is_some_and(|existing| existing.source >= marker.source)
+            {
+                start_marker = Some(marker);
+            }
+
+            if marker.source >= source_range.end()
+                && !end_marker.is_some_and(|existing| existing.source <= marker.source)
+            {
+                end_marker = Some(marker);
+            }
+        }
+
+        let (source_start, formatted_start) = start_marker
+            .map(|marker| (marker.source, marker.dest))
+            .unwrap_or_default();
+
+        let (source_end, formatted_end) = end_marker
+            .map_or((source.text_len(), self.code.text_len()), |marker| {
+                (marker.source, marker.dest)
+            });
+
+        let source_range = TextRange::new(source_start, source_end);
+        let formatted_range = TextRange::new(formatted_start, formatted_end);
+
+        // Extend both ranges to include the indentation
+        let source_range = extend_range_to_include_indent(source_range, source);
+        let formatted_range = extend_range_to_include_indent(formatted_range, &self.code);
+
+        PrintedRange {
+            code: self.code[formatted_range].to_string(),
+            source_range,
+        }
+    }
+}
+
+/// Extends `range` backwards (by reducing `range.start`) to include any directly preceding whitespace (`\t` or ` `).
+///
+/// # Panics
+/// If `range.start` is out of `source`'s bounds.
+fn extend_range_to_include_indent(range: TextRange, source: &str) -> TextRange {
+    let whitespace_len: TextSize = source[..usize::from(range.start())]
+        .chars()
+        .rev()
+        .take_while(|c| matches!(c, ' ' | '\t'))
+        .map(TextLen::text_len)
+        .sum();
+
+    TextRange::new(range.start() - whitespace_len, range.end())
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct PrintedRange {
+    code: String,
+    source_range: TextRange,
+}
+
+impl PrintedRange {
+    pub fn new(code: String, source_range: TextRange) -> Self {
+        Self { code, source_range }
+    }
+
+    pub fn empty() -> Self {
+        Self {
+            code: String::new(),
+            source_range: TextRange::default(),
+        }
+    }
+
+    /// The formatted code.
+    pub fn as_code(&self) -> &str {
+        &self.code
+    }
+
+    pub fn into_code(self) -> String {
+        self.code
+    }
+
+    /// The range the formatted code corresponds to in the source document.
+    pub fn source_range(&self) -> TextRange {
+        self.source_range
+    }
 }
 
 /// Public return type of the formatter
@@ -453,7 +574,7 @@ pub type FormatResult<F> = Result<F, FormatError>;
 /// impl Format<SimpleFormatContext> for Paragraph {
 ///     fn fmt(&self, f: &mut Formatter<SimpleFormatContext>) -> FormatResult<()> {
 ///         write!(f, [
-///             text(&self.0, None),
+///             text(&self.0),
 ///             hard_line_break(),
 ///         ])
 ///     }
@@ -653,10 +774,6 @@ where
     pub fn with_item(mut self, item: T) -> Self {
         self.item = item;
         self
-    }
-
-    pub fn into_item(self) -> T {
-        self.item
     }
 }
 

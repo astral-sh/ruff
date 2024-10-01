@@ -1,0 +1,19 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E302_first_line_expression.py:3:1: E302 [*] Expected 2 blank lines, found 1
+  |
+1 | "Test where the first line is a comment, " + "and the rule violation follows it."
+2 | 
+3 | def fn():
+  | ^^^ E302
+4 |     pass
+  |
+  = help: Add missing blank line(s)
+
+ℹ Safe fix
+1 1 | "Test where the first line is a comment, " + "and the rule violation follows it."
+2 2 | 
+  3 |+
+3 4 | def fn():
+4 5 |     pass

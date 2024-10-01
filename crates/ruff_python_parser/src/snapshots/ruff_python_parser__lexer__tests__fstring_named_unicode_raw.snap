@@ -2,26 +2,33 @@
 source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_source(source)
 ---
+## Tokens
+```
 [
     (
         FStringStart,
         0..3,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE,
+        ),
     ),
     (
-        FStringMiddle {
-            value: "\\N",
-            is_raw: true,
-        },
+        FStringMiddle(
+            "\\N",
+        ),
         3..5,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE,
+        ),
     ),
     (
         Lbrace,
         5..6,
     ),
     (
-        Name {
-            name: "BULLET",
-        },
+        Name(
+            Name("BULLET"),
+        ),
         6..12,
     ),
     (
@@ -29,18 +36,24 @@ expression: lex_source(source)
         12..13,
     ),
     (
-        FStringMiddle {
-            value: " normal",
-            is_raw: true,
-        },
+        FStringMiddle(
+            " normal",
+        ),
         13..20,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE,
+        ),
     ),
     (
         FStringEnd,
         20..21,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING | RAW_STRING_LOWERCASE,
+        ),
     ),
     (
         Newline,
         21..21,
     ),
 ]
+```

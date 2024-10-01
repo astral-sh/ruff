@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
@@ -7,7 +9,8 @@ use std::string::ToString;
 
 use anyhow::{bail, Result};
 use globset::{Glob, GlobMatcher, GlobSet, GlobSetBuilder};
-use pep440_rs::{Version as Pep440Version, VersionSpecifiers};
+use log::debug;
+use pep440_rs::{Operator, Version as Pep440Version, Version, VersionSpecifier, VersionSpecifiers};
 use rustc_hash::FxHashMap;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use strum::IntoEnumIterator;
@@ -49,19 +52,22 @@ pub enum PythonVersion {
     Py310,
     Py311,
     Py312,
+    Py313,
+    // Remember to update the `latest()` function
+    // when adding new versions here!
 }
 
 impl From<PythonVersion> for Pep440Version {
     fn from(version: PythonVersion) -> Self {
         let (major, minor) = version.as_tuple();
-        Self::from_str(&format!("{major}.{minor}.100")).unwrap()
+        Self::new([u64::from(major), u64::from(minor)])
     }
 }
 
 impl PythonVersion {
     /// Return the latest supported Python version.
     pub const fn latest() -> Self {
-        Self::Py312
+        Self::Py313
     }
 
     pub const fn as_tuple(&self) -> (u8, u8) {
@@ -72,6 +78,7 @@ impl PythonVersion {
             Self::Py310 => (3, 10),
             Self::Py311 => (3, 11),
             Self::Py312 => (3, 12),
+            Self::Py313 => (3, 13),
         }
     }
 
@@ -83,18 +90,36 @@ impl PythonVersion {
         self.as_tuple().1
     }
 
+    /// Infer the minimum supported [`PythonVersion`] from a `requires-python` specifier.
     pub fn get_minimum_supported_version(requires_version: &VersionSpecifiers) -> Option<Self> {
-        let mut minimum_version = None;
-        for python_version in PythonVersion::iter() {
-            if requires_version
-                .iter()
-                .all(|specifier| specifier.contains(&python_version.into()))
-            {
-                minimum_version = Some(python_version);
-                break;
-            }
+        /// Truncate a version to its major and minor components.
+        fn major_minor(version: &Version) -> Option<Version> {
+            let major = version.release().first()?;
+            let minor = version.release().get(1)?;
+            Some(Version::new([major, minor]))
         }
-        minimum_version
+
+        // Extract the minimum supported version from the specifiers.
+        let minimum_version = requires_version
+            .iter()
+            .filter(|specifier| {
+                matches!(
+                    specifier.operator(),
+                    Operator::Equal
+                        | Operator::EqualStar
+                        | Operator::ExactEqual
+                        | Operator::TildeEqual
+                        | Operator::GreaterThan
+                        | Operator::GreaterThanEqual
+                )
+            })
+            .filter_map(|specifier| major_minor(specifier.version()))
+            .min()?;
+
+        debug!("Detected minimum supported `requires-python` version: {minimum_version}");
+
+        // Find the Python version that matches the minimum supported version.
+        PythonVersion::iter().find(|version| Version::from(*version) == minimum_version)
     }
 
     /// Return `true` if the current version supports [PEP 701].
@@ -296,13 +321,22 @@ impl CacheKey for FilePatternSet {
 pub struct PerFileIgnore {
     pub(crate) basename: String,
     pub(crate) absolute: PathBuf,
+    pub(crate) negated: bool,
     pub(crate) rules: RuleSet,
 }
 
 impl PerFileIgnore {
-    pub fn new(pattern: String, prefixes: &[RuleSelector], project_root: Option<&Path>) -> Self {
+    pub fn new(
+        mut pattern: String,
+        prefixes: &[RuleSelector],
+        project_root: Option<&Path>,
+    ) -> Self {
         // Rules in preview are included here even if preview mode is disabled; it's safe to ignore disabled rules
         let rules: RuleSet = prefixes.iter().flat_map(RuleSelector::all_rules).collect();
+        let negated = pattern.starts_with('!');
+        if negated {
+            pattern.drain(..1);
+        }
         let path = Path::new(&pattern);
         let absolute = match project_root {
             Some(project_root) => fs::normalize_path_to(path, project_root),
@@ -312,6 +346,7 @@ impl PerFileIgnore {
         Self {
             basename: pattern,
             absolute,
+            negated,
             rules,
         }
     }
@@ -443,55 +478,48 @@ impl From<ExtensionPair> for (String, Language) {
         (value.extension, value.language)
     }
 }
+
 #[derive(Debug, Clone, Default, CacheKey)]
-pub struct ExtensionMapping {
-    mapping: FxHashMap<String, Language>,
-}
+pub struct ExtensionMapping(FxHashMap<String, Language>);
 
 impl ExtensionMapping {
     /// Return the [`Language`] for the given file.
     pub fn get(&self, path: &Path) -> Option<Language> {
         let ext = path.extension()?.to_str()?;
-        self.mapping.get(ext).copied()
-    }
-}
-
-impl Display for ExtensionMapping {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        display_settings! {
-            formatter = f,
-            namespace = "linter.extension",
-            fields = [
-                self.mapping | debug
-            ]
-        }
-        Ok(())
+        self.0.get(ext).copied()
     }
 }
 
 impl From<FxHashMap<String, Language>> for ExtensionMapping {
     fn from(value: FxHashMap<String, Language>) -> Self {
-        Self { mapping: value }
+        Self(value)
     }
 }
 
 impl FromIterator<ExtensionPair> for ExtensionMapping {
     fn from_iter<T: IntoIterator<Item = ExtensionPair>>(iter: T) -> Self {
-        Self {
-            mapping: iter
-                .into_iter()
+        Self(
+            iter.into_iter()
                 .map(|pair| (pair.extension, pair.language))
                 .collect(),
-        }
+        )
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug, Hash, Default)]
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 #[serde(rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub enum SerializationFormat {
+pub enum OutputFormat {
+    // Remove the module level `#![allow(deprecated)` when removing the text variant.
+    // Adding the `#[deprecated]` attribute to text creates clippy warnings about
+    // using a deprecated item in the derived code and there seems to be no way to suppress the clippy error
+    // other than disabling the warning for the entire module and/or moving `OutputFormat` to another module.
+    #[deprecated(note = "Use `concise` or `full` instead")]
     Text,
+    Concise,
+    #[default]
+    Full,
     Json,
     JsonLines,
     Junit,
@@ -499,14 +527,17 @@ pub enum SerializationFormat {
     Github,
     Gitlab,
     Pylint,
+    Rdjson,
     Azure,
     Sarif,
 }
 
-impl Display for SerializationFormat {
+impl Display for OutputFormat {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Text => write!(f, "text"),
+            Self::Concise => write!(f, "concise"),
+            Self::Full => write!(f, "full"),
             Self::Json => write!(f, "json"),
             Self::JsonLines => write!(f, "json_lines"),
             Self::Junit => write!(f, "junit"),
@@ -514,36 +545,53 @@ impl Display for SerializationFormat {
             Self::Github => write!(f, "github"),
             Self::Gitlab => write!(f, "gitlab"),
             Self::Pylint => write!(f, "pylint"),
+            Self::Rdjson => write!(f, "rdjson"),
             Self::Azure => write!(f, "azure"),
             Self::Sarif => write!(f, "sarif"),
         }
     }
 }
 
-impl Default for SerializationFormat {
-    fn default() -> Self {
-        Self::Text
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[serde(try_from = "String")]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub struct Version(String);
+pub struct RequiredVersion(VersionSpecifiers);
 
-impl TryFrom<String> for Version {
-    type Error = semver::Error;
+impl TryFrom<String> for RequiredVersion {
+    type Error = pep440_rs::VersionSpecifiersParseError;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        semver::Version::parse(&value).map(|_| Self(value))
+        // Treat `0.3.1` as `==0.3.1`, for backwards compatibility.
+        if let Ok(version) = pep440_rs::Version::from_str(&value) {
+            Ok(Self(VersionSpecifiers::from(
+                VersionSpecifier::equals_version(version),
+            )))
+        } else {
+            Ok(Self(VersionSpecifiers::from_str(&value)?))
+        }
     }
 }
 
-impl Deref for Version {
-    type Target = str;
+#[cfg(feature = "schemars")]
+impl schemars::JsonSchema for RequiredVersion {
+    fn schema_name() -> String {
+        "RequiredVersion".to_string()
+    }
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
+    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        gen.subschema_for::<String>()
+    }
+}
+
+impl RequiredVersion {
+    /// Return `true` if the given version is required.
+    pub fn contains(&self, version: &pep440_rs::Version) -> bool {
+        self.0.contains(version)
+    }
+}
+
+impl Display for RequiredVersion {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.0, f)
     }
 }
 
@@ -560,43 +608,68 @@ impl Deref for Version {
 /// pattern matching.
 pub type IdentifierPattern = glob::Pattern;
 
-#[derive(Debug, CacheKey, Default)]
-pub struct PerFileIgnores {
-    // Ordered as (absolute path matcher, basename matcher, rules)
-    ignores: Vec<(GlobMatcher, GlobMatcher, RuleSet)>,
+#[derive(Debug, Clone, CacheKey)]
+pub struct CompiledPerFileIgnore {
+    pub absolute_matcher: GlobMatcher,
+    pub basename_matcher: GlobMatcher,
+    pub negated: bool,
+    pub rules: RuleSet,
 }
 
-impl PerFileIgnores {
+impl Display for CompiledPerFileIgnore {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        display_settings! {
+            formatter = f,
+            fields = [
+                self.absolute_matcher | globmatcher,
+                self.basename_matcher | globmatcher,
+                self.negated,
+                self.rules,
+            ]
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, CacheKey, Default)]
+pub struct CompiledPerFileIgnoreList {
+    // Ordered as (absolute path matcher, basename matcher, rules)
+    ignores: Vec<CompiledPerFileIgnore>,
+}
+
+impl CompiledPerFileIgnoreList {
     /// Given a list of patterns, create a `GlobSet`.
     pub fn resolve(per_file_ignores: Vec<PerFileIgnore>) -> Result<Self> {
         let ignores: Result<Vec<_>> = per_file_ignores
             .into_iter()
             .map(|per_file_ignore| {
                 // Construct absolute path matcher.
-                let absolute =
+                let absolute_matcher =
                     Glob::new(&per_file_ignore.absolute.to_string_lossy())?.compile_matcher();
 
                 // Construct basename matcher.
-                let basename = Glob::new(&per_file_ignore.basename)?.compile_matcher();
+                let basename_matcher = Glob::new(&per_file_ignore.basename)?.compile_matcher();
 
-                Ok((absolute, basename, per_file_ignore.rules))
+                Ok(CompiledPerFileIgnore {
+                    absolute_matcher,
+                    basename_matcher,
+                    negated: per_file_ignore.negated,
+                    rules: per_file_ignore.rules,
+                })
             })
             .collect();
         Ok(Self { ignores: ignores? })
     }
 }
 
-impl Display for PerFileIgnores {
+impl Display for CompiledPerFileIgnoreList {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        if self.is_empty() {
+        if self.ignores.is_empty() {
             write!(f, "{{}}")?;
         } else {
             writeln!(f, "{{")?;
-            for (absolute, basename, rules) in &self.ignores {
-                writeln!(
-                    f,
-                    "\t{{ absolute = {absolute:#?}, basename = {basename:#?}, rules = {rules} }},"
-                )?;
+            for ignore in &self.ignores {
+                writeln!(f, "\t{ignore}")?;
             }
             write!(f, "}}")?;
         }
@@ -604,8 +677,8 @@ impl Display for PerFileIgnores {
     }
 }
 
-impl Deref for PerFileIgnores {
-    type Target = Vec<(GlobMatcher, GlobMatcher, RuleSet)>;
+impl Deref for CompiledPerFileIgnoreList {
+    type Target = Vec<CompiledPerFileIgnore>;
 
     fn deref(&self) -> &Self::Target {
         &self.ignores

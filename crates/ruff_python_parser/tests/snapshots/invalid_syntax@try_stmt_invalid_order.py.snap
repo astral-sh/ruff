@@ -1,0 +1,83 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/try_stmt_invalid_order.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..47,
+        body: [
+            Try(
+                StmtTry {
+                    range: 0..31,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 9..13,
+                            },
+                        ),
+                    ],
+                    handlers: [],
+                    orelse: [],
+                    finalbody: [
+                        Pass(
+                            StmtPass {
+                                range: 27..31,
+                            },
+                        ),
+                    ],
+                    is_star: false,
+                },
+            ),
+            Pass(
+                StmtPass {
+                    range: 42..46,
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+3 | finally:
+4 |     pass
+5 | else:
+  | ^^^^ Syntax Error: `else` block must come before `finally` block
+6 |     pass
+  |
+
+
+  |
+3 | finally:
+4 |     pass
+5 | else:
+  |     ^ Syntax Error: Expected a statement
+6 |     pass
+  |
+
+
+  |
+3 | finally:
+4 |     pass
+5 | else:
+  |      ^ Syntax Error: Expected a statement
+6 |     pass
+  |
+
+
+  |
+4 |     pass
+5 | else:
+6 |     pass
+  | ^^^^ Syntax Error: Unexpected indentation
+  |
+
+
+  |
+5 | else:
+6 |     pass
+  |

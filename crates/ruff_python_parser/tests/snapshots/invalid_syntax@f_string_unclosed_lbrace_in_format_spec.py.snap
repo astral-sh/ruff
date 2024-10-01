@@ -1,0 +1,140 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/f_string_unclosed_lbrace_in_format_spec.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..29,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..12,
+                    value: FString(
+                        ExprFString {
+                            range: 0..12,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 0..12,
+                                            elements: [
+                                                Literal(
+                                                    FStringLiteralElement {
+                                                        range: 2..8,
+                                                        value: "hello ",
+                                                    },
+                                                ),
+                                                Expression(
+                                                    FStringExpressionElement {
+                                                        range: 8..11,
+                                                        expression: Name(
+                                                            ExprName {
+                                                                range: 9..10,
+                                                                id: Name("x"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: Some(
+                                                            FStringFormatSpec {
+                                                                range: 11..11,
+                                                                elements: [],
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 13..28,
+                    value: FString(
+                        ExprFString {
+                            range: 13..28,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 13..28,
+                                            elements: [
+                                                Literal(
+                                                    FStringLiteralElement {
+                                                        range: 15..21,
+                                                        value: "hello ",
+                                                    },
+                                                ),
+                                                Expression(
+                                                    FStringExpressionElement {
+                                                        range: 21..27,
+                                                        expression: Name(
+                                                            ExprName {
+                                                                range: 22..23,
+                                                                id: Name("x"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: Some(
+                                                            FStringFormatSpec {
+                                                                range: 24..27,
+                                                                elements: [
+                                                                    Literal(
+                                                                        FStringLiteralElement {
+                                                                            range: 24..27,
+                                                                            value: ".3f",
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | f"hello {x:"
+  |            ^ Syntax Error: f-string: expecting '}'
+2 | f"hello {x:.3f"
+  |
+
+
+  |
+1 | f"hello {x:"
+2 | f"hello {x:.3f"
+  |               ^ Syntax Error: f-string: expecting '}'
+  |

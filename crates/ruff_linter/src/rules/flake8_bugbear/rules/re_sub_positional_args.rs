@@ -4,6 +4,7 @@ use ruff_python_ast::{self as ast};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -56,10 +57,14 @@ impl Violation for ReSubPositionalArgs {
 
 /// B034
 pub(crate) fn re_sub_positional_args(checker: &mut Checker, call: &ast::ExprCall) {
+    if !checker.semantic().seen_module(Modules::RE) {
+        return;
+    }
+
     let Some(method) = checker
         .semantic()
-        .resolve_call_path(&call.func)
-        .and_then(|call_path| match call_path.as_slice() {
+        .resolve_qualified_name(&call.func)
+        .and_then(|qualified_name| match qualified_name.segments() {
             ["re", "sub"] => Some(Method::Sub),
             ["re", "subn"] => Some(Method::Subn),
             ["re", "split"] => Some(Method::Split),

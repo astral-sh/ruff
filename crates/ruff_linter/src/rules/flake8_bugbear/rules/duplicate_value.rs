@@ -49,23 +49,21 @@ impl Violation for DuplicateValue {
 /// B033
 pub(crate) fn duplicate_value(checker: &mut Checker, set: &ast::ExprSet) {
     let mut seen_values: FxHashSet<ComparableExpr> = FxHashSet::default();
-    for (index, elt) in set.elts.iter().enumerate() {
-        if elt.is_literal_expr() {
-            let comparable_value: ComparableExpr = elt.into();
+    for (index, value) in set.iter().enumerate() {
+        if value.is_literal_expr() {
+            let comparable_value = ComparableExpr::from(value);
 
             if !seen_values.insert(comparable_value) {
                 let mut diagnostic = Diagnostic::new(
                     DuplicateValue {
-                        value: checker.generator().expr(elt),
+                        value: checker.generator().expr(value),
                     },
-                    elt.range(),
+                    value.range(),
                 );
 
-                if checker.settings.preview.is_enabled() {
-                    diagnostic.try_set_fix(|| {
-                        remove_member(set, index, checker.locator().contents()).map(Fix::safe_edit)
-                    });
-                }
+                diagnostic.try_set_fix(|| {
+                    remove_member(set, index, checker.locator().contents()).map(Fix::safe_edit)
+                });
 
                 checker.diagnostics.push(diagnostic);
             }
@@ -75,7 +73,7 @@ pub(crate) fn duplicate_value(checker: &mut Checker, set: &ast::ExprSet) {
 
 /// Remove the member at the given index from the [`ast::ExprSet`].
 fn remove_member(set: &ast::ExprSet, index: usize, source: &str) -> Result<Edit> {
-    if index < set.elts.len() - 1 {
+    if index < set.len() - 1 {
         // Case 1: the expression is _not_ the last node, so delete from the start of the
         // expression to the end of the subsequent comma.
         // Ex) Delete `"a"` in `{"a", "b", "c"}`.

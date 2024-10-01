@@ -1,0 +1,314 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/list/recover.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..208,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 82..85,
+                    value: List(
+                        ExprList {
+                            range: 82..85,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        range: 83..83,
+                                        id: Name(""),
+                                        ctx: Invalid,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 87..93,
+                    value: List(
+                        ExprList {
+                            range: 87..93,
+                            elts: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 88..89,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 91..92,
+                                        value: Int(
+                                            2,
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 95..100,
+                    value: List(
+                        ExprList {
+                            range: 95..100,
+                            elts: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 96..97,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 118..123,
+                    value: List(
+                        ExprList {
+                            range: 118..123,
+                            elts: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 119..120,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 121..122,
+                                        value: Int(
+                                            2,
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 156..162,
+                    value: List(
+                        ExprList {
+                            range: 156..162,
+                            elts: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 157..158,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 160..161,
+                                        value: Int(
+                                            2,
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 185..194,
+                    value: List(
+                        ExprList {
+                            range: 185..194,
+                            elts: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 186..187,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                                BinOp(
+                                    ExprBinOp {
+                                        range: 189..192,
+                                        left: Name(
+                                            ExprName {
+                                                range: 189..190,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        op: Add,
+                                        right: Name(
+                                            ExprName {
+                                                range: 192..192,
+                                                id: Name(""),
+                                                ctx: Invalid,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 196..202,
+                    value: List(
+                        ExprList {
+                            range: 196..202,
+                            elts: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 197..198,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 200..201,
+                                        value: Int(
+                                            2,
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 204..207,
+                    value: List(
+                        ExprList {
+                            range: 204..207,
+                            elts: [
+                                Starred(
+                                    ExprStarred {
+                                        range: 205..206,
+                                        value: Name(
+                                            ExprName {
+                                                range: 206..206,
+                                                id: Name(""),
+                                                ctx: Invalid,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # Test cases for list expressions where the parser recovers from a syntax error.
+2 | 
+3 | [,]
+  |  ^ Syntax Error: Expected an expression
+4 | 
+5 | [1,,2]
+  |
+
+
+  |
+3 | [,]
+4 | 
+5 | [1,,2]
+  |    ^ Syntax Error: Expected an expression or a ']'
+6 | 
+7 | [1,,]
+  |
+
+
+  |
+5 | [1,,2]
+6 | 
+7 | [1,,]
+  |    ^ Syntax Error: Expected an expression or a ']'
+8 | 
+9 | # Missing comma
+  |
+
+
+   |
+ 9 | # Missing comma
+10 | [1 2]
+   |    ^ Syntax Error: Expected ',', found int
+11 | 
+12 | # Dictionary element in a list
+   |
+
+
+   |
+12 | # Dictionary element in a list
+13 | [1: 2]
+   |   ^ Syntax Error: Expected an expression or a ']'
+14 | 
+15 | # Missing expression
+   |
+
+
+   |
+15 | # Missing expression
+16 | [1, x + ]
+   |         ^ Syntax Error: Expected an expression
+17 | 
+18 | [1; 2]
+   |
+
+
+   |
+16 | [1, x + ]
+17 | 
+18 | [1; 2]
+   |   ^ Syntax Error: Expected an expression or a ']'
+19 | 
+20 | [*]
+   |
+
+
+   |
+18 | [1; 2]
+19 | 
+20 | [*]
+   |   ^ Syntax Error: Expected an expression
+   |

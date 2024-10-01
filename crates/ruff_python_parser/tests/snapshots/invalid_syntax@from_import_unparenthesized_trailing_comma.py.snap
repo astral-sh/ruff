@@ -1,0 +1,118 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/from_import_unparenthesized_trailing_comma.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..59,
+        body: [
+            ImportFrom(
+                StmtImportFrom {
+                    range: 0..16,
+                    module: Some(
+                        Identifier {
+                            id: Name("a"),
+                            range: 5..6,
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 14..15,
+                            name: Identifier {
+                                id: Name("b"),
+                                range: 14..15,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 0,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    range: 17..38,
+                    module: Some(
+                        Identifier {
+                            id: Name("a"),
+                            range: 22..23,
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 31..37,
+                            name: Identifier {
+                                id: Name("b"),
+                                range: 31..32,
+                            },
+                            asname: Some(
+                                Identifier {
+                                    id: Name("c"),
+                                    range: 36..37,
+                                },
+                            ),
+                        },
+                    ],
+                    level: 0,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    range: 39..58,
+                    module: Some(
+                        Identifier {
+                            id: Name("a"),
+                            range: 44..45,
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 53..54,
+                            name: Identifier {
+                                id: Name("b"),
+                                range: 53..54,
+                            },
+                            asname: None,
+                        },
+                        Alias {
+                            range: 56..57,
+                            name: Identifier {
+                                id: Name("c"),
+                                range: 56..57,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 0,
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | from a import b,
+  |                ^ Syntax Error: Trailing comma not allowed
+2 | from a import b as c,
+3 | from a import b, c,
+  |
+
+
+  |
+1 | from a import b,
+2 | from a import b as c,
+  |                     ^ Syntax Error: Trailing comma not allowed
+3 | from a import b, c,
+  |
+
+
+  |
+1 | from a import b,
+2 | from a import b as c,
+3 | from a import b, c,
+  |                   ^ Syntax Error: Trailing comma not allowed
+  |

@@ -27,7 +27,7 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::EnvFilter;
 
-use ruff::args::{CliOverrides, FormatArguments, FormatCommand, LogLevelArgs};
+use ruff::args::{ConfigArguments, FormatArguments, FormatCommand, GlobalConfigArgs, LogLevelArgs};
 use ruff::resolve::resolve;
 use ruff_formatter::{FormatError, LineWidth, PrintError};
 use ruff_linter::logging::LogLevel;
@@ -38,26 +38,21 @@ use ruff_python_formatter::{
 use ruff_python_parser::ParseError;
 use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig, ResolvedFile, Resolver};
 
-fn parse_cli(dirs: &[PathBuf]) -> anyhow::Result<(FormatArguments, CliOverrides)> {
+fn parse_cli(dirs: &[PathBuf]) -> anyhow::Result<(FormatArguments, ConfigArguments)> {
     let args_matches = FormatCommand::command()
         .no_binary_name(true)
         .get_matches_from(dirs);
     let arguments: FormatCommand = FormatCommand::from_arg_matches(&args_matches)?;
-    let (cli, overrides) = arguments.partition();
-    Ok((cli, overrides))
+    let (cli, config_arguments) = arguments.partition(GlobalConfigArgs::default())?;
+    Ok((cli, config_arguments))
 }
 
 /// Find the [`PyprojectConfig`] to use for formatting.
 fn find_pyproject_config(
     cli: &FormatArguments,
-    overrides: &CliOverrides,
+    config_arguments: &ConfigArguments,
 ) -> anyhow::Result<PyprojectConfig> {
-    let mut pyproject_config = resolve(
-        cli.isolated,
-        cli.config.as_deref(),
-        overrides,
-        cli.stdin_filename.as_deref(),
-    )?;
+    let mut pyproject_config = resolve(config_arguments, cli.stdin_filename.as_deref())?;
     // We don't want to format pyproject.toml
     pyproject_config.settings.file_resolver.include = FilePatternSet::try_from_iter([
         FilePattern::Builtin("*.py"),
@@ -72,9 +67,9 @@ fn find_pyproject_config(
 fn ruff_check_paths<'a>(
     pyproject_config: &'a PyprojectConfig,
     cli: &FormatArguments,
-    overrides: &CliOverrides,
+    config_arguments: &ConfigArguments,
 ) -> anyhow::Result<(Vec<Result<ResolvedFile, ignore::Error>>, Resolver<'a>)> {
-    let (paths, resolver) = python_files_in_path(&cli.files, pyproject_config, overrides)?;
+    let (paths, resolver) = python_files_in_path(&cli.files, pyproject_config, config_arguments)?;
     Ok((paths, resolver))
 }
 
@@ -139,7 +134,7 @@ impl Statistics {
         }
     }
 
-    /// We currently prefer the the similarity index, but i'd like to keep this around
+    /// We currently prefer the similarity index, but i'd like to keep this around
     #[allow(clippy::cast_precision_loss, unused)]
     pub(crate) fn jaccard_index(&self) -> f32 {
         self.intersection as f32 / (self.black_input + self.ruff_output + self.intersection) as f32
@@ -199,6 +194,10 @@ pub(crate) struct Args {
     /// Format the files. Without this flag, the python files are not modified
     #[arg(long)]
     pub(crate) write: bool,
+
+    #[arg(long)]
+    pub(crate) preview: bool,
+
     /// Control the verbosity of the output
     #[arg(long, default_value_t, value_enum)]
     pub(crate) format: Format,
@@ -240,7 +239,8 @@ pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
     let all_success = if args.multi_project {
         format_dev_multi_project(args, error_file)?
     } else {
-        let result = format_dev_project(&args.files, args.stability_check, args.write)?;
+        let result =
+            format_dev_project(&args.files, args.stability_check, args.write, args.preview)?;
         let error_count = result.error_count();
 
         if result.error_count() > 0 {
@@ -349,7 +349,12 @@ fn format_dev_multi_project(
     for project_path in project_paths {
         debug!(parent: None, "Starting {}", project_path.display());
 
-        match format_dev_project(&[project_path.clone()], args.stability_check, args.write) {
+        match format_dev_project(
+            &[project_path.clone()],
+            args.stability_check,
+            args.write,
+            args.preview,
+        ) {
             Ok(result) => {
                 total_errors += result.error_count();
                 total_files += result.file_count;
@@ -447,6 +452,7 @@ fn format_dev_project(
     files: &[PathBuf],
     stability_check: bool,
     write: bool,
+    preview: bool,
 ) -> anyhow::Result<CheckRepoResult> {
     let start = Instant::now();
 
@@ -482,7 +488,14 @@ fn format_dev_project(
         #[cfg(feature = "singlethreaded")]
         let iter = { paths.into_iter() };
         iter.map(|path| {
-            let result = format_dir_entry(path, stability_check, write, &black_options, &resolver);
+            let result = format_dir_entry(
+                path,
+                stability_check,
+                write,
+                preview,
+                &black_options,
+                &resolver,
+            );
             pb_span.pb_inc(1);
             result
         })
@@ -537,6 +550,7 @@ fn format_dir_entry(
     resolved_file: Result<ResolvedFile, ignore::Error>,
     stability_check: bool,
     write: bool,
+    preview: bool,
     options: &BlackOptions,
     resolver: &Resolver,
 ) -> anyhow::Result<(Result<Statistics, CheckFileError>, PathBuf), Error> {
@@ -549,6 +563,10 @@ fn format_dir_entry(
     let path = resolved_file.into_path();
     let mut options = options.to_py_format_options(&path);
 
+    if preview {
+        options = options.with_preview(PreviewMode::Enabled);
+    }
+
     let settings = resolver.resolve(&path);
     // That's a bad way of doing this but it's not worth doing something better for format_dev
     if settings.formatter.line_width != LineWidth::default() {
@@ -556,9 +574,8 @@ fn format_dir_entry(
     }
 
     // Handle panics (mostly in `debug_assert!`)
-    let result = match catch_unwind(|| format_dev_file(&path, stability_check, write, options)) {
-        Ok(result) => result,
-        Err(panic) => {
+    let result = catch_unwind(|| format_dev_file(&path, stability_check, write, options))
+        .unwrap_or_else(|panic| {
             if let Some(message) = panic.downcast_ref::<String>() {
                 Err(CheckFileError::Panic {
                     message: message.clone(),
@@ -573,8 +590,7 @@ fn format_dir_entry(
                     message: "(Panic didn't set a string message)".to_string(),
                 })
             }
-        }
-    };
+        });
     Ok((result, path))
 }
 

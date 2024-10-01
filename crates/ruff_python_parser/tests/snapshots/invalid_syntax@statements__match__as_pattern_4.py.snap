@@ -1,0 +1,116 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/statements/match/as_pattern_4.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..187,
+        body: [
+            Match(
+                StmtMatch {
+                    range: 0..186,
+                    subject: Name(
+                        ExprName {
+                            range: 6..13,
+                            id: Name("subject"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 156..186,
+                            pattern: MatchMapping(
+                                PatternMatchMapping {
+                                    range: 161..172,
+                                    keys: [
+                                        Name(
+                                            ExprName {
+                                                range: 162..163,
+                                                id: Name("x"),
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        Name(
+                                            ExprName {
+                                                range: 167..168,
+                                                id: Name("y"),
+                                                ctx: Store,
+                                            },
+                                        ),
+                                    ],
+                                    patterns: [
+                                        MatchAs(
+                                            PatternMatchAs {
+                                                range: 164..166,
+                                                pattern: None,
+                                                name: Some(
+                                                    Identifier {
+                                                        id: Name("as"),
+                                                        range: 164..166,
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                        MatchValue(
+                                            PatternMatchValue {
+                                                range: 170..171,
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 170..171,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    rest: None,
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Pass(
+                                    StmtPass {
+                                        range: 182..186,
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+2 |     # This `as` pattern is unparenthesized so the parser never takes the path
+3 |     # where it might be confused as a mapping key pattern.
+4 |     case {x as y: 1}:
+  |           ^ Syntax Error: Invalid mapping pattern key
+5 |         pass
+  |
+
+
+  |
+2 |     # This `as` pattern is unparenthesized so the parser never takes the path
+3 |     # where it might be confused as a mapping key pattern.
+4 |     case {x as y: 1}:
+  |             ^^ Syntax Error: Expected ':', found 'as'
+5 |         pass
+  |
+
+
+  |
+2 |     # This `as` pattern is unparenthesized so the parser never takes the path
+3 |     # where it might be confused as a mapping key pattern.
+4 |     case {x as y: 1}:
+  |                ^ Syntax Error: Expected ',', found name
+5 |         pass
+  |

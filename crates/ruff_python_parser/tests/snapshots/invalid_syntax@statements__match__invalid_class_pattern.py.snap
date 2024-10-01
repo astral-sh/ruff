@@ -1,0 +1,383 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/statements/match/invalid_class_pattern.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..383,
+        body: [
+            Match(
+                StmtMatch {
+                    range: 44..285,
+                    subject: Name(
+                        ExprName {
+                            range: 50..57,
+                            id: Name("subject"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 63..97,
+                            pattern: MatchClass(
+                                PatternMatchClass {
+                                    range: 68..83,
+                                    cls: Name(
+                                        ExprName {
+                                            range: 68..71,
+                                            id: Name("Foo"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    arguments: PatternArguments {
+                                        range: 71..83,
+                                        patterns: [],
+                                        keywords: [
+                                            PatternKeyword {
+                                                range: 72..82,
+                                                attr: Identifier {
+                                                    id: Name(""),
+                                                    range: 80..80,
+                                                },
+                                                pattern: MatchValue(
+                                                    PatternMatchValue {
+                                                        range: 81..82,
+                                                        value: NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                range: 81..82,
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ],
+                                    },
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Pass(
+                                    StmtPass {
+                                        range: 93..97,
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 102..135,
+                            pattern: MatchClass(
+                                PatternMatchClass {
+                                    range: 107..121,
+                                    cls: Name(
+                                        ExprName {
+                                            range: 107..110,
+                                            id: Name("Foo"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    arguments: PatternArguments {
+                                        range: 110..121,
+                                        patterns: [],
+                                        keywords: [
+                                            PatternKeyword {
+                                                range: 111..120,
+                                                attr: Identifier {
+                                                    id: Name(""),
+                                                    range: 118..118,
+                                                },
+                                                pattern: MatchValue(
+                                                    PatternMatchValue {
+                                                        range: 119..120,
+                                                        value: NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                range: 119..120,
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ],
+                                    },
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Pass(
+                                    StmtPass {
+                                        range: 131..135,
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 140..174,
+                            pattern: MatchClass(
+                                PatternMatchClass {
+                                    range: 145..160,
+                                    cls: Name(
+                                        ExprName {
+                                            range: 145..148,
+                                            id: Name("Foo"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    arguments: PatternArguments {
+                                        range: 148..160,
+                                        patterns: [],
+                                        keywords: [
+                                            PatternKeyword {
+                                                range: 149..159,
+                                                attr: Identifier {
+                                                    id: Name(""),
+                                                    range: 157..157,
+                                                },
+                                                pattern: MatchValue(
+                                                    PatternMatchValue {
+                                                        range: 158..159,
+                                                        value: NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                range: 158..159,
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ],
+                                    },
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Pass(
+                                    StmtPass {
+                                        range: 170..174,
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 179..217,
+                            pattern: MatchClass(
+                                PatternMatchClass {
+                                    range: 184..203,
+                                    cls: Name(
+                                        ExprName {
+                                            range: 184..187,
+                                            id: Name("Foo"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    arguments: PatternArguments {
+                                        range: 187..203,
+                                        patterns: [],
+                                        keywords: [
+                                            PatternKeyword {
+                                                range: 188..202,
+                                                attr: Identifier {
+                                                    id: Name(""),
+                                                    range: 200..200,
+                                                },
+                                                pattern: MatchValue(
+                                                    PatternMatchValue {
+                                                        range: 201..202,
+                                                        value: NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                range: 201..202,
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ],
+                                    },
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Pass(
+                                    StmtPass {
+                                        range: 213..217,
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 222..249,
+                            pattern: MatchClass(
+                                PatternMatchClass {
+                                    range: 227..235,
+                                    cls: Name(
+                                        ExprName {
+                                            range: 227..230,
+                                            id: Name("Foo"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    arguments: PatternArguments {
+                                        range: 230..235,
+                                        patterns: [],
+                                        keywords: [
+                                            PatternKeyword {
+                                                range: 231..234,
+                                                attr: Identifier {
+                                                    id: Name(""),
+                                                    range: 233..233,
+                                                },
+                                                pattern: MatchValue(
+                                                    PatternMatchValue {
+                                                        range: 233..234,
+                                                        value: NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                range: 233..234,
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ],
+                                    },
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Pass(
+                                    StmtPass {
+                                        range: 245..249,
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 254..285,
+                            pattern: MatchClass(
+                                PatternMatchClass {
+                                    range: 259..271,
+                                    cls: Name(
+                                        ExprName {
+                                            range: 259..262,
+                                            id: Name("Foo"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    arguments: PatternArguments {
+                                        range: 262..271,
+                                        patterns: [],
+                                        keywords: [
+                                            PatternKeyword {
+                                                range: 263..270,
+                                                attr: Identifier {
+                                                    id: Name(""),
+                                                    range: 269..269,
+                                                },
+                                                pattern: MatchValue(
+                                                    PatternMatchValue {
+                                                        range: 269..270,
+                                                        value: NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                range: 269..270,
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ],
+                                    },
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Pass(
+                                    StmtPass {
+                                        range: 281..285,
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # Invalid keyword pattern in class argument
+2 | match subject:
+3 |     case Foo(x as y = 1):
+  |              ^^^^^^ Syntax Error: Expected an identifier for the keyword pattern
+4 |         pass
+5 |     case Foo(x | y = 1):
+  |
+
+
+  |
+3 |     case Foo(x as y = 1):
+4 |         pass
+5 |     case Foo(x | y = 1):
+  |              ^^^^^ Syntax Error: Expected an identifier for the keyword pattern
+6 |         pass
+7 |     case Foo([x, y] = 1):
+  |
+
+
+  |
+5 |     case Foo(x | y = 1):
+6 |         pass
+7 |     case Foo([x, y] = 1):
+  |              ^^^^^^ Syntax Error: Expected an identifier for the keyword pattern
+8 |         pass
+9 |     case Foo({False: 0} = 1):
+  |
+
+
+   |
+ 7 |     case Foo([x, y] = 1):
+ 8 |         pass
+ 9 |     case Foo({False: 0} = 1):
+   |              ^^^^^^^^^^ Syntax Error: Expected an identifier for the keyword pattern
+10 |         pass
+11 |     case Foo(1=1):
+   |
+
+
+   |
+ 9 |     case Foo({False: 0} = 1):
+10 |         pass
+11 |     case Foo(1=1):
+   |              ^ Syntax Error: Expected an identifier for the keyword pattern
+12 |         pass
+13 |     case Foo(Bar()=1):
+   |
+
+
+   |
+11 |     case Foo(1=1):
+12 |         pass
+13 |     case Foo(Bar()=1):
+   |              ^^^^^ Syntax Error: Expected an identifier for the keyword pattern
+14 |         pass
+15 |     # Positional pattern cannot follow keyword pattern
+   |

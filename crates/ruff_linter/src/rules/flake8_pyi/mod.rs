@@ -9,7 +9,8 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::settings::types::PythonVersion;
+    use crate::rules::pep8_naming;
+    use crate::settings::types::{PreviewMode, PythonVersion};
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
@@ -23,16 +24,20 @@ mod tests {
     #[test_case(Rule::BadExitAnnotation, Path::new("PYI036.pyi"))]
     #[test_case(Rule::BadVersionInfoComparison, Path::new("PYI006.py"))]
     #[test_case(Rule::BadVersionInfoComparison, Path::new("PYI006.pyi"))]
+    #[test_case(Rule::BadVersionInfoOrder, Path::new("PYI066.py"))]
+    #[test_case(Rule::BadVersionInfoOrder, Path::new("PYI066.pyi"))]
+    #[test_case(Rule::ByteStringUsage, Path::new("PYI057.py"))]
+    #[test_case(Rule::ByteStringUsage, Path::new("PYI057.pyi"))]
     #[test_case(Rule::CollectionsNamedTuple, Path::new("PYI024.py"))]
     #[test_case(Rule::CollectionsNamedTuple, Path::new("PYI024.pyi"))]
     #[test_case(Rule::ComplexAssignmentInStub, Path::new("PYI017.py"))]
     #[test_case(Rule::ComplexAssignmentInStub, Path::new("PYI017.pyi"))]
     #[test_case(Rule::ComplexIfStatementInStub, Path::new("PYI002.py"))]
     #[test_case(Rule::ComplexIfStatementInStub, Path::new("PYI002.pyi"))]
-    #[test_case(Rule::CustomTypeVarReturnType, Path::new("PYI019.py"))]
-    #[test_case(Rule::CustomTypeVarReturnType, Path::new("PYI019.pyi"))]
     #[test_case(Rule::DocstringInStub, Path::new("PYI021.py"))]
     #[test_case(Rule::DocstringInStub, Path::new("PYI021.pyi"))]
+    #[test_case(Rule::DuplicateLiteralMember, Path::new("PYI062.py"))]
+    #[test_case(Rule::DuplicateLiteralMember, Path::new("PYI062.pyi"))]
     #[test_case(Rule::DuplicateUnionMember, Path::new("PYI016.py"))]
     #[test_case(Rule::DuplicateUnionMember, Path::new("PYI016.pyi"))]
     #[test_case(Rule::EllipsisInNonEmptyClassBody, Path::new("PYI013.py"))]
@@ -41,6 +46,8 @@ mod tests {
     #[test_case(Rule::FutureAnnotationsInStub, Path::new("PYI044.pyi"))]
     #[test_case(Rule::GeneratorReturnFromIterMethod, Path::new("PYI058.py"))]
     #[test_case(Rule::GeneratorReturnFromIterMethod, Path::new("PYI058.pyi"))]
+    #[test_case(Rule::GenericNotLastBaseClass, Path::new("PYI059.py"))]
+    #[test_case(Rule::GenericNotLastBaseClass, Path::new("PYI059.pyi"))]
     #[test_case(Rule::IterMethodReturnIterable, Path::new("PYI045.py"))]
     #[test_case(Rule::IterMethodReturnIterable, Path::new("PYI045.pyi"))]
     #[test_case(Rule::NoReturnArgumentAnnotationInStub, Path::new("PYI050.py"))]
@@ -59,6 +66,10 @@ mod tests {
     #[test_case(Rule::PatchVersionComparison, Path::new("PYI004.pyi"))]
     #[test_case(Rule::QuotedAnnotationInStub, Path::new("PYI020.py"))]
     #[test_case(Rule::QuotedAnnotationInStub, Path::new("PYI020.pyi"))]
+    #[test_case(Rule::PrePep570PositionalArgument, Path::new("PYI063.py"))]
+    #[test_case(Rule::PrePep570PositionalArgument, Path::new("PYI063.pyi"))]
+    #[test_case(Rule::RedundantFinalLiteral, Path::new("PYI064.py"))]
+    #[test_case(Rule::RedundantFinalLiteral, Path::new("PYI064.pyi"))]
     #[test_case(Rule::RedundantLiteralUnion, Path::new("PYI051.py"))]
     #[test_case(Rule::RedundantLiteralUnion, Path::new("PYI051.pyi"))]
     #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041.py"))]
@@ -79,8 +90,12 @@ mod tests {
     #[test_case(Rule::TypeCommentInStub, Path::new("PYI033.pyi"))]
     #[test_case(Rule::TypedArgumentDefaultInStub, Path::new("PYI011.py"))]
     #[test_case(Rule::TypedArgumentDefaultInStub, Path::new("PYI011.pyi"))]
-    #[test_case(Rule::UnaliasedCollectionsAbcSetImport, Path::new("PYI025.py"))]
-    #[test_case(Rule::UnaliasedCollectionsAbcSetImport, Path::new("PYI025.pyi"))]
+    #[test_case(Rule::UnaliasedCollectionsAbcSetImport, Path::new("PYI025_1.py"))]
+    #[test_case(Rule::UnaliasedCollectionsAbcSetImport, Path::new("PYI025_1.pyi"))]
+    #[test_case(Rule::UnaliasedCollectionsAbcSetImport, Path::new("PYI025_2.py"))]
+    #[test_case(Rule::UnaliasedCollectionsAbcSetImport, Path::new("PYI025_2.pyi"))]
+    #[test_case(Rule::UnaliasedCollectionsAbcSetImport, Path::new("PYI025_3.py"))]
+    #[test_case(Rule::UnaliasedCollectionsAbcSetImport, Path::new("PYI025_3.pyi"))]
     #[test_case(Rule::UnannotatedAssignmentInStub, Path::new("PYI052.py"))]
     #[test_case(Rule::UnannotatedAssignmentInStub, Path::new("PYI052.pyi"))]
     #[test_case(Rule::UnassignedSpecialVariableInStub, Path::new("PYI035.py"))]
@@ -119,6 +134,24 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::CustomTypeVarReturnType, Path::new("PYI019.py"))]
+    #[test_case(Rule::CustomTypeVarReturnType, Path::new("PYI019.pyi"))]
+    fn custom_classmethod_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_pyi").join(path).as_path(),
+            &settings::LinterSettings {
+                pep8_naming: pep8_naming::settings::Settings {
+                    classmethod_decorators: vec!["foo_classmethod".to_string()],
+                    ..pep8_naming::settings::Settings::default()
+                },
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test_case(Rule::TypeAliasWithoutAnnotation, Path::new("PYI026.py"))]
     #[test_case(Rule::TypeAliasWithoutAnnotation, Path::new("PYI026.pyi"))]
     fn py38(rule_code: Rule, path: &Path) -> Result<()> {
@@ -127,6 +160,24 @@ mod tests {
             Path::new("flake8_pyi").join(path).as_path(),
             &settings::LinterSettings {
                 target_version: PythonVersion::Py38,
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::FutureAnnotationsInStub, Path::new("PYI044.pyi"))]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_pyi").join(path).as_path(),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;

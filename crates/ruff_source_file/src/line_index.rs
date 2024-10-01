@@ -1,7 +1,8 @@
 use std::fmt;
 use std::fmt::{Debug, Formatter};
-use std::num::NonZeroUsize;
+use std::num::{NonZeroUsize, ParseIntError};
 use std::ops::Deref;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use ruff_text_size::{TextLen, TextRange, TextSize};
@@ -13,11 +14,12 @@ use crate::SourceLocation;
 /// Index for fast [byte offset](TextSize) to [`SourceLocation`] conversions.
 ///
 /// Cloning a [`LineIndex`] is cheap because it only requires bumping a reference count.
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct LineIndex {
     inner: Arc<LineIndexInner>,
 }
 
+#[derive(Eq, PartialEq)]
 struct LineIndexInner {
     line_starts: Vec<TextSize>,
     kind: IndexKind,
@@ -128,6 +130,11 @@ impl LineIndex {
         self.line_starts().len()
     }
 
+    /// Returns `true` if the text only consists of ASCII characters
+    pub fn is_ascii(&self) -> bool {
+        self.kind().is_ascii()
+    }
+
     /// Returns the row number for a given offset.
     ///
     /// ## Examples
@@ -214,6 +221,85 @@ impl LineIndex {
         }
     }
 
+    /// Returns the [byte offset](TextSize) at `line` and `column`.
+    ///
+    /// ## Examples
+    ///
+    /// ### ASCII
+    ///
+    /// ```
+    /// use ruff_source_file::{LineIndex, OneIndexed};
+    /// use ruff_text_size::TextSize;
+    /// let source = r#"a = 4
+    /// c = "some string"
+    /// x = b"#;
+    ///
+    /// let index = LineIndex::from_source_text(source);
+    ///
+    /// // First line, first column
+    /// assert_eq!(index.offset(OneIndexed::from_zero_indexed(0), OneIndexed::from_zero_indexed(0), source), TextSize::new(0));
+    ///
+    /// // Second line, 4th column
+    /// assert_eq!(index.offset(OneIndexed::from_zero_indexed(1), OneIndexed::from_zero_indexed(4), source), TextSize::new(10));
+    ///
+    /// // Offset past the end of the first line
+    /// assert_eq!(index.offset(OneIndexed::from_zero_indexed(0), OneIndexed::from_zero_indexed(10), source), TextSize::new(6));
+    ///
+    /// // Offset past the end of the file
+    /// assert_eq!(index.offset(OneIndexed::from_zero_indexed(3), OneIndexed::from_zero_indexed(0), source), TextSize::new(29));
+    /// ```
+    ///
+    /// ### UTF8
+    ///
+    /// ```
+    /// use ruff_source_file::{LineIndex, OneIndexed};
+    /// use ruff_text_size::TextSize;
+    /// let source = r#"a = 4
+    /// c = "❤️"
+    /// x = b"#;
+    ///
+    /// let index = LineIndex::from_source_text(source);
+    ///
+    /// // First line, first column
+    /// assert_eq!(index.offset(OneIndexed::from_zero_indexed(0), OneIndexed::from_zero_indexed(0), source), TextSize::new(0));
+    ///
+    /// // Third line, 2nd column, after emoji
+    /// assert_eq!(index.offset(OneIndexed::from_zero_indexed(2), OneIndexed::from_zero_indexed(1), source), TextSize::new(20));
+    ///
+    /// // Offset past the end of the second line
+    /// assert_eq!(index.offset(OneIndexed::from_zero_indexed(1), OneIndexed::from_zero_indexed(10), source), TextSize::new(19));
+    ///
+    /// // Offset past the end of the file
+    /// assert_eq!(index.offset(OneIndexed::from_zero_indexed(3), OneIndexed::from_zero_indexed(0), source), TextSize::new(24));
+    /// ```
+    ///
+    pub fn offset(&self, line: OneIndexed, column: OneIndexed, contents: &str) -> TextSize {
+        // If start-of-line position after last line
+        if line.to_zero_indexed() > self.line_starts().len() {
+            return contents.text_len();
+        }
+
+        let line_range = self.line_range(line, contents);
+
+        match self.kind() {
+            IndexKind::Ascii => {
+                line_range.start()
+                    + TextSize::try_from(column.to_zero_indexed())
+                        .unwrap_or(line_range.len())
+                        .clamp(TextSize::new(0), line_range.len())
+            }
+            IndexKind::Utf8 => {
+                let rest = &contents[line_range];
+                let column_offset: TextSize = rest
+                    .chars()
+                    .take(column.to_zero_indexed())
+                    .map(ruff_text_size::TextLen::text_len)
+                    .sum();
+                line_range.start() + column_offset
+            }
+        }
+    }
+
     /// Returns the [byte offsets](TextSize) for every line
     pub fn line_starts(&self) -> &[TextSize] {
         &self.inner.line_starts
@@ -234,7 +320,7 @@ impl Debug for LineIndex {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 enum IndexKind {
     /// Optimized index for an ASCII only document
     Ascii,
@@ -322,6 +408,13 @@ const fn unwrap<T: Copy>(option: Option<T>) -> T {
     match option {
         Some(value) => value,
         None => panic!("unwrapping None"),
+    }
+}
+
+impl FromStr for OneIndexed {
+    type Err = ParseIntError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(OneIndexed(NonZeroUsize::from_str(s)?))
     }
 }
 

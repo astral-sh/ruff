@@ -1,0 +1,116 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/yield/named_expression.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..85,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 52..59,
+                    value: Yield(
+                        ExprYield {
+                            range: 52..59,
+                            value: Some(
+                                Name(
+                                    ExprName {
+                                        range: 58..59,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 63..64,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 63..64,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 66..84,
+                    value: Yield(
+                        ExprYield {
+                            range: 66..84,
+                            value: Some(
+                                Tuple(
+                                    ExprTuple {
+                                        range: 72..84,
+                                        elts: [
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 72..73,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                            Name(
+                                                ExprName {
+                                                    range: 75..76,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 80..81,
+                                                    value: Int(
+                                                        2,
+                                                    ),
+                                                },
+                                            ),
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 83..84,
+                                                    value: Int(
+                                                        3,
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                        ctx: Load,
+                                        parenthesized: false,
+                                    },
+                                ),
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # Unparenthesized named expressions are not allowed
+2 | yield x := 1
+  |         ^^ Syntax Error: Expected a statement
+3 | 
+4 | yield 1, x := 2, 3
+  |
+
+
+  |
+2 | yield x := 1
+3 | 
+4 | yield 1, x := 2, 3
+  |            ^^ Syntax Error: Expected ',', found ':='
+  |

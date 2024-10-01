@@ -48,7 +48,7 @@ impl fmt::Display for ConstantType {
     }
 }
 
-#[derive(Debug, CacheKey)]
+#[derive(Debug, Clone, CacheKey)]
 pub struct Settings {
     pub allow_magic_value_types: Vec<ConstantType>,
     pub allow_dunder_method_names: FxHashSet<String>,
@@ -60,6 +60,7 @@ pub struct Settings {
     pub max_statements: usize,
     pub max_public_methods: usize,
     pub max_locals: usize,
+    pub max_nested_blocks: usize,
 }
 
 impl Default for Settings {
@@ -75,6 +76,7 @@ impl Default for Settings {
             max_statements: 50,
             max_public_methods: 20,
             max_locals: 15,
+            max_nested_blocks: 5,
         }
     }
 }
@@ -86,7 +88,7 @@ impl fmt::Display for Settings {
             namespace = "linter.pylint",
             fields = [
                 self.allow_magic_value_types | array,
-                self.allow_dunder_method_names | array,
+                self.allow_dunder_method_names | set,
                 self.max_args,
                 self.max_positional_args,
                 self.max_returns,

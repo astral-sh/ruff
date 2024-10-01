@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_index::Indexer;
 use ruff_source_file::{Line, Locator};
@@ -86,23 +86,34 @@ pub(crate) fn trailing_whitespace(
         .sum();
     if whitespace_len > TextSize::from(0) {
         let range = TextRange::new(line.end() - whitespace_len, line.end());
-
+        // Removing trailing whitespace is not safe inside multiline strings.
+        let applicability = if indexer.multiline_ranges().contains_range(range) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
         if range == line.range() {
             if settings.rules.enabled(Rule::BlankLineWithWhitespace) {
                 let mut diagnostic = Diagnostic::new(BlankLineWithWhitespace, range);
                 // Remove any preceding continuations, to avoid introducing a potential
                 // syntax error.
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(TextRange::new(
-                    indexer
-                        .preceded_by_continuations(line.start(), locator)
-                        .unwrap_or(range.start()),
-                    range.end(),
-                ))));
+                diagnostic.set_fix(Fix::applicable_edit(
+                    Edit::range_deletion(TextRange::new(
+                        indexer
+                            .preceded_by_continuations(line.start(), locator)
+                            .unwrap_or(range.start()),
+                        range.end(),
+                    )),
+                    applicability,
+                ));
                 return Some(diagnostic);
             }
         } else if settings.rules.enabled(Rule::TrailingWhitespace) {
             let mut diagnostic = Diagnostic::new(TrailingWhitespace, range);
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
+            diagnostic.set_fix(Fix::applicable_edit(
+                Edit::range_deletion(range),
+                applicability,
+            ));
             return Some(diagnostic);
         }
     }

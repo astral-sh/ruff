@@ -67,20 +67,21 @@ fn has_eq_without_hash(body: &[Stmt]) -> bool {
     let mut has_eq = false;
     for statement in body {
         match statement {
-            Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
+            Stmt::Assign(ast::StmtAssign { targets, .. }) => {
                 let [Expr::Name(ast::ExprName { id, .. })] = targets.as_slice() else {
                     continue;
                 };
 
-                // Check if `__hash__` was explicitly set to `None`, as in:
+                // Check if `__hash__` was explicitly set, as in:
                 // ```python
-                // class Class:
+                // class Class(SuperClass):
                 //     def __eq__(self, other):
                 //         return True
                 //
-                //     __hash__ = None
+                //     __hash__ = SuperClass.__hash__
                 // ```
-                if id == "__hash__" && value.is_none_literal_expr() {
+
+                if id == "__hash__" {
                     has_hash = true;
                 }
             }

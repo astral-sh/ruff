@@ -1,0 +1,43 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+dict_iter_missing_items.py:13:13: PLE1141 [*] Unpacking a dictionary in iteration without calling `.items()`
+   |
+12 | # Errors
+13 | for k, v in d:
+   |             ^ PLE1141
+14 |     pass
+   |
+   = help: Add a call to `.items()`
+
+ℹ Safe fix
+10 10 | s2 = {1, 2, 3}
+11 11 | 
+12 12 | # Errors
+13    |-for k, v in d:
+   13 |+for k, v in d.items():
+14 14 |     pass
+15 15 | 
+16 16 | for k, v in d_tuple_incorrect_tuple:
+
+dict_iter_missing_items.py:16:13: PLE1141 [*] Unpacking a dictionary in iteration without calling `.items()`
+   |
+14 |     pass
+15 | 
+16 | for k, v in d_tuple_incorrect_tuple:
+   |             ^^^^^^^^^^^^^^^^^^^^^^^ PLE1141
+17 |     pass
+   |
+   = help: Add a call to `.items()`
+
+ℹ Safe fix
+13 13 | for k, v in d:
+14 14 |     pass
+15 15 | 
+16    |-for k, v in d_tuple_incorrect_tuple:
+   16 |+for k, v in d_tuple_incorrect_tuple.items():
+17 17 |     pass
+18 18 | 
+19 19 | 
+
+

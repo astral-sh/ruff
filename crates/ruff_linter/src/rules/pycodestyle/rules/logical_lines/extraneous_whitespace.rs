@@ -137,16 +137,16 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
         match kind {
             TokenKind::FStringStart => fstrings += 1,
             TokenKind::FStringEnd => fstrings = fstrings.saturating_sub(1),
-            TokenKind::Lsqb if fstrings == 0 => {
+            TokenKind::Lsqb => {
                 brackets.push(kind);
             }
-            TokenKind::Rsqb if fstrings == 0 => {
+            TokenKind::Rsqb => {
                 brackets.pop();
             }
-            TokenKind::Lbrace if fstrings == 0 => {
+            TokenKind::Lbrace => {
                 brackets.push(kind);
             }
-            TokenKind::Rbrace if fstrings == 0 => {
+            TokenKind::Rbrace => {
                 brackets.pop();
             }
             _ => {}
@@ -213,11 +213,11 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                                         diagnostic.range(),
                                     )));
                                     context.push_diagnostic(diagnostic);
-                                } else if iter
-                                    .peek()
-                                    .is_some_and(|token| token.kind() == TokenKind::Rsqb)
-                                {
+                                } else if iter.peek().is_some_and(|token| {
+                                    matches!(token.kind(), TokenKind::Rsqb | TokenKind::Comma)
+                                }) {
                                     // Allow `foo[1 :]`, but not `foo[1  :]`.
+                                    // Or `foo[index :, 2]`, but not `foo[index  :, 2]`.
                                     if let (Whitespace::Many | Whitespace::Tab, offset) = whitespace
                                     {
                                         let mut diagnostic = Diagnostic::new(
@@ -227,6 +227,32 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                                         diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(
                                             diagnostic.range(),
                                         )));
+                                        context.push_diagnostic(diagnostic);
+                                    }
+                                } else if iter.peek().is_some_and(|token| {
+                                    matches!(
+                                        token.kind(),
+                                        TokenKind::NonLogicalNewline | TokenKind::Comment
+                                    )
+                                }) {
+                                    // Allow [
+                                    //      long_expression_calculating_the_index() :
+                                    // ]
+                                    // But not [
+                                    //      long_expression_calculating_the_index()  :
+                                    // ]
+                                    // distinct from the above case, because ruff format produces a
+                                    // whitespace before the colon and so should the fix
+                                    if let (Whitespace::Many | Whitespace::Tab, offset) = whitespace
+                                    {
+                                        let mut diagnostic = Diagnostic::new(
+                                            WhitespaceBeforePunctuation { symbol },
+                                            TextRange::at(token.start() - offset, offset),
+                                        );
+                                        diagnostic.set_fix(Fix::safe_edits(
+                                            Edit::range_deletion(diagnostic.range()),
+                                            [Edit::insertion(" ".into(), token.start() - offset)],
+                                        ));
                                         context.push_diagnostic(diagnostic);
                                     }
                                 } else {
@@ -247,6 +273,13 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                                     }
                                 }
                             } else {
+                                if fstrings > 0
+                                    && symbol == ':'
+                                    && matches!(prev_token, Some(TokenKind::Equal))
+                                {
+                                    // Avoid removing any whitespace for f-string debug expressions.
+                                    continue;
+                                }
                                 let mut diagnostic = Diagnostic::new(
                                     WhitespaceBeforePunctuation { symbol },
                                     TextRange::at(token.start() - offset, offset),

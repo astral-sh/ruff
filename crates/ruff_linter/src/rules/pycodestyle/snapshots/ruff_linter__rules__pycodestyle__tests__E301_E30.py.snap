@@ -1,0 +1,101 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E30.py:478:5: E301 [*] Expected 1 blank line, found 0
+    |
+476 |     def func1():
+477 |         pass
+478 |     def func2():
+    |     ^^^ E301
+479 |         pass
+480 | # end
+    |
+    = help: Add missing blank line
+
+ℹ Safe fix
+475 475 | 
+476 476 |     def func1():
+477 477 |         pass
+    478 |+
+478 479 |     def func2():
+479 480 |         pass
+480 481 | # end
+
+E30.py:489:5: E301 [*] Expected 1 blank line, found 0
+    |
+487 |         pass
+488 |     # comment
+489 |     def fn2():
+    |     ^^^ E301
+490 |         pass
+491 | # end
+    |
+    = help: Add missing blank line
+
+ℹ Safe fix
+485 485 | 
+486 486 |     def fn1():
+487 487 |         pass
+    488 |+
+488 489 |     # comment
+489 490 |     def fn2():
+490 491 |         pass
+
+E30.py:499:5: E301 [*] Expected 1 blank line, found 0
+    |
+498 |     columns = []
+499 |     @classmethod
+    |     ^ E301
+500 |     def cls_method(cls) -> None:
+501 |         pass
+    |
+    = help: Add missing blank line
+
+ℹ Safe fix
+496 496 |     """Class for minimal repo."""
+497 497 | 
+498 498 |     columns = []
+    499 |+
+499 500 |     @classmethod
+500 501 |     def cls_method(cls) -> None:
+501 502 |         pass
+
+E30.py:511:5: E301 [*] Expected 1 blank line, found 0
+    |
+509 |     def method(cls) -> None:
+510 |         pass
+511 |     @classmethod
+    |     ^ E301
+512 |     def cls_method(cls) -> None:
+513 |         pass
+    |
+    = help: Add missing blank line
+
+ℹ Safe fix
+508 508 | 
+509 509 |     def method(cls) -> None:
+510 510 |         pass
+    511 |+
+511 512 |     @classmethod
+512 513 |     def cls_method(cls) -> None:
+513 514 |         pass
+
+E30.py:526:5: E301 [*] Expected 1 blank line, found 0
+    |
+524 |     def bar(self, x: str) -> str:
+525 |         ...
+526 |     def bar(self, x: int | str) -> int | str:
+    |     ^^^ E301
+527 |         return x
+528 | # end
+    |
+    = help: Add missing blank line
+
+ℹ Safe fix
+523 523 |     @overload
+524 524 |     def bar(self, x: str) -> str:
+525 525 |         ...
+    526 |+
+526 527 |     def bar(self, x: int | str) -> int | str:
+527 528 |         return x
+528 529 | # end

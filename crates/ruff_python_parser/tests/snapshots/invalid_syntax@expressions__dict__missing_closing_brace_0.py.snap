@@ -1,0 +1,105 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/dict/missing_closing_brace_0.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..24,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..24,
+                    value: Dict(
+                        ExprDict {
+                            range: 0..24,
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 1..2,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    value: Name(
+                                        ExprName {
+                                            range: 5..8,
+                                            id: Name("def"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                                DictItem {
+                                    key: Some(
+                                        Call(
+                                            ExprCall {
+                                                range: 9..14,
+                                                func: Name(
+                                                    ExprName {
+                                                        range: 9..12,
+                                                        id: Name("foo"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                arguments: Arguments {
+                                                    range: 12..14,
+                                                    args: [],
+                                                    keywords: [],
+                                                },
+                                            },
+                                        ),
+                                    ),
+                                    value: Name(
+                                        ExprName {
+                                            range: 20..24,
+                                            id: Name("pass"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | {x:
+2 | 
+3 | def foo():
+  | ^^^ Syntax Error: Expected an identifier, but found a keyword 'def' that cannot be used here
+4 |     pass
+  |
+
+
+  |
+1 | {x:
+2 | 
+3 | def foo():
+  |     ^^^ Syntax Error: Expected ',', found name
+4 |     pass
+  |
+
+
+  |
+3 | def foo():
+4 |     pass
+  |     ^^^^ Syntax Error: Expected an identifier, but found a keyword 'pass' that cannot be used here
+  |
+
+
+  |
+3 | def foo():
+4 |     pass
+  |          Syntax Error: unexpected EOF while parsing
+  |

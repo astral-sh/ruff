@@ -13,8 +13,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// An empty string is falsy, so it is unnecessary to compare it to `""`. If
-/// the value can be something else Python considers falsy, such as `None` or
-/// `0` or another empty container, then the code is not equivalent.
+/// the value can be something else Python considers falsy, such as `None`,
+/// `0`, or another empty container, then the code is not equivalent.
 ///
 /// ## Known problems
 /// High false positive rate, as the check is context-insensitive and does not

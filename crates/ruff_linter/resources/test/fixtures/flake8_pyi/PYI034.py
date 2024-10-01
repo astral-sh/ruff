@@ -195,6 +195,13 @@ class BadAsyncIterator(collections.abc.AsyncIterator[str]):
     def __aiter__(self) -> typing.AsyncIterator[str]:
         ...  # Y034 "__aiter__" methods in classes like "BadAsyncIterator" usually return "self" at runtime. Consider using "typing_extensions.Self" in "BadAsyncIterator.__aiter__", e.g. "def __aiter__(self) -> Self: ..."  # Y022 Use "collections.abc.AsyncIterator[T]" instead of "typing.AsyncIterator[T]" (PEP 585 syntax)
 
+class SubclassOfBadIterator3(BadIterator3):
+    def __iter__(self) -> Iterator[int]:  # Y034
+        ...
+
+class SubclassOfBadAsyncIterator(BadAsyncIterator):
+    def __aiter__(self) -> collections.abc.AsyncIterator[str]:  # Y034
+        ...
 
 class AsyncIteratorReturningAsyncIterable:
     def __aiter__(self) -> AsyncIterable[str]:
@@ -225,6 +232,11 @@ class MetaclassInWhichSelfCannotBeUsed4(ABCMeta):
     async def __aenter__(self) -> MetaclassInWhichSelfCannotBeUsed4: ...
     def __isub__(self, other: MetaclassInWhichSelfCannotBeUsed4) -> MetaclassInWhichSelfCannotBeUsed4: ...
 
+class SubclassOfMetaclassInWhichSelfCannotBeUsed(MetaclassInWhichSelfCannotBeUsed4):
+    def __new__(cls) -> SubclassOfMetaclassInWhichSelfCannotBeUsed: ...
+    def __enter__(self) -> SubclassOfMetaclassInWhichSelfCannotBeUsed: ...
+    async def __aenter__(self) -> SubclassOfMetaclassInWhichSelfCannotBeUsed: ...
+    def __isub__(self, other: SubclassOfMetaclassInWhichSelfCannotBeUsed) -> SubclassOfMetaclassInWhichSelfCannotBeUsed: ...
 
 class Abstract(Iterator[str]):
     @abstractmethod
@@ -305,3 +317,7 @@ def __ne__(self, other: Any) -> bool:
 
 def __imul__(self, other: Any) -> list[str]:
     ...
+
+class UsesStringizedAnnotations:
+    def __iadd__(self, other: "UsesStringizedAnnotations") -> "typing.Self":
+        return self

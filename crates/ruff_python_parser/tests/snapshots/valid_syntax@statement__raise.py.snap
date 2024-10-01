@@ -1,0 +1,490 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/valid/statement/raise.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..289,
+        body: [
+            Raise(
+                StmtRaise {
+                    range: 8..13,
+                    exc: None,
+                    cause: None,
+                },
+            ),
+            Raise(
+                StmtRaise {
+                    range: 14..21,
+                    exc: Some(
+                        Name(
+                            ExprName {
+                                range: 20..21,
+                                id: Name("a"),
+                                ctx: Load,
+                            },
+                        ),
+                    ),
+                    cause: None,
+                },
+            ),
+            Raise(
+                StmtRaise {
+                    range: 22..34,
+                    exc: Some(
+                        Tuple(
+                            ExprTuple {
+                                range: 28..34,
+                                elts: [
+                                    Name(
+                                        ExprName {
+                                            range: 29..30,
+                                            id: Name("a"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            range: 32..33,
+                                            id: Name("b"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                ctx: Load,
+                                parenthesized: true,
+                            },
+                        ),
+                    ),
+                    cause: None,
+                },
+            ),
+            Raise(
+                StmtRaise {
+                    range: 35..46,
+                    exc: Some(
+                        Compare(
+                            ExprCompare {
+                                range: 41..46,
+                                left: NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 41..42,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                                ops: [
+                                    Lt,
+                                ],
+                                comparators: [
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 45..46,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ),
+                    cause: None,
+                },
+            ),
+            Raise(
+                StmtRaise {
+                    range: 47..60,
+                    exc: Some(
+                        BoolOp(
+                            ExprBoolOp {
+                                range: 53..60,
+                                op: And,
+                                values: [
+                                    Name(
+                                        ExprName {
+                                            range: 53..54,
+                                            id: Name("a"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            range: 59..60,
+                                            id: Name("b"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ),
+                    cause: None,
+                },
+            ),
+            Raise(
+                StmtRaise {
+                    range: 61..78,
+                    exc: Some(
+                        Lambda(
+                            ExprLambda {
+                                range: 67..78,
+                                parameters: Some(
+                                    Parameters {
+                                        range: 74..75,
+                                        posonlyargs: [],
+                                        args: [
+                                            ParameterWithDefault {
+                                                range: 74..75,
+                                                parameter: Parameter {
+                                                    range: 74..75,
+                                                    name: Identifier {
+                                                        id: Name("x"),
+                                                        range: 74..75,
+                                                    },
+                                                    annotation: None,
+                                                },
+                                                default: None,
+                                            },
+                                        ],
+                                        vararg: None,
+                                        kwonlyargs: [],
+                                        kwarg: None,
+                                    },
+                                ),
+                                body: Name(
+                                    ExprName {
+                                        range: 77..78,
+                                        id: Name("y"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                    ),
+                    cause: None,
+                },
+            ),
+            Raise(
+                StmtRaise {
+                    range: 79..92,
+                    exc: Some(
+                        Await(
+                            ExprAwait {
+                                range: 85..92,
+                                value: Name(
+                                    ExprName {
+                                        range: 91..92,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                    ),
+                    cause: None,
+                },
+            ),
+            Raise(
+                StmtRaise {
+                    range: 93..115,
+                    exc: Some(
+                        If(
+                            ExprIf {
+                                range: 99..115,
+                                test: BooleanLiteral(
+                                    ExprBooleanLiteral {
+                                        range: 104..108,
+                                        value: true,
+                                    },
+                                ),
+                                body: Name(
+                                    ExprName {
+                                        range: 99..100,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                orelse: Name(
+                                    ExprName {
+                                        range: 114..115,
+                                        id: Name("y"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                    ),
+                    cause: None,
+                },
+            ),
+            Raise(
+                StmtRaise {
+                    range: 138..152,
+                    exc: Some(
+                        Name(
+                            ExprName {
+                                range: 144..145,
+                                id: Name("x"),
+                                ctx: Load,
+                            },
+                        ),
+                    ),
+                    cause: Some(
+                        Name(
+                            ExprName {
+                                range: 151..152,
+                                id: Name("a"),
+                                ctx: Load,
+                            },
+                        ),
+                    ),
+                },
+            ),
+            Raise(
+                StmtRaise {
+                    range: 153..172,
+                    exc: Some(
+                        Name(
+                            ExprName {
+                                range: 159..160,
+                                id: Name("x"),
+                                ctx: Load,
+                            },
+                        ),
+                    ),
+                    cause: Some(
+                        Tuple(
+                            ExprTuple {
+                                range: 166..172,
+                                elts: [
+                                    Name(
+                                        ExprName {
+                                            range: 167..168,
+                                            id: Name("a"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            range: 170..171,
+                                            id: Name("b"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                ctx: Load,
+                                parenthesized: true,
+                            },
+                        ),
+                    ),
+                },
+            ),
+            Raise(
+                StmtRaise {
+                    range: 173..191,
+                    exc: Some(
+                        Name(
+                            ExprName {
+                                range: 179..180,
+                                id: Name("x"),
+                                ctx: Load,
+                            },
+                        ),
+                    ),
+                    cause: Some(
+                        Compare(
+                            ExprCompare {
+                                range: 186..191,
+                                left: NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 186..187,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                                ops: [
+                                    Lt,
+                                ],
+                                comparators: [
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 190..191,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ),
+                },
+            ),
+            Raise(
+                StmtRaise {
+                    range: 192..212,
+                    exc: Some(
+                        Name(
+                            ExprName {
+                                range: 198..199,
+                                id: Name("x"),
+                                ctx: Load,
+                            },
+                        ),
+                    ),
+                    cause: Some(
+                        BoolOp(
+                            ExprBoolOp {
+                                range: 205..212,
+                                op: And,
+                                values: [
+                                    Name(
+                                        ExprName {
+                                            range: 205..206,
+                                            id: Name("a"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            range: 211..212,
+                                            id: Name("b"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ),
+                },
+            ),
+            Raise(
+                StmtRaise {
+                    range: 213..237,
+                    exc: Some(
+                        Name(
+                            ExprName {
+                                range: 219..220,
+                                id: Name("x"),
+                                ctx: Load,
+                            },
+                        ),
+                    ),
+                    cause: Some(
+                        Lambda(
+                            ExprLambda {
+                                range: 226..237,
+                                parameters: Some(
+                                    Parameters {
+                                        range: 233..234,
+                                        posonlyargs: [],
+                                        args: [
+                                            ParameterWithDefault {
+                                                range: 233..234,
+                                                parameter: Parameter {
+                                                    range: 233..234,
+                                                    name: Identifier {
+                                                        id: Name("x"),
+                                                        range: 233..234,
+                                                    },
+                                                    annotation: None,
+                                                },
+                                                default: None,
+                                            },
+                                        ],
+                                        vararg: None,
+                                        kwonlyargs: [],
+                                        kwarg: None,
+                                    },
+                                ),
+                                body: Name(
+                                    ExprName {
+                                        range: 236..237,
+                                        id: Name("y"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                    ),
+                },
+            ),
+            Raise(
+                StmtRaise {
+                    range: 238..258,
+                    exc: Some(
+                        Name(
+                            ExprName {
+                                range: 244..245,
+                                id: Name("x"),
+                                ctx: Load,
+                            },
+                        ),
+                    ),
+                    cause: Some(
+                        Await(
+                            ExprAwait {
+                                range: 251..258,
+                                value: Name(
+                                    ExprName {
+                                        range: 257..258,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                    ),
+                },
+            ),
+            Raise(
+                StmtRaise {
+                    range: 259..288,
+                    exc: Some(
+                        Name(
+                            ExprName {
+                                range: 265..266,
+                                id: Name("x"),
+                                ctx: Load,
+                            },
+                        ),
+                    ),
+                    cause: Some(
+                        If(
+                            ExprIf {
+                                range: 272..288,
+                                test: BooleanLiteral(
+                                    ExprBooleanLiteral {
+                                        range: 277..281,
+                                        value: true,
+                                    },
+                                ),
+                                body: Name(
+                                    ExprName {
+                                        range: 272..273,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                orelse: Name(
+                                    ExprName {
+                                        range: 287..288,
+                                        id: Name("y"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

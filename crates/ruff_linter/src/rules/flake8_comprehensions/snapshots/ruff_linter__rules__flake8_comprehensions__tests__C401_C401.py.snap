@@ -1,255 +1,249 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
 ---
-C401.py:1:5: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
+C401.py:2:13: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
   |
-1 | x = set(x for x in range(3))
-  |     ^^^^^^^^^^^^^^^^^^^^^^^^ C401
-2 | x = set(x for x in range(3))
-3 | y = f"{set(a if a < 6 else 0  for a in range(3))}"
-  |
-  = help: Rewrite as a `set` comprehension
-
-ℹ Unsafe fix
-1   |-x = set(x for x in range(3))
-  1 |+x = {x for x in range(3)}
-2 2 | x = set(x for x in range(3))
-3 3 | y = f"{set(a if a < 6 else 0  for a in range(3))}"
-4 4 | _ = "{}".format(set(a if a < 6 else 0 for a in range(3)))
-
-C401.py:2:5: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
-  |
-1 | x = set(x for x in range(3))
-2 | x = set(x for x in range(3))
-  |     ^^^^^^^^^^^^^^^^^^^^^^^^ C401
-3 | y = f"{set(a if a < 6 else 0  for a in range(3))}"
-4 | _ = "{}".format(set(a if a < 6 else 0 for a in range(3)))
+1 | # Cannot conbime with C416. Should use set comprehension here.
+2 | even_nums = set(2 * x for x in range(3))
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C401
+3 | odd_nums = set(
+4 |     2 * x + 1 for x in range(3)
   |
   = help: Rewrite as a `set` comprehension
 
 ℹ Unsafe fix
-1 1 | x = set(x for x in range(3))
-2   |-x = set(x for x in range(3))
-  2 |+x = {x for x in range(3)}
-3 3 | y = f"{set(a if a < 6 else 0  for a in range(3))}"
-4 4 | _ = "{}".format(set(a if a < 6 else 0 for a in range(3)))
-5 5 | print(f"Hello {set(a for a in range(3))} World")
+1 1 | # Cannot conbime with C416. Should use set comprehension here.
+2   |-even_nums = set(2 * x for x in range(3))
+  2 |+even_nums = {2 * x for x in range(3)}
+3 3 | odd_nums = set(
+4 4 |     2 * x + 1 for x in range(3)
+5 5 | )
 
-C401.py:3:8: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
+C401.py:3:12: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
   |
-1 | x = set(x for x in range(3))
-2 | x = set(x for x in range(3))
-3 | y = f"{set(a if a < 6 else 0  for a in range(3))}"
-  |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C401
-4 | _ = "{}".format(set(a if a < 6 else 0 for a in range(3)))
-5 | print(f"Hello {set(a for a in range(3))} World")
-  |
-  = help: Rewrite as a `set` comprehension
-
-ℹ Unsafe fix
-1 1 | x = set(x for x in range(3))
-2 2 | x = set(x for x in range(3))
-3   |-y = f"{set(a if a < 6 else 0  for a in range(3))}"
-  3 |+y = f"{ {a if a < 6 else 0  for a in range(3)} }"
-4 4 | _ = "{}".format(set(a if a < 6 else 0 for a in range(3)))
-5 5 | print(f"Hello {set(a for a in range(3))} World")
-6 6 | 
-
-C401.py:4:17: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
-  |
-2 | x = set(x for x in range(3))
-3 | y = f"{set(a if a < 6 else 0  for a in range(3))}"
-4 | _ = "{}".format(set(a if a < 6 else 0 for a in range(3)))
-  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C401
-5 | print(f"Hello {set(a for a in range(3))} World")
+1 |   # Cannot conbime with C416. Should use set comprehension here.
+2 |   even_nums = set(2 * x for x in range(3))
+3 |   odd_nums = set(
+  |  ____________^
+4 | |     2 * x + 1 for x in range(3)
+5 | | )
+  | |_^ C401
+6 |   small_nums = f"{set(a if a < 6 else 0 for a in range(3))}"
   |
   = help: Rewrite as a `set` comprehension
 
 ℹ Unsafe fix
-1 1 | x = set(x for x in range(3))
-2 2 | x = set(x for x in range(3))
-3 3 | y = f"{set(a if a < 6 else 0  for a in range(3))}"
-4   |-_ = "{}".format(set(a if a < 6 else 0 for a in range(3)))
-  4 |+_ = "{}".format({a if a < 6 else 0 for a in range(3)})
-5 5 | print(f"Hello {set(a for a in range(3))} World")
-6 6 | 
-7 7 | 
-
-C401.py:5:16: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
-  |
-3 | y = f"{set(a if a < 6 else 0  for a in range(3))}"
-4 | _ = "{}".format(set(a if a < 6 else 0 for a in range(3)))
-5 | print(f"Hello {set(a for a in range(3))} World")
-  |                ^^^^^^^^^^^^^^^^^^^^^^^^ C401
-  |
-  = help: Rewrite as a `set` comprehension
-
-ℹ Unsafe fix
-2 2 | x = set(x for x in range(3))
-3 3 | y = f"{set(a if a < 6 else 0  for a in range(3))}"
-4 4 | _ = "{}".format(set(a if a < 6 else 0 for a in range(3)))
-5   |-print(f"Hello {set(a for a in range(3))} World")
-  5 |+print(f"Hello { {a for a in range(3)} } World")
-6 6 | 
+1 1 | # Cannot conbime with C416. Should use set comprehension here.
+2 2 | even_nums = set(2 * x for x in range(3))
+3   |-odd_nums = set(
+  3 |+odd_nums = {
+4 4 |     2 * x + 1 for x in range(3)
+5   |-)
+  5 |+}
+6 6 | small_nums = f"{set(a if a < 6 else 0 for a in range(3))}"
 7 7 | 
 8 8 | def f(x):
 
-C401.py:12:16: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
+C401.py:6:17: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
+  |
+4 |     2 * x + 1 for x in range(3)
+5 | )
+6 | small_nums = f"{set(a if a < 6 else 0 for a in range(3))}"
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C401
+7 | 
+8 | def f(x):
+  |
+  = help: Rewrite as a `set` comprehension
+
+ℹ Unsafe fix
+3 3 | odd_nums = set(
+4 4 |     2 * x + 1 for x in range(3)
+5 5 | )
+6   |-small_nums = f"{set(a if a < 6 else 0 for a in range(3))}"
+  6 |+small_nums = f"{ {a if a < 6 else 0 for a in range(3)} }"
+7 7 | 
+8 8 | def f(x):
+9 9 |     return x
+
+C401.py:11:16: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
    |
-12 | print(f'Hello {set(a for a in "abc")} World')
-   |                ^^^^^^^^^^^^^^^^^^^^^ C401
-13 | print(f"Hello {set(a for a in 'abc')} World")
-14 | print(f"Hello {set(f(a) for a in 'abc')} World")
+ 9 |     return x
+10 | 
+11 | print(f"Hello {set(f(a) for a in 'abc')} World")
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^ C401
+12 | print(f"Hello { set(f(a) for a in 'abc') } World")
+   |
+   = help: Rewrite as a `set` comprehension
+
+ℹ Unsafe fix
+8  8  | def f(x):
+9  9  |     return x
+10 10 | 
+11    |-print(f"Hello {set(f(a) for a in 'abc')} World")
+   11 |+print(f"Hello { {f(a) for a in 'abc'} } World")
+12 12 | print(f"Hello { set(f(a) for a in 'abc') } World")
+13 13 | 
+14 14 | 
+
+C401.py:12:17: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
+   |
+11 | print(f"Hello {set(f(a) for a in 'abc')} World")
+12 | print(f"Hello { set(f(a) for a in 'abc') } World")
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^ C401
    |
    = help: Rewrite as a `set` comprehension
 
 ℹ Unsafe fix
 9  9  |     return x
 10 10 | 
-11 11 | 
-12    |-print(f'Hello {set(a for a in "abc")} World')
-   12 |+print(f'Hello { {a for a in "abc"} } World')
-13 13 | print(f"Hello {set(a for a in 'abc')} World")
-14 14 | print(f"Hello {set(f(a) for a in 'abc')} World")
-15 15 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
+11 11 | print(f"Hello {set(f(a) for a in 'abc')} World")
+12    |-print(f"Hello { set(f(a) for a in 'abc') } World")
+   12 |+print(f"Hello { {f(a) for a in 'abc'} } World")
+13 13 | 
+14 14 | 
+15 15 | # Short-circuit case, combine with C416 and should produce x = set(range(3))
 
-C401.py:13:16: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
+C401.py:16:5: C401 [*] Unnecessary generator (rewrite using `set()`)
    |
-12 | print(f'Hello {set(a for a in "abc")} World')
-13 | print(f"Hello {set(a for a in 'abc')} World")
-   |                ^^^^^^^^^^^^^^^^^^^^^ C401
-14 | print(f"Hello {set(f(a) for a in 'abc')} World")
-15 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
+15 | # Short-circuit case, combine with C416 and should produce x = set(range(3))
+16 | x = set(x for x in range(3))
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^ C401
+17 | x = set(
+18 |     x for x in range(3)
    |
-   = help: Rewrite as a `set` comprehension
+   = help: Rewrite using `set()`
 
 ℹ Unsafe fix
-10 10 | 
-11 11 | 
-12 12 | print(f'Hello {set(a for a in "abc")} World')
-13    |-print(f"Hello {set(a for a in 'abc')} World")
-   13 |+print(f"Hello { {a for a in 'abc'} } World")
-14 14 | print(f"Hello {set(f(a) for a in 'abc')} World")
-15 15 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
-16 16 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+13 13 | 
+14 14 | 
+15 15 | # Short-circuit case, combine with C416 and should produce x = set(range(3))
+16    |-x = set(x for x in range(3))
+   16 |+x = set(range(3))
+17 17 | x = set(
+18 18 |     x for x in range(3)
+19 19 | )
 
-C401.py:14:16: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
+C401.py:17:5: C401 [*] Unnecessary generator (rewrite using `set()`)
    |
-12 | print(f'Hello {set(a for a in "abc")} World')
-13 | print(f"Hello {set(a for a in 'abc')} World")
-14 | print(f"Hello {set(f(a) for a in 'abc')} World")
+15 |   # Short-circuit case, combine with C416 and should produce x = set(range(3))
+16 |   x = set(x for x in range(3))
+17 |   x = set(
+   |  _____^
+18 | |     x for x in range(3)
+19 | | )
+   | |_^ C401
+20 |   print(f"Hello {set(a for a in range(3))} World")
+21 |   print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
+   |
+   = help: Rewrite using `set()`
+
+ℹ Unsafe fix
+14 14 | 
+15 15 | # Short-circuit case, combine with C416 and should produce x = set(range(3))
+16 16 | x = set(x for x in range(3))
+17    |-x = set(
+18    |-    x for x in range(3)
+19    |-)
+   17 |+x = set(range(3))
+20 18 | print(f"Hello {set(a for a in range(3))} World")
+21 19 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
+22 20 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+
+C401.py:20:16: C401 [*] Unnecessary generator (rewrite using `set()`)
+   |
+18 |     x for x in range(3)
+19 | )
+20 | print(f"Hello {set(a for a in range(3))} World")
    |                ^^^^^^^^^^^^^^^^^^^^^^^^ C401
-15 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
-16 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+21 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
+22 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
    |
-   = help: Rewrite as a `set` comprehension
+   = help: Rewrite using `set()`
 
 ℹ Unsafe fix
-11 11 | 
-12 12 | print(f'Hello {set(a for a in "abc")} World')
-13 13 | print(f"Hello {set(a for a in 'abc')} World")
-14    |-print(f"Hello {set(f(a) for a in 'abc')} World")
-   14 |+print(f"Hello { {f(a) for a in 'abc'} } World")
-15 15 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
-16 16 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
-17 17 | 
+17 17 | x = set(
+18 18 |     x for x in range(3)
+19 19 | )
+20    |-print(f"Hello {set(a for a in range(3))} World")
+   20 |+print(f"Hello {set(range(3))} World")
+21 21 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
+22 22 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+23 23 | 
 
-C401.py:15:10: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
+C401.py:21:10: C401 [*] Unnecessary generator (rewrite using `set()`)
    |
-13 | print(f"Hello {set(a for a in 'abc')} World")
-14 | print(f"Hello {set(f(a) for a in 'abc')} World")
-15 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
+19 | )
+20 | print(f"Hello {set(a for a in range(3))} World")
+21 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
    |          ^^^^^^^^^^^^^^^^^^^^^ C401
-16 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+22 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
    |
-   = help: Rewrite as a `set` comprehension
+   = help: Rewrite using `set()`
 
 ℹ Unsafe fix
-12 12 | print(f'Hello {set(a for a in "abc")} World')
-13 13 | print(f"Hello {set(a for a in 'abc')} World")
-14 14 | print(f"Hello {set(f(a) for a in 'abc')} World")
-15    |-print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
-   15 |+print(f"{ {a for a in 'abc'} - set(a for a in 'ab')}")
-16 16 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
-17 17 | 
-18 18 | # The fix generated for this diagnostic is incorrect, as we add additional space
+18 18 |     x for x in range(3)
+19 19 | )
+20 20 | print(f"Hello {set(a for a in range(3))} World")
+21    |-print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
+   21 |+print(f"{set('abc') - set(a for a in 'ab')}")
+22 22 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+23 23 | 
+24 24 | 
 
-C401.py:15:34: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
+C401.py:21:34: C401 [*] Unnecessary generator (rewrite using `set()`)
    |
-13 | print(f"Hello {set(a for a in 'abc')} World")
-14 | print(f"Hello {set(f(a) for a in 'abc')} World")
-15 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
+19 | )
+20 | print(f"Hello {set(a for a in range(3))} World")
+21 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
    |                                  ^^^^^^^^^^^^^^^^^^^^ C401
-16 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+22 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
    |
-   = help: Rewrite as a `set` comprehension
+   = help: Rewrite using `set()`
 
 ℹ Unsafe fix
-12 12 | print(f'Hello {set(a for a in "abc")} World')
-13 13 | print(f"Hello {set(a for a in 'abc')} World")
-14 14 | print(f"Hello {set(f(a) for a in 'abc')} World")
-15    |-print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
-   15 |+print(f"{set(a for a in 'abc') - {a for a in 'ab'} }")
-16 16 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
-17 17 | 
-18 18 | # The fix generated for this diagnostic is incorrect, as we add additional space
+18 18 |     x for x in range(3)
+19 19 | )
+20 20 | print(f"Hello {set(a for a in range(3))} World")
+21    |-print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
+   21 |+print(f"{set(a for a in 'abc') - set('ab')}")
+22 22 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+23 23 | 
+24 24 | 
 
-C401.py:16:11: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
+C401.py:22:11: C401 [*] Unnecessary generator (rewrite using `set()`)
    |
-14 | print(f"Hello {set(f(a) for a in 'abc')} World")
-15 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
-16 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+20 | print(f"Hello {set(a for a in range(3))} World")
+21 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
+22 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
    |           ^^^^^^^^^^^^^^^^^^^^^ C401
-17 | 
-18 | # The fix generated for this diagnostic is incorrect, as we add additional space
    |
-   = help: Rewrite as a `set` comprehension
+   = help: Rewrite using `set()`
 
 ℹ Unsafe fix
-13 13 | print(f"Hello {set(a for a in 'abc')} World")
-14 14 | print(f"Hello {set(f(a) for a in 'abc')} World")
-15 15 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
-16    |-print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
-   16 |+print(f"{ {a for a in 'abc'} - set(a for a in 'ab') }")
-17 17 | 
-18 18 | # The fix generated for this diagnostic is incorrect, as we add additional space
-19 19 | # around the set comprehension.
+19 19 | )
+20 20 | print(f"Hello {set(a for a in range(3))} World")
+21 21 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
+22    |-print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+   22 |+print(f"{ set('abc') - set(a for a in 'ab') }")
+23 23 | 
+24 24 | 
+25 25 | # Not built-in set.
 
-C401.py:16:35: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
+C401.py:22:35: C401 [*] Unnecessary generator (rewrite using `set()`)
    |
-14 | print(f"Hello {set(f(a) for a in 'abc')} World")
-15 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
-16 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+20 | print(f"Hello {set(a for a in range(3))} World")
+21 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
+22 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
    |                                   ^^^^^^^^^^^^^^^^^^^^ C401
-17 | 
-18 | # The fix generated for this diagnostic is incorrect, as we add additional space
    |
-   = help: Rewrite as a `set` comprehension
+   = help: Rewrite using `set()`
 
 ℹ Unsafe fix
-13 13 | print(f"Hello {set(a for a in 'abc')} World")
-14 14 | print(f"Hello {set(f(a) for a in 'abc')} World")
-15 15 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
-16    |-print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
-   16 |+print(f"{ set(a for a in 'abc') - {a for a in 'ab'} }")
-17 17 | 
-18 18 | # The fix generated for this diagnostic is incorrect, as we add additional space
-19 19 | # around the set comprehension.
-
-C401.py:20:12: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
-   |
-18 | # The fix generated for this diagnostic is incorrect, as we add additional space
-19 | # around the set comprehension.
-20 | print(f"{ {set(a for a in 'abc')} }")
-   |            ^^^^^^^^^^^^^^^^^^^^^ C401
-   |
-   = help: Rewrite as a `set` comprehension
-
-ℹ Unsafe fix
-17 17 | 
-18 18 | # The fix generated for this diagnostic is incorrect, as we add additional space
-19 19 | # around the set comprehension.
-20    |-print(f"{ {set(a for a in 'abc')} }")
-   20 |+print(f"{ { {a for a in 'abc'} } }")
-
-
+19 19 | )
+20 20 | print(f"Hello {set(a for a in range(3))} World")
+21 21 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
+22    |-print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+   22 |+print(f"{ set(a for a in 'abc') - set('ab') }")
+23 23 | 
+24 24 | 
+25 25 | # Not built-in set.

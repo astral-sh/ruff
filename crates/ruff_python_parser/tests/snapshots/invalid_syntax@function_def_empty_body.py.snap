@@ -1,0 +1,105 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/function_def_empty_body.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..36,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 0..10,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 4..7,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 7..9,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 11..28,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 15..18,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 18..20,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: Some(
+                        Name(
+                            ExprName {
+                                range: 24..27,
+                                id: Name("int"),
+                                ctx: Load,
+                            },
+                        ),
+                    ),
+                    body: [],
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 29..35,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 29..30,
+                                id: Name("x"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 33..35,
+                            value: Int(
+                                42,
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | def foo():
+2 | def foo() -> int:
+  | ^^^ Syntax Error: Expected an indented block after function definition
+3 | x = 42
+  |
+
+
+  |
+1 | def foo():
+2 | def foo() -> int:
+3 | x = 42
+  | ^ Syntax Error: Expected an indented block after function definition
+  |

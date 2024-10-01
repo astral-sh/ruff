@@ -2,24 +2,35 @@
 source: crates/ruff_python_parser/src/lexer.rs
 expression: fstring_single_quote_escape_eol(WINDOWS_EOL)
 ---
+## Tokens
+```
 [
     (
         FStringStart,
         0..2,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
-        FStringMiddle {
-            value: "text \\\r\n more text",
-            is_raw: false,
-        },
+        FStringMiddle(
+            "text \\\r\n more text",
+        ),
         2..20,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         FStringEnd,
         20..21,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         Newline,
         21..21,
     ),
 ]
+```

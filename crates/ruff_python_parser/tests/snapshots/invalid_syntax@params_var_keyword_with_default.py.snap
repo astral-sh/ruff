@@ -1,0 +1,166 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/params_var_keyword_with_default.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..43,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 0..36,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 4..7,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 7..20,
+                        posonlyargs: [],
+                        args: [
+                            ParameterWithDefault {
+                                range: 8..9,
+                                parameter: Parameter {
+                                    range: 8..9,
+                                    name: Identifier {
+                                        id: Name("a"),
+                                        range: 8..9,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: Some(
+                            Parameter {
+                                range: 11..19,
+                                name: Identifier {
+                                    id: Name("kwargs"),
+                                    range: 13..19,
+                                },
+                                annotation: None,
+                            },
+                        ),
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 20..36,
+                                value: Dict(
+                                    ExprDict {
+                                        range: 20..36,
+                                        items: [
+                                            DictItem {
+                                                key: Some(
+                                                    StringLiteral(
+                                                        ExprStringLiteral {
+                                                            range: 21..24,
+                                                            value: StringLiteralValue {
+                                                                inner: Single(
+                                                                    StringLiteral {
+                                                                        range: 21..24,
+                                                                        value: "b",
+                                                                        flags: StringLiteralFlags {
+                                                                            quote_style: Single,
+                                                                            prefix: Empty,
+                                                                            triple_quoted: false,
+                                                                        },
+                                                                    },
+                                                                ),
+                                                            },
+                                                        },
+                                                    ),
+                                                ),
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 26..27,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                            DictItem {
+                                                key: Some(
+                                                    StringLiteral(
+                                                        ExprStringLiteral {
+                                                            range: 29..32,
+                                                            value: StringLiteralValue {
+                                                                inner: Single(
+                                                                    StringLiteral {
+                                                                        range: 29..32,
+                                                                        value: "c",
+                                                                        flags: StringLiteralFlags {
+                                                                            quote_style: Single,
+                                                                            prefix: Empty,
+                                                                            triple_quoted: false,
+                                                                        },
+                                                                    },
+                                                                ),
+                                                            },
+                                                        },
+                                                    ),
+                                                ),
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 34..35,
+                                                        value: Int(
+                                                            2,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ],
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 39..42,
+                    value: EllipsisLiteral(
+                        ExprEllipsisLiteral {
+                            range: 39..42,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | def foo(a, **kwargs={'b': 1, 'c': 2}): ...
+  |                    ^ Syntax Error: Parameter with '*' or '**' cannot have default value
+  |
+
+
+  |
+1 | def foo(a, **kwargs={'b': 1, 'c': 2}): ...
+  |                     ^ Syntax Error: Expected ')', found '{'
+  |
+
+
+  |
+1 | def foo(a, **kwargs={'b': 1, 'c': 2}): ...
+  |                                     ^ Syntax Error: Expected newline, found ')'
+  |
+
+
+  |
+1 | def foo(a, **kwargs={'b': 1, 'c': 2}): ...
+  |                                      ^ Syntax Error: Expected a statement
+  |

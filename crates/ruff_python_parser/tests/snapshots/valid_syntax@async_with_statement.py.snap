@@ -1,0 +1,46 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/async_with_statement.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..21,
+        body: [
+            With(
+                StmtWith {
+                    range: 0..20,
+                    is_async: true,
+                    items: [
+                        WithItem {
+                            range: 11..15,
+                            context_expr: Name(
+                                ExprName {
+                                    range: 11..15,
+                                    id: Name("item"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                    ],
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 17..20,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 17..20,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```

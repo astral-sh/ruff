@@ -180,6 +180,13 @@ this_will_also_become_one_line = (  # comment
     "b"
     "c"
 )
+
+assert some_var == expected_result, """
+test
+"""
+assert some_var == expected_result, f"""
+expected: {expected_result}
+actual: {some_var}"""
 ```
 
 ## Black Differences
@@ -301,7 +308,19 @@ this_will_also_become_one_line = (  # comment
  # Another use case
  data = yaml.load("""\
  a: 1
-@@ -85,11 +114,13 @@
+@@ -77,19 +106,23 @@
+ b: 2
+ """,
+ )
+-data = yaml.load("""\
++data = yaml.load(
++    """\
+     a: 1
+     b: 2
+-""")
++"""
++)
+ 
  MULTILINE = """
  foo
  """.replace("\n", "")
@@ -316,7 +335,7 @@ this_will_also_become_one_line = (  # comment
  parser.usage += """
  Custom extra help summary.
  
-@@ -156,16 +187,24 @@
+@@ -156,16 +189,24 @@
               10 LOAD_CONST               0 (None)
               12 RETURN_VALUE
  """ % (_C.__init__.__code__.co_firstlineno + 1,)
@@ -347,7 +366,7 @@ this_will_also_become_one_line = (  # comment
  [
      """cow
  moos""",
-@@ -198,7 +237,7 @@
+@@ -198,7 +239,7 @@
  `--global-option` is reserved to flags like `--verbose` or `--quiet`.
  """
  
@@ -356,7 +375,7 @@ this_will_also_become_one_line = (  # comment
  
  this_will_stay_on_three_lines = (
      "a"  # comment
-@@ -206,4 +245,6 @@
+@@ -206,7 +247,9 @@
      "c"
  )
  
@@ -364,6 +383,9 @@ this_will_also_become_one_line = (  # comment
 +this_will_also_become_one_line = (  # comment
 +    "a" "b" "c"
 +)
+ 
+ assert some_var == expected_result, """
+ test
 ```
 
 ## Ruff Output
@@ -477,10 +499,12 @@ a: 1
 b: 2
 """,
 )
-data = yaml.load("""\
+data = yaml.load(
+    """\
     a: 1
     b: 2
-""")
+"""
+)
 
 MULTILINE = """
 foo
@@ -619,6 +643,13 @@ this_will_stay_on_three_lines = (
 this_will_also_become_one_line = (  # comment
     "a" "b" "c"
 )
+
+assert some_var == expected_result, """
+test
+"""
+assert some_var == expected_result, f"""
+expected: {expected_result}
+actual: {some_var}"""
 ```
 
 ## Black Output
@@ -833,6 +864,11 @@ this_will_stay_on_three_lines = (
 )
 
 this_will_also_become_one_line = "abc"  # comment
+
+assert some_var == expected_result, """
+test
+"""
+assert some_var == expected_result, f"""
+expected: {expected_result}
+actual: {some_var}"""
 ```
-
-

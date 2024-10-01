@@ -1,0 +1,189 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/decorator_missing_expression.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..51,
+        body: [
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 5..15,
+                    target: Call(
+                        ExprCall {
+                            range: 5..10,
+                            func: Name(
+                                ExprName {
+                                    range: 5..8,
+                                    id: Name("foo"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 8..10,
+                                args: [],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                    annotation: EllipsisLiteral(
+                        ExprEllipsisLiteral {
+                            range: 12..15,
+                        },
+                    ),
+                    value: None,
+                    simple: false,
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 16..32,
+                    is_async: false,
+                    decorator_list: [
+                        Decorator {
+                            range: 16..17,
+                            expression: Name(
+                                ExprName {
+                                    range: 17..17,
+                                    id: Name(""),
+                                    ctx: Invalid,
+                                },
+                            ),
+                        },
+                    ],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 22..25,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 25..27,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 29..32,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 29..32,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 33..50,
+                    is_async: false,
+                    decorator_list: [
+                        Decorator {
+                            range: 33..35,
+                            expression: BinOp(
+                                ExprBinOp {
+                                    range: 34..35,
+                                    left: Name(
+                                        ExprName {
+                                            range: 34..34,
+                                            id: Name(""),
+                                            ctx: Invalid,
+                                        },
+                                    ),
+                                    op: MatMult,
+                                    right: Name(
+                                        ExprName {
+                                            range: 35..35,
+                                            id: Name(""),
+                                            ctx: Invalid,
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 40..43,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 43..45,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 47..50,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 47..50,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | @def foo(): ...
+  |  ^^^ Syntax Error: Expected an identifier, but found a keyword 'def' that cannot be used here
+2 | @
+3 | def foo(): ...
+  |
+
+
+  |
+1 | @def foo(): ...
+  |      ^^^ Syntax Error: Expected newline, found name
+2 | @
+3 | def foo(): ...
+  |
+
+
+  |
+1 | @def foo(): ...
+2 | @
+  |  ^ Syntax Error: Expected an expression
+3 | def foo(): ...
+4 | @@
+5 | def foo(): ...
+  |
+
+
+  |
+2 | @
+3 | def foo(): ...
+4 | @@
+  |  ^ Syntax Error: Expected an expression
+5 | def foo(): ...
+  |
+
+
+  |
+2 | @
+3 | def foo(): ...
+4 | @@
+  |   ^ Syntax Error: Expected an expression
+5 | def foo(): ...
+  |

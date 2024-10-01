@@ -1,0 +1,390 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/parenthesized/tuple.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..267,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 83..86,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 83..86,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        range: 84..84,
+                                        id: Name(""),
+                                        ctx: Invalid,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: true,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 88..94,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 88..94,
+                            elts: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 89..90,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 92..93,
+                                        value: Int(
+                                            2,
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: true,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 96..101,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 96..101,
+                            elts: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 97..98,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: true,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 119..121,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 120..121,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 122..123,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 122..123,
+                            value: Int(
+                                2,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 157..162,
+                    target: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 158..159,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                    annotation: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 161..162,
+                            value: Int(
+                                2,
+                            ),
+                        },
+                    ),
+                    value: None,
+                    simple: false,
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 186..195,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 186..195,
+                            elts: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 187..188,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                                BinOp(
+                                    ExprBinOp {
+                                        range: 190..193,
+                                        left: Name(
+                                            ExprName {
+                                                range: 190..191,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        op: Add,
+                                        right: Name(
+                                            ExprName {
+                                                range: 193..193,
+                                                id: Name(""),
+                                                ctx: Invalid,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: true,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 197..199,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 198..199,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 201..202,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 201..202,
+                            value: Int(
+                                2,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 255..267,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 255..267,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        range: 255..256,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 258..259,
+                                        id: Name("y"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 263..264,
+                                        value: Int(
+                                            2,
+                                        ),
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 266..267,
+                                        id: Name("z"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: false,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # Test cases for tuple expressions where the parser recovers from a syntax error.
+2 | 
+3 | (,)
+  |  ^ Syntax Error: Expected an expression
+4 | 
+5 | (1,,2)
+  |
+
+
+  |
+3 | (,)
+4 | 
+5 | (1,,2)
+  |    ^ Syntax Error: Expected an expression or a ')'
+6 | 
+7 | (1,,)
+  |
+
+
+  |
+5 | (1,,2)
+6 | 
+7 | (1,,)
+  |    ^ Syntax Error: Expected an expression or a ')'
+8 | 
+9 | # Missing comma
+  |
+
+
+   |
+ 9 | # Missing comma
+10 | (1 2)
+   |    ^ Syntax Error: Expected ')', found int
+11 | 
+12 | # Dictionary element in a list
+   |
+
+
+   |
+ 9 | # Missing comma
+10 | (1 2)
+   |     ^ Syntax Error: Expected a statement
+11 | 
+12 | # Dictionary element in a list
+   |
+
+
+   |
+ 9 | # Missing comma
+10 | (1 2)
+   |      ^ Syntax Error: Expected a statement
+11 | 
+12 | # Dictionary element in a list
+13 | (1: 2)
+   |
+
+
+   |
+12 | # Dictionary element in a list
+13 | (1: 2)
+   |   ^ Syntax Error: Expected ')', found ':'
+14 | 
+15 | # Missing expression
+   |
+
+
+   |
+12 | # Dictionary element in a list
+13 | (1: 2)
+   |  ^ Syntax Error: Invalid annotated assignment target
+14 | 
+15 | # Missing expression
+   |
+
+
+   |
+12 | # Dictionary element in a list
+13 | (1: 2)
+   |      ^ Syntax Error: Expected a statement
+14 | 
+15 | # Missing expression
+   |
+
+
+   |
+12 | # Dictionary element in a list
+13 | (1: 2)
+   |       ^ Syntax Error: Expected a statement
+14 | 
+15 | # Missing expression
+16 | (1, x + )
+   |
+
+
+   |
+15 | # Missing expression
+16 | (1, x + )
+   |         ^ Syntax Error: Expected an expression
+17 | 
+18 | (1; 2)
+   |
+
+
+   |
+16 | (1, x + )
+17 | 
+18 | (1; 2)
+   |   ^ Syntax Error: Expected ')', found ';'
+19 | 
+20 | # Unparenthesized named expression is not allowed
+   |
+
+
+   |
+16 | (1, x + )
+17 | 
+18 | (1; 2)
+   |      ^ Syntax Error: Expected a statement
+19 | 
+20 | # Unparenthesized named expression is not allowed
+   |
+
+
+   |
+16 | (1, x + )
+17 | 
+18 | (1; 2)
+   |       ^ Syntax Error: Expected a statement
+19 | 
+20 | # Unparenthesized named expression is not allowed
+21 | x, y := 2, z
+   |
+
+
+   |
+20 | # Unparenthesized named expression is not allowed
+21 | x, y := 2, z
+   |      ^^ Syntax Error: Expected ',', found ':='
+   |

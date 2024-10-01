@@ -1,0 +1,158 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/dict/double_star_comprehension.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..358,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 122..147,
+                    value: Dict(
+                        ExprDict {
+                            range: 122..147,
+                            items: [
+                                DictItem {
+                                    key: None,
+                                    value: Name(
+                                        ExprName {
+                                            range: 125..126,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                                DictItem {
+                                    key: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 128..129,
+                                                id: Name("y"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    value: Name(
+                                        ExprName {
+                                            range: 130..133,
+                                            id: Name("for"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                                DictItem {
+                                    key: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 134..135,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    value: Name(
+                                        ExprName {
+                                            range: 135..135,
+                                            id: Name(""),
+                                            ctx: Invalid,
+                                        },
+                                    ),
+                                },
+                                DictItem {
+                                    key: Some(
+                                        Compare(
+                                            ExprCompare {
+                                                range: 137..146,
+                                                left: Name(
+                                                    ExprName {
+                                                        range: 137..138,
+                                                        id: Name("y"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ops: [
+                                                    In,
+                                                ],
+                                                comparators: [
+                                                    Name(
+                                                        ExprName {
+                                                            range: 142..146,
+                                                            id: Name("data"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                ],
+                                            },
+                                        ),
+                                    ),
+                                    value: Name(
+                                        ExprName {
+                                            range: 146..146,
+                                            id: Name(""),
+                                            ctx: Invalid,
+                                        },
+                                    ),
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+2 | # it's actually a comprehension.
+3 | 
+4 | {**x: y for x, y in data}
+  |     ^ Syntax Error: Expected an expression or a '}'
+5 | 
+6 | # TODO(dhruvmanila): This test case fails because there's no way to represent `**y`
+  |
+
+
+  |
+2 | # it's actually a comprehension.
+3 | 
+4 | {**x: y for x, y in data}
+  |         ^^^ Syntax Error: Expected ':', found 'for'
+5 | 
+6 | # TODO(dhruvmanila): This test case fails because there's no way to represent `**y`
+  |
+
+
+  |
+2 | # it's actually a comprehension.
+3 | 
+4 | {**x: y for x, y in data}
+  |             ^ Syntax Error: Expected ',', found name
+5 | 
+6 | # TODO(dhruvmanila): This test case fails because there's no way to represent `**y`
+  |
+
+
+  |
+2 | # it's actually a comprehension.
+3 | 
+4 | {**x: y for x, y in data}
+  |              ^ Syntax Error: Expected ':', found ','
+5 | 
+6 | # TODO(dhruvmanila): This test case fails because there's no way to represent `**y`
+  |
+
+
+  |
+2 | # it's actually a comprehension.
+3 | 
+4 | {**x: y for x, y in data}
+  |                         ^ Syntax Error: Expected ':', found '}'
+5 | 
+6 | # TODO(dhruvmanila): This test case fails because there's no way to represent `**y`
+  |

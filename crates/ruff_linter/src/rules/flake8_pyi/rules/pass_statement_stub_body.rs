@@ -9,22 +9,22 @@ use crate::checkers::ast::Checker;
 /// Checks for `pass` statements in empty stub bodies.
 ///
 /// ## Why is this bad?
-/// For consistency, empty stub bodies should contain `...` instead of `pass`.
-///
-/// Additionally, an ellipsis better conveys the intent of the stub body (that
-/// the body has been implemented, but has been intentionally left blank to
-/// document the interface).
+/// For stylistic consistency, `...` should always be used rather than `pass`
+/// in stub files.
 ///
 /// ## Example
-/// ```python
-/// def foo(bar: int) -> list[int]:
-///     pass
+/// ```pyi
+/// def foo(bar: int) -> list[int]: pass
 /// ```
 ///
 /// Use instead:
-/// ```python
+/// ```pyi
 /// def foo(bar: int) -> list[int]: ...
 /// ```
+///
+/// ## References
+/// The [recommended style for functions and methods](https://typing.readthedocs.io/en/latest/source/stubs.html#functions-and-methods)
+/// in the typing docs.
 #[violation]
 pub struct PassStatementStubBody;
 

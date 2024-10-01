@@ -6,7 +6,7 @@ use std::fmt;
 
 use crate::line_width::LineLength;
 
-#[derive(Debug, Default, CacheKey)]
+#[derive(Debug, Clone, Default, CacheKey)]
 pub struct Settings {
     pub max_line_length: LineLength,
     pub max_doc_length: Option<LineLength>,

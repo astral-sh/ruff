@@ -1,0 +1,41 @@
+---
+source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
+---
+TCH010_2.py:4:4: TCH010 Invalid string member in `X | Y`-style union type
+  |
+4 | x: "int" | str  # TCH010
+  |    ^^^^^ TCH010
+5 | x: ("int" | str) | "bool"  # TCH010
+  |
+
+TCH010_2.py:5:5: TCH010 Invalid string member in `X | Y`-style union type
+  |
+4 | x: "int" | str  # TCH010
+5 | x: ("int" | str) | "bool"  # TCH010
+  |     ^^^^^ TCH010
+  |
+
+TCH010_2.py:5:20: TCH010 Invalid string member in `X | Y`-style union type
+  |
+4 | x: "int" | str  # TCH010
+5 | x: ("int" | str) | "bool"  # TCH010
+  |                    ^^^^^^ TCH010
+  |
+
+TCH010_2.py:12:20: TCH010 Invalid string member in `X | Y`-style union type
+   |
+12 | z: list[str, str | "int"] = []  # TCH010
+   |                    ^^^^^ TCH010
+13 | 
+14 | type A = Value["int" | str]  # OK
+   |
+
+TCH010_2.py:16:30: TCH010 Invalid string member in `X | Y`-style union type
+   |
+14 | type A = Value["int" | str]  # OK
+15 | 
+16 | OldS = TypeVar('OldS', int | 'str', str)  # TCH010
+   |                              ^^^^^ TCH010
+   |
+
+

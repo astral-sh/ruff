@@ -88,7 +88,7 @@ pub(crate) fn explicit_f_string_type_conversion(checker: &mut Checker, f_string:
         }
 
         // Can't be a conversion otherwise.
-        let [arg] = args.as_slice() else {
+        let [arg] = &**args else {
             continue;
         };
 
@@ -100,15 +100,11 @@ pub(crate) fn explicit_f_string_type_conversion(checker: &mut Checker, f_string:
             continue;
         }
 
-        let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else {
-            continue;
-        };
-
-        if !matches!(id.as_str(), "str" | "repr" | "ascii") {
-            continue;
-        };
-
-        if !checker.semantic().is_builtin(id) {
+        if !checker
+            .semantic()
+            .resolve_builtin_symbol(func)
+            .is_some_and(|builtin| matches!(builtin, "str" | "repr" | "ascii"))
+        {
             continue;
         }
 

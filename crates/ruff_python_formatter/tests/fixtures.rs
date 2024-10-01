@@ -1,5 +1,7 @@
+use std::borrow::Cow;
 use std::fmt::{Formatter, Write};
 use std::io::BufReader;
+use std::ops::Range;
 use std::path::Path;
 use std::{fmt, fs};
 
@@ -8,8 +10,10 @@ use similar::TextDiff;
 use crate::normalizer::Normalizer;
 use ruff_formatter::FormatOptions;
 use ruff_python_ast::comparable::ComparableMod;
-use ruff_python_formatter::{format_module_source, PreviewMode, PyFormatOptions};
+use ruff_python_formatter::{format_module_source, format_range, PreviewMode, PyFormatOptions};
 use ruff_python_parser::{parse, AsMode};
+use ruff_source_file::{LineIndex, OneIndexed};
+use ruff_text_size::{TextRange, TextSize};
 
 mod normalizer;
 
@@ -28,12 +32,65 @@ fn black_compatibility() {
             PyFormatOptions::from_extension(input_path)
         };
 
-        let printed = format_module_source(&content, options.clone()).unwrap_or_else(|err| {
-            panic!(
-                "Formatting of {} to succeed but encountered error {err}",
-                input_path.display()
-            )
-        });
+        let first_line = content.lines().next().unwrap_or_default();
+        let formatted_code = if first_line.starts_with("# flags:")
+            && first_line.contains("--line-ranges=")
+        {
+            let line_index = LineIndex::from_source_text(&content);
+
+            let ranges = first_line
+                .split_ascii_whitespace()
+                .filter_map(|chunk| {
+                    let (_, lines) = chunk.split_once("--line-ranges=")?;
+                    let (lower, upper) = lines.split_once('-')?;
+
+                    let lower = lower
+                        .parse::<OneIndexed>()
+                        .expect("Expected a valid line number");
+                    let upper = upper
+                        .parse::<OneIndexed>()
+                        .expect("Expected a valid line number");
+
+                    let range_start = line_index.line_start(lower, &content);
+                    let range_end = line_index.line_end(upper, &content);
+
+                    Some(TextRange::new(range_start, range_end))
+                })
+                .rev();
+
+            let mut formatted_code = content.clone();
+
+            for range in ranges {
+                let formatted =
+                    format_range(&content, range, options.clone()).unwrap_or_else(|err| {
+                        panic!(
+                            "Range-formatting of {} to succeed but encountered error {err}",
+                            input_path.display()
+                        )
+                    });
+
+                let range = formatted.source_range();
+
+                formatted_code.replace_range(Range::<usize>::from(range), formatted.as_code());
+            }
+
+            // We can't do stability checks for range formatting because we don't know the updated rangs.
+
+            formatted_code
+        } else {
+            let printed = format_module_source(&content, options.clone()).unwrap_or_else(|err| {
+                panic!(
+                    "Formatting of {} to succeed but encountered error {err}",
+                    input_path.display()
+                )
+            });
+
+            let formatted_code = printed.into_code();
+
+            ensure_stability_when_formatting_twice(&formatted_code, &options, input_path);
+
+            formatted_code
+        };
 
         let extension = input_path
             .extension()
@@ -43,10 +100,7 @@ fn black_compatibility() {
         let expected_output = fs::read_to_string(&expected_path)
             .unwrap_or_else(|_| panic!("Expected Black output file '{expected_path:?}' to exist"));
 
-        let formatted_code = printed.as_code();
-
-        ensure_unchanged_ast(&content, formatted_code, &options, input_path);
-        ensure_stability_when_formatting_twice(formatted_code, &options, input_path);
+        ensure_unchanged_ast(&content, &formatted_code, &options, input_path);
 
         if formatted_code == expected_output {
             // Black and Ruff formatting matches. Delete any existing snapshot files because the Black output
@@ -88,7 +142,7 @@ fn black_compatibility() {
 
             write!(snapshot, "{}", Header::new("Black Differences")).unwrap();
 
-            let diff = TextDiff::from_lines(expected_output.as_str(), formatted_code)
+            let diff = TextDiff::from_lines(expected_output.as_str(), &formatted_code)
                 .unified_diff()
                 .header("Black", "Ruff")
                 .to_string();
@@ -124,12 +178,7 @@ fn format() {
         let content = fs::read_to_string(input_path).unwrap();
 
         let options = PyFormatOptions::from_extension(input_path);
-        let printed =
-            format_module_source(&content, options.clone()).expect("Formatting to succeed");
-        let formatted_code = printed.as_code();
-
-        ensure_unchanged_ast(&content, formatted_code, &options, input_path);
-        ensure_stability_when_formatting_twice(formatted_code, &options, input_path);
+        let formatted_code = format_file(&content, &options, input_path);
 
         let mut snapshot = format!("## Input\n{}", CodeFrame::new("python", &content));
 
@@ -142,12 +191,7 @@ fn format() {
             writeln!(snapshot, "## Outputs").unwrap();
 
             for (i, options) in options.into_iter().enumerate() {
-                let printed =
-                    format_module_source(&content, options.clone()).expect("Formatting to succeed");
-                let formatted_code = printed.as_code();
-
-                ensure_unchanged_ast(&content, formatted_code, &options, input_path);
-                ensure_stability_when_formatting_twice(formatted_code, &options, input_path);
+                let formatted_code = format_file(&content, &options, input_path);
 
                 writeln!(
                     snapshot,
@@ -164,16 +208,7 @@ fn format() {
 
                 // We want to capture the differences in the preview style in our fixtures
                 let options_preview = options.with_preview(PreviewMode::Enabled);
-                let printed_preview = format_module_source(&content, options_preview.clone())
-                    .expect("Formatting to succeed");
-                let formatted_preview = printed_preview.as_code();
-
-                ensure_unchanged_ast(&content, formatted_preview, &options_preview, input_path);
-                ensure_stability_when_formatting_twice(
-                    formatted_preview,
-                    &options_preview,
-                    input_path,
-                );
+                let formatted_preview = format_file(&content, &options_preview, input_path);
 
                 if formatted_code != formatted_preview {
                     // Having both snapshots makes it hard to see the difference, so we're keeping only
@@ -183,7 +218,7 @@ fn format() {
                         "#### Preview changes\n{}",
                         CodeFrame::new(
                             "diff",
-                            TextDiff::from_lines(formatted_code, formatted_preview)
+                            TextDiff::from_lines(&formatted_code, &formatted_preview)
                                 .unified_diff()
                                 .header("Stable", "Preview")
                         )
@@ -194,12 +229,7 @@ fn format() {
         } else {
             // We want to capture the differences in the preview style in our fixtures
             let options_preview = options.with_preview(PreviewMode::Enabled);
-            let printed_preview = format_module_source(&content, options_preview.clone())
-                .expect("Formatting to succeed");
-            let formatted_preview = printed_preview.as_code();
-
-            ensure_unchanged_ast(&content, formatted_preview, &options_preview, input_path);
-            ensure_stability_when_formatting_twice(formatted_preview, &options_preview, input_path);
+            let formatted_preview = format_file(&content, &options_preview, input_path);
 
             if formatted_code == formatted_preview {
                 writeln!(
@@ -217,7 +247,7 @@ fn format() {
                     CodeFrame::new("python", &formatted_code),
                     CodeFrame::new(
                         "diff",
-                        TextDiff::from_lines(formatted_code, formatted_preview)
+                        TextDiff::from_lines(&formatted_code, &formatted_preview)
                             .unified_diff()
                             .header("Stable", "Preview")
                     )
@@ -240,6 +270,66 @@ fn format() {
         "test/fixtures/ruff/**/*.{py,pyi}",
         test_file
     );
+}
+
+fn format_file(source: &str, options: &PyFormatOptions, input_path: &Path) -> String {
+    let (unformatted, formatted_code) = if source.contains("<RANGE_START>") {
+        let mut content = source.to_string();
+        let without_markers = content
+            .replace("<RANGE_START>", "")
+            .replace("<RANGE_END>", "");
+
+        while let Some(range_start_marker) = content.find("<RANGE_START>") {
+            // Remove the start marker
+            content.replace_range(
+                range_start_marker..range_start_marker + "<RANGE_START>".len(),
+                "",
+            );
+
+            let range_end_marker = content[range_start_marker..]
+                .find("<RANGE_END>")
+                .expect("Matching <RANGE_END> marker for <RANGE_START> to exist")
+                + range_start_marker;
+
+            content.replace_range(range_end_marker..range_end_marker + "<RANGE_END>".len(), "");
+
+            // Replace all other markers to get a valid Python input
+            let format_input = content
+                .replace("<RANGE_START>", "")
+                .replace("<RANGE_END>", "");
+
+            let range = TextRange::new(
+                TextSize::try_from(range_start_marker).unwrap(),
+                TextSize::try_from(range_end_marker).unwrap(),
+            );
+
+            let formatted =
+                format_range(&format_input, range, options.clone()).unwrap_or_else(|err| {
+                    panic!(
+                        "Range-formatting of {} to succeed but encountered error {err}",
+                        input_path.display()
+                    )
+                });
+
+            content.replace_range(
+                Range::<usize>::from(formatted.source_range()),
+                formatted.as_code(),
+            );
+        }
+
+        (Cow::Owned(without_markers), content)
+    } else {
+        let printed = format_module_source(source, options.clone()).expect("Formatting to succeed");
+        let formatted_code = printed.into_code();
+
+        ensure_stability_when_formatting_twice(&formatted_code, options, input_path);
+
+        (Cow::Borrowed(source), formatted_code)
+    };
+
+    ensure_unchanged_ast(&unformatted, &formatted_code, options, input_path);
+
+    formatted_code
 }
 
 /// Format another time and make sure that there are no changes anymore
@@ -301,13 +391,15 @@ fn ensure_unchanged_ast(
 
     // Parse the unformatted code.
     let mut unformatted_ast = parse(unformatted_code, source_type.as_mode())
-        .expect("Unformatted code to be valid syntax");
+        .expect("Unformatted code to be valid syntax")
+        .into_syntax();
     Normalizer.visit_module(&mut unformatted_ast);
     let unformatted_ast = ComparableMod::from(&unformatted_ast);
 
     // Parse the formatted code.
-    let mut formatted_ast =
-        parse(formatted_code, source_type.as_mode()).expect("Formatted code to be valid syntax");
+    let mut formatted_ast = parse(formatted_code, source_type.as_mode())
+        .expect("Formatted code to be valid syntax")
+        .into_syntax();
     Normalizer.visit_module(&mut formatted_ast);
     let formatted_ast = ComparableMod::from(&formatted_ast);
 
@@ -381,7 +473,8 @@ magic-trailing-comma       = {magic_trailing_comma:?}
 docstring-code             = {docstring_code:?}
 docstring-code-line-width  = {docstring_code_line_width:?}
 preview                    = {preview:?}
-target_version             = {target_version:?}"#,
+target_version             = {target_version:?}
+source_type                = {source_type:?}"#,
             indent_style = self.0.indent_style(),
             indent_width = self.0.indent_width().value(),
             line_width = self.0.line_width().value(),
@@ -391,7 +484,8 @@ target_version             = {target_version:?}"#,
             docstring_code = self.0.docstring_code(),
             docstring_code_line_width = self.0.docstring_code_line_width(),
             preview = self.0.preview(),
-            target_version = self.0.target_version()
+            target_version = self.0.target_version(),
+            source_type = self.0.source_type()
         )
     }
 }

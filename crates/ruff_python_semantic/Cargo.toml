@@ -10,22 +10,28 @@ documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 
-[lib]
-
 [dependencies]
-ruff_index = { path = "../ruff_index" }
-ruff_python_ast = { path = "../ruff_python_ast" }
-ruff_python_stdlib = { path = "../ruff_python_stdlib" }
-ruff_source_file = { path = "../ruff_source_file" }
-ruff_text_size = { path = "../ruff_text_size" }
+ruff_cache = { workspace = true }
+ruff_index = { workspace = true }
+ruff_macros = { workspace = true }
+ruff_python_ast = { workspace = true }
+ruff_python_parser = { workspace = true }
+ruff_python_stdlib = { workspace = true }
+ruff_source_file = { workspace = true }
+ruff_text_size = { workspace = true }
 
 bitflags = { workspace = true }
 is-macro = { workspace = true }
 rustc-hash = { workspace = true }
-smallvec = { workspace = true }
+schemars = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
 
 [dev-dependencies]
-ruff_python_parser = { path = "../ruff_python_parser" }
+ruff_python_parser = { workspace = true }
 
 [lints]
 workspace = true
+
+[package.metadata.cargo-shear]
+# Used via `CacheKey` macro expansion.
+ignored = ["ruff_cache"]

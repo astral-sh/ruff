@@ -3,6 +3,7 @@ panics, fix errors and similar problems.
 
 It's a less elaborate, more hacky version of check_ecosystem.py
 """
+
 from __future__ import annotations
 
 import json

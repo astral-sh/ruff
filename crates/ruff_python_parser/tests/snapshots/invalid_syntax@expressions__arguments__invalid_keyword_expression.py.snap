@@ -1,0 +1,229 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/arguments/invalid_keyword_expression.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..69,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..17,
+                    value: Call(
+                        ExprCall {
+                            range: 0..17,
+                            func: Name(
+                                ExprName {
+                                    range: 0..4,
+                                    id: Name("call"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 4..17,
+                                args: [],
+                                keywords: [
+                                    Keyword {
+                                        range: 5..16,
+                                        arg: Some(
+                                            Identifier {
+                                                id: Name("x"),
+                                                range: 5..6,
+                                            },
+                                        ),
+                                        value: Yield(
+                                            ExprYield {
+                                                range: 9..16,
+                                                value: Some(
+                                                    Name(
+                                                        ExprName {
+                                                            range: 15..16,
+                                                            id: Name("y"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 18..40,
+                    value: Call(
+                        ExprCall {
+                            range: 18..40,
+                            func: Name(
+                                ExprName {
+                                    range: 18..22,
+                                    id: Name("call"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 22..40,
+                                args: [],
+                                keywords: [
+                                    Keyword {
+                                        range: 23..39,
+                                        arg: Some(
+                                            Identifier {
+                                                id: Name("x"),
+                                                range: 23..24,
+                                            },
+                                        ),
+                                        value: YieldFrom(
+                                            ExprYieldFrom {
+                                                range: 27..39,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 38..39,
+                                                        id: Name("y"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 41..53,
+                    value: Call(
+                        ExprCall {
+                            range: 41..53,
+                            func: Name(
+                                ExprName {
+                                    range: 41..45,
+                                    id: Name("call"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 45..53,
+                                args: [],
+                                keywords: [
+                                    Keyword {
+                                        range: 46..52,
+                                        arg: Some(
+                                            Identifier {
+                                                id: Name("x"),
+                                                range: 46..47,
+                                            },
+                                        ),
+                                        value: Starred(
+                                            ExprStarred {
+                                                range: 50..52,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 51..52,
+                                                        id: Name("y"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 54..68,
+                    value: Call(
+                        ExprCall {
+                            range: 54..68,
+                            func: Name(
+                                ExprName {
+                                    range: 54..58,
+                                    id: Name("call"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 58..68,
+                                args: [],
+                                keywords: [
+                                    Keyword {
+                                        range: 59..67,
+                                        arg: Some(
+                                            Identifier {
+                                                id: Name("x"),
+                                                range: 59..60,
+                                            },
+                                        ),
+                                        value: Starred(
+                                            ExprStarred {
+                                                range: 64..66,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 65..66,
+                                                        id: Name("y"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ],
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | call(x = yield y)
+  |          ^^^^^^^ Syntax Error: Yield expression cannot be used here
+2 | call(x = yield from y)
+3 | call(x = *y)
+  |
+
+
+  |
+1 | call(x = yield y)
+2 | call(x = yield from y)
+  |          ^^^^^^^^^^^^ Syntax Error: Yield expression cannot be used here
+3 | call(x = *y)
+4 | call(x = (*y))
+  |
+
+
+  |
+1 | call(x = yield y)
+2 | call(x = yield from y)
+3 | call(x = *y)
+  |          ^^ Syntax Error: Starred expression cannot be used here
+4 | call(x = (*y))
+  |
+
+
+  |
+2 | call(x = yield from y)
+3 | call(x = *y)
+4 | call(x = (*y))
+  |           ^^ Syntax Error: Starred expression cannot be used here
+  |

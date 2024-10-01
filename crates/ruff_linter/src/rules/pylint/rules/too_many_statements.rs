@@ -8,7 +8,7 @@ use ruff_python_ast::identifier::Identifier;
 /// Checks for functions or methods with too many statements.
 ///
 /// By default, this rule allows up to 50 statements, as configured by the
-/// [`pylint.max-statements`] option.
+/// [`lint.pylint.max-statements`] option.
 ///
 /// ## Why is this bad?
 /// Functions or methods with many statements are harder to understand
@@ -44,7 +44,7 @@ use ruff_python_ast::identifier::Identifier;
 /// ```
 ///
 /// ## Options
-/// - `pylint.max-statements`
+/// - `lint.pylint.max-statements`
 #[violation]
 pub struct TooManyStatements {
     statements: usize,
@@ -90,6 +90,7 @@ fn num_statements(stmts: &[Stmt]) -> usize {
             Stmt::Match(ast::StmtMatch { cases, .. }) => {
                 count += 1;
                 for case in cases {
+                    count += 1;
                     count += num_statements(&case.body);
                 }
             }
@@ -157,9 +158,15 @@ pub(crate) fn too_many_statements(
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use ruff_python_parser::parse_suite;
+
+    use ruff_python_ast::Suite;
+    use ruff_python_parser::parse_module;
 
     use super::num_statements;
+
+    fn parse_suite(source: &str) -> Result<Suite> {
+        Ok(parse_module(source)?.into_suite())
+    }
 
     #[test]
     fn pass() -> Result<()> {
@@ -230,6 +237,21 @@ def f():
 ";
         let stmts = parse_suite(source)?;
         assert_eq!(num_statements(&stmts), 9);
+        Ok(())
+    }
+
+    #[test]
+    fn match_case() -> Result<()> {
+        let source: &str = r"
+def f():
+    match x:
+        case 3:
+            pass
+        case _:
+            pass
+";
+        let stmts = parse_suite(source)?;
+        assert_eq!(num_statements(&stmts), 6);
         Ok(())
     }
 

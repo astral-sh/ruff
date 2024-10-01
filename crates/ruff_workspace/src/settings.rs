@@ -1,9 +1,10 @@
 use path_absolutize::path_dedot;
 use ruff_cache::cache_dir;
 use ruff_formatter::{FormatOptions, IndentStyle, IndentWidth, LineWidth};
+use ruff_graph::AnalyzeSettings;
 use ruff_linter::display_settings;
 use ruff_linter::settings::types::{
-    ExtensionMapping, FilePattern, FilePatternSet, SerializationFormat, UnsafeFixes,
+    ExtensionMapping, FilePattern, FilePatternSet, OutputFormat, UnsafeFixes,
 };
 use ruff_linter::settings::LinterSettings;
 use ruff_macros::CacheKey;
@@ -28,15 +29,14 @@ pub struct Settings {
     #[cache_key(ignore)]
     pub unsafe_fixes: UnsafeFixes,
     #[cache_key(ignore)]
-    pub output_format: SerializationFormat,
+    pub output_format: OutputFormat,
     #[cache_key(ignore)]
     pub show_fixes: bool,
-    #[cache_key(ignore)]
-    pub show_source: bool,
 
     pub file_resolver: FileResolverSettings,
     pub linter: LinterSettings,
     pub formatter: FormatterSettings,
+    pub analyze: AnalyzeSettings,
 }
 
 impl Default for Settings {
@@ -46,13 +46,13 @@ impl Default for Settings {
             cache_dir: cache_dir(project_root),
             fix: false,
             fix_only: false,
-            output_format: SerializationFormat::default(),
+            output_format: OutputFormat::default(),
             show_fixes: false,
-            show_source: false,
             unsafe_fixes: UnsafeFixes::default(),
             linter: LinterSettings::new(project_root),
             file_resolver: FileResolverSettings::new(project_root),
             formatter: FormatterSettings::default(),
+            analyze: AnalyzeSettings::default(),
         }
     }
 }
@@ -63,18 +63,16 @@ impl fmt::Display for Settings {
         display_settings! {
             formatter = f,
             fields = [
-                // We want the quotes and lossy UTF8 conversion for this path, so
-                // using PathBuf's `Debug` formatter suffices.
-                self.cache_dir     | debug,
+                self.cache_dir     | path,
                 self.fix,
                 self.fix_only,
                 self.output_format,
                 self.show_fixes,
-                self.show_source,
                 self.unsafe_fixes,
                 self.file_resolver | nested,
                 self.linter        | nested,
-                self.formatter     | nested
+                self.formatter     | nested,
+                self.analyze       | nested,
             ]
         }
         Ok(())
@@ -105,7 +103,7 @@ impl fmt::Display for FileResolverSettings {
                 self.include,
                 self.extend_include,
                 self.respect_gitignore,
-                self.project_root | debug,
+                self.project_root | path,
             ]
         }
         Ok(())
@@ -134,7 +132,6 @@ pub(crate) static EXCLUDE: &[FilePattern] = &[
     FilePattern::Builtin("__pypackages__"),
     FilePattern::Builtin("_build"),
     FilePattern::Builtin("buck-out"),
-    FilePattern::Builtin("build"),
     FilePattern::Builtin("dist"),
     FilePattern::Builtin("node_modules"),
     FilePattern::Builtin("site-packages"),
@@ -144,6 +141,7 @@ pub(crate) static EXCLUDE: &[FilePattern] = &[
 pub(crate) static INCLUDE: &[FilePattern] = &[
     FilePattern::Builtin("*.py"),
     FilePattern::Builtin("*.pyi"),
+    FilePattern::Builtin("*.ipynb"),
     FilePattern::Builtin("**/pyproject.toml"),
 ];
 

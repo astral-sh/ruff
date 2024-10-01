@@ -1,0 +1,258 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/assign_stmt_invalid_target.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..58,
+        body: [
+            Assign(
+                StmtAssign {
+                    range: 0..5,
+                    targets: [
+                        NumberLiteral(
+                            ExprNumberLiteral {
+                                range: 0..1,
+                                value: Int(
+                                    1,
+                                ),
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 4..5,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 6..15,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 6..7,
+                                id: Name("x"),
+                                ctx: Store,
+                            },
+                        ),
+                        NumberLiteral(
+                            ExprNumberLiteral {
+                                range: 10..11,
+                                value: Int(
+                                    1,
+                                ),
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 14..15,
+                            value: Int(
+                                2,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 16..33,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 16..17,
+                                id: Name("x"),
+                                ctx: Store,
+                            },
+                        ),
+                        NumberLiteral(
+                            ExprNumberLiteral {
+                                range: 20..21,
+                                value: Int(
+                                    1,
+                                ),
+                            },
+                        ),
+                        Name(
+                            ExprName {
+                                range: 24..25,
+                                id: Name("y"),
+                                ctx: Store,
+                            },
+                        ),
+                        NumberLiteral(
+                            ExprNumberLiteral {
+                                range: 28..29,
+                                value: Int(
+                                    2,
+                                ),
+                            },
+                        ),
+                    ],
+                    value: Name(
+                        ExprName {
+                            range: 32..33,
+                            id: Name("z"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 34..57,
+                    targets: [
+                        List(
+                            ExprList {
+                                range: 34..44,
+                                elts: [
+                                    StringLiteral(
+                                        ExprStringLiteral {
+                                            range: 35..38,
+                                            value: StringLiteralValue {
+                                                inner: Single(
+                                                    StringLiteral {
+                                                        range: 35..38,
+                                                        value: "a",
+                                                        flags: StringLiteralFlags {
+                                                            quote_style: Double,
+                                                            prefix: Empty,
+                                                            triple_quoted: false,
+                                                        },
+                                                    },
+                                                ),
+                                            },
+                                        },
+                                    ),
+                                    StringLiteral(
+                                        ExprStringLiteral {
+                                            range: 40..43,
+                                            value: StringLiteralValue {
+                                                inner: Single(
+                                                    StringLiteral {
+                                                        range: 40..43,
+                                                        value: "b",
+                                                        flags: StringLiteralFlags {
+                                                            quote_style: Double,
+                                                            prefix: Empty,
+                                                            triple_quoted: false,
+                                                        },
+                                                    },
+                                                ),
+                                            },
+                                        },
+                                    ),
+                                ],
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: List(
+                        ExprList {
+                            range: 47..57,
+                            elts: [
+                                StringLiteral(
+                                    ExprStringLiteral {
+                                        range: 48..51,
+                                        value: StringLiteralValue {
+                                            inner: Single(
+                                                StringLiteral {
+                                                    range: 48..51,
+                                                    value: "a",
+                                                    flags: StringLiteralFlags {
+                                                        quote_style: Double,
+                                                        prefix: Empty,
+                                                        triple_quoted: false,
+                                                    },
+                                                },
+                                            ),
+                                        },
+                                    },
+                                ),
+                                StringLiteral(
+                                    ExprStringLiteral {
+                                        range: 53..56,
+                                        value: StringLiteralValue {
+                                            inner: Single(
+                                                StringLiteral {
+                                                    range: 53..56,
+                                                    value: "b",
+                                                    flags: StringLiteralFlags {
+                                                        quote_style: Double,
+                                                        prefix: Empty,
+                                                        triple_quoted: false,
+                                                    },
+                                                },
+                                            ),
+                                        },
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | 1 = 1
+  | ^ Syntax Error: Invalid assignment target
+2 | x = 1 = 2
+3 | x = 1 = y = 2 = z
+  |
+
+
+  |
+1 | 1 = 1
+2 | x = 1 = 2
+  |     ^ Syntax Error: Invalid assignment target
+3 | x = 1 = y = 2 = z
+4 | ["a", "b"] = ["a", "b"]
+  |
+
+
+  |
+1 | 1 = 1
+2 | x = 1 = 2
+3 | x = 1 = y = 2 = z
+  |     ^ Syntax Error: Invalid assignment target
+4 | ["a", "b"] = ["a", "b"]
+  |
+
+
+  |
+1 | 1 = 1
+2 | x = 1 = 2
+3 | x = 1 = y = 2 = z
+  |             ^ Syntax Error: Invalid assignment target
+4 | ["a", "b"] = ["a", "b"]
+  |
+
+
+  |
+2 | x = 1 = 2
+3 | x = 1 = y = 2 = z
+4 | ["a", "b"] = ["a", "b"]
+  |  ^^^ Syntax Error: Invalid assignment target
+  |
+
+
+  |
+2 | x = 1 = 2
+3 | x = 1 = y = 2 = z
+4 | ["a", "b"] = ["a", "b"]
+  |       ^^^ Syntax Error: Invalid assignment target
+  |

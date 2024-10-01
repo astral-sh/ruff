@@ -1,0 +1,41 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/statements/with/unclosed_ambiguous_lpar_eof.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..6,
+        body: [
+            With(
+                StmtWith {
+                    range: 0..6,
+                    is_async: false,
+                    items: [
+                        WithItem {
+                            range: 5..6,
+                            context_expr: Name(
+                                ExprName {
+                                    range: 6..6,
+                                    id: Name(""),
+                                    ctx: Invalid,
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                    ],
+                    body: [],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | with (
+  |        Syntax Error: unexpected EOF while parsing
+  |

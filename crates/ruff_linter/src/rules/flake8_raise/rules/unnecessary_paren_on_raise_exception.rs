@@ -76,15 +76,36 @@ pub(crate) fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: 
             None
         };
 
-        // `ctypes.WinError()` is a function, not a class. It's part of the standard library, so
-        // we might as well get it right.
-        if exception_type.is_none()
-            && checker
+        if exception_type.is_none() {
+            // If the method name doesn't _look_ like a class (i.e., it's lowercase), it's
+            // probably a function call, not a class.
+            let identifier = match func.as_ref() {
+                Expr::Name(ast::ExprName { id, .. }) => Some(id.as_str()),
+                Expr::Attribute(ast::ExprAttribute { attr, .. }) => Some(attr.as_str()),
+                _ => None,
+            };
+            if identifier.is_some_and(|identifier| {
+                identifier
+                    .strip_prefix('_')
+                    .unwrap_or(identifier)
+                    .chars()
+                    .next()
+                    .is_some_and(char::is_lowercase)
+            }) {
+                return;
+            }
+
+            // `ctypes.WinError()` is a function, not a class. It's part of the standard library, so
+            // we might as well get it right.
+            if checker
                 .semantic()
-                .resolve_call_path(func)
-                .is_some_and(|call_path| matches!(call_path.as_slice(), ["ctypes", "WinError"]))
-        {
-            return;
+                .resolve_qualified_name(func)
+                .is_some_and(|qualified_name| {
+                    matches!(qualified_name.segments(), ["ctypes", "WinError"])
+                })
+            {
+                return;
+            }
         }
 
         let mut diagnostic = Diagnostic::new(UnnecessaryParenOnRaiseException, arguments.range());

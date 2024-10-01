@@ -1,0 +1,97 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/function_def_parameter_range.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..56,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 0..55,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 4..7,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 7..43,
+                        posonlyargs: [],
+                        args: [
+                            ParameterWithDefault {
+                                range: 13..23,
+                                parameter: Parameter {
+                                    range: 13..23,
+                                    name: Identifier {
+                                        id: Name("first"),
+                                        range: 13..18,
+                                    },
+                                    annotation: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 20..23,
+                                                id: Name("int"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 29..40,
+                                parameter: Parameter {
+                                    range: 29..40,
+                                    name: Identifier {
+                                        id: Name("second"),
+                                        range: 29..35,
+                                    },
+                                    annotation: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 37..40,
+                                                id: Name("int"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                },
+                                default: None,
+                            },
+                        ],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: Some(
+                        Name(
+                            ExprName {
+                                range: 47..50,
+                                id: Name("int"),
+                                ctx: Load,
+                            },
+                        ),
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 52..55,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 52..55,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```

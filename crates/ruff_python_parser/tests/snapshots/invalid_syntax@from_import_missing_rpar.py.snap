@@ -1,0 +1,147 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/from_import_missing_rpar.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..53,
+        body: [
+            ImportFrom(
+                StmtImportFrom {
+                    range: 0..19,
+                    module: Some(
+                        Identifier {
+                            id: Name("x"),
+                            range: 5..6,
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 15..16,
+                            name: Identifier {
+                                id: Name("a"),
+                                range: 15..16,
+                            },
+                            asname: None,
+                        },
+                        Alias {
+                            range: 18..19,
+                            name: Identifier {
+                                id: Name("b"),
+                                range: 18..19,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 0,
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 20..25,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 20..25,
+                            left: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 20..21,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                            op: Add,
+                            right: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 24..25,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    range: 26..46,
+                    module: Some(
+                        Identifier {
+                            id: Name("x"),
+                            range: 31..32,
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 41..42,
+                            name: Identifier {
+                                id: Name("a"),
+                                range: 41..42,
+                            },
+                            asname: None,
+                        },
+                        Alias {
+                            range: 44..45,
+                            name: Identifier {
+                                id: Name("b"),
+                                range: 44..45,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 0,
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 47..52,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 47..52,
+                            left: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 47..48,
+                                    value: Int(
+                                        2,
+                                    ),
+                                },
+                            ),
+                            op: Add,
+                            right: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 51..52,
+                                    value: Int(
+                                        2,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | from x import (a, b
+  |                    ^ Syntax Error: Expected ')', found newline
+2 | 1 + 1
+3 | from x import (a, b,
+4 | 2 + 2
+  |
+
+
+  |
+1 | from x import (a, b
+2 | 1 + 1
+3 | from x import (a, b,
+  |                     ^ Syntax Error: Expected ')', found newline
+4 | 2 + 2
+  |

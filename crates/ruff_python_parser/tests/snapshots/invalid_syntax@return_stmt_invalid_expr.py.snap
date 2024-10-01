@@ -1,0 +1,182 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/return_stmt_invalid_expr.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..74,
+        body: [
+            Return(
+                StmtReturn {
+                    range: 0..8,
+                    value: Some(
+                        Starred(
+                            ExprStarred {
+                                range: 7..8,
+                                value: Name(
+                                    ExprName {
+                                        range: 8..8,
+                                        id: Name(""),
+                                        ctx: Invalid,
+                                    },
+                                ),
+                                ctx: Load,
+                            },
+                        ),
+                    ),
+                },
+            ),
+            Return(
+                StmtReturn {
+                    range: 9..23,
+                    value: Some(
+                        Yield(
+                            ExprYield {
+                                range: 16..23,
+                                value: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 22..23,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ),
+                    ),
+                },
+            ),
+            Return(
+                StmtReturn {
+                    range: 24..43,
+                    value: Some(
+                        YieldFrom(
+                            ExprYieldFrom {
+                                range: 31..43,
+                                value: Name(
+                                    ExprName {
+                                        range: 42..43,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                    ),
+                },
+            ),
+            Return(
+                StmtReturn {
+                    range: 44..52,
+                    value: Some(
+                        Name(
+                            ExprName {
+                                range: 51..52,
+                                id: Name("x"),
+                                ctx: Load,
+                            },
+                        ),
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 56..57,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 56..57,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Return(
+                StmtReturn {
+                    range: 58..73,
+                    value: Some(
+                        Starred(
+                            ExprStarred {
+                                range: 65..73,
+                                value: BoolOp(
+                                    ExprBoolOp {
+                                        range: 66..73,
+                                        op: And,
+                                        values: [
+                                            Name(
+                                                ExprName {
+                                                    range: 66..67,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            Name(
+                                                ExprName {
+                                                    range: 72..73,
+                                                    id: Name("y"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
+                                    },
+                                ),
+                                ctx: Load,
+                            },
+                        ),
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | return *
+  |         ^ Syntax Error: Expected an expression
+2 | return yield x
+3 | return yield from x
+4 | return x := 1
+  |
+
+
+  |
+1 | return *
+2 | return yield x
+  |        ^^^^^^^ Syntax Error: Yield expression cannot be used here
+3 | return yield from x
+4 | return x := 1
+  |
+
+
+  |
+1 | return *
+2 | return yield x
+3 | return yield from x
+  |        ^^^^^^^^^^^^ Syntax Error: Yield expression cannot be used here
+4 | return x := 1
+5 | return *x and y
+  |
+
+
+  |
+2 | return yield x
+3 | return yield from x
+4 | return x := 1
+  |          ^^ Syntax Error: Expected a statement
+5 | return *x and y
+  |
+
+
+  |
+3 | return yield from x
+4 | return x := 1
+5 | return *x and y
+  |         ^^^^^^^ Syntax Error: Boolean expression cannot be used here
+  |

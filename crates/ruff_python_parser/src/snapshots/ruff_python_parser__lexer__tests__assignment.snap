@@ -2,11 +2,13 @@
 source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_source(source)
 ---
+## Tokens
+```
 [
     (
-        Name {
-            name: "a_variable",
-        },
+        Name(
+            Name("a_variable"),
+        ),
         0..10,
     ),
     (
@@ -14,9 +16,9 @@ expression: lex_source(source)
         11..12,
     ),
     (
-        Int {
-            value: 99,
-        },
+        Int(
+            99,
+        ),
         13..15,
     ),
     (
@@ -24,9 +26,9 @@ expression: lex_source(source)
         16..17,
     ),
     (
-        Int {
-            value: 2,
-        },
+        Int(
+            2,
+        ),
         18..19,
     ),
     (
@@ -34,9 +36,9 @@ expression: lex_source(source)
         19..20,
     ),
     (
-        Int {
-            value: 0,
-        },
+        Int(
+            0,
+        ),
         20..21,
     ),
     (
@@ -44,3 +46,4 @@ expression: lex_source(source)
         21..21,
     ),
 ]
+```

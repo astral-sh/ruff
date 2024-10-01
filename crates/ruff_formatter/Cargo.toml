@@ -11,9 +11,9 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-ruff_cache = { path = "../ruff_cache" }
-ruff_macros = { path = "../ruff_macros" }
-ruff_text_size = { path = "../ruff_text_size" }
+ruff_cache = { workspace = true }
+ruff_macros = { workspace = true }
+ruff_text_size = { workspace = true }
 
 drop_bomb = { workspace = true }
 rustc-hash = { workspace = true }
@@ -24,7 +24,10 @@ tracing = { workspace = true }
 unicode-width = { workspace = true }
 
 [dev-dependencies]
-insta = { workspace = true }
+
+[package.metadata.cargo-shear]
+# Used via `CacheKey` macro expansion.
+ignored = ["ruff_cache"]
 
 [features]
 serde = ["dep:serde", "ruff_text_size/serde"]

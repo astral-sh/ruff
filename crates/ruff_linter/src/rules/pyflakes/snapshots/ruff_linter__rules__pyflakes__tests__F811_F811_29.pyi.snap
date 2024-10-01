@@ -1,0 +1,11 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F811_29.pyi:8:1: F811 Redefinition of unused `Bar` from line 3
+  |
+6 |     Bar: int  # OK
+7 | 
+8 | Bar = 1  # F811
+  | ^^^ F811
+  |
+  = help: Remove definition: `Bar`

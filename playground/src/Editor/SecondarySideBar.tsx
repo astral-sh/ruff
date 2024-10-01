@@ -20,7 +20,7 @@ export default function SecondarySideBar({
   return (
     <SideBar position="right">
       <SideBarEntry
-        title="Format (beta)"
+        title="Format"
         position={"right"}
         selected={selected === SecondaryTool.Format}
         onClick={() => onSelected(SecondaryTool.Format)}

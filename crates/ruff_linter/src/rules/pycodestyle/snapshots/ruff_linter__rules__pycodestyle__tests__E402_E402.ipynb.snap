@@ -24,6 +24,6 @@ E402.ipynb:30:1: E402 Module level import not at top of cell
    |
 30 | import no_ok
    | ^^^^^^^^^^^^ E402
+31 | 
+32 | %%time
    |
-
-

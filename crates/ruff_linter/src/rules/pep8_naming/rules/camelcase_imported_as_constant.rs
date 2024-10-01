@@ -6,7 +6,7 @@ use ruff_python_stdlib::str::{self};
 use ruff_text_size::Ranged;
 
 use crate::rules::pep8_naming::helpers;
-use crate::settings::types::IdentifierPattern;
+use crate::rules::pep8_naming::settings::IgnoreNames;
 
 /// ## What it does
 /// Checks for `CamelCase` imports that are aliased to constant-style names.
@@ -51,20 +51,17 @@ pub(crate) fn camelcase_imported_as_constant(
     asname: &str,
     alias: &Alias,
     stmt: &Stmt,
-    ignore_names: &[IdentifierPattern],
+    ignore_names: &IgnoreNames,
 ) -> Option<Diagnostic> {
-    if ignore_names
-        .iter()
-        .any(|ignore_name| ignore_name.matches(name))
-    {
-        return None;
-    }
-
     if helpers::is_camelcase(name)
         && !str::is_cased_lowercase(asname)
         && str::is_cased_uppercase(asname)
         && !helpers::is_acronym(name, asname)
     {
+        // Ignore any explicitly-allowed names.
+        if ignore_names.matches(name) || ignore_names.matches(asname) {
+            return None;
+        }
         let mut diagnostic = Diagnostic::new(
             CamelcaseImportedAsConstant {
                 name: name.to_string(),

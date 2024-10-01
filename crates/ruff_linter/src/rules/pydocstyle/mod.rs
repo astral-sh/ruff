@@ -5,14 +5,13 @@ pub mod settings;
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
     use std::path::Path;
 
     use anyhow::Result;
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::settings::types::PreviewMode;
+
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
@@ -20,6 +19,7 @@ mod tests {
 
     #[test_case(Rule::BlankLineAfterLastSection, Path::new("sections.py"))]
     #[test_case(Rule::NoBlankLineAfterSection, Path::new("sections.py"))]
+    #[test_case(Rule::BlankLineAfterLastSection, Path::new("D413.py"))]
     #[test_case(Rule::BlankLineAfterSummary, Path::new("D.py"))]
     #[test_case(Rule::NoBlankLineBeforeSection, Path::new("sections.py"))]
     #[test_case(Rule::CapitalizeSectionName, Path::new("sections.py"))]
@@ -29,7 +29,9 @@ mod tests {
     #[test_case(Rule::UndocumentedParam, Path::new("sections.py"))]
     #[test_case(Rule::EndsInPeriod, Path::new("D.py"))]
     #[test_case(Rule::EndsInPeriod, Path::new("D400.py"))]
+    #[test_case(Rule::EndsInPeriod, Path::new("D400_415.py"))]
     #[test_case(Rule::EndsInPunctuation, Path::new("D.py"))]
+    #[test_case(Rule::EndsInPunctuation, Path::new("D400_415.py"))]
     #[test_case(Rule::FirstLineCapitalized, Path::new("D.py"))]
     #[test_case(Rule::FirstLineCapitalized, Path::new("D403.py"))]
     #[test_case(Rule::FitsOnOneLine, Path::new("D.py"))]
@@ -45,9 +47,11 @@ mod tests {
     #[test_case(Rule::BlankLineBeforeClass, Path::new("D.py"))]
     #[test_case(Rule::NoBlankLineBeforeFunction, Path::new("D.py"))]
     #[test_case(Rule::BlankLinesBetweenHeaderAndContent, Path::new("sections.py"))]
+    #[test_case(Rule::BlankLinesBetweenHeaderAndContent, Path::new("sphinx.py"))]
     #[test_case(Rule::OverIndentation, Path::new("D.py"))]
     #[test_case(Rule::OverIndentation, Path::new("D208.py"))]
     #[test_case(Rule::NoSignature, Path::new("D.py"))]
+    #[test_case(Rule::NoSignature, Path::new("D402.py"))]
     #[test_case(Rule::SurroundingWhitespace, Path::new("D.py"))]
     #[test_case(Rule::DocstringStartsWithThis, Path::new("D.py"))]
     #[test_case(Rule::UnderIndentation, Path::new("D.py"))]
@@ -96,40 +100,11 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pydocstyle").join(path).as_path(),
             &settings::LinterSettings {
-                pydocstyle: Settings {
-                    convention: None,
-                    ignore_decorators: BTreeSet::from_iter(["functools.wraps".to_string()]),
-                    property_decorators: BTreeSet::from_iter([
-                        "gi.repository.GObject.Property".to_string()
-                    ]),
-                },
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
-        )?;
-        assert_messages!(snapshot, diagnostics);
-        Ok(())
-    }
-
-    #[test_case(Rule::TripleSingleQuotes, Path::new("D.py"))]
-    #[test_case(Rule::TripleSingleQuotes, Path::new("D300.py"))]
-    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        // Tests for rules with preview features
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
-        let diagnostics = test_path(
-            Path::new("pydocstyle").join(path).as_path(),
-            &settings::LinterSettings {
-                pydocstyle: Settings {
-                    convention: None,
-                    ignore_decorators: BTreeSet::from_iter(["functools.wraps".to_string()]),
-                    property_decorators: BTreeSet::from_iter([
-                        "gi.repository.GObject.Property".to_string()
-                    ]),
-                },
-                preview: PreviewMode::Enabled,
+                pydocstyle: Settings::new(
+                    None,
+                    ["functools.wraps".to_string()],
+                    ["gi.repository.GObject.Property".to_string()],
+                ),
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
@@ -154,11 +129,7 @@ mod tests {
             &settings::LinterSettings {
                 // When inferring the convention, we'll see a few false negatives.
                 // See: https://github.com/PyCQA/pydocstyle/issues/459.
-                pydocstyle: Settings {
-                    convention: None,
-                    ignore_decorators: BTreeSet::new(),
-                    property_decorators: BTreeSet::new(),
-                },
+                pydocstyle: Settings::default(),
                 ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
             },
         )?;
@@ -172,11 +143,7 @@ mod tests {
             Path::new("pydocstyle/D417.py"),
             &settings::LinterSettings {
                 // With explicit Google convention, we should flag every function.
-                pydocstyle: Settings {
-                    convention: Some(Convention::Google),
-                    ignore_decorators: BTreeSet::new(),
-                    property_decorators: BTreeSet::new(),
-                },
+                pydocstyle: Settings::new(Some(Convention::Google), [], []),
                 ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
             },
         )?;
@@ -189,12 +156,8 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pydocstyle/D417.py"),
             &settings::LinterSettings {
-                // With explicit Google convention, we shouldn't flag anything.
-                pydocstyle: Settings {
-                    convention: Some(Convention::Numpy),
-                    ignore_decorators: BTreeSet::new(),
-                    property_decorators: BTreeSet::new(),
-                },
+                // With explicit numpy convention, we shouldn't flag anything.
+                pydocstyle: Settings::new(Some(Convention::Numpy), [], []),
                 ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
             },
         )?;

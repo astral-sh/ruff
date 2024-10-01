@@ -1,27 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-D410.py:2:5: D410 [*] Missing blank line after section ("Parameters")
-   |
- 1 |   def f(a: int, b: int) -> int:
- 2 |       """Showcase function.
-   |  _____^
- 3 | | 
- 4 | |     Parameters
- 5 | |     ----------
- 6 | |     a : int
- 7 | |         _description_
- 8 | |     b : int
- 9 | |         _description_
-10 | |     Returns
-11 | |     -------
-12 | |     int
-13 | |         _description
-14 | |     """
-   | |_______^ D410
-15 |       return b - a
-   |
-   = help: Add blank line after "Parameters"
+D410.py:4:5: D410 [*] Missing blank line after section ("Parameters")
+  |
+2 |     """Showcase function.
+3 | 
+4 |     Parameters
+  |     ^^^^^^^^^^ D410
+5 |     ----------
+6 |     a : int
+  |
+  = help: Add blank line after "Parameters"
 
 ℹ Safe fix
 7  7  |         _description_
@@ -32,18 +21,14 @@ D410.py:2:5: D410 [*] Missing blank line after section ("Parameters")
 11 12 |     -------
 12 13 |     int
 
-D410.py:19:5: D410 [*] Missing blank line after section ("Parameters")
+D410.py:21:5: D410 [*] Missing blank line after section ("Parameters")
    |
-18 |   def f() -> int:
-19 |       """Showcase function.
-   |  _____^
-20 | | 
-21 | |     Parameters
-22 | |     ----------
-23 | |     Returns
-24 | |     -------
-25 | |     """
-   | |_______^ D410
+19 |     """Showcase function.
+20 | 
+21 |     Parameters
+   |     ^^^^^^^^^^ D410
+22 |     ----------
+23 |     Returns
    |
    = help: Add blank line after "Parameters"
 
@@ -55,5 +40,3 @@ D410.py:19:5: D410 [*] Missing blank line after section ("Parameters")
 23 24 |     Returns
 24 25 |     -------
 25 26 |     """
-
-

@@ -5,7 +5,6 @@ use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 use crate::rules::{
     flake8_bandit, flake8_blind_except, flake8_bugbear, flake8_builtins, pycodestyle, pylint,
-    tryceratops,
 };
 
 /// Run lint rules over an [`ExceptHandler`] syntax node.
@@ -66,19 +65,16 @@ pub(crate) fn except_handler(except_handler: &ExceptHandler, checker: &mut Check
             if checker.enabled(Rule::ExceptWithNonExceptionClasses) {
                 flake8_bugbear::rules::except_with_non_exception_classes(checker, except_handler);
             }
-            if checker.enabled(Rule::ReraiseNoCause) {
-                tryceratops::rules::reraise_no_cause(checker, body);
-            }
             if checker.enabled(Rule::BinaryOpException) {
                 pylint::rules::binary_op_exception(checker, except_handler);
             }
             if let Some(name) = name {
                 if checker.enabled(Rule::AmbiguousVariableName) {
-                    if let Some(diagnostic) =
-                        pycodestyle::rules::ambiguous_variable_name(name.as_str(), name.range())
-                    {
-                        checker.diagnostics.push(diagnostic);
-                    }
+                    pycodestyle::rules::ambiguous_variable_name(
+                        checker,
+                        name.as_str(),
+                        name.range(),
+                    );
                 }
                 if checker.enabled(Rule::BuiltinVariableShadowing) {
                     flake8_builtins::rules::builtin_variable_shadowing(checker, name, name.range());

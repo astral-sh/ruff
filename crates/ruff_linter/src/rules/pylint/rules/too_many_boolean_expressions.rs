@@ -10,7 +10,7 @@ use crate::checkers::ast::Checker;
 /// Checks for too many Boolean expressions in an `if` statement.
 ///
 /// By default, this rule allows up to 5 expressions. This can be configured
-/// using the [`pylint.max-bool-expr`] option.
+/// using the [`lint.pylint.max-bool-expr`] option.
 ///
 /// ## Why is this bad?
 /// `if` statements with many Boolean expressions are harder to understand
@@ -24,7 +24,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## Options
-/// - `pylint.max-bool-expr`
+/// - `lint.pylint.max-bool-expr`
 #[violation]
 pub struct TooManyBooleanExpressions {
     expressions: usize,

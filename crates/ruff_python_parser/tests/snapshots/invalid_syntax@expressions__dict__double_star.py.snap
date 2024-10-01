@@ -1,0 +1,575 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/dict/double_star.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..278,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 125..135,
+                    value: Dict(
+                        ExprDict {
+                            range: 125..135,
+                            items: [
+                                DictItem {
+                                    key: None,
+                                    value: Name(
+                                        ExprName {
+                                            range: 128..129,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                                DictItem {
+                                    key: Some(
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 133..134,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                    value: Name(
+                                        ExprName {
+                                            range: 134..134,
+                                            id: Name(""),
+                                            ctx: Invalid,
+                                        },
+                                    ),
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 136..162,
+                    value: Dict(
+                        ExprDict {
+                            range: 136..162,
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 137..138,
+                                                id: Name("a"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 140..141,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                },
+                                DictItem {
+                                    key: None,
+                                    value: If(
+                                        ExprIf {
+                                            range: 145..161,
+                                            test: BooleanLiteral(
+                                                ExprBooleanLiteral {
+                                                    range: 150..154,
+                                                    value: true,
+                                                },
+                                            ),
+                                            body: Name(
+                                                ExprName {
+                                                    range: 145..146,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            orelse: Name(
+                                                ExprName {
+                                                    range: 160..161,
+                                                    id: Name("y"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 163..184,
+                    value: Dict(
+                        ExprDict {
+                            range: 163..184,
+                            items: [
+                                DictItem {
+                                    key: None,
+                                    value: Lambda(
+                                        ExprLambda {
+                                            range: 166..177,
+                                            parameters: Some(
+                                                Parameters {
+                                                    range: 173..174,
+                                                    posonlyargs: [],
+                                                    args: [
+                                                        ParameterWithDefault {
+                                                            range: 173..174,
+                                                            parameter: Parameter {
+                                                                range: 173..174,
+                                                                name: Identifier {
+                                                                    id: Name("x"),
+                                                                    range: 173..174,
+                                                                },
+                                                                annotation: None,
+                                                            },
+                                                            default: None,
+                                                        },
+                                                    ],
+                                                    vararg: None,
+                                                    kwonlyargs: [],
+                                                    kwarg: None,
+                                                },
+                                            ),
+                                            body: Name(
+                                                ExprName {
+                                                    range: 176..177,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                },
+                                DictItem {
+                                    key: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 179..180,
+                                                id: Name("b"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 182..183,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 185..201,
+                    value: Dict(
+                        ExprDict {
+                            range: 185..201,
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 186..187,
+                                                id: Name("a"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 189..190,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                },
+                                DictItem {
+                                    key: None,
+                                    value: BoolOp(
+                                        ExprBoolOp {
+                                            range: 194..200,
+                                            op: Or,
+                                            values: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 194..195,
+                                                        id: Name("x"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        range: 199..200,
+                                                        id: Name("y"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                        },
+                                    ),
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 202..219,
+                    value: Dict(
+                        ExprDict {
+                            range: 202..219,
+                            items: [
+                                DictItem {
+                                    key: None,
+                                    value: BoolOp(
+                                        ExprBoolOp {
+                                            range: 205..212,
+                                            op: And,
+                                            values: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 205..206,
+                                                        id: Name("x"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        range: 211..212,
+                                                        id: Name("y"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                        },
+                                    ),
+                                },
+                                DictItem {
+                                    key: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 214..215,
+                                                id: Name("b"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 217..218,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 220..241,
+                    value: Dict(
+                        ExprDict {
+                            range: 220..241,
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 221..222,
+                                                id: Name("a"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 224..225,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                },
+                                DictItem {
+                                    key: None,
+                                    value: UnaryOp(
+                                        ExprUnaryOp {
+                                            range: 229..234,
+                                            op: Not,
+                                            operand: Name(
+                                                ExprName {
+                                                    range: 233..234,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                },
+                                DictItem {
+                                    key: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 236..237,
+                                                id: Name("b"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 239..240,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 242..252,
+                    value: Dict(
+                        ExprDict {
+                            range: 242..252,
+                            items: [
+                                DictItem {
+                                    key: None,
+                                    value: Compare(
+                                        ExprCompare {
+                                            range: 245..251,
+                                            left: Name(
+                                                ExprName {
+                                                    range: 245..246,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            ops: [
+                                                In,
+                                            ],
+                                            comparators: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 250..251,
+                                                        id: Name("y"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                        },
+                                    ),
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 253..267,
+                    value: Dict(
+                        ExprDict {
+                            range: 253..267,
+                            items: [
+                                DictItem {
+                                    key: None,
+                                    value: Compare(
+                                        ExprCompare {
+                                            range: 256..266,
+                                            left: Name(
+                                                ExprName {
+                                                    range: 256..257,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            ops: [
+                                                NotIn,
+                                            ],
+                                            comparators: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 265..266,
+                                                        id: Name("y"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                        },
+                                    ),
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 268..277,
+                    value: Dict(
+                        ExprDict {
+                            range: 268..277,
+                            items: [
+                                DictItem {
+                                    key: None,
+                                    value: Compare(
+                                        ExprCompare {
+                                            range: 271..276,
+                                            left: Name(
+                                                ExprName {
+                                                    range: 271..272,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            ops: [
+                                                Lt,
+                                            ],
+                                            comparators: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 275..276,
+                                                        id: Name("y"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                        },
+                                    ),
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+2 | # the ones which are higher than that.
+3 | 
+4 | {**x := 1}
+  |      ^^ Syntax Error: Expected ',', found ':='
+5 | {a: 1, **x if True else y}
+6 | {**lambda x: x, b: 2}
+  |
+
+
+  |
+2 | # the ones which are higher than that.
+3 | 
+4 | {**x := 1}
+  |          ^ Syntax Error: Expected ':', found '}'
+5 | {a: 1, **x if True else y}
+6 | {**lambda x: x, b: 2}
+  |
+
+
+  |
+4 | {**x := 1}
+5 | {a: 1, **x if True else y}
+  |          ^^^^^^^^^^^^^^^^ Syntax Error: Conditional expression cannot be used here
+6 | {**lambda x: x, b: 2}
+7 | {a: 1, **x or y}
+  |
+
+
+  |
+4 | {**x := 1}
+5 | {a: 1, **x if True else y}
+6 | {**lambda x: x, b: 2}
+  |    ^^^^^^^^^^^ Syntax Error: Lambda expression cannot be used here
+7 | {a: 1, **x or y}
+8 | {**x and y, b: 2}
+  |
+
+
+  |
+5 | {a: 1, **x if True else y}
+6 | {**lambda x: x, b: 2}
+7 | {a: 1, **x or y}
+  |          ^^^^^^ Syntax Error: Boolean expression cannot be used here
+8 | {**x and y, b: 2}
+9 | {a: 1, **not x, b: 2}
+  |
+
+
+   |
+ 6 | {**lambda x: x, b: 2}
+ 7 | {a: 1, **x or y}
+ 8 | {**x and y, b: 2}
+   |    ^^^^^^^ Syntax Error: Boolean expression cannot be used here
+ 9 | {a: 1, **not x, b: 2}
+10 | {**x in y}
+   |
+
+
+   |
+ 7 | {a: 1, **x or y}
+ 8 | {**x and y, b: 2}
+ 9 | {a: 1, **not x, b: 2}
+   |          ^^^^^ Syntax Error: Boolean expression cannot be used here
+10 | {**x in y}
+11 | {**x not in y}
+   |
+
+
+   |
+ 8 | {**x and y, b: 2}
+ 9 | {a: 1, **not x, b: 2}
+10 | {**x in y}
+   |    ^^^^^^ Syntax Error: Comparison expression cannot be used here
+11 | {**x not in y}
+12 | {**x < y}
+   |
+
+
+   |
+ 9 | {a: 1, **not x, b: 2}
+10 | {**x in y}
+11 | {**x not in y}
+   |    ^^^^^^^^^^ Syntax Error: Comparison expression cannot be used here
+12 | {**x < y}
+   |
+
+
+   |
+10 | {**x in y}
+11 | {**x not in y}
+12 | {**x < y}
+   |    ^^^^^ Syntax Error: Comparison expression cannot be used here
+   |

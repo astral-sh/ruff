@@ -58,3 +58,8 @@ for key in (
         .keys()
 ):
     continue
+
+from builtins import dict as SneakyDict
+
+d = SneakyDict()
+key in d.keys()  # SIM118

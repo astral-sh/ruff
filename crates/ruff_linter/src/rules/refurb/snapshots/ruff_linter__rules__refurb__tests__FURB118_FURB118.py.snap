@@ -617,7 +617,7 @@ FURB118.py:27:9: FURB118 [*] Use `operator.is_` instead of defining a lambda
    28 |+op_is = operator.is_
 28 29 | op_isnot = lambda x, y: x is not y
 29 30 | op_in = lambda x, y: y in x
-30 31 | 
+30 31 | op_itemgetter = lambda x: x[0]
 
 FURB118.py:28:12: FURB118 [*] Use `operator.is_not` instead of defining a lambda
    |
@@ -626,6 +626,7 @@ FURB118.py:28:12: FURB118 [*] Use `operator.is_not` instead of defining a lambda
 28 | op_isnot = lambda x, y: x is not y
    |            ^^^^^^^^^^^^^^^^^^^^^^^ FURB118
 29 | op_in = lambda x, y: y in x
+30 | op_itemgetter = lambda x: x[0]
    |
    = help: Replace with `operator.is_not`
 
@@ -642,8 +643,8 @@ FURB118.py:28:12: FURB118 [*] Use `operator.is_not` instead of defining a lambda
 28    |-op_isnot = lambda x, y: x is not y
    29 |+op_isnot = operator.is_not
 29 30 | op_in = lambda x, y: y in x
-30 31 | 
-31 32 | 
+30 31 | op_itemgetter = lambda x: x[0]
+31 32 | op_itemgetter = lambda x: (x[0], x[1], x[2])
 
 FURB118.py:29:9: FURB118 [*] Use `operator.contains` instead of defining a lambda
    |
@@ -651,6 +652,8 @@ FURB118.py:29:9: FURB118 [*] Use `operator.contains` instead of defining a lambd
 28 | op_isnot = lambda x, y: x is not y
 29 | op_in = lambda x, y: y in x
    |         ^^^^^^^^^^^^^^^^^^^ FURB118
+30 | op_itemgetter = lambda x: x[0]
+31 | op_itemgetter = lambda x: (x[0], x[1], x[2])
    |
    = help: Replace with `operator.contains`
 
@@ -666,36 +669,280 @@ FURB118.py:29:9: FURB118 [*] Use `operator.contains` instead of defining a lambd
 28 29 | op_isnot = lambda x, y: x is not y
 29    |-op_in = lambda x, y: y in x
    30 |+op_in = operator.contains
-30 31 | 
-31 32 | 
-32 33 | def op_not2(x):
+30 31 | op_itemgetter = lambda x: x[0]
+31 32 | op_itemgetter = lambda x: (x[0], x[1], x[2])
+32 33 | op_itemgetter = lambda x: (x[1:], x[2])
 
-FURB118.py:32:1: FURB118 Use `operator.not_` instead of defining a function
+FURB118.py:30:17: FURB118 [*] Use `operator.itemgetter(0)` instead of defining a lambda
    |
-32 | / def op_not2(x):
-33 | |     return not x
-   | |________________^ FURB118
+28 | op_isnot = lambda x, y: x is not y
+29 | op_in = lambda x, y: y in x
+30 | op_itemgetter = lambda x: x[0]
+   |                 ^^^^^^^^^^^^^^ FURB118
+31 | op_itemgetter = lambda x: (x[0], x[1], x[2])
+32 | op_itemgetter = lambda x: (x[1:], x[2])
+   |
+   = help: Replace with `operator.itemgetter(0)`
+
+ℹ Safe fix
+1  1  | # Errors.
+   2  |+import operator
+2  3  | op_bitnot = lambda x: ~x
+3  4  | op_not = lambda x: not x
+4  5  | op_pos = lambda x: +x
+--------------------------------------------------------------------------------
+27 28 | op_is = lambda x, y: x is y
+28 29 | op_isnot = lambda x, y: x is not y
+29 30 | op_in = lambda x, y: y in x
+30    |-op_itemgetter = lambda x: x[0]
+   31 |+op_itemgetter = operator.itemgetter(0)
+31 32 | op_itemgetter = lambda x: (x[0], x[1], x[2])
+32 33 | op_itemgetter = lambda x: (x[1:], x[2])
+33 34 | op_itemgetter = lambda x: x[:]
+
+FURB118.py:31:17: FURB118 [*] Use `operator.itemgetter(0, 1, 2)` instead of defining a lambda
+   |
+29 | op_in = lambda x, y: y in x
+30 | op_itemgetter = lambda x: x[0]
+31 | op_itemgetter = lambda x: (x[0], x[1], x[2])
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB118
+32 | op_itemgetter = lambda x: (x[1:], x[2])
+33 | op_itemgetter = lambda x: x[:]
+   |
+   = help: Replace with `operator.itemgetter(0, 1, 2)`
+
+ℹ Safe fix
+1  1  | # Errors.
+   2  |+import operator
+2  3  | op_bitnot = lambda x: ~x
+3  4  | op_not = lambda x: not x
+4  5  | op_pos = lambda x: +x
+--------------------------------------------------------------------------------
+28 29 | op_isnot = lambda x, y: x is not y
+29 30 | op_in = lambda x, y: y in x
+30 31 | op_itemgetter = lambda x: x[0]
+31    |-op_itemgetter = lambda x: (x[0], x[1], x[2])
+   32 |+op_itemgetter = operator.itemgetter(0, 1, 2)
+32 33 | op_itemgetter = lambda x: (x[1:], x[2])
+33 34 | op_itemgetter = lambda x: x[:]
+34 35 | op_itemgetter = lambda x: x[0, 1]
+
+FURB118.py:32:17: FURB118 [*] Use `operator.itemgetter(slice(1, None), 2)` instead of defining a lambda
+   |
+30 | op_itemgetter = lambda x: x[0]
+31 | op_itemgetter = lambda x: (x[0], x[1], x[2])
+32 | op_itemgetter = lambda x: (x[1:], x[2])
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^ FURB118
+33 | op_itemgetter = lambda x: x[:]
+34 | op_itemgetter = lambda x: x[0, 1]
+   |
+   = help: Replace with `operator.itemgetter(slice(1, None), 2)`
+
+ℹ Safe fix
+1  1  | # Errors.
+   2  |+import operator
+2  3  | op_bitnot = lambda x: ~x
+3  4  | op_not = lambda x: not x
+4  5  | op_pos = lambda x: +x
+--------------------------------------------------------------------------------
+29 30 | op_in = lambda x, y: y in x
+30 31 | op_itemgetter = lambda x: x[0]
+31 32 | op_itemgetter = lambda x: (x[0], x[1], x[2])
+32    |-op_itemgetter = lambda x: (x[1:], x[2])
+   33 |+op_itemgetter = operator.itemgetter(slice(1, None), 2)
+33 34 | op_itemgetter = lambda x: x[:]
+34 35 | op_itemgetter = lambda x: x[0, 1]
+35 36 | op_itemgetter = lambda x: x[(0, 1)]
+
+FURB118.py:33:17: FURB118 [*] Use `operator.itemgetter(slice(None))` instead of defining a lambda
+   |
+31 | op_itemgetter = lambda x: (x[0], x[1], x[2])
+32 | op_itemgetter = lambda x: (x[1:], x[2])
+33 | op_itemgetter = lambda x: x[:]
+   |                 ^^^^^^^^^^^^^^ FURB118
+34 | op_itemgetter = lambda x: x[0, 1]
+35 | op_itemgetter = lambda x: x[(0, 1)]
+   |
+   = help: Replace with `operator.itemgetter(slice(None))`
+
+ℹ Safe fix
+1  1  | # Errors.
+   2  |+import operator
+2  3  | op_bitnot = lambda x: ~x
+3  4  | op_not = lambda x: not x
+4  5  | op_pos = lambda x: +x
+--------------------------------------------------------------------------------
+30 31 | op_itemgetter = lambda x: x[0]
+31 32 | op_itemgetter = lambda x: (x[0], x[1], x[2])
+32 33 | op_itemgetter = lambda x: (x[1:], x[2])
+33    |-op_itemgetter = lambda x: x[:]
+   34 |+op_itemgetter = operator.itemgetter(slice(None))
+34 35 | op_itemgetter = lambda x: x[0, 1]
+35 36 | op_itemgetter = lambda x: x[(0, 1)]
+36 37 | 
+
+FURB118.py:34:17: FURB118 [*] Use `operator.itemgetter((0, 1))` instead of defining a lambda
+   |
+32 | op_itemgetter = lambda x: (x[1:], x[2])
+33 | op_itemgetter = lambda x: x[:]
+34 | op_itemgetter = lambda x: x[0, 1]
+   |                 ^^^^^^^^^^^^^^^^^ FURB118
+35 | op_itemgetter = lambda x: x[(0, 1)]
+   |
+   = help: Replace with `operator.itemgetter((0, 1))`
+
+ℹ Safe fix
+1  1  | # Errors.
+   2  |+import operator
+2  3  | op_bitnot = lambda x: ~x
+3  4  | op_not = lambda x: not x
+4  5  | op_pos = lambda x: +x
+--------------------------------------------------------------------------------
+31 32 | op_itemgetter = lambda x: (x[0], x[1], x[2])
+32 33 | op_itemgetter = lambda x: (x[1:], x[2])
+33 34 | op_itemgetter = lambda x: x[:]
+34    |-op_itemgetter = lambda x: x[0, 1]
+   35 |+op_itemgetter = operator.itemgetter((0, 1))
+35 36 | op_itemgetter = lambda x: x[(0, 1)]
+36 37 | 
+37 38 | 
+
+FURB118.py:35:17: FURB118 [*] Use `operator.itemgetter((0, 1))` instead of defining a lambda
+   |
+33 | op_itemgetter = lambda x: x[:]
+34 | op_itemgetter = lambda x: x[0, 1]
+35 | op_itemgetter = lambda x: x[(0, 1)]
+   |                 ^^^^^^^^^^^^^^^^^^^ FURB118
+   |
+   = help: Replace with `operator.itemgetter((0, 1))`
+
+ℹ Safe fix
+1  1  | # Errors.
+   2  |+import operator
+2  3  | op_bitnot = lambda x: ~x
+3  4  | op_not = lambda x: not x
+4  5  | op_pos = lambda x: +x
+--------------------------------------------------------------------------------
+32 33 | op_itemgetter = lambda x: (x[1:], x[2])
+33 34 | op_itemgetter = lambda x: x[:]
+34 35 | op_itemgetter = lambda x: x[0, 1]
+35    |-op_itemgetter = lambda x: x[(0, 1)]
+   36 |+op_itemgetter = operator.itemgetter((0, 1))
+36 37 | 
+37 38 | 
+38 39 | def op_not2(x):
+
+FURB118.py:38:5: FURB118 Use `operator.not_` instead of defining a function
+   |
+38 | def op_not2(x):
+   |     ^^^^^^^ FURB118
+39 |     return not x
    |
    = help: Replace with `operator.not_`
 
-FURB118.py:36:1: FURB118 Use `operator.add` instead of defining a function
+FURB118.py:42:5: FURB118 Use `operator.add` instead of defining a function
    |
-36 | / def op_add2(x, y):
-37 | |     return x + y
-   | |________________^ FURB118
-   |
-   = help: Replace with `operator.add`
-
-FURB118.py:41:5: FURB118 Use `operator.add` instead of defining a function
-   |
-40 |   class Adder:
-41 |       def add(x, y):
-   |  _____^
-42 | |         return x + y
-   | |____________________^ FURB118
-43 |   
-44 |   # OK.
+42 | def op_add2(x, y):
+   |     ^^^^^^^ FURB118
+43 |     return x + y
    |
    = help: Replace with `operator.add`
 
+FURB118.py:88:17: FURB118 [*] Use `operator.itemgetter((slice(None), 1))` instead of defining a lambda
+   |
+87 | # See https://github.com/astral-sh/ruff/issues/13508
+88 | op_itemgetter = lambda x: x[:, 1]
+   |                 ^^^^^^^^^^^^^^^^^ FURB118
+89 | op_itemgetter = lambda x: x[1, :]
+   |
+   = help: Replace with `operator.itemgetter((slice(None), 1))`
 
+ℹ Safe fix
+1  1  | # Errors.
+   2  |+import operator
+2  3  | op_bitnot = lambda x: ~x
+3  4  | op_not = lambda x: not x
+4  5  | op_pos = lambda x: +x
+--------------------------------------------------------------------------------
+85 86 |         return x + y
+86 87 | 
+87 88 | # See https://github.com/astral-sh/ruff/issues/13508
+88    |-op_itemgetter = lambda x: x[:, 1]
+   89 |+op_itemgetter = operator.itemgetter((slice(None), 1))
+89 90 | op_itemgetter = lambda x: x[1, :]
+90 91 | 
+91 92 | # With a slice, trivia is dropped
+
+FURB118.py:89:17: FURB118 [*] Use `operator.itemgetter((1, slice(None)))` instead of defining a lambda
+   |
+87 | # See https://github.com/astral-sh/ruff/issues/13508
+88 | op_itemgetter = lambda x: x[:, 1]
+89 | op_itemgetter = lambda x: x[1, :]
+   |                 ^^^^^^^^^^^^^^^^^ FURB118
+90 | 
+91 | # With a slice, trivia is dropped
+   |
+   = help: Replace with `operator.itemgetter((1, slice(None)))`
+
+ℹ Safe fix
+1  1  | # Errors.
+   2  |+import operator
+2  3  | op_bitnot = lambda x: ~x
+3  4  | op_not = lambda x: not x
+4  5  | op_pos = lambda x: +x
+--------------------------------------------------------------------------------
+86 87 | 
+87 88 | # See https://github.com/astral-sh/ruff/issues/13508
+88 89 | op_itemgetter = lambda x: x[:, 1]
+89    |-op_itemgetter = lambda x: x[1, :]
+   90 |+op_itemgetter = operator.itemgetter((1, slice(None)))
+90 91 | 
+91 92 | # With a slice, trivia is dropped
+92 93 | op_itemgetter = lambda x: x[1,          :]
+
+FURB118.py:92:17: FURB118 [*] Use `operator.itemgetter((1, slice(None)))` instead of defining a lambda
+   |
+91 | # With a slice, trivia is dropped
+92 | op_itemgetter = lambda x: x[1,          :]
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB118
+93 | 
+94 | # Without a slice, trivia is retained
+   |
+   = help: Replace with `operator.itemgetter((1, slice(None)))`
+
+ℹ Safe fix
+1  1  | # Errors.
+   2  |+import operator
+2  3  | op_bitnot = lambda x: ~x
+3  4  | op_not = lambda x: not x
+4  5  | op_pos = lambda x: +x
+--------------------------------------------------------------------------------
+89 90 | op_itemgetter = lambda x: x[1, :]
+90 91 | 
+91 92 | # With a slice, trivia is dropped
+92    |-op_itemgetter = lambda x: x[1,          :]
+   93 |+op_itemgetter = operator.itemgetter((1, slice(None)))
+93 94 | 
+94 95 | # Without a slice, trivia is retained
+95 96 | op_itemgetter = lambda x: x[1,          2]
+
+FURB118.py:95:17: FURB118 [*] Use `operator.itemgetter((1,          2))` instead of defining a lambda
+   |
+94 | # Without a slice, trivia is retained
+95 | op_itemgetter = lambda x: x[1,          2]
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB118
+   |
+   = help: Replace with `operator.itemgetter((1,          2))`
+
+ℹ Safe fix
+1  1  | # Errors.
+   2  |+import operator
+2  3  | op_bitnot = lambda x: ~x
+3  4  | op_not = lambda x: not x
+4  5  | op_pos = lambda x: +x
+--------------------------------------------------------------------------------
+92 93 | op_itemgetter = lambda x: x[1,          :]
+93 94 | 
+94 95 | # Without a slice, trivia is retained
+95    |-op_itemgetter = lambda x: x[1,          2]
+   96 |+op_itemgetter = operator.itemgetter((1,          2))

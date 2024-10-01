@@ -1,0 +1,506 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/valid/expressions/unary_op.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..276,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 9..11,
+                    value: UnaryOp(
+                        ExprUnaryOp {
+                            range: 9..11,
+                            op: USub,
+                            operand: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 10..11,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 12..14,
+                    value: UnaryOp(
+                        ExprUnaryOp {
+                            range: 12..14,
+                            op: UAdd,
+                            operand: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 13..14,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 15..17,
+                    value: UnaryOp(
+                        ExprUnaryOp {
+                            range: 15..17,
+                            op: Invert,
+                            operand: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 16..17,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 18..23,
+                    value: UnaryOp(
+                        ExprUnaryOp {
+                            range: 18..23,
+                            op: Not,
+                            operand: Name(
+                                ExprName {
+                                    range: 22..23,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 36..40,
+                    value: UnaryOp(
+                        ExprUnaryOp {
+                            range: 36..40,
+                            op: USub,
+                            operand: UnaryOp(
+                                ExprUnaryOp {
+                                    range: 37..40,
+                                    op: USub,
+                                    operand: UnaryOp(
+                                        ExprUnaryOp {
+                                            range: 38..40,
+                                            op: USub,
+                                            operand: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 39..40,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 41..45,
+                    value: UnaryOp(
+                        ExprUnaryOp {
+                            range: 41..45,
+                            op: USub,
+                            operand: UnaryOp(
+                                ExprUnaryOp {
+                                    range: 42..45,
+                                    op: UAdd,
+                                    operand: UnaryOp(
+                                        ExprUnaryOp {
+                                            range: 43..45,
+                                            op: Invert,
+                                            operand: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 44..45,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 46..53,
+                    value: UnaryOp(
+                        ExprUnaryOp {
+                            range: 46..53,
+                            op: Not,
+                            operand: UnaryOp(
+                                ExprUnaryOp {
+                                    range: 49..53,
+                                    op: USub,
+                                    operand: UnaryOp(
+                                        ExprUnaryOp {
+                                            range: 50..53,
+                                            op: UAdd,
+                                            operand: UnaryOp(
+                                                ExprUnaryOp {
+                                                    range: 51..53,
+                                                    op: Invert,
+                                                    operand: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 52..53,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 54..63,
+                    value: UnaryOp(
+                        ExprUnaryOp {
+                            range: 54..63,
+                            op: Not,
+                            operand: UnaryOp(
+                                ExprUnaryOp {
+                                    range: 58..63,
+                                    op: Not,
+                                    operand: Name(
+                                        ExprName {
+                                            range: 62..63,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 84..93,
+                    value: UnaryOp(
+                        ExprUnaryOp {
+                            range: 84..93,
+                            op: USub,
+                            operand: Await(
+                                ExprAwait {
+                                    range: 86..93,
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 92..93,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 94..109,
+                    value: UnaryOp(
+                        ExprUnaryOp {
+                            range: 94..109,
+                            op: UAdd,
+                            operand: BinOp(
+                                ExprBinOp {
+                                    range: 96..109,
+                                    left: Await(
+                                        ExprAwait {
+                                            range: 96..103,
+                                            value: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 102..103,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                    op: Pow,
+                                    right: UnaryOp(
+                                        ExprUnaryOp {
+                                            range: 107..109,
+                                            op: USub,
+                                            operand: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 108..109,
+                                                    value: Int(
+                                                        2,
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 110..117,
+                    value: UnaryOp(
+                        ExprUnaryOp {
+                            range: 110..117,
+                            op: Invert,
+                            operand: Tuple(
+                                ExprTuple {
+                                    range: 111..117,
+                                    elts: [
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 112..113,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 115..116,
+                                                value: Int(
+                                                    2,
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                    parenthesized: true,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 118..124,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 118..124,
+                            left: UnaryOp(
+                                ExprUnaryOp {
+                                    range: 118..120,
+                                    op: USub,
+                                    operand: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 119..120,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                            op: Add,
+                            right: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 123..124,
+                                    value: Int(
+                                        2,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 212..246,
+                    value: BoolOp(
+                        ExprBoolOp {
+                            range: 212..246,
+                            op: Or,
+                            values: [
+                                BoolOp(
+                                    ExprBoolOp {
+                                        range: 212..223,
+                                        op: And,
+                                        values: [
+                                            UnaryOp(
+                                                ExprUnaryOp {
+                                                    range: 212..217,
+                                                    op: Not,
+                                                    operand: Name(
+                                                        ExprName {
+                                                            range: 216..217,
+                                                            id: Name("a"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                            Name(
+                                                ExprName {
+                                                    range: 222..223,
+                                                    id: Name("b"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
+                                    },
+                                ),
+                                BoolOp(
+                                    ExprBoolOp {
+                                        range: 227..246,
+                                        op: And,
+                                        values: [
+                                            UnaryOp(
+                                                ExprUnaryOp {
+                                                    range: 227..236,
+                                                    op: Not,
+                                                    operand: BinOp(
+                                                        ExprBinOp {
+                                                            range: 231..236,
+                                                            left: Name(
+                                                                ExprName {
+                                                                    range: 231..232,
+                                                                    id: Name("c"),
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                            op: BitOr,
+                                                            right: Name(
+                                                                ExprName {
+                                                                    range: 235..236,
+                                                                    id: Name("d"),
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                            UnaryOp(
+                                                ExprUnaryOp {
+                                                    range: 241..246,
+                                                    op: Not,
+                                                    operand: Name(
+                                                        ExprName {
+                                                            range: 245..246,
+                                                            id: Name("e"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 247..259,
+                    value: UnaryOp(
+                        ExprUnaryOp {
+                            range: 247..259,
+                            op: Not,
+                            operand: Named(
+                                ExprNamed {
+                                    range: 252..258,
+                                    target: Name(
+                                        ExprName {
+                                            range: 252..253,
+                                            id: Name("x"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 257..258,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 260..275,
+                    value: UnaryOp(
+                        ExprUnaryOp {
+                            range: 260..275,
+                            op: Not,
+                            operand: BinOp(
+                                ExprBinOp {
+                                    range: 264..275,
+                                    left: Name(
+                                        ExprName {
+                                            range: 264..265,
+                                            id: Name("a"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    op: BitOr,
+                                    right: UnaryOp(
+                                        ExprUnaryOp {
+                                            range: 269..274,
+                                            op: Not,
+                                            operand: Name(
+                                                ExprName {
+                                                    range: 273..274,
+                                                    id: Name("b"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

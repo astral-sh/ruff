@@ -68,8 +68,8 @@ pub(crate) fn variable_name_task_id(
     // If the function doesn't come from Airflow, we can't do anything.
     if !checker
         .semantic()
-        .resolve_call_path(func)
-        .is_some_and(|call_path| matches!(call_path[0], "airflow"))
+        .resolve_qualified_name(func)
+        .is_some_and(|qualified_name| matches!(qualified_name.segments()[0], "airflow"))
     {
         return None;
     }
@@ -81,7 +81,7 @@ pub(crate) fn variable_name_task_id(
     let ast::ExprStringLiteral { value: task_id, .. } = keyword.value.as_string_literal_expr()?;
 
     // If the target name is the same as the task_id, no violation.
-    if task_id == id {
+    if task_id == id.as_str() {
         return None;
     }
 

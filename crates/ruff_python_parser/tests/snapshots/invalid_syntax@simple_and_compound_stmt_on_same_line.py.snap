@@ -1,0 +1,65 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/simple_and_compound_stmt_on_same_line.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..17,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..1,
+                    value: Name(
+                        ExprName {
+                            range: 0..1,
+                            id: Name("a"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            If(
+                StmtIf {
+                    range: 3..16,
+                    test: Name(
+                        ExprName {
+                            range: 6..7,
+                            id: Name("b"),
+                            ctx: Load,
+                        },
+                    ),
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 9..13,
+                            },
+                        ),
+                        Expr(
+                            StmtExpr {
+                                range: 15..16,
+                                value: Name(
+                                    ExprName {
+                                        range: 15..16,
+                                        id: Name("b"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | a; if b: pass; b
+  |    ^^ Syntax Error: Compound statements are not allowed on the same line as simple statements
+  |

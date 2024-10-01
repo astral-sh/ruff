@@ -14,7 +14,7 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::rules::pyupgrade;
-    use crate::settings::types::PythonVersion;
+    use crate::settings::types::{PreviewMode, PythonVersion};
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
@@ -55,12 +55,15 @@ mod tests {
     #[test_case(Rule::OutdatedVersionBlock, Path::new("UP036_5.py"))]
     #[test_case(Rule::PrintfStringFormatting, Path::new("UP031_0.py"))]
     #[test_case(Rule::PrintfStringFormatting, Path::new("UP031_1.py"))]
-    #[test_case(Rule::QuotedAnnotation, Path::new("UP037.py"))]
+    #[test_case(Rule::QuotedAnnotation, Path::new("UP037_0.py"))]
+    #[test_case(Rule::QuotedAnnotation, Path::new("UP037_1.py"))]
     #[test_case(Rule::RedundantOpenModes, Path::new("UP015.py"))]
+    #[test_case(Rule::RedundantOpenModes, Path::new("UP015_1.py"))]
     #[test_case(Rule::ReplaceStdoutStderr, Path::new("UP022.py"))]
     #[test_case(Rule::ReplaceUniversalNewlines, Path::new("UP021.py"))]
     #[test_case(Rule::SuperCallWithParameters, Path::new("UP008.py"))]
     #[test_case(Rule::TimeoutErrorAlias, Path::new("UP041.py"))]
+    #[test_case(Rule::ReplaceStrEnum, Path::new("UP042.py"))]
     #[test_case(Rule::TypeOfPrimitive, Path::new("UP003.py"))]
     #[test_case(Rule::TypingTextStrAlias, Path::new("UP019.py"))]
     #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_0.py"))]
@@ -77,6 +80,7 @@ mod tests {
     #[test_case(Rule::UnicodeKindPrefix, Path::new("UP025.py"))]
     #[test_case(Rule::UnnecessaryBuiltinImport, Path::new("UP029.py"))]
     #[test_case(Rule::UnnecessaryClassParentheses, Path::new("UP039.py"))]
+    #[test_case(Rule::UnnecessaryDefaultTypeArgs, Path::new("UP043.py"))]
     #[test_case(Rule::UnnecessaryEncodeUTF8, Path::new("UP012.py"))]
     #[test_case(Rule::UnnecessaryFutureImport, Path::new("UP010.py"))]
     #[test_case(Rule::UnpackedListComprehension, Path::new("UP027.py"))]
@@ -93,6 +97,19 @@ mod tests {
             &settings::LinterSettings::for_rule(rule_code),
         )?;
         assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::PrintfStringFormatting, Path::new("UP031_0.py"))]
+    fn preview(rule_code: Rule, path: &Path) -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyupgrade").join(path),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(diagnostics);
         Ok(())
     }
 

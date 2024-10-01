@@ -1,0 +1,104 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/statements/if_extra_indent.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..153,
+        body: [
+            If(
+                StmtIf {
+                    range: 103..134,
+                    test: BooleanLiteral(
+                        ExprBooleanLiteral {
+                            range: 106..110,
+                            value: true,
+                        },
+                    ),
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 116..120,
+                            },
+                        ),
+                        Expr(
+                            StmtExpr {
+                                range: 129..134,
+                                value: BinOp(
+                                    ExprBinOp {
+                                        range: 129..134,
+                                        left: Name(
+                                            ExprName {
+                                                range: 129..130,
+                                                id: Name("a"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        op: Add,
+                                        right: Name(
+                                            ExprName {
+                                                range: 133..134,
+                                                id: Name("b"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [],
+                },
+            ),
+            Pass(
+                StmtPass {
+                    range: 140..144,
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 146..152,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 146..147,
+                                id: Name("a"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 150..152,
+                            value: Int(
+                                10,
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+2 | if True:
+3 |     pass
+4 |         a + b
+  | ^^^^^^^^ Syntax Error: Unexpected indentation
+5 | 
+6 |     pass
+  |
+
+
+  |
+6 |     pass
+7 | 
+8 | a = 10
+  |  Syntax Error: Expected a statement
+  |

@@ -1,12 +1,10 @@
-use ruff_python_ast::{Expr, Keyword};
-
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_text_size::Ranged;
+use ruff_python_ast as ast;
+use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
-
-use crate::rules::flake8_comprehensions::fixes;
+use crate::rules::flake8_comprehensions::fixes::{pad_end, pad_start};
 
 use super::helpers;
 
@@ -45,25 +43,43 @@ impl AlwaysFixableViolation for UnnecessaryListComprehensionSet {
 }
 
 /// C403 (`set([...])`)
-pub(crate) fn unnecessary_list_comprehension_set(
-    checker: &mut Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
-) {
-    let Some(argument) =
-        helpers::exactly_one_argument_with_matching_function("set", func, args, keywords)
-    else {
+pub(crate) fn unnecessary_list_comprehension_set(checker: &mut Checker, call: &ast::ExprCall) {
+    let Some(argument) = helpers::exactly_one_argument_with_matching_function(
+        "set",
+        &call.func,
+        &call.arguments.args,
+        &call.arguments.keywords,
+    ) else {
         return;
     };
-    if !checker.semantic().is_builtin("set") {
+    if !checker.semantic().has_builtin_binding("set") {
         return;
     }
     if argument.is_list_comp_expr() {
-        let mut diagnostic = Diagnostic::new(UnnecessaryListComprehensionSet, expr.range());
-        diagnostic.try_set_fix(|| {
-            fixes::fix_unnecessary_list_comprehension_set(expr, checker).map(Fix::unsafe_edit)
+        let mut diagnostic = Diagnostic::new(UnnecessaryListComprehensionSet, call.range());
+        diagnostic.set_fix({
+            // Replace `set(` with `{`.
+            let call_start = Edit::replacement(
+                pad_start("{", call.range(), checker.locator(), checker.semantic()),
+                call.start(),
+                call.arguments.start() + TextSize::from(1),
+            );
+
+            // Replace `)` with `}`.
+            let call_end = Edit::replacement(
+                pad_end("}", call.range(), checker.locator(), checker.semantic()),
+                call.arguments.end() - TextSize::from(1),
+                call.end(),
+            );
+
+            // Delete the open bracket (`[`).
+            let argument_start =
+                Edit::deletion(argument.start(), argument.start() + TextSize::from(1));
+
+            // Delete the close bracket (`]`).
+            let argument_end = Edit::deletion(argument.end() - TextSize::from(1), argument.end());
+
+            Fix::unsafe_edits(call_start, [argument_start, argument_end, call_end])
         });
         checker.diagnostics.push(diagnostic);
     }

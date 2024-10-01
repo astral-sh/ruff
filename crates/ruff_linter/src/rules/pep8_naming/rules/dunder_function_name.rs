@@ -6,7 +6,7 @@ use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{Scope, ScopeKind};
 
-use crate::settings::types::IdentifierPattern;
+use crate::rules::pep8_naming::settings::IgnoreNames;
 
 /// ## What it does
 /// Checks for functions with "dunder" names (that is, names with two
@@ -47,7 +47,7 @@ pub(crate) fn dunder_function_name(
     scope: &Scope,
     stmt: &Stmt,
     name: &str,
-    ignore_names: &[IdentifierPattern],
+    ignore_names: &IgnoreNames,
 ) -> Option<Diagnostic> {
     if matches!(scope.kind, ScopeKind::Class(_)) {
         return None;
@@ -59,12 +59,9 @@ pub(crate) fn dunder_function_name(
     if matches!(scope.kind, ScopeKind::Module) && (name == "__getattr__" || name == "__dir__") {
         return None;
     }
-    if ignore_names
-        .iter()
-        .any(|ignore_name| ignore_name.matches(name))
-    {
+    // Ignore any explicitly-allowed names.
+    if ignore_names.matches(name) {
         return None;
     }
-
     Some(Diagnostic::new(DunderFunctionName, stmt.identifier()))
 }

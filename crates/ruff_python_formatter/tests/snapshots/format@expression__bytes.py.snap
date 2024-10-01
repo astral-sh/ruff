@@ -141,6 +141,7 @@ docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = Py38
+source_type                = Python
 ```
 
 ```python
@@ -296,6 +297,7 @@ docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = Py38
+source_type                = Python
 ```
 
 ```python

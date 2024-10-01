@@ -1,0 +1,101 @@
+{
+    "settings": [
+        {
+            "nativeServer": "on",
+            "cwd": "/Users/test/projects/pandas",
+            "workspace": "file:///Users/test/projects/pandas",
+            "path": [],
+            "ignoreStandardLibrary": true,
+            "interpreter": [
+                "/Users/test/projects/pandas/.venv/bin/python"
+            ],
+            "importStrategy": "fromEnvironment",
+            "codeAction": {
+                "fixViolation": {
+                    "enable": false
+                },
+                "disableRuleComment": {
+                    "enable": false
+                }
+            },
+            "lint": {
+                "enable": true,
+                "run": "onType",
+                "args": []
+            },
+            "format": {
+                "args": []
+            },
+            "enable": true,
+            "organizeImports": true,
+            "fixAll": true,
+            "showNotifications": "off",
+            "showSyntaxErrors": true
+        },
+        {
+            "nativeServer": "on",
+            "cwd": "/Users/test/projects/scipy",
+            "workspace": "file:///Users/test/projects/scipy",
+            "path": [],
+            "ignoreStandardLibrary": true,
+            "interpreter": [
+                "/Users/test/projects/scipy/.venv/bin/python"
+            ],
+            "importStrategy": "fromEnvironment",
+            "codeAction": {
+                "fixViolation": {
+                    "enable": false
+                },
+                "disableRuleComment": {
+                    "enable": true
+                }
+            },
+            "lint": {
+                "enable": true,
+                "preview": false,
+                "run": "onType",
+                "args": []
+            },
+            "format": {
+                "args": []
+            },
+            "enable": true,
+            "organizeImports": true,
+            "fixAll": true,
+            "showNotifications": "off",
+            "showSyntaxErrors": true
+        }
+    ],
+    "globalSettings": {
+        "nativeServer": "on",
+        "cwd": "/",
+        "workspace": "/",
+        "path": [],
+        "ignoreStandardLibrary": true,
+        "interpreter": [],
+        "importStrategy": "fromEnvironment",
+        "codeAction": {
+            "fixViolation": {
+                "enable": false
+            },
+            "disableRuleComment": {
+                "enable": false
+            }
+        },
+        "lint": {
+            "enable": true,
+            "preview": true,
+            "select": ["F", "I"],
+            "run": "onType",
+            "args": []
+        },
+        "format": {
+            "args": []
+        },
+        "enable": true,
+        "organizeImports": true,
+        "fixAll": false,
+        "showNotifications": "off",
+        "showSyntaxErrors": true
+    }
+}

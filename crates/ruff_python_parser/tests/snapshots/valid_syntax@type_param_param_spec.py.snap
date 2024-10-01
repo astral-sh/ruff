@@ -1,0 +1,197 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/type_param_param_spec.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..90,
+        body: [
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 0..17,
+                    name: Name(
+                        ExprName {
+                            range: 5..6,
+                            id: Name("X"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 6..11,
+                            type_params: [
+                                ParamSpec(
+                                    TypeParamParamSpec {
+                                        range: 7..10,
+                                        name: Identifier {
+                                            id: Name("P"),
+                                            range: 9..10,
+                                        },
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            range: 14..17,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 18..41,
+                    name: Name(
+                        ExprName {
+                            range: 23..24,
+                            id: Name("X"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 24..35,
+                            type_params: [
+                                ParamSpec(
+                                    TypeParamParamSpec {
+                                        range: 25..34,
+                                        name: Identifier {
+                                            id: Name("P"),
+                                            range: 27..28,
+                                        },
+                                        default: Some(
+                                            Name(
+                                                ExprName {
+                                                    range: 31..34,
+                                                    id: Name("int"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            range: 38..41,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 42..62,
+                    name: Name(
+                        ExprName {
+                            range: 47..48,
+                            id: Name("X"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 48..56,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 49..50,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 49..50,
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                                ParamSpec(
+                                    TypeParamParamSpec {
+                                        range: 52..55,
+                                        name: Identifier {
+                                            id: Name("P"),
+                                            range: 54..55,
+                                        },
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            range: 59..62,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 63..89,
+                    name: Name(
+                        ExprName {
+                            range: 68..69,
+                            id: Name("X"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 69..83,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 70..71,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 70..71,
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                                ParamSpec(
+                                    TypeParamParamSpec {
+                                        range: 73..82,
+                                        name: Identifier {
+                                            id: Name("P"),
+                                            range: 75..76,
+                                        },
+                                        default: Some(
+                                            Name(
+                                                ExprName {
+                                                    range: 79..82,
+                                                    id: Name("int"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            range: 86..89,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

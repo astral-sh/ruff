@@ -107,8 +107,8 @@ def __await__(): return (yield)
 ```diff
 --- Black
 +++ Ruff
-@@ -65,6 +65,7 @@
- 
+@@ -62,6 +62,7 @@
+ ): ...
  def spaces2(result=_core.Value(None)):
      assert fut is self._read_fut, (fut, self._read_fut)
 +    # EMPTY LINE WITH WHITESPACE (this comment will be removed)
@@ -181,10 +181,7 @@ def spaces_types(
     g: int = 1 if False else 2,
     h: str = "",
     i: str = r"",
-):
-    ...
-
-
+): ...
 def spaces2(result=_core.Value(None)):
     assert fut is self._read_fut, (fut, self._read_fut)
     # EMPTY LINE WITH WHITESPACE (this comment will be removed)
@@ -335,10 +332,7 @@ def spaces_types(
     g: int = 1 if False else 2,
     h: str = "",
     i: str = r"",
-):
-    ...
-
-
+): ...
 def spaces2(result=_core.Value(None)):
     assert fut is self._read_fut, (fut, self._read_fut)
 
@@ -423,5 +417,3 @@ def f(
 def __await__():
     return (yield)
 ```
-
-

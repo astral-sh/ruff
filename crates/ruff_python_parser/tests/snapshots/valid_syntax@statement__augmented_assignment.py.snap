@@ -1,0 +1,484 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/valid/statement/augmented_assignment.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..212,
+        body: [
+            AugAssign(
+                StmtAugAssign {
+                    range: 0..6,
+                    target: Name(
+                        ExprName {
+                            range: 0..1,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    op: Add,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 5..6,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            AugAssign(
+                StmtAugAssign {
+                    range: 7..23,
+                    target: Attribute(
+                        ExprAttribute {
+                            range: 7..10,
+                            value: Name(
+                                ExprName {
+                                    range: 7..8,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            attr: Identifier {
+                                id: Name("y"),
+                                range: 9..10,
+                            },
+                            ctx: Store,
+                        },
+                    ),
+                    op: Add,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 14..23,
+                            elts: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 15..16,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 18..19,
+                                        value: Int(
+                                            2,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 21..22,
+                                        value: Int(
+                                            3,
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: true,
+                        },
+                    ),
+                },
+            ),
+            AugAssign(
+                StmtAugAssign {
+                    range: 24..41,
+                    target: Subscript(
+                        ExprSubscript {
+                            range: 24..28,
+                            value: Name(
+                                ExprName {
+                                    range: 24..25,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Name(
+                                ExprName {
+                                    range: 26..27,
+                                    id: Name("y"),
+                                    ctx: Load,
+                                },
+                            ),
+                            ctx: Store,
+                        },
+                    ),
+                    op: Add,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 32..41,
+                            elts: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 33..34,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 36..37,
+                                        value: Int(
+                                            2,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 39..40,
+                                        value: Int(
+                                            3,
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: true,
+                        },
+                    ),
+                },
+            ),
+            AugAssign(
+                StmtAugAssign {
+                    range: 86..92,
+                    target: Name(
+                        ExprName {
+                            range: 86..87,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    op: Add,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 91..92,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            AugAssign(
+                StmtAugAssign {
+                    range: 93..99,
+                    target: Name(
+                        ExprName {
+                            range: 93..94,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    op: Sub,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 98..99,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            AugAssign(
+                StmtAugAssign {
+                    range: 100..106,
+                    target: Name(
+                        ExprName {
+                            range: 100..101,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    op: Mult,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 105..106,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            AugAssign(
+                StmtAugAssign {
+                    range: 107..113,
+                    target: Name(
+                        ExprName {
+                            range: 107..108,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    op: Div,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 112..113,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            AugAssign(
+                StmtAugAssign {
+                    range: 114..121,
+                    target: Name(
+                        ExprName {
+                            range: 114..115,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    op: FloorDiv,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 120..121,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            AugAssign(
+                StmtAugAssign {
+                    range: 122..128,
+                    target: Name(
+                        ExprName {
+                            range: 122..123,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    op: Mod,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 127..128,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            AugAssign(
+                StmtAugAssign {
+                    range: 129..136,
+                    target: Name(
+                        ExprName {
+                            range: 129..130,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    op: Pow,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 135..136,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            AugAssign(
+                StmtAugAssign {
+                    range: 137..143,
+                    target: Name(
+                        ExprName {
+                            range: 137..138,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    op: BitAnd,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 142..143,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            AugAssign(
+                StmtAugAssign {
+                    range: 144..150,
+                    target: Name(
+                        ExprName {
+                            range: 144..145,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    op: BitOr,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 149..150,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            AugAssign(
+                StmtAugAssign {
+                    range: 151..157,
+                    target: Name(
+                        ExprName {
+                            range: 151..152,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    op: BitXor,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 156..157,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            AugAssign(
+                StmtAugAssign {
+                    range: 158..165,
+                    target: Name(
+                        ExprName {
+                            range: 158..159,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    op: LShift,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 164..165,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            AugAssign(
+                StmtAugAssign {
+                    range: 166..173,
+                    target: Name(
+                        ExprName {
+                            range: 166..167,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    op: RShift,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 172..173,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            AugAssign(
+                StmtAugAssign {
+                    range: 174..180,
+                    target: Name(
+                        ExprName {
+                            range: 174..175,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    op: MatMult,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 179..180,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            AugAssign(
+                StmtAugAssign {
+                    range: 190..212,
+                    target: Name(
+                        ExprName {
+                            range: 190..191,
+                            id: Name("a"),
+                            ctx: Store,
+                        },
+                    ),
+                    op: FloorDiv,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 196..212,
+                            left: BinOp(
+                                ExprBinOp {
+                                    range: 197..202,
+                                    left: Name(
+                                        ExprName {
+                                            range: 197..198,
+                                            id: Name("a"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    op: Add,
+                                    right: Name(
+                                        ExprName {
+                                            range: 201..202,
+                                            id: Name("b"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                            op: Sub,
+                            right: BinOp(
+                                ExprBinOp {
+                                    range: 206..212,
+                                    left: Name(
+                                        ExprName {
+                                            range: 206..207,
+                                            id: Name("c"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    op: Pow,
+                                    right: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 211..212,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

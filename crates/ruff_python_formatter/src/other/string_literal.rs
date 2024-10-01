@@ -1,9 +1,7 @@
 use ruff_python_ast::StringLiteral;
-use ruff_text_size::Ranged;
 
 use crate::prelude::*;
-use crate::preview::is_hex_codes_in_unicode_sequences_enabled;
-use crate::string::{docstring, Quoting, StringPart};
+use crate::string::{docstring, Quoting, StringNormalizer};
 use crate::QuoteStyle;
 
 pub(crate) struct FormatStringLiteral<'a> {
@@ -48,22 +46,19 @@ impl StringLiteralKind {
 
 impl Format<PyFormatContext<'_>> for FormatStringLiteral<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let locator = f.context().locator();
-
-        let quote_style = if self.layout.is_docstring() {
-            // Per PEP 8 and PEP 257, always prefer double quotes for docstrings
+        let quote_style = f.options().quote_style();
+        let quote_style = if self.layout.is_docstring() && !quote_style.is_preserve() {
+            // Per PEP 8 and PEP 257, always prefer double quotes for docstrings,
+            // except when using quote-style=preserve
             QuoteStyle::Double
         } else {
-            f.options().quote_style()
+            quote_style
         };
 
-        let normalized = StringPart::from_source(self.value.range(), &locator).normalize(
-            self.layout.quoting(),
-            &locator,
-            quote_style,
-            f.context().docstring(),
-            is_hex_codes_in_unicode_sequences_enabled(f.context()),
-        );
+        let normalized = StringNormalizer::from_context(f.context())
+            .with_quoting(self.layout.quoting())
+            .with_preferred_quote_style(quote_style)
+            .normalize(self.value.into());
 
         if self.layout.is_docstring() {
             docstring::format(&normalized, f)

@@ -1,0 +1,68 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/dict/missing_closing_brace_1.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..10,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..10,
+                    value: Dict(
+                        ExprDict {
+                            range: 0..10,
+                            items: [
+                                DictItem {
+                                    key: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 1..2,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                    value: BinOp(
+                                        ExprBinOp {
+                                            range: 5..10,
+                                            left: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 5..6,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                            op: Add,
+                                            right: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 9..10,
+                                                    value: Int(
+                                                        2,
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | {x:
+2 | 
+3 | 1 + 2
+  |       Syntax Error: unexpected EOF while parsing
+  |

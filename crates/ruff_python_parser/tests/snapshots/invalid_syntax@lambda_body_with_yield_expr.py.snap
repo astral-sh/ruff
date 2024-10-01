@@ -1,0 +1,121 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/lambda_body_with_yield_expr.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..41,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..17,
+                    value: Lambda(
+                        ExprLambda {
+                            range: 0..17,
+                            parameters: Some(
+                                Parameters {
+                                    range: 7..8,
+                                    posonlyargs: [],
+                                    args: [
+                                        ParameterWithDefault {
+                                            range: 7..8,
+                                            parameter: Parameter {
+                                                range: 7..8,
+                                                name: Identifier {
+                                                    id: Name("x"),
+                                                    range: 7..8,
+                                                },
+                                                annotation: None,
+                                            },
+                                            default: None,
+                                        },
+                                    ],
+                                    vararg: None,
+                                    kwonlyargs: [],
+                                    kwarg: None,
+                                },
+                            ),
+                            body: Yield(
+                                ExprYield {
+                                    range: 10..17,
+                                    value: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 16..17,
+                                                id: Name("y"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 18..40,
+                    value: Lambda(
+                        ExprLambda {
+                            range: 18..40,
+                            parameters: Some(
+                                Parameters {
+                                    range: 25..26,
+                                    posonlyargs: [],
+                                    args: [
+                                        ParameterWithDefault {
+                                            range: 25..26,
+                                            parameter: Parameter {
+                                                range: 25..26,
+                                                name: Identifier {
+                                                    id: Name("x"),
+                                                    range: 25..26,
+                                                },
+                                                annotation: None,
+                                            },
+                                            default: None,
+                                        },
+                                    ],
+                                    vararg: None,
+                                    kwonlyargs: [],
+                                    kwarg: None,
+                                },
+                            ),
+                            body: YieldFrom(
+                                ExprYieldFrom {
+                                    range: 28..40,
+                                    value: Name(
+                                        ExprName {
+                                            range: 39..40,
+                                            id: Name("y"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | lambda x: yield y
+  |           ^^^^^^^ Syntax Error: Yield expression cannot be used here
+2 | lambda x: yield from y
+  |
+
+
+  |
+1 | lambda x: yield y
+2 | lambda x: yield from y
+  |           ^^^^^^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |

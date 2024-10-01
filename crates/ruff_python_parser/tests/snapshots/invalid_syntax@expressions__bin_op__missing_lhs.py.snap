@@ -1,0 +1,62 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/bin_op/missing_lhs.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..10,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 2..3,
+                    value: Name(
+                        ExprName {
+                            range: 2..3,
+                            id: Name("y"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 5..10,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 5..10,
+                            left: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 5..6,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                            op: Add,
+                            right: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 9..10,
+                                    value: Int(
+                                        2,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | / y
+  | ^ Syntax Error: Expected a statement
+2 | 
+3 | 1 + 2
+  |

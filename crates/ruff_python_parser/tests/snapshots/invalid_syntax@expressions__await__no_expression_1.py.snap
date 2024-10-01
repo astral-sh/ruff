@@ -1,0 +1,70 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/await/no_expression_1.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..85,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 59..64,
+                    value: Await(
+                        ExprAwait {
+                            range: 59..64,
+                            value: Name(
+                                ExprName {
+                                    range: 64..64,
+                                    id: Name(""),
+                                    ctx: Invalid,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 66..85,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 70..73,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 73..75,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 81..85,
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # No expression after `await`, a statement on another line
+2 | await
+  |      ^ Syntax Error: Expected an expression
+3 | 
+4 | def foo():
+5 |     pass
+  |

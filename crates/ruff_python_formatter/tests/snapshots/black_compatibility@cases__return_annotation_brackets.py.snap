@@ -95,7 +95,6 @@ def foo() -> tuple[int, int, int,]:
     return 2
 
 # Magic trailing comma example, with params
-# this is broken - the trailing comma is transferred to the param list. Fixed in preview
 def foo(a,b) -> tuple[int, int, int,]:
     return 2
 ```
@@ -127,17 +126,49 @@ def foo(a,b) -> tuple[int, int, int,]:
      return 2 * a
  
  
-@@ -124,5 +132,9 @@
- # this is broken - the trailing comma is transferred to the param list. Fixed in preview
- def foo(
-     a, b
--) -> tuple[int, int, int,]:
-+) -> tuple[
-+    int,
-+    int,
-+    int,
-+]:
+@@ -99,25 +107,31 @@
      return 2
+ 
+ 
+-def foo() -> tuple[
+-    loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,
+-    loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,
+-    loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,
+-]:
++def foo() -> (
++    tuple[
++        loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,
++        loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,
++        loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,
++    ]
++):
+     return 2
+ 
+ 
+ # Magic trailing comma example
+-def foo() -> tuple[
+-    int,
+-    int,
+-    int,
+-]:
++def foo() -> (
++    tuple[
++        int,
++        int,
++        int,
++    ]
++):
+     return 2
+ 
+ 
+ # Magic trailing comma example, with params
+-def foo(a, b) -> tuple[
++def foo(
++    a, b
++) -> tuple[
+     int,
+     int,
+     int,
 ```
 
 ## Ruff Output
@@ -274,7 +305,6 @@ def foo() -> (
 
 
 # Magic trailing comma example, with params
-# this is broken - the trailing comma is transferred to the param list. Fixed in preview
 def foo(
     a, b
 ) -> tuple[
@@ -389,33 +419,28 @@ def foo() -> tuple[int, int, int]:
     return 2
 
 
-def foo() -> (
-    tuple[
-        loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,
-        loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,
-        loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,
-    ]
-):
+def foo() -> tuple[
+    loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,
+    loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,
+    loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,
+]:
     return 2
 
 
 # Magic trailing comma example
-def foo() -> (
-    tuple[
-        int,
-        int,
-        int,
-    ]
-):
+def foo() -> tuple[
+    int,
+    int,
+    int,
+]:
     return 2
 
 
 # Magic trailing comma example, with params
-# this is broken - the trailing comma is transferred to the param list. Fixed in preview
-def foo(
-    a, b
-) -> tuple[int, int, int,]:
+def foo(a, b) -> tuple[
+    int,
+    int,
+    int,
+]:
     return 2
 ```
-
-

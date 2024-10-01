@@ -1,0 +1,34 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/lambda_with_no_parameters.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..10,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..9,
+                    value: Lambda(
+                        ExprLambda {
+                            range: 0..9,
+                            parameters: None,
+                            body: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 8..9,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

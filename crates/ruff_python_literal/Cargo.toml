@@ -11,16 +11,17 @@ documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 
+[lib]
+doctest = false
+
 [dependencies]
+ruff_python_ast = { workspace = true }
+
 bitflags = { workspace = true }
-hexf-parse = { workspace = true }
-is-macro = { workspace = true }
 itertools = { workspace = true }
-lexical-parse-float = { workspace = true, features = ["format"] }
 unic-ucd-category = { workspace = true }
 
 [dev-dependencies]
-rand = { workspace = true }
 
 [lints]
 workspace = true

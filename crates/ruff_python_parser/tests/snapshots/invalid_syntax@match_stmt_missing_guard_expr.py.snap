@@ -1,0 +1,64 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/match_stmt_missing_guard_expr.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..28,
+        body: [
+            Match(
+                StmtMatch {
+                    range: 0..27,
+                    subject: Name(
+                        ExprName {
+                            range: 6..7,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 13..27,
+                            pattern: MatchAs(
+                                PatternMatchAs {
+                                    range: 18..19,
+                                    pattern: None,
+                                    name: Some(
+                                        Identifier {
+                                            id: Name("y"),
+                                            range: 18..19,
+                                        },
+                                    ),
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 24..27,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 24..27,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | match x:
+2 |     case y if: ...
+  |              ^ Syntax Error: Expected an expression
+  |

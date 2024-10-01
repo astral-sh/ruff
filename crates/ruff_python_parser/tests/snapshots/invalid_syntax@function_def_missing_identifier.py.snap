@@ -1,0 +1,103 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/function_def_missing_identifier.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..31,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 0..11,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name(""),
+                        range: 3..3,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 4..6,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 8..11,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 8..11,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 12..30,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name(""),
+                        range: 15..15,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 16..18,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: Some(
+                        Name(
+                            ExprName {
+                                range: 22..25,
+                                id: Name("int"),
+                                ctx: Load,
+                            },
+                        ),
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 27..30,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 27..30,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | def (): ...
+  |     ^ Syntax Error: Expected an identifier
+2 | def () -> int: ...
+  |
+
+
+  |
+1 | def (): ...
+2 | def () -> int: ...
+  |     ^ Syntax Error: Expected an identifier
+  |

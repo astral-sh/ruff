@@ -1,0 +1,55 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/set/missing_closing_curly_brace_1.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..136,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 128..136,
+                    value: Set(
+                        ExprSet {
+                            range: 128..136,
+                            elts: [
+                                BinOp(
+                                    ExprBinOp {
+                                        range: 131..136,
+                                        left: Name(
+                                            ExprName {
+                                                range: 131..132,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        op: Add,
+                                        right: Name(
+                                            ExprName {
+                                                range: 135..136,
+                                                id: Name("y"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+4 | {
+5 | 
+6 | x + y
+  |       Syntax Error: unexpected EOF while parsing
+  |

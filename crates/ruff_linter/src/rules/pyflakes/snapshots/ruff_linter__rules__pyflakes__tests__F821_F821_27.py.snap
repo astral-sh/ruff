@@ -1,0 +1,46 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F821_27.py:30:11: F821 Undefined name `foo`
+   |
+28 | class MyClass:
+29 |     foo: int
+30 |     bar = foo  # Still invalid even when `__future__.annotations` are enabled
+   |           ^^^ F821
+31 |     bar = "foo"  # always okay
+   |
+
+F821_27.py:34:8: F821 Undefined name `baz`
+   |
+33 | baz: MyClass
+34 | eggs = baz  # Still invalid even when `__future__.annotations` are enabled
+   |        ^^^ F821
+35 | eggs = "baz"  # always okay
+   |
+
+F821_27.py:38:33: F821 Undefined name `DStr`
+   |
+37 | # Forward references:
+38 | MaybeDStr: TypeAlias = Optional[DStr]  # Still invalid even when `__future__.annotations` are enabled
+   |                                 ^^^^ F821
+39 | MaybeDStr2: TypeAlias = Optional["DStr"]  # always okay
+40 | DStr: TypeAlias = Union[D, str]  # Still invalid even when `__future__.annotations` are enabled
+   |
+
+F821_27.py:40:25: F821 Undefined name `D`
+   |
+38 | MaybeDStr: TypeAlias = Optional[DStr]  # Still invalid even when `__future__.annotations` are enabled
+39 | MaybeDStr2: TypeAlias = Optional["DStr"]  # always okay
+40 | DStr: TypeAlias = Union[D, str]  # Still invalid even when `__future__.annotations` are enabled
+   |                         ^ F821
+41 | DStr2: TypeAlias = Union["D", str]  # always okay
+   |
+
+F821_27.py:47:17: F821 Undefined name `Tree`
+   |
+45 | # More circular references
+46 | class Leaf: ...
+47 | class Tree(list[Tree | Leaf]): ...  # Still invalid even when `__future__.annotations` are enabled
+   |                 ^^^^ F821
+48 | class Tree2(list["Tree | Leaf"]): ...  # always okay
+   |

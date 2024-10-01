@@ -148,10 +148,10 @@ fn create_class_def_stmt(
     ast::StmtClassDef {
         name: Identifier::new(class_name.to_string(), TextRange::default()),
         arguments: Some(Box::new(Arguments {
-            args: vec![base_class.clone()],
+            args: Box::from([base_class.clone()]),
             keywords: match total_keyword {
-                Some(keyword) => vec![keyword.clone()],
-                None => vec![],
+                Some(keyword) => Box::from([keyword.clone()]),
+                None => Box::from([]),
             },
             range: TextRange::default(),
         })),
@@ -163,16 +163,16 @@ fn create_class_def_stmt(
     .into()
 }
 
-fn fields_from_dict_literal(keys: &[Option<Expr>], values: &[Expr]) -> Option<Vec<Stmt>> {
-    if keys.is_empty() {
+fn fields_from_dict_literal(items: &[ast::DictItem]) -> Option<Vec<Stmt>> {
+    if items.is_empty() {
         let node = Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
         });
         Some(vec![node])
     } else {
-        keys.iter()
-            .zip(values.iter())
-            .map(|(key, value)| match key {
+        items
+            .iter()
+            .map(|ast::DictItem { key, value }| match key {
                 Some(Expr::StringLiteral(ast::ExprStringLiteral { value: field, .. })) => {
                     if !is_identifier(field.to_str()) {
                         return None;
@@ -226,16 +226,14 @@ fn fields_from_keywords(keywords: &[Keyword]) -> Option<Vec<Stmt>> {
 
 /// Match the fields and `total` keyword from a `TypedDict` call.
 fn match_fields_and_total(arguments: &Arguments) -> Option<(Vec<Stmt>, Option<&Keyword>)> {
-    match (arguments.args.as_slice(), arguments.keywords.as_slice()) {
+    match (&*arguments.args, &*arguments.keywords) {
         // Ex) `TypedDict("MyType", {"a": int, "b": str})`
         ([_typename, fields], [..]) => {
             let total = arguments.find_keyword("total");
             match fields {
-                Expr::Dict(ast::ExprDict {
-                    keys,
-                    values,
-                    range: _,
-                }) => Some((fields_from_dict_literal(keys, values)?, total)),
+                Expr::Dict(ast::ExprDict { items, range: _ }) => {
+                    Some((fields_from_dict_literal(items)?, total))
+                }
                 Expr::Call(ast::ExprCall {
                     func,
                     arguments: Arguments { keywords, .. },

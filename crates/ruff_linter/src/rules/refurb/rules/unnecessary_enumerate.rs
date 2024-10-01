@@ -3,6 +3,7 @@ use std::fmt;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
+use ruff_python_ast::name::Name;
 use ruff_python_ast::{Arguments, Expr, Int};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::analyze::typing::{is_dict, is_list, is_set, is_tuple};
@@ -102,21 +103,15 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
         return;
     };
 
-    // Check that the function is the `enumerate` builtin.
-    let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else {
-        return;
-    };
-    if id != "enumerate" {
-        return;
-    };
-    if !checker.semantic().is_builtin("enumerate") {
-        return;
-    };
-
     // Get the first argument, which is the sequence to iterate over.
     let Some(Expr::Name(sequence)) = arguments.args.first() else {
         return;
     };
+
+    // Check that the function is the `enumerate` builtin.
+    if !checker.semantic().match_builtin_expr(func, "enumerate") {
+        return;
+    }
 
     // Check if the index and value are used.
     match (
@@ -179,7 +174,9 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
                 },
                 func.range(),
             );
-            if checker.semantic().is_builtin("range") && checker.semantic().is_builtin("len") {
+            if checker.semantic().has_builtin_binding("range")
+                && checker.semantic().has_builtin_binding("len")
+            {
                 // If the `start` argument is set to something other than the `range` default,
                 // there's no clear fix.
                 let start = arguments.find_argument("start", 1);
@@ -193,7 +190,7 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
                     )
                 }) {
                     let replace_iter = Edit::range_replacement(
-                        generate_range_len_call(&sequence.id, checker.generator()),
+                        generate_range_len_call(sequence.id.clone(), checker.generator()),
                         stmt_for.iter.range(),
                     );
 
@@ -233,10 +230,10 @@ impl fmt::Display for EnumerateSubset {
 
 /// Format a code snippet to call `range(len(name))`, where `name` is the given
 /// sequence name.
-fn generate_range_len_call(name: &str, generator: Generator) -> String {
+fn generate_range_len_call(name: Name, generator: Generator) -> String {
     // Construct `name`.
     let var = ast::ExprName {
-        id: name.to_string(),
+        id: name,
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
     };
@@ -244,15 +241,15 @@ fn generate_range_len_call(name: &str, generator: Generator) -> String {
     let len = ast::ExprCall {
         func: Box::new(
             ast::ExprName {
-                id: "len".to_string(),
+                id: Name::new_static("len"),
                 ctx: ast::ExprContext::Load,
                 range: TextRange::default(),
             }
             .into(),
         ),
         arguments: Arguments {
-            args: vec![var.into()],
-            keywords: vec![],
+            args: Box::from([var.into()]),
+            keywords: Box::from([]),
             range: TextRange::default(),
         },
         range: TextRange::default(),
@@ -261,15 +258,15 @@ fn generate_range_len_call(name: &str, generator: Generator) -> String {
     let range = ast::ExprCall {
         func: Box::new(
             ast::ExprName {
-                id: "range".to_string(),
+                id: Name::new_static("range"),
                 ctx: ast::ExprContext::Load,
                 range: TextRange::default(),
             }
             .into(),
         ),
         arguments: Arguments {
-            args: vec![len.into()],
-            keywords: vec![],
+            args: Box::from([len.into()]),
+            keywords: Box::from([]),
             range: TextRange::default(),
         },
         range: TextRange::default(),

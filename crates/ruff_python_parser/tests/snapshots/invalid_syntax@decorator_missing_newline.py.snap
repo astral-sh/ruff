@@ -1,0 +1,162 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/decorator_missing_newline.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..60,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 0..17,
+                    is_async: false,
+                    decorator_list: [
+                        Decorator {
+                            range: 0..2,
+                            expression: Name(
+                                ExprName {
+                                    range: 1..2,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 7..10,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 10..12,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 14..17,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 14..17,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 18..41,
+                    is_async: true,
+                    decorator_list: [
+                        Decorator {
+                            range: 18..20,
+                            expression: Name(
+                                ExprName {
+                                    range: 19..20,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 31..34,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 34..36,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 38..41,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 38..41,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            ClassDef(
+                StmtClassDef {
+                    range: 42..59,
+                    decorator_list: [
+                        Decorator {
+                            range: 42..44,
+                            expression: Name(
+                                ExprName {
+                                    range: 43..44,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ],
+                    name: Identifier {
+                        id: Name("Foo"),
+                        range: 51..54,
+                    },
+                    type_params: None,
+                    arguments: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 56..59,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 56..59,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | @x def foo(): ...
+  |    ^^^ Syntax Error: Expected newline, found 'def'
+2 | @x async def foo(): ...
+3 | @x class Foo: ...
+  |
+
+
+  |
+1 | @x def foo(): ...
+2 | @x async def foo(): ...
+  |    ^^^^^ Syntax Error: Expected newline, found 'async'
+3 | @x class Foo: ...
+  |
+
+
+  |
+1 | @x def foo(): ...
+2 | @x async def foo(): ...
+3 | @x class Foo: ...
+  |    ^^^^^ Syntax Error: Expected newline, found 'class'
+  |

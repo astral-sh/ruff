@@ -1,0 +1,84 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/if/missing_orelse_expr_0.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..88,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 53..67,
+                    value: If(
+                        ExprIf {
+                            range: 53..67,
+                            test: Name(
+                                ExprName {
+                                    range: 58..62,
+                                    id: Name("expr"),
+                                    ctx: Load,
+                                },
+                            ),
+                            body: Name(
+                                ExprName {
+                                    range: 53..54,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            orelse: Name(
+                                ExprName {
+                                    range: 67..67,
+                                    id: Name(""),
+                                    ctx: Invalid,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 69..88,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 73..76,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 76..78,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 84..88,
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # Missing orelse expression, followed by a statement
+2 | x if expr else
+  |               ^ Syntax Error: Expected an expression
+3 | 
+4 | def foo():
+5 |     pass
+  |

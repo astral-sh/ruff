@@ -22,7 +22,16 @@ impl Default for Quote {
     }
 }
 
-#[derive(Debug, CacheKey)]
+impl From<ruff_python_ast::str::Quote> for Quote {
+    fn from(value: ruff_python_ast::str::Quote) -> Self {
+        match value {
+            ruff_python_ast::str::Quote::Double => Self::Double,
+            ruff_python_ast::str::Quote::Single => Self::Single,
+        }
+    }
+}
+
+#[derive(Debug, Clone, CacheKey)]
 pub struct Settings {
     pub inline_quotes: Quote,
     pub multiline_quotes: Quote,

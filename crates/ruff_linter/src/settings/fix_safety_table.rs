@@ -14,7 +14,7 @@ use crate::{
 
 /// A table to keep track of which rules fixes should have
 /// their safety overridden.
-#[derive(Debug, CacheKey, Default)]
+#[derive(Debug, Clone, CacheKey, Default)]
 pub struct FixSafetyTable {
     forced_safe: RuleSet,
     forced_unsafe: RuleSet,

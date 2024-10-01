@@ -4,15 +4,13 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_python_ast::{self as ast, PySourceType, Stmt};
-use ruff_python_parser::{lexer, AsMode, Tok};
+use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_parser::{TokenKind, Tokens};
 use ruff_python_semantic::{Binding, Scope};
-use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::delete_stmt;
-use crate::settings::types::PreviewMode;
 
 /// ## What it does
 /// Checks for the presence of unused variables in function scopes.
@@ -23,7 +21,7 @@ use crate::settings::types::PreviewMode;
 ///
 /// If a variable is intentionally defined-but-not-used, it should be
 /// prefixed with an underscore, or some other value that adheres to the
-/// [`dummy-variable-rgx`] pattern.
+/// [`lint.dummy-variable-rgx`] pattern.
 ///
 /// Under [preview mode](https://docs.astral.sh/ruff/preview), this rule also
 /// triggers on unused unpacked assignments (for example, `x, y = foo()`).
@@ -44,7 +42,7 @@ use crate::settings::types::PreviewMode;
 /// ```
 ///
 /// ## Options
-/// - `dummy-variable-rgx`
+/// - `lint.dummy-variable-rgx`
 #[violation]
 pub struct UnusedVariable {
     pub name: String,
@@ -66,22 +64,13 @@ impl Violation for UnusedVariable {
 }
 
 /// Return the [`TextRange`] of the token before the next match of the predicate
-fn match_token_before<F>(
-    location: TextSize,
-    locator: &Locator,
-    source_type: PySourceType,
-    f: F,
-) -> Option<TextRange>
+fn match_token_before<F>(tokens: &Tokens, location: TextSize, f: F) -> Option<TextRange>
 where
-    F: Fn(Tok) -> bool,
+    F: Fn(TokenKind) -> bool,
 {
-    let contents = locator.after(location);
-    for ((_, range), (tok, _)) in lexer::lex_starts_at(contents, source_type.as_mode(), location)
-        .flatten()
-        .tuple_windows()
-    {
-        if f(tok) {
-            return Some(range);
+    for (prev, current) in tokens.after(location).iter().tuple_windows() {
+        if f(current.kind()) {
+            return Some(prev.range());
         }
     }
     None
@@ -89,55 +78,31 @@ where
 
 /// Return the [`TextRange`] of the token after the next match of the predicate, skipping over
 /// any bracketed expressions.
-fn match_token_after<F>(
-    location: TextSize,
-    locator: &Locator,
-    source_type: PySourceType,
-    f: F,
-) -> Option<TextRange>
+fn match_token_after<F>(tokens: &Tokens, location: TextSize, f: F) -> Option<TextRange>
 where
-    F: Fn(Tok) -> bool,
+    F: Fn(TokenKind) -> bool,
 {
-    let contents = locator.after(location);
-
     // Track the bracket depth.
-    let mut par_count = 0u32;
-    let mut sqb_count = 0u32;
-    let mut brace_count = 0u32;
+    let mut nesting = 0u32;
 
-    for ((tok, _), (_, range)) in lexer::lex_starts_at(contents, source_type.as_mode(), location)
-        .flatten()
-        .tuple_windows()
-    {
-        match tok {
-            Tok::Lpar => {
-                par_count = par_count.saturating_add(1);
+    for (current, next) in tokens.after(location).iter().tuple_windows() {
+        match current.kind() {
+            TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Lbrace => {
+                nesting = nesting.saturating_add(1);
             }
-            Tok::Lsqb => {
-                sqb_count = sqb_count.saturating_add(1);
-            }
-            Tok::Lbrace => {
-                brace_count = brace_count.saturating_add(1);
-            }
-            Tok::Rpar => {
-                par_count = par_count.saturating_sub(1);
-            }
-            Tok::Rsqb => {
-                sqb_count = sqb_count.saturating_sub(1);
-            }
-            Tok::Rbrace => {
-                brace_count = brace_count.saturating_sub(1);
+            TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace => {
+                nesting = nesting.saturating_sub(1);
             }
             _ => {}
         }
 
         // If we're in nested brackets, continue.
-        if par_count > 0 || sqb_count > 0 || brace_count > 0 {
+        if nesting > 0 {
             continue;
         }
 
-        if f(tok) {
-            return Some(range);
+        if f(current.kind()) {
+            return Some(next.range());
         }
     }
     None
@@ -145,61 +110,34 @@ where
 
 /// Return the [`TextRange`] of the token matching the predicate or the first mismatched
 /// bracket, skipping over any bracketed expressions.
-fn match_token_or_closing_brace<F>(
-    location: TextSize,
-    locator: &Locator,
-    source_type: PySourceType,
-    f: F,
-) -> Option<TextRange>
+fn match_token_or_closing_brace<F>(tokens: &Tokens, location: TextSize, f: F) -> Option<TextRange>
 where
-    F: Fn(Tok) -> bool,
+    F: Fn(TokenKind) -> bool,
 {
-    let contents = locator.after(location);
+    // Track the nesting level.
+    let mut nesting = 0u32;
 
-    // Track the bracket depth.
-    let mut par_count = 0u32;
-    let mut sqb_count = 0u32;
-    let mut brace_count = 0u32;
-
-    for (tok, range) in lexer::lex_starts_at(contents, source_type.as_mode(), location).flatten() {
-        match tok {
-            Tok::Lpar => {
-                par_count = par_count.saturating_add(1);
+    for token in tokens.after(location) {
+        match token.kind() {
+            TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Lbrace => {
+                nesting = nesting.saturating_add(1);
             }
-            Tok::Lsqb => {
-                sqb_count = sqb_count.saturating_add(1);
-            }
-            Tok::Lbrace => {
-                brace_count = brace_count.saturating_add(1);
-            }
-            Tok::Rpar => {
-                if par_count == 0 {
-                    return Some(range);
+            TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace => {
+                if nesting == 0 {
+                    return Some(token.range());
                 }
-                par_count = par_count.saturating_sub(1);
-            }
-            Tok::Rsqb => {
-                if sqb_count == 0 {
-                    return Some(range);
-                }
-                sqb_count = sqb_count.saturating_sub(1);
-            }
-            Tok::Rbrace => {
-                if brace_count == 0 {
-                    return Some(range);
-                }
-                brace_count = brace_count.saturating_sub(1);
+                nesting = nesting.saturating_sub(1);
             }
             _ => {}
         }
 
         // If we're in nested brackets, continue.
-        if par_count > 0 || sqb_count > 0 || brace_count > 0 {
+        if nesting > 0 {
             continue;
         }
 
-        if f(tok) {
-            return Some(range);
+        if f(token.kind()) {
+            return Some(token.range());
         }
     }
     None
@@ -220,24 +158,21 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
         {
             if target.is_name_expr() {
                 return if targets.len() > 1
-                    || contains_effect(value, |id| checker.semantic().is_builtin(id))
+                    || contains_effect(value, |id| checker.semantic().has_builtin_binding(id))
                 {
                     // If the expression is complex (`x = foo()`), remove the assignment,
                     // but preserve the right-hand side.
                     let start = parenthesized_range(
                         target.into(),
                         statement.into(),
-                        checker.indexer().comment_ranges(),
+                        checker.comment_ranges(),
                         checker.locator().contents(),
                     )
                     .unwrap_or(target.range())
                     .start();
-                    let end = match_token_after(
-                        target.end(),
-                        checker.locator(),
-                        checker.source_type,
-                        |tok| tok == Tok::Equal,
-                    )?
+                    let end = match_token_after(checker.tokens(), target.end(), |token| {
+                        token == TokenKind::Equal
+                    })?
                     .start();
                     let edit = Edit::deletion(start, end);
                     Some(Fix::unsafe_edit(edit))
@@ -266,15 +201,13 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
     }) = statement
     {
         if target.is_name_expr() {
-            return if contains_effect(value, |id| checker.semantic().is_builtin(id)) {
+            return if contains_effect(value, |id| checker.semantic().has_builtin_binding(id)) {
                 // If the expression is complex (`x = foo()`), remove the assignment,
                 // but preserve the right-hand side.
                 let start = statement.start();
                 let end =
-                    match_token_after(start, checker.locator(), checker.source_type, |tok| {
-                        tok == Tok::Equal
-                    })?
-                    .start();
+                    match_token_after(checker.tokens(), start, |token| token == TokenKind::Equal)?
+                        .start();
                 let edit = Edit::deletion(start, end);
                 Some(Fix::unsafe_edit(edit))
             } else {
@@ -293,21 +226,16 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
             if let Some(optional_vars) = &item.optional_vars {
                 if optional_vars.range() == binding.range() {
                     // Find the first token before the `as` keyword.
-                    let start = match_token_before(
-                        item.context_expr.start(),
-                        checker.locator(),
-                        checker.source_type,
-                        |tok| tok == Tok::As,
-                    )?
-                    .end();
+                    let start =
+                        match_token_before(checker.tokens(), item.context_expr.start(), |token| {
+                            token == TokenKind::As
+                        })?
+                        .end();
 
                     // Find the first colon, comma, or closing bracket after the `as` keyword.
-                    let end = match_token_or_closing_brace(
-                        start,
-                        checker.locator(),
-                        checker.source_type,
-                        |tok| tok == Tok::Colon || tok == Tok::Comma,
-                    )?
+                    let end = match_token_or_closing_brace(checker.tokens(), start, |token| {
+                        token == TokenKind::Colon || token == TokenKind::Comma
+                    })?
                     .start();
 
                     let edit = Edit::deletion(start, end);
@@ -333,11 +261,11 @@ pub(crate) fn unused_variable(checker: &Checker, scope: &Scope, diagnostics: &mu
             if (binding.kind.is_assignment()
                 || binding.kind.is_named_expr_assignment()
                 || binding.kind.is_with_item_var())
-                && (!binding.is_unpacked_assignment()
-                    || matches!(checker.settings.preview, PreviewMode::Enabled))
+                // Stabilization depends on resolving https://github.com/astral-sh/ruff/issues/8884
+                && (!binding.is_unpacked_assignment() || checker.settings.preview.is_enabled())
+                && binding.is_unused()
                 && !binding.is_nonlocal()
                 && !binding.is_global()
-                && !binding.is_used()
                 && !checker.settings.dummy_variable_rgx.is_match(name)
                 && !matches!(
                     name,

@@ -1,0 +1,104 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/bin_op/missing_rhs_1.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..18,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..11,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 0..11,
+                            left: BinOp(
+                                ExprBinOp {
+                                    range: 0..5,
+                                    left: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 0..1,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                    op: Add,
+                                    right: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 4..5,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                            op: Sub,
+                            right: BinOp(
+                                ExprBinOp {
+                                    range: 8..11,
+                                    left: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 8..9,
+                                            value: Int(
+                                                3,
+                                            ),
+                                        },
+                                    ),
+                                    op: Mult,
+                                    right: Name(
+                                        ExprName {
+                                            range: 11..11,
+                                            id: Name(""),
+                                            ctx: Invalid,
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 13..18,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 13..18,
+                            left: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 13..14,
+                                    value: Int(
+                                        4,
+                                    ),
+                                },
+                            ),
+                            op: Add,
+                            right: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 17..18,
+                                    value: Int(
+                                        5,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | 1 + 2 - 3 *
+  |            ^ Syntax Error: Expected an expression
+2 | 
+3 | 4 + 5
+  |

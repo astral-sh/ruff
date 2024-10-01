@@ -1,0 +1,14 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/range_formatting/end_of_file.py
+---
+## Input
+```python
+a + b<RANGE_START><RANGE_END>```
+
+## Output
+```python
+a + b```
+
+
+

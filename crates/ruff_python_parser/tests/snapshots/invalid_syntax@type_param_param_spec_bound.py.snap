@@ -1,0 +1,93 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/type_param_param_spec_bound.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..23,
+        body: [
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 0..10,
+                    name: Name(
+                        ExprName {
+                            range: 5..6,
+                            id: Name("X"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 6..10,
+                            type_params: [
+                                ParamSpec(
+                                    TypeParamParamSpec {
+                                        range: 7..10,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 9..10,
+                                        },
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            range: 10..10,
+                            id: Name(""),
+                            ctx: Invalid,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 12..15,
+                    value: Name(
+                        ExprName {
+                            range: 12..15,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 19..22,
+                    value: Name(
+                        ExprName {
+                            range: 19..22,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | type X[**T: int] = int
+  |           ^ Syntax Error: Expected ']', found ':'
+  |
+
+
+  |
+1 | type X[**T: int] = int
+  |                ^ Syntax Error: Expected a statement
+  |
+
+
+  |
+1 | type X[**T: int] = int
+  |                  ^ Syntax Error: Expected a statement
+  |

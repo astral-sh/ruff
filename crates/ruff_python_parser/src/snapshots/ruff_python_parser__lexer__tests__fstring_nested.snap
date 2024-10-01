@@ -2,17 +2,24 @@
 source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_source(source)
 ---
+## Tokens
+```
 [
     (
         FStringStart,
         0..2,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
-        FStringMiddle {
-            value: "foo ",
-            is_raw: false,
-        },
+        FStringMiddle(
+            "foo ",
+        ),
         2..6,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Lbrace,
@@ -21,22 +28,27 @@ expression: lex_source(source)
     (
         FStringStart,
         7..9,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
-        FStringMiddle {
-            value: "bar ",
-            is_raw: false,
-        },
+        FStringMiddle(
+            "bar ",
+        ),
         9..13,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Lbrace,
         13..14,
     ),
     (
-        Name {
-            name: "x",
-        },
+        Name(
+            Name("x"),
+        ),
         14..15,
     ),
     (
@@ -46,15 +58,18 @@ expression: lex_source(source)
     (
         FStringStart,
         18..20,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Lbrace,
         20..21,
     ),
     (
-        Name {
-            name: "wow",
-        },
+        Name(
+            Name("wow"),
+        ),
         21..24,
     ),
     (
@@ -64,6 +79,9 @@ expression: lex_source(source)
     (
         FStringEnd,
         25..26,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Rbrace,
@@ -72,32 +90,45 @@ expression: lex_source(source)
     (
         FStringEnd,
         27..28,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Rbrace,
         28..29,
     ),
     (
-        FStringMiddle {
-            value: " baz",
-            is_raw: false,
-        },
+        FStringMiddle(
+            " baz",
+        ),
         29..33,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         FStringEnd,
         33..34,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         FStringStart,
         35..37,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
-        FStringMiddle {
-            value: "foo ",
-            is_raw: false,
-        },
+        FStringMiddle(
+            "foo ",
+        ),
         37..41,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         Lbrace,
@@ -106,28 +137,38 @@ expression: lex_source(source)
     (
         FStringStart,
         42..44,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
-        FStringMiddle {
-            value: "bar",
-            is_raw: false,
-        },
+        FStringMiddle(
+            "bar",
+        ),
         44..47,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         FStringEnd,
         47..48,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         Rbrace,
         48..49,
     ),
     (
-        FStringMiddle {
-            value: " some ",
-            is_raw: false,
-        },
+        FStringMiddle(
+            " some ",
+        ),
         49..55,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         Lbrace,
@@ -136,17 +177,25 @@ expression: lex_source(source)
     (
         FStringStart,
         56..58,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
-        FStringMiddle {
-            value: "another",
-            is_raw: false,
-        },
+        FStringMiddle(
+            "another",
+        ),
         58..65,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         FStringEnd,
         65..66,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Rbrace,
@@ -155,9 +204,13 @@ expression: lex_source(source)
     (
         FStringEnd,
         67..68,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
         Newline,
         68..68,
     ),
 ]
+```

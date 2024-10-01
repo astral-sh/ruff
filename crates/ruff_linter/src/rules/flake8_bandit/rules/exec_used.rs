@@ -35,8 +35,8 @@ impl Violation for ExecBuiltin {
 pub(crate) fn exec_used(checker: &mut Checker, func: &Expr) {
     if checker
         .semantic()
-        .resolve_call_path(func)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["" | "builtin", "exec"]))
+        .resolve_qualified_name(func)
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["" | "builtin", "exec"]))
     {
         checker
             .diagnostics

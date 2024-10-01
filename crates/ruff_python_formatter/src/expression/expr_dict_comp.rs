@@ -3,7 +3,7 @@ use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprDictComp;
 use ruff_text_size::Ranged;
 
-use crate::comments::{dangling_comments, SourceComment};
+use crate::comments::dangling_comments;
 use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 
@@ -57,15 +57,6 @@ impl FormatNodeRule<ExprDictComp> for FormatExprDictComp {
             )
             .with_dangling_comments(open_parenthesis_comments)]
         )
-    }
-
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_node_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        // Handled as part of `fmt_fields`
-        Ok(())
     }
 }
 

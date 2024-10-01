@@ -34,7 +34,11 @@ impl Violation for NonAsciiName {
     #[derive_message_formats]
     fn message(&self) -> String {
         let Self { name, kind } = self;
-        format!("{kind} name `{name}` contains a non-ASCII character, consider renaming it")
+        format!("{kind} name `{name}` contains a non-ASCII character")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Rename the variable using ASCII characters".to_string())
     }
 }
 
@@ -53,8 +57,8 @@ pub(crate) fn non_ascii_name(binding: &Binding, locator: &Locator) -> Option<Dia
         BindingKind::TypeParam => Kind::TypeParam,
         BindingKind::LoopVar => Kind::LoopVar,
         BindingKind::WithItemVar => Kind::WithItemVar,
-        BindingKind::Global => Kind::Global,
-        BindingKind::Nonlocal(_) => Kind::Nonlocal,
+        BindingKind::Global(_) => Kind::Global,
+        BindingKind::Nonlocal(_, _) => Kind::Nonlocal,
         BindingKind::ClassDefinition(_) => Kind::ClassDefinition,
         BindingKind::FunctionDefinition(_) => Kind::FunctionDefinition,
         BindingKind::BoundException => Kind::BoundException,
@@ -66,6 +70,7 @@ pub(crate) fn non_ascii_name(binding: &Binding, locator: &Locator) -> Option<Dia
         | BindingKind::FromImport(_)
         | BindingKind::SubmoduleImport(_)
         | BindingKind::Deletion
+        | BindingKind::ConditionalDeletion(_)
         | BindingKind::UnboundException(_) => {
             return None;
         }
@@ -80,7 +85,7 @@ pub(crate) fn non_ascii_name(binding: &Binding, locator: &Locator) -> Option<Dia
     ))
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum Kind {
     Annotation,
     Argument,

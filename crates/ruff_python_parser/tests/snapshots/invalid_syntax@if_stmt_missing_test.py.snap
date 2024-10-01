@@ -1,0 +1,46 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/if_stmt_missing_test.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..9,
+        body: [
+            If(
+                StmtIf {
+                    range: 0..8,
+                    test: Name(
+                        ExprName {
+                            range: 2..2,
+                            id: Name(""),
+                            ctx: Invalid,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 5..8,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 5..8,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | if : ...
+  |    ^ Syntax Error: Expected an expression
+  |

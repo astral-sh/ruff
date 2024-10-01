@@ -12,22 +12,25 @@ use crate::checkers::ast::Checker;
 /// in stub (`.pyi`) files.
 ///
 /// ## Why is this bad?
-/// If a function has a default value where the string or bytes representation
-/// is greater than 50 characters, it is likely to be an implementation detail
-/// or a constant that varies depending on the system you're running on.
+/// If a function or variable has a default value where the string or bytes
+/// representation is greater than 50 characters long, it is likely to be an
+/// implementation detail or a constant that varies depending on the system
+/// you're running on.
 ///
-/// Consider replacing such constants with ellipses (`...`).
+/// Although IDEs may find them useful, default values are ignored by type
+/// checkers, the primary consumers of stub files. Replace very long constants
+/// with ellipses (`...`) to simplify the stub.
 ///
 /// ## Example
-/// ```python
-/// def foo(arg: str = "51 character stringgggggggggggggggggggggggggggggggg") -> None:
-///     ...
+///
+/// ```pyi
+/// def foo(arg: str = "51 character stringgggggggggggggggggggggggggggggggg") -> None: ...
 /// ```
 ///
 /// Use instead:
-/// ```python
-/// def foo(arg: str = ...) -> None:
-///     ...
+///
+/// ```pyi
+/// def foo(arg: str = ...) -> None: ...
 /// ```
 #[violation]
 pub struct StringOrBytesTooLong;
@@ -56,12 +59,14 @@ pub(crate) fn string_or_bytes_too_long(checker: &mut Checker, string: StringLike
         return;
     }
 
+    if semantic.in_annotation() {
+        return;
+    }
+
     let length = match string {
-        StringLike::StringLiteral(ast::ExprStringLiteral { value, .. }) => value.chars().count(),
-        StringLike::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => value.len(),
-        StringLike::FStringLiteral(ast::FStringLiteralElement { value, .. }) => {
-            value.chars().count()
-        }
+        StringLike::String(ast::ExprStringLiteral { value, .. }) => value.chars().count(),
+        StringLike::Bytes(ast::ExprBytesLiteral { value, .. }) => value.len(),
+        StringLike::FString(node) => count_f_string_chars(node),
     };
     if length <= 50 {
         return;
@@ -75,6 +80,26 @@ pub(crate) fn string_or_bytes_too_long(checker: &mut Checker, string: StringLike
     checker.diagnostics.push(diagnostic);
 }
 
+/// Count the number of visible characters in an f-string. This accounts for
+/// implicitly concatenated f-strings as well.
+fn count_f_string_chars(f_string: &ast::ExprFString) -> usize {
+    f_string
+        .value
+        .iter()
+        .map(|part| match part {
+            ast::FStringPart::Literal(string) => string.chars().count(),
+            ast::FStringPart::FString(f_string) => f_string
+                .elements
+                .iter()
+                .map(|element| match element {
+                    ast::FStringElement::Literal(string) => string.chars().count(),
+                    ast::FStringElement::Expression(expr) => expr.range().len().to_usize(),
+                })
+                .sum(),
+        })
+        .sum()
+}
+
 fn is_warnings_dot_deprecated(expr: Option<&ast::Expr>, semantic: &SemanticModel) -> bool {
     // Does `expr` represent a call to `warnings.deprecated` or `typing_extensions.deprecated`?
     let Some(expr) = expr else {
@@ -84,10 +109,10 @@ fn is_warnings_dot_deprecated(expr: Option<&ast::Expr>, semantic: &SemanticModel
         return false;
     };
     semantic
-        .resolve_call_path(&call.func)
-        .is_some_and(|call_path| {
+        .resolve_qualified_name(&call.func)
+        .is_some_and(|qualified_name| {
             matches!(
-                call_path.as_slice(),
+                qualified_name.segments(),
                 ["warnings" | "typing_extensions", "deprecated"]
             )
         })

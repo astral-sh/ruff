@@ -15,14 +15,14 @@ use crate::fix;
 /// is redundant.
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// class Foo:
 ///     ...
 ///     value: int
 /// ```
 ///
 /// Use instead:
-/// ```python
+/// ```pyi
 /// class Foo:
 ///     value: int
 /// ```

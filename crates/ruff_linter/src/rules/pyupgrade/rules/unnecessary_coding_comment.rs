@@ -4,6 +4,7 @@ use regex::Regex;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_index::Indexer;
+use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -49,10 +50,11 @@ pub(crate) fn unnecessary_coding_comment(
     diagnostics: &mut Vec<Diagnostic>,
     locator: &Locator,
     indexer: &Indexer,
+    comment_ranges: &CommentRanges,
 ) {
     // The coding comment must be on one of the first two lines. Since each comment spans at least
     // one line, we only need to check the first two comments at most.
-    for comment_range in indexer.comment_ranges().iter().take(2) {
+    for comment_range in comment_ranges.iter().take(2) {
         // If leading content is not whitespace then it's not a valid coding comment e.g.
         // ```
         // print(x) # coding=utf8

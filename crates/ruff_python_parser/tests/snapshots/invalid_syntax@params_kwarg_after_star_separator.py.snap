@@ -1,0 +1,63 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/params_kwarg_after_star_separator.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..26,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 0..25,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 4..7,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 7..20,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: Some(
+                            Parameter {
+                                range: 11..19,
+                                name: Identifier {
+                                    id: Name("kwargs"),
+                                    range: 13..19,
+                                },
+                                annotation: None,
+                            },
+                        ),
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 22..25,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 22..25,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | def foo(*, **kwargs): ...
+  |            ^^^^^^^^ Syntax Error: Expected one or more keyword parameter after '*' separator
+  |

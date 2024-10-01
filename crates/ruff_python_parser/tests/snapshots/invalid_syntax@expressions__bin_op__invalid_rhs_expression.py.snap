@@ -1,0 +1,116 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/bin_op/invalid_rhs_expression.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..28,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..15,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 0..15,
+                            left: Name(
+                                ExprName {
+                                    range: 0..1,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            op: Add,
+                            right: Lambda(
+                                ExprLambda {
+                                    range: 4..15,
+                                    parameters: Some(
+                                        Parameters {
+                                            range: 11..12,
+                                            posonlyargs: [],
+                                            args: [
+                                                ParameterWithDefault {
+                                                    range: 11..12,
+                                                    parameter: Parameter {
+                                                        range: 11..12,
+                                                        name: Identifier {
+                                                            id: Name("y"),
+                                                            range: 11..12,
+                                                        },
+                                                        annotation: None,
+                                                    },
+                                                    default: None,
+                                                },
+                                            ],
+                                            vararg: None,
+                                            kwonlyargs: [],
+                                            kwarg: None,
+                                        },
+                                    ),
+                                    body: Name(
+                                        ExprName {
+                                            range: 14..15,
+                                            id: Name("y"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 17..28,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 17..28,
+                            left: Name(
+                                ExprName {
+                                    range: 17..18,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            op: Sub,
+                            right: Yield(
+                                ExprYield {
+                                    range: 21..28,
+                                    value: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 27..28,
+                                                id: Name("y"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | x + lambda y: y
+  |     ^^^^^^^^^^^ Syntax Error: Lambda expression cannot be used here
+2 | 
+3 | x - yield y
+  |
+
+
+  |
+1 | x + lambda y: y
+2 | 
+3 | x - yield y
+  |     ^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |

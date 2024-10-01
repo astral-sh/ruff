@@ -1,0 +1,35 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/parenthesized/missing_closing_paren_0.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..47,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 46..47,
+                    value: Name(
+                        ExprName {
+                            range: 47..47,
+                            id: Name(""),
+                            ctx: Invalid,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # Missing closing parentheses 0: No elements
+2 | 
+3 | (
+  |   Syntax Error: unexpected EOF while parsing
+  |

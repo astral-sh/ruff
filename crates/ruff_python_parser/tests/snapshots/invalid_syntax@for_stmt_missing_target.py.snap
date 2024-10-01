@@ -1,0 +1,60 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/for_stmt_missing_target.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..14,
+        body: [
+            For(
+                StmtFor {
+                    range: 0..13,
+                    is_async: false,
+                    target: Name(
+                        ExprName {
+                            range: 4..6,
+                            id: Name("in"),
+                            ctx: Store,
+                        },
+                    ),
+                    iter: Name(
+                        ExprName {
+                            range: 7..8,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 10..13,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 10..13,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | for in x: ...
+  |     ^^ Syntax Error: Expected an identifier, but found a keyword 'in' that cannot be used here
+  |
+
+
+  |
+1 | for in x: ...
+  |        ^ Syntax Error: Expected 'in', found name
+  |

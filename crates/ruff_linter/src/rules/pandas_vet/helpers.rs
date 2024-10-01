@@ -29,7 +29,7 @@ pub(super) fn test_expression(expr: &Expr, semantic: &SemanticModel) -> Resoluti
         | Expr::SetComp(_)
         | Expr::ListComp(_)
         | Expr::DictComp(_)
-        | Expr::GeneratorExp(_) => Resolution::IrrelevantExpression,
+        | Expr::Generator(_) => Resolution::IrrelevantExpression,
         Expr::Name(name) => {
             semantic
                 .resolve_name(name)
@@ -47,9 +47,11 @@ pub(super) fn test_expression(expr: &Expr, semantic: &SemanticModel) -> Resoluti
                         | BindingKind::Assignment
                         | BindingKind::NamedExprAssignment
                         | BindingKind::LoopVar
-                        | BindingKind::Global
-                        | BindingKind::Nonlocal(_) => Resolution::RelevantLocal,
-                        BindingKind::Import(import) if matches!(import.call_path(), ["pandas"]) => {
+                        | BindingKind::Global(_)
+                        | BindingKind::Nonlocal(_, _) => Resolution::RelevantLocal,
+                        BindingKind::Import(import)
+                            if matches!(import.qualified_name().segments(), ["pandas"]) =>
+                        {
                             Resolution::PandasModule
                         }
                         _ => Resolution::IrrelevantBinding,

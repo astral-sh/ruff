@@ -4,7 +4,7 @@ use drop_bomb::DebugDropBomb;
 use unicode_width::UnicodeWidthChar;
 
 pub use printer_options::*;
-use ruff_text_size::{Ranged, TextLen, TextSize};
+use ruff_text_size::{TextLen, TextSize};
 
 use crate::format_element::document::Document;
 use crate::format_element::tag::{Condition, GroupMode};
@@ -60,7 +60,10 @@ impl<'a> Printer<'a> {
         document: &'a Document,
         indent: u16,
     ) -> PrintResult<Printed> {
-        let mut stack = PrintCallStack::new(PrintElementArgs::new(Indention::Level(indent)));
+        let indentation = Indentation::Level(indent);
+        self.state.pending_indent = indentation;
+
+        let mut stack = PrintCallStack::new(PrintElementArgs::new(indentation));
         let mut queue: PrintQueue<'a> = PrintQueue::new(document.as_ref());
 
         loop {
@@ -72,6 +75,9 @@ impl<'a> Printer<'a> {
                 }
             }
         }
+
+        // Push any pending marker
+        self.push_marker();
 
         Ok(Printed::new(
             self.state.buffer,
@@ -94,46 +100,42 @@ impl<'a> Printer<'a> {
         let args = stack.top();
 
         match element {
-            FormatElement::Space => self.print_text(Text::Token(" "), None),
-            FormatElement::Token { text } => self.print_text(Text::Token(text), None),
-            FormatElement::Text { text, text_width } => self.print_text(
-                Text::Text {
-                    text,
-                    text_width: *text_width,
-                },
-                None,
-            ),
+            FormatElement::Space => self.print_text(Text::Token(" ")),
+            FormatElement::Token { text } => self.print_text(Text::Token(text)),
+            FormatElement::Text { text, text_width } => self.print_text(Text::Text {
+                text,
+                text_width: *text_width,
+            }),
             FormatElement::SourceCodeSlice { slice, text_width } => {
                 let text = slice.text(self.source_code);
-                self.print_text(
-                    Text::Text {
-                        text,
-                        text_width: *text_width,
-                    },
-                    Some(slice.range()),
-                );
+                self.print_text(Text::Text {
+                    text,
+                    text_width: *text_width,
+                });
             }
             FormatElement::Line(line_mode) => {
                 if args.mode().is_flat()
                     && matches!(line_mode, LineMode::Soft | LineMode::SoftOrSpace)
                 {
                     if line_mode == &LineMode::SoftOrSpace {
-                        self.print_text(Text::Token(" "), None);
+                        self.print_text(Text::Token(" "));
                     }
                 } else if self.state.line_suffixes.has_pending() {
                     self.flush_line_suffixes(queue, stack, Some(element));
                 } else {
                     // Only print a newline if the current line isn't already empty
-                    if self.state.line_width > 0 {
+                    if !self.state.buffer[self.state.line_start..].is_empty() {
+                        self.push_marker();
                         self.print_char('\n');
                     }
 
                     // Print a second line break if this is an empty line
                     if line_mode == &LineMode::Empty {
+                        self.push_marker();
                         self.print_char('\n');
                     }
 
-                    self.state.pending_indent = args.indention();
+                    self.state.pending_indent = args.indentation();
                 }
             }
 
@@ -142,8 +144,11 @@ impl<'a> Printer<'a> {
             }
 
             FormatElement::SourcePosition(position) => {
-                self.state.source_position = *position;
-                self.push_marker();
+                // The printer defers printing indents until the next text
+                // is printed. Pushing the marker now would mean that the
+                // mapped range includes the indent range, which we don't want.
+                // Queue the source map position and emit it when printing the next character
+                self.state.pending_source_position = Some(*position);
             }
 
             FormatElement::LineSuffixBoundary => {
@@ -435,7 +440,7 @@ impl<'a> Printer<'a> {
         Ok(print_mode)
     }
 
-    fn print_text(&mut self, text: Text, source_range: Option<TextRange>) {
+    fn print_text(&mut self, text: Text) {
         if !self.state.pending_indent.is_empty() {
             let (indent_char, repeat_count) = match self.options.indent_style() {
                 IndentStyle::Tab => ('\t', 1),
@@ -456,19 +461,6 @@ impl<'a> Printer<'a> {
             for _ in 0..indent.align() {
                 self.print_char(' ');
             }
-        }
-
-        // Insert source map markers before and after the token
-        //
-        // If the token has source position information the start marker
-        // will use the start position of the original token, and the end
-        // marker will use that position + the text length of the token
-        //
-        // If the token has no source position (was created by the formatter)
-        // both the start and end marker will use the last known position
-        // in the input source (from state.source_position)
-        if let Some(range) = source_range {
-            self.state.source_position = range.start();
         }
 
         self.push_marker();
@@ -493,29 +485,24 @@ impl<'a> Printer<'a> {
                 }
             }
         }
-
-        if let Some(range) = source_range {
-            self.state.source_position = range.end();
-        }
-
-        self.push_marker();
     }
 
     fn push_marker(&mut self) {
-        if self.options.source_map_generation.is_disabled() {
+        let Some(source_position) = self.state.pending_source_position.take() else {
             return;
-        }
+        };
 
         let marker = SourceMarker {
-            source: self.state.source_position,
+            source: source_position,
             dest: self.state.buffer.text_len(),
         };
 
-        if let Some(last) = self.state.source_markers.last() {
-            if last != &marker {
-                self.state.source_markers.push(marker);
-            }
-        } else {
+        if self
+            .state
+            .source_markers
+            .last()
+            .map_or(true, |last| last != &marker)
+        {
             self.state.source_markers.push(marker);
         }
     }
@@ -843,6 +830,7 @@ impl<'a> Printer<'a> {
                 .push_str(self.options.line_ending.as_str());
 
             self.state.line_width = 0;
+            self.state.line_start = self.state.buffer.len();
 
             // Fit's only tests if groups up to the first line break fit.
             // The next group must re-measure if it still fits.
@@ -885,12 +873,29 @@ enum FillPairLayout {
 /// position the printer currently is.
 #[derive(Default, Debug)]
 struct PrinterState<'a> {
+    /// The formatted output.
     buffer: String,
+
+    /// The source markers that map source positions to formatted positions.
     source_markers: Vec<SourceMarker>,
-    source_position: TextSize,
-    pending_indent: Indention,
+
+    /// The next source position that should be flushed when writing the next text.
+    pending_source_position: Option<TextSize>,
+
+    /// The current indentation that should be written before the next text.
+    pending_indent: Indentation,
+
+    /// Caches if the code up to the next newline has been measured to fit on a single line.
+    /// This is used to avoid re-measuring the same content multiple times.
     measured_group_fits: bool,
+
+    /// The offset at which the current line in `buffer` starts.
+    line_start: usize,
+
+    /// The accumulated unicode-width of all characters on the current line.
     line_width: u32,
+
+    /// The line suffixes that should be printed at the end of the line.
     line_suffixes: LineSuffixes<'a>,
     verbatim_markers: Vec<TextRange>,
     group_modes: GroupModes,
@@ -938,37 +943,37 @@ impl GroupModes {
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
-enum Indention {
-    /// Indent the content by `count` levels by using the indention sequence specified by the printer options.
+enum Indentation {
+    /// Indent the content by `count` levels by using the indentation sequence specified by the printer options.
     Level(u16),
 
-    /// Indent the content by n-`level`s using the indention sequence specified by the printer options and `align` spaces.
+    /// Indent the content by n-`level`s using the indentation sequence specified by the printer options and `align` spaces.
     Align { level: u16, align: NonZeroU8 },
 }
 
-impl Indention {
+impl Indentation {
     const fn is_empty(self) -> bool {
-        matches!(self, Indention::Level(0))
+        matches!(self, Indentation::Level(0))
     }
 
-    /// Creates a new indention level with a zero-indent.
+    /// Creates a new indentation level with a zero-indent.
     const fn new() -> Self {
-        Indention::Level(0)
+        Indentation::Level(0)
     }
 
-    /// Returns the indention level
+    /// Returns the indentation level
     fn level(self) -> u16 {
         match self {
-            Indention::Level(count) => count,
-            Indention::Align { level: indent, .. } => indent,
+            Indentation::Level(count) => count,
+            Indentation::Align { level: indent, .. } => indent,
         }
     }
 
     /// Returns the number of trailing align spaces or 0 if none
     fn align(self) -> u8 {
         match self {
-            Indention::Level(_) => 0,
-            Indention::Align { align, .. } => align.into(),
+            Indentation::Level(_) => 0,
+            Indentation::Align { align, .. } => align.into(),
         }
     }
 
@@ -977,16 +982,18 @@ impl Indention {
     /// The behaviour depends on the [`indent_style`][IndentStyle] if this is an [`Indent::Align`]:
     /// - **Tabs**: `align` is converted into an indent. This results in `level` increasing by two: once for the align, once for the level increment
     /// - **Spaces**: Increments the `level` by one and keeps the `align` unchanged.
-    /// Keeps any  the current value is [`Indent::Align`] and increments the level by one.
+    ///   Keeps any  the current value is [`Indent::Align`] and increments the level by one.
     fn increment_level(self, indent_style: IndentStyle) -> Self {
         match self {
-            Indention::Level(count) => Indention::Level(count + 1),
+            Indentation::Level(count) => Indentation::Level(count + 1),
             // Increase the indent AND convert the align to an indent
-            Indention::Align { level, .. } if indent_style.is_tab() => Indention::Level(level + 2),
-            Indention::Align {
+            Indentation::Align { level, .. } if indent_style.is_tab() => {
+                Indentation::Level(level + 2)
+            }
+            Indentation::Align {
                 level: indent,
                 align,
-            } => Indention::Align {
+            } => Indentation::Align {
                 level: indent + 1,
                 align,
             },
@@ -1000,23 +1007,23 @@ impl Indention {
     /// No-op if the level is already zero.
     fn decrement(self) -> Self {
         match self {
-            Indention::Level(level) => Indention::Level(level.saturating_sub(1)),
-            Indention::Align { level, .. } => Indention::Level(level),
+            Indentation::Level(level) => Indentation::Level(level.saturating_sub(1)),
+            Indentation::Align { level, .. } => Indentation::Level(level),
         }
     }
 
-    /// Adds an `align` of `count` spaces to the current indention.
+    /// Adds an `align` of `count` spaces to the current indentation.
     ///
     /// It increments the `level` value if the current value is [`Indent::IndentAlign`].
     fn set_align(self, count: NonZeroU8) -> Self {
         match self {
-            Indention::Level(indent_count) => Indention::Align {
+            Indentation::Level(indent_count) => Indentation::Align {
                 level: indent_count,
                 align: count,
             },
 
             // Convert the existing align to an indent
-            Indention::Align { level: indent, .. } => Indention::Align {
+            Indentation::Align { level: indent, .. } => Indentation::Align {
                 level: indent + 1,
                 align: count,
             },
@@ -1024,9 +1031,9 @@ impl Indention {
     }
 }
 
-impl Default for Indention {
+impl Default for Indentation {
     fn default() -> Self {
-        Indention::new()
+        Indentation::new()
     }
 }
 
@@ -1186,7 +1193,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                             MeasureMode::AllLines | MeasureMode::AllLinesAllowTextOverflow => {
                                 // Continue measuring on the next line
                                 self.state.line_width = 0;
-                                self.state.pending_indent = args.indention();
+                                self.state.pending_indent = args.indentation();
                             }
                         }
                     }
@@ -1297,7 +1304,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                     // to ensure any trailing comments (that, unfortunately, are attached to the statement and not the expression)
                     // fit too.
                     self.state.line_width = 0;
-                    self.state.pending_indent = unindented.indention();
+                    self.state.pending_indent = unindented.indentation();
 
                     return Ok(self.fits_text(Text::Token(")"), unindented));
                 }
@@ -1610,7 +1617,7 @@ impl From<bool> for Fits {
 /// State used when measuring if a group fits on a single line
 #[derive(Debug)]
 struct FitsState {
-    pending_indent: Indention,
+    pending_indent: Indentation,
     has_line_suffix: bool,
     line_width: u32,
 }
@@ -1742,7 +1749,7 @@ a",
         let result = format_with_options(
             &format_args![
                 token("function main() {"),
-                block_indent(&text("let x = `This is a multiline\nstring`;", None)),
+                block_indent(&text("let x = `This is a multiline\nstring`;")),
                 token("}"),
                 hard_line_break()
             ],
@@ -1759,7 +1766,7 @@ a",
     fn it_breaks_a_group_if_a_string_contains_a_newline() {
         let result = format(&FormatArrayElements {
             items: vec![
-                &text("`This is a string spanning\ntwo lines`", None),
+                &text("`This is a string spanning\ntwo lines`"),
                 &token("\"b\""),
             ],
         });

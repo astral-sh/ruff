@@ -1,0 +1,94 @@
+---
+source: crates/ruff/tests/integration_test.rs
+info:
+  program: ruff
+  args:
+    - rule
+    - F401
+---
+success: true
+exit_code: 0
+----- stdout -----
+# unused-import (F401)
+
+Derived from the **Pyflakes** linter.
+
+Fix is sometimes available.
+
+## What it does
+Checks for unused imports.
+
+## Why is this bad?
+Unused imports add a performance overhead at runtime, and risk creating
+import cycles. They also increase the cognitive load of reading the code.
+
+If an import statement is used to check for the availability or existence
+of a module, consider using `importlib.util.find_spec` instead.
+
+If an import statement is used to re-export a symbol as part of a module's
+public interface, consider using a "redundant" import alias, which
+instructs Ruff (and other tools) to respect the re-export, and avoid
+marking it as unused, as in:
+
+```python
+from module import member as member
+```
+
+Alternatively, you can use `__all__` to declare a symbol as part of the module's
+interface, as in:
+
+```python
+# __init__.py
+import some_module
+
+__all__ = ["some_module"]
+```
+
+## Fix safety
+
+Fixes to remove unused imports are safe, except in `__init__.py` files.
+
+Applying fixes to `__init__.py` files is currently in preview. The fix offered depends on the
+type of the unused import. Ruff will suggest a safe fix to export first-party imports with
+either a redundant alias or, if already present in the file, an `__all__` entry. If multiple
+`__all__` declarations are present, Ruff will not offer a fix. Ruff will suggest an unsafe fix
+to remove third-party and standard library imports -- the fix is unsafe because the module's
+interface changes.
+
+## Example
+
+```python
+import numpy as np  # unused import
+
+
+def area(radius):
+    return 3.14 * radius**2
+```
+
+Use instead:
+
+```python
+def area(radius):
+    return 3.14 * radius**2
+```
+
+To check the availability of a module, use `importlib.util.find_spec`:
+
+```python
+from importlib.util import find_spec
+
+if find_spec("numpy") is not None:
+    print("numpy is installed")
+else:
+    print("numpy is not installed")
+```
+
+## Options
+- `lint.ignore-init-module-imports`
+
+## References
+- [Python documentation: `import`](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
+- [Python documentation: `importlib.util.find_spec`](https://docs.python.org/3/library/importlib.html#importlib.util.find_spec)
+- [Typing documentation: interface conventions](https://typing.readthedocs.io/en/latest/source/libraries.html#library-interface-public-and-private-symbols)
+
+----- stderr -----

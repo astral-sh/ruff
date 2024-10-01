@@ -5,7 +5,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_stdlib::str;
 use ruff_text_size::Ranged;
 
-use crate::settings::types::IdentifierPattern;
+use crate::rules::pep8_naming::settings::IgnoreNames;
 
 /// ## What it does
 /// Checks for argument names that do not follow the `snake_case` convention.
@@ -52,15 +52,13 @@ impl Violation for InvalidArgumentName {
 pub(crate) fn invalid_argument_name(
     name: &str,
     parameter: &Parameter,
-    ignore_names: &[IdentifierPattern],
+    ignore_names: &IgnoreNames,
 ) -> Option<Diagnostic> {
-    if ignore_names
-        .iter()
-        .any(|ignore_name| ignore_name.matches(name))
-    {
-        return None;
-    }
     if !str::is_lowercase(name) {
+        // Ignore any explicitly-allowed names.
+        if ignore_names.matches(name) {
+            return None;
+        }
         return Some(Diagnostic::new(
             InvalidArgumentName {
                 name: name.to_string(),

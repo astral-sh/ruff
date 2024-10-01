@@ -3,14 +3,12 @@ use std::str::FromStr;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::str::{leading_quote, trailing_quote};
-use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, whitespace::indentation, AnyStringFlags, Expr, StringFlags};
 use ruff_python_codegen::Stylist;
 use ruff_python_literal::cformat::{
     CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatString,
 };
-use ruff_python_parser::{lexer, AsMode, Tok};
+use ruff_python_parser::TokenKind;
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
@@ -20,7 +18,8 @@ use crate::checkers::ast::Checker;
 use crate::rules::pyupgrade::helpers::curly_escape;
 
 /// ## What it does
-/// Checks for `printf`-style string formatting.
+/// Checks for `printf`-style string formatting, and offers to replace it with
+/// `str.format` calls.
 ///
 /// ## Why is this bad?
 /// `printf`-style string formatting has a number of quirks, and leads to less
@@ -28,38 +27,47 @@ use crate::rules::pyupgrade::helpers::curly_escape;
 /// the newer `str.format` and f-strings constructs over `printf`-style string
 /// formatting.
 ///
-/// ## Known problems
-/// This rule is unable to detect cases in which the format string contains
-/// a single, generic format specifier (e.g. `%s`), and the right-hand side
-/// is an ambiguous expression.
-///
-/// For example, given:
-/// ```python
-/// "%s" % value
-/// ```
-///
-/// `value` could be a single-element tuple, _or_ it could be a single value.
-/// Both of these would resolve to the same formatted string when using
-/// `printf`-style formatting, but _not_ when using f-strings:
-///
-/// ```python
-/// value = 1
-/// print("%s" % value)  # "1"
-/// print("{}".format(value))  # "1"
-///
-/// value = (1,)
-/// print("%s" % value)  # "1"
-/// print("{}".format(value))  # "(1,)"
-/// ```
-///
 /// ## Example
+///
 /// ```python
 /// "%s, %s" % ("Hello", "World")  # "Hello, World"
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// "{}, {}".format("Hello", "World")  # "Hello, World"
+/// ```
+///
+/// ```python
+/// f"{'Hello'}, {'World'}"  # "Hello, World"
+/// ```
+///
+/// ## Fix safety
+///
+/// In cases where the format string contains a single generic format specifier
+/// (e.g. `%s`), and the right-hand side is an ambiguous expression,
+/// we cannot offer a safe fix.
+///
+/// For example, given:
+///
+/// ```python
+/// "%s" % val
+/// ```
+///
+/// `val` could be a single-element tuple, _or_ a single value (not
+/// contained in a tuple). Both of these would resolve to the same
+/// formatted string when using `printf`-style formatting, but
+/// resolve differently when using f-strings:
+///
+/// ```python
+/// val = 1
+/// print("%s" % val)  # "1"
+/// print("{}".format(val))  # "1"
+///
+/// val = (1,)
+/// print("%s" % val)  # "1"
+/// print("{}".format(val))  # "(1,)"
 /// ```
 ///
 /// ## References
@@ -150,8 +158,19 @@ fn handle_part(part: &CFormatPart<String>) -> Cow<'_, str> {
                     match precision {
                         CFormatPrecision::Quantity(quantity) => match quantity {
                             CFormatQuantity::Amount(amount) => {
-                                format_string.push('.');
-                                format_string.push_str(&amount.to_string());
+                                // Integer-only presentation types.
+                                //
+                                // See: https://docs.python.org/3/library/string.html#format-specification-mini-language
+                                if matches!(
+                                    spec.format_char,
+                                    'b' | 'c' | 'd' | 'o' | 'x' | 'X' | 'n'
+                                ) {
+                                    format_string.push('0');
+                                    format_string.push_str(&amount.to_string());
+                                } else {
+                                    format_string.push('.');
+                                    format_string.push_str(&amount.to_string());
+                                }
                             }
                             CFormatQuantity::FromValuesTuple => {
                                 unreachable!("Width should be a usize")
@@ -187,8 +206,8 @@ fn percent_to_format(format_string: &CFormatString) -> String {
 
 /// If a tuple has one argument, remove the comma; otherwise, return it as-is.
 fn clean_params_tuple<'a>(right: &Expr, locator: &Locator<'a>) -> Cow<'a, str> {
-    if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &right {
-        if elts.len() == 1 {
+    if let Expr::Tuple(tuple) = &right {
+        if tuple.len() == 1 {
             if !locator.contains_line_break(right.range()) {
                 let mut contents = locator.slice(right).to_string();
                 for (i, character) in contents.chars().rev().enumerate() {
@@ -211,16 +230,11 @@ fn clean_params_tuple<'a>(right: &Expr, locator: &Locator<'a>) -> Cow<'a, str> {
 fn clean_params_dictionary(right: &Expr, locator: &Locator, stylist: &Stylist) -> Option<String> {
     let is_multi_line = locator.contains_line_break(right.range());
     let mut contents = String::new();
-    if let Expr::Dict(ast::ExprDict {
-        keys,
-        values,
-        range: _,
-    }) = &right
-    {
+    if let Expr::Dict(ast::ExprDict { items, range: _ }) = &right {
         let mut arguments: Vec<String> = vec![];
         let mut seen: Vec<&str> = vec![];
         let mut indent = None;
-        for (key, value) in keys.iter().zip(values.iter()) {
+        for ast::DictItem { key, value } in items {
             match key {
                 Some(key) => {
                     if let Expr::StringLiteral(ast::ExprStringLiteral {
@@ -261,9 +275,7 @@ fn clean_params_dictionary(right: &Expr, locator: &Locator, stylist: &Stylist) -
         }
         contents.push('(');
         if is_multi_line {
-            let Some(indent) = indent else {
-                return None;
-            };
+            let indent = indent?;
 
             for item in &arguments {
                 contents.push_str(stylist.line_ending().as_str());
@@ -351,49 +363,35 @@ fn convertible(format_string: &CFormatString, params: &Expr) -> bool {
 }
 
 /// UP031
-pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right: &Expr) {
-    // Grab each string segment (in case there's an implicit concatenation).
-    let mut strings: Vec<TextRange> = vec![];
-    let mut extension = None;
-    for (tok, range) in lexer::lex_starts_at(
-        checker.locator().slice(expr),
-        checker.source_type.as_mode(),
-        expr.start(),
-    )
-    .flatten()
-    {
-        if tok.is_string() {
-            strings.push(range);
-        } else if matches!(tok, Tok::Rpar) {
-            // If we hit a right paren, we have to preserve it.
-            extension = Some(range);
-        } else if matches!(tok, Tok::Percent) {
-            // Break as soon as we find the modulo symbol.
-            break;
-        }
-    }
+pub(crate) fn printf_string_formatting(
+    checker: &mut Checker,
+    bin_op: &ast::ExprBinOp,
+    string_expr: &ast::ExprStringLiteral,
+) {
+    let right = &*bin_op.right;
 
-    // If there are no string segments, abort.
-    if strings.is_empty() {
-        return;
-    }
-
-    // Parse each string segment.
     let mut num_positional_arguments = 0;
     let mut num_keyword_arguments = 0;
-    let mut format_strings = Vec::with_capacity(strings.len());
-    for range in &strings {
-        let string = checker.locator().slice(*range);
-        let (Some(leader), Some(trailer)) = (leading_quote(string), trailing_quote(string)) else {
-            return;
-        };
-        let string = &string[leader.len()..string.len() - trailer.len()];
+    let mut format_strings: Vec<(TextRange, String)> =
+        Vec::with_capacity(string_expr.value.as_slice().len());
+
+    // Parse each string segment.
+    for string_literal in &string_expr.value {
+        let string = checker.locator().slice(string_literal);
+        let flags = AnyStringFlags::from(string_literal.flags);
+        let string = &string
+            [usize::from(flags.opener_len())..(string.len() - usize::from(flags.closer_len()))];
 
         // Parse the format string (e.g. `"%s"`) into a list of `PercentFormat`.
         let Ok(format_string) = CFormatString::from_str(string) else {
             return;
         };
         if !convertible(&format_string, right) {
+            if checker.settings.preview.is_enabled() {
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(PrintfStringFormatting, string_expr.range()));
+            }
             return;
         }
 
@@ -410,8 +408,10 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
         }
 
         // Convert the `%`-format string to a `.format` string.
-        let format_string = percent_to_format(&format_string);
-        format_strings.push(format!("{leader}{format_string}{trailer}"));
+        format_strings.push((
+            string_literal.range(),
+            flags.format_string_contents(&percent_to_format(&format_string)),
+        ));
     }
 
     // Parse the parameters.
@@ -441,7 +441,8 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
                 // print("%s" % x)
                 // print("{}".format(x))
                 // ```
-                return;
+                // So we offer an unsafe fix:
+                Cow::Owned(format!("({})", checker.locator().slice(right)))
             }
         }
         Expr::Tuple(_) => clean_params_tuple(right, checker.locator()),
@@ -449,6 +450,11 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
             let Some(params_string) =
                 clean_params_dictionary(right, checker.locator(), checker.stylist())
             else {
+                if checker.settings.preview.is_enabled() {
+                    checker
+                        .diagnostics
+                        .push(Diagnostic::new(PrintfStringFormatting, string_expr.range()));
+                }
                 return;
             };
             Cow::Owned(params_string)
@@ -458,41 +464,55 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
 
     // Reconstruct the string.
     let mut contents = String::new();
-    let mut prev = None;
-    for (range, format_string) in strings.iter().zip(format_strings) {
+    let mut prev_end = None;
+    for (range, format_string) in format_strings {
         // Add the content before the string segment.
-        match prev {
+        match prev_end {
             None => {
                 contents.push_str(
                     checker
                         .locator()
-                        .slice(TextRange::new(expr.start(), range.start())),
+                        .slice(TextRange::new(bin_op.start(), range.start())),
                 );
             }
-            Some(prev) => {
-                contents.push_str(checker.locator().slice(TextRange::new(prev, range.start())));
+            Some(prev_end) => {
+                contents.push_str(
+                    checker
+                        .locator()
+                        .slice(TextRange::new(prev_end, range.start())),
+                );
             }
         }
         // Add the string itself.
         contents.push_str(&format_string);
-        prev = Some(range.end());
+        prev_end = Some(range.end());
     }
 
-    if let Some(range) = extension {
-        contents.push_str(
-            checker
-                .locator()
-                .slice(TextRange::new(prev.unwrap(), range.end())),
-        );
+    if let Some(prev_end) = prev_end {
+        for token in checker.tokens().after(prev_end) {
+            match token.kind() {
+                // If we hit a right paren, we have to preserve it.
+                TokenKind::Rpar => {
+                    contents.push_str(
+                        checker
+                            .locator()
+                            .slice(TextRange::new(prev_end, token.end())),
+                    );
+                }
+                // Break as soon as we find the modulo symbol.
+                TokenKind::Percent => break,
+                _ => {}
+            }
+        }
     }
 
     // Add the `.format` call.
     contents.push_str(&format!(".format{params_string}"));
 
-    let mut diagnostic = Diagnostic::new(PrintfStringFormatting, expr.range());
+    let mut diagnostic = Diagnostic::new(PrintfStringFormatting, bin_op.range());
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         contents,
-        expr.range(),
+        bin_op.range(),
     )));
     checker.diagnostics.push(diagnostic);
 }

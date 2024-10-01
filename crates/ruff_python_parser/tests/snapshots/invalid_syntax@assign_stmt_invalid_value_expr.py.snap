@@ -1,0 +1,256 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/assign_stmt_invalid_value_expr.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..72,
+        body: [
+            Assign(
+                StmtAssign {
+                    range: 0..12,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 0..1,
+                                id: Name("x"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: Starred(
+                        ExprStarred {
+                            range: 4..12,
+                            value: BoolOp(
+                                ExprBoolOp {
+                                    range: 5..12,
+                                    op: And,
+                                    values: [
+                                        Name(
+                                            ExprName {
+                                                range: 5..6,
+                                                id: Name("a"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        Name(
+                                            ExprName {
+                                                range: 11..12,
+                                                id: Name("b"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 13..25,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 13..14,
+                                id: Name("x"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: Starred(
+                        ExprStarred {
+                            range: 17..25,
+                            value: Yield(
+                                ExprYield {
+                                    range: 18..25,
+                                    value: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 24..25,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 26..43,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 26..27,
+                                id: Name("x"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: Starred(
+                        ExprStarred {
+                            range: 30..43,
+                            value: YieldFrom(
+                                ExprYieldFrom {
+                                    range: 31..43,
+                                    value: Name(
+                                        ExprName {
+                                            range: 42..43,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 44..60,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 44..45,
+                                id: Name("x"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: Starred(
+                        ExprStarred {
+                            range: 48..60,
+                            value: Lambda(
+                                ExprLambda {
+                                    range: 49..60,
+                                    parameters: Some(
+                                        Parameters {
+                                            range: 56..57,
+                                            posonlyargs: [],
+                                            args: [
+                                                ParameterWithDefault {
+                                                    range: 56..57,
+                                                    parameter: Parameter {
+                                                        range: 56..57,
+                                                        name: Identifier {
+                                                            id: Name("x"),
+                                                            range: 56..57,
+                                                        },
+                                                        annotation: None,
+                                                    },
+                                                    default: None,
+                                                },
+                                            ],
+                                            vararg: None,
+                                            kwonlyargs: [],
+                                            kwarg: None,
+                                        },
+                                    ),
+                                    body: Name(
+                                        ExprName {
+                                            range: 59..60,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 61..66,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 61..62,
+                                id: Name("x"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: Name(
+                        ExprName {
+                            range: 65..66,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 70..71,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 70..71,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | x = *a and b
+  |      ^^^^^^^ Syntax Error: Boolean expression cannot be used here
+2 | x = *yield x
+3 | x = *yield from x
+  |
+
+
+  |
+1 | x = *a and b
+2 | x = *yield x
+  |      ^^^^^^^ Syntax Error: Yield expression cannot be used here
+3 | x = *yield from x
+4 | x = *lambda x: x
+  |
+
+
+  |
+1 | x = *a and b
+2 | x = *yield x
+3 | x = *yield from x
+  |      ^^^^^^^^^^^^ Syntax Error: Yield expression cannot be used here
+4 | x = *lambda x: x
+5 | x = x := 1
+  |
+
+
+  |
+2 | x = *yield x
+3 | x = *yield from x
+4 | x = *lambda x: x
+  |      ^^^^^^^^^^^ Syntax Error: Lambda expression cannot be used here
+5 | x = x := 1
+  |
+
+
+  |
+3 | x = *yield from x
+4 | x = *lambda x: x
+5 | x = x := 1
+  |       ^^ Syntax Error: Expected a statement
+  |

@@ -1,0 +1,113 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/yield/star_expression.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..67,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 37..47,
+                    value: Yield(
+                        ExprYield {
+                            range: 37..47,
+                            value: Some(
+                                Starred(
+                                    ExprStarred {
+                                        range: 44..46,
+                                        value: Name(
+                                            ExprName {
+                                                range: 45..46,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 49..66,
+                    value: Yield(
+                        ExprYield {
+                            range: 49..66,
+                            value: Some(
+                                Tuple(
+                                    ExprTuple {
+                                        range: 55..66,
+                                        elts: [
+                                            Starred(
+                                                ExprStarred {
+                                                    range: 55..63,
+                                                    value: BoolOp(
+                                                        ExprBoolOp {
+                                                            range: 56..63,
+                                                            op: And,
+                                                            values: [
+                                                                Name(
+                                                                    ExprName {
+                                                                        range: 56..57,
+                                                                        id: Name("x"),
+                                                                        ctx: Load,
+                                                                    },
+                                                                ),
+                                                                Name(
+                                                                    ExprName {
+                                                                        range: 62..63,
+                                                                        id: Name("y"),
+                                                                        ctx: Load,
+                                                                    },
+                                                                ),
+                                                            ],
+                                                        },
+                                                    ),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            Name(
+                                                ExprName {
+                                                    range: 65..66,
+                                                    id: Name("z"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
+                                        ctx: Load,
+                                        parenthesized: false,
+                                    },
+                                ),
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # Cannot use starred expression here
+2 | yield (*x)
+  |        ^^ Syntax Error: Starred expression cannot be used here
+3 | 
+4 | yield *x and y, z
+  |
+
+
+  |
+2 | yield (*x)
+3 | 
+4 | yield *x and y, z
+  |        ^^^^^^^ Syntax Error: Boolean expression cannot be used here
+  |

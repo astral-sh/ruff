@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
 ---
-SIM103.py:3:5: SIM103 [*] Return the condition `a` directly
+SIM103.py:3:5: SIM103 [*] Return the condition `bool(a)` directly
   |
 1 |   def f():
 2 |       # SIM103
@@ -52,7 +52,7 @@ SIM103.py:11:5: SIM103 [*] Return the condition `a == b` directly
 16 13 | 
 17 14 | def f():
 
-SIM103.py:21:5: SIM103 [*] Return the condition `b` directly
+SIM103.py:21:5: SIM103 [*] Return the condition `bool(b)` directly
    |
 19 |       if a:
 20 |           return 1
@@ -78,7 +78,7 @@ SIM103.py:21:5: SIM103 [*] Return the condition `b` directly
 26 23 | 
 27 24 | def f():
 
-SIM103.py:32:9: SIM103 [*] Return the condition `b` directly
+SIM103.py:32:9: SIM103 [*] Return the condition `bool(b)` directly
    |
 30 |           return 1
 31 |       else:
@@ -104,10 +104,10 @@ SIM103.py:32:9: SIM103 [*] Return the condition `b` directly
 37 34 | 
 38 35 | def f():
 
-SIM103.py:57:5: SIM103 [*] Return the condition `a` directly
+SIM103.py:57:5: SIM103 [*] Return the condition `not a` directly
    |
 55 |   def f():
-56 |       # SIM103 (but not fixable)
+56 |       # SIM103
 57 |       if a:
    |  _____^
 58 | |         return False
@@ -120,7 +120,7 @@ SIM103.py:57:5: SIM103 [*] Return the condition `a` directly
 ℹ Unsafe fix
 54 54 | 
 55 55 | def f():
-56 56 |     # SIM103 (but not fixable)
+56 56 |     # SIM103
 57    |-    if a:
 58    |-        return False
 59    |-    else:
@@ -130,7 +130,7 @@ SIM103.py:57:5: SIM103 [*] Return the condition `a` directly
 62 59 | 
 63 60 | def f():
 
-SIM103.py:83:5: SIM103 Return the condition `a` directly
+SIM103.py:83:5: SIM103 Return the condition directly
    |
 81 |       def bool():
 82 |           return False
@@ -143,4 +143,119 @@ SIM103.py:83:5: SIM103 Return the condition `a` directly
    |
    = help: Inline condition
 
+SIM103.py:91:5: SIM103 [*] Return the condition `not (keys is not None and notice.key not in keys)` directly
+   |
+89 |   def f():
+90 |       # SIM103
+91 |       if keys is not None and notice.key not in keys:
+   |  _____^
+92 | |         return False
+93 | |     else:
+94 | |         return True
+   | |___________________^ SIM103
+   |
+   = help: Replace with `return not (keys is not None and notice.key not in keys)`
 
+ℹ Unsafe fix
+88 88 | 
+89 89 | def f():
+90 90 |     # SIM103
+91    |-    if keys is not None and notice.key not in keys:
+92    |-        return False
+93    |-    else:
+94    |-        return True
+   91 |+    return not (keys is not None and notice.key not in keys)
+95 92 | 
+96 93 | 
+97 94 | ###
+
+SIM103.py:104:5: SIM103 [*] Return the condition `bool(a)` directly
+    |
+102 |   def f():
+103 |       # SIM103
+104 |       if a:
+    |  _____^
+105 | |         return True
+106 | |     return False
+    | |________________^ SIM103
+    |
+    = help: Replace with `return bool(a)`
+
+ℹ Unsafe fix
+101 101 | 
+102 102 | def f():
+103 103 |     # SIM103
+104     |-    if a:
+105     |-        return True
+106     |-    return False
+    104 |+    return bool(a)
+107 105 | 
+108 106 | 
+109 107 | def f():
+
+SIM103.py:111:5: SIM103 [*] Return the condition `not a` directly
+    |
+109 |   def f():
+110 |       # SIM103
+111 |       if a:
+    |  _____^
+112 | |         return False
+113 | |     return True
+    | |_______________^ SIM103
+    |
+    = help: Replace with `return not a`
+
+ℹ Unsafe fix
+108 108 | 
+109 109 | def f():
+110 110 |     # SIM103
+111     |-    if a:
+112     |-        return False
+113     |-    return True
+    111 |+    return not a
+114 112 | 
+115 113 | 
+116 114 | def f():
+
+SIM103.py:117:5: SIM103 [*] Return the condition `10 < a` directly
+    |
+116 |   def f():
+117 |       if not 10 < a:
+    |  _____^
+118 | |         return False
+119 | |     return True
+    | |_______________^ SIM103
+    |
+    = help: Replace with `return 10 < a`
+
+ℹ Unsafe fix
+114 114 | 
+115 115 | 
+116 116 | def f():
+117     |-    if not 10 < a:
+118     |-        return False
+119     |-    return True
+    117 |+    return 10 < a
+120 118 | 
+121 119 | 
+122 120 | def f():
+
+SIM103.py:123:5: SIM103 [*] Return the condition `not 10 < a` directly
+    |
+122 |   def f():
+123 |       if 10 < a:
+    |  _____^
+124 | |         return False
+125 | |     return True
+    | |_______________^ SIM103
+    |
+    = help: Replace with `return not 10 < a`
+
+ℹ Unsafe fix
+120 120 | 
+121 121 | 
+122 122 | def f():
+123     |-    if 10 < a:
+124     |-        return False
+125     |-    return True
+    123 |+    return not 10 < a

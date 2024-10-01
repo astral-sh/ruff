@@ -129,21 +129,31 @@ fn apply_fixes<'a>(
 
 /// Compare two fixes.
 fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Ordering {
-    fix1.min_start()
-        .cmp(&fix2.min_start())
-        .then_with(|| match (&rule1, &rule2) {
-            // Apply `EndsInPeriod` fixes before `NewLineAfterLastParagraph` fixes.
-            (Rule::EndsInPeriod, Rule::NewLineAfterLastParagraph) => std::cmp::Ordering::Less,
-            (Rule::NewLineAfterLastParagraph, Rule::EndsInPeriod) => std::cmp::Ordering::Greater,
-            // Apply `IfElseBlockInsteadOfDictGet` fixes before `IfElseBlockInsteadOfIfExp` fixes.
-            (Rule::IfElseBlockInsteadOfDictGet, Rule::IfElseBlockInsteadOfIfExp) => {
-                std::cmp::Ordering::Less
-            }
-            (Rule::IfElseBlockInsteadOfIfExp, Rule::IfElseBlockInsteadOfDictGet) => {
-                std::cmp::Ordering::Greater
-            }
-            _ => std::cmp::Ordering::Equal,
-        })
+    // Always apply `RedefinedWhileUnused` before `UnusedImport`, as the latter can end up fixing
+    // the former. But we can't apply this just for `RedefinedWhileUnused` and `UnusedImport` because it violates
+    // `< is transitive: a < b and b < c implies a < c. The same must hold for both == and >.`
+    // See https://github.com/astral-sh/ruff/issues/12469#issuecomment-2244392085
+    match (rule1, rule2) {
+        (Rule::RedefinedWhileUnused, _) => std::cmp::Ordering::Less,
+        (_, Rule::RedefinedWhileUnused) => std::cmp::Ordering::Greater,
+        _ => std::cmp::Ordering::Equal,
+    }
+    // Apply fixes in order of their start position.
+    .then_with(|| fix1.min_start().cmp(&fix2.min_start()))
+    // Break ties in the event of overlapping rules, for some specific combinations.
+    .then_with(|| match (&rule1, &rule2) {
+        // Apply `EndsInPeriod` fixes before `NewLineAfterLastParagraph` fixes.
+        (Rule::EndsInPeriod, Rule::NewLineAfterLastParagraph) => std::cmp::Ordering::Less,
+        (Rule::NewLineAfterLastParagraph, Rule::EndsInPeriod) => std::cmp::Ordering::Greater,
+        // Apply `IfElseBlockInsteadOfDictGet` fixes before `IfElseBlockInsteadOfIfExp` fixes.
+        (Rule::IfElseBlockInsteadOfDictGet, Rule::IfElseBlockInsteadOfIfExp) => {
+            std::cmp::Ordering::Less
+        }
+        (Rule::IfElseBlockInsteadOfIfExp, Rule::IfElseBlockInsteadOfDictGet) => {
+            std::cmp::Ordering::Greater
+        }
+        _ => std::cmp::Ordering::Equal,
+    })
 }
 
 #[cfg(test)]

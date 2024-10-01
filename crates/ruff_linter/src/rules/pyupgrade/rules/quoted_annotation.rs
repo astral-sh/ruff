@@ -10,26 +10,48 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// In Python, type annotations can be quoted to avoid forward references.
+///
 /// However, if `from __future__ import annotations` is present, Python
 /// will always evaluate type annotations in a deferred manner, making
 /// the quotes unnecessary.
 ///
+/// Similarly, if the annotation is located in a typing-only context and
+/// won't be evaluated by Python at runtime, the quotes will also be
+/// considered unnecessary. For example, Python does not evaluate type
+/// annotations on assignments in function bodies.
+///
 /// ## Example
+///
+/// Given:
+///
 /// ```python
 /// from __future__ import annotations
 ///
 ///
-/// def foo(bar: "Bar") -> "Bar":
-///     ...
+/// def foo(bar: "Bar") -> "Bar": ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// from __future__ import annotations
 ///
 ///
-/// def foo(bar: Bar) -> Bar:
-///     ...
+/// def foo(bar: Bar) -> Bar: ...
+/// ```
+///
+/// Given:
+///
+/// ```python
+/// def foo() -> None:
+///     bar: "Bar"
+/// ```
+///
+/// Use instead:
+///
+/// ```python
+/// def foo() -> None:
+///     bar: Bar
 /// ```
 ///
 /// ## References

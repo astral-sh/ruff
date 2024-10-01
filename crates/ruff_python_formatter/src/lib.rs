@@ -1,23 +1,24 @@
 use thiserror::Error;
 use tracing::Level;
 
+pub use range::format_range;
 use ruff_formatter::prelude::*;
-use ruff_formatter::{format, FormatError, Formatted, PrintError, Printed, SourceCode};
+use ruff_formatter::{format, write, FormatError, Formatted, PrintError, Printed, SourceCode};
 use ruff_python_ast::AstNode;
 use ruff_python_ast::Mod;
-use ruff_python_index::tokens_and_ranges;
-use ruff_python_parser::{parse_tokens, AsMode, ParseError, ParseErrorType};
+use ruff_python_parser::{parse, AsMode, ParseError, Parsed};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 
 use crate::comments::{
-    dangling_comments, leading_comments, trailing_comments, Comments, SourceComment,
+    has_skip_comment, leading_comments, trailing_comments, Comments, SourceComment,
 };
 pub use crate::context::PyFormatContext;
 pub use crate::options::{
     DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, PreviewMode, PyFormatOptions,
     PythonVersion, QuoteStyle,
 };
+use crate::range::is_logical_line;
 pub use crate::shared_traits::{AsFormat, FormattedIter, FormattedIterExt, IntoFormat};
 use crate::verbatim::suppressed_node;
 
@@ -33,6 +34,7 @@ pub(crate) mod other;
 pub(crate) mod pattern;
 mod prelude;
 mod preview;
+mod range;
 mod shared_traits;
 pub(crate) mod statement;
 pub(crate) mod string;
@@ -57,44 +59,34 @@ where
         } else {
             leading_comments(node_comments.leading).fmt(f)?;
 
-            let is_source_map_enabled = f.options().source_map_generation().is_enabled();
+            let node_ref = node.as_any_node_ref();
 
-            if is_source_map_enabled {
-                source_position(node.start()).fmt(f)?;
-            }
+            // Emit source map information for nodes that are valid "narrowing" targets
+            // in range formatting. Never emit source map information if they're disabled
+            // for performance reasons.
+            let emit_source_position = (is_logical_line(node_ref) || node_ref.is_mod_module())
+                && f.options().source_map_generation().is_enabled();
+
+            emit_source_position
+                .then_some(source_position(node.start()))
+                .fmt(f)?;
 
             self.fmt_fields(node, f)?;
 
-            if is_source_map_enabled {
-                source_position(node.end()).fmt(f)?;
-            }
+            debug_assert!(node_comments.dangling.iter().all(SourceComment::is_formatted), "The node has dangling comments that need to be formatted manually. Add the special dangling comments handling to `fmt_fields`.");
 
-            trailing_comments(node_comments.trailing).fmt(f)
+            write!(
+                f,
+                [
+                    emit_source_position.then_some(source_position(node.end())),
+                    trailing_comments(node_comments.trailing)
+                ]
+            )
         }
     }
 
     /// Formats the node's fields.
     fn fmt_fields(&self, item: &N, f: &mut PyFormatter) -> FormatResult<()>;
-
-    /// Formats the [dangling comments](comments#dangling-comments) of the node.
-    ///
-    /// You should override this method if the node handled by this rule can have dangling comments because the
-    /// default implementation formats the dangling comments at the end of the node, which isn't ideal but ensures that
-    /// no comments are dropped.
-    ///
-    /// A node can have dangling comments if all its children are tokens or if all node children are optional.
-    fn fmt_dangling_comments(
-        &self,
-        dangling_node_comments: &[SourceComment],
-        f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        debug_assert!(
-            dangling_node_comments.is_empty(),
-            "The node has dangling comments that need to be formatted manually. Add the special dangling comments handling to `fmt_fields` and override `fmt_dangling_comments` with an empty implementation that returns `Ok(())`."
-        );
-
-        dangling_comments(dangling_node_comments).fmt(f)
-    }
 
     fn is_suppressed(
         &self,
@@ -121,29 +113,25 @@ pub fn format_module_source(
     options: PyFormatOptions,
 ) -> Result<Printed, FormatModuleError> {
     let source_type = options.source_type();
-    let (tokens, comment_ranges) =
-        tokens_and_ranges(source, source_type).map_err(|err| ParseError {
-            offset: err.location,
-            error: ParseErrorType::Lexical(err.error),
-        })?;
-    let module = parse_tokens(tokens, source, source_type.as_mode())?;
-    let formatted = format_module_ast(&module, &comment_ranges, source, options)?;
+    let parsed = parse(source, source_type.as_mode())?;
+    let comment_ranges = CommentRanges::from(parsed.tokens());
+    let formatted = format_module_ast(&parsed, &comment_ranges, source, options)?;
     Ok(formatted.print()?)
 }
 
 pub fn format_module_ast<'a>(
-    module: &'a Mod,
+    parsed: &'a Parsed<Mod>,
     comment_ranges: &'a CommentRanges,
     source: &'a str,
     options: PyFormatOptions,
 ) -> FormatResult<Formatted<PyFormatContext<'a>>> {
     let source_code = SourceCode::new(source);
-    let comments = Comments::from_ast(module, source_code, comment_ranges);
+    let comments = Comments::from_ast(parsed.syntax(), source_code, comment_ranges);
     let locator = Locator::new(source);
 
     let formatted = format!(
-        PyFormatContext::new(options, locator.contents(), comments),
-        [module.format()]
+        PyFormatContext::new(options, locator.contents(), comments, parsed.tokens()),
+        [parsed.syntax().format()]
     )?;
     formatted
         .context()
@@ -168,10 +156,11 @@ mod tests {
     use insta::assert_snapshot;
 
     use ruff_python_ast::PySourceType;
-    use ruff_python_index::tokens_and_ranges;
-    use ruff_python_parser::{parse_tokens, AsMode};
+    use ruff_python_parser::{parse, AsMode};
+    use ruff_python_trivia::CommentRanges;
+    use ruff_text_size::{TextRange, TextSize};
 
-    use crate::{format_module_ast, format_module_source, PyFormatOptions};
+    use crate::{format_module_ast, format_module_source, format_range, PyFormatOptions};
 
     /// Very basic test intentionally kept very similar to the CLI
     #[test]
@@ -209,13 +198,13 @@ def main() -> None:
 
 "#;
         let source_type = PySourceType::Python;
-        let (tokens, comment_ranges) = tokens_and_ranges(source, source_type).unwrap();
 
         // Parse the AST.
         let source_path = "code_inline.py";
-        let module = parse_tokens(tokens, source, source_type.as_mode()).unwrap();
+        let parsed = parse(source, source_type.as_mode()).unwrap();
+        let comment_ranges = CommentRanges::from(parsed.tokens());
         let options = PyFormatOptions::from_extension(Path::new(source_path));
-        let formatted = format_module_ast(&module, &comment_ranges, source, options).unwrap();
+        let formatted = format_module_ast(&parsed, &comment_ranges, source, options).unwrap();
 
         // Uncomment the `dbg` to print the IR.
         // Use `dbg_write!(f, []) instead of `write!(f, [])` in your formatting code to print some IR
@@ -239,6 +228,57 @@ def main() -> None:
 ) + expression.get_db_converters(connection):
     ...
 "
+        );
+    }
+
+    /// Use this test to quickly debug some formatting issue.
+    #[ignore]
+    #[test]
+    fn range_formatting_quick_test() {
+        let source = r#"def convert_str(value: str) -> str:  # Trailing comment
+    """Return a string as-is."""
+
+<RANGE_START>
+
+    return value  # Trailing comment
+<RANGE_END>"#;
+
+        let mut source = source.to_string();
+
+        let start = TextSize::try_from(
+            source
+                .find("<RANGE_START>")
+                .expect("Start marker not found"),
+        )
+        .unwrap();
+
+        source.replace_range(
+            start.to_usize()..start.to_usize() + "<RANGE_START>".len(),
+            "",
+        );
+
+        let end =
+            TextSize::try_from(source.find("<RANGE_END>").expect("End marker not found")).unwrap();
+
+        source.replace_range(end.to_usize()..end.to_usize() + "<RANGE_END>".len(), "");
+
+        let source_type = PySourceType::Python;
+        let options = PyFormatOptions::from_source_type(source_type);
+        let printed = format_range(&source, TextRange::new(start, end), options).unwrap();
+
+        let mut formatted = source.to_string();
+        formatted.replace_range(
+            std::ops::Range::<usize>::from(printed.source_range()),
+            printed.as_code(),
+        );
+
+        assert_eq!(
+            formatted,
+            r#"print ( "format me" )
+print("format me")
+print("format me")
+print ( "format me" )
+print ( "format me" )"#
         );
     }
 
@@ -269,7 +309,7 @@ def main() -> None:
                     while let Some(word) = words.next() {
                         let is_last = words.peek().is_none();
                         let format_word = format_with(|f| {
-                            write!(f, [text(word, None)])?;
+                            write!(f, [text(word)])?;
 
                             if is_last {
                                 write!(f, [token("\"")])?;

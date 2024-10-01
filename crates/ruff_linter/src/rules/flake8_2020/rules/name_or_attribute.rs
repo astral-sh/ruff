@@ -1,7 +1,7 @@
-use ruff_python_ast::Expr;
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::Expr;
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -47,10 +47,14 @@ impl Violation for SixPY3 {
 
 /// YTT202
 pub(crate) fn name_or_attribute(checker: &mut Checker, expr: &Expr) {
+    if !checker.semantic().seen_module(Modules::SIX) {
+        return;
+    }
+
     if checker
         .semantic()
-        .resolve_call_path(expr)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["six", "PY3"]))
+        .resolve_qualified_name(expr)
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["six", "PY3"]))
     {
         checker
             .diagnostics

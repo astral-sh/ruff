@@ -1,7 +1,7 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, Expr, StmtFor};
+use ruff_python_ast::{self as ast, Expr, Int, Number, StmtFor};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -37,11 +37,11 @@ pub struct UnnecessaryListIndexLookup;
 impl AlwaysFixableViolation for UnnecessaryListIndexLookup {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary lookup of list item by index")
+        format!("List index lookup in `enumerate()` loop")
     }
 
     fn fix_title(&self) -> String {
-        format!("Use existing variable")
+        format!("Use the loop variable directly")
     }
 }
 
@@ -72,7 +72,7 @@ pub(crate) fn unnecessary_list_index_lookup(checker: &mut Checker, stmt_for: &St
 
 /// PLR1736
 pub(crate) fn unnecessary_list_index_lookup_comprehension(checker: &mut Checker, expr: &Expr) {
-    let (Expr::GeneratorExp(ast::ExprGeneratorExp {
+    let (Expr::Generator(ast::ExprGenerator {
         elt, generators, ..
     })
     | Expr::DictComp(ast::ExprDictComp {
@@ -124,14 +124,6 @@ fn enumerate_items<'a>(
         func, arguments, ..
     } = call_expr.as_call_expr()?;
 
-    // Check that the function is the `enumerate` builtin.
-    if !semantic
-        .resolve_call_path(func.as_ref())
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["builtins" | "", "enumerate"]))
-    {
-        return None;
-    }
-
     let Expr::Tuple(ast::ExprTuple { elts, .. }) = tuple_expr else {
         return None;
     };
@@ -158,6 +150,24 @@ fn enumerate_items<'a>(
     let Some(Expr::Name(sequence)) = arguments.args.first() else {
         return None;
     };
+
+    // If the `enumerate` call has a non-zero `start`, don't omit.
+    if !arguments.find_argument("start", 1).map_or(true, |expr| {
+        matches!(
+            expr,
+            Expr::NumberLiteral(ast::ExprNumberLiteral {
+                value: Number::Int(Int::ZERO),
+                ..
+            })
+        )
+    }) {
+        return None;
+    }
+
+    // Check that the function is the `enumerate` builtin.
+    if !semantic.match_builtin_expr(func, "enumerate") {
+        return None;
+    }
 
     Some((sequence, index_name, value_name))
 }

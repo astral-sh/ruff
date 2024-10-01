@@ -1,0 +1,273 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/valid/statement/annotated_assignment.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..103,
+        body: [
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 0..6,
+                    target: Name(
+                        ExprName {
+                            range: 0..1,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    annotation: Name(
+                        ExprName {
+                            range: 3..6,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                    value: None,
+                    simple: true,
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 7..17,
+                    target: Name(
+                        ExprName {
+                            range: 7..8,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    annotation: Name(
+                        ExprName {
+                            range: 10..13,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                    value: Some(
+                        NumberLiteral(
+                            ExprNumberLiteral {
+                                range: 16..17,
+                                value: Int(
+                                    1,
+                                ),
+                            },
+                        ),
+                    ),
+                    simple: true,
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 18..28,
+                    target: Name(
+                        ExprName {
+                            range: 19..20,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    annotation: BinOp(
+                        ExprBinOp {
+                            range: 23..28,
+                            left: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 23..24,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                            op: Add,
+                            right: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 27..28,
+                                    value: Int(
+                                        2,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                    value: None,
+                    simple: false,
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 29..55,
+                    target: Name(
+                        ExprName {
+                            range: 29..30,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    annotation: BinOp(
+                        ExprBinOp {
+                            range: 32..48,
+                            left: Subscript(
+                                ExprSubscript {
+                                    range: 32..42,
+                                    value: Name(
+                                        ExprName {
+                                            range: 32..37,
+                                            id: Name("tuple"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    slice: Name(
+                                        ExprName {
+                                            range: 38..41,
+                                            id: Name("int"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ctx: Load,
+                                },
+                            ),
+                            op: BitOr,
+                            right: Name(
+                                ExprName {
+                                    range: 45..48,
+                                    id: Name("int"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                    value: Some(
+                        Tuple(
+                            ExprTuple {
+                                range: 51..55,
+                                elts: [
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 52..53,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                ],
+                                ctx: Load,
+                                parenthesized: true,
+                            },
+                        ),
+                    ),
+                    simple: true,
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 56..83,
+                    target: Name(
+                        ExprName {
+                            range: 56..57,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    annotation: If(
+                        ExprIf {
+                            range: 59..79,
+                            test: BooleanLiteral(
+                                ExprBooleanLiteral {
+                                    range: 66..70,
+                                    value: true,
+                                },
+                            ),
+                            body: Name(
+                                ExprName {
+                                    range: 59..62,
+                                    id: Name("int"),
+                                    ctx: Load,
+                                },
+                            ),
+                            orelse: Name(
+                                ExprName {
+                                    range: 76..79,
+                                    id: Name("str"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                    value: Some(
+                        NumberLiteral(
+                            ExprNumberLiteral {
+                                range: 82..83,
+                                value: Int(
+                                    1,
+                                ),
+                            },
+                        ),
+                    ),
+                    simple: true,
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 84..102,
+                    target: Name(
+                        ExprName {
+                            range: 84..85,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    annotation: Lambda(
+                        ExprLambda {
+                            range: 87..98,
+                            parameters: Some(
+                                Parameters {
+                                    range: 94..95,
+                                    posonlyargs: [],
+                                    args: [
+                                        ParameterWithDefault {
+                                            range: 94..95,
+                                            parameter: Parameter {
+                                                range: 94..95,
+                                                name: Identifier {
+                                                    id: Name("x"),
+                                                    range: 94..95,
+                                                },
+                                                annotation: None,
+                                            },
+                                            default: None,
+                                        },
+                                    ],
+                                    vararg: None,
+                                    kwonlyargs: [],
+                                    kwarg: None,
+                                },
+                            ),
+                            body: Name(
+                                ExprName {
+                                    range: 97..98,
+                                    id: Name("y"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                    value: Some(
+                        NumberLiteral(
+                            ExprNumberLiteral {
+                                range: 101..102,
+                                value: Int(
+                                    1,
+                                ),
+                            },
+                        ),
+                    ),
+                    simple: true,
+                },
+            ),
+        ],
+    },
+)
+```

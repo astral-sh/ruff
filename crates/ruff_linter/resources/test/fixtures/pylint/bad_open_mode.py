@@ -32,3 +32,6 @@ pathlib.Path(NAME).open(mode)
 pathlib.Path(NAME).open("rwx")  # [bad-open-mode]
 pathlib.Path(NAME).open(mode="rwx")  # [bad-open-mode]
 pathlib.Path(NAME).open("rwx", encoding="utf-8")  # [bad-open-mode]
+
+import builtins
+builtins.open(NAME, "Ua", encoding="utf-8")

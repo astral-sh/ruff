@@ -1,0 +1,65 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/match_stmt_single_starred_subject.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..28,
+        body: [
+            Match(
+                StmtMatch {
+                    range: 0..27,
+                    subject: Starred(
+                        ExprStarred {
+                            range: 6..10,
+                            value: Name(
+                                ExprName {
+                                    range: 7..10,
+                                    id: Name("foo"),
+                                    ctx: Load,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 16..27,
+                            pattern: MatchAs(
+                                PatternMatchAs {
+                                    range: 21..22,
+                                    pattern: None,
+                                    name: None,
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 24..27,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 24..27,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | match *foo:
+  |       ^^^^ Syntax Error: Starred expression cannot be used here
+2 |     case _: ...
+  |

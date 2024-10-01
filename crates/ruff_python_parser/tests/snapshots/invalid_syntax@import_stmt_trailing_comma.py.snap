@@ -1,0 +1,65 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/import_stmt_trailing_comma.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..22,
+        body: [
+            Import(
+                StmtImport {
+                    range: 0..8,
+                    names: [],
+                },
+            ),
+            Import(
+                StmtImport {
+                    range: 9..21,
+                    names: [
+                        Alias {
+                            range: 16..17,
+                            name: Identifier {
+                                id: Name("x"),
+                                range: 16..17,
+                            },
+                            asname: None,
+                        },
+                        Alias {
+                            range: 19..20,
+                            name: Identifier {
+                                id: Name("y"),
+                                range: 19..20,
+                            },
+                            asname: None,
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | import ,
+  |        ^ Syntax Error: Expected an import name
+2 | import x, y,
+  |
+
+
+  |
+1 | import ,
+  |         ^ Syntax Error: Expected one or more symbol names after import
+2 | import x, y,
+  |
+
+
+  |
+1 | import ,
+2 | import x, y,
+  |            ^ Syntax Error: Trailing comma not allowed
+  |

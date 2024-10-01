@@ -1,6 +1,6 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff_python_index::Indexer;
+use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -16,12 +16,12 @@ use ruff_macros::{derive_message_formats, violation};
 /// stub files are not executed at runtime. The one exception is `# type: ignore`.
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// x = 1  # type: int
 /// ```
 ///
 /// Use instead:
-/// ```python
+/// ```pyi
 /// x: int = 1
 /// ```
 #[violation]
@@ -38,13 +38,13 @@ impl Violation for TypeCommentInStub {
 pub(crate) fn type_comment_in_stub(
     diagnostics: &mut Vec<Diagnostic>,
     locator: &Locator,
-    indexer: &Indexer,
+    comment_ranges: &CommentRanges,
 ) {
-    for range in indexer.comment_ranges() {
-        let comment = locator.slice(*range);
+    for range in comment_ranges {
+        let comment = locator.slice(range);
 
         if TYPE_COMMENT_REGEX.is_match(comment) && !TYPE_IGNORE_REGEX.is_match(comment) {
-            diagnostics.push(Diagnostic::new(TypeCommentInStub, *range));
+            diagnostics.push(Diagnostic::new(TypeCommentInStub, range));
         }
     }
 }

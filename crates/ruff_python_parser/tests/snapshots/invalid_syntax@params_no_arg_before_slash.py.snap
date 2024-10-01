@@ -1,0 +1,108 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/params_no_arg_before_slash.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..35,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 0..15,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 4..7,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 7..10,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 12..15,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 12..15,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 16..34,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 20..23,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 23..29,
+                        posonlyargs: [],
+                        args: [
+                            ParameterWithDefault {
+                                range: 27..28,
+                                parameter: Parameter {
+                                    range: 27..28,
+                                    name: Identifier {
+                                        id: Name("a"),
+                                        range: 27..28,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 31..34,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 31..34,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | def foo(/): ...
+  |         ^ Syntax Error: Position-only parameter separator not allowed as first parameter
+2 | def foo(/, a): ...
+  |
+
+
+  |
+1 | def foo(/): ...
+2 | def foo(/, a): ...
+  |         ^ Syntax Error: Position-only parameter separator not allowed as first parameter
+  |

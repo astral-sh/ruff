@@ -2,77 +2,70 @@
 source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_source(source)
 ---
+## Tokens
+```
 [
     (
-        String {
-            value: "double",
-            kind: String,
-            triple_quoted: false,
-        },
+        String(
+            "double",
+        ),
         0..8,
+        TokenFlags(
+            DOUBLE_QUOTES,
+        ),
     ),
     (
-        String {
-            value: "single",
-            kind: String,
-            triple_quoted: false,
-        },
+        String(
+            "single",
+        ),
         9..17,
     ),
     (
-        String {
-            value: "can\\'t",
-            kind: String,
-            triple_quoted: false,
-        },
+        String(
+            "can\\'t",
+        ),
         18..26,
     ),
     (
-        String {
-            value: "\\\\\\\"",
-            kind: String,
-            triple_quoted: false,
-        },
+        String(
+            "\\\\\\\"",
+        ),
         27..33,
+        TokenFlags(
+            DOUBLE_QUOTES,
+        ),
     ),
     (
-        String {
-            value: "\\t\\r\\n",
-            kind: String,
-            triple_quoted: false,
-        },
+        String(
+            "\\t\\r\\n",
+        ),
         34..42,
     ),
     (
-        String {
-            value: "\\g",
-            kind: String,
-            triple_quoted: false,
-        },
+        String(
+            "\\g",
+        ),
         43..47,
     ),
     (
-        String {
-            value: "raw\\'",
-            kind: RawString,
-            triple_quoted: false,
-        },
+        String(
+            "raw\\'",
+        ),
         48..56,
+        TokenFlags(
+            RAW_STRING_LOWERCASE,
+        ),
     ),
     (
-        String {
-            value: "\\420",
-            kind: String,
-            triple_quoted: false,
-        },
+        String(
+            "\\420",
+        ),
         57..63,
     ),
     (
-        String {
-            value: "\\200\\0a",
-            kind: String,
-            triple_quoted: false,
-        },
+        String(
+            "\\200\\0a",
+        ),
         64..73,
     ),
     (
@@ -80,3 +73,4 @@ expression: lex_source(source)
         73..73,
     ),
 ]
+```

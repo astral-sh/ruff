@@ -1,11 +1,8 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_index::Indexer;
-use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::Tok;
-use ruff_python_trivia::leading_indentation;
 use ruff_source_file::Locator;
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use ruff_text_size::{TextRange, TextSize};
 
 /// ## What it does
 /// Checks for indentation that uses tabs.
@@ -13,18 +10,6 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 /// ## Why is this bad?
 /// According to [PEP 8], spaces are preferred over tabs (unless used to remain
 /// consistent with code that is already indented with tabs).
-///
-/// ## Example
-/// ```python
-/// if True:
-/// 	a = 1
-/// ```
-///
-/// Use instead:
-/// ```python
-/// if True:
-///     a = 1
-/// ```
 ///
 /// ## Formatter compatibility
 /// We recommend against using this rule alongside the [formatter]. The
@@ -48,44 +33,52 @@ impl Violation for TabIndentation {
 /// W191
 pub(crate) fn tab_indentation(
     diagnostics: &mut Vec<Diagnostic>,
-    tokens: &[LexResult],
     locator: &Locator,
     indexer: &Indexer,
 ) {
-    // Always check the first line for tab indentation as there's no newline
-    // token before it.
-    tab_indentation_at_line_start(diagnostics, locator, TextSize::default());
+    let contents = locator.contents().as_bytes();
+    let mut offset = 0;
+    while let Some(index) = memchr::memchr(b'\t', &contents[offset..]) {
+        // If we find a tab in the file, grab the entire line.
+        let range = locator.full_line_range(TextSize::try_from(offset + index).unwrap());
 
-    for (tok, range) in tokens.iter().flatten() {
-        if matches!(tok, Tok::Newline | Tok::NonLogicalNewline) {
-            tab_indentation_at_line_start(diagnostics, locator, range.end());
+        // Determine whether the tab is part of the line's indentation.
+        if let Some(indent) = tab_indentation_at_line_start(range.start(), locator, indexer) {
+            diagnostics.push(Diagnostic::new(TabIndentation, indent));
         }
-    }
 
-    // The lexer doesn't emit `Newline` / `NonLogicalNewline` for a line
-    // continuation character (`\`), so we need to manually check for tab
-    // indentation for lines that follow a line continuation character.
-    for continuation_line in indexer.continuation_line_starts() {
-        tab_indentation_at_line_start(
-            diagnostics,
-            locator,
-            locator.full_line_end(*continuation_line),
-        );
+        // Advance to the next line.
+        offset = range.end().to_usize();
     }
 }
 
-/// Checks for indentation that uses tabs for a line starting at
-/// the given [`TextSize`].
+/// If a line includes tabs in its indentation, returns the range of the
+/// indent.
 fn tab_indentation_at_line_start(
-    diagnostics: &mut Vec<Diagnostic>,
-    locator: &Locator,
     line_start: TextSize,
-) {
-    let indent = leading_indentation(locator.after(line_start));
-    if indent.find('\t').is_some() {
-        diagnostics.push(Diagnostic::new(
-            TabIndentation,
-            TextRange::at(line_start, indent.text_len()),
-        ));
+    locator: &Locator,
+    indexer: &Indexer,
+) -> Option<TextRange> {
+    let mut contains_tab = false;
+    for (i, char) in locator.after(line_start).as_bytes().iter().enumerate() {
+        match char {
+            // If we find a tab character, report it as a violation.
+            b'\t' => {
+                contains_tab = true;
+            }
+            // If we find a space, continue.
+            b' ' | b'\x0C' => {}
+            // If we find a non-whitespace character, stop.
+            _ => {
+                if contains_tab {
+                    let range = TextRange::at(line_start, TextSize::try_from(i).unwrap());
+                    if !indexer.multiline_ranges().contains_range(range) {
+                        return Some(range);
+                    }
+                }
+                break;
+            }
+        }
     }
+    None
 }

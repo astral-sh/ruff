@@ -25,7 +25,7 @@ use crate::checkers::ast::Checker;
 ///         rec = 1 / n
 ///         print(f"reciprocal of {n} is {rec}")
 ///         return rec
-///     except ZeroDivisionError as exc:
+///     except ZeroDivisionError:
 ///         logging.exception("Exception occurred")
 /// ```
 ///
@@ -37,7 +37,7 @@ use crate::checkers::ast::Checker;
 /// def reciprocal(n):
 ///     try:
 ///         rec = 1 / n
-///     except ZeroDivisionError as exc:
+///     except ZeroDivisionError:
 ///         logging.exception("Exception occurred")
 ///     else:
 ///         print(f"reciprocal of {n} is {rec}")
@@ -67,7 +67,7 @@ pub(crate) fn try_consider_else(
         if let Some(stmt) = body.last() {
             if let Stmt::Return(ast::StmtReturn { value, range: _ }) = stmt {
                 if let Some(value) = value {
-                    if contains_effect(value, |id| checker.semantic().is_builtin(id)) {
+                    if contains_effect(value, |id| checker.semantic().has_builtin_binding(id)) {
                         return;
                     }
                 }

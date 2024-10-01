@@ -46,7 +46,9 @@ mod tests {
     #[test_case(Rule::SubprocessWithoutShellEqualsTrue, Path::new("S603.py"))]
     #[test_case(Rule::SuspiciousPickleUsage, Path::new("S301.py"))]
     #[test_case(Rule::SuspiciousEvalUsage, Path::new("S307.py"))]
+    #[test_case(Rule::SuspiciousMarkSafeUsage, Path::new("S308.py"))]
     #[test_case(Rule::SuspiciousURLOpenUsage, Path::new("S310.py"))]
+    #[test_case(Rule::SuspiciousNonCryptographicRandomUsage, Path::new("S311.py"))]
     #[test_case(Rule::SuspiciousTelnetUsage, Path::new("S312.py"))]
     #[test_case(Rule::SuspiciousTelnetlibImport, Path::new("S401.py"))]
     #[test_case(Rule::SuspiciousFtplibImport, Path::new("S402.py"))]
@@ -67,6 +69,7 @@ mod tests {
     #[test_case(Rule::UnixCommandWildcardInjection, Path::new("S609.py"))]
     #[test_case(Rule::UnsafeYAMLLoad, Path::new("S506.py"))]
     #[test_case(Rule::WeakCryptographicKey, Path::new("S505.py"))]
+    #[test_case(Rule::DjangoExtra, Path::new("S610.py"))]
     #[test_case(Rule::DjangoRawSql, Path::new("S611.py"))]
     #[test_case(Rule::TarfileUnsafeMembers, Path::new("S202.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {

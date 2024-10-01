@@ -1,0 +1,269 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/invalid_del_target.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..75,
+        body: [
+            Delete(
+                StmtDelete {
+                    range: 0..9,
+                    targets: [
+                        BinOp(
+                            ExprBinOp {
+                                range: 4..9,
+                                left: Name(
+                                    ExprName {
+                                        range: 4..5,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                op: Add,
+                                right: NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 8..9,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            Delete(
+                StmtDelete {
+                    range: 10..22,
+                    targets: [
+                        Dict(
+                            ExprDict {
+                                range: 14..22,
+                                items: [
+                                    DictItem {
+                                        key: Some(
+                                            StringLiteral(
+                                                ExprStringLiteral {
+                                                    range: 15..18,
+                                                    value: StringLiteralValue {
+                                                        inner: Single(
+                                                            StringLiteral {
+                                                                range: 15..18,
+                                                                value: "x",
+                                                                flags: StringLiteralFlags {
+                                                                    quote_style: Single,
+                                                                    prefix: Empty,
+                                                                    triple_quoted: false,
+                                                                },
+                                                            },
+                                                        ),
+                                                    },
+                                                },
+                                            ),
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 20..21,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ],
+                            },
+                        ),
+                    ],
+                },
+            ),
+            Delete(
+                StmtDelete {
+                    range: 23..37,
+                    targets: [
+                        Set(
+                            ExprSet {
+                                range: 27..37,
+                                elts: [
+                                    StringLiteral(
+                                        ExprStringLiteral {
+                                            range: 28..31,
+                                            value: StringLiteralValue {
+                                                inner: Single(
+                                                    StringLiteral {
+                                                        range: 28..31,
+                                                        value: "x",
+                                                        flags: StringLiteralFlags {
+                                                            quote_style: Single,
+                                                            prefix: Empty,
+                                                            triple_quoted: false,
+                                                        },
+                                                    },
+                                                ),
+                                            },
+                                        },
+                                    ),
+                                    StringLiteral(
+                                        ExprStringLiteral {
+                                            range: 33..36,
+                                            value: StringLiteralValue {
+                                                inner: Single(
+                                                    StringLiteral {
+                                                        range: 33..36,
+                                                        value: "y",
+                                                        flags: StringLiteralFlags {
+                                                            quote_style: Single,
+                                                            prefix: Empty,
+                                                            triple_quoted: false,
+                                                        },
+                                                    },
+                                                ),
+                                            },
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                },
+            ),
+            Delete(
+                StmtDelete {
+                    range: 38..74,
+                    targets: [
+                        NoneLiteral(
+                            ExprNoneLiteral {
+                                range: 42..46,
+                            },
+                        ),
+                        BooleanLiteral(
+                            ExprBooleanLiteral {
+                                range: 48..52,
+                                value: true,
+                            },
+                        ),
+                        BooleanLiteral(
+                            ExprBooleanLiteral {
+                                range: 54..59,
+                                value: false,
+                            },
+                        ),
+                        NumberLiteral(
+                            ExprNumberLiteral {
+                                range: 61..62,
+                                value: Int(
+                                    1,
+                                ),
+                            },
+                        ),
+                        NumberLiteral(
+                            ExprNumberLiteral {
+                                range: 64..67,
+                                value: Float(
+                                    1.0,
+                                ),
+                            },
+                        ),
+                        StringLiteral(
+                            ExprStringLiteral {
+                                range: 69..74,
+                                value: StringLiteralValue {
+                                    inner: Single(
+                                        StringLiteral {
+                                            range: 69..74,
+                                            value: "abc",
+                                            flags: StringLiteralFlags {
+                                                quote_style: Double,
+                                                prefix: Empty,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                },
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | del x + 1
+  |     ^^^^^ Syntax Error: Invalid delete target
+2 | del {'x': 1}
+3 | del {'x', 'y'}
+  |
+
+
+  |
+1 | del x + 1
+2 | del {'x': 1}
+  |     ^^^^^^^^ Syntax Error: Invalid delete target
+3 | del {'x', 'y'}
+4 | del None, True, False, 1, 1.0, "abc"
+  |
+
+
+  |
+1 | del x + 1
+2 | del {'x': 1}
+3 | del {'x', 'y'}
+  |     ^^^^^^^^^^ Syntax Error: Invalid delete target
+4 | del None, True, False, 1, 1.0, "abc"
+  |
+
+
+  |
+2 | del {'x': 1}
+3 | del {'x', 'y'}
+4 | del None, True, False, 1, 1.0, "abc"
+  |     ^^^^ Syntax Error: Invalid delete target
+  |
+
+
+  |
+2 | del {'x': 1}
+3 | del {'x', 'y'}
+4 | del None, True, False, 1, 1.0, "abc"
+  |           ^^^^ Syntax Error: Invalid delete target
+  |
+
+
+  |
+2 | del {'x': 1}
+3 | del {'x', 'y'}
+4 | del None, True, False, 1, 1.0, "abc"
+  |                 ^^^^^ Syntax Error: Invalid delete target
+  |
+
+
+  |
+2 | del {'x': 1}
+3 | del {'x', 'y'}
+4 | del None, True, False, 1, 1.0, "abc"
+  |                        ^ Syntax Error: Invalid delete target
+  |
+
+
+  |
+2 | del {'x': 1}
+3 | del {'x', 'y'}
+4 | del None, True, False, 1, 1.0, "abc"
+  |                           ^^^ Syntax Error: Invalid delete target
+  |
+
+
+  |
+2 | del {'x': 1}
+3 | del {'x', 'y'}
+4 | del None, True, False, 1, 1.0, "abc"
+  |                                ^^^^^ Syntax Error: Invalid delete target
+  |

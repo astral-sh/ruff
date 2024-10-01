@@ -1,0 +1,42 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/ann_assign_stmt_missing_rhs.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..9,
+        body: [
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 0..8,
+                    target: Name(
+                        ExprName {
+                            range: 0..1,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    annotation: Name(
+                        ExprName {
+                            range: 3..6,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                    value: None,
+                    simple: true,
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | x: int =
+  |         ^ Syntax Error: Expected an expression
+  |

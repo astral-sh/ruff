@@ -1,0 +1,68 @@
+---
+source: crates/ruff_linter/src/rules/pydoclint/mod.rs
+---
+DOC402_numpy.py:11:5: DOC402 `yield` is not documented in docstring
+   |
+ 9 |         A number
+10 |     """
+11 |     yield 'test'
+   |     ^^^^^^^^^^^^ DOC402
+   |
+   = help: Add a "Yields" section to the docstring
+
+DOC402_numpy.py:62:9: DOC402 `yield` is not documented in docstring
+   |
+60 |             A number
+61 |         """
+62 |         yield 'test'
+   |         ^^^^^^^^^^^^ DOC402
+   |
+   = help: Add a "Yields" section to the docstring
+
+DOC402_numpy.py:89:5: DOC402 `yield` is not documented in docstring
+   |
+87 |     Do something
+88 |     """
+89 |     yield None
+   |     ^^^^^^^^^^ DOC402
+90 |     yield 1
+   |
+   = help: Add a "Yields" section to the docstring
+
+DOC402_numpy.py:98:5: DOC402 `yield` is not documented in docstring
+   |
+96 |     Do something
+97 |     """
+98 |     yield None
+   |     ^^^^^^^^^^ DOC402
+   |
+   = help: Add a "Yields" section to the docstring
+
+DOC402_numpy.py:122:5: DOC402 `yield` is not documented in docstring
+    |
+120 |     Do something
+121 |     """
+122 |     yield None
+    |     ^^^^^^^^^^ DOC402
+123 |     yield 1
+    |
+    = help: Add a "Yields" section to the docstring
+
+DOC402_numpy.py:131:5: DOC402 `yield` is not documented in docstring
+    |
+129 |     Do something
+130 |     """
+131 |     yield 1
+    |     ^^^^^^^ DOC402
+132 |     yield
+    |
+    = help: Add a "Yields" section to the docstring
+
+DOC402_numpy.py:140:5: DOC402 `yield` is not documented in docstring
+    |
+138 |     Do something
+139 |     """
+140 |     yield
+    |     ^^^^^ DOC402
+    |
+    = help: Add a "Yields" section to the docstring

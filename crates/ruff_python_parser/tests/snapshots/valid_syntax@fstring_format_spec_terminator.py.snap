@@ -1,0 +1,138 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/fstring_format_spec_terminator.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..43,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..19,
+                    value: FString(
+                        ExprFString {
+                            range: 0..19,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 0..19,
+                                            elements: [
+                                                Literal(
+                                                    FStringLiteralElement {
+                                                        range: 2..8,
+                                                        value: "hello ",
+                                                    },
+                                                ),
+                                                Expression(
+                                                    FStringExpressionElement {
+                                                        range: 8..12,
+                                                        expression: Name(
+                                                            ExprName {
+                                                                range: 9..10,
+                                                                id: Name("x"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: Some(
+                                                            FStringFormatSpec {
+                                                                range: 11..11,
+                                                                elements: [],
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                                Literal(
+                                                    FStringLiteralElement {
+                                                        range: 12..18,
+                                                        value: " world",
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 20..42,
+                    value: FString(
+                        ExprFString {
+                            range: 20..42,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 20..42,
+                                            elements: [
+                                                Literal(
+                                                    FStringLiteralElement {
+                                                        range: 22..28,
+                                                        value: "hello ",
+                                                    },
+                                                ),
+                                                Expression(
+                                                    FStringExpressionElement {
+                                                        range: 28..35,
+                                                        expression: Name(
+                                                            ExprName {
+                                                                range: 29..30,
+                                                                id: Name("x"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: Some(
+                                                            FStringFormatSpec {
+                                                                range: 31..34,
+                                                                elements: [
+                                                                    Literal(
+                                                                        FStringLiteralElement {
+                                                                            range: 31..34,
+                                                                            value: ".3f",
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                                Literal(
+                                                    FStringLiteralElement {
+                                                        range: 35..41,
+                                                        value: " world",
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

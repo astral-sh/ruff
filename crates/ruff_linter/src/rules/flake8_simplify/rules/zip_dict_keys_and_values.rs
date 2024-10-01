@@ -1,6 +1,6 @@
 use ast::{ExprAttribute, ExprName, Identifier};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Arguments, Expr, ExprCall};
+use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_text_size::Ranged;
 
 use crate::{checkers::ast::Checker, fix::snippet::SourceCodeSnippet};
@@ -59,8 +59,8 @@ impl AlwaysFixableViolation for ZipDictKeysAndValues {
 }
 
 /// SIM911
-pub(crate) fn zip_dict_keys_and_values(checker: &mut Checker, expr: &ExprCall) {
-    let ExprCall {
+pub(crate) fn zip_dict_keys_and_values(checker: &mut Checker, expr: &ast::ExprCall) {
+    let ast::ExprCall {
         func,
         arguments: Arguments { args, keywords, .. },
         ..
@@ -72,9 +72,6 @@ pub(crate) fn zip_dict_keys_and_values(checker: &mut Checker, expr: &ExprCall) {
         }] if name.as_str() == "strict" => {}
         _ => return,
     };
-    if matches!(func.as_ref(), Expr::Name(ExprName { id, .. }) if id != "zip") {
-        return;
-    }
     let [arg1, arg2] = &args[..] else {
         return;
     };
@@ -85,6 +82,9 @@ pub(crate) fn zip_dict_keys_and_values(checker: &mut Checker, expr: &ExprCall) {
         return;
     };
     if var1.id != var2.id || attr1 != "keys" || attr2 != "values" {
+        return;
+    }
+    if !checker.semantic().match_builtin_expr(func, "zip") {
         return;
     }
 

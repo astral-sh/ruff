@@ -7,7 +7,7 @@ use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::str;
 
-use crate::settings::types::IdentifierPattern;
+use crate::rules::pep8_naming::settings::IgnoreNames;
 
 /// ## What it does
 /// Checks for functions names that do not follow the `snake_case` naming
@@ -20,10 +20,10 @@ use crate::settings::types::IdentifierPattern;
 /// > improve readability. mixedCase is allowed only in contexts where that’s already the
 /// > prevailing style (e.g. threading.py), to retain backwards compatibility.
 ///
-/// Names can be excluded from this rule using the [`pep8-naming.ignore-names`]
-/// or [`pep8-naming.extend-ignore-names`] configuration options. For example,
+/// Names can be excluded from this rule using the [`lint.pep8-naming.ignore-names`]
+/// or [`lint.pep8-naming.extend-ignore-names`] configuration options. For example,
 /// to ignore all functions starting with `test_` from this rule, set the
-/// [`pep8-naming.extend-ignore-names`] option to `["test_*"]`.
+/// [`lint.pep8-naming.extend-ignore-names`] option to `["test_*"]`.
 ///
 /// ## Example
 /// ```python
@@ -38,8 +38,8 @@ use crate::settings::types::IdentifierPattern;
 /// ```
 ///
 /// ## Options
-/// - `pep8-naming.ignore-names`
-/// - `pep8-naming.extend-ignore-names`
+/// - `lint.pep8-naming.ignore-names`
+/// - `lint.pep8-naming.extend-ignore-names`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-variable-names
 #[violation]
@@ -60,17 +60,9 @@ pub(crate) fn invalid_function_name(
     stmt: &Stmt,
     name: &str,
     decorator_list: &[Decorator],
-    ignore_names: &[IdentifierPattern],
+    ignore_names: &IgnoreNames,
     semantic: &SemanticModel,
 ) -> Option<Diagnostic> {
-    // Ignore any explicitly-ignored function names.
-    if ignore_names
-        .iter()
-        .any(|ignore_name| ignore_name.matches(name))
-    {
-        return None;
-    }
-
     // Ignore any function names that are already lowercase.
     if str::is_lowercase(name) {
         return None;
@@ -82,6 +74,11 @@ pub(crate) fn invalid_function_name(
     if visibility::is_override(decorator_list, semantic)
         || visibility::is_overload(decorator_list, semantic)
     {
+        return None;
+    }
+
+    // Ignore any explicitly-allowed names.
+    if ignore_names.matches(name) {
         return None;
     }
 

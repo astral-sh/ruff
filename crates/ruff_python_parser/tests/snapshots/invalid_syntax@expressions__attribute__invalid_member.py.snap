@@ -1,0 +1,146 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/attribute/invalid_member.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..16,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..1,
+                    value: Name(
+                        ExprName {
+                            range: 0..1,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 1..3,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 1..3,
+                            value: Float(
+                                0.1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 4..5,
+                    value: Name(
+                        ExprName {
+                            range: 4..5,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 5..7,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 5..7,
+                            value: Float(
+                                0.1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 7..9,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 7..9,
+                            value: Float(
+                                0.0,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 10..15,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 10..15,
+                            value: Attribute(
+                                ExprAttribute {
+                                    range: 10..12,
+                                    value: Name(
+                                        ExprName {
+                                            range: 10..11,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    attr: Identifier {
+                                        id: Name(""),
+                                        range: 12..12,
+                                    },
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 13..14,
+                                    value: Int(
+                                        0,
+                                    ),
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | x.1
+  |  ^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+2 | x.1.0
+3 | x.[0]
+  |
+
+
+  |
+1 | x.1
+2 | x.1.0
+  |  ^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+3 | x.[0]
+  |
+
+
+  |
+1 | x.1
+2 | x.1.0
+  |    ^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+3 | x.[0]
+  |
+
+
+  |
+1 | x.1
+2 | x.1.0
+3 | x.[0]
+  |   ^ Syntax Error: Expected an identifier
+  |

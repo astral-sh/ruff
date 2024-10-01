@@ -1,0 +1,247 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/type_param_type_var_tuple.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..115,
+        body: [
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 0..17,
+                    name: Name(
+                        ExprName {
+                            range: 5..6,
+                            id: Name("X"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 6..11,
+                            type_params: [
+                                TypeVarTuple(
+                                    TypeParamTypeVarTuple {
+                                        range: 7..10,
+                                        name: Identifier {
+                                            id: Name("Ts"),
+                                            range: 8..10,
+                                        },
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            range: 14..17,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 18..41,
+                    name: Name(
+                        ExprName {
+                            range: 23..24,
+                            id: Name("X"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 24..35,
+                            type_params: [
+                                TypeVarTuple(
+                                    TypeParamTypeVarTuple {
+                                        range: 25..34,
+                                        name: Identifier {
+                                            id: Name("Ts"),
+                                            range: 26..28,
+                                        },
+                                        default: Some(
+                                            Name(
+                                                ExprName {
+                                                    range: 31..34,
+                                                    id: Name("int"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            range: 38..41,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 42..66,
+                    name: Name(
+                        ExprName {
+                            range: 47..48,
+                            id: Name("X"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 48..60,
+                            type_params: [
+                                TypeVarTuple(
+                                    TypeParamTypeVarTuple {
+                                        range: 49..59,
+                                        name: Identifier {
+                                            id: Name("Ts"),
+                                            range: 50..52,
+                                        },
+                                        default: Some(
+                                            Starred(
+                                                ExprStarred {
+                                                    range: 55..59,
+                                                    value: Name(
+                                                        ExprName {
+                                                            range: 56..59,
+                                                            id: Name("int"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            range: 63..66,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 67..87,
+                    name: Name(
+                        ExprName {
+                            range: 72..73,
+                            id: Name("X"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 73..81,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 74..75,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 74..75,
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                                TypeVarTuple(
+                                    TypeParamTypeVarTuple {
+                                        range: 77..80,
+                                        name: Identifier {
+                                            id: Name("Ts"),
+                                            range: 78..80,
+                                        },
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            range: 84..87,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 88..114,
+                    name: Name(
+                        ExprName {
+                            range: 93..94,
+                            id: Name("X"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 94..108,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 95..96,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 95..96,
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                                TypeVarTuple(
+                                    TypeParamTypeVarTuple {
+                                        range: 98..107,
+                                        name: Identifier {
+                                            id: Name("Ts"),
+                                            range: 99..101,
+                                        },
+                                        default: Some(
+                                            Name(
+                                                ExprName {
+                                                    range: 104..107,
+                                                    id: Name("int"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            range: 111..114,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

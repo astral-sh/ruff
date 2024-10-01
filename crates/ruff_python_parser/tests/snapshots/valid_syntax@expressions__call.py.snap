@@ -1,0 +1,589 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/valid/expressions/call.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..349,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 114..120,
+                    value: Call(
+                        ExprCall {
+                            range: 114..120,
+                            func: Name(
+                                ExprName {
+                                    range: 114..118,
+                                    id: Name("call"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 118..120,
+                                args: [],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 121..132,
+                    value: Call(
+                        ExprCall {
+                            range: 121..132,
+                            func: Attribute(
+                                ExprAttribute {
+                                    range: 121..130,
+                                    value: Name(
+                                        ExprName {
+                                            range: 121..125,
+                                            id: Name("attr"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    attr: Identifier {
+                                        id: Name("expr"),
+                                        range: 126..130,
+                                    },
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 130..132,
+                                args: [],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 133..150,
+                    value: Call(
+                        ExprCall {
+                            range: 133..150,
+                            func: Subscript(
+                                ExprSubscript {
+                                    range: 133..148,
+                                    value: Name(
+                                        ExprName {
+                                            range: 133..142,
+                                            id: Name("subscript"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    slice: Tuple(
+                                        ExprTuple {
+                                            range: 143..147,
+                                            elts: [
+                                                NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 143..144,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                                NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 146..147,
+                                                        value: Int(
+                                                            2,
+                                                        ),
+                                                    },
+                                                ),
+                                            ],
+                                            ctx: Load,
+                                            parenthesized: false,
+                                        },
+                                    ),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 148..150,
+                                args: [],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 151..162,
+                    value: Call(
+                        ExprCall {
+                            range: 151..162,
+                            func: Subscript(
+                                ExprSubscript {
+                                    range: 151..160,
+                                    value: Name(
+                                        ExprName {
+                                            range: 151..156,
+                                            id: Name("slice"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    slice: Slice(
+                                        ExprSlice {
+                                            range: 157..159,
+                                            lower: None,
+                                            upper: Some(
+                                                NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 158..159,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                            ),
+                                            step: None,
+                                        },
+                                    ),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 160..162,
+                                args: [],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 163..174,
+                    value: Call(
+                        ExprCall {
+                            range: 163..174,
+                            func: List(
+                                ExprList {
+                                    range: 163..172,
+                                    elts: [
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 164..165,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 167..168,
+                                                value: Int(
+                                                    2,
+                                                ),
+                                            },
+                                        ),
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 170..171,
+                                                value: Int(
+                                                    3,
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 172..174,
+                                args: [],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 175..186,
+                    value: Call(
+                        ExprCall {
+                            range: 175..186,
+                            func: Tuple(
+                                ExprTuple {
+                                    range: 175..184,
+                                    elts: [
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 176..177,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 179..180,
+                                                value: Int(
+                                                    2,
+                                                ),
+                                            },
+                                        ),
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 182..183,
+                                                value: Int(
+                                                    3,
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                    parenthesized: true,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 184..186,
+                                args: [],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 187..206,
+                    value: Call(
+                        ExprCall {
+                            range: 187..206,
+                            func: Generator(
+                                ExprGenerator {
+                                    range: 187..204,
+                                    elt: Name(
+                                        ExprName {
+                                            range: 188..189,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    generators: [
+                                        Comprehension {
+                                            range: 190..203,
+                                            target: Name(
+                                                ExprName {
+                                                    range: 194..195,
+                                                    id: Name("x"),
+                                                    ctx: Store,
+                                                },
+                                            ),
+                                            iter: Name(
+                                                ExprName {
+                                                    range: 199..203,
+                                                    id: Name("iter"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            ifs: [],
+                                            is_async: false,
+                                        },
+                                    ],
+                                    parenthesized: true,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 204..206,
+                                args: [],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 207..218,
+                    value: Call(
+                        ExprCall {
+                            range: 207..218,
+                            func: Set(
+                                ExprSet {
+                                    range: 207..216,
+                                    elts: [
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 208..209,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 211..212,
+                                                value: Int(
+                                                    2,
+                                                ),
+                                            },
+                                        ),
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 214..215,
+                                                value: Int(
+                                                    3,
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 216..218,
+                                args: [],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 219..233,
+                    value: Call(
+                        ExprCall {
+                            range: 219..233,
+                            func: Dict(
+                                ExprDict {
+                                    range: 219..231,
+                                    items: [
+                                        DictItem {
+                                            key: Some(
+                                                NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 220..221,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                            ),
+                                            value: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 223..224,
+                                                    value: Int(
+                                                        2,
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                        DictItem {
+                                            key: Some(
+                                                NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 226..227,
+                                                        value: Int(
+                                                            3,
+                                                        ),
+                                                    },
+                                                ),
+                                            ),
+                                            value: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 229..230,
+                                                    value: Int(
+                                                        4,
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ],
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 231..233,
+                                args: [],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 234..245,
+                    value: Call(
+                        ExprCall {
+                            range: 234..245,
+                            func: Yield(
+                                ExprYield {
+                                    range: 235..242,
+                                    value: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 241..242,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 243..245,
+                                args: [],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 306..312,
+                    value: Call(
+                        ExprCall {
+                            range: 306..312,
+                            func: BooleanLiteral(
+                                ExprBooleanLiteral {
+                                    range: 306..310,
+                                    value: true,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 310..312,
+                                args: [],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 313..320,
+                    value: Call(
+                        ExprCall {
+                            range: 313..320,
+                            func: BooleanLiteral(
+                                ExprBooleanLiteral {
+                                    range: 313..318,
+                                    value: false,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 318..320,
+                                args: [],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 321..327,
+                    value: Call(
+                        ExprCall {
+                            range: 321..327,
+                            func: NoneLiteral(
+                                ExprNoneLiteral {
+                                    range: 321..325,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 325..327,
+                                args: [],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 328..338,
+                    value: Call(
+                        ExprCall {
+                            range: 328..338,
+                            func: StringLiteral(
+                                ExprStringLiteral {
+                                    range: 328..336,
+                                    value: StringLiteralValue {
+                                        inner: Single(
+                                            StringLiteral {
+                                                range: 328..336,
+                                                value: "string",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Double,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                },
+                                            },
+                                        ),
+                                    },
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 336..338,
+                                args: [],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 339..342,
+                    value: Call(
+                        ExprCall {
+                            range: 339..342,
+                            func: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 339..340,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 340..342,
+                                args: [],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 343..348,
+                    value: Call(
+                        ExprCall {
+                            range: 343..348,
+                            func: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 343..346,
+                                    value: Float(
+                                        1.0,
+                                    ),
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 346..348,
+                                args: [],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

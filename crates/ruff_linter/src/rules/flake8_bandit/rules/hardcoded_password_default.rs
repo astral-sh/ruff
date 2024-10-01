@@ -22,18 +22,18 @@ use super::super::helpers::{matches_password_name, string_literal};
 /// control.
 ///
 /// ## Example
+///
 /// ```python
-/// def connect_to_server(password="hunter2"):
-///     ...
+/// def connect_to_server(password="hunter2"): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// import os
 ///
 ///
-/// def connect_to_server(password=os.environ["PASSWORD"]):
-///     ...
+/// def connect_to_server(password=os.environ["PASSWORD"]): ...
 /// ```
 ///
 /// ## References
@@ -74,11 +74,7 @@ pub(crate) fn hardcoded_password_default(checker: &mut Checker, parameters: &Par
         parameter,
         default,
         range: _,
-    } in parameters
-        .posonlyargs
-        .iter()
-        .chain(&parameters.args)
-        .chain(&parameters.kwonlyargs)
+    } in parameters.iter_non_variadic_params()
     {
         let Some(default) = default else {
             continue;

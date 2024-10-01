@@ -15,9 +15,9 @@ use ruff_macros::{derive_message_formats, violation};
 /// will instead raise an error when type checking is performed.
 ///
 /// ## Example
+///
 /// ```python
-/// def foo() -> "/":
-///     ...
+/// def foo() -> "/": ...
 /// ```
 ///
 /// ## References

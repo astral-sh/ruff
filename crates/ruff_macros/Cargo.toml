@@ -15,7 +15,7 @@ proc-macro = true
 doctest = false
 
 [dependencies]
-ruff_python_trivia = { path = "../ruff_python_trivia" }
+ruff_python_trivia = { workspace = true }
 
 proc-macro2 = { workspace = true }
 quote = { workspace = true }

@@ -2,47 +2,70 @@
 source: crates/ruff_python_parser/src/lexer.rs
 expression: lex_source(source)
 ---
+## Tokens
+```
 [
     (
         FStringStart,
         0..4,
+        TokenFlags(
+            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING,
+        ),
     ),
     (
-        FStringMiddle {
-            value: "\nhello\n    world\n",
-            is_raw: false,
-        },
+        FStringMiddle(
+            "\nhello\n    world\n",
+        ),
         4..21,
+        TokenFlags(
+            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING,
+        ),
     ),
     (
         FStringEnd,
         21..24,
+        TokenFlags(
+            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING,
+        ),
     ),
     (
         FStringStart,
         25..29,
+        TokenFlags(
+            TRIPLE_QUOTED_STRING | F_STRING,
+        ),
     ),
     (
-        FStringMiddle {
-            value: "\n    world\nhello\n",
-            is_raw: false,
-        },
+        FStringMiddle(
+            "\n    world\nhello\n",
+        ),
         29..46,
+        TokenFlags(
+            TRIPLE_QUOTED_STRING | F_STRING,
+        ),
     ),
     (
         FStringEnd,
         46..49,
+        TokenFlags(
+            TRIPLE_QUOTED_STRING | F_STRING,
+        ),
     ),
     (
         FStringStart,
         50..52,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
-        FStringMiddle {
-            value: "some ",
-            is_raw: false,
-        },
+        FStringMiddle(
+            "some ",
+        ),
         52..57,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Lbrace,
@@ -51,22 +74,27 @@ expression: lex_source(source)
     (
         FStringStart,
         58..62,
+        TokenFlags(
+            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING,
+        ),
     ),
     (
-        FStringMiddle {
-            value: "multiline\nallowed ",
-            is_raw: false,
-        },
+        FStringMiddle(
+            "multiline\nallowed ",
+        ),
         62..80,
+        TokenFlags(
+            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING,
+        ),
     ),
     (
         Lbrace,
         80..81,
     ),
     (
-        Name {
-            name: "x",
-        },
+        Name(
+            Name("x"),
+        ),
         81..82,
     ),
     (
@@ -76,24 +104,33 @@ expression: lex_source(source)
     (
         FStringEnd,
         83..86,
+        TokenFlags(
+            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING,
+        ),
     ),
     (
         Rbrace,
         86..87,
     ),
     (
-        FStringMiddle {
-            value: " string",
-            is_raw: false,
-        },
+        FStringMiddle(
+            " string",
+        ),
         87..94,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         FStringEnd,
         94..95,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
     ),
     (
         Newline,
         95..95,
     ),
 ]
+```

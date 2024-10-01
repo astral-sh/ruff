@@ -386,18 +386,24 @@ RUF022.py:54:11: RUF022 [*] `__all__` is not sorted
 76 70 |     "SUNDAY",
 77 71 |     "THURSDAY",
 78 72 |     "TUESDAY",
-   73 |+    "WEDNESDAY",
+79    |-    "TextCalendar",
+80 73 |     "WEDNESDAY",
    74 |+    "Calendar",
    75 |+    "Day",
    76 |+    "HTMLCalendar",
    77 |+    "IllegalMonthError",
    78 |+    "LocaleHTMLCalendar",
    79 |+    "Month",
-79 80 |     "TextCalendar",
-80    |-    "WEDNESDAY",
+   80 |+    "TextCalendar",
 81 81 |     "calendar",
 82 82 |     "timegm",
 83 83 |     "weekday",
+84    |-    "weekheader"]
+   84 |+    "weekheader",
+   85 |+]
+85 86 | 
+86 87 | ##########################################
+87 88 | # Messier multiline __all__ definitions...
 
 RUF022.py:91:11: RUF022 [*] `__all__` is not sorted
    |
@@ -559,10 +565,11 @@ RUF022.py:110:11: RUF022 [*] `__all__` is not sorted
     151 |+    "register_error",
     152 |+    "replace_errors",
     153 |+    "strict_errors",
-    154 |+    "xmlcharrefreplace_errors"]
-124 155 | 
-125 156 | __all__: tuple[str, ...] = (  # a comment about the opening paren
-126 157 |     # multiline comment about "bbb" part 1
+    154 |+    "xmlcharrefreplace_errors",
+    155 |+]
+124 156 | 
+125 157 | __all__: tuple[str, ...] = (  # a comment about the opening paren
+126 158 |     # multiline comment about "bbb" part 1
 
 RUF022.py:125:28: RUF022 [*] `__all__` is not sorted
     |
@@ -896,8 +903,178 @@ RUF022.py:219:11: RUF022 `__all__` is not sorted
 219 | __all__ = ("don't" "care" "about", "__all__" "with", "concatenated" "strings")
     |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF022
 220 | 
-221 | ###################################
+221 | ############################################################
     |
     = help: Apply an isort-style sorting to `__all__`
+
+RUF022.py:225:11: RUF022 [*] `__all__` is not sorted
+    |
+223 |   ############################################################
+224 |   
+225 |   __all__ = (
+    |  ___________^
+226 | |     "loads",
+227 | |     "dumps",)
+    | |_____________^ RUF022
+228 |   
+229 |   __all__ = [
+    |
+    = help: Apply an isort-style sorting to `__all__`
+
+ℹ Safe fix
+223 223 | ############################################################
+224 224 | 
+225 225 | __all__ = (
+    226 |+    "dumps",
+226 227 |     "loads",
+227     |-    "dumps",)
+    228 |+)
+228 229 | 
+229 230 | __all__ = [
+230 231 |     "loads",
+
+RUF022.py:229:11: RUF022 [*] `__all__` is not sorted
+    |
+227 |       "dumps",)
+228 |   
+229 |   __all__ = [
+    |  ___________^
+230 | |     "loads",
+231 | |     "dumps"       ,     ]
+    | |_________________________^ RUF022
+232 |   
+233 |   __all__ = ['xp', 'yp',
+    |
+    = help: Apply an isort-style sorting to `__all__`
+
+ℹ Safe fix
+227 227 |     "dumps",)
+228 228 | 
+229 229 | __all__ = [
+230     |-    "loads",
+231     |-    "dumps"       ,     ]
+    230 |+    "dumps",
+    231 |+    "loads"       ,     ]
+232 232 | 
+233 233 | __all__ = ['xp', 'yp',
+234 234 |                 'canvas'
+
+RUF022.py:233:11: RUF022 [*] `__all__` is not sorted
+    |
+231 |       "dumps"       ,     ]
+232 |   
+233 |   __all__ = ['xp', 'yp',
+    |  ___________^
+234 | |                 'canvas'
+235 | | 
+236 | |                 # very strangely placed comment
+237 | | 
+238 | |                 ,
+239 | | 
+240 | |                 # another strangely placed comment
+241 | |                 ]
+    | |_________________^ RUF022
+242 |   
+243 |   __all__ = (
+    |
+    = help: Apply an isort-style sorting to `__all__`
+
+ℹ Safe fix
+230 230 |     "loads",
+231 231 |     "dumps"       ,     ]
+232 232 | 
+233     |-__all__ = ['xp', 'yp',
+234     |-                'canvas'
+    233 |+__all__ = [
+    234 |+    'canvas',
+    235 |+    'xp',
+    236 |+    'yp'
+235 237 | 
+236 238 |                 # very strangely placed comment
+237 239 | 
+
+RUF022.py:243:11: RUF022 [*] `__all__` is not sorted
+    |
+241 |                   ]
+242 |   
+243 |   __all__ = (
+    |  ___________^
+244 | |     "foo"
+245 | |     # strange comment 1
+246 | |     ,
+247 | |     # comment about bar
+248 | |     "bar"
+249 | |     # strange comment 2
+250 | |     ,
+251 | | )
+    | |_^ RUF022
+252 |   
+253 |   __all__ = (  # comment about the opening paren
+    |
+    = help: Apply an isort-style sorting to `__all__`
+
+ℹ Safe fix
+241 241 |                 ]
+242 242 | 
+243 243 | __all__ = (
+244     |-    "foo"
+245 244 |     # strange comment 1
+246     |-    ,
+247 245 |     # comment about bar
+248     |-    "bar"
+    246 |+    "bar",
+    247 |+    "foo"
+249 248 |     # strange comment 2
+250 249 |     ,
+251 250 | )
+
+RUF022.py:253:11: RUF022 [*] `__all__` is not sorted
+    |
+251 |   )
+252 |   
+253 |   __all__ = (  # comment about the opening paren
+    |  ___________^
+254 | |     # multiline strange comment 0a
+255 | |     # multiline strange comment 0b
+256 | |     "foo"  # inline comment about foo
+257 | |     # multiline strange comment 1a
+258 | |     # multiline strange comment 1b
+259 | |     ,  # comment about the comma??
+260 | |     # comment about bar part a
+261 | |     # comment about bar part b
+262 | |     "bar"  # inline comment about bar
+263 | |     # strange multiline comment comment 2a
+264 | |     # strange multiline comment 2b
+265 | |     ,
+266 | |     # strange multiline comment 3a
+267 | |     # strange multiline comment 3b
+268 | | )  # comment about the closing paren
+    | |_^ RUF022
+269 |   
+270 |   ###################################
+    |
+    = help: Apply an isort-style sorting to `__all__`
+
+ℹ Safe fix
+251 251 | )
+252 252 | 
+253 253 | __all__ = (  # comment about the opening paren
+254     |-    # multiline strange comment 0a
+255     |-    # multiline strange comment 0b
+256     |-    "foo"  # inline comment about foo
+257 254 |     # multiline strange comment 1a
+258 255 |     # multiline strange comment 1b
+259     |-    ,  # comment about the comma??
+    256 |+      # comment about the comma??
+260 257 |     # comment about bar part a
+261 258 |     # comment about bar part b
+262     |-    "bar"  # inline comment about bar
+    259 |+    "bar",  # inline comment about bar
+    260 |+    # multiline strange comment 0a
+    261 |+    # multiline strange comment 0b
+    262 |+    "foo"  # inline comment about foo
+263 263 |     # strange multiline comment comment 2a
+264 264 |     # strange multiline comment 2b
+265 265 |     ,
 
 

@@ -91,7 +91,11 @@ if True:
 with (aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb as c):
     pass
 
-
+with (  # outer comment
+    CtxManager1(),
+    CtxManager2(),
+):
+    pass
 ```
 
 ## Outputs
@@ -107,6 +111,7 @@ docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Enabled
 target_version             = Py39
+source_type                = Python
 ```
 
 ```python
@@ -216,7 +221,10 @@ with (
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb as c
 ):
     pass
+
+with (  # outer comment
+    CtxManager1(),
+    CtxManager2(),
+):
+    pass
 ```
-
-
-

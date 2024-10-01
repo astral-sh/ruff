@@ -1,0 +1,34 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/range_formatting/module.py
+---
+## Input
+```python
+print("Before range start" )
+
+<RANGE_START>
+if a   + b :
+    print("formatted"  )
+
+print("still in range"  )
+<RANGE_END>
+
+print("After range end"  )
+```
+
+## Output
+```python
+print("Before range start" )
+
+
+if a + b:
+    print("formatted")
+
+print("still in range")
+
+
+print("After range end"  )
+```
+
+
+

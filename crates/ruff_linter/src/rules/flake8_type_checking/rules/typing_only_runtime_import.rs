@@ -28,14 +28,14 @@ use crate::rules::isort::{categorize, ImportSection, ImportType};
 /// instead be imported conditionally under an `if TYPE_CHECKING:` block to
 /// minimize runtime overhead.
 ///
-/// If [`flake8-type-checking.quote-annotations`] is set to `true`,
+/// If [`lint.flake8-type-checking.quote-annotations`] is set to `true`,
 /// annotations will be wrapped in quotes if doing so would enable the
 /// corresponding import to be moved into an `if TYPE_CHECKING:` block.
 ///
 /// If a class _requires_ that type annotations be available at runtime (as is
 /// the case for Pydantic, SQLAlchemy, and other libraries), consider using
-/// the [`flake8-type-checking.runtime-evaluated-base-classes`] and
-/// [`flake8-type-checking.runtime-evaluated-decorators`] settings to mark them
+/// the [`lint.flake8-type-checking.runtime-evaluated-base-classes`] and
+/// [`lint.flake8-type-checking.runtime-evaluated-decorators`] settings to mark them
 /// as such.
 ///
 /// ## Example
@@ -64,9 +64,10 @@ use crate::rules::isort::{categorize, ImportSection, ImportType};
 /// ```
 ///
 /// ## Options
-/// - `flake8-type-checking.quote-annotations`
-/// - `flake8-type-checking.runtime-evaluated-base-classes`
-/// - `flake8-type-checking.runtime-evaluated-decorators`
+/// - `lint.flake8-type-checking.quote-annotations`
+/// - `lint.flake8-type-checking.runtime-evaluated-base-classes`
+/// - `lint.flake8-type-checking.runtime-evaluated-decorators`
+/// - `lint.typing-modules`
 ///
 /// ## References
 /// - [PEP 536](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
@@ -101,14 +102,14 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// instead be imported conditionally under an `if TYPE_CHECKING:` block to
 /// minimize runtime overhead.
 ///
-/// If [`flake8-type-checking.quote-annotations`] is set to `true`,
+/// If [`lint.flake8-type-checking.quote-annotations`] is set to `true`,
 /// annotations will be wrapped in quotes if doing so would enable the
 /// corresponding import to be moved into an `if TYPE_CHECKING:` block.
 ///
 /// If a class _requires_ that type annotations be available at runtime (as is
 /// the case for Pydantic, SQLAlchemy, and other libraries), consider using
-/// the [`flake8-type-checking.runtime-evaluated-base-classes`] and
-/// [`flake8-type-checking.runtime-evaluated-decorators`] settings to mark them
+/// the [`lint.flake8-type-checking.runtime-evaluated-base-classes`] and
+/// [`lint.flake8-type-checking.runtime-evaluated-decorators`] settings to mark them
 /// as such.
 ///
 /// ## Example
@@ -137,9 +138,10 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// ```
 ///
 /// ## Options
-/// - `flake8-type-checking.quote-annotations`
-/// - `flake8-type-checking.runtime-evaluated-base-classes`
-/// - `flake8-type-checking.runtime-evaluated-decorators`
+/// - `lint.flake8-type-checking.quote-annotations`
+/// - `lint.flake8-type-checking.runtime-evaluated-base-classes`
+/// - `lint.flake8-type-checking.runtime-evaluated-decorators`
+/// - `lint.typing-modules`
 ///
 /// ## References
 /// - [PEP 536](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
@@ -174,14 +176,14 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// instead be imported conditionally under an `if TYPE_CHECKING:` block to
 /// minimize runtime overhead.
 ///
-/// If [`flake8-type-checking.quote-annotations`] is set to `true`,
+/// If [`lint.flake8-type-checking.quote-annotations`] is set to `true`,
 /// annotations will be wrapped in quotes if doing so would enable the
 /// corresponding import to be moved into an `if TYPE_CHECKING:` block.
 ///
 /// If a class _requires_ that type annotations be available at runtime (as is
 /// the case for Pydantic, SQLAlchemy, and other libraries), consider using
-/// the [`flake8-type-checking.runtime-evaluated-base-classes`] and
-/// [`flake8-type-checking.runtime-evaluated-decorators`] settings to mark them
+/// the [`lint.flake8-type-checking.runtime-evaluated-base-classes`] and
+/// [`lint.flake8-type-checking.runtime-evaluated-decorators`] settings to mark them
 /// as such.
 ///
 /// ## Example
@@ -210,9 +212,10 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// ```
 ///
 /// ## Options
-/// - `flake8-type-checking.quote-annotations`
-/// - `flake8-type-checking.runtime-evaluated-base-classes`
-/// - `flake8-type-checking.runtime-evaluated-decorators`
+/// - `lint.flake8-type-checking.quote-annotations`
+/// - `lint.flake8-type-checking.runtime-evaluated-base-classes`
+/// - `lint.flake8-type-checking.runtime-evaluated-decorators`
+/// - `lint.typing-modules`
 ///
 /// ## References
 /// - [PEP 536](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
@@ -282,7 +285,7 @@ pub(crate) fn typing_only_runtime_import(
             let qualified_name = import.qualified_name();
 
             if is_exempt(
-                qualified_name.as_str(),
+                &qualified_name.to_string(),
                 &checker
                     .settings
                     .flake8_type_checking
@@ -296,14 +299,16 @@ pub(crate) fn typing_only_runtime_import(
 
             // Categorize the import, using coarse-grained categorization.
             let import_type = match categorize(
-                qualified_name.as_str(),
-                None,
+                &qualified_name.to_string(),
+                qualified_name.is_unresolved_import(),
                 &checker.settings.src,
                 checker.package(),
                 checker.settings.isort.detect_same_package,
                 &checker.settings.isort.known_modules,
                 checker.settings.target_version,
                 checker.settings.isort.no_sections,
+                &checker.settings.isort.section_order,
+                &checker.settings.isort.default_section,
             ) {
                 ImportSection::Known(ImportType::LocalFolder | ImportType::FirstParty) => {
                     ImportType::FirstParty
@@ -363,8 +368,10 @@ pub(crate) fn typing_only_runtime_import(
             ..
         } in imports
         {
-            let mut diagnostic =
-                Diagnostic::new(diagnostic_for(import_type, import.qualified_name()), range);
+            let mut diagnostic = Diagnostic::new(
+                diagnostic_for(import_type, import.qualified_name().to_string()),
+                range,
+            );
             if let Some(range) = parent_range {
                 diagnostic.set_parent(range.start());
             }
@@ -385,8 +392,10 @@ pub(crate) fn typing_only_runtime_import(
             ..
         } in imports
         {
-            let mut diagnostic =
-                Diagnostic::new(diagnostic_for(import_type, import.qualified_name()), range);
+            let mut diagnostic = Diagnostic::new(
+                diagnostic_for(import_type, import.qualified_name().to_string()),
+                range,
+            );
             if let Some(range) = parent_range {
                 diagnostic.set_parent(range.start());
             }
@@ -482,7 +491,6 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
             },
             at,
             checker.semantic(),
-            checker.source_type,
         )?
         .into_edits();
 
@@ -493,7 +501,7 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
             .flat_map(|ImportBinding { binding, .. }| {
                 binding.references.iter().filter_map(|reference_id| {
                     let reference = checker.semantic().reference(*reference_id);
-                    if reference.context().is_runtime() {
+                    if reference.in_runtime_context() {
                         Some(quote_annotation(
                             reference.expression_id()?,
                             checker.semantic(),

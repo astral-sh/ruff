@@ -1,0 +1,166 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/arguments/missing_expression.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..38,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..10,
+                    value: Call(
+                        ExprCall {
+                            range: 0..10,
+                            func: Name(
+                                ExprName {
+                                    range: 0..4,
+                                    id: Name("call"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 4..10,
+                                args: [
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 8..9,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 11..21,
+                    value: Call(
+                        ExprCall {
+                            range: 11..21,
+                            func: Name(
+                                ExprName {
+                                    range: 11..15,
+                                    id: Name("call"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 15..21,
+                                args: [],
+                                keywords: [
+                                    Keyword {
+                                        range: 16..19,
+                                        arg: Some(
+                                            Identifier {
+                                                id: Name("x"),
+                                                range: 16..17,
+                                            },
+                                        ),
+                                        value: Name(
+                                            ExprName {
+                                                range: 19..19,
+                                                id: Name(""),
+                                                ctx: Invalid,
+                                            },
+                                        ),
+                                    },
+                                ],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 22..32,
+                    value: Call(
+                        ExprCall {
+                            range: 22..32,
+                            func: Name(
+                                ExprName {
+                                    range: 22..26,
+                                    id: Name("call"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 26..32,
+                                args: [
+                                    Starred(
+                                        ExprStarred {
+                                            range: 27..28,
+                                            value: Name(
+                                                ExprName {
+                                                    range: 28..28,
+                                                    id: Name(""),
+                                                    ctx: Invalid,
+                                                },
+                                            ),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            range: 30..31,
+                                            id: Name("y"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 34..37,
+                    value: Name(
+                        ExprName {
+                            range: 34..37,
+                            id: Name("foo"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | call( = 1)
+  |       ^ Syntax Error: Expected an expression or a ')'
+2 | call(x = )
+3 | call(*, y)
+  |
+
+
+  |
+1 | call( = 1)
+2 | call(x = )
+  |          ^ Syntax Error: Expected an expression
+3 | call(*, y)
+  |
+
+
+  |
+1 | call( = 1)
+2 | call(x = )
+3 | call(*, y)
+  |       ^ Syntax Error: Expected an expression
+4 | 
+5 | foo
+  |

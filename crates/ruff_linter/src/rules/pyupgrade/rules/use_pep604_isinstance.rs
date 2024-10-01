@@ -3,7 +3,7 @@ use std::fmt;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::pep_604_union;
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::Expr;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -87,32 +87,32 @@ pub(crate) fn use_pep604_isinstance(
     func: &Expr,
     args: &[Expr],
 ) {
-    if let Expr::Name(ast::ExprName { id, .. }) = func {
-        let Some(kind) = CallKind::from_name(id) else {
-            return;
-        };
-        if !checker.semantic().is_builtin(id) {
-            return;
-        };
-        if let Some(types) = args.get(1) {
-            if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &types {
-                // Ex) `()`
-                if elts.is_empty() {
-                    return;
-                }
-
-                // Ex) `(*args,)`
-                if elts.iter().any(Expr::is_starred_expr) {
-                    return;
-                }
-
-                let mut diagnostic = Diagnostic::new(NonPEP604Isinstance { kind }, expr.range());
-                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                    checker.generator().expr(&pep_604_union(elts)),
-                    types.range(),
-                )));
-                checker.diagnostics.push(diagnostic);
-            }
-        }
+    let Some(types) = args.get(1) else {
+        return;
+    };
+    let Expr::Tuple(tuple) = types else {
+        return;
+    };
+    // Ex) `()`
+    if tuple.is_empty() {
+        return;
     }
+    // Ex) `(*args,)`
+    if tuple.iter().any(Expr::is_starred_expr) {
+        return;
+    }
+    let Some(builtin_function_name) = checker.semantic().resolve_builtin_symbol(func) else {
+        return;
+    };
+    let Some(kind) = CallKind::from_name(builtin_function_name) else {
+        return;
+    };
+    checker.diagnostics.push(
+        Diagnostic::new(NonPEP604Isinstance { kind }, expr.range()).with_fix(Fix::unsafe_edit(
+            Edit::range_replacement(
+                checker.generator().expr(&pep_604_union(&tuple.elts)),
+                types.range(),
+            ),
+        )),
+    );
 }

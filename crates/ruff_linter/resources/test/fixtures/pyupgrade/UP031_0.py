@@ -29,6 +29,11 @@ print("%#o" % (123,))
 
 print("brace {} %s" % (1,))
 
+print((
+    "foo %s "
+    "bar %s" % (x, y)
+))
+
 print(
   "%s" % (
     "trailing comma",
@@ -52,10 +57,6 @@ print("%(ab)s" % {"a" "b": 1})
 
 print("%(a)s" % {"a"  :  1})
 
-print((
-    "foo %s "
-    "bar %s" % (x, y)
-))
 
 print(
     "foo %(foo)s "
@@ -117,3 +118,54 @@ path = "%s-%s-%s.pem" % (
     cert.not_valid_after.date().isoformat().replace("-", ""), # expiration date
     hexlify(cert.fingerprint(hashes.SHA256())).decode("ascii")[0:8], # fingerprint prefix
 )
+
+# UP031 (no longer false negatives; now offer potentially unsafe fixes)
+'Hello %s' % bar
+
+'Hello %s' % bar.baz
+
+'Hello %s' % bar['bop']
+
+# Not a valid type annotation but this test shouldn't result in a panic.
+# Refer: https://github.com/astral-sh/ruff/issues/11736
+x: "'%s + %s' % (1, 2)"
+
+# See: https://github.com/astral-sh/ruff/issues/12421
+print("%.2X" % 1)
+print("%.02X" % 1)
+print("%02X" % 1)
+print("%.00002X" % 1)
+print("%.20X" % 1)
+
+print("%2X" % 1)
+print("%02X" % 1)
+
+# UP031 (no longer false negatives, but offer no fix because of more complex syntax)
+
+"%d.%d" % (a, b)
+
+"%*s" % (5, "hi")
+
+"%d" % (flt,)
+
+"%c" % (some_string,)
+
+"%.2r" % (1.25)
+
+"%.*s" % (5, "hi")
+
+"%i" % (flt,)
+
+"%()s" % {"": "empty"}
+
+"%s" % {"k": "v"}
+
+"%()s" % {"": "bar"}
+
+"%(1)s" % {"1": "bar"}
+
+"%(a)s" % {"a": 1, "a": 2}
+
+"%(1)s" % {1: 2, "1": 2}
+
+"%(and)s" % {"and": 2}

@@ -1,0 +1,232 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/aug_assign_stmt_invalid_target.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..59,
+        body: [
+            AugAssign(
+                StmtAugAssign {
+                    range: 0..6,
+                    target: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 0..1,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                    op: Add,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 5..6,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            AugAssign(
+                StmtAugAssign {
+                    range: 7..17,
+                    target: StringLiteral(
+                        ExprStringLiteral {
+                            range: 7..10,
+                            value: StringLiteralValue {
+                                inner: Single(
+                                    StringLiteral {
+                                        range: 7..10,
+                                        value: "a",
+                                        flags: StringLiteralFlags {
+                                            quote_style: Double,
+                                            prefix: Empty,
+                                            triple_quoted: false,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                    op: Add,
+                    value: StringLiteral(
+                        ExprStringLiteral {
+                            range: 14..17,
+                            value: StringLiteralValue {
+                                inner: Single(
+                                    StringLiteral {
+                                        range: 14..17,
+                                        value: "b",
+                                        flags: StringLiteralFlags {
+                                            quote_style: Double,
+                                            prefix: Empty,
+                                            triple_quoted: false,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            AugAssign(
+                StmtAugAssign {
+                    range: 18..25,
+                    target: Starred(
+                        ExprStarred {
+                            range: 18..20,
+                            value: Name(
+                                ExprName {
+                                    range: 19..20,
+                                    id: Name("x"),
+                                    ctx: Store,
+                                },
+                            ),
+                            ctx: Store,
+                        },
+                    ),
+                    op: Add,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 24..25,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Pass(
+                StmtPass {
+                    range: 26..30,
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 34..35,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 34..35,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            AugAssign(
+                StmtAugAssign {
+                    range: 36..45,
+                    target: Name(
+                        ExprName {
+                            range: 36..37,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    op: Add,
+                    value: Name(
+                        ExprName {
+                            range: 41..45,
+                            id: Name("pass"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            AugAssign(
+                StmtAugAssign {
+                    range: 46..58,
+                    target: BinOp(
+                        ExprBinOp {
+                            range: 47..52,
+                            left: Name(
+                                ExprName {
+                                    range: 47..48,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            op: Add,
+                            right: Name(
+                                ExprName {
+                                    range: 51..52,
+                                    id: Name("y"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                    op: Add,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 57..58,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | 1 += 1
+  | ^ Syntax Error: Invalid augmented assignment target
+2 | "a" += "b"
+3 | *x += 1
+  |
+
+
+  |
+1 | 1 += 1
+2 | "a" += "b"
+  | ^^^ Syntax Error: Invalid augmented assignment target
+3 | *x += 1
+4 | pass += 1
+  |
+
+
+  |
+1 | 1 += 1
+2 | "a" += "b"
+3 | *x += 1
+  | ^^ Syntax Error: Invalid augmented assignment target
+4 | pass += 1
+5 | x += pass
+  |
+
+
+  |
+2 | "a" += "b"
+3 | *x += 1
+4 | pass += 1
+  |      ^^ Syntax Error: Expected a statement
+5 | x += pass
+6 | (x + y) += 1
+  |
+
+
+  |
+3 | *x += 1
+4 | pass += 1
+5 | x += pass
+  |      ^^^^ Syntax Error: Expected an identifier, but found a keyword 'pass' that cannot be used here
+6 | (x + y) += 1
+  |
+
+
+  |
+4 | pass += 1
+5 | x += pass
+6 | (x + y) += 1
+  |  ^^^^^ Syntax Error: Invalid augmented assignment target
+  |

@@ -1,0 +1,315 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/type_param_type_var.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..147,
+        body: [
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 0..15,
+                    name: Name(
+                        ExprName {
+                            range: 5..6,
+                            id: Name("X"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 6..9,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 7..8,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 7..8,
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            range: 12..15,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 16..37,
+                    name: Name(
+                        ExprName {
+                            range: 21..22,
+                            id: Name("X"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 22..31,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 23..30,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 23..24,
+                                        },
+                                        bound: None,
+                                        default: Some(
+                                            Name(
+                                                ExprName {
+                                                    range: 27..30,
+                                                    id: Name("int"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            range: 34..37,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 38..64,
+                    name: Name(
+                        ExprName {
+                            range: 43..44,
+                            id: Name("X"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 44..58,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 45..57,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 45..46,
+                                        },
+                                        bound: Some(
+                                            Name(
+                                                ExprName {
+                                                    range: 48..51,
+                                                    id: Name("int"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                        default: Some(
+                                            Name(
+                                                ExprName {
+                                                    range: 54..57,
+                                                    id: Name("int"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            range: 61..64,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 65..98,
+                    name: Name(
+                        ExprName {
+                            range: 70..71,
+                            id: Name("X"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 71..92,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 72..91,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 72..73,
+                                        },
+                                        bound: Some(
+                                            Tuple(
+                                                ExprTuple {
+                                                    range: 75..85,
+                                                    elts: [
+                                                        Name(
+                                                            ExprName {
+                                                                range: 76..79,
+                                                                id: Name("int"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        Name(
+                                                            ExprName {
+                                                                range: 81..84,
+                                                                id: Name("int"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                    ],
+                                                    ctx: Load,
+                                                    parenthesized: true,
+                                                },
+                                            ),
+                                        ),
+                                        default: Some(
+                                            Name(
+                                                ExprName {
+                                                    range: 88..91,
+                                                    id: Name("int"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            range: 95..98,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 99..146,
+                    name: Name(
+                        ExprName {
+                            range: 104..105,
+                            id: Name("X"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 105..140,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 106..118,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 106..107,
+                                        },
+                                        bound: Some(
+                                            Name(
+                                                ExprName {
+                                                    range: 109..112,
+                                                    id: Name("int"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                        default: Some(
+                                            Name(
+                                                ExprName {
+                                                    range: 115..118,
+                                                    id: Name("int"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 120..139,
+                                        name: Identifier {
+                                            id: Name("U"),
+                                            range: 120..121,
+                                        },
+                                        bound: Some(
+                                            Tuple(
+                                                ExprTuple {
+                                                    range: 123..133,
+                                                    elts: [
+                                                        Name(
+                                                            ExprName {
+                                                                range: 124..127,
+                                                                id: Name("int"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        Name(
+                                                            ExprName {
+                                                                range: 129..132,
+                                                                id: Name("int"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                    ],
+                                                    ctx: Load,
+                                                    parenthesized: true,
+                                                },
+                                            ),
+                                        ),
+                                        default: Some(
+                                            Name(
+                                                ExprName {
+                                                    range: 136..139,
+                                                    id: Name("int"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            range: 143..146,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

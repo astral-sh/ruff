@@ -4,7 +4,6 @@ use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, ParameterWithDefault, Stmt};
-use ruff_python_parser::typing::parse_type_annotation;
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::Definition;
 use ruff_python_stdlib::typing::simple_magic_return_type;
@@ -24,15 +23,15 @@ use crate::rules::ruff::typing::type_hint_resolves_to_any;
 /// any provided arguments match expectation.
 ///
 /// ## Example
+///
 /// ```python
-/// def foo(x):
-///     ...
+/// def foo(x): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// def foo(x: int):
-///     ...
+/// def foo(x: int): ...
 /// ```
 #[violation]
 pub struct MissingTypeFunctionArgument {
@@ -56,15 +55,15 @@ impl Violation for MissingTypeFunctionArgument {
 /// any provided arguments match expectation.
 ///
 /// ## Example
+///
 /// ```python
-/// def foo(*args):
-///     ...
+/// def foo(*args): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// def foo(*args: int):
-///     ...
+/// def foo(*args: int): ...
 /// ```
 #[violation]
 pub struct MissingTypeArgs {
@@ -88,15 +87,15 @@ impl Violation for MissingTypeArgs {
 /// any provided arguments match expectation.
 ///
 /// ## Example
+///
 /// ```python
-/// def foo(**kwargs):
-///     ...
+/// def foo(**kwargs): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// def foo(**kwargs: int):
-///     ...
+/// def foo(**kwargs: int): ...
 /// ```
 #[violation]
 pub struct MissingTypeKwargs {
@@ -111,6 +110,10 @@ impl Violation for MissingTypeKwargs {
     }
 }
 
+/// ## Deprecation
+/// This rule is commonly disabled because type checkers can infer this type without annotation.
+/// It will be removed in a future release.
+///
 /// ## What it does
 /// Checks that instance method `self` arguments have type annotations.
 ///
@@ -123,17 +126,17 @@ impl Violation for MissingTypeKwargs {
 /// annotation is not strictly necessary.
 ///
 /// ## Example
+///
 /// ```python
 /// class Foo:
-///     def bar(self):
-///         ...
+///     def bar(self): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// class Foo:
-///     def bar(self: "Foo"):
-///         ...
+///     def bar(self: "Foo"): ...
 /// ```
 #[violation]
 pub struct MissingTypeSelf {
@@ -148,6 +151,10 @@ impl Violation for MissingTypeSelf {
     }
 }
 
+/// ## Deprecation
+/// This rule is commonly disabled because type checkers can infer this type without annotation.
+/// It will be removed in a future release.
+///
 /// ## What it does
 /// Checks that class method `cls` arguments have type annotations.
 ///
@@ -160,19 +167,19 @@ impl Violation for MissingTypeSelf {
 /// annotation is not strictly necessary.
 ///
 /// ## Example
+///
 /// ```python
 /// class Foo:
 ///     @classmethod
-///     def bar(cls):
-///         ...
+///     def bar(cls): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// class Foo:
 ///     @classmethod
-///     def bar(cls: Type["Foo"]):
-///         ...
+///     def bar(cls: Type["Foo"]): ...
 /// ```
 #[violation]
 pub struct MissingTypeCls {
@@ -286,7 +293,7 @@ impl Violation for MissingReturnTypePrivateFunction {
 ///
 /// Note that type checkers often allow you to omit the return type annotation for
 /// `__init__` methods, as long as at least one argument has a type annotation. To
-/// opt-in to this behavior, use the `mypy-init-return` setting in your `pyproject.toml`
+/// opt in to this behavior, use the `mypy-init-return` setting in your `pyproject.toml`
 /// or `ruff.toml` file:
 ///
 /// ```toml
@@ -441,29 +448,29 @@ impl Violation for MissingReturnTypeClassMethod {
 /// `Any` as an "escape hatch" only when it is really needed.
 ///
 /// ## Example
+///
 /// ```python
-/// def foo(x: Any):
-///     ...
+/// def foo(x: Any): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// def foo(x: int):
-///     ...
+/// def foo(x: int): ...
 /// ```
 ///
 /// ## Known problems
 ///
 /// Type aliases are unsupported and can lead to false positives.
 /// For example, the following will trigger this rule inadvertently:
+///
 /// ```python
 /// from typing import Any
 ///
 /// MyAny = Any
 ///
 ///
-/// def foo(x: MyAny):
-///     ...
+/// def foo(x: MyAny): ...
 /// ```
 ///
 /// ## References
@@ -504,15 +511,12 @@ fn check_dynamically_typed<F>(
 ) where
     F: FnOnce() -> String,
 {
-    if let Expr::StringLiteral(ast::ExprStringLiteral { range, value }) = annotation {
+    if let Expr::StringLiteral(string_expr) = annotation {
         // Quoted annotations
-        if let Ok((parsed_annotation, _)) =
-            parse_type_annotation(value.to_str(), *range, checker.locator().contents())
-        {
+        if let Some(parsed_annotation) = checker.parse_type_annotation(string_expr) {
             if type_hint_resolves_to_any(
-                &parsed_annotation,
-                checker.semantic(),
-                checker.locator(),
+                parsed_annotation.expression(),
+                checker,
                 checker.settings.target_version.minor(),
             ) {
                 diagnostics.push(Diagnostic::new(
@@ -522,12 +526,7 @@ fn check_dynamically_typed<F>(
             }
         }
     } else {
-        if type_hint_resolves_to_any(
-            annotation,
-            checker.semantic(),
-            checker.locator(),
-            checker.settings.target_version.minor(),
-        ) {
+        if type_hint_resolves_to_any(annotation, checker, checker.settings.target_version.minor()) {
             diagnostics.push(Diagnostic::new(
                 AnyType { name: func() },
                 annotation.range(),
@@ -574,6 +573,7 @@ fn is_stub_function(function_def: &ast::StmtFunctionDef, checker: &Checker) -> b
 }
 
 /// Generate flake8-annotation checks for a given `Definition`.
+/// ANN001, ANN401
 pub(crate) fn definition(
     checker: &Checker,
     definition: &Definition,
@@ -607,23 +607,14 @@ pub(crate) fn definition(
 
     let is_overridden = visibility::is_override(decorator_list, checker.semantic());
 
-    // ANN001, ANN401
+    // If this is a non-static method, skip `cls` or `self`.
     for ParameterWithDefault {
         parameter,
         default: _,
         range: _,
-    } in parameters
-        .posonlyargs
-        .iter()
-        .chain(&parameters.args)
-        .chain(&parameters.kwonlyargs)
-        .skip(
-            // If this is a non-static method, skip `cls` or `self`.
-            usize::from(
-                is_method && !visibility::is_staticmethod(decorator_list, checker.semantic()),
-            ),
-        )
-    {
+    } in parameters.iter_non_variadic_params().skip(usize::from(
+        is_method && !visibility::is_staticmethod(decorator_list, checker.semantic()),
+    )) {
         // ANN401 for dynamically typed parameters
         if let Some(annotation) = &parameter.annotation {
             has_any_typed_arg = true;

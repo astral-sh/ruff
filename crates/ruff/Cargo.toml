@@ -1,7 +1,7 @@
 [package]
 name = "ruff"
-version = "0.1.14"
-publish = false
+version = "0.6.8"
+publish = true
 authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -13,16 +13,19 @@ readme = "../../README.md"
 default-run = "ruff"
 
 [dependencies]
-ruff_cache = { path = "../ruff_cache" }
-ruff_diagnostics = { path = "../ruff_diagnostics" }
-ruff_linter = { path = "../ruff_linter", features = ["clap"] }
-ruff_macros = { path = "../ruff_macros" }
-ruff_notebook = { path = "../ruff_notebook" }
-ruff_python_ast = { path = "../ruff_python_ast" }
-ruff_python_formatter = { path = "../ruff_python_formatter" }
-ruff_source_file = { path = "../ruff_source_file" }
-ruff_text_size = { path = "../ruff_text_size" }
-ruff_workspace = { path = "../ruff_workspace" }
+ruff_cache = { workspace = true }
+ruff_db = { workspace = true, default-features = false, features = ["os"] }
+ruff_diagnostics = { workspace = true }
+ruff_graph = { workspace = true, features = ["serde", "clap"] }
+ruff_linter = { workspace = true, features = ["clap"] }
+ruff_macros = { workspace = true }
+ruff_notebook = { workspace = true }
+ruff_python_ast = { workspace = true }
+ruff_python_formatter = { workspace = true }
+ruff_server = { workspace = true }
+ruff_source_file = { workspace = true }
+ruff_text_size = { workspace = true }
+ruff_workspace = { workspace = true }
 
 anyhow = { workspace = true }
 argfile = { workspace = true }
@@ -30,11 +33,12 @@ bincode = { workspace = true }
 bitflags = { workspace = true }
 cachedir = { workspace = true }
 chrono = { workspace = true }
-clap = { workspace = true, features = ["derive", "env"] }
+clap = { workspace = true, features = ["derive", "env", "wrap_help"] }
 clap_complete_command = { workspace = true }
 clearscreen = { workspace = true }
 colored = { workspace = true }
 filetime = { workspace = true }
+globwalk = { workspace = true }
 ignore = { workspace = true }
 is-macro = { workspace = true }
 itertools = { workspace = true }
@@ -48,24 +52,34 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 shellexpand = { workspace = true }
 strum = { workspace = true, features = [] }
+tempfile = { workspace = true }
 thiserror = { workspace = true }
+toml = { workspace = true }
 tracing = { workspace = true, features = ["log"] }
 walkdir = { workspace = true }
 wild = { workspace = true }
 
 [dev-dependencies]
-assert_cmd = { workspace = true }
+# Enable test rules during development
+ruff_linter = { workspace = true, features = ["clap", "test-rules"] }
+
+assert_fs = { workspace = true }
 # Avoid writing colored snapshots when running tests from the terminal
-colored = { workspace = true, features = ["no-color"]}
+colored = { workspace = true, features = ["no-color"] }
+indoc = { workspace = true }
 insta = { workspace = true, features = ["filters", "json"] }
 insta-cmd = { workspace = true }
 tempfile = { workspace = true }
 test-case = { workspace = true }
 
+[package.metadata.cargo-shear]
+# Used via macro expansion.
+ignored = ["chrono"]
+
 [target.'cfg(target_os = "windows")'.dependencies]
 mimalloc = { workspace = true }
 
-[target.'cfg(all(not(target_os = "windows"), not(target_os = "openbsd"), any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "powerpc64")))'.dependencies]
+[target.'cfg(all(not(target_os = "windows"), not(target_os = "openbsd"), not(target_os = "aix"), any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "powerpc64")))'.dependencies]
 tikv-jemallocator = { workspace = true }
 
 [lints]
