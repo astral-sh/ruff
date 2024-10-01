@@ -1688,7 +1688,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Number::Int(n) => n
                 .as_i64()
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| builtins_symbol_ty(self.db, "int").to_instance(self.db)),
+                .unwrap_or_else(|| Type::builtin_int_instance(self.db)),
             ast::Number::Float(_) => builtins_symbol_ty(self.db, "float").to_instance(self.db),
             ast::Number::Complex { .. } => {
                 builtins_symbol_ty(self.db, "complex").to_instance(self.db)
@@ -2327,17 +2327,17 @@ impl<'db> TypeInferenceBuilder<'db> {
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Add) => n
                 .checked_add(m)
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| builtins_symbol_ty(self.db, "int").to_instance(self.db)),
+                .unwrap_or_else(|| Type::builtin_int_instance(self.db)),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Sub) => n
                 .checked_sub(m)
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| builtins_symbol_ty(self.db, "int").to_instance(self.db)),
+                .unwrap_or_else(|| Type::builtin_int_instance(self.db)),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Mult) => n
                 .checked_mul(m)
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| builtins_symbol_ty(self.db, "int").to_instance(self.db)),
+                .unwrap_or_else(|| Type::builtin_int_instance(self.db)),
 
             (Type::IntLiteral(_), Type::IntLiteral(_), ast::Operator::Div) => {
                 builtins_symbol_ty(self.db, "float").to_instance(self.db)
@@ -2346,12 +2346,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::FloorDiv) => n
                 .checked_div(m)
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| builtins_symbol_ty(self.db, "int").to_instance(self.db)),
+                .unwrap_or_else(|| Type::builtin_int_instance(self.db)),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Mod) => n
                 .checked_rem(m)
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| builtins_symbol_ty(self.db, "int").to_instance(self.db)),
+                .unwrap_or_else(|| Type::builtin_int_instance(self.db)),
 
             (Type::BytesLiteral(lhs), Type::BytesLiteral(rhs), ast::Operator::Add) => {
                 Type::BytesLiteral(BytesLiteralType::new(
@@ -2911,7 +2911,7 @@ impl StringPartsCollector {
 
     fn ty(self, db: &dyn Db) -> Type {
         if self.expression {
-            Type::builtin_str(db).to_instance(db)
+            Type::builtin_str_instance(db)
         } else if let Some(concatenated) = self.concatenated {
             Type::StringLiteral(StringLiteralType::new(db, concatenated.into_boxed_str()))
         } else {

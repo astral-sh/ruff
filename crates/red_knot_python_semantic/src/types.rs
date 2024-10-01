@@ -385,8 +385,12 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub fn builtin_str(db: &'db dyn Db) -> Self {
-        builtins_symbol_ty(db, "str")
+    pub fn builtin_str_instance(db: &'db dyn Db) -> Self {
+        builtins_symbol_ty(db, "str").to_instance(db)
+    }
+
+    pub fn builtin_int_instance(db: &'db dyn Db) -> Self {
+        builtins_symbol_ty(db, "int").to_instance(db)
     }
 
     pub fn is_stdlib_symbol(&self, db: &'db dyn Db, module_name: &str, name: &str) -> bool {
@@ -777,7 +781,7 @@ impl<'db> Type<'db> {
             Type::IntLiteral(_) | Type::BooleanLiteral(_) => self.repr(db),
             Type::StringLiteral(_) | Type::LiteralString => *self,
             // TODO: handle more complex types
-            _ => Type::builtin_str(db).to_instance(db),
+            _ => Type::builtin_str_instance(db),
         }
     }
 
@@ -800,7 +804,7 @@ impl<'db> Type<'db> {
             })),
             Type::LiteralString => Type::LiteralString,
             // TODO: handle more complex types
-            _ => Type::builtin_str(db).to_instance(db),
+            _ => Type::builtin_str_instance(db),
         }
     }
 }
