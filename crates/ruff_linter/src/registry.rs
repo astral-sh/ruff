@@ -1,6 +1,3 @@
-//! Remnant of the registry of all [`Rule`] implementations, now it's reexporting from codes.rs
-//! with some helper symbols
-
 use strum_macros::EnumIter;
 
 pub use codes::Rule;
@@ -268,7 +265,6 @@ impl Rule {
             | Rule::CommentedOutCode
             | Rule::EmptyComment
             | Rule::ExtraneousParentheses
-            | Rule::FStringSingleQuotes
             | Rule::InvalidCharacterBackspace
             | Rule::InvalidCharacterEsc
             | Rule::InvalidCharacterNul
