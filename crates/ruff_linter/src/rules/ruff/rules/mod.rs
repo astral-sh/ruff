@@ -31,6 +31,8 @@ pub(crate) use unused_async::*;
 pub(crate) use unused_noqa::*;
 pub(crate) use useless_if_else::*;
 pub(crate) use zip_instead_of_pairwise::*;
+pub(crate) use use_dataclasses_for_data_classes::*;
+pub(crate) use f_string_single_quotes::*;
 
 mod ambiguous_unicode_character;
 mod assert_with_print_message;
