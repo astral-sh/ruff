@@ -6,6 +6,7 @@ pub(crate) use collection_literal_concatenation::*;
 pub(crate) use decimal_from_float_literal::*;
 pub(crate) use default_factory_kwarg::*;
 pub(crate) use explicit_f_string_type_conversion::*;
+pub(crate) use f_string_single_quotes::*;
 pub(crate) use function_call_in_dataclass_default::*;
 pub(crate) use implicit_optional::*;
 pub(crate) use incorrectly_parenthesized_tuple_in_subscript::*;
@@ -29,10 +30,10 @@ pub(crate) use unnecessary_iterable_allocation_for_first_element::*;
 pub(crate) use unnecessary_key_check::*;
 pub(crate) use unused_async::*;
 pub(crate) use unused_noqa::*;
+pub(crate) use use_dataclasses_for_data_classes::*;
 pub(crate) use useless_if_else::*;
 pub(crate) use zip_instead_of_pairwise::*;
-pub(crate) use use_dataclasses_for_data_classes::*;
-pub(crate) use f_string_single_quotes::*;
+
 
 mod ambiguous_unicode_character;
 mod assert_with_print_message;
@@ -43,6 +44,7 @@ mod confusables;
 mod decimal_from_float_literal;
 mod default_factory_kwarg;
 mod explicit_f_string_type_conversion;
+mod f_string_single_quotes;
 mod function_call_in_dataclass_default;
 mod helpers;
 mod implicit_optional;
@@ -69,6 +71,7 @@ mod unnecessary_iterable_allocation_for_first_element;
 mod unnecessary_key_check;
 mod unused_async;
 mod unused_noqa;
+mod use_dataclasses_for_data_classes
 mod useless_if_else;
 mod zip_instead_of_pairwise;
 
