@@ -160,7 +160,7 @@ fn run() -> anyhow::Result<ExitStatus> {
         SystemPathBuf::from_path_buf(cwd)
             .map_err(|path| {
                 anyhow!(
-                    "The current working directory '{}' contains non-unicode characters. Red Knot only supports unicode paths.",
+                    "The current working directory `{}` contains non-Unicode characters. Red Knot only supports Unicode paths.",
                     path.display()
                 )
             })?

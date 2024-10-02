@@ -194,7 +194,7 @@ where
 
     let root_path = SystemPath::from_std_path(temp_dir.path()).ok_or_else(|| {
         anyhow!(
-            "Temp directory '{}' is not a valid UTF-8 path.",
+            "Temporary directory `{}` is not a valid UTF-8 path.",
             temp_dir.path().display()
         )
     })?;
