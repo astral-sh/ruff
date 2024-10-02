@@ -71,7 +71,7 @@ mod unnecessary_iterable_allocation_for_first_element;
 mod unnecessary_key_check;
 mod unused_async;
 mod unused_noqa;
-mod use_dataclasses_for_data_classes
+mod use_dataclasses_for_data_classes;
 mod useless_if_else;
 mod zip_instead_of_pairwise;
 
