@@ -796,6 +796,14 @@ pub struct LintCommonOptions {
     )]
     pub typing_modules: Option<Vec<String>>,
 
+    /// A list of modules which is allowed even thought it is not used
+    /// in the code.
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"allowed-imports = ["hvplot.pandas"]"#
+    )]
+    pub allowed_imports: Option<Vec<String>>,
     /// A list of rule codes or prefixes to consider non-fixable.
     #[option(
         default = "[]",
