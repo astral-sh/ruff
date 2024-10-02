@@ -307,6 +307,14 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
         {
             continue;
         }
+        if checker
+            .settings
+            .allowed_imports
+            .iter()
+            .any(|allowed_import| name.starts_with(allowed_import))
+        {
+            continue;
+        }
 
         let import = ImportBinding {
             name,
