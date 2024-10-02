@@ -1,0 +1,24 @@
+[package]
+name = "red_knot_test"
+version = "0.0.0"
+publish = false
+edition.workspace = true
+rust-version.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+repository.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+once_cell = { workspace = true }
+regex = { workspace = true }
+ruff_index = { workspace = true }
+ruff_python_trivia = { workspace = true }
+rustc-hash = { workspace = true }
+
+[dev-dependencies]
+
+[lints]
+workspace = true

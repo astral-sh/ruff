@@ -2128,6 +2128,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "red_knot_test"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "once_cell",
+ "regex",
+ "ruff_index",
+ "ruff_python_trivia",
+ "rustc-hash 2.0.0",
+]
+
+[[package]]
 name = "red_knot_vendored"
 version = "0.0.0"
 dependencies = [
