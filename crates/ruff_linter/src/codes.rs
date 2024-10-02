@@ -356,8 +356,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bugbear, "904") => (RuleGroup::Stable, rules::flake8_bugbear::rules::RaiseWithoutFromInsideExcept),
         (Flake8Bugbear, "905") => (RuleGroup::Stable, rules::flake8_bugbear::rules::ZipWithoutExplicitStrict),
         (Flake8Bugbear, "909") => (RuleGroup::Preview, rules::flake8_bugbear::rules::LoopIteratorMutation),
-        (Flake8Bugbear, "903") => (RuleGroup::Preview, crate::registry::Rule::UseDataclassesForDataClasses),
-        (Flake8Bugbear, "907") => (RuleGroup::Preview, crate::registry::Rule::FStringSingleQuotes),
+        (Flake8Bugbear, "903") => (RuleGroup::Preview, rules::registry::Rule::UseDataclassesForDataClasses),
+        (Flake8Bugbear, "907") => (RuleGroup::Preview, rules::registry::Rule::FStringSingleQuotes),
 
         // flake8-blind-except
         (Flake8BlindExcept, "001") => (RuleGroup::Stable, rules::flake8_blind_except::rules::BlindExcept),
