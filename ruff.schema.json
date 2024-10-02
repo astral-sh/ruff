@@ -16,6 +16,17 @@
         "minLength": 1
       }
     },
+    "allowed-imports": {
+      "description": "A list of modules which is allowed even thought it is not used in the code.",
+      "deprecated": true,
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
     "analyze": {
       "description": "Options to configure import map generation.",
       "anyOf": [
@@ -1885,6 +1896,16 @@
             "type": "string",
             "maxLength": 1,
             "minLength": 1
+          }
+        },
+        "allowed-imports": {
+          "description": "A list of modules which is allowed even thought it is not used in the code.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
           }
         },
         "dummy-variable-rgx": {
