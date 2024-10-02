@@ -1,3 +1,4 @@
+//! Rules from [flake8-bugbear](https://pypi.org/project/flake8-bugbear/).
 pub(crate) mod helpers;
 pub(crate) mod rules;
 pub mod settings;
