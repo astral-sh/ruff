@@ -116,7 +116,7 @@ mod tests {
         assert!(!comment_contains_code(
             "# pylint: disable=redefined-outer-name",
             &[]
-        ),);
+        ));
         assert!(!comment_contains_code(
             "# Issue #999: This is not code",
             &[]
@@ -190,11 +190,11 @@ mod tests {
         assert!(comment_contains_code(
             "# user_content_type, _ = TimelineEvent.objects.using(db_alias).get_or_create(",
             &[]
-        ),);
+        ));
         assert!(comment_contains_code(
             "# (user_content_type, _) = TimelineEvent.objects.using(db_alias).get_or_create(",
             &[]
-        ),);
+        ));
         assert!(comment_contains_code(
             "# ( user_content_type , _ )= TimelineEvent.objects.using(db_alias).get_or_create(",
             &[]

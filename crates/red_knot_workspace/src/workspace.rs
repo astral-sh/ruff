@@ -226,7 +226,7 @@ impl Workspace {
     ///
     /// This changes the behavior of `check` to only check the open files rather than all files in the workspace.
     pub fn open_file(self, db: &mut dyn Db, file: File) {
-        tracing::debug!("Opening file '{}'", file.path(db));
+        tracing::debug!("Opening file `{}`", file.path(db));
 
         let mut open_files = self.take_open_files(db);
         open_files.insert(file);
@@ -235,7 +235,7 @@ impl Workspace {
 
     /// Closes a file in the workspace.
     pub fn close_file(self, db: &mut dyn Db, file: File) -> bool {
-        tracing::debug!("Closing file '{}'", file.path(db));
+        tracing::debug!("Closing file `{}`", file.path(db));
 
         let mut open_files = self.take_open_files(db);
         let removed = open_files.remove(&file);
@@ -310,7 +310,7 @@ impl Package {
     #[tracing::instrument(level = "debug", skip(db))]
     pub fn remove_file(self, db: &mut dyn Db, file: File) {
         tracing::debug!(
-            "Removing file '{}' from package '{}'",
+            "Removing file `{}` from package `{}`",
             file.path(db),
             self.name(db)
         );
@@ -324,7 +324,7 @@ impl Package {
 
     pub fn add_file(self, db: &mut dyn Db, file: File) {
         tracing::debug!(
-            "Adding file '{}' to package '{}'",
+            "Adding file `{}` to package `{}`",
             file.path(db),
             self.name(db)
         );
@@ -346,7 +346,7 @@ impl Package {
                     tracing::debug_span!("index_package_files", package = %self.name(db)).entered();
 
                 let files = discover_package_files(db, self.root(db));
-                tracing::info!("Found {} files in package '{}'", files.len(), self.name(db));
+                tracing::info!("Found {} files in package `{}`", files.len(), self.name(db));
                 vacant.set(files)
             }
             Index::Indexed(indexed) => indexed,
@@ -372,7 +372,7 @@ impl Package {
     }
 
     pub fn reload_files(self, db: &mut dyn Db) {
-        tracing::debug!("Reloading files for package '{}'", self.name(db));
+        tracing::debug!("Reloading files for package `{}`", self.name(db));
 
         if !self.file_set(db).is_lazy() {
             // Force a re-index of the files in the next revision.

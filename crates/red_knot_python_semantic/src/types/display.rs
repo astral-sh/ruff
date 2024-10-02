@@ -37,7 +37,7 @@ impl Display for DisplayType<'_> {
                 | Type::Class(_)
                 | Type::Function(_)
         ) {
-            write!(f, "Literal[{representation}]",)
+            write!(f, "Literal[{representation}]")
         } else {
             representation.fmt(f)
         }
@@ -335,7 +335,7 @@ mod tests {
             class B: ...
             ",
         )?;
-        let mod_file = system_path_to_file(&db, "src/main.py").expect("Expected file to exist.");
+        let mod_file = system_path_to_file(&db, "src/main.py").expect("file to exist");
 
         let union_elements = &[
             Type::Unknown,

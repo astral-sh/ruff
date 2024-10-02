@@ -157,7 +157,7 @@ impl RootDatabase {
                 base_configuration.cloned(),
             ) {
                 Ok(metadata) => {
-                    tracing::debug!("Reloading workspace after structural change.");
+                    tracing::debug!("Reloading workspace after structural change");
                     // TODO: Handle changes in the program settings.
                     workspace.reload(self, metadata);
                 }

@@ -480,12 +480,12 @@ impl<'db> TypeInferenceBuilder<'db> {
         match declared_ty {
             Type::Class(class) => {
                 self.add_diagnostic(node, "invalid-assignment", format_args!(
-                        "Implicit shadowing of class '{}'; annotate to make it explicit if this is intentional.",
+                        "Implicit shadowing of class `{}`; annotate to make it explicit if this is intentional",
                         class.name(self.db)));
             }
             Type::Function(function) => {
                 self.add_diagnostic(node, "invalid-assignment", format_args!(
-                        "Implicit shadowing of function '{}'; annotate to make it explicit if this is intentional.",
+                        "Implicit shadowing of function `{}`; annotate to make it explicit if this is intentional",
                         function.name(self.db)));
             }
             _ => {
@@ -493,7 +493,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     node,
                     "invalid-assignment",
                     format_args!(
-                        "Object of type '{}' is not assignable to '{}'.",
+                        "Object of type `{}` is not assignable to `{}`",
                         assigned_ty.display(self.db),
                         declared_ty.display(self.db),
                     ),
@@ -515,9 +515,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         };
 
         let (op, by_zero) = match expr.op {
-            ast::Operator::Div => ("divide", "by zero."),
-            ast::Operator::FloorDiv => ("floor divide", "by zero."),
-            ast::Operator::Mod => ("reduce", "modulo zero."),
+            ast::Operator::Div => ("divide", "by zero"),
+            ast::Operator::FloorDiv => ("floor divide", "by zero"),
+            ast::Operator::Mod => ("reduce", "modulo zero"),
             _ => return,
         };
 
@@ -525,7 +525,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             expr.into(),
             "division-by-zero",
             format_args!(
-                "Cannot {op} object of type '{}' {by_zero}",
+                "Cannot {op} object of type `{}` {by_zero}",
                 left.display(self.db)
             ),
         );
@@ -550,7 +550,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     node,
                     "conflicting-declarations",
                     format_args!(
-                        "Conflicting declared types for '{symbol_name}': {}.",
+                        "Conflicting declared types for `{symbol_name}`: {}",
                         conflicting.display(self.db)
                     ),
                 );
@@ -579,7 +579,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 node,
                 "invalid-declaration",
                 format_args!(
-                    "Cannot declare type '{}' for inferred type '{}'.",
+                    "Cannot declare type `{}` for inferred type `{}`",
                     ty.display(self.db),
                     inferred_ty.display(self.db)
                 ),
@@ -1280,7 +1280,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             node,
             "not-iterable",
             format_args!(
-                "Object of type '{}' is not iterable.",
+                "Object of type `{}` is not iterable",
                 not_iterable_ty.display(self.db)
             ),
         );
@@ -1298,7 +1298,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             node,
             "index-out-of-bounds",
             format_args!(
-                "Index {index} is out of bounds for tuple of type '{}' with length {length}.",
+                "Index {index} is out of bounds for tuple of type `{}` with length {length}",
                 tuple_ty.display(self.db)
             ),
         );
@@ -1316,7 +1316,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             node,
             "index-out-of-bounds",
             format_args!(
-                "Index {index} is out of bounds for string '{}' with length {length}.",
+                "Index {index} is out of bounds for string `{}` with length {length}",
                 string_ty.display(self.db)
             ),
         );
@@ -1333,7 +1333,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             node,
             "non-subscriptable",
             format_args!(
-                "Cannot subscript object of type '{}' with no `{method}` method.",
+                "Cannot subscript object of type `{}` with no `{method}` method",
                 non_subscriptable_ty.display(self.db)
             ),
         );
@@ -1455,7 +1455,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             import_node.into(),
             "unresolved-import",
             format_args!(
-                "Cannot resolve import '{}{}'.",
+                "Cannot resolve import `{}{}`",
                 ".".repeat(level as usize),
                 module.unwrap_or_default()
             ),
@@ -1516,7 +1516,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let module_name = if let Some(level) = NonZeroU32::new(*level) {
             tracing::trace!(
-                "Resolving imported object '{}' from module '{}' relative to file '{}'",
+                "Resolving imported object `{}` from module `{}` relative to file `{}`",
                 alias.name,
                 format_import_from_module(level.get(), module),
                 self.file.path(self.db),
@@ -1524,7 +1524,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             self.relative_module_name(module, level)
         } else {
             tracing::trace!(
-                "Resolving imported object '{}' from module '{}'",
+                "Resolving imported object `{}` from module `{}`",
                 alias.name,
                 format_import_from_module(*level, module),
             );
@@ -1549,7 +1549,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             Err(ModuleNameResolutionError::TooManyDots) => {
                 tracing::debug!(
-                    "Relative module resolution '{}' failed: too many leading dots",
+                    "Relative module resolution `{}` failed: too many leading dots",
                     format_import_from_module(*level, module),
                 );
                 self.unresolved_module_diagnostic(import_from, *level, module);
@@ -1557,7 +1557,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             Err(ModuleNameResolutionError::UnknownCurrentModule) => {
                 tracing::debug!(
-                    "Relative module resolution '{}' failed; could not resolve file '{}' to a module",
+                    "Relative module resolution `{}` failed; could not resolve file `{}` to a module",
                     format_import_from_module(*level, module),
                     self.file.path(self.db)
                 );
@@ -1580,7 +1580,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 AnyNodeRef::Alias(alias),
                 "unresolved-import",
                 format_args!(
-                    "Module '{}{}' has no member '{name}'",
+                    "Module `{}{}` has no member `{name}`",
                     ".".repeat(*level as usize),
                     module.unwrap_or_default()
                 ),
@@ -2220,7 +2220,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         name_node.into(),
                         "undefined-reveal",
                         format_args!(
-                            "'reveal_type' used without importing it; this is allowed for debugging convenience but will fail at runtime."),
+                            "`reveal_type` used without importing it; this is allowed for debugging convenience but will fail at runtime"),
                     );
                     builtin_ty = typing_extensions_symbol_ty(self.db, name);
                 }
@@ -2622,7 +2622,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 (&**value).into(),
                                 "call-non-callable",
                                 format_args!(
-                                    "Method `__getitem__` of type '{}' is not callable on object of type '{}'.",
+                                    "Method `__getitem__` of type `{}` is not callable on object of type `{}`",
                                     err.called_ty().display(self.db),
                                     value_ty.display(self.db),
                                 ),
@@ -2644,7 +2644,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                     (&**value).into(),
                                     "call-non-callable",
                                     format_args!(
-                                        "Method `__class_getitem__` of type '{}' is not callable on object of type '{}'.",
+                                        "Method `__class_getitem__` of type `{}` is not callable on object of type `{}`",
                                         err.called_ty().display(self.db),
                                         value_ty.display(self.db),
                                     ),
@@ -3065,7 +3065,7 @@ mod tests {
     }
 
     fn assert_public_ty(db: &TestDb, file_name: &str, symbol_name: &str, expected: &str) {
-        let file = system_path_to_file(db, file_name).expect("Expected file to exist.");
+        let file = system_path_to_file(db, file_name).expect("file to exist");
 
         let ty = global_symbol_ty(db, file, symbol_name);
         assert_eq!(
@@ -3082,7 +3082,7 @@ mod tests {
         symbol_name: &str,
         expected: &str,
     ) {
-        let file = system_path_to_file(db, file_name).expect("Expected file to exist.");
+        let file = system_path_to_file(db, file_name).expect("file to exist");
         let index = semantic_index(db, file);
         let mut file_scope_id = FileScopeId::global();
         let mut scope = file_scope_id.to_scope_id(db, file);
@@ -3129,7 +3129,7 @@ mod tests {
             ",
         )?;
 
-        assert_file_diagnostics(&db, "/src/a.py", &["Revealed type is 'Literal[1]'."]);
+        assert_file_diagnostics(&db, "/src/a.py", &["Revealed type is `Literal[1]`"]);
 
         Ok(())
     }
@@ -3148,7 +3148,7 @@ mod tests {
             ",
         )?;
 
-        assert_file_diagnostics(&db, "/src/a.py", &["Revealed type is 'Literal[1]'."]);
+        assert_file_diagnostics(&db, "/src/a.py", &["Revealed type is `Literal[1]`"]);
 
         Ok(())
     }
@@ -3167,7 +3167,7 @@ mod tests {
             ",
         )?;
 
-        assert_file_diagnostics(&db, "/src/a.py", &["Revealed type is 'Literal[1]'."]);
+        assert_file_diagnostics(&db, "/src/a.py", &["Revealed type is `Literal[1]`"]);
 
         Ok(())
     }
@@ -3188,8 +3188,8 @@ mod tests {
             &db,
             "/src/a.py",
             &[
-                "'reveal_type' used without importing it; this is allowed for debugging convenience but will fail at runtime.",
-                "Revealed type is 'Literal[1]'.",
+                "`reveal_type` used without importing it; this is allowed for debugging convenience but will fail at runtime",
+                "Revealed type is `Literal[1]`",
             ],
         );
 
@@ -3395,7 +3395,7 @@ mod tests {
             ",
         )?;
 
-        let mod_file = system_path_to_file(&db, "src/mod.py").expect("Expected file to exist.");
+        let mod_file = system_path_to_file(&db, "src/mod.py").expect("file to exist");
         let ty = global_symbol_ty(&db, mod_file, "Sub");
 
         let class = ty.expect_class();
@@ -4144,7 +4144,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "src/a.py",
-            &["Object of type 'Literal[1] | Literal[f]' is not callable (due to union element 'Literal[1]')."],
+            &["Object of type `Literal[1] | Literal[f]` is not callable (due to union element `Literal[1]`)"],
         );
         assert_public_ty(&db, "src/a.py", "x", "Unknown | int");
 
@@ -4173,7 +4173,7 @@ mod tests {
             &db,
             "src/a.py",
             &[
-                r#"Object of type 'Literal[1] | Literal["foo"] | Literal[f]' is not callable (due to union elements Literal[1], Literal["foo"])."#,
+                r#"Object of type `Literal[1] | Literal["foo"] | Literal[f]` is not callable (due to union elements Literal[1], Literal["foo"])"#,
             ],
         );
         assert_public_ty(&db, "src/a.py", "x", "Unknown | int");
@@ -4199,7 +4199,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "src/a.py",
-            &[r#"Object of type 'Literal[1] | Literal["foo"]' is not callable."#],
+            &[r#"Object of type `Literal[1] | Literal["foo"]` is not callable"#],
         );
         assert_public_ty(&db, "src/a.py", "x", "Unknown");
 
@@ -4222,7 +4222,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "/src/a.py",
-            &["Object of type 'Literal[123]' is not callable."],
+            &["Object of type `Literal[123]` is not callable"],
         );
     }
 
@@ -4297,11 +4297,11 @@ mod tests {
             &db,
             "src/a.py",
             &[
-                "Cannot divide object of type 'Literal[1]' by zero.",
-                "Cannot floor divide object of type 'Literal[2]' by zero.",
-                "Cannot reduce object of type 'Literal[3]' modulo zero.",
-                "Cannot divide object of type 'int' by zero.",
-                "Cannot divide object of type 'float' by zero.",
+                "Cannot divide object of type `Literal[1]` by zero",
+                "Cannot floor divide object of type `Literal[2]` by zero",
+                "Cannot reduce object of type `Literal[3]` modulo zero",
+                "Cannot divide object of type `int` by zero",
+                "Cannot divide object of type `float` by zero",
             ],
         );
 
@@ -4647,7 +4647,7 @@ mod tests {
             ",
         )?;
 
-        let a = system_path_to_file(&db, "src/a.py").expect("Expected file to exist.");
+        let a = system_path_to_file(&db, "src/a.py").expect("file to exist");
         let c_ty = global_symbol_ty(&db, a, "C");
         let c_class = c_ty.expect_class();
         let mut c_bases = c_class.bases(&db);
@@ -4677,7 +4677,7 @@ mod tests {
             ",
         )?;
 
-        let file = system_path_to_file(&db, "src/a.py").expect("Expected file to exist.");
+        let file = system_path_to_file(&db, "src/a.py").expect("file to exist");
         let index = semantic_index(&db, file);
         let function_scope = index
             .child_scopes(FileScopeId::global())
@@ -4708,7 +4708,7 @@ mod tests {
             ",
         )?;
 
-        let file = system_path_to_file(&db, "src/a.py").expect("Expected file to exist.");
+        let file = system_path_to_file(&db, "src/a.py").expect("file to exist");
         let index = semantic_index(&db, file);
         let function_scope = index
             .child_scopes(FileScopeId::global())
@@ -4739,7 +4739,7 @@ mod tests {
             ",
         )?;
 
-        let file = system_path_to_file(&db, "src/a.py").expect("Expected file to exist.");
+        let file = system_path_to_file(&db, "src/a.py").expect("file to exist");
         let index = semantic_index(&db, file);
         let function_scope = index
             .child_scopes(FileScopeId::global())
@@ -4773,7 +4773,7 @@ mod tests {
             ",
         )?;
 
-        let file = system_path_to_file(&db, "src/a.py").expect("Expected file to exist.");
+        let file = system_path_to_file(&db, "src/a.py").expect("file to exist");
         let index = semantic_index(&db, file);
         let class_scope = index
             .child_scopes(FileScopeId::global())
@@ -4874,7 +4874,7 @@ mod tests {
 
         assert_public_ty(&db, "/src/a.py", "x", "Literal[copyright]");
         // imported builtins module is the same file as the implicit builtins
-        let file = system_path_to_file(&db, "/src/a.py").expect("Expected file to exist.");
+        let file = system_path_to_file(&db, "/src/a.py").expect("file to exist");
         let builtins_ty = global_symbol_ty(&db, file, "builtins");
         let builtins_file = builtins_ty.expect_module();
         let implicit_builtins_file = builtins_module_scope(&db)
@@ -5388,7 +5388,7 @@ mod tests {
 
         db.write_file("src/foo.py", "import bar\n").unwrap();
 
-        assert_file_diagnostics(&db, "src/foo.py", &["Cannot resolve import 'bar'."]);
+        assert_file_diagnostics(&db, "src/foo.py", &["Cannot resolve import `bar`"]);
     }
 
     #[test]
@@ -5397,7 +5397,7 @@ mod tests {
 
         db.write_file("src/foo.py", "from bar import baz\n")
             .unwrap();
-        assert_file_diagnostics(&db, "/src/foo.py", &["Cannot resolve import 'bar'."]);
+        assert_file_diagnostics(&db, "/src/foo.py", &["Cannot resolve import `bar`"]);
     }
 
     #[test]
@@ -5407,7 +5407,7 @@ mod tests {
         db.write_files([("/src/a.py", ""), ("/src/b.py", "from a import thing")])
             .unwrap();
 
-        assert_file_diagnostics(&db, "/src/b.py", &["Module 'a' has no member 'thing'"]);
+        assert_file_diagnostics(&db, "/src/b.py", &["Module `a` has no member `thing`"]);
     }
 
     #[test]
@@ -5420,7 +5420,7 @@ mod tests {
         ])
         .unwrap();
 
-        assert_file_diagnostics(&db, "/src/a.py", &["Cannot resolve import 'foo'."]);
+        assert_file_diagnostics(&db, "/src/a.py", &["Cannot resolve import `foo`"]);
 
         // Importing the unresolved import into a second first-party file should not trigger
         // an additional "unresolved import" violation
@@ -5658,7 +5658,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "src/a.py",
-            &["Object of type 'NotIterable' is not iterable."],
+            &["Object of type `NotIterable` is not iterable"],
         );
         assert_public_ty(&db, "src/a.py", "x", "Unbound | Unknown");
 
@@ -5709,7 +5709,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "src/a.py",
-            &["Cannot resolve import 'nonexistent_module'."],
+            &["Cannot resolve import `nonexistent_module`"],
         );
         assert_public_ty(&db, "src/a.py", "foo", "Unknown");
         assert_public_ty(&db, "src/a.py", "e", "Unknown");
@@ -5969,7 +5969,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "src/a.py",
-            &["Object of type 'Unbound' is not iterable."],
+            &["Object of type `Unbound` is not iterable"],
         );
 
         Ok(())
@@ -5997,7 +5997,7 @@ mod tests {
 
         assert_scope_ty(&db, "src/a.py", &["foo", "<listcomp>"], "x", "int");
         assert_scope_ty(&db, "src/a.py", &["foo", "<listcomp>"], "z", "Unknown");
-        assert_file_diagnostics(&db, "src/a.py", &["Object of type 'int' is not iterable."]);
+        assert_file_diagnostics(&db, "src/a.py", &["Object of type `int` is not iterable"]);
 
         Ok(())
     }
@@ -6193,7 +6193,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "/src/a.py",
-            &["Object of type 'Literal[123]' is not iterable."],
+            &["Object of type `Literal[123]` is not iterable"],
         );
     }
 
@@ -6219,7 +6219,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "/src/a.py",
-            &["Object of type 'NotIterable' is not iterable."],
+            &["Object of type `NotIterable` is not iterable"],
         );
     }
 
@@ -6248,7 +6248,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "/src/a.py",
-            &["Object of type 'NotIterable' is not iterable."],
+            &["Object of type `NotIterable` is not iterable"],
         );
     }
 
@@ -6278,7 +6278,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "/src/a.py",
-            &["Object of type 'NotIterable' is not iterable."],
+            &["Object of type `NotIterable` is not iterable"],
         );
     }
 
@@ -6297,7 +6297,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "/src/a.py",
-            &[r#"Object of type 'Literal["foo"]' is not assignable to 'int'."#],
+            &[r#"Object of type `Literal["foo"]` is not assignable to `int`"#],
         );
     }
 
@@ -6317,7 +6317,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "/src/a.py",
-            &[r#"Object of type 'Literal["foo"]' is not assignable to 'int'."#],
+            &[r#"Object of type `Literal["foo"]` is not assignable to `int`"#],
         );
     }
 
@@ -6369,7 +6369,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "/src/a.py",
-            &[r"Cannot declare type 'str' for inferred type 'Literal[1]'."],
+            &[r"Cannot declare type `str` for inferred type `Literal[1]`"],
         );
     }
 
@@ -6392,7 +6392,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "/src/a.py",
-            &[r"Conflicting declared types for 'x': str, int."],
+            &[r"Conflicting declared types for `x`: str, int"],
         );
     }
 
@@ -6413,7 +6413,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "/src/a.py",
-            &[r"Conflicting declared types for 'x': Unknown, int."],
+            &[r"Conflicting declared types for `x`: Unknown, int"],
         );
     }
 
@@ -6437,8 +6437,8 @@ mod tests {
             &db,
             "/src/a.py",
             &[
-                r"Conflicting declared types for 'x': str, int.",
-                r#"Object of type 'Literal[b"foo"]' is not assignable to 'str | int'."#,
+                r"Conflicting declared types for `x`: str, int",
+                r#"Object of type `Literal[b"foo"]` is not assignable to `str | int`"#,
             ],
         );
     }
@@ -6460,7 +6460,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "/src/a.py",
-            &[r"Conflicting declared types for 'x': Unknown, int."],
+            &[r"Conflicting declared types for `x`: Unknown, int"],
         );
     }
 
@@ -6499,7 +6499,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "/src/a.py",
-            &["Implicit shadowing of function 'f'; annotate to make it explicit if this is intentional."],
+            &["Implicit shadowing of function `f`; annotate to make it explicit if this is intentional"],
         );
     }
 
@@ -6519,7 +6519,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "/src/a.py",
-            &["Implicit shadowing of class 'C'; annotate to make it explicit if this is intentional."],
+            &["Implicit shadowing of class `C`; annotate to make it explicit if this is intentional"],
         );
     }
 
@@ -6574,7 +6574,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "/src/a.py",
-            &[r#"Object of type 'Literal["foo"]' is not assignable to 'int'."#],
+            &[r#"Object of type `Literal["foo"]` is not assignable to `int`"#],
         );
     }
 
@@ -6755,7 +6755,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "src/a.py",
-            &["Index 4 is out of bounds for tuple of type 'tuple[Literal[1], Literal[\"a\"], Literal[\"b\"]]' with length 3.", "Index -4 is out of bounds for tuple of type 'tuple[Literal[1], Literal[\"a\"], Literal[\"b\"]]' with length 3."],
+            &["Index 4 is out of bounds for tuple of type `tuple[Literal[1], Literal[\"a\"], Literal[\"b\"]]` with length 3", "Index -4 is out of bounds for tuple of type `tuple[Literal[1], Literal[\"a\"], Literal[\"b\"]]` with length 3"],
         );
 
         Ok(())
@@ -6790,8 +6790,8 @@ mod tests {
             &db,
             "src/a.py",
             &[
-                "Index 8 is out of bounds for string 'Literal[\"abcde\"]' with length 5.",
-                "Index -8 is out of bounds for string 'Literal[\"abcde\"]' with length 5.",
+                "Index 8 is out of bounds for string `Literal[\"abcde\"]` with length 5",
+                "Index -8 is out of bounds for string `Literal[\"abcde\"]` with length 5",
             ],
         );
 
@@ -6816,7 +6816,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "/src/a.py",
-            &["Cannot subscript object of type 'NotSubscriptable' with no `__getitem__` method."],
+            &["Cannot subscript object of type `NotSubscriptable` with no `__getitem__` method"],
         );
 
         Ok(())
@@ -6840,7 +6840,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "/src/a.py",
-            &["Cannot subscript object of type 'Literal[NotSubscriptable]' with no `__class_getitem__` method."],
+            &["Cannot subscript object of type `Literal[NotSubscriptable]` with no `__class_getitem__` method"],
         );
 
         Ok(())
@@ -6864,7 +6864,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "/src/a.py",
-            &["Method `__getitem__` of type 'None' is not callable on object of type 'NotSubscriptable'."],
+            &["Method `__getitem__` of type `None` is not callable on object of type `NotSubscriptable`"],
         );
 
         Ok(())
@@ -7039,7 +7039,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "/src/a.py",
-            &["Method `__class_getitem__` of type 'Literal[__class_getitem__] | Unbound' is not callable on object of type 'Literal[Identity, Identity]'."],
+            &["Method `__class_getitem__` of type `Literal[__class_getitem__] | Unbound` is not callable on object of type `Literal[Identity, Identity]`"],
         );
 
         Ok(())
@@ -7071,7 +7071,7 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "/src/a.py",
-            &["Cannot subscript object of type 'Literal[Identity] | Literal[1]' with no `__getitem__` method."],
+            &["Cannot subscript object of type `Literal[Identity] | Literal[1]` with no `__getitem__` method"],
         );
 
         Ok(())
@@ -7103,7 +7103,7 @@ mod tests {
         assert_public_ty(&db, "/src/a.py", "a", "float");
         assert_public_ty(&db, "/src/a.py", "b", "Unknown");
 
-        assert_file_diagnostics(&db, "src/a.py", &["Object of type 'Unit' is not callable."]);
+        assert_file_diagnostics(&db, "src/a.py", &["Object of type `Unit` is not callable"]);
 
         Ok(())
     }
