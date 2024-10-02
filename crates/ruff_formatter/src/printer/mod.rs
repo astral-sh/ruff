@@ -1718,7 +1718,7 @@ mod tests {
                 token("b"),
                 soft_block_indent(&format_args!(
                     token("c"),
-                    soft_block_indent(&format_args!(token("d"), soft_line_break(), token("d"),)),
+                    soft_block_indent(&format_args!(token("d"), soft_line_break(), token("d"))),
                     token("c"),
                 )),
                 token("b"),

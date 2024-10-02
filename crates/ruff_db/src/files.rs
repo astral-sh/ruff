@@ -406,7 +406,7 @@ impl File {
         };
 
         if file.status(db) != status {
-            tracing::debug!("Updating the status of `{}`", file.path(db),);
+            tracing::debug!("Updating the status of `{}`", file.path(db));
             file.set_status(db).to(status);
         }
 
@@ -416,7 +416,7 @@ impl File {
         }
 
         if file.permissions(db) != permission {
-            tracing::debug!("Updating the permissions of `{}`", file.path(db),);
+            tracing::debug!("Updating the permissions of `{}`", file.path(db));
             file.set_permissions(db).to(permission);
         }
     }

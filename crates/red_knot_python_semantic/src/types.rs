@@ -169,7 +169,7 @@ fn bindings_ty<'db>(
 
     let first = all_types
         .next()
-        .expect("bindings_ty should never be called with zero definitions and no unbound_ty.");
+        .expect("bindings_ty should never be called with zero definitions and no unbound_ty");
 
     if let Some(second) = all_types.next() {
         UnionType::from_elements(db, [first, second].into_iter().chain(all_types))
@@ -204,7 +204,7 @@ fn declarations_ty<'db>(
     let mut all_types = undeclared_ty.into_iter().chain(decl_types);
 
     let first = all_types.next().expect(
-        "declarations_ty must not be called with zero declarations and no may-be-undeclared.",
+        "declarations_ty must not be called with zero declarations and no may-be-undeclared",
     );
 
     let mut conflicting: Vec<Type<'db>> = vec![];
@@ -917,7 +917,7 @@ impl<'db> CallOutcome<'db> {
                     node,
                     "call-non-callable",
                     format_args!(
-                        "Object of type `{}` is not callable.",
+                        "Object of type `{}` is not callable",
                         not_callable_ty.display(db)
                     ),
                 );
@@ -932,7 +932,7 @@ impl<'db> CallOutcome<'db> {
                     node,
                     "call-non-callable",
                     format_args!(
-                        "Object of type `{}` is not callable (due to union element `{}`).",
+                        "Object of type `{}` is not callable (due to union element `{}`)",
                         called_ty.display(db),
                         not_callable_ty.display(db),
                     ),
@@ -948,7 +948,7 @@ impl<'db> CallOutcome<'db> {
                     node,
                     "call-non-callable",
                     format_args!(
-                        "Object of type `{}` is not callable (due to union elements {}).",
+                        "Object of type `{}` is not callable (due to union elements {})",
                         called_ty.display(db),
                         not_callable_tys.display(db),
                     ),
@@ -974,7 +974,7 @@ impl<'db> CallOutcome<'db> {
                 builder.add_diagnostic(
                     node,
                     "revealed-type",
-                    format_args!("Revealed type is `{}`.", revealed_ty.display(db)),
+                    format_args!("Revealed type is `{}`", revealed_ty.display(db)),
                 );
                 Ok(*return_ty)
             }

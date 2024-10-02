@@ -174,7 +174,7 @@ fn run() -> anyhow::Result<ExitStatus> {
                 Ok(SystemPath::absolute(cwd, &cli_base_path))
             } else {
                 Err(anyhow!(
-                    "Provided current-directory path '{cwd}' is not a directory."
+                    "Provided current-directory path `{cwd}` is not a directory"
                 ))
             }
         })

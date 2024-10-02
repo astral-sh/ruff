@@ -36,14 +36,14 @@ pub(crate) fn resolve_module_query<'db>(
     let _span = tracing::trace_span!("resolve_module", %name).entered();
 
     let Some((search_path, module_file, kind)) = resolve_name(db, name) else {
-        tracing::debug!("Module '{name}' not found in the search paths.");
+        tracing::debug!("Module `{name}` not found in search paths");
         return None;
     };
 
     let module = Module::new(name.clone(), kind, search_path, module_file);
 
     tracing::trace!(
-        "Resolved module '{name}' to '{path}'.",
+        "Resolved module `{name}` to `{path}`",
         path = module_file.path(db)
     );
 
@@ -324,7 +324,7 @@ pub(crate) fn dynamic_resolution_paths(db: &dyn Db) -> Vec<SearchPath> {
 
         let site_packages_root = files
             .root(db.upcast(), site_packages_dir)
-            .expect("Site-package root to have been created.");
+            .expect("Site-package root to have been created");
 
         // This query needs to be re-executed each time a `.pth` file
         // is added, modified or removed from the `site-packages` directory.
