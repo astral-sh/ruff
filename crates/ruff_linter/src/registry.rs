@@ -265,6 +265,7 @@ impl Rule {
             | Rule::CommentedOutCode
             | Rule::EmptyComment
             | Rule::ExtraneousParentheses
+            | Rule::FStringSingleQuotes
             | Rule::InvalidCharacterBackspace
             | Rule::InvalidCharacterEsc
             | Rule::InvalidCharacterNul
