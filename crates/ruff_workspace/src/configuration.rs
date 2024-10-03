@@ -303,7 +303,6 @@ impl Configuration {
                     .unwrap_or_else(|| TASK_TAGS.iter().map(ToString::to_string).collect()),
                 logger_objects: lint.logger_objects.unwrap_or_default(),
                 typing_modules: lint.typing_modules.unwrap_or_default(),
-                allowed_unused_imports: lint.allowed_unused_imports.unwrap_or_default(),
                 // Plugins
                 flake8_annotations: lint
                     .flake8_annotations

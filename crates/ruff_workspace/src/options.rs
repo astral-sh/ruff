@@ -2822,12 +2822,28 @@ pub struct PyflakesOptions {
         example = "extend-generics = [\"django.db.models.ForeignKey\"]"
     )]
     pub extend_generics: Option<Vec<String>>,
+
+    /// A list of modules to ignore when considering unused imports.
+    ///
+    /// Used to prevent violations for specific modules that are known to have side effects on
+    /// import (e.g., `hvplot.pandas`).
+    ///
+    /// Modules in this list are expected to be fully-qualified names (e.g., `hvplot.pandas`). Any
+    /// submodule of a given module will also be ignored (e.g., given `hvplot`, `hvplot.pandas`
+    /// will also be ignored).
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"allowed-unused-imports = ["hvplot.pandas"]"#
+    )]
+    pub ignore_unused_imports: Option<Vec<String>>,
 }
 
 impl PyflakesOptions {
     pub fn into_settings(self) -> pyflakes::settings::Settings {
         pyflakes::settings::Settings {
             extend_generics: self.extend_generics.unwrap_or_default(),
+            ignore_unused_imports: self.ignore_unused_imports.unwrap_or_default(),
         }
     }
 }

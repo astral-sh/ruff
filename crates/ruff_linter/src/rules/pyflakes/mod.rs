@@ -332,7 +332,10 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyflakes").join(path).as_path(),
             &LinterSettings {
-                allowed_unused_imports: vec!["hvplot.pandas".to_string()],
+                pyflakes: pyflakes::settings::Settings {
+                    ignore_unused_imports: vec!["hvplot.pandas".to_string()],
+                    ..pyflakes::settings::Settings::default()
+                },
                 ..LinterSettings::for_rule(rule_code)
             },
         )?;
@@ -439,7 +442,7 @@ mod tests {
             Path::new("pyflakes/project/foo/bar.py"),
             &LinterSettings {
                 typing_modules: vec!["foo.typical".to_string()],
-                ..LinterSettings::for_rules(vec![Rule::UndefinedName])
+                ..LinterSettings::for_rule(Rule::UndefinedName)
             },
         )?;
         assert_messages!(diagnostics);
@@ -452,7 +455,7 @@ mod tests {
             Path::new("pyflakes/project/foo/bop/baz.py"),
             &LinterSettings {
                 typing_modules: vec!["foo.typical".to_string()],
-                ..LinterSettings::for_rules(vec![Rule::UndefinedName])
+                ..LinterSettings::for_rule(Rule::UndefinedName)
             },
         )?;
         assert_messages!(diagnostics);
@@ -467,8 +470,9 @@ mod tests {
             &LinterSettings {
                 pyflakes: pyflakes::settings::Settings {
                     extend_generics: vec!["django.db.models.ForeignKey".to_string()],
+                    ..pyflakes::settings::Settings::default()
                 },
-                ..LinterSettings::for_rules(vec![Rule::UnusedImport])
+                ..LinterSettings::for_rule(Rule::UnusedImport)
             },
         )?;
         assert_messages!(snapshot, diagnostics);
