@@ -2133,10 +2133,17 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "once_cell",
+ "red_knot_python_semantic",
+ "red_knot_vendored",
  "regex",
+ "ruff_db",
  "ruff_index",
  "ruff_python_trivia",
+ "ruff_source_file",
+ "ruff_text_size",
  "rustc-hash 2.0.0",
+ "salsa",
+ "smallvec",
 ]
 
 [[package]]

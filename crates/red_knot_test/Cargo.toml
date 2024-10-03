@@ -13,10 +13,17 @@ license.workspace = true
 [dependencies]
 anyhow = { workspace = true }
 once_cell = { workspace = true }
+red_knot_python_semantic = { workspace = true }
+red_knot_vendored = { workspace = true }
 regex = { workspace = true }
+ruff_db = { workspace = true }
 ruff_index = { workspace = true }
 ruff_python_trivia = { workspace = true }
+ruff_source_file = { workspace = true }
+ruff_text_size = { workspace = true }
 rustc-hash = { workspace = true }
+salsa = { workspace = true }
+smallvec = { workspace = true }
 
 [dev-dependencies]
 
