@@ -1,10 +1,7 @@
-// TODO remove
-#![allow(dead_code)]
-
 use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 use ruff_index::{newtype_index, IndexVec};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 pub(crate) fn parse<'s>(path: &'s str, source: &'s str) -> anyhow::Result<MarkdownTestSuite<'s>> {
     let parser = Parser::new(path, source);
@@ -30,7 +27,7 @@ pub(crate) struct MarkdownTestSuite<'s> {
 }
 
 impl<'s> MarkdownTestSuite<'s> {
-    fn tests<'m>(&'m self) -> MarkdownTestIterator<'m, 's> {
+    pub(crate) fn tests<'m>(&'m self) -> MarkdownTestIterator<'m, 's> {
         MarkdownTestIterator {
             suite: self,
             current_file_index: 0,
@@ -100,9 +97,9 @@ struct Section<'s> {
 #[derive(Debug)]
 pub(crate) struct File<'s> {
     section: SectionId,
-    path: &'s str,
-    lang: &'s str,
-    code: &'s str,
+    pub(crate) path: &'s str,
+    pub(crate) lang: &'s str,
+    pub(crate) code: &'s str,
 }
 
 static HEADER_RE: Lazy<Regex> =
@@ -129,7 +126,7 @@ struct Parser<'s> {
     stack: Vec<SectionId>,
 
     /// True if current active section (last in stack) has files.
-    current_section_has_files: bool,
+    current_section_files: Option<FxHashSet<&'s str>>,
 }
 
 impl<'s> Parser<'s> {
@@ -145,7 +142,7 @@ impl<'s> Parser<'s> {
             files: IndexVec::default(),
             rest: source,
             stack: vec![root_section_id],
-            current_section_has_files: false,
+            current_section_files: None,
         }
     }
 
@@ -180,7 +177,7 @@ impl<'s> Parser<'s> {
                     parent_id: Some(*parent),
                 };
 
-                if self.current_section_has_files {
+                if self.current_section_files.is_some() {
                     return Err(anyhow::anyhow!(
                         "Header '{}' not valid inside a test case; parent '{}' has code files.",
                         section.title,
@@ -191,7 +188,7 @@ impl<'s> Parser<'s> {
                 let section_id = self.sections.push(section);
                 self.stack.push(section_id);
 
-                self.current_section_has_files = false;
+                self.current_section_files = None;
             } else if let Some(caps) = self.scan(&CODE_RE) {
                 // We never pop the implicit root section.
                 let parent = self.stack.last().unwrap();
@@ -212,15 +209,28 @@ impl<'s> Parser<'s> {
                     }
                 }
 
+                let path = config.get("path").unwrap_or(&"test.py");
+
                 self.files.push(File {
+                    path,
                     section: *parent,
-                    path: config.get("path").unwrap_or(&"test.py"),
                     // CODE_RE can't match without matches for 'lang' and 'code'.
                     lang: caps.name("lang").unwrap().into(),
                     code: caps.name("code").unwrap().into(),
                 });
 
-                self.current_section_has_files = true;
+                if let Some(current_files) = &mut self.current_section_files {
+                    if current_files.contains(*path) {
+                        let current = &self.sections[*self.stack.last().unwrap()];
+                        return Err(anyhow::anyhow!(
+                            "Test `{}` has duplicate files named `{path}`.",
+                            current.title
+                        ));
+                    }
+                    current_files.insert(*path);
+                } else {
+                    self.current_section_files = Some(FxHashSet::from_iter([*path]));
+                }
             } else {
                 self.scan(&IGNORE_RE);
             }
@@ -236,7 +246,9 @@ impl<'s> Parser<'s> {
             .is_some_and(|section_id| level <= self.sections[*section_id].level)
         {
             self.stack.pop();
-            self.current_section_has_files = false;
+            // We would have errored before pushing a child section if there were files, so we know
+            // no parent section can have files.
+            self.current_section_files = None;
         }
     }
 
@@ -427,6 +439,28 @@ mod tests {
         assert!(
             mf.as_ref()
                 .is_err_and(|err| err.to_string() == "Invalid config item `foo=bar=baz`."),
+            "Unexpected parse result: {mf:?}",
+        );
+    }
+
+    #[test]
+    fn no_duplicate_name_files_in_test() {
+        let source = dedent(
+            "
+            ```py
+            x = 1
+            ```
+
+            ```py
+            y = 2
+            ```
+            ",
+        );
+        let mf = super::parse("file.md", &source);
+        assert!(
+            mf.as_ref().is_err_and(
+                |err| err.to_string() == "Test `file.md` has duplicate files named `test.py`."
+            ),
             "Unexpected parse result: {mf:?}",
         );
     }

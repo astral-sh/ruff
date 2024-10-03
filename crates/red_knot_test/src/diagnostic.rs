@@ -1,9 +1,6 @@
 //! Sort and group diagnostics by line number, so they can be correlated with assertions.
 //!
 //! We don't assume that we will get the diagnostics in source order.
-// TODO remove
-#![allow(dead_code)]
-
 use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::Ranged;
 use smallvec::SmallVec;
@@ -77,6 +74,12 @@ pub(crate) struct LineDiagnostics<T> {
 
     /// Diagnostics starting on this line.
     pub(crate) diagnostics: DiagnosticVec<T>,
+}
+
+impl<'a, T> From<&'a LineDiagnostics<T>> for &'a [T] {
+    fn from(value: &'a LineDiagnostics<T>) -> Self {
+        &value.diagnostics[..]
+    }
 }
 
 #[derive(Debug)]

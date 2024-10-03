@@ -33,9 +33,6 @@
 //! # Type: Unbound
 //! reveal_type(x)
 //! ```
-// TODO remove
-#![allow(dead_code)]
-
 use crate::db::TestDb;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -220,6 +217,12 @@ pub(crate) struct LineAssertions<'a> {
 
     /// The assertions referring to this line.
     pub(crate) assertions: AssertionVec<'a>,
+}
+
+impl<'a, 'b> From<&'a LineAssertions<'b>> for &'a [Assertion<'b>] {
+    fn from(value: &'a LineAssertions<'b>) -> Self {
+        &value.assertions[..]
+    }
 }
 
 static TYPE_RE: Lazy<Regex> =

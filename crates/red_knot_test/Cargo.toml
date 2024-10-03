@@ -13,9 +13,11 @@ license.workspace = true
 [dependencies]
 anyhow = { workspace = true }
 once_cell = { workspace = true }
+ordermap = { workspace = true }
 red_knot_python_semantic = { workspace = true }
 red_knot_vendored = { workspace = true }
 regex = { workspace = true }
+rstest = { workspace = true }
 ruff_db = { workspace = true }
 ruff_index = { workspace = true }
 ruff_python_trivia = { workspace = true }

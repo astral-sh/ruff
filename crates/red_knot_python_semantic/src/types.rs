@@ -17,7 +17,7 @@ use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet, Module};
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
-pub(crate) use self::diagnostic::TypeCheckDiagnostics;
+pub use self::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 pub(crate) use self::display::TypeArrayDisplay;
 pub(crate) use self::infer::{
     infer_deferred_types, infer_definition_types, infer_expression_types, infer_scope_types,

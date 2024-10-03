@@ -3684,28 +3684,6 @@ mod tests {
     }
 
     #[test]
-    fn number_literal() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            a = 1
-            b = 9223372036854775808
-            c = 1.45
-            d = 2j
-            ",
-        )?;
-
-        assert_public_ty(&db, "src/a.py", "a", "Literal[1]");
-        assert_public_ty(&db, "src/a.py", "b", "int");
-        assert_public_ty(&db, "src/a.py", "c", "float");
-        assert_public_ty(&db, "src/a.py", "d", "complex");
-
-        Ok(())
-    }
-
-    #[test]
     fn negated_int_literal() -> anyhow::Result<()> {
         let mut db = setup_db();
 

@@ -115,6 +115,7 @@ quote = { version = "1.0.23" }
 rand = { version = "0.8.5" }
 rayon = { version = "1.10.0" }
 regex = { version = "1.10.2" }
+rstest = { version = "0.22.0" }
 rustc-hash = { version = "2.0.0" }
 salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "4a7c955255e707e64e43f3ce5eabb771ae067768" }
 schemars = { version = "0.8.16" }

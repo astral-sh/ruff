@@ -1,6 +1,3 @@
-// TODO remove
-#![allow(dead_code)]
-
 use red_knot_python_semantic::{Db, Program, ProgramSettings, PythonVersion, SearchPathSettings};
 use ruff_db::files::{File, Files};
 use ruff_db::system::SystemPathBuf;
