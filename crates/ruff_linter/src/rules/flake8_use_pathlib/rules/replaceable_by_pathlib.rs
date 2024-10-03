@@ -1,5 +1,7 @@
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
-use ruff_python_ast::{Expr, ExprBooleanLiteral, ExprCall};
+use ruff_python_ast::{self as ast, Expr, ExprBooleanLiteral, ExprCall};
+use ruff_python_semantic::analyze::typing;
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -124,6 +126,10 @@ pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, call: &ExprCall) {
                         .arguments
                         .find_argument("opener", 7)
                         .is_some_and(|expr| !expr.is_none_literal_expr())
+                    || call
+                        .arguments
+                        .find_positional(0)
+                        .is_some_and(|expr| is_file_descriptor(expr, checker.semantic()))
                 {
                     return None;
                 }
@@ -158,4 +164,27 @@ pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, call: &ExprCall) {
             checker.diagnostics.push(diagnostic);
         }
     }
+}
+
+/// Returns `true` if the given expression looks like a file descriptor, i.e., if it is an integer.
+fn is_file_descriptor(expr: &Expr, semantic: &SemanticModel) -> bool {
+    if matches!(
+        expr,
+        Expr::NumberLiteral(ast::ExprNumberLiteral {
+            value: ast::Number::Int(_),
+            ..
+        })
+    ) {
+        return true;
+    };
+
+    let Some(name) = expr.as_name_expr() else {
+        return false;
+    };
+
+    let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
+        return false;
+    };
+
+    typing::is_int(binding, semantic)
 }

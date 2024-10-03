@@ -46,3 +46,12 @@ open(p, opener=opener)
 open(p, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 open(p, 'r', - 1, None, None, None, True, None)
 open(p, 'r', - 1, None, None, None, False, opener)
+
+# Cannot be upgraded `pathlib.Open` does not support fds
+# See https://github.com/astral-sh/ruff/issues/12871
+open(1)
+open(1, "w")
+x = 2
+open(x)
+def foo(y: int):
+    open(y)
