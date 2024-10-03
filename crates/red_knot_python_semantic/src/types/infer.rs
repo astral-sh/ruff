@@ -2604,13 +2604,32 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Type::IntLiteral(i64::from(b)),
                 ),
             // Lookup the rich comparison `__dunder__` methods on instances
-            (Type::Instance(left_class_ty), Type::Instance(right_class_ty)) => match op {
-                ast::CmpOp::Lt => {
-                    perform_rich_comparison(self.db, left_class_ty, right_class_ty, "__lt__")
-                }
-                // TODO: implement mapping from `ast::CmpOp` to rich comparison methods
-                _ => Some(Type::Todo),
-            },
+            (Type::Instance(left_class_ty), Type::Instance(right_class_ty)) => {
+                let dunder_name = match op {
+                    ast::CmpOp::Lt => "__lt__",
+                    ast::CmpOp::LtE => "__le__",
+                    ast::CmpOp::Eq => "__eq__",
+                    ast::CmpOp::NotEq => "__ne__",
+                    ast::CmpOp::Gt => "__gt__",
+                    ast::CmpOp::GtE => "__ge__",
+                    ast::CmpOp::In => "__contains__",
+                    ast::CmpOp::NotIn => "__contains__",
+                    ast::CmpOp::Is | ast::CmpOp::IsNot => {
+                        return Some(builtins_symbol_ty(self.db, "bool").to_instance(self.db))
+                    }
+                };
+                perform_rich_comparison(self.db, left_class_ty, right_class_ty, dunder_name).map(
+                    |ty| {
+                        // `not in` is a special case as it's the negation of `__contains__`, and
+                        // it always returns a bool (not an arbitrary type).
+                        if matches!(op, ast::CmpOp::NotIn) {
+                            ty.bool(self.db).negate().into_type(self.db)
+                        } else {
+                            ty
+                        }
+                    },
+                )
+            }
             // TODO: handle more types
             _ => Some(Type::Todo),
         }
@@ -3148,7 +3167,6 @@ fn perform_rich_comparison<'db>(
     //
     // TODO: the reflected dunder actually has priority if the r.h.s. is a strict subclass of the
     // l.h.s.
-    // TODO: `object.__ne__` will call `__eq__` if `__ne__` is not defined
 
     let dunder = left.class_member(db, dunder_name);
     if !dunder.is_unbound() {
@@ -3159,8 +3177,31 @@ fn perform_rich_comparison<'db>(
             .return_ty(db);
     }
 
-    // TODO: reflected dunder -- (==, ==), (!=, !=), (<, >), (>, <), (<=, >=), (>=, <=)
-    None
+    let reflected_dunder_name = match dunder_name {
+        "__eq__" => "__eq__", // (==, ==)
+        "__ne__" => "__ne__", // (==, ==)
+        "__lt__" => "__ge__", // (<, >=)
+        "__gt__" => "__le__", // (>, <=)
+        "__le__" => "__gt__", // (<=, >)
+        "__ge__" => "__lt__", // (>=, <)
+        _ => return None,
+    };
+    let dunder = right.class_member(db, reflected_dunder_name);
+    if !dunder.is_unbound() {
+        return dunder
+            .call(db, &[Type::Instance(left), Type::Instance(right)])
+            .return_ty(db);
+    }
+
+    // Special case: `object.__ne__` (default implementation) will call `__eq__` if not defined.
+    if dunder_name == "__ne__" {
+        // While `__eq__` can be any type, `object.__eq__` is implemented as a bool, which means
+        // we'll error on any implementation that returns a non-bool type.
+        perform_rich_comparison(db, left, right, "__eq__")
+            .map(|ty| ty.bool(db).negate().into_type(db))
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
