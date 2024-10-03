@@ -11,7 +11,7 @@ FURB118.py:2:13: FURB118 [*] Use `operator.invert` instead of defining a lambda
   |
   = help: Replace with `operator.invert`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1 1 | # Errors.
 2   |-op_bitnot = lambda x: ~x
   2 |+import operator
@@ -31,7 +31,7 @@ FURB118.py:3:10: FURB118 [*] Use `operator.not_` instead of defining a lambda
   |
   = help: Replace with `operator.not_`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1 1 | # Errors.
   2 |+import operator
 2 3 | op_bitnot = lambda x: ~x
@@ -51,7 +51,7 @@ FURB118.py:4:10: FURB118 [*] Use `operator.pos` instead of defining a lambda
   |
   = help: Replace with `operator.pos`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1 1 | # Errors.
   2 |+import operator
 2 3 | op_bitnot = lambda x: ~x
@@ -73,7 +73,7 @@ FURB118.py:5:10: FURB118 [*] Use `operator.neg` instead of defining a lambda
   |
   = help: Replace with `operator.neg`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1 1 | # Errors.
   2 |+import operator
 2 3 | op_bitnot = lambda x: ~x
@@ -96,7 +96,7 @@ FURB118.py:7:10: FURB118 [*] Use `operator.add` instead of defining a lambda
   |
   = help: Replace with `operator.add`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1 1 | # Errors.
   2 |+import operator
 2 3 | op_bitnot = lambda x: ~x
@@ -120,7 +120,7 @@ FURB118.py:8:10: FURB118 [*] Use `operator.sub` instead of defining a lambda
    |
    = help: Replace with `operator.sub`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1  1  | # Errors.
    2  |+import operator
 2  3  | op_bitnot = lambda x: ~x
@@ -146,7 +146,7 @@ FURB118.py:9:11: FURB118 [*] Use `operator.mul` instead of defining a lambda
    |
    = help: Replace with `operator.mul`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1  1  | # Errors.
    2  |+import operator
 2  3  | op_bitnot = lambda x: ~x
@@ -173,7 +173,7 @@ FURB118.py:10:14: FURB118 [*] Use `operator.matmul` instead of defining a lambda
    |
    = help: Replace with `operator.matmul`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1  1  | # Errors.
    2  |+import operator
 2  3  | op_bitnot = lambda x: ~x
@@ -200,7 +200,7 @@ FURB118.py:11:14: FURB118 [*] Use `operator.truediv` instead of defining a lambd
    |
    = help: Replace with `operator.truediv`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1  1  | # Errors.
    2  |+import operator
 2  3  | op_bitnot = lambda x: ~x
@@ -227,7 +227,7 @@ FURB118.py:12:10: FURB118 [*] Use `operator.mod` instead of defining a lambda
    |
    = help: Replace with `operator.mod`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1  1  | # Errors.
    2  |+import operator
 2  3  | op_bitnot = lambda x: ~x
@@ -254,7 +254,7 @@ FURB118.py:13:10: FURB118 [*] Use `operator.pow` instead of defining a lambda
    |
    = help: Replace with `operator.pow`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1  1  | # Errors.
    2  |+import operator
 2  3  | op_bitnot = lambda x: ~x
@@ -281,7 +281,7 @@ FURB118.py:14:13: FURB118 [*] Use `operator.lshift` instead of defining a lambda
    |
    = help: Replace with `operator.lshift`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1  1  | # Errors.
    2  |+import operator
 2  3  | op_bitnot = lambda x: ~x
@@ -308,7 +308,7 @@ FURB118.py:15:13: FURB118 [*] Use `operator.rshift` instead of defining a lambda
    |
    = help: Replace with `operator.rshift`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1  1  | # Errors.
    2  |+import operator
 2  3  | op_bitnot = lambda x: ~x
@@ -335,7 +335,7 @@ FURB118.py:16:12: FURB118 [*] Use `operator.or_` instead of defining a lambda
    |
    = help: Replace with `operator.or_`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1  1  | # Errors.
    2  |+import operator
 2  3  | op_bitnot = lambda x: ~x
@@ -362,7 +362,7 @@ FURB118.py:17:10: FURB118 [*] Use `operator.xor` instead of defining a lambda
    |
    = help: Replace with `operator.xor`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1  1  | # Errors.
    2  |+import operator
 2  3  | op_bitnot = lambda x: ~x
@@ -388,7 +388,7 @@ FURB118.py:18:13: FURB118 [*] Use `operator.and_` instead of defining a lambda
    |
    = help: Replace with `operator.and_`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1  1  | # Errors.
    2  |+import operator
 2  3  | op_bitnot = lambda x: ~x
@@ -415,7 +415,7 @@ FURB118.py:19:15: FURB118 [*] Use `operator.floordiv` instead of defining a lamb
    |
    = help: Replace with `operator.floordiv`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1  1  | # Errors.
    2  |+import operator
 2  3  | op_bitnot = lambda x: ~x
@@ -442,7 +442,7 @@ FURB118.py:21:9: FURB118 [*] Use `operator.eq` instead of defining a lambda
    |
    = help: Replace with `operator.eq`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1  1  | # Errors.
    2  |+import operator
 2  3  | op_bitnot = lambda x: ~x
@@ -468,7 +468,7 @@ FURB118.py:22:9: FURB118 [*] Use `operator.ne` instead of defining a lambda
    |
    = help: Replace with `operator.ne`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1  1  | # Errors.
    2  |+import operator
 2  3  | op_bitnot = lambda x: ~x
@@ -495,7 +495,7 @@ FURB118.py:23:9: FURB118 [*] Use `operator.lt` instead of defining a lambda
    |
    = help: Replace with `operator.lt`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1  1  | # Errors.
    2  |+import operator
 2  3  | op_bitnot = lambda x: ~x
@@ -522,7 +522,7 @@ FURB118.py:24:10: FURB118 [*] Use `operator.le` instead of defining a lambda
    |
    = help: Replace with `operator.le`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1  1  | # Errors.
    2  |+import operator
 2  3  | op_bitnot = lambda x: ~x
@@ -549,7 +549,7 @@ FURB118.py:25:9: FURB118 [*] Use `operator.gt` instead of defining a lambda
    |
    = help: Replace with `operator.gt`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1  1  | # Errors.
    2  |+import operator
 2  3  | op_bitnot = lambda x: ~x
@@ -576,7 +576,7 @@ FURB118.py:26:10: FURB118 [*] Use `operator.ge` instead of defining a lambda
    |
    = help: Replace with `operator.ge`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1  1  | # Errors.
    2  |+import operator
 2  3  | op_bitnot = lambda x: ~x
@@ -603,7 +603,7 @@ FURB118.py:27:9: FURB118 [*] Use `operator.is_` instead of defining a lambda
    |
    = help: Replace with `operator.is_`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1  1  | # Errors.
    2  |+import operator
 2  3  | op_bitnot = lambda x: ~x
@@ -630,7 +630,7 @@ FURB118.py:28:12: FURB118 [*] Use `operator.is_not` instead of defining a lambda
    |
    = help: Replace with `operator.is_not`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1  1  | # Errors.
    2  |+import operator
 2  3  | op_bitnot = lambda x: ~x
@@ -657,7 +657,7 @@ FURB118.py:29:9: FURB118 [*] Use `operator.contains` instead of defining a lambd
    |
    = help: Replace with `operator.contains`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1  1  | # Errors.
    2  |+import operator
 2  3  | op_bitnot = lambda x: ~x
@@ -684,7 +684,7 @@ FURB118.py:30:17: FURB118 [*] Use `operator.itemgetter(0)` instead of defining a
    |
    = help: Replace with `operator.itemgetter(0)`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1  1  | # Errors.
    2  |+import operator
 2  3  | op_bitnot = lambda x: ~x
@@ -711,7 +711,7 @@ FURB118.py:31:17: FURB118 [*] Use `operator.itemgetter(0, 1, 2)` instead of defi
    |
    = help: Replace with `operator.itemgetter(0, 1, 2)`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1  1  | # Errors.
    2  |+import operator
 2  3  | op_bitnot = lambda x: ~x
@@ -738,7 +738,7 @@ FURB118.py:32:17: FURB118 [*] Use `operator.itemgetter(slice(1, None), 2)` inste
    |
    = help: Replace with `operator.itemgetter(slice(1, None), 2)`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1  1  | # Errors.
    2  |+import operator
 2  3  | op_bitnot = lambda x: ~x
@@ -765,7 +765,7 @@ FURB118.py:33:17: FURB118 [*] Use `operator.itemgetter(slice(None))` instead of 
    |
    = help: Replace with `operator.itemgetter(slice(None))`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1  1  | # Errors.
    2  |+import operator
 2  3  | op_bitnot = lambda x: ~x
@@ -791,7 +791,7 @@ FURB118.py:34:17: FURB118 [*] Use `operator.itemgetter((0, 1))` instead of defin
    |
    = help: Replace with `operator.itemgetter((0, 1))`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1  1  | # Errors.
    2  |+import operator
 2  3  | op_bitnot = lambda x: ~x
@@ -816,7 +816,7 @@ FURB118.py:35:17: FURB118 [*] Use `operator.itemgetter((0, 1))` instead of defin
    |
    = help: Replace with `operator.itemgetter((0, 1))`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1  1  | # Errors.
    2  |+import operator
 2  3  | op_bitnot = lambda x: ~x
@@ -857,7 +857,7 @@ FURB118.py:88:17: FURB118 [*] Use `operator.itemgetter((slice(None), 1))` instea
    |
    = help: Replace with `operator.itemgetter((slice(None), 1))`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1  1  | # Errors.
    2  |+import operator
 2  3  | op_bitnot = lambda x: ~x
@@ -884,7 +884,7 @@ FURB118.py:89:17: FURB118 [*] Use `operator.itemgetter((1, slice(None)))` instea
    |
    = help: Replace with `operator.itemgetter((1, slice(None)))`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1  1  | # Errors.
    2  |+import operator
 2  3  | op_bitnot = lambda x: ~x
@@ -910,7 +910,7 @@ FURB118.py:92:17: FURB118 [*] Use `operator.itemgetter((1, slice(None)))` instea
    |
    = help: Replace with `operator.itemgetter((1, slice(None)))`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1  1  | # Errors.
    2  |+import operator
 2  3  | op_bitnot = lambda x: ~x
@@ -934,7 +934,7 @@ FURB118.py:95:17: FURB118 [*] Use `operator.itemgetter((1,          2))` instead
    |
    = help: Replace with `operator.itemgetter((1,          2))`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1  1  | # Errors.
    2  |+import operator
 2  3  | op_bitnot = lambda x: ~x
