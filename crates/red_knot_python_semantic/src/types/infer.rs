@@ -2574,16 +2574,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // Undefined for (int, int)
                 ast::CmpOp::In | ast::CmpOp::NotIn => None,
             },
-            (Type::IntLiteral(_), Type::Instance(_)) => self.infer_binary_type_comparison(
-                builtins_symbol_ty(self.db, "int").to_instance(self.db),
-                op,
-                right,
-            ),
-            (Type::Instance(_), Type::IntLiteral(_)) => self.infer_binary_type_comparison(
-                left,
-                op,
-                builtins_symbol_ty(self.db, "int").to_instance(self.db),
-            ),
+            (Type::IntLiteral(_), Type::Instance(_)) => {
+                self.infer_binary_type_comparison(Type::builtin_int_instance(self.db), op, right)
+            }
+            (Type::Instance(_), Type::IntLiteral(_)) => {
+                self.infer_binary_type_comparison(left, op, Type::builtin_int_instance(self.db))
+            }
             // Booleans are coded as integers (False = 0, True = 1)
             (Type::IntLiteral(n), Type::BooleanLiteral(b)) => self.infer_binary_type_comparison(
                 Type::IntLiteral(n),
