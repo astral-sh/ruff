@@ -520,8 +520,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         match left {
             Type::IntLiteral(_) => {}
             Type::Instance(cls)
-                if cls.is_stdlib_symbol(self.db, "builtins", "float")
-                    || cls.is_stdlib_symbol(self.db, "builtins", "int") => {}
+                if matches!(
+                    cls.is_builtin(self.db),
+                    Some(BuiltinType::Float | BuiltinType::Int)
+                ) => {}
             _ => return,
         };
 
@@ -863,11 +865,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             .node_scope(NodeWithScopeRef::Class(class))
             .to_scope_id(self.db, self.file);
 
+        let is_builtin = ClassType::maybe_builtin(self.db, &name.id, &body_scope);
         let class_ty = Type::Class(ClassType::new(
             self.db,
             name.id.clone(),
             definition,
             body_scope,
+            is_builtin,
         ));
 
         self.add_declaration_with_binding(class.into(), definition, class_ty, class_ty);
@@ -1839,7 +1843,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // TODO generic
-        BuiltinsSymbol::Set.to_instance(self.db)
+        BuiltinType::Set.to_instance(self.db)
     }
 
     fn infer_dict_expression(&mut self, dict: &ast::ExprDict) -> Type<'db> {
@@ -1851,7 +1855,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // TODO generic
-        BuiltinsSymbol::Dict.to_instance(self.db)
+        BuiltinType::Dict.to_instance(self.db)
     }
 
     /// Infer the type of the `iter` expression of the first comprehension.

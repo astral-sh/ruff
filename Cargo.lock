@@ -2098,6 +2098,8 @@ dependencies = [
  "salsa",
  "smallvec",
  "static_assertions",
+ "strum",
+ "strum_macros",
  "tempfile",
  "test-case",
  "thiserror",

@@ -1,3 +1,5 @@
+use strum::IntoEnumIterator;
+
 use infer::TypeInferenceBuilder;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
@@ -416,18 +418,18 @@ impl<'db> Type<'db> {
             (Type::Never, _) => true,
             (_, Type::Never) => false,
             (Type::IntLiteral(_), Type::Instance(class))
-                if class.is_stdlib_symbol(db, "builtins", "int") =>
+                if matches!(class.is_builtin(db), Some(BuiltinType::Int)) =>
             {
                 true
             }
             (Type::StringLiteral(_), Type::LiteralString) => true,
             (Type::StringLiteral(_) | Type::LiteralString, Type::Instance(class))
-                if class.is_stdlib_symbol(db, "builtins", "str") =>
+                if matches!(class.is_builtin(db), Some(BuiltinType::Str)) =>
             {
                 true
             }
             (Type::BytesLiteral(_), Type::Instance(class))
-                if class.is_stdlib_symbol(db, "builtins", "bytes") =>
+                if matches!(class.is_builtin(db), Some(BuiltinType::Bytes)) =>
             {
                 true
             }
@@ -435,8 +437,16 @@ impl<'db> Type<'db> {
                 .elements(db)
                 .iter()
                 .any(|&elem_ty| ty.is_subtype_of(db, elem_ty)),
-            (_, Type::Instance(class)) if class.is_stdlib_symbol(db, "builtins", "object") => true,
-            (Type::Instance(class), _) if class.is_stdlib_symbol(db, "builtins", "object") => false,
+            (_, Type::Instance(class))
+                if matches!(class.is_builtin(db), Some(BuiltinType::Object)) =>
+            {
+                true
+            }
+            (Type::Instance(class), _)
+                if matches!(class.is_builtin(db), Some(BuiltinType::Object)) =>
+            {
+                false
+            }
             // TODO
             _ => false,
         }
@@ -602,16 +612,15 @@ impl<'db> Type<'db> {
 
             // TODO annotated return type on `__new__` or metaclass `__call__`
             Type::Class(class) => {
-                // If the class is the builtin-bool class (for example `bool(1)`), we try to return
-                // the specific truthiness value of the input arg, `Literal[True]` for the example above.
-                let is_bool = class.is_stdlib_symbol(db, "builtins", "bool");
-                CallOutcome::callable(if is_bool {
-                    arg_types
+                CallOutcome::callable(match class.is_builtin(db) {
+                    // If the class is the builtin-bool class (for example `bool(1)`), we try to
+                    // return the specific truthiness value of the input arg, `Literal[True]` for
+                    // the example above.
+                    Some(BuiltinType::Bool) => arg_types
                         .first()
                         .map(|arg| arg.bool(db).into_type(db))
-                        .unwrap_or(Type::BooleanLiteral(false))
-                } else {
-                    Type::Instance(class)
+                        .unwrap_or(Type::BooleanLiteral(false)),
+                    _ => Type::Instance(class),
                 })
             }
 
@@ -821,6 +830,7 @@ impl<'db> From<&Type<'db>> for Type<'db> {
 ///
 /// Feel free to expend this enum if you ever find yourself using the same builtin type in multiple
 /// places.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, strum_macros::EnumIter)]
 pub enum BuiltinType {
     Bool,
     Object,
@@ -856,6 +866,10 @@ impl<'db> BuiltinType {
 
     pub fn to_class(&self, db: &'db dyn Db) -> Type<'db> {
         builtins_symbol_ty(db, self.as_str())
+    }
+
+    pub fn from_name(name: &str) -> Option<Self> {
+        BuiltinType::iter().find(|&builtin| builtin.as_str() == name)
     }
 }
 
@@ -1255,9 +1269,26 @@ pub struct ClassType<'db> {
     definition: Definition<'db>,
 
     body_scope: ScopeId<'db>,
+
+    is_builtin: Option<BuiltinType>,
 }
 
 impl<'db> ClassType<'db> {
+    /// Find if a class is a builtin type.
+    pub fn maybe_builtin(
+        db: &'db dyn Db,
+        name: &ast::name::Name,
+        body_scope: &ScopeId<'db>,
+    ) -> Option<BuiltinType> {
+        if file_to_module(db, body_scope.file(db)).is_some_and(|module| {
+            module.search_path().is_standard_library() && module.name() == "builtins"
+        }) {
+            BuiltinType::from_name(name.as_str())
+        } else {
+            None
+        }
+    }
+
     /// Return true if this class is a standard library type with given module name and name.
     pub(crate) fn is_stdlib_symbol(self, db: &'db dyn Db, module_name: &str, name: &str) -> bool {
         name == self.name(db)
