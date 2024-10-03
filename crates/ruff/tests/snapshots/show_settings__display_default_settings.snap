@@ -220,7 +220,6 @@ linter.task_tags = [
 	XXX,
 ]
 linter.typing_modules = []
-linter.allowed_unused_imports = []
 
 # Linter Plugins
 linter.flake8_annotations.mypy_init_return = false
@@ -360,6 +359,7 @@ linter.pycodestyle.max_line_length = 88
 linter.pycodestyle.max_doc_length = none
 linter.pycodestyle.ignore_overlong_task_comments = false
 linter.pyflakes.extend_generics = []
+linter.pyflakes.allowed_unused_imports = []
 linter.pylint.allow_magic_value_types = [
 	str,
 	bytes,

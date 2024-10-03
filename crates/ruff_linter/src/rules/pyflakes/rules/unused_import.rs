@@ -313,7 +313,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
         if checker
             .settings
             .pyflakes
-            .ignore_unused_imports
+            .allowed_unused_imports
             .iter()
             .any(|allowed_unused_import| {
                 let allowed_unused_import = QualifiedName::from_dotted_name(allowed_unused_import);

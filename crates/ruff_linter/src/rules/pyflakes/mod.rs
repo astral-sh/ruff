@@ -333,7 +333,7 @@ mod tests {
             Path::new("pyflakes").join(path).as_path(),
             &LinterSettings {
                 pyflakes: pyflakes::settings::Settings {
-                    ignore_unused_imports: vec!["hvplot.pandas".to_string()],
+                    allowed_unused_imports: vec!["hvplot.pandas".to_string()],
                     ..pyflakes::settings::Settings::default()
                 },
                 ..LinterSettings::for_rule(rule_code)

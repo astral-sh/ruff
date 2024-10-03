@@ -7,7 +7,7 @@ use std::fmt;
 #[derive(Debug, Clone, Default, CacheKey)]
 pub struct Settings {
     pub extend_generics: Vec<String>,
-    pub ignore_unused_imports: Vec<String>,
+    pub allowed_unused_imports: Vec<String>,
 }
 
 impl fmt::Display for Settings {
@@ -17,7 +17,7 @@ impl fmt::Display for Settings {
             namespace = "linter.pyflakes",
             fields = [
                 self.extend_generics | debug,
-                self.ignore_unused_imports | debug
+                self.allowed_unused_imports | debug
             ]
         }
         Ok(())

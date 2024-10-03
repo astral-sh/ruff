@@ -2836,14 +2836,14 @@ pub struct PyflakesOptions {
         value_type = "list[str]",
         example = r#"allowed-unused-imports = ["hvplot.pandas"]"#
     )]
-    pub ignore_unused_imports: Option<Vec<String>>,
+    pub allowed_unused_imports: Option<Vec<String>>,
 }
 
 impl PyflakesOptions {
     pub fn into_settings(self) -> pyflakes::settings::Settings {
         pyflakes::settings::Settings {
             extend_generics: self.extend_generics.unwrap_or_default(),
-            ignore_unused_imports: self.ignore_unused_imports.unwrap_or_default(),
+            allowed_unused_imports: self.allowed_unused_imports.unwrap_or_default(),
         }
     }
 }
