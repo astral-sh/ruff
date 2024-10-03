@@ -2594,6 +2594,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             (Type::Instance(_), Type::IntLiteral(_)) => {
                 self.infer_binary_type_comparison(left, op, KnownClass::Int.to_instance(self.db))
             }
+
             // Booleans are coded as integers (False = 0, True = 1)
             (Type::IntLiteral(n), Type::BooleanLiteral(b)) => self.infer_binary_type_comparison(
                 Type::IntLiteral(n),
@@ -2611,6 +2612,49 @@ impl<'db> TypeInferenceBuilder<'db> {
                     op,
                     Type::IntLiteral(i64::from(b)),
                 ),
+
+            (Type::StringLiteral(s1), Type::StringLiteral(s2)) => match op {
+                ast::CmpOp::Eq => Some(Type::BooleanLiteral(s1 == s2)),
+                ast::CmpOp::NotEq => Some(Type::BooleanLiteral(s1 != s2)),
+                ast::CmpOp::Lt => Some(Type::BooleanLiteral(s1 < s2)),
+                ast::CmpOp::LtE => Some(Type::BooleanLiteral(s1 <= s2)),
+                ast::CmpOp::Gt => Some(Type::BooleanLiteral(s1 > s2)),
+                ast::CmpOp::GtE => Some(Type::BooleanLiteral(s1 >= s2)),
+                ast::CmpOp::In => Some(Type::BooleanLiteral(
+                    s2.value(self.db).contains(s1.value(self.db).as_ref()),
+                )),
+                ast::CmpOp::NotIn => Some(Type::BooleanLiteral(
+                    !s2.value(self.db).contains(s1.value(self.db).as_ref()),
+                )),
+                ast::CmpOp::Is => {
+                    if s1 == s2 {
+                        Some(builtins_symbol_ty(self.db, "bool").to_instance(self.db))
+                    } else {
+                        Some(Type::BooleanLiteral(false))
+                    }
+                }
+                ast::CmpOp::IsNot => {
+                    if s1 == s2 {
+                        Some(builtins_symbol_ty(self.db, "bool").to_instance(self.db))
+                    } else {
+                        Some(Type::BooleanLiteral(true))
+                    }
+                }
+            },
+            (Type::StringLiteral(_), _) => {
+                self.infer_binary_type_comparison(Type::builtin_str_instance(self.db), op, right)
+            }
+            (_, Type::StringLiteral(_)) => {
+                self.infer_binary_type_comparison(left, op, Type::builtin_str_instance(self.db))
+            }
+
+            (Type::LiteralString, _) => {
+                self.infer_binary_type_comparison(Type::builtin_str_instance(self.db), op, right)
+            }
+            (_, Type::LiteralString) => {
+                self.infer_binary_type_comparison(left, op, Type::builtin_str_instance(self.db))
+            }
+
             // Lookup the rich comparison `__dunder__` methods on instances
             (Type::Instance(left_class_ty), Type::Instance(right_class_ty)) => match op {
                 ast::CmpOp::Lt => {
@@ -4106,6 +4150,32 @@ mod tests {
         assert_public_ty(&db, "src/a.py", "a", "@Todo");
         assert_public_ty(&db, "src/a.py", "b", "bool");
         assert_public_ty(&db, "src/a.py", "c", "bool");
+
+        Ok(())
+    }
+
+    #[test]
+    fn comparison_string_literals() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "src/a.py",
+            r#"
+            def str_instance() -> str: ...
+            a = "abc" == "abc"
+            b = "ab_cd" <= "ab_ce"
+            c = "abc" in "ab cd"
+            d = "" not in "hello"
+            e = "--" is "--"
+            f = str_instance() < "..."
+            "#,
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "a", "Literal[True]");
+        assert_public_ty(&db, "src/a.py", "b", "Literal[True]");
+        assert_public_ty(&db, "src/a.py", "c", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "d", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "e", "bool");
+        assert_public_ty(&db, "src/a.py", "f", "bool");
 
         Ok(())
     }
