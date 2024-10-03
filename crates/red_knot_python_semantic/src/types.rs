@@ -385,14 +385,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub fn builtin_str_instance(db: &'db dyn Db) -> Self {
-        builtins_symbol_ty(db, "str").to_instance(db)
-    }
-
-    pub fn builtin_int_instance(db: &'db dyn Db) -> Self {
-        builtins_symbol_ty(db, "int").to_instance(db)
-    }
-
     pub fn is_stdlib_symbol(&self, db: &'db dyn Db, module_name: &str, name: &str) -> bool {
         match self {
             Type::Class(class) => class.is_stdlib_symbol(db, module_name, name),
@@ -714,7 +706,7 @@ impl<'db> Type<'db> {
         let dunder_get_item_method = iterable_meta_type.member(db, "__getitem__");
 
         dunder_get_item_method
-            .call(db, &[self, builtins_symbol_ty(db, "int").to_instance(db)])
+            .call(db, &[self, BuiltinType::Int.to_instance(db)])
             .return_ty(db)
             .map(|element_ty| IterationOutcome::Iterable { element_ty })
             .unwrap_or(IterationOutcome::NotIterable {
@@ -758,17 +750,17 @@ impl<'db> Type<'db> {
             Type::Never => Type::Never,
             Type::Instance(class) => Type::Class(*class),
             Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
-            Type::BooleanLiteral(_) => builtins_symbol_ty(db, "bool"),
-            Type::BytesLiteral(_) => builtins_symbol_ty(db, "bytes"),
-            Type::IntLiteral(_) => builtins_symbol_ty(db, "int"),
+            Type::BooleanLiteral(_) => BuiltinType::Bool.to_class(db),
+            Type::BytesLiteral(_) => BuiltinType::Bytes.to_class(db),
+            Type::IntLiteral(_) => BuiltinType::Int.to_class(db),
             Type::Function(_) => types_symbol_ty(db, "FunctionType"),
             Type::Module(_) => types_symbol_ty(db, "ModuleType"),
-            Type::Tuple(_) => builtins_symbol_ty(db, "tuple"),
+            Type::Tuple(_) => BuiltinType::Tuple.to_class(db),
             Type::None => typeshed_symbol_ty(db, "NoneType"),
             // TODO not accurate if there's a custom metaclass...
             Type::Class(_) => builtins_symbol_ty(db, "type"),
             // TODO can we do better here? `type[LiteralString]`?
-            Type::StringLiteral(_) | Type::LiteralString => builtins_symbol_ty(db, "str"),
+            Type::StringLiteral(_) | Type::LiteralString => BuiltinType::Str.to_class(db),
             // TODO: `type[Any]`?
             Type::Any => Type::Todo,
             // TODO: `type[Unknown]`?
@@ -790,7 +782,7 @@ impl<'db> Type<'db> {
             Type::IntLiteral(_) | Type::BooleanLiteral(_) => self.repr(db),
             Type::StringLiteral(_) | Type::LiteralString => *self,
             // TODO: handle more complex types
-            _ => Type::builtin_str_instance(db),
+            _ => BuiltinType::Str.to_instance(db),
         }
     }
 
@@ -813,7 +805,7 @@ impl<'db> Type<'db> {
             })),
             Type::LiteralString => Type::LiteralString,
             // TODO: handle more complex types
-            _ => Type::builtin_str_instance(db),
+            _ => BuiltinType::Str.to_instance(db),
         }
     }
 }
@@ -821,6 +813,49 @@ impl<'db> Type<'db> {
 impl<'db> From<&Type<'db>> for Type<'db> {
     fn from(value: &Type<'db>) -> Self {
         *value
+    }
+}
+
+/// Non-exhaustive enumeration of builtin types to allow for easier syntax when interacting with
+/// the most common builtin types (e.g. int, str, ...).
+///
+/// Feel free to expend this enum if you ever find yourself using the same builtin type in multiple
+/// places.
+pub enum BuiltinType {
+    Bool,
+    Object,
+    Bytes,
+    Int,
+    Float,
+    Str,
+    List,
+    Tuple,
+    Set,
+    Dict,
+}
+
+impl<'db> BuiltinType {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Bool => "bool",
+            Self::Object => "object",
+            Self::Bytes => "bytes",
+            Self::Tuple => "tuple",
+            Self::Int => "int",
+            Self::Float => "float",
+            Self::Str => "str",
+            Self::Set => "set",
+            Self::Dict => "dict",
+            Self::List => "list",
+        }
+    }
+
+    pub fn to_instance(&self, db: &'db dyn Db) -> Type<'db> {
+        builtins_symbol_ty(db, self.as_str()).to_instance(db)
+    }
+
+    pub fn to_class(&self, db: &'db dyn Db) -> Type<'db> {
+        builtins_symbol_ty(db, self.as_str())
     }
 }
 
@@ -1128,7 +1163,7 @@ impl Truthiness {
         match self {
             Self::AlwaysTrue => Type::BooleanLiteral(true),
             Self::AlwaysFalse => Type::BooleanLiteral(false),
-            Self::Ambiguous => builtins_symbol_ty(db, "bool").to_instance(db),
+            Self::Ambiguous => BuiltinType::Bool.to_instance(db),
         }
     }
 }

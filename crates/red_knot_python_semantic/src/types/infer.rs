@@ -56,6 +56,8 @@ use crate::types::{
 };
 use crate::Db;
 
+use super::BuiltinType;
+
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
 /// scope.
@@ -1708,8 +1710,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Number::Int(n) => n
                 .as_i64()
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| Type::builtin_int_instance(self.db)),
-            ast::Number::Float(_) => builtins_symbol_ty(self.db, "float").to_instance(self.db),
+                .unwrap_or_else(|| BuiltinType::Int.to_instance(self.db)),
+            ast::Number::Float(_) => BuiltinType::Float.to_instance(self.db),
             ast::Number::Complex { .. } => {
                 builtins_symbol_ty(self.db, "complex").to_instance(self.db)
             }
@@ -1826,7 +1828,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // TODO generic
-        builtins_symbol_ty(self.db, "list").to_instance(self.db)
+        BuiltinType::List.to_instance(self.db)
     }
 
     fn infer_set_expression(&mut self, set: &ast::ExprSet) -> Type<'db> {
@@ -1837,7 +1839,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // TODO generic
-        builtins_symbol_ty(self.db, "set").to_instance(self.db)
+        BuiltinsSymbol::Set.to_instance(self.db)
     }
 
     fn infer_dict_expression(&mut self, dict: &ast::ExprDict) -> Type<'db> {
@@ -1849,7 +1851,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // TODO generic
-        builtins_symbol_ty(self.db, "dict").to_instance(self.db)
+        BuiltinsSymbol::Dict.to_instance(self.db)
     }
 
     /// Infer the type of the `iter` expression of the first comprehension.
@@ -2347,31 +2349,31 @@ impl<'db> TypeInferenceBuilder<'db> {
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Add) => n
                 .checked_add(m)
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| Type::builtin_int_instance(self.db)),
+                .unwrap_or_else(|| BuiltinType::Int.to_instance(self.db)),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Sub) => n
                 .checked_sub(m)
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| Type::builtin_int_instance(self.db)),
+                .unwrap_or_else(|| BuiltinType::Int.to_instance(self.db)),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Mult) => n
                 .checked_mul(m)
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| Type::builtin_int_instance(self.db)),
+                .unwrap_or_else(|| BuiltinType::Int.to_instance(self.db)),
 
             (Type::IntLiteral(_), Type::IntLiteral(_), ast::Operator::Div) => {
-                builtins_symbol_ty(self.db, "float").to_instance(self.db)
+                BuiltinType::Float.to_instance(self.db)
             }
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::FloorDiv) => n
                 .checked_div(m)
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| Type::builtin_int_instance(self.db)),
+                .unwrap_or_else(|| BuiltinType::Int.to_instance(self.db)),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Mod) => n
                 .checked_rem(m)
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| Type::builtin_int_instance(self.db)),
+                .unwrap_or_else(|| BuiltinType::Int.to_instance(self.db)),
 
             (Type::BytesLiteral(lhs), Type::BytesLiteral(rhs), ast::Operator::Add) => {
                 Type::BytesLiteral(BytesLiteralType::new(
@@ -3124,7 +3126,7 @@ impl StringPartsCollector {
 
     fn ty(self, db: &dyn Db) -> Type {
         if self.expression {
-            Type::builtin_str_instance(db)
+            BuiltinType::Str.to_instance(db)
         } else if let Some(concatenated) = self.concatenated {
             Type::StringLiteral(StringLiteralType::new(db, concatenated.into_boxed_str()))
         } else {
