@@ -220,7 +220,7 @@ linter.task_tags = [
 	XXX,
 ]
 linter.typing_modules = []
-linter.allowed_imports = []
+linter.allowed_unused_imports = []
 
 # Linter Plugins
 linter.flake8_annotations.mypy_init_return = false

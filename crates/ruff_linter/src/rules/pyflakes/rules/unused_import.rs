@@ -309,9 +309,9 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
         }
         if checker
             .settings
-            .allowed_imports
+            .allowed_unused_imports
             .iter()
-            .any(|allowed_import| name.starts_with(allowed_import))
+            .any(|allowed_unused_import| name.starts_with(allowed_unused_import))
         {
             continue;
         }

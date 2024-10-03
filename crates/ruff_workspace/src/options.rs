@@ -801,9 +801,9 @@ pub struct LintCommonOptions {
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
-        example = r#"allowed-imports = ["hvplot.pandas"]"#
+        example = r#"allowed-unused-imports = ["hvplot.pandas"]"#
     )]
-    pub allowed_imports: Option<Vec<String>>,
+    pub allowed_unused_imports: Option<Vec<String>>,
     /// A list of rule codes or prefixes to consider non-fixable.
     #[option(
         default = "[]",

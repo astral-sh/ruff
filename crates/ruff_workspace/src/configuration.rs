@@ -303,7 +303,7 @@ impl Configuration {
                     .unwrap_or_else(|| TASK_TAGS.iter().map(ToString::to_string).collect()),
                 logger_objects: lint.logger_objects.unwrap_or_default(),
                 typing_modules: lint.typing_modules.unwrap_or_default(),
-                allowed_imports: lint.allowed_imports.unwrap_or_default(),
+                allowed_unused_imports: lint.allowed_unused_imports.unwrap_or_default(),
                 // Plugins
                 flake8_annotations: lint
                     .flake8_annotations
@@ -627,7 +627,7 @@ pub struct LintConfiguration {
     pub logger_objects: Option<Vec<String>>,
     pub task_tags: Option<Vec<String>>,
     pub typing_modules: Option<Vec<String>>,
-    pub allowed_imports: Option<Vec<String>>,
+    pub allowed_unused_imports: Option<Vec<String>>,
 
     // Plugins
     pub flake8_annotations: Option<Flake8AnnotationsOptions>,
@@ -740,7 +740,7 @@ impl LintConfiguration {
             task_tags: options.common.task_tags,
             logger_objects: options.common.logger_objects,
             typing_modules: options.common.typing_modules,
-            allowed_imports: options.common.allowed_imports,
+            allowed_unused_imports: options.common.allowed_unused_imports,
             // Plugins
             flake8_annotations: options.common.flake8_annotations,
             flake8_bandit: options.common.flake8_bandit,
@@ -1109,7 +1109,9 @@ impl LintConfiguration {
                 .or(config.explicit_preview_rules),
             task_tags: self.task_tags.or(config.task_tags),
             typing_modules: self.typing_modules.or(config.typing_modules),
-            allowed_imports: self.allowed_imports.or(config.allowed_imports),
+            allowed_unused_imports: self
+                .allowed_unused_imports
+                .or(config.allowed_unused_imports),
             // Plugins
             flake8_annotations: self.flake8_annotations.combine(config.flake8_annotations),
             flake8_bandit: self.flake8_bandit.combine(config.flake8_bandit),
@@ -1331,7 +1333,7 @@ fn warn_about_deprecated_top_level_lint_options(
         explicit_preview_rules,
         task_tags,
         typing_modules,
-        allowed_imports,
+        allowed_unused_imports,
         unfixable,
         flake8_annotations,
         flake8_bandit,
@@ -1430,8 +1432,8 @@ fn warn_about_deprecated_top_level_lint_options(
     if typing_modules.is_some() {
         used_options.push("typing-modules");
     }
-    if allowed_imports.is_some() {
-        used_options.push("allowed-imports");
+    if allowed_unused_imports.is_some() {
+        used_options.push("allowed-unused-imports");
     }
 
     if unfixable.is_some() {

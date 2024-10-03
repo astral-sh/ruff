@@ -16,7 +16,7 @@
         "minLength": 1
       }
     },
-    "allowed-imports": {
+    "allowed-unused-imports": {
       "description": "A list of modules which is allowed even thought it is not used in the code.",
       "deprecated": true,
       "type": [
@@ -1898,7 +1898,7 @@
             "minLength": 1
           }
         },
-        "allowed-imports": {
+        "allowed-unused-imports": {
           "description": "A list of modules which is allowed even thought it is not used in the code.",
           "type": [
             "array",

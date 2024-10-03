@@ -238,7 +238,7 @@ pub struct LinterSettings {
     pub line_length: LineLength,
     pub task_tags: Vec<String>,
     pub typing_modules: Vec<String>,
-    pub allowed_imports: Vec<String>,
+    pub allowed_unused_imports: Vec<String>,
 
     // Plugins
     pub flake8_annotations: flake8_annotations::settings::Settings,
@@ -300,7 +300,7 @@ impl Display for LinterSettings {
                 self.line_length,
                 self.task_tags | array,
                 self.typing_modules | array,
-                self.allowed_imports | array,
+                self.allowed_unused_imports | array,
             ]
         }
         writeln!(f, "\n# Linter Plugins")?;
@@ -407,7 +407,7 @@ impl LinterSettings {
 
             task_tags: TASK_TAGS.iter().map(ToString::to_string).collect(),
             typing_modules: vec![],
-            allowed_imports: vec![],
+            allowed_unused_imports: vec![],
             flake8_annotations: flake8_annotations::settings::Settings::default(),
             flake8_bandit: flake8_bandit::settings::Settings::default(),
             flake8_boolean_trap: flake8_boolean_trap::settings::Settings::default(),
