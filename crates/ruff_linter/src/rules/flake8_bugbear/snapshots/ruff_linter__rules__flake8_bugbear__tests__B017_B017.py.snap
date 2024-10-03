@@ -35,4 +35,11 @@ B017.py:48:10: B017 `pytest.raises(Exception)` should be considered evil
 49 |         raise ValueError("Hello")
    |
 
-
+B017.py:57:36: B017 `pytest.raises(Exception)` should be considered evil
+   |
+55 |         raise ValueError("This is also fine")
+56 | 
+57 |     with contextlib.nullcontext(), pytest.raises(Exception):
+   |                                    ^^^^^^^^^^^^^^^^^^^^^^^^ B017
+58 |         raise ValueError("Multiple context managers")
+   |
