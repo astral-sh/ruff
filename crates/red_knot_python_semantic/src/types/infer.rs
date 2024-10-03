@@ -2534,7 +2534,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         )
     }
 
-    /// Infers the type of a binary comparison (e.g. '<left> == <right>'). See
+    /// Infers the type of a binary comparison (e.g. 'left == right'). See
     /// `infer_compare_expression` for the higher level logic dealing with multi-comparison
     /// expressions.
     ///
@@ -3146,7 +3146,7 @@ fn perform_rich_comparison<'db>(
     //
     // TODO: the reflected dunder actually has priority if the r.h.s. is a strict subclass of the
     // l.h.s.
-    // TODO: __neq__ in object will call __eq__ if __neq__ is not defined
+    // TODO: `object.__ne__` will call `__eq__` if `__ne__` is not defined
 
     let dunder = left.class_member(db, dunder_name);
     if !dunder.is_unbound() {
