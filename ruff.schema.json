@@ -16,6 +16,17 @@
         "minLength": 1
       }
     },
+    "allowed-unused-imports": {
+      "description": "A list of modules which is allowed even thought they are not used in the code.\n\nThis is useful when a module has a side effect when imported.",
+      "deprecated": true,
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
     "analyze": {
       "description": "Options to configure import map generation.",
       "anyOf": [
@@ -1887,6 +1898,16 @@
             "minLength": 1
           }
         },
+        "allowed-unused-imports": {
+          "description": "A list of modules which is allowed even thought they are not used in the code.\n\nThis is useful when a module has a side effect when imported.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "dummy-variable-rgx": {
           "description": "A regular expression used to identify \"dummy\" variables, or those which should be ignored when enforcing (e.g.) unused-variable rules. The default expression matches `_`, `__`, and `_var`, but not `_var_`.",
           "type": [
@@ -2585,6 +2606,16 @@
     "PyflakesOptions": {
       "type": "object",
       "properties": {
+        "allowed-unused-imports": {
+          "description": "A list of modules to ignore when considering unused imports.\n\nUsed to prevent violations for specific modules that are known to have side effects on import (e.g., `hvplot.pandas`).\n\nModules in this list are expected to be fully-qualified names (e.g., `hvplot.pandas`). Any submodule of a given module will also be ignored (e.g., given `hvplot`, `hvplot.pandas` will also be ignored).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "extend-generics": {
           "description": "Additional functions or classes to consider generic, such that any subscripts should be treated as type annotation (e.g., `ForeignKey` in `django.db.models.ForeignKey[\"User\"]`.\n\nExpects to receive a list of fully-qualified names (e.g., `django.db.models.ForeignKey`, rather than `ForeignKey`).",
           "type": [
