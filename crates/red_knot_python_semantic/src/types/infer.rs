@@ -26,6 +26,7 @@
 //! stringified annotations. We have a fourth Salsa query for inferring the deferred types
 //! associated with a particular definition. Scope-level inference infers deferred types for all
 //! definitions once the rest of the types in the scope have been inferred.
+use itertools::Itertools;
 use std::num::NonZeroU32;
 
 use ruff_db::files::File;
@@ -2484,6 +2485,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             comparators,
         } = compare;
 
+        self.infer_expression(left);
+        for expr in comparators {
+            self.infer_expression(expr);
+        }
+
         // https://docs.python.org/3/reference/expressions.html#comparisons
         // > Formally, if `a, b, c, …, y, z` are expressions and `op1, op2, …, opN` are comparison
         // > operators, then `a op1 b op2 c ... y opN z` is equivalent to a `op1 b and b op2 c and
@@ -2496,14 +2502,16 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::BoolOp::And,
             std::iter::once(left.as_ref())
                 .chain(comparators.as_ref().iter())
-                // Evaluate expressions before iterating through pairs with `windows`
-                .map(|expr| self.infer_expression(expr))
-                .collect::<Vec<_>>()
-                .windows(2)
-                //.tuple_windows(2)
+                .tuple_windows::<(_, _)>()
                 .zip(ops.iter())
-                .map(|(pair, op)| {
-                    let (left_ty, right_ty) = (pair[0], pair[1]);
+                .map(|((left, right), op)| {
+                    let left_ty = self
+                        .types
+                        .expression_ty(left.scoped_ast_id(self.db, self.scope));
+                    let right_ty = self
+                        .types
+                        .expression_ty(right.scoped_ast_id(self.db, self.scope));
+
                     self.infer_binary_type_comparison(left_ty, *op, right_ty)
                         .unwrap_or_else(|| {
                             // Handle unsupported operators (diagnostic, `bool`/`Unknown` outcome)

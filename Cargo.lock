@@ -2083,6 +2083,7 @@ dependencies = [
  "countme",
  "hashbrown",
  "insta",
+ "itertools 0.13.0",
  "ordermap",
  "red_knot_vendored",
  "ruff_db",
