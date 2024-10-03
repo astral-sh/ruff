@@ -46,7 +46,7 @@ use crate::importer::{ImportRequest, Importer};
 /// ## Fix safety
 /// This fix is usually safe, but if the lambda is called with keyword arguments, e.g.,
 /// `add = lambda x, y: x + y; add(x=1, y=2)`, replacing the lambda with an operator function, e.g.,
-/// `operator.add`, will cause the call to raise a `TypeError`, as operator functions do not allow
+/// `operator.add`, will cause the call to raise a `TypeError`, as functions in `operator` do not allow
 /// keyword arguments.
 #[violation]
 pub struct ReimplementedOperator {
