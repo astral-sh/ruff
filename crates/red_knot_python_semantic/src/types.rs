@@ -1,5 +1,3 @@
-use strum::IntoEnumIterator;
-
 use infer::TypeInferenceBuilder;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
@@ -830,7 +828,7 @@ impl<'db> From<&Type<'db>> for Type<'db> {
 ///
 /// Feel free to expend this enum if you ever find yourself using the same builtin type in multiple
 /// places.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, strum_macros::EnumIter)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BuiltinType {
     Bool,
     Object,
@@ -869,7 +867,19 @@ impl<'db> BuiltinType {
     }
 
     pub fn from_name(name: &str) -> Option<Self> {
-        BuiltinType::iter().find(|&builtin| builtin.as_str() == name)
+        match name {
+            "bool" => Some(Self::Bool),
+            "object" => Some(Self::Object),
+            "bytes" => Some(Self::Bytes),
+            "tuple" => Some(Self::Tuple),
+            "int" => Some(Self::Int),
+            "float" => Some(Self::Float),
+            "str" => Some(Self::Str),
+            "set" => Some(Self::Set),
+            "dict" => Some(Self::Dict),
+            "list" => Some(Self::List),
+            _ => None,
+        }
     }
 }
 
