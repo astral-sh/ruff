@@ -426,7 +426,7 @@ impl<'map, 'db> Iterator for DeclarationsIterator<'map, 'db> {
 impl std::iter::FusedIterator for DeclarationsIterator<'_, '_> {}
 
 /// A snapshot of the definitions and constraints state at a particular point in control flow.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct FlowSnapshot {
     symbol_states: IndexVec<ScopedSymbolId, SymbolState>,
 }
