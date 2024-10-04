@@ -877,7 +877,7 @@ where
                     self.flow_merge(state);
                 }
 
-                // These definitions were erased by `self.flow_restor`ing to the post-`else` state.
+                // These definitions were erased by `self.flow_restore`ing to the post-`else` state.
                 // We can't simply `self.flow_merge()` with any snapshots taken during the `finally` block, however,
                 // as there are more potential definition states inside the `finally` block than there are
                 // from a point after the `finally` block's completion.
