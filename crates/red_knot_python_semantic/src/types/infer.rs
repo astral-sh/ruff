@@ -6635,6 +6635,145 @@ mod tests {
     }
 
     #[test]
+    fn exception_handler_control_flow_no_except_with_finally_no_redef_in_finally() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            from typing_extensions import reveal_type
+
+            def could_raise_returns_str() -> str: ...
+
+            x = 1
+
+            try:
+                reveal_type(x)
+                x = could_raise_returns_str()
+                reveal_type(x)
+            finally:
+                reveal_type(x)
+
+            # If we get here, unlike the state when we're visiting the `finally`,
+            # we know that the `try` block ran to completion,
+            # so there are fewer possibilities than there were inside the `finally` block.
+            reveal_type(x)
+            ",
+        )?;
+
+        assert_file_diagnostics(
+            &db,
+            "src/a.py",
+            &[
+                "Revealed type is `Literal[1]`",
+                "Revealed type is `str`",
+                "Revealed type is `Literal[1] | str`",
+                "Revealed type is `str`",
+            ],
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn exception_handler_control_flow_single_except_with_finally() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            from typing_extensions import reveal_type
+
+            def could_raise_returns_str() -> str: ...
+            def could_raise_returns_bytes() -> bytes: ...
+
+            x = 1
+
+            try:
+                reveal_type(x)
+                x = could_raise_returns_str()
+                reveal_type(x)
+            except TypeError:
+                reveal_type(x)
+                x = could_raise_returns_bytes()
+                reveal_type(x)
+            finally:
+                reveal_type(x)
+                x = 2
+                reveal_type(x)
+
+            # `finally` is *always* executed, so this should be the same
+            # as at the end of the `finally` block (`Literal[2]`)
+            reveal_type(x)
+            ",
+        )?;
+
+        assert_file_diagnostics(
+            &db,
+            "src/a.py",
+            &[
+                "Revealed type is `Literal[1]`",
+                "Revealed type is `str`",
+                "Revealed type is `Literal[1] | str`",
+                "Revealed type is `bytes`",
+                "Revealed type is `Literal[1] | str | bytes`",
+                "Revealed type is `Literal[2]`",
+                "Revealed type is `Literal[2]`",
+            ],
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn exception_handler_control_flow_single_except_with_finally_no_redef_in_finally() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            from typing_extensions import reveal_type
+
+            def could_raise_returns_str() -> str: ...
+            def could_raise_returns_bytes() -> bytes: ...
+
+            x = 1
+
+            try:
+                reveal_type(x)
+                x = could_raise_returns_str()
+                reveal_type(x)
+            except TypeError:
+                reveal_type(x)
+                x = could_raise_returns_bytes()
+                reveal_type(x)
+            finally:
+                reveal_type(x)
+
+            # If we get here, unlike the state when we're visiting the `finally`,
+            # we know that either the `try` block ran to completion or the `except` block did,
+            # so there are fewer possibilities than there were inside the `finally` block.
+            reveal_type(x)
+            ",
+        )?;
+
+        assert_file_diagnostics(
+            &db,
+            "src/a.py",
+            &[
+                "Revealed type is `Literal[1]`",
+                "Revealed type is `str`",
+                "Revealed type is `Literal[1] | str`",
+                "Revealed type is `bytes`",
+                "Revealed type is `Literal[1] | str | bytes`",
+                "Revealed type is `str | bytes`",
+            ],
+        );
+
+        Ok(())
+    }
+
+    #[test]
     fn basic_comprehension() -> anyhow::Result<()> {
         let mut db = setup_db();
 
