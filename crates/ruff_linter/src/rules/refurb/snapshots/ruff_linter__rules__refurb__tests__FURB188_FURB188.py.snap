@@ -250,4 +250,23 @@ FURB188.py:162:5: FURB188 [*] Prefer `removeprefix` over conditionally replacing
     162 |+    text = text.removeprefix("!")
 164 163 |     print(text)
 165 164 | 
-166 165 |
+166 165 | 
+
+FURB188.py:183:5: FURB188 [*] Prefer `removeprefix` over conditionally replacing with slice.
+    |
+181 |       # with fix `text = text.removeprefix("ř")`
+182 |       text = "řetězec"
+183 |       if text.startswith("ř"): 
+    |  _____^
+184 | |         text = text[1:]
+    | |_______________________^ FURB188
+    |
+    = help: Use removeprefix instead of assignment conditional upon startswith.
+
+ℹ Safe fix
+180 180 |     # should be linted
+181 181 |     # with fix `text = text.removeprefix("ř")`
+182 182 |     text = "řetězec"
+183     |-    if text.startswith("ř"): 
+184     |-        text = text[1:]
+    183 |+    text = text.removeprefix("ř")
