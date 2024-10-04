@@ -460,7 +460,14 @@ impl<'db> UseDefMapBuilder<'db> {
         debug_assert_eq!(symbol, new_symbol);
     }
 
-    pub(super) fn add_definition(
+    pub(super) fn record_constraint(&mut self, constraint: Constraint<'db>) {
+        let constraint_id = self.all_constraints.push(constraint);
+        for state in &mut self.symbol_states {
+            state.record_constraint(constraint_id);
+        }
+    }
+
+    pub(super) fn record_definition(
         &mut self,
         symbol: ScopedSymbolId,
         definition: Definition<'db>,
@@ -483,13 +490,6 @@ impl<'db> UseDefMapBuilder<'db> {
             SymbolDefinitions::Declarations(symbol_state.declarations().clone()),
         );
         symbol_state.record_binding(def_id);
-    }
-
-    pub(super) fn record_constraint(&mut self, constraint: Constraint<'db>) {
-        let constraint_id = self.all_constraints.push(constraint);
-        for state in &mut self.symbol_states {
-            state.record_constraint(constraint_id);
-        }
     }
 
     fn record_declaration(&mut self, symbol: ScopedSymbolId, declaration: Definition<'db>) {

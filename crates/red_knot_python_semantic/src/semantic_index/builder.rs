@@ -239,7 +239,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         }
 
         self.current_use_def_map_mut()
-            .add_definition(symbol, definition, category);
+            .record_definition(symbol, definition, category);
         self.try_node_context_stack_mut()
             .record_definition(self, symbol, definition, category);
 
@@ -890,7 +890,7 @@ where
                     } in finally_definitions
                     {
                         self.current_use_def_map_mut()
-                            .add_definition(symbol, definition, category);
+                            .record_definition(symbol, definition, category);
                     }
                 }
             }
