@@ -24,6 +24,7 @@ bitflags = { workspace = true }
 camino = { workspace = true }
 compact_str = { workspace = true }
 countme = { workspace = true }
+itertools = { workspace = true}
 ordermap = { workspace = true }
 salsa = { workspace = true }
 thiserror = { workspace = true }
