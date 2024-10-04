@@ -855,20 +855,33 @@ where
                 self.visit_body(orelse);
                 let post_else_state = self.flow_snapshot();
 
+                // If there is a `finally` block, prepare to visit it:
                 let finally_snapshots = self.try_node_context_stack_mut().enter_finally_block();
+                debug_assert!(finally_snapshots
+                    .as_ref()
+                    .map_or(true, |_| !finalbody.is_empty()));
+
                 if let Some(finally_snapshots) = finally_snapshots {
-                    debug_assert!(!finalbody.is_empty());
                     self.flow_restore(pre_try_block_state);
                     for state in finally_snapshots {
                         self.flow_merge(state);
                     }
+
+                    // Visit the `finally` block!
                     self.visit_body(finalbody);
                 }
 
+                // Prepare for exiting the `StmtTry` node
                 self.flow_restore(post_else_state);
                 for state in post_except_states {
                     self.flow_merge(state);
                 }
+
+                // These definitions were erased by `self.flow_restor`ing to the post-`else` state.
+                // We can't simply `self.flow_merge()` with any snapshots taken during the `finally` block, however,
+                // as there are more potential definition states inside the `finally` block than there are
+                // from a point after the `finally` block's completion.
+                // Instead, we must manually re-add these definitions to the `use-def` map
                 if let Some(finally_definitions) = self.try_node_context_stack().pop_context() {
                     for DefinitionRecord {
                         symbol,
