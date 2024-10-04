@@ -270,3 +270,54 @@ FURB188.py:183:5: FURB188 [*] Prefer `removeprefix` over conditionally replacing
 183     |-    if text.startswith("ř"): 
 184     |-        text = text[1:]
     183 |+    text = text.removeprefix("ř")
+185 184 | 
+186 185 | 
+187 186 | def handle_surrogates():
+
+FURB188.py:190:5: FURB188 [*] Prefer `removeprefix` over conditionally replacing with slice.
+    |
+188 |       # should be linted
+189 |       text = "\ud800\udc00heythere"
+190 |       if text.startswith("\ud800\udc00"):
+    |  _____^
+191 | |         text = text[2:]
+    | |_______________________^ FURB188
+192 |       text = "\U00010000heythere"
+193 |       if text.startswith("\U00010000"):
+    |
+    = help: Use removeprefix instead of assignment conditional upon startswith.
+
+ℹ Safe fix
+187 187 | def handle_surrogates():
+188 188 |     # should be linted
+189 189 |     text = "\ud800\udc00heythere"
+190     |-    if text.startswith("\ud800\udc00"):
+191     |-        text = text[2:]
+    190 |+    text = text.removeprefix("\ud800\udc00")
+192 191 |     text = "\U00010000heythere"
+193 192 |     if text.startswith("\U00010000"):
+194 193 |         text = text[1:]
+
+FURB188.py:193:5: FURB188 [*] Prefer `removeprefix` over conditionally replacing with slice.
+    |
+191 |           text = text[2:]
+192 |       text = "\U00010000heythere"
+193 |       if text.startswith("\U00010000"):
+    |  _____^
+194 | |         text = text[1:]
+    | |_______________________^ FURB188
+195 |       
+196 |       # should not be linted
+    |
+    = help: Use removeprefix instead of assignment conditional upon startswith.
+
+ℹ Safe fix
+190 190 |     if text.startswith("\ud800\udc00"):
+191 191 |         text = text[2:]
+192 192 |     text = "\U00010000heythere"
+193     |-    if text.startswith("\U00010000"):
+194     |-        text = text[1:]
+    193 |+    text = text.removeprefix("\U00010000")
+195 194 |     
+196 195 |     # should not be linted
+197 196 |     text = "\ud800\udc00heythere"
