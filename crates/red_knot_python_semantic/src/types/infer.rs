@@ -2516,7 +2516,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 AnyNodeRef::ExprCompare(compare),
                                 "operator-unsupported",
                                 format_args!(
-                                    "Operator \"{}\" is not supported for types {} and {}",
+                                    "Operator `{}` is not supported for types `{}` and `{}`",
                                     op,
                                     left_ty.display(self.db),
                                     right_ty.display(self.db)
@@ -4118,9 +4118,9 @@ mod tests {
             &db,
             "src/a.py",
             &[
-                "Operator \"in\" is not supported for types Literal[1] and Literal[7]",
-                "Operator \"not in\" is not supported for types Literal[0] and Literal[10]",
-                "Operator \"<\" is not supported for types object and Literal[5]",
+                "Operator `in` is not supported for types `Literal[1]` and `Literal[7]`",
+                "Operator `not in` is not supported for types `Literal[0]` and `Literal[10]`",
+                "Operator `<` is not supported for types `object` and `Literal[5]`",
             ],
         );
         assert_public_ty(&db, "src/a.py", "a", "bool");
