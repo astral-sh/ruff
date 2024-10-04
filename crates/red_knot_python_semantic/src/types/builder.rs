@@ -29,7 +29,7 @@ use crate::types::{IntersectionType, Type, UnionType};
 use crate::{Db, FxOrderSet};
 use smallvec::SmallVec;
 
-use super::BuiltinClass;
+use super::KnownClass;
 
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<Type<'db>>,
@@ -66,7 +66,7 @@ impl<'db> UnionBuilder<'db> {
                 let mut to_remove = SmallVec::<[usize; 2]>::new();
                 for (index, element) in self.elements.iter().enumerate() {
                     if Some(*element) == bool_pair {
-                        to_add = BuiltinClass::Bool.to_class(self.db);
+                        to_add = KnownClass::Bool.to_class(self.db);
                         to_remove.push(index);
                         // The type we are adding is a BooleanLiteral, which doesn't have any
                         // subtypes. And we just found that the union already contained our
@@ -302,7 +302,7 @@ mod tests {
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
-    use crate::types::{BuiltinClass, UnionBuilder};
+    use crate::types::{KnownClass, UnionBuilder};
     use crate::ProgramSettings;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
@@ -362,7 +362,7 @@ mod tests {
     #[test]
     fn build_union_bool() {
         let db = setup_db();
-        let bool_ty = BuiltinClass::Bool.to_class(&db);
+        let bool_ty = KnownClass::Bool.to_class(&db);
 
         let t0 = Type::BooleanLiteral(true);
         let t1 = Type::BooleanLiteral(true);
@@ -391,7 +391,7 @@ mod tests {
     #[test]
     fn build_union_simplify_subtype() {
         let db = setup_db();
-        let t0 = BuiltinClass::Str.to_instance(&db);
+        let t0 = KnownClass::Str.to_instance(&db);
         let t1 = Type::LiteralString;
         let u0 = UnionType::from_elements(&db, [t0, t1]);
         let u1 = UnionType::from_elements(&db, [t1, t0]);
@@ -403,7 +403,7 @@ mod tests {
     #[test]
     fn build_union_no_simplify_unknown() {
         let db = setup_db();
-        let t0 = BuiltinClass::Str.to_instance(&db);
+        let t0 = KnownClass::Str.to_instance(&db);
         let t1 = Type::Unknown;
         let u0 = UnionType::from_elements(&db, [t0, t1]);
         let u1 = UnionType::from_elements(&db, [t1, t0]);
@@ -415,9 +415,9 @@ mod tests {
     #[test]
     fn build_union_subsume_multiple() {
         let db = setup_db();
-        let str_ty = BuiltinClass::Str.to_instance(&db);
-        let int_ty = BuiltinClass::Int.to_instance(&db);
-        let object_ty = BuiltinClass::Object.to_instance(&db);
+        let str_ty = KnownClass::Str.to_instance(&db);
+        let int_ty = KnownClass::Int.to_instance(&db);
+        let object_ty = KnownClass::Object.to_instance(&db);
         let unknown_ty = Type::Unknown;
 
         let u0 = UnionType::from_elements(&db, [str_ty, unknown_ty, int_ty, object_ty]);

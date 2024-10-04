@@ -14,7 +14,7 @@ use crate::stdlib::{
     builtins_symbol_ty, types_symbol_ty, typeshed_symbol_ty, typing_extensions_symbol_ty,
 };
 use crate::types::narrow::narrowing_constraint;
-use crate::{Db, FxOrderSet};
+use crate::{Db, FxOrderSet, Module};
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
 pub(crate) use self::diagnostic::TypeCheckDiagnostics;
@@ -416,18 +416,18 @@ impl<'db> Type<'db> {
             (Type::Never, _) => true,
             (_, Type::Never) => false,
             (Type::IntLiteral(_), Type::Instance(class))
-                if class.is_builtin(db, BuiltinClass::Int) =>
+                if class.is_known_class(db, KnownClass::Int) =>
             {
                 true
             }
             (Type::StringLiteral(_), Type::LiteralString) => true,
             (Type::StringLiteral(_) | Type::LiteralString, Type::Instance(class))
-                if class.is_builtin(db, BuiltinClass::Str) =>
+                if class.is_known_class(db, KnownClass::Str) =>
             {
                 true
             }
             (Type::BytesLiteral(_), Type::Instance(class))
-                if class.is_builtin(db, BuiltinClass::Bytes) =>
+                if class.is_known_class(db, KnownClass::Bytes) =>
             {
                 true
             }
@@ -435,8 +435,8 @@ impl<'db> Type<'db> {
                 .elements(db)
                 .iter()
                 .any(|&elem_ty| ty.is_subtype_of(db, elem_ty)),
-            (_, Type::Instance(class)) if class.is_builtin(db, BuiltinClass::Object) => true,
-            (Type::Instance(class), _) if class.is_builtin(db, BuiltinClass::Object) => false,
+            (_, Type::Instance(class)) if class.is_known_class(db, KnownClass::Object) => true,
+            (Type::Instance(class), _) if class.is_known_class(db, KnownClass::Object) => false,
             // TODO
             _ => false,
         }
@@ -592,9 +592,9 @@ impl<'db> Type<'db> {
     fn call(self, db: &'db dyn Db, arg_types: &[Type<'db>]) -> CallOutcome<'db> {
         match self {
             // TODO validate typed call arguments vs callable signature
-            Type::Function(function_type) => match function_type.kind(db) {
-                FunctionKind::Ordinary => CallOutcome::callable(function_type.return_type(db)),
-                FunctionKind::RevealType => CallOutcome::revealed(
+            Type::Function(function_type) => match function_type.known(db) {
+                None => CallOutcome::callable(function_type.return_type(db)),
+                Some(KnownFunction::RevealType) => CallOutcome::revealed(
                     function_type.return_type(db),
                     *arg_types.first().unwrap_or(&Type::Unknown),
                 ),
@@ -602,11 +602,11 @@ impl<'db> Type<'db> {
 
             // TODO annotated return type on `__new__` or metaclass `__call__`
             Type::Class(class) => {
-                CallOutcome::callable(match class.known_builtin(db) {
+                CallOutcome::callable(match class.known(db) {
                     // If the class is the builtin-bool class (for example `bool(1)`), we try to
                     // return the specific truthiness value of the input arg, `Literal[True]` for
                     // the example above.
-                    Some(BuiltinClass::Bool) => arg_types
+                    Some(KnownClass::Bool) => arg_types
                         .first()
                         .map(|arg| arg.bool(db).into_type(db))
                         .unwrap_or(Type::BooleanLiteral(false)),
@@ -705,7 +705,7 @@ impl<'db> Type<'db> {
         let dunder_get_item_method = iterable_meta_type.member(db, "__getitem__");
 
         dunder_get_item_method
-            .call(db, &[self, BuiltinClass::Int.to_instance(db)])
+            .call(db, &[self, KnownClass::Int.to_instance(db)])
             .return_ty(db)
             .map(|element_ty| IterationOutcome::Iterable { element_ty })
             .unwrap_or(IterationOutcome::NotIterable {
@@ -749,17 +749,17 @@ impl<'db> Type<'db> {
             Type::Never => Type::Never,
             Type::Instance(class) => Type::Class(*class),
             Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
-            Type::BooleanLiteral(_) => BuiltinClass::Bool.to_class(db),
-            Type::BytesLiteral(_) => BuiltinClass::Bytes.to_class(db),
-            Type::IntLiteral(_) => BuiltinClass::Int.to_class(db),
+            Type::BooleanLiteral(_) => KnownClass::Bool.to_class(db),
+            Type::BytesLiteral(_) => KnownClass::Bytes.to_class(db),
+            Type::IntLiteral(_) => KnownClass::Int.to_class(db),
             Type::Function(_) => types_symbol_ty(db, "FunctionType"),
             Type::Module(_) => types_symbol_ty(db, "ModuleType"),
-            Type::Tuple(_) => BuiltinClass::Tuple.to_class(db),
+            Type::Tuple(_) => KnownClass::Tuple.to_class(db),
             Type::None => typeshed_symbol_ty(db, "NoneType"),
             // TODO not accurate if there's a custom metaclass...
             Type::Class(_) => builtins_symbol_ty(db, "type"),
             // TODO can we do better here? `type[LiteralString]`?
-            Type::StringLiteral(_) | Type::LiteralString => BuiltinClass::Str.to_class(db),
+            Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class(db),
             // TODO: `type[Any]`?
             Type::Any => Type::Todo,
             // TODO: `type[Unknown]`?
@@ -781,7 +781,7 @@ impl<'db> Type<'db> {
             Type::IntLiteral(_) | Type::BooleanLiteral(_) => self.repr(db),
             Type::StringLiteral(_) | Type::LiteralString => *self,
             // TODO: handle more complex types
-            _ => BuiltinClass::Str.to_instance(db),
+            _ => KnownClass::Str.to_instance(db),
         }
     }
 
@@ -804,7 +804,7 @@ impl<'db> Type<'db> {
             })),
             Type::LiteralString => Type::LiteralString,
             // TODO: handle more complex types
-            _ => BuiltinClass::Str.to_instance(db),
+            _ => KnownClass::Str.to_instance(db),
         }
     }
 }
@@ -815,13 +815,15 @@ impl<'db> From<&Type<'db>> for Type<'db> {
     }
 }
 
-/// Non-exhaustive enumeration of builtin types to allow for easier syntax when interacting with
-/// the most common builtin types (e.g. int, str, ...).
+/// Non-exhaustive enumeration of known classes (e.g. `builtins.int`, `typing.Any`, ...) to allow
+/// for easier syntax when interacting with very common classes.
 ///
-/// Feel free to expand this enum if you ever find yourself using the same builtin type in multiple
+/// Feel free to expand this enum if you ever find yourself using the same class in multiple
 /// places.
+/// Note: good candidates are any classes in `[crate::stdlib::CoreStdlibModule]`
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum BuiltinClass {
+pub enum KnownClass {
+    // Builtins
     Bool,
     Object,
     Bytes,
@@ -832,9 +834,11 @@ pub enum BuiltinClass {
     Tuple,
     Set,
     Dict,
+    // Typing
+    Any, // Not currently used, included to show support for non-builtins
 }
 
-impl<'db> BuiltinClass {
+impl<'db> KnownClass {
     pub const fn as_str(&self) -> &'static str {
         match self {
             Self::Bool => "bool",
@@ -847,6 +851,7 @@ impl<'db> BuiltinClass {
             Self::Set => "set",
             Self::Dict => "dict",
             Self::List => "list",
+            Self::Any => "Any",
         }
     }
 
@@ -855,7 +860,17 @@ impl<'db> BuiltinClass {
     }
 
     pub fn to_class(&self, db: &'db dyn Db) -> Type<'db> {
+        // TODO: figure out how to deal with non-builtins
         builtins_symbol_ty(db, self.as_str())
+    }
+
+    pub fn maybe_from_module(module: &Module, class_name: &str) -> Option<Self> {
+        let candidate = Self::from_name(class_name)?;
+        if candidate.check_module(module) {
+            Some(candidate)
+        } else {
+            None
+        }
     }
 
     pub fn from_name(name: &str) -> Option<Self> {
@@ -870,7 +885,29 @@ impl<'db> BuiltinClass {
             "set" => Some(Self::Set),
             "dict" => Some(Self::Dict),
             "list" => Some(Self::List),
+            "Any" => Some(Self::Any),
             _ => None,
+        }
+    }
+
+    /// Private method checking if known class can be defined in the given module.
+    fn check_module(self, module: &Module) -> bool {
+        let is_builtin = module.search_path().is_standard_library() && module.name() == "builtins";
+        let is_typing = module.search_path().is_standard_library() && module.name() == "typing";
+        let is_typing_extensions =
+            module.search_path().is_standard_library() && module.name() == "typing_extensions";
+        match self {
+            Self::Bool
+            | Self::Object
+            | Self::Bytes
+            | Self::Int
+            | Self::Float
+            | Self::Str
+            | Self::List
+            | Self::Dict
+            | Self::Set
+            | Self::Tuple => is_builtin,
+            Self::Any => is_typing || is_typing_extensions,
         }
     }
 }
@@ -1179,7 +1216,7 @@ impl Truthiness {
         match self {
             Self::AlwaysTrue => Type::BooleanLiteral(true),
             Self::AlwaysFalse => Type::BooleanLiteral(false),
-            Self::Ambiguous => BuiltinClass::Bool.to_instance(db),
+            Self::Ambiguous => KnownClass::Bool.to_instance(db),
         }
     }
 }
@@ -1201,7 +1238,7 @@ pub struct FunctionType<'db> {
     pub name: ast::name::Name,
 
     /// Is this a function that we special-case somehow? If so, which one?
-    kind: FunctionKind,
+    known: Option<KnownFunction>,
 
     definition: Definition<'db>,
 
@@ -1253,11 +1290,10 @@ impl<'db> FunctionType<'db> {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Default, Hash)]
-pub enum FunctionKind {
-    /// Just a normal function for which we have no particular special casing
-    #[default]
-    Ordinary,
+/// Non-exhaustive enumeration of known functions (e.g. `builtins.reveal_type`, ...) that might
+/// have special behavior.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum KnownFunction {
     /// `builtins.reveal_type`, `typing.reveal_type` or `typing_extensions.reveal_type`
     RevealType,
 }
@@ -1272,28 +1308,13 @@ pub struct ClassType<'db> {
 
     body_scope: ScopeId<'db>,
 
-    known_builtin: Option<BuiltinClass>,
+    known: Option<KnownClass>,
 }
 
 impl<'db> ClassType<'db> {
-    /// Find if a class is a known builtin class (we test for a subset of builtins)
-    pub fn maybe_known_builtin(
-        db: &'db dyn Db,
-        name: &ast::name::Name,
-        body_scope: &ScopeId<'db>,
-    ) -> Option<BuiltinClass> {
-        if file_to_module(db, body_scope.file(db)).is_some_and(|module| {
-            module.search_path().is_standard_library() && module.name() == "builtins"
-        }) {
-            BuiltinClass::from_name(name.as_str())
-        } else {
-            None
-        }
-    }
-
-    pub fn is_builtin(self, db: &'db dyn Db, builtin: BuiltinClass) -> bool {
-        match self.known_builtin(db) {
-            Some(class_builtin) => class_builtin == builtin,
+    pub fn is_known_class(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
+        match self.known(db) {
+            Some(known) => known == known_class,
             None => false,
         }
     }
