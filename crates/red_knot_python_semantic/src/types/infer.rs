@@ -6635,7 +6635,8 @@ mod tests {
     }
 
     #[test]
-    fn exception_handler_control_flow_no_except_with_finally_no_redef_in_finally() -> anyhow::Result<()> {
+    fn exception_handler_control_flow_no_except_with_finally_no_redef_in_finally(
+    ) -> anyhow::Result<()> {
         let mut db = setup_db();
 
         db.write_dedented(
@@ -6735,7 +6736,8 @@ mod tests {
     }
 
     #[test]
-    fn exception_handler_control_flow_single_except_with_finally_no_redef_in_finally() -> anyhow::Result<()> {
+    fn exception_handler_control_flow_single_except_with_finally_no_redef_in_finally(
+    ) -> anyhow::Result<()> {
         let mut db = setup_db();
 
         db.write_dedented(
@@ -6785,6 +6787,152 @@ mod tests {
                 "Revealed type is `bool`",
                 "Revealed type is `Literal[1] | str | bytes | bool`",
                 "Revealed type is `str | bool`",
+            ],
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn exception_handler_control_flow_multiple_excepts_with_finally() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            from typing_extensions import reveal_type
+
+            def could_raise_returns_str() -> str:
+                return 'foo'
+
+            def could_raise_returns_bytes() -> bytes:
+                return b'foo'
+
+            def could_raise_returns_bool() -> bool:
+                return True
+
+            def could_raise_returns_memoryview() -> memoryview:
+                return True
+
+            def could_raise_returns_float() -> float:
+                return True
+
+            x = 1
+
+            try:
+                reveal_type(x)
+                x = could_raise_returns_str()
+                reveal_type(x)
+            except TypeError:
+                reveal_type(x)
+                x = could_raise_returns_bytes()
+                reveal_type(x)
+                x = could_raise_returns_bool()
+                reveal_type(x)
+            except ValueError:
+                reveal_type(x)
+                x = could_raise_returns_memoryview()
+                reveal_type(x)
+                x = could_raise_returns_float()
+                reveal_type(x)
+            finally:
+                reveal_type(x)
+                x = 2
+                reveal_type(x)
+
+            # `finally` is *always* executed, so this should be the same
+            # as at the end of the `finally` block (`Literal[2]`)
+            reveal_type(x)
+            ",
+        )?;
+
+        assert_file_diagnostics(
+            &db,
+            "src/a.py",
+            &[
+                "Revealed type is `Literal[1]`",
+                "Revealed type is `str`",
+                "Revealed type is `Literal[1] | str`",
+                "Revealed type is `bytes`",
+                "Revealed type is `bool`",
+                "Revealed type is `Literal[1] | str`",
+                "Revealed type is `memoryview`",
+                "Revealed type is `float`",
+                "Revealed type is `Literal[1] | str | bytes | bool | memoryview | float`",
+                "Revealed type is `Literal[2]`",
+                "Revealed type is `Literal[2]`",
+            ],
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn exception_handler_control_flow_multiple_excepts_no_redef_in_finally() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            from typing_extensions import reveal_type
+
+            def could_raise_returns_str() -> str:
+                return 'foo'
+
+            def could_raise_returns_bytes() -> bytes:
+                return b'foo'
+
+            def could_raise_returns_bool() -> bool:
+                return True
+
+            def could_raise_returns_memoryview() -> memoryview:
+                return True
+
+            def could_raise_returns_float() -> float:
+                return True
+
+            x = 1
+
+            try:
+                reveal_type(x)
+                x = could_raise_returns_str()
+                reveal_type(x)
+            except TypeError:
+                reveal_type(x)
+                x = could_raise_returns_bytes()
+                reveal_type(x)
+                x = could_raise_returns_bool()
+                reveal_type(x)
+            except ValueError:
+                reveal_type(x)
+                x = could_raise_returns_memoryview()
+                reveal_type(x)
+                x = could_raise_returns_float()
+                reveal_type(x)
+            finally:
+                reveal_type(x)
+
+            # If we get here, unlike the state when we're visiting the `finally`,
+            # we know that either the `try` block ran to completion or exactly one `except` block did,
+            # so there are fewer possibilities than there were inside the `finally` block.
+            reveal_type(x)
+            ",
+        )?;
+
+        assert_file_diagnostics(
+            &db,
+            "src/a.py",
+            &[
+                "Revealed type is `Literal[1]`",
+                "Revealed type is `str`",
+                "Revealed type is `Literal[1] | str`",
+                "Revealed type is `bytes`",
+                "Revealed type is `bool`",
+                "Revealed type is `Literal[1] | str`",
+                "Revealed type is `memoryview`",
+                "Revealed type is `float`",
+                "Revealed type is `Literal[1] | str | bytes | bool | memoryview | float`",
+                "Revealed type is `str | bool | float`",
             ],
         );
 
