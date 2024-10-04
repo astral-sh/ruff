@@ -31,6 +31,9 @@ use super::definition::{
     DefinitionCategory, ExceptHandlerDefinitionNodeRef, MatchPatternDefinitionNodeRef,
     WithItemDefinitionNodeRef,
 };
+use except_handlers::{TryBlockContextRefMut, TryBlockContexts, TryBlockContextsStack};
+
+mod except_handlers;
 
 pub(super) struct SemanticIndexBuilder<'db> {
     // Builder state
@@ -44,6 +47,8 @@ pub(super) struct SemanticIndexBuilder<'db> {
     current_match_case: Option<CurrentMatchCase<'db>>,
     /// Flow states at each `break` in the current loop.
     loop_break_states: Vec<FlowSnapshot>,
+    /// Per-scope contexts regarding nested `try`/`except` statements
+    try_block_contexts_stack: TryBlockContextsStack,
 
     /// Flags about the file's global scope
     has_future_annotations: bool,
@@ -70,6 +75,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             current_assignment: None,
             current_match_case: None,
             loop_break_states: vec![],
+            try_block_contexts_stack: TryBlockContextsStack::default(),
 
             has_future_annotations: false,
 
@@ -97,6 +103,16 @@ impl<'db> SemanticIndexBuilder<'db> {
             .expect("Always to have a root scope")
     }
 
+    fn try_block_contexts(&self) -> &TryBlockContexts {
+        self.try_block_contexts_stack.current_try_block_context()
+    }
+
+    fn try_block_contexts_mut(&self) -> TryBlockContextRefMut {
+        self.try_block_contexts_stack
+            .current_try_block_context()
+            .borrow_mut()
+    }
+
     fn push_scope(&mut self, node: NodeWithScopeRef) {
         let parent = self.current_scope();
         self.push_scope_with_parent(node, Some(parent));
@@ -110,6 +126,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             kind: node.scope_kind(),
             descendents: children_start..children_start,
         };
+        self.try_block_contexts_stack.push_context();
 
         let file_scope_id = self.scopes.push(scope);
         self.symbol_tables.push(SymbolTableBuilder::new());
@@ -139,6 +156,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         let children_end = self.scopes.next_index();
         let scope = &mut self.scopes[id];
         scope.descendents = scope.descendents.start..children_end;
+        self.try_block_contexts_stack.pop_context();
         id
     }
 
@@ -226,6 +244,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             DefinitionCategory::Declaration => use_def.record_declaration(symbol, definition),
             DefinitionCategory::Binding => use_def.record_binding(symbol, definition),
         }
+        self.try_block_contexts_mut().record_definitions_state(self);
 
         definition
     }
