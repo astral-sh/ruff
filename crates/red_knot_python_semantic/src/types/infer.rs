@@ -2487,9 +2487,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = compare;
 
         self.infer_expression(left);
-        for expr in comparators {
-            self.infer_expression(expr);
-        }
+        for right in comparators.as_ref() {
+            self.infer_expression(right);
 
         // https://docs.python.org/3/reference/expressions.html#comparisons
         // > Formally, if `a, b, c, …, y, z` are expressions and `op1, op2, …, opN` are comparison
