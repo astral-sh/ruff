@@ -6532,6 +6532,66 @@ mod tests {
     }
 
     #[test]
+    fn exception_handler_control_flow_multiple_excepts_with_else() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            from typing_extensions import reveal_type
+
+            def could_raise_returns_str() -> str: ...
+
+            x = 1
+
+            try:
+                reveal_type(x)
+                x = could_raise_returns_str()
+                reveal_type(x)
+            except TypeError:
+                reveal_type(x)
+                x = 2
+                reveal_type(x)
+            except ValueError:
+                reveal_type(x)
+                x = 3
+                reveal_type(x)
+            else:
+                reveal_type(x)
+                x = 4
+                reveal_type(x)
+
+            # If we reach this point, either `try` and `else` was executed in its entirety,
+            # or exactly one `except` was executed in its entirety
+            #
+            # - At the end of `except TypeError`, `x == 2`
+            # - At the end of `except ValueError`, `x == 3`
+            # - At the end of `else`, `x == 4`
+
+            reveal_type(x)
+            ",
+        )?;
+
+        assert_file_diagnostics(
+            &db,
+            "src/a.py",
+            &[
+                "Revealed type is `Literal[1]`",
+                "Revealed type is `str`",
+                "Revealed type is `Literal[1] | str`",
+                "Revealed type is `Literal[2]`",
+                "Revealed type is `Literal[1] | str`",
+                "Revealed type is `Literal[3]`",
+                "Revealed type is `str`",
+                "Revealed type is `Literal[4]`",
+                "Revealed type is `Literal[2, 3, 4]`",
+            ],
+        );
+
+        Ok(())
+    }
+
+    #[test]
     fn basic_comprehension() -> anyhow::Result<()> {
         let mut db = setup_db();
 
