@@ -43,7 +43,7 @@ use crate::checkers::ast::Checker;
 ///     print(x, y)
 /// ```
 ///
-/// The tuple key is unpackaged into `x` and `y` instead of the key and values. This means that
+/// The tuple key is unpacked into `x` and `y` instead of the key and values. This means that
 /// the suggested fix of using `d.items()` would result in different runtime behavior. Ruff
 /// cannot yet detect the tuple key.
 ///
