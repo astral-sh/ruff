@@ -329,6 +329,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         matches!(self.region, InferenceRegion::Deferred(_))
     }
 
+    /// Get the already-inferred type of an expression node.
+    ///
+    /// PANIC if no type has been inferred for this node.
+    fn expression_ty(&self, expr: &ast::Expr) -> Type<'db> {
+        self.types
+            .expression_ty(expr.scoped_ast_id(self.db, self.scope))
+    }
+
     /// Infers types in the given [`InferenceRegion`].
     fn infer_region(&mut self) {
         match self.region {
@@ -985,9 +993,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         // TODO(dhruvmanila): The correct type inference here is the return type of the __enter__
         // method of the context manager.
-        let context_expr_ty = self
-            .types
-            .expression_ty(with_item.context_expr.scoped_ast_id(self.db, self.scope));
+        let context_expr_ty = self.expression_ty(&with_item.context_expr);
 
         self.types
             .expressions
@@ -1152,9 +1158,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let expression = self.index.expression(assignment.value.as_ref());
         let result = infer_expression_types(self.db, expression);
         self.extend(result);
-        let value_ty = self
-            .types
-            .expression_ty(assignment.value.scoped_ast_id(self.db, self.scope));
+        let value_ty = self.expression_ty(&assignment.value);
         self.add_binding(assignment.into(), definition, value_ty);
         self.types
             .expressions
@@ -1350,9 +1354,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let expression = self.index.expression(iterable);
         let result = infer_expression_types(self.db, expression);
         self.extend(result);
-        let iterable_ty = self
-            .types
-            .expression_ty(iterable.scoped_ast_id(self.db, self.scope));
+        let iterable_ty = self.expression_ty(iterable);
 
         let loop_var_value_ty = if is_async {
             // TODO(Alex): async iterables/iterators!
@@ -2504,12 +2506,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .tuple_windows::<(_, _)>()
                 .zip(ops.iter())
                 .map(|((left, right), op)| {
-                    let left_ty = self
-                        .types
-                        .expression_ty(left.scoped_ast_id(self.db, self.scope));
-                    let right_ty = self
-                        .types
-                        .expression_ty(right.scoped_ast_id(self.db, self.scope));
+                    let left_ty = self.expression_ty(left);
+                    let right_ty = self.expression_ty(right);
 
                     self.infer_binary_type_comparison(left_ty, *op, right_ty)
                         .unwrap_or_else(|| {
