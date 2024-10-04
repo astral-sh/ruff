@@ -416,18 +416,18 @@ impl<'db> Type<'db> {
             (Type::Never, _) => true,
             (_, Type::Never) => false,
             (Type::IntLiteral(_), Type::Instance(class))
-                if matches!(class.is_builtin(db), Some(BuiltinType::Int)) =>
+                if class.is_builtin(db, BuiltinClass::Int) =>
             {
                 true
             }
             (Type::StringLiteral(_), Type::LiteralString) => true,
             (Type::StringLiteral(_) | Type::LiteralString, Type::Instance(class))
-                if matches!(class.is_builtin(db), Some(BuiltinType::Str)) =>
+                if class.is_builtin(db, BuiltinClass::Str) =>
             {
                 true
             }
             (Type::BytesLiteral(_), Type::Instance(class))
-                if matches!(class.is_builtin(db), Some(BuiltinType::Bytes)) =>
+                if class.is_builtin(db, BuiltinClass::Bytes) =>
             {
                 true
             }
@@ -435,16 +435,8 @@ impl<'db> Type<'db> {
                 .elements(db)
                 .iter()
                 .any(|&elem_ty| ty.is_subtype_of(db, elem_ty)),
-            (_, Type::Instance(class))
-                if matches!(class.is_builtin(db), Some(BuiltinType::Object)) =>
-            {
-                true
-            }
-            (Type::Instance(class), _)
-                if matches!(class.is_builtin(db), Some(BuiltinType::Object)) =>
-            {
-                false
-            }
+            (_, Type::Instance(class)) if class.is_builtin(db, BuiltinClass::Object) => true,
+            (Type::Instance(class), _) if class.is_builtin(db, BuiltinClass::Object) => false,
             // TODO
             _ => false,
         }
@@ -610,11 +602,11 @@ impl<'db> Type<'db> {
 
             // TODO annotated return type on `__new__` or metaclass `__call__`
             Type::Class(class) => {
-                CallOutcome::callable(match class.is_builtin(db) {
+                CallOutcome::callable(match class.known_builtin(db) {
                     // If the class is the builtin-bool class (for example `bool(1)`), we try to
                     // return the specific truthiness value of the input arg, `Literal[True]` for
                     // the example above.
-                    Some(BuiltinType::Bool) => arg_types
+                    Some(BuiltinClass::Bool) => arg_types
                         .first()
                         .map(|arg| arg.bool(db).into_type(db))
                         .unwrap_or(Type::BooleanLiteral(false)),
@@ -713,7 +705,7 @@ impl<'db> Type<'db> {
         let dunder_get_item_method = iterable_meta_type.member(db, "__getitem__");
 
         dunder_get_item_method
-            .call(db, &[self, BuiltinType::Int.to_instance(db)])
+            .call(db, &[self, BuiltinClass::Int.to_instance(db)])
             .return_ty(db)
             .map(|element_ty| IterationOutcome::Iterable { element_ty })
             .unwrap_or(IterationOutcome::NotIterable {
@@ -757,17 +749,17 @@ impl<'db> Type<'db> {
             Type::Never => Type::Never,
             Type::Instance(class) => Type::Class(*class),
             Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
-            Type::BooleanLiteral(_) => BuiltinType::Bool.to_class(db),
-            Type::BytesLiteral(_) => BuiltinType::Bytes.to_class(db),
-            Type::IntLiteral(_) => BuiltinType::Int.to_class(db),
+            Type::BooleanLiteral(_) => BuiltinClass::Bool.to_class(db),
+            Type::BytesLiteral(_) => BuiltinClass::Bytes.to_class(db),
+            Type::IntLiteral(_) => BuiltinClass::Int.to_class(db),
             Type::Function(_) => types_symbol_ty(db, "FunctionType"),
             Type::Module(_) => types_symbol_ty(db, "ModuleType"),
-            Type::Tuple(_) => BuiltinType::Tuple.to_class(db),
+            Type::Tuple(_) => BuiltinClass::Tuple.to_class(db),
             Type::None => typeshed_symbol_ty(db, "NoneType"),
             // TODO not accurate if there's a custom metaclass...
             Type::Class(_) => builtins_symbol_ty(db, "type"),
             // TODO can we do better here? `type[LiteralString]`?
-            Type::StringLiteral(_) | Type::LiteralString => BuiltinType::Str.to_class(db),
+            Type::StringLiteral(_) | Type::LiteralString => BuiltinClass::Str.to_class(db),
             // TODO: `type[Any]`?
             Type::Any => Type::Todo,
             // TODO: `type[Unknown]`?
@@ -789,7 +781,7 @@ impl<'db> Type<'db> {
             Type::IntLiteral(_) | Type::BooleanLiteral(_) => self.repr(db),
             Type::StringLiteral(_) | Type::LiteralString => *self,
             // TODO: handle more complex types
-            _ => BuiltinType::Str.to_instance(db),
+            _ => BuiltinClass::Str.to_instance(db),
         }
     }
 
@@ -812,7 +804,7 @@ impl<'db> Type<'db> {
             })),
             Type::LiteralString => Type::LiteralString,
             // TODO: handle more complex types
-            _ => BuiltinType::Str.to_instance(db),
+            _ => BuiltinClass::Str.to_instance(db),
         }
     }
 }
@@ -826,10 +818,10 @@ impl<'db> From<&Type<'db>> for Type<'db> {
 /// Non-exhaustive enumeration of builtin types to allow for easier syntax when interacting with
 /// the most common builtin types (e.g. int, str, ...).
 ///
-/// Feel free to expend this enum if you ever find yourself using the same builtin type in multiple
+/// Feel free to expand this enum if you ever find yourself using the same builtin type in multiple
 /// places.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum BuiltinType {
+pub enum BuiltinClass {
     Bool,
     Object,
     Bytes,
@@ -842,7 +834,7 @@ pub enum BuiltinType {
     Dict,
 }
 
-impl<'db> BuiltinType {
+impl<'db> BuiltinClass {
     pub const fn as_str(&self) -> &'static str {
         match self {
             Self::Bool => "bool",
@@ -859,7 +851,7 @@ impl<'db> BuiltinType {
     }
 
     pub fn to_instance(&self, db: &'db dyn Db) -> Type<'db> {
-        builtins_symbol_ty(db, self.as_str()).to_instance(db)
+        self.to_class(db).to_instance(db)
     }
 
     pub fn to_class(&self, db: &'db dyn Db) -> Type<'db> {
@@ -1187,7 +1179,7 @@ impl Truthiness {
         match self {
             Self::AlwaysTrue => Type::BooleanLiteral(true),
             Self::AlwaysFalse => Type::BooleanLiteral(false),
-            Self::Ambiguous => BuiltinType::Bool.to_instance(db),
+            Self::Ambiguous => BuiltinClass::Bool.to_instance(db),
         }
     }
 }
@@ -1280,22 +1272,29 @@ pub struct ClassType<'db> {
 
     body_scope: ScopeId<'db>,
 
-    is_builtin: Option<BuiltinType>,
+    known_builtin: Option<BuiltinClass>,
 }
 
 impl<'db> ClassType<'db> {
-    /// Find if a class is a builtin type.
-    pub fn maybe_builtin(
+    /// Find if a class is a known builtin class (we test for a subset of builtins)
+    pub fn maybe_known_builtin(
         db: &'db dyn Db,
         name: &ast::name::Name,
         body_scope: &ScopeId<'db>,
-    ) -> Option<BuiltinType> {
+    ) -> Option<BuiltinClass> {
         if file_to_module(db, body_scope.file(db)).is_some_and(|module| {
             module.search_path().is_standard_library() && module.name() == "builtins"
         }) {
-            BuiltinType::from_name(name.as_str())
+            BuiltinClass::from_name(name.as_str())
         } else {
             None
+        }
+    }
+
+    pub fn is_builtin(self, db: &'db dyn Db, builtin: BuiltinClass) -> bool {
+        match self.known_builtin(db) {
+            Some(class_builtin) => class_builtin == builtin,
+            None => false,
         }
     }
 

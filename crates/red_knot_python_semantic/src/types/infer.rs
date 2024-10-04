@@ -56,7 +56,7 @@ use crate::types::{
 };
 use crate::Db;
 
-use super::BuiltinType;
+use super::BuiltinClass;
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -521,8 +521,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             Type::IntLiteral(_) => {}
             Type::Instance(cls)
                 if matches!(
-                    cls.is_builtin(self.db),
-                    Some(BuiltinType::Float | BuiltinType::Int)
+                    cls.known_builtin(self.db),
+                    Some(BuiltinClass::Float | BuiltinClass::Int)
                 ) => {}
             _ => return,
         };
@@ -865,7 +865,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .node_scope(NodeWithScopeRef::Class(class))
             .to_scope_id(self.db, self.file);
 
-        let is_builtin = ClassType::maybe_builtin(self.db, &name.id, &body_scope);
+        let is_builtin = ClassType::maybe_known_builtin(self.db, &name.id, &body_scope);
         let class_ty = Type::Class(ClassType::new(
             self.db,
             name.id.clone(),
@@ -1714,8 +1714,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Number::Int(n) => n
                 .as_i64()
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| BuiltinType::Int.to_instance(self.db)),
-            ast::Number::Float(_) => BuiltinType::Float.to_instance(self.db),
+                .unwrap_or_else(|| BuiltinClass::Int.to_instance(self.db)),
+            ast::Number::Float(_) => BuiltinClass::Float.to_instance(self.db),
             ast::Number::Complex { .. } => {
                 builtins_symbol_ty(self.db, "complex").to_instance(self.db)
             }
@@ -1832,7 +1832,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // TODO generic
-        BuiltinType::List.to_instance(self.db)
+        BuiltinClass::List.to_instance(self.db)
     }
 
     fn infer_set_expression(&mut self, set: &ast::ExprSet) -> Type<'db> {
@@ -1843,7 +1843,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // TODO generic
-        BuiltinType::Set.to_instance(self.db)
+        BuiltinClass::Set.to_instance(self.db)
     }
 
     fn infer_dict_expression(&mut self, dict: &ast::ExprDict) -> Type<'db> {
@@ -1855,7 +1855,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // TODO generic
-        BuiltinType::Dict.to_instance(self.db)
+        BuiltinClass::Dict.to_instance(self.db)
     }
 
     /// Infer the type of the `iter` expression of the first comprehension.
@@ -2353,31 +2353,31 @@ impl<'db> TypeInferenceBuilder<'db> {
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Add) => n
                 .checked_add(m)
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| BuiltinType::Int.to_instance(self.db)),
+                .unwrap_or_else(|| BuiltinClass::Int.to_instance(self.db)),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Sub) => n
                 .checked_sub(m)
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| BuiltinType::Int.to_instance(self.db)),
+                .unwrap_or_else(|| BuiltinClass::Int.to_instance(self.db)),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Mult) => n
                 .checked_mul(m)
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| BuiltinType::Int.to_instance(self.db)),
+                .unwrap_or_else(|| BuiltinClass::Int.to_instance(self.db)),
 
             (Type::IntLiteral(_), Type::IntLiteral(_), ast::Operator::Div) => {
-                BuiltinType::Float.to_instance(self.db)
+                BuiltinClass::Float.to_instance(self.db)
             }
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::FloorDiv) => n
                 .checked_div(m)
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| BuiltinType::Int.to_instance(self.db)),
+                .unwrap_or_else(|| BuiltinClass::Int.to_instance(self.db)),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Mod) => n
                 .checked_rem(m)
                 .map(Type::IntLiteral)
-                .unwrap_or_else(|| BuiltinType::Int.to_instance(self.db)),
+                .unwrap_or_else(|| BuiltinClass::Int.to_instance(self.db)),
 
             (Type::BytesLiteral(lhs), Type::BytesLiteral(rhs), ast::Operator::Add) => {
                 Type::BytesLiteral(BytesLiteralType::new(
@@ -3130,7 +3130,7 @@ impl StringPartsCollector {
 
     fn ty(self, db: &dyn Db) -> Type {
         if self.expression {
-            BuiltinType::Str.to_instance(db)
+            BuiltinClass::Str.to_instance(db)
         } else if let Some(concatenated) = self.concatenated {
             Type::StringLiteral(StringLiteralType::new(db, concatenated.into_boxed_str()))
         } else {
