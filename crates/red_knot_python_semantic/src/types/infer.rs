@@ -7216,7 +7216,6 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "src/a.py",
-
             // NOTE: the order of diagnostics here is somewhat confusing:
             // diagnostics for the outer scope are reported before any of the inner scopes
             &[
@@ -7226,7 +7225,6 @@ mod tests {
                 "Revealed type is `complex`",
                 "Revealed type is `Literal[1] | Literal[foo] | Literal[Bar] | complex`",
                 "Revealed type is `Literal[foo] | complex`",
-
                 // `reveal_type`s local to `y`
                 "Revealed type is `str`",
                 "Revealed type is `bytes`",
@@ -7235,7 +7233,6 @@ mod tests {
                 "Revealed type is `float`",
                 "Revealed type is `str | bytes | bytearray | float`",
                 "Revealed type is `bytes | float`",
-
                 // `reveal_type`s local to `Bar`:
                 "Revealed type is `range`",
             ],
