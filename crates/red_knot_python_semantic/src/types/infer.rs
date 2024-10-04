@@ -6315,7 +6315,7 @@ mod tests {
             "
             from typing_extensions import reveal_type
 
-            def could_raise_returns_str() -> str: ...
+            def could_raise_returns_str() -> str: return 'foo'
 
             x = 1
 
@@ -6359,7 +6359,7 @@ mod tests {
             "
             from typing_extensions import reveal_type
 
-            def could_raise_returns_str() -> str: ...
+            def could_raise_returns_str() -> str: return 'foo'
 
             x = 1
 
@@ -6389,7 +6389,7 @@ mod tests {
             "
             from typing_extensions import reveal_type
 
-            def could_raise_returns_str() -> str: ...
+            def could_raise_returns_str() -> str: return 'foo'
 
             x = 1
 
@@ -6433,7 +6433,7 @@ mod tests {
             "
             from typing_extensions import reveal_type
 
-            def could_raise_returns_str() -> str: ...
+            def could_raise_returns_str() -> str: return 'foo'
 
             x = 1
 
@@ -6487,7 +6487,7 @@ mod tests {
             "
             from typing_extensions import reveal_type
 
-            def could_raise_returns_str() -> str: ...
+            def could_raise_returns_str() -> str: return 'foo'
 
             x = 1
 
@@ -6540,7 +6540,7 @@ mod tests {
             "
             from typing_extensions import reveal_type
 
-            def could_raise_returns_str() -> str: ...
+            def could_raise_returns_str() -> str: return 'foo'
 
             x = 1
 
@@ -6600,7 +6600,7 @@ mod tests {
             "
             from typing_extensions import reveal_type
 
-            def could_raise_returns_str() -> str: ...
+            def could_raise_returns_str() -> str: return 'foo'
 
             x = 1
 
@@ -6643,7 +6643,7 @@ mod tests {
             "
             from typing_extensions import reveal_type
 
-            def could_raise_returns_str() -> str: ...
+            def could_raise_returns_str() -> str: return 'foo'
 
             x = 1
 
@@ -6684,8 +6684,14 @@ mod tests {
             "
             from typing_extensions import reveal_type
 
-            def could_raise_returns_str() -> str: ...
-            def could_raise_returns_bytes() -> bytes: ...
+            def could_raise_returns_str() -> str:
+                return 'foo'
+
+            def could_raise_returns_bytes() -> bytes:
+                return b'foo'
+
+            def could_raise_returns_bool() -> bool:
+                return True
 
             x = 1
 
@@ -6696,6 +6702,8 @@ mod tests {
             except TypeError:
                 reveal_type(x)
                 x = could_raise_returns_bytes()
+                reveal_type(x)
+                x = could_raise_returns_bool()
                 reveal_type(x)
             finally:
                 reveal_type(x)
@@ -6716,7 +6724,8 @@ mod tests {
                 "Revealed type is `str`",
                 "Revealed type is `Literal[1] | str`",
                 "Revealed type is `bytes`",
-                "Revealed type is `Literal[1] | str | bytes`",
+                "Revealed type is `bool`",
+                "Revealed type is `Literal[1] | str | bytes | bool`",
                 "Revealed type is `Literal[2]`",
                 "Revealed type is `Literal[2]`",
             ],
@@ -6734,8 +6743,14 @@ mod tests {
             "
             from typing_extensions import reveal_type
 
-            def could_raise_returns_str() -> str: ...
-            def could_raise_returns_bytes() -> bytes: ...
+            def could_raise_returns_str() -> str:
+                return 'foo'
+
+            def could_raise_returns_bytes() -> bytes:
+                return b'foo'
+
+            def could_raise_returns_bool() -> bool:
+                return True
 
             x = 1
 
@@ -6746,6 +6761,8 @@ mod tests {
             except TypeError:
                 reveal_type(x)
                 x = could_raise_returns_bytes()
+                reveal_type(x)
+                x = could_raise_returns_bool()
                 reveal_type(x)
             finally:
                 reveal_type(x)
@@ -6765,8 +6782,9 @@ mod tests {
                 "Revealed type is `str`",
                 "Revealed type is `Literal[1] | str`",
                 "Revealed type is `bytes`",
-                "Revealed type is `Literal[1] | str | bytes`",
-                "Revealed type is `str | bytes`",
+                "Revealed type is `bool`",
+                "Revealed type is `Literal[1] | str | bytes | bool`",
+                "Revealed type is `str | bool`",
             ],
         );
 
