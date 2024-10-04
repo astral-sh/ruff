@@ -860,8 +860,10 @@ impl<'db> KnownClass {
     }
 
     pub fn to_class(&self, db: &'db dyn Db) -> Type<'db> {
-        // TODO: figure out how to deal with non-builtins
-        builtins_symbol_ty(db, self.as_str())
+        match self {
+            Self::Any => types_symbol_ty(db, self.as_str()),
+            _ => builtins_symbol_ty(db, self.as_str()),
+        }
     }
 
     pub fn maybe_from_module(module: &Module, class_name: &str) -> Option<Self> {
@@ -897,17 +899,8 @@ impl<'db> KnownClass {
         let is_typing_extensions =
             module.search_path().is_standard_library() && module.name() == "typing_extensions";
         match self {
-            Self::Bool
-            | Self::Object
-            | Self::Bytes
-            | Self::Int
-            | Self::Float
-            | Self::Str
-            | Self::List
-            | Self::Dict
-            | Self::Set
-            | Self::Tuple => is_builtin,
             Self::Any => is_typing || is_typing_extensions,
+            _ => is_builtin,
         }
     }
 }
