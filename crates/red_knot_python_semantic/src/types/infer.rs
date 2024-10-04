@@ -7149,6 +7149,102 @@ mod tests {
     }
 
     #[test]
+    fn exception_handler_control_flow_nested_scopes() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            from typing_extensions import reveal_type
+
+            def could_raise_returns_str() -> str:
+                return 'foo'
+
+            def could_raise_returns_bytes() -> bytes:
+                return b'foo'
+
+            def could_raise_returns_range() -> range:
+                return range(42)
+
+            def could_raise_returns_bytearray() -> bytearray:
+                return bytearray()
+
+            def could_raise_returns_float() -> float:
+                return 3.14
+
+            def could_raise_returns_complex() -> complex:
+                return 3j
+
+            x = 1
+
+            try:
+                def foo(param=could_raise_returns_str()):
+                    x = could_raise_returns_str()
+
+                    try:
+                        reveal_type(x)
+                        x = could_raise_returns_bytes()
+                        reveal_type(x)
+                    except:
+                        reveal_type(x)
+                        x = could_raise_returns_bytearray()
+                        reveal_type(x)
+                        x = could_raise_returns_float()
+                        reveal_type(x)
+                    finally:
+                        reveal_type(x)
+                    reveal_type(x)
+
+                x = foo
+                reveal_type(x)
+            except:
+                class Bar:
+                    x = could_raise_returns_range()
+                    reveal_type(x)
+
+                x = Bar
+                reveal_type(x)
+                x: complex = could_raise_returns_complex()
+                reveal_type(x)
+            finally:
+                reveal_type(x)
+
+            reveal_type(x)
+            ",
+        )?;
+
+        assert_file_diagnostics(
+            &db,
+            "src/a.py",
+
+            // NOTE: the order of diagnostics here is somewhat confusing:
+            // diagnostics for the outer scope are reported before any of the inner scopes
+            &[
+                // global-scope `reveal_type`s
+                "Revealed type is `Literal[foo]`",
+                "Revealed type is `Literal[Bar]`",
+                "Revealed type is `complex`",
+                "Revealed type is `Literal[1] | Literal[foo] | Literal[Bar] | complex`",
+                "Revealed type is `Literal[foo] | complex`",
+
+                // `reveal_type`s local to `y`
+                "Revealed type is `str`",
+                "Revealed type is `bytes`",
+                "Revealed type is `str | bytes`",
+                "Revealed type is `bytearray`",
+                "Revealed type is `float`",
+                "Revealed type is `str | bytes | bytearray | float`",
+                "Revealed type is `bytes | float`",
+
+                // `reveal_type`s local to `Bar`:
+                "Revealed type is `range`",
+            ],
+        );
+
+        Ok(())
+    }
+
+    #[test]
     fn basic_comprehension() -> anyhow::Result<()> {
         let mut db = setup_db();
 
