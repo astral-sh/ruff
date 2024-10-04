@@ -4,7 +4,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_semantic::SemanticModel;
 use ruff_source_file::Locator;
-use ruff_text_size::{Ranged, TextLen};
+use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for the removal of a prefix or suffix from a string by assigning
@@ -334,8 +334,10 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
             }),
         ) => num
             .as_int()
-            .and_then(ast::Int::as_u32) // Only support prefix removal for size at most `u32::MAX`
-            .is_some_and(|x| x == string_val.to_str().text_len().to_u32()),
+            // Only support prefix removal for size at most `u32::MAX`
+            .and_then(ast::Int::as_u32)
+            .and_then(|x| usize::try_from(x).ok())
+            .is_some_and(|x| x == string_val.to_str().chars().count()),
         (
             AffixKind::StartsWith,
             ast::Expr::Call(ast::ExprCall {
@@ -370,7 +372,8 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
                 value
                     .as_int()
                     .and_then(ast::Int::as_u32)
-                    .is_some_and(|x| x == string_val.to_str().text_len().to_u32())
+                    .and_then(|x| usize::try_from(x).ok())
+                    .is_some_and(|x| x == string_val.to_str().chars().count())
             },
         ),
         (
