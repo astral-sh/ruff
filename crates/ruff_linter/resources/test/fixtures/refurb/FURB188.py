@@ -194,7 +194,7 @@ def handle_surrogates():
         text = text[1:]
     
     # should not be linted
-        text = "\ud800\udc00heythere"
+    text = "\ud800\udc00heythere"
     if text.startswith("\ud800\udc00"):
         text = text[1:]
     
