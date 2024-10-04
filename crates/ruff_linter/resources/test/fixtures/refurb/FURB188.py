@@ -170,3 +170,15 @@ def ignore_step():
     if text.startswith("!"):
         text = text[1::2]
     print(text)
+
+def handle_unicode():
+    # should be skipped!
+    text = "řetězec"
+    if text.startswith("ř"): 
+        text = text[2:]
+
+    # should be linted
+    # with fix `text = text.removeprefix("ř")`
+    text = "řetězec"
+    if text.startswith("ř"): 
+        text = text[1:]
