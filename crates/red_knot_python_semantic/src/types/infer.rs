@@ -50,7 +50,7 @@ use crate::semantic_index::SemanticIndex;
 use crate::stdlib::builtins_module_scope;
 use crate::types::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 use crate::types::{
-    bindings_ty, builtins_symbol_ty, declarations_ty, global_symbol_ty, symbol_ty,
+    bindings_ty, builtins_symbol_ty, declarations_ty, global_symbol_lookup, symbol_ty,
     typing_extensions_symbol_ty, BytesLiteralType, ClassType, FunctionKind, FunctionType,
     StringLiteralType, Truthiness, TupleType, Type, TypeArrayDisplay, UnionType,
 };
@@ -2213,7 +2213,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             let ty = if file_scope_id.is_global() {
                 Type::Unbound
             } else {
-                global_symbol_ty(self.db, self.file, name)
+                global_symbol_lookup(self.db, self.file, name)
             };
             // Fallback to builtins (without infinite recursion if we're already in builtins.)
             if ty.may_be_unbound(self.db) && Some(self.scope) != builtins_module_scope(self.db) {
@@ -3184,6 +3184,7 @@ mod tests {
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast::name::Name;
+    use test_case::test_case;
 
     use super::TypeInferenceBuilder;
 
@@ -3521,7 +3522,7 @@ mod tests {
     }
 
     #[test]
-    fn imported_unbound_symbol_is_unknown() -> anyhow::Result<()> {
+    fn imported_unbound_symbol_is_never() -> anyhow::Result<()> {
         let mut db = setup_db();
 
         db.write_files([
@@ -3532,8 +3533,8 @@ mod tests {
 
         // the type as seen from external modules (`Unknown`)
         // is different from the type inside the module itself (`Unbound`):
-        assert_public_ty(&db, "src/package/foo.py", "x", "Unbound");
-        assert_public_ty(&db, "src/package/bar.py", "x", "Unknown");
+        assert_public_ty(&db, "src/package/foo.py", "x", "Never");
+        assert_public_ty(&db, "src/package/bar.py", "x", "Never");
 
         Ok(())
     }
@@ -4208,7 +4209,7 @@ mod tests {
         )?;
 
         // TODO: sys.version_info, and need to understand @final and @type_check_only
-        assert_public_ty(&db, "src/a.py", "x", "Unknown | EllipsisType");
+        assert_public_ty(&db, "src/a.py", "x", "EllipsisType | Unknown");
 
         Ok(())
     }
@@ -4541,6 +4542,40 @@ mod tests {
     }
 
     #[test]
+    fn resolve_unbound_public() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            if flag:
+                x: int = 1
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "x", "int");
+
+        Ok(())
+    }
+
+    #[test]
+    fn resolve_unannotated_unbound_public() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            if flag:
+                x = 1
+            ",
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "x", "Literal[1]");
+
+        Ok(())
+    }
+
+    #[test]
     fn literal_int_arithmetic() -> anyhow::Result<()> {
         let mut db = setup_db();
 
@@ -4756,8 +4791,8 @@ mod tests {
         )?;
 
         assert_public_ty(&db, "src/a.py", "x", "Literal[3, 4, 5]");
-        assert_public_ty(&db, "src/a.py", "r", "Unbound | Literal[2]");
-        assert_public_ty(&db, "src/a.py", "s", "Unbound | Literal[5]");
+        assert_public_ty(&db, "src/a.py", "r", "Literal[2]");
+        assert_public_ty(&db, "src/a.py", "s", "Literal[5]");
         Ok(())
     }
 
@@ -4898,7 +4933,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_public_ty(&db, "src/a.py", "y", "Unbound | Literal[2, 3]");
+        assert_public_ty(&db, "src/a.py", "y", "Literal[2, 3]");
     }
 
     #[test]
@@ -5014,24 +5049,29 @@ mod tests {
         let y_ty = symbol_ty(&db, function_scope, "y");
         let x_ty = symbol_ty(&db, function_scope, "x");
 
-        assert_eq!(x_ty.display(&db).to_string(), "Unbound");
+        assert_eq!(x_ty.display(&db).to_string(), "Never");
         assert_eq!(y_ty.display(&db).to_string(), "Literal[1]");
 
         Ok(())
     }
 
-    #[test]
-    fn conditionally_global_or_builtin() -> anyhow::Result<()> {
+    #[test_case("")]
+    // Tests that we only use the definition of a symbol instead of its declaration when we are
+    // checking module globals without a nonlocal binding.
+    #[test_case(": int"; "with a declaration")]
+    fn conditionally_global_or_builtin(annotation: &'static str) -> anyhow::Result<()> {
         let mut db = setup_db();
 
         db.write_dedented(
             "/src/a.py",
-            "
-            if flag:
-                copyright = 1
-            def f():
-                y = copyright
+            &format!(
+                "
+                if flag:
+                    copyright {annotation} = 1
+                def f():
+                    y = copyright
             ",
+            ),
         )?;
 
         let file = system_path_to_file(&db, "src/a.py").expect("file to exist");
@@ -5079,7 +5119,7 @@ mod tests {
         let y_ty = symbol_ty(&db, class_scope, "y");
         let x_ty = symbol_ty(&db, class_scope, "x");
 
-        assert_eq!(x_ty.display(&db).to_string(), "Unbound | Literal[2]");
+        assert_eq!(x_ty.display(&db).to_string(), "Literal[2]");
         assert_eq!(y_ty.display(&db).to_string(), "Literal[1]");
 
         Ok(())
@@ -5742,7 +5782,7 @@ mod tests {
             ",
         )?;
 
-        assert_public_ty(&db, "src/a.py", "x", "Unbound | int");
+        assert_public_ty(&db, "src/a.py", "x", "int");
 
         Ok(())
     }
@@ -5848,7 +5888,7 @@ mod tests {
             ",
         )?;
 
-        assert_public_ty(&db, "src/a.py", "x", "Unbound | int");
+        assert_public_ty(&db, "src/a.py", "x", "int");
 
         Ok(())
     }
@@ -5862,6 +5902,8 @@ mod tests {
         db.write_dedented(
             "src/a.py",
             "
+            from typing import reveal_type
+
             async def foo():
                 class Iterator:
                     def __next__(self) -> int:
@@ -5873,12 +5915,14 @@ mod tests {
 
                 async for x in Iterator():
                     pass
+
+                reveal_type(x)
             ",
         )?;
 
         // We currently return `Todo` for all `async for` loops,
         // including loops that have invalid syntax
-        assert_scope_ty(&db, "src/a.py", &["foo"], "x", "Unbound | @Todo");
+        assert_file_diagnostics(&db, "src/a.py", &["Revealed type is 'Unbound | @Todo'."]);
 
         Ok(())
     }
@@ -5890,6 +5934,8 @@ mod tests {
         db.write_dedented(
             "src/a.py",
             "
+            from typing import reveal_type
+
             async def foo():
                 class IntAsyncIterator:
                     async def __anext__(self) -> int:
@@ -5901,11 +5947,13 @@ mod tests {
 
                 async for x in IntAsyncIterable():
                     pass
+
+                reveal_type(x)
             ",
         )?;
 
         // TODO(Alex) async iterables/iterators!
-        assert_scope_ty(&db, "src/a.py", &["foo"], "x", "Unbound | @Todo");
+        assert_file_diagnostics(&db, "src/a.py", &["Revealed type is 'Unbound | @Todo'."]);
 
         Ok(())
     }
@@ -5926,7 +5974,7 @@ mod tests {
             &db,
             "src/a.py",
             "x",
-            r#"Unbound | Literal[1] | Literal["a"] | Literal[b"foo"]"#,
+            r#"Literal[1] | Literal["a"] | Literal[b"foo"]"#,
         );
 
         Ok(())
@@ -5955,7 +6003,7 @@ mod tests {
             "src/a.py",
             &["Object of type `NotIterable` is not iterable"],
         );
-        assert_public_ty(&db, "src/a.py", "x", "Unbound | Unknown");
+        assert_public_ty(&db, "src/a.py", "x", "Unknown");
 
         Ok(())
     }
@@ -6078,10 +6126,7 @@ mod tests {
 
         assert_file_diagnostics(&db, "src/a.py", &[]);
 
-        // TODO: once we support `sys.version_info` branches,
-        // we can set `--target-version=py311` in this test
-        // and the inferred type will just be `BaseExceptionGroup` --Alex
-        assert_public_ty(&db, "src/a.py", "e", "Unknown | BaseExceptionGroup");
+        assert_public_ty(&db, "src/a.py", "e", "BaseExceptionGroup");
 
         Ok(())
     }
@@ -6107,7 +6152,7 @@ mod tests {
         // and the inferred type will just be `BaseExceptionGroup` --Alex
         //
         // TODO more precise would be `ExceptionGroup[OSError]` --Alex
-        assert_public_ty(&db, "src/a.py", "e", "Unknown | BaseExceptionGroup");
+        assert_public_ty(&db, "src/a.py", "e", "BaseExceptionGroup");
 
         Ok(())
     }
@@ -6133,7 +6178,7 @@ mod tests {
         // and the inferred type will just be `BaseExceptionGroup` --Alex
         //
         // TODO more precise would be `ExceptionGroup[TypeError | AttributeError]` --Alex
-        assert_public_ty(&db, "src/a.py", "e", "Unknown | BaseExceptionGroup");
+        assert_public_ty(&db, "src/a.py", "e", "BaseExceptionGroup");
 
         Ok(())
     }
@@ -6396,7 +6441,7 @@ mod tests {
             ",
         )?;
 
-        assert_scope_ty(&db, "src/a.py", &["foo", "<listcomp>"], "z", "Unbound");
+        assert_scope_ty(&db, "src/a.py", &["foo", "<listcomp>"], "z", "Never");
 
         // (There is a diagnostic for invalid syntax that's emitted, but it's not listed by `assert_file_diagnostics`)
         assert_file_diagnostics(&db, "src/a.py", &[]);

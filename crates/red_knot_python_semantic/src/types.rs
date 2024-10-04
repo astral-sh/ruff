@@ -43,25 +43,38 @@ pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
     diagnostics
 }
 
+#[derive(Clone, Copy, Eq, PartialEq, Debug)]
+enum SymbolTableLookupContext {
+    PublicImport,
+    GlobalWithinModule,
+}
+
 /// Infer the public type of a symbol (its type as seen from outside its scope).
-fn symbol_ty_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymbolId) -> Type<'db> {
+fn symbol_ty_by_id<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    symbol: ScopedSymbolId,
+    context: SymbolTableLookupContext,
+) -> Type<'db> {
     let _span = tracing::trace_span!("symbol_ty_by_id", ?symbol).entered();
 
     let use_def = use_def_map(db, scope);
 
-    // If the symbol is declared, the public type is based on declarations; otherwise, it's based
-    // on inference from bindings.
-    if use_def.has_public_declarations(symbol) {
+    let unbound_ty = use_def
+        .public_may_be_unbound(symbol)
+        .then_some(match context {
+            SymbolTableLookupContext::PublicImport => Type::Never,
+            SymbolTableLookupContext::GlobalWithinModule => Type::Unbound,
+        });
+
+    // If we want to try to use declarations and the symbol is declared, the public type is based on
+    // declarations; otherwise, it's based on inference from bindings.
+    if context == SymbolTableLookupContext::PublicImport && use_def.has_public_declarations(symbol)
+    {
         let declarations = use_def.public_declarations(symbol);
         // If the symbol is undeclared in some paths, include the inferred type in the public type.
         let undeclared_ty = if declarations.may_be_undeclared() {
-            Some(bindings_ty(
-                db,
-                use_def.public_bindings(symbol),
-                use_def
-                    .public_may_be_unbound(symbol)
-                    .then_some(Type::Unknown),
-            ))
+            Some(bindings_ty(db, use_def.public_bindings(symbol), unbound_ty))
         } else {
             None
         };
@@ -69,28 +82,40 @@ fn symbol_ty_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymb
         // problem of the module we are importing from.
         declarations_ty(db, declarations, undeclared_ty).unwrap_or_else(|(ty, _)| ty)
     } else {
-        bindings_ty(
-            db,
-            use_def.public_bindings(symbol),
-            use_def
-                .public_may_be_unbound(symbol)
-                .then_some(Type::Unbound),
-        )
+        bindings_ty(db, use_def.public_bindings(symbol), unbound_ty)
     }
 }
 
-/// Shorthand for `symbol_ty` that takes a symbol name instead of an ID.
+/// Shorthand for `symbol_ty_by_id` that takes a symbol name instead of an ID.
 fn symbol_ty<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Type<'db> {
     let table = symbol_table(db, scope);
     table
         .symbol_id_by_name(name)
-        .map(|symbol| symbol_ty_by_id(db, scope, symbol))
+        .map(|symbol| symbol_ty_by_id(db, scope, symbol, SymbolTableLookupContext::PublicImport))
         .unwrap_or(Type::Unbound)
 }
 
 /// Shorthand for `symbol_ty` that looks up a module-global symbol by name in a file.
 pub(crate) fn global_symbol_ty<'db>(db: &'db dyn Db, file: File, name: &str) -> Type<'db> {
     symbol_ty(db, global_scope(db, file), name)
+}
+
+/// Shorthand for `symbol_ty_by_id` that looks up a global symbol from the context of being in that
+/// module.
+pub(crate) fn global_symbol_lookup<'db>(db: &'db dyn Db, file: File, name: &str) -> Type<'db> {
+    let table = symbol_table(db, global_scope(db, file));
+
+    table
+        .symbol_id_by_name(name)
+        .map(|symbol| {
+            symbol_ty_by_id(
+                db,
+                global_scope(db, file),
+                symbol,
+                SymbolTableLookupContext::GlobalWithinModule,
+            )
+        })
+        .unwrap_or_else(|| Type::Unbound)
 }
 
 /// Infer the type of a binding.
