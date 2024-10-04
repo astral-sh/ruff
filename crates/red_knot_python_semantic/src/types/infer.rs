@@ -2551,9 +2551,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         op: ast::CmpOp,
         right: Type<'db>,
     ) -> Option<Type<'db>> {
-        // Note: identity (is, is not) is unreliable in Python and not part of the language specs.
-        // - `[ast::CompOp::Is]`: return `false` if different, `bool` if the same
-        // - `[ast::CompOp::IsNot]`: return `true` if different, `bool` if the same
+        // Note: identity (is, is not) for equal builtin types is unreliable and not part of the
+        // language spec.
+        // - `[ast::CompOp::Is]`: return `false` if unequal, `bool` if equal
+        // - `[ast::CompOp::IsNot]`: return `true` if unequal, `bool` if equal
         match (left, right) {
             (Type::IntLiteral(n), Type::IntLiteral(m)) => match op {
                 ast::CmpOp::Eq => Some(Type::BooleanLiteral(n == m)),
