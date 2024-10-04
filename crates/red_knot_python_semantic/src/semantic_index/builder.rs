@@ -1,5 +1,8 @@
 use std::sync::Arc;
 
+use except_handlers::{
+    DefinitionRecord, TryNodeContextStack, TryNodeContextStackManager, TryNodeContextStackRefMut,
+};
 use rustc_hash::FxHashMap;
 
 use ruff_db::files::File;
@@ -28,10 +31,8 @@ use crate::Db;
 
 use super::constraint::{Constraint, PatternConstraint};
 use super::definition::{
-    DefinitionCategory, ExceptHandlerDefinitionNodeRef, MatchPatternDefinitionNodeRef,
-    WithItemDefinitionNodeRef,
+    ExceptHandlerDefinitionNodeRef, MatchPatternDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
-use except_handlers::{TryBlockContextRefMut, TryBlockContexts, TryBlockContextsStack};
 
 mod except_handlers;
 
@@ -48,7 +49,7 @@ pub(super) struct SemanticIndexBuilder<'db> {
     /// Flow states at each `break` in the current loop.
     loop_break_states: Vec<FlowSnapshot>,
     /// Per-scope contexts regarding nested `try`/`except` statements
-    try_block_contexts_stack: TryBlockContextsStack,
+    try_node_context_stack_manager: TryNodeContextStackManager<'db>,
 
     /// Flags about the file's global scope
     has_future_annotations: bool,
@@ -75,7 +76,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             current_assignment: None,
             current_match_case: None,
             loop_break_states: vec![],
-            try_block_contexts_stack: TryBlockContextsStack::default(),
+            try_node_context_stack_manager: TryNodeContextStackManager::default(),
 
             has_future_annotations: false,
 
@@ -103,13 +104,14 @@ impl<'db> SemanticIndexBuilder<'db> {
             .expect("Always to have a root scope")
     }
 
-    fn try_block_contexts(&self) -> &TryBlockContexts {
-        self.try_block_contexts_stack.current_try_block_context()
+    fn try_node_context_stack<'s>(&'s self) -> &'s TryNodeContextStack<'db> {
+        self.try_node_context_stack_manager
+            .current_try_context_stack()
     }
 
-    fn try_block_contexts_mut(&self) -> TryBlockContextRefMut {
-        self.try_block_contexts_stack
-            .current_try_block_context()
+    fn try_node_context_stack_mut<'s>(&'s self) -> TryNodeContextStackRefMut<'s, 'db> {
+        self.try_node_context_stack_manager
+            .current_try_context_stack()
             .borrow_mut()
     }
 
@@ -126,7 +128,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             kind: node.scope_kind(),
             descendents: children_start..children_start,
         };
-        self.try_block_contexts_stack.push_context();
+        self.try_node_context_stack_manager.enter_nested_scope();
 
         let file_scope_id = self.scopes.push(scope);
         self.symbol_tables.push(SymbolTableBuilder::new());
@@ -156,7 +158,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         let children_end = self.scopes.next_index();
         let scope = &mut self.scopes[id];
         scope.descendents = scope.descendents.start..children_end;
-        self.try_block_contexts_stack.pop_context();
+        self.try_node_context_stack_manager.exit_scope();
         id
     }
 
@@ -236,15 +238,10 @@ impl<'db> SemanticIndexBuilder<'db> {
             self.mark_symbol_bound(symbol);
         }
 
-        let use_def = self.current_use_def_map_mut();
-        match category {
-            DefinitionCategory::DeclarationAndBinding => {
-                use_def.record_declaration_and_binding(symbol, definition);
-            }
-            DefinitionCategory::Declaration => use_def.record_declaration(symbol, definition),
-            DefinitionCategory::Binding => use_def.record_binding(symbol, definition),
-        }
-        self.try_block_contexts_mut().record_definitions_state(self);
+        self.current_use_def_map_mut()
+            .add_definition(symbol, definition, category);
+        self.try_node_context_stack_mut()
+            .record_definition(self, symbol, definition, category);
 
         definition
     }
@@ -772,9 +769,45 @@ where
                 is_star,
                 range: _,
             }) => {
+                // Save the state prior to visiting any of the `try` block.
+                //
+                // Potentially none of the `try` block could have been executed prior to executing
+                // the `except` block(s) and/or the `finally` block.
+                // We will merge this state with all of the intermediate
+                // states during the `try` block before visiting those suites.
+                let pre_try_block_state = self.flow_snapshot();
+
+                if finalbody.is_empty() {
+                    self.try_node_context_stack().push_context_without_finally();
+                } else {
+                    self.try_node_context_stack().push_context_with_finally();
+                }
+
+                // Save the state immediately *after* visiting the `try` block
+                // but *before* we prepare for visiting the `except` block(s).
+                //
+                // We will revert to this state prior to visiting the the `else` block,
+                // as there necessarily must have been 0 `except` blocks executed
+                // if we hit the `else` block.
+                let post_try_block_state = self.flow_snapshot();
+
+                // Visit the `try` block!
                 self.visit_body(body);
 
-                for except_handler in handlers {
+                let try_block_snapshots = self.try_node_context_stack_mut().exit_try_block();
+
+                // Prepare for visiting the `except` block(s)
+                self.flow_restore(pre_try_block_state.clone());
+                for state in try_block_snapshots {
+                    self.flow_merge(state);
+                }
+
+                let pre_except_state = self.flow_snapshot();
+
+                let mut post_except_states = vec![];
+                let num_handlers = handlers.len();
+
+                for (i, except_handler) in handlers.iter().enumerate() {
                     let ast::ExceptHandler::ExceptHandler(except_handler) = except_handler;
                     let ast::ExceptHandlerExceptHandler {
                         name: symbol_name,
@@ -803,10 +836,48 @@ where
                     }
 
                     self.visit_body(handler_body);
+                    // Each `except` block is mutually exclusive with all other `except` blocks.
+                    post_except_states.push(self.flow_snapshot());
+
+                    // It's unnecessary to do the `self.flow_restore()` call for the final except handler,
+                    // as we'll immediately call `self.flow_restore()` to a different state
+                    // as soon as this loop over the handlers terminates.
+                    if i < (num_handlers - 1) {
+                        self.flow_restore(pre_except_state.clone());
+                    }
                 }
 
+                // If we get to the `else` block, we know that 0 of the `except` blocks can have been executed,
+                // and the entire `try` block must have been executed:
+                self.flow_restore(post_try_block_state);
                 self.visit_body(orelse);
-                self.visit_body(finalbody);
+                let post_else_state = self.flow_snapshot();
+
+                let finally_snapshots = self.try_node_context_stack_mut().enter_finally_block();
+                if let Some(finally_snapshots) = finally_snapshots {
+                    debug_assert!(!finalbody.is_empty());
+                    self.flow_restore(pre_try_block_state);
+                    for state in finally_snapshots {
+                        self.flow_merge(state);
+                    }
+                    self.visit_body(finalbody);
+                }
+
+                self.flow_restore(post_else_state);
+                for state in post_except_states {
+                    self.flow_merge(state);
+                }
+                if let Some(finally_definitions) = self.try_node_context_stack().pop_context() {
+                    for DefinitionRecord {
+                        symbol,
+                        definition,
+                        category,
+                    } in finally_definitions
+                    {
+                        self.current_use_def_map_mut()
+                            .add_definition(symbol, definition, category);
+                    }
+                }
             }
             _ => {
                 walk_stmt(self, stmt);
