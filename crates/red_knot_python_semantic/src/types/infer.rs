@@ -6307,6 +6307,124 @@ mod tests {
     }
 
     #[test]
+    fn exception_handler_control_flow_single_bare_except() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            from typing_extensions import reveal_type
+
+            def could_raise_returns_str() -> str: ...
+
+            x = 1
+
+            try:
+                reveal_type(x)
+                x = could_raise_returns_str()
+                reveal_type(x)
+            except:
+                reveal_type(x)
+                x = 2
+                reveal_type(x)
+
+            # If we reach this point, either `try` was executed in its entirety,
+            # or `except` was executed in its entirety.
+            # At the end of try`, `type(x) == str`; at the end of `except`, `x == 2`.
+            reveal_type(x)
+            ",
+        )?;
+
+        assert_file_diagnostics(
+            &db,
+            "src/a.py",
+            &[
+                "Revealed type is `Literal[1]`",
+                "Revealed type is `str`",
+                "Revealed type is `Literal[1] | str`",
+                "Revealed type is `Literal[2]`",
+                "Revealed type is `str | Literal[2]`",
+            ],
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn exception_handler_control_flow_single_bare_except_branches_unify() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            from typing_extensions import reveal_type
+
+            def could_raise_returns_str() -> str: ...
+
+            x = 1
+
+            try:
+                x = could_raise_returns_str()
+            except:
+                x = could_raise_returns_str()
+
+            reveal_type(x)
+            ",
+        )?;
+
+        assert_file_diagnostics(&db, "src/a.py", &["Revealed type is `str`"]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn exception_handler_control_flow_single_non_bare_except() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        // For simple `try`/`except` blocks, `except TypeError:` has the same control flow
+        // as `except:`. There might have been an unhandled exception, but that would
+        // lead to termination of the scope -- it's irrelevant to consider this possibility.
+        db.write_dedented(
+            "src/a.py",
+            "
+            from typing_extensions import reveal_type
+
+            def could_raise_returns_str() -> str: ...
+
+            x = 1
+
+            try:
+                reveal_type(x)
+                x = could_raise_returns_str()
+                reveal_type(x)
+            except TypeError:
+                reveal_type(x)
+                x = 2
+                reveal_type(x)
+
+            # If we reach this point, either `try` was executed in its entirety,
+            # or `except` was executed in its entirety.
+            # At the end of try`, `type(x) == str`; at the end of `except`, `x == 2`.
+            reveal_type(x)
+            ",
+        )?;
+
+        assert_file_diagnostics(
+            &db,
+            "src/a.py",
+            &[
+                "Revealed type is `Literal[1]`",
+                "Revealed type is `str`",
+                "Revealed type is `Literal[1] | str`",
+                "Revealed type is `Literal[2]`",
+                "Revealed type is `str | Literal[2]`",
+            ],
+        );
+
+        Ok(())
+    }
+
+    #[test]
     fn basic_comprehension() -> anyhow::Result<()> {
         let mut db = setup_db();
 

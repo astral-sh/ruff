@@ -783,6 +783,9 @@ where
                     self.try_node_context_stack().push_context_with_finally();
                 }
 
+                // Visit the `try` block!
+                self.visit_body(body);
+
                 // Save the state immediately *after* visiting the `try` block
                 // but *before* we prepare for visiting the `except` block(s).
                 //
@@ -791,9 +794,8 @@ where
                 // if we hit the `else` block.
                 let post_try_block_state = self.flow_snapshot();
 
-                // Visit the `try` block!
-                self.visit_body(body);
-
+                // Take a record also of all the intermediate states we encountered
+                // while visiting the `try` block
                 let try_block_snapshots = self.try_node_context_stack_mut().exit_try_block();
 
                 // Prepare for visiting the `except` block(s)

@@ -470,7 +470,7 @@ impl<'db> UseDefMapBuilder<'db> {
             DefinitionCategory::Binding => self.record_binding(symbol, definition),
             DefinitionCategory::Declaration => self.record_declaration(symbol, definition),
             DefinitionCategory::DeclarationAndBinding => {
-                self.record_declaration_and_binding(symbol, definition)
+                self.record_declaration_and_binding(symbol, definition);
             }
         }
     }
