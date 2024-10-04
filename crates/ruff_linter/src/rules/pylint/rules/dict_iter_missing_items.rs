@@ -45,7 +45,7 @@ use crate::checkers::ast::Checker;
 ///
 /// The tuple key is unpacked into `x` and `y` instead of the key and values. This means that
 /// the suggested fix of using `d.items()` would result in different runtime behavior. Ruff
-/// cannot yet detect the tuple key.
+/// cannot consistently infer the type of a dictionary's keys.
 ///
 /// ## Fix safety
 /// Due to the known problem with tuple keys, this fix is unsafe.
