@@ -2446,10 +2446,10 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// Computes the output of a chain of (one) boolean operation, consuming as input an iterator
     /// of types. The iterator is consumed even if the boolean evaluation can be short-circuited,
     /// in order to ensure the invariant that all expressions are evaluated when inferring types.
-    fn infer_chained_boolean_types<T: Into<Type<'db>>>(
+    fn infer_chained_boolean_types(
         db: &'db dyn Db,
         op: ast::BoolOp,
-        values: impl IntoIterator<Item = T>,
+        values: impl IntoIterator<Item = Type<'db>>,
         n_values: usize,
     ) -> Type<'db> {
         let mut done = false;
@@ -2460,17 +2460,16 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Type::Never
                 } else {
                     let is_last = i == n_values - 1;
-                    let value_ty: Type<'db> = ty.into();
-                    match (value_ty.bool(db), is_last, op) {
-                        (Truthiness::Ambiguous, _, _) => value_ty,
+                    match (ty.bool(db), is_last, op) {
+                        (Truthiness::Ambiguous, _, _) => ty,
                         (Truthiness::AlwaysTrue, false, ast::BoolOp::And) => Type::Never,
                         (Truthiness::AlwaysFalse, false, ast::BoolOp::Or) => Type::Never,
                         (Truthiness::AlwaysFalse, _, ast::BoolOp::And)
                         | (Truthiness::AlwaysTrue, _, ast::BoolOp::Or) => {
                             done = true;
-                            value_ty
+                            ty
                         }
-                        (_, true, _) => value_ty,
+                        (_, true, _) => ty,
                     }
                 }
             }),
