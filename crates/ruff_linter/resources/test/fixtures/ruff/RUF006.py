@@ -185,3 +185,9 @@ def f():
     global task
     loop = asyncio.get_event_loop()
     task = loop.create_task(main()) # Error
+
+# OK
+# The task is returned by the lambda
+f = lambda *args: asyncio.create_task(foo())
+f = lambda *args: lambda *args: asyncio.create_task(foo())
+f = lambda *args: [asyncio.create_task(foo()) for x in args]
