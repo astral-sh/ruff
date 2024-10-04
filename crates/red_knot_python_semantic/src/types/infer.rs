@@ -6936,6 +6936,92 @@ mod tests {
     }
 
     #[test]
+    fn exception_handler_control_flow_multiple_excepts_with_else_and_finally() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            from typing_extensions import reveal_type
+
+            def could_raise_returns_str() -> str:
+                return 'foo'
+
+            def could_raise_returns_bytes() -> bytes:
+                return b'foo'
+
+            def could_raise_returns_bool() -> bool:
+                return True
+
+            def could_raise_returns_memoryview() -> memoryview:
+                return memoryview()
+
+            def could_raise_returns_float() -> float:
+                return 3.14
+
+            def could_raise_returns_range() -> range:
+                return range(42)
+
+            def could_raise_returns_slice() -> slice:
+                return slice(None)
+
+            x = 1
+
+            try:
+                reveal_type(x)
+                x = could_raise_returns_str()
+                reveal_type(x)
+            except TypeError:
+                reveal_type(x)
+                x = could_raise_returns_bytes()
+                reveal_type(x)
+                x = could_raise_returns_bool()
+                reveal_type(x)
+            except ValueError:
+                reveal_type(x)
+                x = could_raise_returns_memoryview()
+                reveal_type(x)
+                x = could_raise_returns_float()
+                reveal_type(x)
+            else:
+                reveal_type(x)
+                x = could_raise_returns_range()
+                reveal_type(x)
+                x = could_raise_returns_slice()
+                reveal_type(x)
+            finally:
+                reveal_type(x)
+
+            # Either one `except` branch or the `else`
+            # must have been taken and completed to get here:
+            reveal_type(x)
+            ",
+        )?;
+
+        assert_file_diagnostics(
+            &db,
+            "src/a.py",
+            &[
+                "Revealed type is `Literal[1]`",
+                "Revealed type is `str`",
+                "Revealed type is `Literal[1] | str`",
+                "Revealed type is `bytes`",
+                "Revealed type is `bool`",
+                "Revealed type is `Literal[1] | str`",
+                "Revealed type is `memoryview`",
+                "Revealed type is `float`",
+                "Revealed type is `str`",
+                "Revealed type is `range`",
+                "Revealed type is `slice`",
+                "Revealed type is `Literal[1] | str | bytes | bool | memoryview | float | range | slice`",
+                "Revealed type is `bool | float | slice`",
+            ],
+        );
+
+        Ok(())
+    }
+
+    #[test]
     fn basic_comprehension() -> anyhow::Result<()> {
         let mut db = setup_db();
 
