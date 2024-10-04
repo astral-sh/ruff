@@ -317,5 +317,3 @@ full_name.py:47:1: PTH123 `open()` should be replaced by `Path.open()`
    | ^^^^ PTH123
 48 | open(p, 'r', - 1, None, None, None, False, opener)
    |
-
-
