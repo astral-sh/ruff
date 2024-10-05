@@ -2614,18 +2614,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 ),
 
             (Type::StringLiteral(salsa_s1), Type::StringLiteral(salsa_s2)) => {
-                // For anything non-ASCII, don't even try to infer precise literal types.
-                // It would be complicated, it's an unimportant edge case,
-                // and Rust and Python probably do subtly different things
-                // in their string methods for non-ASCII characters.
+                // Note: this relies on rust's `PartialOrd` implementation for `String` matching
+                // the behavior of Python's string comparison. Which is not exactly guaranteed.
                 let s1 = salsa_s1.value(self.db);
-                if !s1.is_ascii() {
-                    return Some(builtins_symbol_ty(self.db, "bool").to_instance(self.db));
-                }
                 let s2 = salsa_s2.value(self.db);
-                if !s2.is_ascii() {
-                    return Some(builtins_symbol_ty(self.db, "bool").to_instance(self.db));
-                }
                 match op {
                     ast::CmpOp::Eq => Some(Type::BooleanLiteral(s1 == s2)),
                     ast::CmpOp::NotEq => Some(Type::BooleanLiteral(s1 != s2)),
