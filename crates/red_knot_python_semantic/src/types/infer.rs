@@ -520,8 +520,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         match left {
             Type::IntLiteral(_) => {}
             Type::Instance(cls)
-                if cls.is_known_class(self.db, KnownClass::Float)
-                    || cls.is_known_class(self.db, KnownClass::Int) => {}
+                if cls.is_known(self.db, KnownClass::Float)
+                    || cls.is_known(self.db, KnownClass::Int) => {}
             _ => return,
         };
 

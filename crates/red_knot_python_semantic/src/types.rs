@@ -415,19 +415,17 @@ impl<'db> Type<'db> {
             (_, Type::Unknown | Type::Any | Type::Todo) => false,
             (Type::Never, _) => true,
             (_, Type::Never) => false,
-            (Type::IntLiteral(_), Type::Instance(class))
-                if class.is_known_class(db, KnownClass::Int) =>
-            {
+            (Type::IntLiteral(_), Type::Instance(class)) if class.is_known(db, KnownClass::Int) => {
                 true
             }
             (Type::StringLiteral(_), Type::LiteralString) => true,
             (Type::StringLiteral(_) | Type::LiteralString, Type::Instance(class))
-                if class.is_known_class(db, KnownClass::Str) =>
+                if class.is_known(db, KnownClass::Str) =>
             {
                 true
             }
             (Type::BytesLiteral(_), Type::Instance(class))
-                if class.is_known_class(db, KnownClass::Bytes) =>
+                if class.is_known(db, KnownClass::Bytes) =>
             {
                 true
             }
@@ -435,8 +433,8 @@ impl<'db> Type<'db> {
                 .elements(db)
                 .iter()
                 .any(|&elem_ty| ty.is_subtype_of(db, elem_ty)),
-            (_, Type::Instance(class)) if class.is_known_class(db, KnownClass::Object) => true,
-            (Type::Instance(class), _) if class.is_known_class(db, KnownClass::Object) => false,
+            (_, Type::Instance(class)) if class.is_known(db, KnownClass::Object) => true,
+            (Type::Instance(class), _) if class.is_known(db, KnownClass::Object) => false,
             // TODO
             _ => false,
         }
@@ -1305,7 +1303,7 @@ pub struct ClassType<'db> {
 }
 
 impl<'db> ClassType<'db> {
-    pub fn is_known_class(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
+    pub fn is_known(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
         match self.known(db) {
             Some(known) => known == known_class,
             None => false,
