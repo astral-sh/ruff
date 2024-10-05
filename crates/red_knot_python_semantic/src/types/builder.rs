@@ -692,4 +692,31 @@ mod tests {
             .build();
         assert_eq!(truthy_and_falsy, KnownClass::Int.to_instance(&db));
     }
+
+    #[test]
+    fn build_intersection_truthy_and_falsy_is_always_positive() {
+        let db = setup_db();
+
+        // `X & !Truthy` -> `X & Falsy`
+        let truthy_int_positive = IntersectionBuilder::new(&db)
+            .add_positive(KnownClass::Int.to_instance(&db))
+            .add_positive(Type::Truthy)
+            .build();
+        let falsy_int_negative = IntersectionBuilder::new(&db)
+            .add_positive(KnownClass::Int.to_instance(&db))
+            .add_negative(Type::Falsy)
+            .build();
+        assert_eq!(truthy_int_positive, falsy_int_negative);
+
+        // `X & !Falsy` -> `X & Truthy`
+        let falsy_int_positive = IntersectionBuilder::new(&db)
+            .add_positive(KnownClass::Int.to_instance(&db))
+            .add_positive(Type::Falsy)
+            .build();
+        let truthy_int_negative = IntersectionBuilder::new(&db)
+            .add_positive(KnownClass::Int.to_instance(&db))
+            .add_negative(Type::Truthy)
+            .build();
+        assert_eq!(falsy_int_positive, truthy_int_negative);
+    }
 }
