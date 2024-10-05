@@ -2614,8 +2614,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 ),
 
             (Type::StringLiteral(salsa_s1), Type::StringLiteral(salsa_s2)) => {
-                // Note: this relies on rust's `PartialOrd` implementation for `String` matching
-                // the behavior of Python's string comparison. Which is not exactly guaranteed.
+                // TODO: this relies on rust's `PartialOrd` implementation for `String` matching
+                // the behavior of Python's string comparison. Which is not exactly guaranteed,
+                // especially for non ascii characters.
                 let s1 = salsa_s1.value(self.db);
                 let s2 = salsa_s2.value(self.db);
                 match op {
