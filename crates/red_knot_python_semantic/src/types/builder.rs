@@ -66,7 +66,7 @@ impl<'db> UnionBuilder<'db> {
                 let mut to_remove = SmallVec::<[usize; 2]>::new();
                 for (index, element) in self.elements.iter().enumerate() {
                     if Some(*element) == bool_pair {
-                        to_add = KnownClass::Bool.to_class(self.db);
+                        to_add = KnownClass::Bool.to_instance(self.db);
                         to_remove.push(index);
                         // The type we are adding is a BooleanLiteral, which doesn't have any
                         // subtypes. And we just found that the union already contained our
@@ -362,7 +362,7 @@ mod tests {
     #[test]
     fn build_union_bool() {
         let db = setup_db();
-        let bool_ty = KnownClass::Bool.to_class(&db);
+        let bool_instance_ty = KnownClass::Bool.to_instance(&db);
 
         let t0 = Type::BooleanLiteral(true);
         let t1 = Type::BooleanLiteral(true);
@@ -373,7 +373,7 @@ mod tests {
         assert_eq!(union.elements(&db), &[t0, t3]);
 
         let union = UnionType::from_elements(&db, [t0, t1, t2, t3]).expect_union();
-        assert_eq!(union.elements(&db), &[bool_ty, t3]);
+        assert_eq!(union.elements(&db), &[bool_instance_ty, t3]);
     }
 
     #[test]
