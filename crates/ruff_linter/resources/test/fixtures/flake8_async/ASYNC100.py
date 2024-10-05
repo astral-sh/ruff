@@ -37,6 +37,11 @@ async def func():
 
 
 async def func():
+    with trio.move_at():
+        [x async for x in range(1)]
+
+
+async def func():
     with anyio.move_on_after(delay=0.2):
         ...
 
