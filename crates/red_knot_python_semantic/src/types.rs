@@ -821,10 +821,14 @@ impl<'db> From<&Type<'db>> for Type<'db> {
 /// Note: good candidates are any classes in `[crate::stdlib::CoreStdlibModule]`
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum KnownClass {
+    // To figure out where an stdlib symbol is defined, you can go into `crates/red_knot_vendored`
+    // and grep for the symbol name in any `.pyi` file.
+
     // Builtins
     Bool,
     Object,
     Bytes,
+    Type,
     Int,
     Float,
     Str,
@@ -832,8 +836,11 @@ pub enum KnownClass {
     Tuple,
     Set,
     Dict,
-    // Typing
-    Any, // Not currently used, included to show support for non-builtins
+    // Types
+    ModuleType,
+    FunctionType,
+    // Typeshed
+    NoneType, // Part of `types` for python >= 3.10
 }
 
 impl<'db> KnownClass {
@@ -849,7 +856,10 @@ impl<'db> KnownClass {
             Self::Set => "set",
             Self::Dict => "dict",
             Self::List => "list",
-            Self::Any => "Any",
+            Self::Type => "type",
+            Self::ModuleType => "ModuleType",
+            Self::FunctionType => "FunctionType",
+            Self::NoneType => "NoneType",
         }
     }
 
@@ -859,8 +869,19 @@ impl<'db> KnownClass {
 
     pub fn to_class(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
-            Self::Any => types_symbol_ty(db, self.as_str()),
-            _ => builtins_symbol_ty(db, self.as_str()),
+            Self::Bool
+            | Self::Object
+            | Self::Bytes
+            | Self::Type
+            | Self::Int
+            | Self::Float
+            | Self::Str
+            | Self::List
+            | Self::Tuple
+            | Self::Set
+            | Self::Dict => builtins_symbol_ty(db, self.as_str()),
+            Self::ModuleType | Self::FunctionType => types_symbol_ty(db, self.as_str()),
+            Self::NoneType => typeshed_symbol_ty(db, self.as_str()),
         }
     }
 
@@ -873,32 +894,48 @@ impl<'db> KnownClass {
         }
     }
 
-    pub fn from_name(name: &str) -> Option<Self> {
+    fn from_name(name: &str) -> Option<Self> {
+        // Note: if this becomes hard to maintain (as rust can't ensure at compile time that all
+        // variants of `Self` are covered), we might use a macro (in-house or dependency)
+        // See: https://stackoverflow.com/q/39070244
         match name {
             "bool" => Some(Self::Bool),
             "object" => Some(Self::Object),
             "bytes" => Some(Self::Bytes),
             "tuple" => Some(Self::Tuple),
+            "type" => Some(Self::Type),
             "int" => Some(Self::Int),
             "float" => Some(Self::Float),
             "str" => Some(Self::Str),
             "set" => Some(Self::Set),
             "dict" => Some(Self::Dict),
             "list" => Some(Self::List),
-            "Any" => Some(Self::Any),
+            "NoneType" => Some(Self::NoneType),
+            "ModuleType" => Some(Self::ModuleType),
+            "FunctionType" => Some(Self::FunctionType),
             _ => None,
         }
     }
 
     /// Private method checking if known class can be defined in the given module.
     fn check_module(self, module: &Module) -> bool {
-        let is_builtin = module.search_path().is_standard_library() && module.name() == "builtins";
-        let is_typing = module.search_path().is_standard_library() && module.name() == "typing";
-        let is_typing_extensions =
-            module.search_path().is_standard_library() && module.name() == "typing_extensions";
+        if !module.search_path().is_standard_library() {
+            return false;
+        }
         match self {
-            Self::Any => is_typing || is_typing_extensions,
-            _ => is_builtin,
+            Self::Bool
+            | Self::Object
+            | Self::Bytes
+            | Self::Type
+            | Self::Int
+            | Self::Float
+            | Self::Str
+            | Self::List
+            | Self::Tuple
+            | Self::Set
+            | Self::Dict => module.name() == "builtins",
+            Self::ModuleType | Self::FunctionType => module.name() == "types",
+            Self::NoneType => matches!(module.name().as_str(), "_typeshed" | "types"),
         }
     }
 }
