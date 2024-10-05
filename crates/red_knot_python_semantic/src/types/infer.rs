@@ -2640,17 +2640,17 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
             (Type::StringLiteral(_), _) => {
-                self.infer_binary_type_comparison(Type::builtin_str_instance(self.db), op, right)
+                self.infer_binary_type_comparison(KnownClass::Str.to_instance(self.db), op, right)
             }
             (_, Type::StringLiteral(_)) => {
-                self.infer_binary_type_comparison(left, op, Type::builtin_str_instance(self.db))
+                self.infer_binary_type_comparison(left, op, KnownClass::Str.to_instance(self.db))
             }
 
             (Type::LiteralString, _) => {
-                self.infer_binary_type_comparison(Type::builtin_str_instance(self.db), op, right)
+                self.infer_binary_type_comparison(KnownClass::Str.to_instance(self.db), op, right)
             }
             (_, Type::LiteralString) => {
-                self.infer_binary_type_comparison(left, op, Type::builtin_str_instance(self.db))
+                self.infer_binary_type_comparison(left, op, KnownClass::Str.to_instance(self.db))
             }
 
             // Lookup the rich comparison `__dunder__` methods on instances
