@@ -335,10 +335,20 @@ impl FromStr for TodoDirectiveKind {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         // The lengths of the respective variant strings: TODO, FIXME, HACK, XXX
+
         for length in [3, 4, 5] {
             let Some(substr) = s.get(..length) else {
                 break;
             };
+
+            if s.len() > length {
+                if let Some(c) = s.chars().nth(length) {
+                    if c.is_alphanumeric() {
+                        // The word is longer, so ignore it
+                        continue;
+                    }
+                }
+            }
 
             match substr.to_lowercase().as_str() {
                 "fixme" => {
