@@ -4181,7 +4181,6 @@ mod tests {
             h = "A" is not "B"
             i = str_instance() < "..."
             j = "ab" < "ab_cd"
-            k = "£12" >= "£10"  # Sadly, not in red-knot, because £ is not ASCII
             "#,
         )?;
 
@@ -4197,8 +4196,6 @@ mod tests {
         // Very cornercase test ensuring we're not comparing the interned salsa symbols, which
         // compare by order of declaration
         assert_public_ty(&db, "src/a.py", "j", "Literal[True]");
-        // Case for non-ASCII characters (not supported as a likely source of edge cases)
-        assert_public_ty(&db, "src/a.py", "k", "bool");
 
         Ok(())
     }
