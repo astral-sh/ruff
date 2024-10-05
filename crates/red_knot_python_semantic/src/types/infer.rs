@@ -4549,6 +4549,31 @@ mod tests {
     }
 
     #[test]
+    fn simplify_true_and_false_to_bool() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            from typing_extensions import reveal_type
+
+            def returns_bool() -> bool: ...
+
+            if returns_bool():
+                x = True
+            else:
+                x = False
+
+            reveal_type(x)
+            ",
+        )?;
+
+        assert_file_diagnostics(&db, "src/a.py", &["Revealed type is `bool`"]);
+
+        Ok(())
+    }
+
+    #[test]
     fn literal_int_arithmetic() -> anyhow::Result<()> {
         let mut db = setup_db();
 
