@@ -2535,9 +2535,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 ast::CmpOp::In
                                 | ast::CmpOp::NotIn
                                 | ast::CmpOp::Is
-                                | ast::CmpOp::IsNot => {
-                                    builtins_symbol_ty(self.db, "bool").to_instance(self.db)
-                                }
+                                | ast::CmpOp::IsNot => KnownClass::Bool.to_instance(self.db),
                                 // Other operators can return arbitrary types
                                 _ => Type::Unknown,
                             }
@@ -2573,14 +2571,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                 ast::CmpOp::GtE => Some(Type::BooleanLiteral(n >= m)),
                 ast::CmpOp::Is => {
                     if n == m {
-                        Some(builtins_symbol_ty(self.db, "bool").to_instance(self.db))
+                        Some(KnownClass::Bool.to_instance(self.db))
                     } else {
                         Some(Type::BooleanLiteral(false))
                     }
                 }
                 ast::CmpOp::IsNot => {
                     if n == m {
-                        Some(builtins_symbol_ty(self.db, "bool").to_instance(self.db))
+                        Some(KnownClass::Bool.to_instance(self.db))
                     } else {
                         Some(Type::BooleanLiteral(true))
                     }
@@ -2627,14 +2625,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                     ast::CmpOp::NotIn => Some(Type::BooleanLiteral(!s2.contains(s1.as_ref()))),
                     ast::CmpOp::Is => {
                         if s1 == s2 {
-                            Some(builtins_symbol_ty(self.db, "bool").to_instance(self.db))
+                            Some(KnownClass::Bool.to_instance(self.db))
                         } else {
                             Some(Type::BooleanLiteral(false))
                         }
                     }
                     ast::CmpOp::IsNot => {
                         if s1 == s2 {
-                            Some(builtins_symbol_ty(self.db, "bool").to_instance(self.db))
+                            Some(KnownClass::Bool.to_instance(self.db))
                         } else {
                             Some(Type::BooleanLiteral(true))
                         }
