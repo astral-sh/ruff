@@ -4557,7 +4557,8 @@ mod tests {
             "
             from typing_extensions import reveal_type
 
-            def returns_bool() -> bool: ...
+            def returns_bool() -> bool:
+                return True
 
             if returns_bool():
                 x = True
