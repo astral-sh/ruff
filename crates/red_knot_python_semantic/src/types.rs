@@ -750,12 +750,12 @@ impl<'db> Type<'db> {
             Type::BooleanLiteral(_) => KnownClass::Bool.to_class(db),
             Type::BytesLiteral(_) => KnownClass::Bytes.to_class(db),
             Type::IntLiteral(_) => KnownClass::Int.to_class(db),
-            Type::Function(_) => types_symbol_ty(db, "FunctionType"),
-            Type::Module(_) => types_symbol_ty(db, "ModuleType"),
+            Type::Function(_) => KnownClass::FunctionType.to_class(db),
+            Type::Module(_) => KnownClass::ModuleType.to_class(db),
             Type::Tuple(_) => KnownClass::Tuple.to_class(db),
-            Type::None => typeshed_symbol_ty(db, "NoneType"),
+            Type::None => KnownClass::NoneType.to_class(db),
             // TODO not accurate if there's a custom metaclass...
-            Type::Class(_) => builtins_symbol_ty(db, "type"),
+            Type::Class(_) => KnownClass::Type.to_class(db),
             // TODO can we do better here? `type[LiteralString]`?
             Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class(db),
             // TODO: `type[Any]`?
