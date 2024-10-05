@@ -36,9 +36,9 @@ async def func():
             ...
 
 
-async def func():
-    with trio.move_at():
-        [x async for x in range(1)]
+async def main():
+    async with asyncio.timeout(7):
+        print({i async for i in long_running_range()})
 
 
 async def func():
