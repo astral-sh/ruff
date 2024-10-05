@@ -840,7 +840,7 @@ pub enum KnownClass {
     ModuleType,
     FunctionType,
     // Typeshed
-    NoneType, // Part of `types` for python >= 3.10
+    NoneType, // Part of `types` for Python >= 3.10
 }
 
 impl<'db> KnownClass {
