@@ -302,7 +302,7 @@ mod tests {
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
-    use crate::types::{KnownClass, UnionBuilder};
+    use crate::types::{BytesLiteralType, KnownClass, StringLiteralType, TupleType, UnionBuilder};
     use crate::ProgramSettings;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
@@ -423,6 +423,16 @@ mod tests {
         let u0 = UnionType::from_elements(&db, [str_ty, unknown_ty, int_ty, object_ty]);
 
         assert_eq!(u0.expect_union().elements(&db), &[unknown_ty, object_ty]);
+    }
+
+    #[test]
+    fn build_union_truthy_falsy() {
+        let db = setup_db();
+
+        // `Truthy | Falsy` -> `Any` -- this probably should never happen in practice
+        let t0 = UnionType::from_elements(&db, [Type::Truthy, Type::Falsy]);
+
+        assert_eq!(t0, Type::Any);
     }
 
     impl<'db> IntersectionType<'db> {
@@ -574,5 +584,112 @@ mod tests {
             .build();
 
         assert_eq!(ty, Type::IntLiteral(1));
+    }
+
+    /// Test all tpes where `X & Falsy` can be evaluated to specific literals.
+    #[test]
+    fn build_intersection_simplify_to_falsy_literals() {
+        let db = setup_db();
+
+        let falsy_int = IntersectionBuilder::new(&db)
+            .add_positive(KnownClass::Int.to_instance(&db))
+            .add_positive(Type::Falsy)
+            .build();
+        assert_eq!(falsy_int, Type::IntLiteral(0));
+
+        let empty_str = Type::StringLiteral(StringLiteralType::new(&db, "".into()));
+        let falsy_str = IntersectionBuilder::new(&db)
+            .add_positive(KnownClass::Str.to_instance(&db))
+            .add_positive(Type::Falsy)
+            .build();
+        assert_eq!(falsy_str, empty_str);
+
+        let falsy_literal_str = IntersectionBuilder::new(&db)
+            .add_positive(Type::LiteralString)
+            .add_positive(Type::Falsy)
+            .build();
+        assert_eq!(falsy_literal_str, empty_str);
+
+        let falsy_bool = IntersectionBuilder::new(&db)
+            .add_positive(KnownClass::Bool.to_instance(&db))
+            .add_positive(Type::Falsy)
+            .build();
+        assert_eq!(falsy_bool, Type::BooleanLiteral(false));
+
+        let empty_tuple = Type::Tuple(TupleType::new(&db, vec![].into()));
+        let falsy_tuple = IntersectionBuilder::new(&db)
+            .add_positive(KnownClass::Tuple.to_instance(&db))
+            .add_positive(Type::Falsy)
+            .build();
+        assert_eq!(falsy_tuple, empty_tuple);
+
+        let empty_bytes = Type::BytesLiteral(BytesLiteralType::new(&db, vec![].into()));
+        let falsy_bytes = IntersectionBuilder::new(&db)
+            .add_positive(KnownClass::Bytes.to_instance(&db))
+            .add_positive(Type::Falsy)
+            .build();
+        assert_eq!(falsy_bytes, empty_bytes);
+    }
+
+    #[test]
+    fn build_intersection_known_literals_and_truthy() {
+        let db = setup_db();
+
+        let hello_literal = Type::StringLiteral(StringLiteralType::new(&db, "hello".into()));
+        let hello_literal_and_truthy = IntersectionBuilder::new(&db)
+            .add_positive(hello_literal)
+            .add_positive(Type::Truthy)
+            .build();
+        assert_eq!(hello_literal_and_truthy, hello_literal);
+
+        let zero_and_truthy = IntersectionBuilder::new(&db)
+            .add_positive(Type::IntLiteral(0))
+            .add_positive(Type::Truthy)
+            .build();
+        assert_eq!(zero_and_truthy, Type::Never);
+
+        let none_and_truthy = IntersectionBuilder::new(&db)
+            .add_positive(KnownClass::NoneType.to_instance(&db))
+            .add_positive(Type::Truthy)
+            .build();
+        assert_eq!(none_and_truthy, Type::Never);
+    }
+
+    #[test]
+    fn build_intersection_truthy_and_falsy() {
+        let db = setup_db();
+
+        // `Truthy & Falsy` -> `Never`
+        let truthy_and_falsy = IntersectionBuilder::new(&db)
+            .add_positive(Type::Truthy)
+            .add_positive(Type::Falsy)
+            .build();
+        assert_eq!(truthy_and_falsy, Type::Never);
+
+        let truthy_and_falsy = IntersectionBuilder::new(&db)
+            .add_positive(Type::Truthy)
+            .add_positive(Type::Falsy)
+            .build();
+        assert_eq!(truthy_and_falsy, Type::Never);
+    }
+
+    #[test]
+    fn build_union_type_truthy_and_type_falsy() {
+        let db = setup_db();
+
+        // `X & Falsy | X & Truthy` -> `X`
+        let truthy_int = UnionBuilder::new(&db)
+            .add(KnownClass::Int.to_instance(&db))
+            .add(Type::Truthy)
+            .build();
+        let falsy_int = UnionBuilder::new(&db)
+            .add(KnownClass::Int.to_instance(&db))
+            .add(Type::Falsy)
+            .build();
+        let truthy_and_falsy = UnionBuilder::new(&db)
+            .add(truthy_int)
+            .add(falsy_int)
+            .build();
+        assert_eq!(truthy_and_falsy, KnownClass::Int.to_instance(&db));
     }
 }

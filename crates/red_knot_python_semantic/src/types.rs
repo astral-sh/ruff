@@ -245,6 +245,13 @@ pub enum Type<'db> {
     Unbound,
     /// The None object -- TODO remove this in favor of Instance(types.NoneType)
     None,
+    /// Type for narrowing a type to the subset of that type that is truthy (bool(x) == True).
+    /// Mainly used in intersections: `X & Truthy`. Example: for `list` it's all lists of `len > 0`
+    Truthy,
+    /// Type for narrowing a type to the subset of that type that is falsy (bool(x) == False).
+    /// Mainly used in intersections: `X & Falsy`. Example: for `int` it's the singleton
+    /// `IntLiteral[0]`.
+    Falsy,
     /// Temporary type for symbols that can't be inferred yet because of missing implementations.
     /// Behaves equivalently to `Any`.
     ///

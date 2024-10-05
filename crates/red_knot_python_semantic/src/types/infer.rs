@@ -7631,6 +7631,53 @@ mod tests {
     }
 
     #[test]
+    fn bool_chain_narrows_falsy_and_truthy_types() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        // In a chained boolean expression, we return a type early if and only if
+        // - `and` operator -> the left side is falsy
+        // - `or` operator -> the left side is truthy
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+            def int_instance() -> int:
+                return 1
+
+            def str_instance() -> str:
+                return "str"
+
+            def bool_instance() -> bool:
+                return False
+
+            a = str_instance() and int_instance() and bool_instance()
+            b = bool_instance() or int_instance() or ""
+            c = int_instance() or 0
+            "#,
+        )?;
+
+        // str_instance() and int_instance() and "x"
+        // - str_instance() & Falsy => ""
+        // - int_instance() & Falsy => 0
+        // - bool_instance() is last => unchanged
+        assert_public_ty(&db, "/src/a.py", "a", r#"Literal[""] | Literal[0] | bool"#);
+        // bool_instance() or int_instance() or ""
+        // - bool_instance() & Truthy => True
+        // - int_instance() & Truthy => {int != 0}
+        // - "" is last => unchanged
+        assert_public_ty(
+            &db,
+            "/src/a.py",
+            "b",
+            "Literal[True] | int & Truthy | Literal[\"\"]",
+        );
+        // TODO: I don't know if red-knot can be smart enough to realise that
+        // `Literal[0]` = `int & Falsy`, which leads to:
+        // `int & Truthy | Literal[0]` = `int & Truthy | int & Falsy` = `int`
+        assert_public_ty(&db, "/src/a.py", "c", "int");
+        Ok(())
+    }
+
+    #[test]
     fn bool_function_falsy_values() -> anyhow::Result<()> {
         let mut db = setup_db();
         db.write_dedented(
