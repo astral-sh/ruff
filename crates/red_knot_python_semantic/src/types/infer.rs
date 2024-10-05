@@ -5968,19 +5968,22 @@ mod tests {
             "src/a.py",
             "
             import re
+            from typing_extensions import reveal_type
 
             try:
                 x
             except NameError as e:
-                pass
+                reveal_type(e)
             except re.error as f:
-                pass
+                reveal_type(f)
             ",
         )?;
 
-        assert_public_ty(&db, "src/a.py", "e", "NameError");
-        assert_public_ty(&db, "src/a.py", "f", "error");
-        assert_file_diagnostics(&db, "src/a.py", &[]);
+        assert_file_diagnostics(
+            &db,
+            "src/a.py",
+            &["Revealed type is `NameError`", "Revealed type is `error`"],
+        );
 
         Ok(())
     }
@@ -5993,21 +5996,25 @@ mod tests {
             "src/a.py",
             "
             from nonexistent_module import foo
+            from typing_extensions import reveal_type
 
             try:
                 x
             except foo as e:
-                pass
+                reveal_type(foo)
+                reveal_type(e)
             ",
         )?;
 
         assert_file_diagnostics(
             &db,
             "src/a.py",
-            &["Cannot resolve import `nonexistent_module`"],
+            &[
+                "Cannot resolve import `nonexistent_module`",
+                "Revealed type is `Unknown`",
+                "Revealed type is `Unknown`",
+            ],
         );
-        assert_public_ty(&db, "src/a.py", "foo", "Unknown");
-        assert_public_ty(&db, "src/a.py", "e", "Unknown");
 
         Ok(())
     }
@@ -6019,25 +6026,28 @@ mod tests {
         db.write_dedented(
             "src/a.py",
             "
+            from typing_extensions import reveal_type
+
             EXCEPTIONS = (AttributeError, TypeError)
 
             try:
                 x
             except (RuntimeError, OSError) as e:
-                pass
+                reveal_type(e)
             except EXCEPTIONS as f:
-                pass
+                reveal_type(f)
             ",
         )?;
 
-        assert_file_diagnostics(&db, "src/a.py", &[]);
-
         // For these TODOs we need support for `tuple` types:
+        let expected_diagnostics = &[
+            // TODO: Should be `RuntimeError | OSError` --Alex
+            "Revealed type is `@Todo`",
+            // TODO: Should be `AttributeError | TypeError` --Alex
+            "Revealed type is `@Todo`",
+        ];
 
-        // TODO: Should be `RuntimeError | OSError` --Alex
-        assert_public_ty(&db, "src/a.py", "e", "@Todo");
-        // TODO: Should be `AttributeError | TypeError` --Alex
-        assert_public_ty(&db, "src/a.py", "e", "@Todo");
+        assert_file_diagnostics(&db, "src/a.py", expected_diagnostics);
 
         Ok(())
     }
@@ -6049,15 +6059,16 @@ mod tests {
         db.write_dedented(
             "src/a.py",
             "
+            from typing_extensions import reveal_type
+
             try:
                 x
             except as e:
-                pass
+                reveal_type(e)
             ",
         )?;
 
-        assert_file_diagnostics(&db, "src/a.py", &[]);
-        assert_public_ty(&db, "src/a.py", "e", "Unknown");
+        assert_file_diagnostics(&db, "src/a.py", &["Revealed type is `Unknown`"]);
 
         Ok(())
     }
@@ -6069,19 +6080,23 @@ mod tests {
         db.write_dedented(
             "src/a.py",
             "
+            from typing_extensions import reveal_type
+
             try:
                 x
             except* BaseException as e:
-                pass
+                reveal_type(e)
             ",
         )?;
-
-        assert_file_diagnostics(&db, "src/a.py", &[]);
 
         // TODO: once we support `sys.version_info` branches,
         // we can set `--target-version=py311` in this test
         // and the inferred type will just be `BaseExceptionGroup` --Alex
-        assert_public_ty(&db, "src/a.py", "e", "Unknown | BaseExceptionGroup");
+        assert_file_diagnostics(
+            &db,
+            "src/a.py",
+            &["Revealed type is `Unknown | BaseExceptionGroup`"],
+        );
 
         Ok(())
     }
@@ -6093,21 +6108,25 @@ mod tests {
         db.write_dedented(
             "src/a.py",
             "
+            from typing_extensions import reveal_type
+
             try:
                 x
             except* OSError as e:
-                pass
+                reveal_type(e)
             ",
         )?;
-
-        assert_file_diagnostics(&db, "src/a.py", &[]);
 
         // TODO: once we support `sys.version_info` branches,
         // we can set `--target-version=py311` in this test
         // and the inferred type will just be `BaseExceptionGroup` --Alex
         //
         // TODO more precise would be `ExceptionGroup[OSError]` --Alex
-        assert_public_ty(&db, "src/a.py", "e", "Unknown | BaseExceptionGroup");
+        assert_file_diagnostics(
+            &db,
+            "src/a.py",
+            &["Revealed type is `Unknown | BaseExceptionGroup`"],
+        );
 
         Ok(())
     }
@@ -6119,21 +6138,25 @@ mod tests {
         db.write_dedented(
             "src/a.py",
             "
+            from typing_extensions import reveal_type
+
             try:
                 x
             except* (TypeError, AttributeError) as e:
-                pass
+                reveal_type(e)
             ",
         )?;
-
-        assert_file_diagnostics(&db, "src/a.py", &[]);
 
         // TODO: once we support `sys.version_info` branches,
         // we can set `--target-version=py311` in this test
         // and the inferred type will just be `BaseExceptionGroup` --Alex
         //
         // TODO more precise would be `ExceptionGroup[TypeError | AttributeError]` --Alex
-        assert_public_ty(&db, "src/a.py", "e", "Unknown | BaseExceptionGroup");
+        assert_file_diagnostics(
+            &db,
+            "src/a.py",
+            &["Revealed type is `Unknown | BaseExceptionGroup`"],
+        );
 
         Ok(())
     }
