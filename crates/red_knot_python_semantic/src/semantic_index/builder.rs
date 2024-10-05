@@ -797,63 +797,64 @@ where
                 // Take a record also of all the intermediate states we encountered
                 // while visiting the `try` block
                 let try_block_snapshots = self.try_node_context_stack_mut().exit_try_block();
-
-                // Prepare for visiting the `except` block(s)
-                self.flow_restore(pre_try_block_state.clone());
-                for state in try_block_snapshots {
-                    self.flow_merge(state);
-                }
-
-                let pre_except_state = self.flow_snapshot();
-
                 let mut post_except_states = vec![];
-                let num_handlers = handlers.len();
 
-                for (i, except_handler) in handlers.iter().enumerate() {
-                    let ast::ExceptHandler::ExceptHandler(except_handler) = except_handler;
-                    let ast::ExceptHandlerExceptHandler {
-                        name: symbol_name,
-                        type_: handled_exceptions,
-                        body: handler_body,
-                        range: _,
-                    } = except_handler;
-
-                    if let Some(handled_exceptions) = handled_exceptions {
-                        self.visit_expr(handled_exceptions);
+                if !handlers.is_empty() {
+                    // Prepare for visiting the `except` block(s)
+                    self.flow_restore(pre_try_block_state.clone());
+                    for state in try_block_snapshots {
+                        self.flow_merge(state);
                     }
 
-                    // If `handled_exceptions` above was `None`, it's something like `except as e:`,
-                    // which is invalid syntax. However, it's still pretty obvious here that the user
-                    // *wanted* `e` to be bound, so we should still create a definition here nonetheless.
-                    if let Some(symbol_name) = symbol_name {
-                        let symbol = self.add_symbol(symbol_name.id.clone());
+                    let pre_except_state = self.flow_snapshot();
+                    let num_handlers = handlers.len();
 
-                        self.add_definition(
-                            symbol,
-                            DefinitionNodeRef::ExceptHandler(ExceptHandlerDefinitionNodeRef {
-                                handler: except_handler,
-                                is_star: *is_star,
-                            }),
-                        );
+                    for (i, except_handler) in handlers.iter().enumerate() {
+                        let ast::ExceptHandler::ExceptHandler(except_handler) = except_handler;
+                        let ast::ExceptHandlerExceptHandler {
+                            name: symbol_name,
+                            type_: handled_exceptions,
+                            body: handler_body,
+                            range: _,
+                        } = except_handler;
+
+                        if let Some(handled_exceptions) = handled_exceptions {
+                            self.visit_expr(handled_exceptions);
+                        }
+
+                        // If `handled_exceptions` above was `None`, it's something like `except as e:`,
+                        // which is invalid syntax. However, it's still pretty obvious here that the user
+                        // *wanted* `e` to be bound, so we should still create a definition here nonetheless.
+                        if let Some(symbol_name) = symbol_name {
+                            let symbol = self.add_symbol(symbol_name.id.clone());
+
+                            self.add_definition(
+                                symbol,
+                                DefinitionNodeRef::ExceptHandler(ExceptHandlerDefinitionNodeRef {
+                                    handler: except_handler,
+                                    is_star: *is_star,
+                                }),
+                            );
+                        }
+
+                        self.visit_body(handler_body);
+                        // Each `except` block is mutually exclusive with all other `except` blocks.
+                        post_except_states.push(self.flow_snapshot());
+
+                        // It's unnecessary to do the `self.flow_restore()` call for the final except handler,
+                        // as we'll immediately call `self.flow_restore()` to a different state
+                        // as soon as this loop over the handlers terminates.
+                        if i < (num_handlers - 1) {
+                            self.flow_restore(pre_except_state.clone());
+                        }
                     }
 
-                    self.visit_body(handler_body);
-                    // Each `except` block is mutually exclusive with all other `except` blocks.
-                    post_except_states.push(self.flow_snapshot());
-
-                    // It's unnecessary to do the `self.flow_restore()` call for the final except handler,
-                    // as we'll immediately call `self.flow_restore()` to a different state
-                    // as soon as this loop over the handlers terminates.
-                    if i < (num_handlers - 1) {
-                        self.flow_restore(pre_except_state.clone());
-                    }
+                    // If we get to the `else` block, we know that 0 of the `except` blocks can have been executed,
+                    // and the entire `try` block must have been executed:
+                    self.flow_restore(post_try_block_state);
                 }
 
-                // If we get to the `else` block, we know that 0 of the `except` blocks can have been executed,
-                // and the entire `try` block must have been executed:
-                self.flow_restore(post_try_block_state);
                 self.visit_body(orelse);
-                let post_else_state = self.flow_snapshot();
 
                 // If there is a `finally` block, prepare to visit it:
                 let finally_snapshots = self.try_node_context_stack_mut().enter_finally_block();
@@ -862,6 +863,7 @@ where
                     .map_or(true, |_| !finalbody.is_empty()));
 
                 if let Some(finally_snapshots) = finally_snapshots {
+                    let post_else_state = self.flow_snapshot();
                     self.flow_restore(pre_try_block_state);
                     for state in finally_snapshots {
                         self.flow_merge(state);
@@ -869,10 +871,10 @@ where
 
                     // Visit the `finally` block!
                     self.visit_body(finalbody);
+                    self.flow_restore(post_else_state);
                 }
 
                 // Prepare for exiting the `StmtTry` node
-                self.flow_restore(post_else_state);
                 for state in post_except_states {
                     self.flow_merge(state);
                 }
@@ -882,16 +884,14 @@ where
                 // as there are more potential definition states inside the `finally` block than there are
                 // from a point after the `finally` block's completion.
                 // Instead, we must manually re-add these definitions to the `use-def` map
-                if let Some(finally_definitions) = self.try_node_context_stack().pop_context() {
-                    for DefinitionRecord {
-                        symbol,
-                        definition,
-                        category,
-                    } in finally_definitions
-                    {
-                        self.current_use_def_map_mut()
-                            .record_definition(symbol, definition, category);
-                    }
+                for DefinitionRecord {
+                    symbol,
+                    definition,
+                    category,
+                } in self.try_node_context_stack().pop_context()
+                {
+                    self.current_use_def_map_mut()
+                        .record_definition(symbol, definition, category);
                 }
             }
             _ => {

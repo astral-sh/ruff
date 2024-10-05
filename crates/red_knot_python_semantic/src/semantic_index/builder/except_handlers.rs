@@ -65,7 +65,7 @@ impl<'db> TryNodeContextStack<'db> {
     /// If the [`TryNodeContext`] represented a [`ruff_python_ast::StmtTry`] node
     /// that had a `finally` branch, return a record of all [`Definition`]s that took
     /// place during the `finally` branch. Else, return `None`.
-    pub(super) fn pop_context(&self) -> Option<Vec<DefinitionRecord<'db>>> {
+    pub(super) fn pop_context(&self) -> Vec<DefinitionRecord<'db>> {
         let context = self
             .0
             .borrow_mut()
@@ -75,9 +75,9 @@ impl<'db> TryNodeContextStack<'db> {
             finally_definitions,
         } = context.visitation_state
         {
-            Some(finally_definitions)
+            finally_definitions
         } else {
-            None
+            vec![]
         }
     }
 
