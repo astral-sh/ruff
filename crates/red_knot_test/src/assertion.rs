@@ -266,8 +266,8 @@ impl<'a> Assertion<'a> {
 impl std::fmt::Display for Assertion<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Type(ta) => ta.fmt(f),
-            Self::Error(ea) => ea.fmt(f),
+            Self::Type(assertion) => assertion.fmt(f),
+            Self::Error(assertion) => assertion.fmt(f),
         }
     }
 }
@@ -300,7 +300,7 @@ pub(crate) struct ErrorAssertion<'a> {
 
 impl std::fmt::Display for ErrorAssertion<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Error:")?;
+        f.write_str("Error:")?;
         if let Some(column) = self.column {
             write!(f, " {column}")?;
         }
