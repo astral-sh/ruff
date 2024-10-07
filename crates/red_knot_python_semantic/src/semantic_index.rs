@@ -1,7 +1,7 @@
 use std::iter::FusedIterator;
 use std::sync::Arc;
 
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxBuildHasher, FxHashMap};
 use salsa::plumbing::AsId;
 
 use ruff_db::files::File;
@@ -31,7 +31,7 @@ pub(crate) use self::use_def::{
     BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator,
 };
 
-type SymbolMap = hashbrown::HashMap<ScopedSymbolId, (), ()>;
+type SymbolMap = hashbrown::HashMap<ScopedSymbolId, (), FxBuildHasher>;
 
 /// Returns the semantic index for `file`.
 ///
