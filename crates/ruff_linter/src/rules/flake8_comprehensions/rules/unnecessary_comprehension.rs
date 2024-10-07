@@ -33,8 +33,8 @@ use crate::rules::flake8_comprehensions::fixes;
 ///
 /// This rule may produce false positives for dictionary comprehensions that iterate over a mapping.
 /// The `dict` constructor behaves differently depending on if it receives a sequence (e.g., a
-/// `list`) or a mapping (e.g., a `dict`). When the comprension iterates over the keys of a mapping,
-/// replacing it with a `dict` constructor will give a different result.
+/// `list`) or a mapping (e.g., a `dict`). When a comprehension iterates over the keys of a mapping,
+/// replacing it with a `dict` constructor call will give a different result.
 ///
 /// For example:
 ///
