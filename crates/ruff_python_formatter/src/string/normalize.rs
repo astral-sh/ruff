@@ -206,6 +206,7 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
                 // TODO: Remove the `b'{'` in `choose_quotes` when promoting the
                 // `format_fstring` preview style
                 is_f_string_formatting_enabled(self.context),
+                false,
             )
         } else {
             Cow::Borrowed(raw_content)
@@ -599,6 +600,7 @@ pub(crate) fn normalize_string(
     start_offset: usize,
     new_flags: AnyStringFlags,
     format_f_string: bool,
+    escape_braces: bool,
 ) -> Cow<str> {
     // The normalized string if `input` is not yet normalized.
     // `output` must remain empty if `input` is already normalized.
@@ -620,16 +622,24 @@ pub(crate) fn normalize_string(
 
     while let Some((index, c)) = chars.next() {
         if matches!(c, '{' | '}') && is_fstring {
-            if chars.peek().copied().is_some_and(|(_, next)| next == c) {
-                // Skip over the second character of the double braces
-                chars.next();
-            } else if c == '{' {
-                formatted_value_nesting += 1;
-            } else {
-                // Safe to assume that `c == '}'` here because of the matched pattern above
-                formatted_value_nesting = formatted_value_nesting.saturating_sub(1);
+            if escape_braces {
+                // Escape `{` and `}` when converting a regular string literal to an f-string literal.
+                output.push_str(&input[last_index..=index]);
+                output.push(c);
+                last_index = index + c.len_utf8();
+                continue;
+            } else if is_fstring {
+                if chars.peek().copied().is_some_and(|(_, next)| next == c) {
+                    // Skip over the second character of the double braces
+                    chars.next();
+                } else if c == '{' {
+                    formatted_value_nesting += 1;
+                } else {
+                    // Safe to assume that `c == '}'` here because of the matched pattern above
+                    formatted_value_nesting = formatted_value_nesting.saturating_sub(1);
+                }
+                continue;
             }
-            continue;
         }
 
         if c == '\r' {
@@ -1014,6 +1024,7 @@ mod tests {
                 false,
             ),
             true,
+            false,
         );
 
         assert_eq!(r"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a", &normalized);

@@ -76,14 +76,9 @@ impl Format<PyFormatContext<'_>> for FormatFString<'_> {
         let quotes = StringQuotes::from(string_kind);
         write!(f, [string_kind.prefix(), quotes])?;
 
-        f.join()
-            .entries(
-                self.value
-                    .elements
-                    .iter()
-                    .map(|element| FormatFStringElement::new(element, context)),
-            )
-            .finish()?;
+        for element in &self.value.elements {
+            FormatFStringElement::new(element, context).fmt(f)?;
+        }
 
         // Ending quote
         quotes.fmt(f)

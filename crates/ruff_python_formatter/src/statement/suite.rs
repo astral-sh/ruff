@@ -11,7 +11,7 @@ use crate::comments::{
     leading_comments, trailing_comments, Comments, LeadingDanglingTrailingComments,
 };
 use crate::context::{NodeLevel, TopLevelStatementPosition, WithIndentLevel, WithNodeLevel};
-use crate::other::string_literal::StringLiteralKind;
+use crate::expression::expr_string_literal::ExprStringLiteralLayout;
 use crate::prelude::*;
 use crate::statement::stmt_expr::FormatStmtExpr;
 use crate::verbatim::{
@@ -850,7 +850,7 @@ impl Format<PyFormatContext<'_>> for DocstringStmt<'_> {
                         .then_some(source_position(self.docstring.start())),
                     string_literal
                         .format()
-                        .with_options(StringLiteralKind::Docstring),
+                        .with_options(ExprStringLiteralLayout::docstring()),
                     f.options()
                         .source_map_generation()
                         .is_enabled()

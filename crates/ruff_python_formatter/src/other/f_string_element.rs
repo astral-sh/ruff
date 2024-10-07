@@ -61,7 +61,7 @@ impl<'a> FormatFStringLiteralElement<'a> {
 impl Format<PyFormatContext<'_>> for FormatFStringLiteralElement<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let literal_content = f.context().locator().slice(self.element.range());
-        let normalized = normalize_string(literal_content, 0, self.fstring_flags, true);
+        let normalized = normalize_string(literal_content, 0, self.fstring_flags, true, false);
         match &normalized {
             Cow::Borrowed(_) => source_text_slice(self.element.range()).fmt(f),
             Cow::Owned(normalized) => text(normalized).fmt(f),
@@ -235,11 +235,9 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
                 if let Some(format_spec) = format_spec.as_deref() {
                     token(":").fmt(f)?;
 
-                    f.join()
-                        .entries(format_spec.elements.iter().map(|element| {
-                            FormatFStringElement::new(element, self.context.f_string())
-                        }))
-                        .finish()?;
+                    for element in &format_spec.elements {
+                        FormatFStringElement::new(element, self.context.f_string()).fmt(f)?;
+                    }
 
                     // These trailing comments can only occur if the format specifier is
                     // present. For example,

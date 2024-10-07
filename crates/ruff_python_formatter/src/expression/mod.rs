@@ -768,15 +768,18 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. })
                 if value.is_implicit_concatenated() =>
             {
-                self.update_max_precedence(OperatorPrecedence::String);
+                // FIXME make this a preview only change
+                // self.update_max_precedence(OperatorPrecedence::String);
+                return;
             }
             Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. })
                 if value.is_implicit_concatenated() =>
             {
-                self.update_max_precedence(OperatorPrecedence::String);
+                // self.update_max_precedence(OperatorPrecedence::String);
+                return;
             }
             Expr::FString(ast::ExprFString { value, .. }) if value.is_implicit_concatenated() => {
-                self.update_max_precedence(OperatorPrecedence::String);
+                // self.update_max_precedence(OperatorPrecedence::String);
                 return;
             }
 
@@ -1254,8 +1257,9 @@ pub(crate) fn is_splittable_expression(expr: &Expr, context: &PyFormatContext) -
         }
 
         // String like literals can expand if they are implicit concatenated.
+        // TODO REVIEW
         Expr::FString(fstring) => fstring.value.is_implicit_concatenated(),
-        Expr::StringLiteral(string) => string.value.is_implicit_concatenated(),
+        Expr::StringLiteral(_) => false,
         Expr::BytesLiteral(bytes) => bytes.value.is_implicit_concatenated(),
 
         // Expressions that have no split points per se, but they contain nested sub expressions that might expand.

@@ -1,6 +1,6 @@
 use ruff_formatter::{format_args, write, FormatError};
 use ruff_python_ast::{
-    AnyNodeRef, Expr, ExprAttribute, ExprCall, Operator, StmtAssign, TypeParams,
+    AnyNodeRef, Expr, ExprAttribute, ExprCall, Operator, StmtAssign, StringLike, TypeParams,
 };
 
 use crate::builders::parenthesize_if_expands;
@@ -8,6 +8,9 @@ use crate::comments::{
     trailing_comments, Comments, LeadingDanglingTrailingComments, SourceComment,
 };
 use crate::context::{NodeLevel, WithNodeLevel};
+use crate::expression::expr_bytes_literal::ExprBytesLiteralLayout;
+use crate::expression::expr_f_string::ExprFStringLayout;
+use crate::expression::expr_string_literal::ExprStringLiteralLayout;
 use crate::expression::parentheses::{
     is_expression_parenthesized, optional_parentheses, NeedsParentheses, OptionalParentheses,
     Parentheses, Parenthesize,
@@ -16,7 +19,9 @@ use crate::expression::{
     can_omit_optional_parentheses, has_own_parentheses, has_parentheses,
     maybe_parenthesize_expression,
 };
+use crate::other::string_literal::StringLiteralKind;
 use crate::statement::trailing_semicolon;
+use crate::string::StringLikeExtensions;
 use crate::{has_skip_comment, prelude::*};
 
 #[derive(Default)]
@@ -281,8 +286,12 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
         match self {
             FormatStatementsLastExpression::LeftToRight { value, statement } => {
                 let can_inline_comment = should_inline_comments(value, *statement, f.context());
+                let is_implicit_concatenated = StringLike::try_from(*value).is_ok_and(|string| {
+                    string.is_implicit_concatenated()
+                        && !string.is_implicit_and_cant_join(f.context())
+                });
 
-                if !can_inline_comment {
+                if !can_inline_comment && !is_implicit_concatenated {
                     return maybe_parenthesize_expression(
                         value,
                         *statement,
@@ -299,30 +308,98 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                     *statement,
                     &comments,
                 ) {
-                    let group_id = f.group_id("optional_parentheses");
+                    if is_implicit_concatenated {
+                        let implicit_group_id = f.group_id("implicit_concatenated");
+                        optional_parentheses(&format_with(|f| {
+                            inline_comments.mark_formatted();
 
-                    let f = &mut WithNodeLevel::new(NodeLevel::Expression(Some(group_id)), f);
+                            match value {
+                                Expr::StringLiteral(literal) => {
+                                    assert!(literal.value.is_implicit_concatenated());
 
-                    best_fit_parenthesize(&format_with(|f| {
-                        inline_comments.mark_formatted();
+                                    literal
+                                        .format()
+                                        .with_options(ExprStringLiteralLayout {
+                                            kind: StringLiteralKind::String,
+                                            implicit_group_id: Some(implicit_group_id),
+                                        })
+                                        .fmt(f)?;
+                                }
+                                Expr::BytesLiteral(literal) => {
+                                    assert!(literal.value.is_implicit_concatenated());
 
-                        value.format().with_options(Parentheses::Never).fmt(f)?;
+                                    literal
+                                        .format()
+                                        .with_options(ExprBytesLiteralLayout {
+                                            implicit_group_id: Some(implicit_group_id),
+                                        })
+                                        .fmt(f)?;
+                                }
+
+                                Expr::FString(literal) => {
+                                    assert!(literal.value.is_implicit_concatenated());
+
+                                    literal
+                                        .format()
+                                        .with_options(ExprFStringLayout {
+                                            implicit_group_id: Some(implicit_group_id),
+                                        })
+                                        .fmt(f)?;
+                                }
+
+                                _ => {
+                                    unreachable!(
+                                        "Should only be called for implicit concatenated strings."
+                                    )
+                                }
+                            }
+
+                            if !inline_comments.is_empty() {
+                                // If the implicit concatenated string fits in a single line,, format the comment in parentheses
+                                if_group_fits_on_line(&inline_comments)
+                                    .with_group_id(Some(implicit_group_id))
+                                    .fmt(f)?;
+                            }
+
+                            Ok(())
+                        }))
+                        .fmt(f)?;
 
                         if !inline_comments.is_empty() {
-                            // If the expressions exceeds the line width, format the comments in the parentheses
-                            if_group_breaks(&inline_comments).fmt(f)?;
+                            // If the implicit concatenated string expands, format the comments outside the parentheses
+                            if_group_breaks(&inline_comments)
+                                .with_group_id(Some(implicit_group_id))
+                                .fmt(f)?;
                         }
+                    } else {
+                        let group_id = f.group_id("optional_parentheses");
+                        let f = &mut WithNodeLevel::new(NodeLevel::Expression(Some(group_id)), f);
 
-                        Ok(())
-                    }))
-                    .with_group_id(Some(group_id))
-                    .fmt(f)?;
+                        best_fit_parenthesize(&format_once(|f| {
+                            inline_comments.mark_formatted();
 
-                    if !inline_comments.is_empty() {
-                        // If the line fits into the line width, format the comments after the parenthesized expression
-                        if_group_fits_on_line(&inline_comments)
-                            .with_group_id(Some(group_id))
-                            .fmt(f)?;
+                            // Can we just call `FormatImplicitString` here with a custom layout assigns a group id
+                            // that we can reference in `if_group_breaks` and `if_group_fits_on_line`.
+                            // The other alternative is that this code creates the `FormatImplicitStringGroup` and by-passes
+                            // calling `FormatStringLiteralExpression` directly.
+                            value.format().with_options(Parentheses::Never).fmt(f)?;
+
+                            if !inline_comments.is_empty() {
+                                // If the expressions exceeds the line width, format the comments in the parentheses
+                                if_group_breaks(&inline_comments).fmt(f)?;
+                            }
+
+                            Ok(())
+                        }))
+                        .with_group_id(Some(group_id))
+                        .fmt(f)?;
+
+                        if !inline_comments.is_empty() {
+                            // If the line fits into the line width, format the comments after the parenthesized expression
+                            if_group_fits_on_line(&inline_comments)
+                                .with_group_id(Some(group_id))
+                                .fmt(f)?;
+                        }
                     }
 
                     Ok(())

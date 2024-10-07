@@ -1,3 +1,4 @@
+use ruff_formatter::{FormatRuleWithOptions, GroupId};
 use ruff_python_ast::{AnyNodeRef, ExprFString, StringLike};
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
@@ -10,7 +11,23 @@ use crate::prelude::*;
 use crate::string::{FormatImplicitConcatenatedString, Quoting, StringLikeExtensions};
 
 #[derive(Default)]
-pub struct FormatExprFString;
+pub struct FormatExprFString {
+    layout: ExprFStringLayout,
+}
+
+#[derive(Default)]
+pub struct ExprFStringLayout {
+    pub implicit_group_id: Option<GroupId>,
+}
+
+impl FormatRuleWithOptions<ExprFString, PyFormatContext<'_>> for FormatExprFString {
+    type Options = ExprFStringLayout;
+
+    fn with_options(mut self, options: Self::Options) -> Self {
+        self.layout = options;
+        self
+    }
+}
 
 impl FormatNodeRule<ExprFString> for FormatExprFString {
     fn fmt_fields(&self, item: &ExprFString, f: &mut PyFormatter) -> FormatResult<()> {
@@ -22,7 +39,14 @@ impl FormatNodeRule<ExprFString> for FormatExprFString {
                 f_string_quoting(item, &f.context().locator()),
             )
             .fmt(f),
-            _ => in_parentheses_only_group(&FormatImplicitConcatenatedString::new(item)).fmt(f),
+            _ => match self.layout.implicit_group_id {
+                Some(group_id) => group(&FormatImplicitConcatenatedString::new(item))
+                    .with_group_id(Some(group_id))
+                    .fmt(f),
+                None => {
+                    in_parentheses_only_group(&FormatImplicitConcatenatedString::new(item)).fmt(f)
+                }
+            },
         }
     }
 }
@@ -35,6 +59,7 @@ impl NeedsParentheses for ExprFString {
     ) -> OptionalParentheses {
         if self.value.is_implicit_concatenated() {
             OptionalParentheses::Multiline
+        }
         // TODO(dhruvmanila): Ideally what we want here is a new variant which
         // is something like:
         // - If the expression fits by just adding the parentheses, then add them and
@@ -53,7 +78,7 @@ impl NeedsParentheses for ExprFString {
         //   ```
         // This isn't decided yet, refer to the relevant discussion:
         // https://github.com/astral-sh/ruff/discussions/9785
-        } else if StringLike::FString(self).is_multiline(context.source()) {
+        else if StringLike::FString(self).is_multiline(context.source()) {
             OptionalParentheses::Never
         } else {
             OptionalParentheses::BestFit
