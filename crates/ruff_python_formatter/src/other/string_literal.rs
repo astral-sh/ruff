@@ -2,7 +2,8 @@ use ruff_formatter::FormatRuleWithOptions;
 use ruff_python_ast::StringLiteral;
 
 use crate::prelude::*;
-use crate::string::{docstring, StringNormalizer};
+use crate::preview::is_f_string_implicit_concatenated_string_literal_quotes_enabled;
+use crate::string::{docstring, Quoting, StringNormalizer};
 use crate::QuoteStyle;
 
 #[derive(Default)]
@@ -27,12 +28,35 @@ pub enum StringLiteralKind {
     String,
     /// A string literal used as a docstring.
     Docstring,
+    /// A string literal that is implicitly concatenated with an f-string. This
+    /// makes the overall expression an f-string whose quoting detection comes
+    /// from the parent node (f-string expression).
+    #[deprecated]
+    #[allow(private_interfaces)]
+    InImplicitlyConcatenatedFString(Quoting),
 }
 
 impl StringLiteralKind {
     /// Checks if this string literal is a docstring.
     pub(crate) const fn is_docstring(self) -> bool {
         matches!(self, StringLiteralKind::Docstring)
+    }
+
+    /// Returns the quoting to be used for this string literal.
+    fn quoting(self, context: &PyFormatContext) -> Quoting {
+        match self {
+            StringLiteralKind::String | StringLiteralKind::Docstring => Quoting::CanChange,
+            #[allow(deprecated)]
+            StringLiteralKind::InImplicitlyConcatenatedFString(quoting) => {
+                // TODO: Remove StringLiteralKind::InImplicitlyConcatenatedFString when promoting
+                //   this style to stable
+                if is_f_string_implicit_concatenated_string_literal_quotes_enabled(context) {
+                    Quoting::CanChange
+                } else {
+                    quoting
+                }
+            }
+        }
     }
 }
 
@@ -48,6 +72,7 @@ impl FormatNodeRule<StringLiteral> for FormatStringLiteral {
         };
 
         let normalized = StringNormalizer::from_context(f.context())
+            .with_quoting(self.layout.quoting(f.context()))
             .with_preferred_quote_style(quote_style)
             .normalize(item.into());
 
