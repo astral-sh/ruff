@@ -406,7 +406,7 @@ impl<'db> Type<'db> {
         IntersectionBuilder::build_truthy(db, *self)
     }
 
-    /// Return the `Falsy` subset of this type (intersection with Truthy).
+    /// Return the `Falsy` subset of this type (intersection with Falsy).
     #[must_use]
     pub fn falsy(&self, db: &'db dyn Db) -> Type<'db> {
         self.falsy_set(db)
