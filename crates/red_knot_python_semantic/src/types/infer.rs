@@ -48,6 +48,7 @@ use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::{NodeWithScopeKind, NodeWithScopeRef, ScopeId};
 use crate::semantic_index::SemanticIndex;
 use crate::stdlib::builtins_module_scope;
+use crate::types::builder::IntersectionBuilder;
 use crate::types::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 use crate::types::{
     bindings_ty, builtins_symbol_ty, declarations_ty, global_symbol_ty, symbol_ty,
@@ -2471,13 +2472,23 @@ impl<'db> TypeInferenceBuilder<'db> {
                 } else {
                     let is_last = i == n_values - 1;
                     match (ty.bool(db), is_last, op) {
-                        (Truthiness::Ambiguous, _, _) => ty,
+                        // We only every return a type early in an `and` if it's a part of the
+                        // `falsy` subset of its type.
+                        (Truthiness::Ambiguous, false, ast::BoolOp::And) => {
+                            IntersectionBuilder::build_falsy(db, ty)
+                        }
+                        // We only every return a type early in an `and` if it's a part of the
+                        // `truthy` subset of its type.
+                        (Truthiness::Ambiguous, false, ast::BoolOp::Or) => {
+                            IntersectionBuilder::build_truthy(db, ty)
+                        }
+
                         (Truthiness::AlwaysTrue, false, ast::BoolOp::And) => Type::Never,
                         (Truthiness::AlwaysFalse, false, ast::BoolOp::Or) => Type::Never,
                         (Truthiness::AlwaysFalse, _, ast::BoolOp::And)
                         | (Truthiness::AlwaysTrue, _, ast::BoolOp::Or) => {
                             done = true;
-                            ty
+                            ty // Those types are already truthy/falsy
                         }
                         (_, true, _) => ty,
                     }
@@ -4125,7 +4136,7 @@ mod tests {
         assert_public_ty(&db, "src/a.py", "g", "bool");
         assert_public_ty(&db, "src/a.py", "h", "Literal[False]");
         assert_public_ty(&db, "src/a.py", "i", "Literal[True]");
-        assert_public_ty(&db, "src/a.py", "j", "@Todo | Literal[True]");
+        assert_public_ty(&db, "src/a.py", "j", "@Todo & Falsy | Literal[True]");
 
         Ok(())
     }
@@ -4245,15 +4256,15 @@ mod tests {
         // 2. A() < B() and B() < C()  - split in N comparison
         // 3. A() and B()              - evaluate outcome types
         // 4. bool and bool            - evaluate truthiness
-        // 5. A | B                    - union of "first true" types
-        assert_public_ty(&db, "src/a.py", "a", "A | B");
+        // 5. A & Falsy | B            - A instances are returned if and only if falsy
+        assert_public_ty(&db, "src/a.py", "a", "A & Falsy | B");
         // Walking through the example
         // 1. 0 < 1 < A() < 3
         // 2. 0 < 1 and 1 < A() and A() < 3   - split in N comparison
         // 3. True and bool and A             - evaluate outcome types
         // 4. True and bool and bool          - evaluate truthiness
-        // 5. bool | A                        - union of "true" types
-        assert_public_ty(&db, "src/a.py", "b", "bool | A");
+        // 5. Literal[False] | A              - the 'bool' type is returned if falsy => `False`
+        assert_public_ty(&db, "src/a.py", "b", "Literal[False] | A");
         // Short-cicuit to False
         assert_public_ty(&db, "src/a.py", "c", "Literal[False]");
 
@@ -5421,15 +5432,7 @@ mod tests {
         )
         .unwrap();
 
-        // TODO: The correct inferred type should be `Literal[0] | None` but currently the
-        // simplification logic doesn't account for this. The final type with parenthesis:
-        // `Literal[0] | None | (Literal[1] & None)`
-        assert_public_ty(
-            &db,
-            "/src/a.py",
-            "y",
-            "Literal[0] | None | Literal[1] & None",
-        );
+        assert_public_ty(&db, "/src/a.py", "y", "Literal[0] | None");
     }
 
     #[test]
@@ -7545,8 +7548,8 @@ mod tests {
         db.write_dedented(
             "/src/a.py",
             "
-            def foo() -> str:
-                pass
+            def str_instance() -> str:
+                return ''
 
             a = True or False
             b = 'x' or 'y' or 'z'
@@ -7554,8 +7557,8 @@ mod tests {
             d = False or 'z'
             e = False or True
             f = False or False
-            g = foo() or False
-            h = foo() or True
+            g = str_instance() or False
+            h = str_instance() or True
             ",
         )?;
 
@@ -7565,8 +7568,8 @@ mod tests {
         assert_public_ty(&db, "/src/a.py", "d", r#"Literal["z"]"#);
         assert_public_ty(&db, "/src/a.py", "e", "Literal[True]");
         assert_public_ty(&db, "/src/a.py", "f", "Literal[False]");
-        assert_public_ty(&db, "/src/a.py", "g", "str | Literal[False]");
-        assert_public_ty(&db, "/src/a.py", "h", "str | Literal[True]");
+        assert_public_ty(&db, "/src/a.py", "g", "str & Truthy | Literal[False]");
+        assert_public_ty(&db, "/src/a.py", "h", "str & Truthy | Literal[True]");
 
         Ok(())
     }
@@ -7578,13 +7581,13 @@ mod tests {
         db.write_dedented(
             "/src/a.py",
             "
-            def foo() -> str:
-                pass
+            def str_instance() -> str:
+                return ''
 
             a = True and False
             b = False and True
-            c = foo() and False
-            d = foo() and True
+            c = str_instance() and False
+            d = True and str_instance()
             e = 'x' and 'y' and 'z'
             f = 'x' and 'y' and ''
             g = '' and 'y'
@@ -7593,8 +7596,8 @@ mod tests {
 
         assert_public_ty(&db, "/src/a.py", "a", "Literal[False]");
         assert_public_ty(&db, "/src/a.py", "b", "Literal[False]");
-        assert_public_ty(&db, "/src/a.py", "c", "str | Literal[False]");
-        assert_public_ty(&db, "/src/a.py", "d", "str | Literal[True]");
+        assert_public_ty(&db, "/src/a.py", "c", r#"Literal[""] | Literal[False]"#);
+        assert_public_ty(&db, "/src/a.py", "d", "str");
         assert_public_ty(&db, "/src/a.py", "e", r#"Literal["z"]"#);
         assert_public_ty(&db, "/src/a.py", "f", r#"Literal[""]"#);
         assert_public_ty(&db, "/src/a.py", "g", r#"Literal[""]"#);
@@ -7608,9 +7611,6 @@ mod tests {
         db.write_dedented(
             "/src/a.py",
             r#"
-            def foo() -> str:
-                pass
-
             a = "x" and "y" or "z"
             b = "x" or "y" and "z"
             c = "" and "y" or "z"
@@ -7670,7 +7670,7 @@ mod tests {
             "b",
             "Literal[True] | int & Truthy | Literal[\"\"]",
         );
-        // TODO: I don't know if red-knot can be smart enough to realise that
+        // Corner case with some builtins with a defined `truthy` or `falsy` set of values
         // `Literal[0]` = `int & Falsy`, which leads to:
         // `int & Truthy | Literal[0]` = `int & Truthy | int & Falsy` = `int`
         assert_public_ty(&db, "/src/a.py", "c", "int");
