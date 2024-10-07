@@ -766,4 +766,24 @@ mod tests {
 
         assert_fail(result, &[(3, &[r#"unexpected error: [third-rule] "msg""#])]);
     }
+
+    #[test]
+    fn parenthesized_expression() {
+        let source = "
+            a = b + (
+                Error: [undefined-reveal]
+                reveal_type(5)  # Type: Literal[5]
+            )
+            ";
+        let reveal = source.find("reveal_type").unwrap();
+        let result = get_result(
+            source,
+            vec![
+                TestDiagnostic::new("undefined-reveal", "msg", reveal),
+                TestDiagnostic::new("revealed-type", "Revealed type is `Literal[5]`", reveal),
+            ],
+        );
+
+        assert_ok(&result);
+    }
 }
