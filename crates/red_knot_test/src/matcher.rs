@@ -3,7 +3,6 @@
 use crate::assertion::{Assertion, FileAssertions};
 use crate::db::TestDb;
 use crate::diagnostic::SortedDiagnostics;
-use crate::FxOrderMap;
 use red_knot_python_semantic::types::TypeCheckDiagnostic;
 use ruff_db::files::File;
 use ruff_db::source::{line_index, source_text, SourceText};
@@ -11,9 +10,44 @@ use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashSet;
 use std::cmp::Ordering;
+use std::ops::Range;
 use std::sync::Arc;
 
-pub(super) type FailuresByLine = FxOrderMap<OneIndexed, Vec<String>>;
+#[derive(Debug, Default)]
+pub(super) struct FailuresByLine {
+    failures: Vec<String>,
+    lines: Vec<LineFailures>,
+}
+
+impl FailuresByLine {
+    pub(super) fn iter(&self) -> impl Iterator<Item = (OneIndexed, &[String])> {
+        self.lines.iter().map(|line_failures| {
+            (
+                line_failures.line_number,
+                &self.failures[line_failures.range.clone()],
+            )
+        })
+    }
+
+    fn push(&mut self, line_number: OneIndexed, messages: Vec<String>) {
+        let start = self.failures.len();
+        self.failures.extend(messages);
+        self.lines.push(LineFailures {
+            line_number,
+            range: start..self.failures.len(),
+        });
+    }
+
+    fn is_empty(&self) -> bool {
+        self.lines.is_empty()
+    }
+}
+
+#[derive(Debug)]
+struct LineFailures {
+    line_number: OneIndexed,
+    range: Range<usize>,
+}
 
 pub(super) fn match_file<T>(
     db: &TestDb,
@@ -48,8 +82,8 @@ where
                         // iterators.
                         matcher
                             .match_line(diagnostics, assertions)
-                            .unwrap_or_else(|msgs| {
-                                failures.insert(assertions.line, msgs);
+                            .unwrap_or_else(|messages| {
+                                failures.push(assertions.line, messages);
                             });
                         current_assertions = line_assertions.next();
                         current_diagnostics = line_diagnostics.next();
@@ -57,13 +91,13 @@ where
                     Ordering::Less => {
                         // We have assertions on an earlier line than diagnostics; report these
                         // assertions as all unmatched, and advance the assertions iterator.
-                        failures.insert(assertions.line, unmatched(assertions));
+                        failures.push(assertions.line, unmatched(assertions));
                         current_assertions = line_assertions.next();
                     }
                     Ordering::Greater => {
                         // We have diagnostics on an earlier line than assertions; report these
                         // diagnostics as all unmatched, and advance the diagnostics iterator.
-                        failures.insert(diagnostics.line, unmatched(diagnostics));
+                        failures.push(diagnostics.line, unmatched(diagnostics));
                         current_diagnostics = line_diagnostics.next();
                     }
                 }
@@ -71,13 +105,13 @@ where
             (Some(assertions), None) => {
                 // We've exhausted diagnostics but still have assertions; report these assertions
                 // as unmatched and advance the assertions iterator.
-                failures.insert(assertions.line, unmatched(assertions));
+                failures.push(assertions.line, unmatched(assertions));
                 current_assertions = line_assertions.next();
             }
             (None, Some(diagnostics)) => {
                 // We've exhausted assertions but still have diagnostics; report these
                 // diagnostics as unmatched and advance the diagnostics iterator.
-                failures.insert(diagnostics.line, unmatched(diagnostics));
+                failures.push(diagnostics.line, unmatched(diagnostics));
                 current_diagnostics = line_diagnostics.next();
             }
             // When we've exhausted both diagnostics and assertions, break.
@@ -301,7 +335,7 @@ mod tests {
             panic!("expected a failure");
         };
 
-        let expected: FailuresByLine = messages
+        let expected: Vec<(OneIndexed, Vec<String>)> = messages
             .iter()
             .map(|(idx, msgs)| {
                 (
@@ -309,6 +343,10 @@ mod tests {
                     msgs.iter().map(ToString::to_string).collect(),
                 )
             })
+            .collect();
+        let failures: Vec<(OneIndexed, Vec<String>)> = failures
+            .iter()
+            .map(|(idx, msgs)| (idx, msgs.to_vec()))
             .collect();
 
         assert_eq!(failures, expected);

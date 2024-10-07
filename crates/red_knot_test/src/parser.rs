@@ -3,8 +3,9 @@ use regex::{Captures, Regex};
 use ruff_index::{newtype_index, IndexVec};
 use rustc_hash::{FxHashMap, FxHashSet};
 
-pub(crate) fn parse<'s>(path: &'s str, source: &'s str) -> anyhow::Result<MarkdownTestSuite<'s>> {
-    let parser = Parser::new(path, source);
+/// Parse the Markdown `source` as a test suite with given `title`.
+pub(crate) fn parse<'s>(title: &'s str, source: &'s str) -> anyhow::Result<MarkdownTestSuite<'s>> {
+    let parser = Parser::new(title, source);
     parser.parse()
 }
 
@@ -130,10 +131,10 @@ struct Parser<'s> {
 }
 
 impl<'s> Parser<'s> {
-    fn new(path: &'s str, source: &'s str) -> Self {
+    fn new(title: &'s str, source: &'s str) -> Self {
         let mut sections = IndexVec::default();
         let root_section_id = sections.push(Section {
-            title: path,
+            title,
             level: 0,
             parent_id: None,
         });
@@ -222,6 +223,14 @@ impl<'s> Parser<'s> {
                 if let Some(current_files) = &mut self.current_section_files {
                     if current_files.contains(*path) {
                         let current = &self.sections[*self.stack.last().unwrap()];
+                        if *path == "test.py" {
+                            return Err(anyhow::anyhow!(
+                                "Test `{}` has duplicate files named `{path}`. \
+                                (This is the default filename; \
+                                 consider giving some files an explicit name with `path=...`.)",
+                                current.title
+                            ));
+                        }
                         return Err(anyhow::anyhow!(
                             "Test `{}` has duplicate files named `{path}`.",
                             current.title
@@ -458,8 +467,31 @@ mod tests {
         );
         let mf = super::parse("file.md", &source);
         assert!(
+            mf.as_ref().is_err_and(|err| err.to_string()
+                == "Test `file.md` has duplicate files named `test.py`. \
+                (This is the default filename; consider giving some files an explicit name \
+                 with `path=...`.)"),
+            "Unexpected parse result: {mf:?}",
+        );
+    }
+
+    #[test]
+    fn no_duplicate_name_files_in_test_non_default() {
+        let source = dedent(
+            "
+            ```py path=foo.py
+            x = 1
+            ```
+
+            ```py path=foo.py
+            y = 2
+            ```
+            ",
+        );
+        let mf = super::parse("file.md", &source);
+        assert!(
             mf.as_ref().is_err_and(
-                |err| err.to_string() == "Test `file.md` has duplicate files named `test.py`."
+                |err| err.to_string() == "Test `file.md` has duplicate files named `foo.py`."
             ),
             "Unexpected parse result: {mf:?}",
         );

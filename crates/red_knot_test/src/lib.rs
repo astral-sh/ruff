@@ -1,15 +1,12 @@
-use ordermap::map::OrderMap;
+use parser as test_parser;
 use red_knot_python_semantic::types::check_types;
 use ruff_db::files::system_path_to_file;
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
-use rustc_hash::FxHasher;
-use std::hash::BuildHasherDefault;
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-type FxOrderMap<K, V> = OrderMap<K, V, BuildHasherDefault<FxHasher>>;
-
-type Failures = FxOrderMap<SystemPathBuf, matcher::FailuresByLine>;
+type Failures = BTreeMap<SystemPathBuf, matcher::FailuresByLine>;
 
 mod assertion;
 mod db;
@@ -17,27 +14,18 @@ mod diagnostic;
 mod matcher;
 mod parser;
 
-/// Run given file path as a markdown test suite.
+/// Run `path` as a markdown test suite with given `title`.
 ///
 /// Panic on test failure, and print failure details.
 #[allow(clippy::print_stdout)]
-pub fn run(path: &PathBuf) {
-    let relpath: PathBuf = path
-        .components()
-        .rev()
-        .take_while(|component| {
-            if let std::path::Component::Normal(os_str) = component {
-                os_str.to_str().is_some_and(|s| s != "mdtest")
-            } else {
-                true
-            }
-        })
-        .collect::<Vec<_>>()
-        .iter()
-        .rev()
-        .collect();
+pub fn run(path: &PathBuf, title: &str) {
     let source = std::fs::read_to_string(path).unwrap();
-    let suite = parser::parse(relpath.to_str().unwrap(), &source).unwrap();
+    let suite = match test_parser::parse(title, &source) {
+        Ok(suite) => suite,
+        Err(err) => {
+            panic!("Error parsing `{}`: {err}", path.to_str().unwrap())
+        }
+    };
 
     let mut any_failures = false;
     for test in suite.tests() {
@@ -47,7 +35,7 @@ pub fn run(path: &PathBuf) {
 
             for (path, by_line) in failures {
                 println!("  {path}");
-                for (line, failures) in by_line {
+                for (line, failures) in by_line.iter() {
                     for failure in failures {
                         println!("    line {line}: {failure}");
                     }
@@ -68,7 +56,7 @@ fn run_test(test: &parser::MarkdownTest) -> Result<(), Failures> {
 
     for file in test.files() {
         assert!(
-            file.lang == "py" || file.lang == "pyi",
+            matches!(file.lang, "py" | "pyi"),
             "Non-Python files not supported yet."
         );
         let full_path = workspace_root.join(file.path);
@@ -76,14 +64,20 @@ fn run_test(test: &parser::MarkdownTest) -> Result<(), Failures> {
         system_paths.push(full_path);
     }
 
-    let mut failures = FxOrderMap::default();
+    let mut failures = BTreeMap::default();
 
     for path in system_paths {
         let file = system_path_to_file(&db, path.clone()).unwrap();
         let parsed = parsed_module(&db, file);
 
         // TODO allow testing against code with syntax errors
-        assert!(parsed.errors().is_empty(), "{:?}", parsed.errors());
+        assert!(
+            parsed.errors().is_empty(),
+            "Python syntax errors in {}, {:?}: {:?}",
+            test.name(),
+            path,
+            parsed.errors()
+        );
 
         matcher::match_file(&db, file, check_types(&db, file)).unwrap_or_else(|line_failures| {
             failures.insert(path, line_failures);
