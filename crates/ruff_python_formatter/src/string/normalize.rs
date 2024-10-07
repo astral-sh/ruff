@@ -209,6 +209,63 @@ impl QuoteSelection {
     }
 }
 
+#[derive(Clone, Debug)]
+pub(crate) struct QuoteMetadata {
+    kind: QuoteMetadataKind,
+
+    /// The quote style in the source.
+    source_style: QuoteStyle,
+}
+
+impl QuoteMetadata {
+    fn choose(&self, context: &PyFormatContext) -> QuoteStyle {
+        todo!()
+    }
+
+    fn merge(self, other: &QuoteMetadata) -> Option<QuoteMetadata> {
+        match (self.kind, other.kind) {
+            (
+                QuoteMetadataKind::Regular {
+                    single_quotes: self_single,
+                    double_quotes: self_double,
+                },
+                QuoteMetadataKind::Regular {
+                    single_quotes: other_single,
+                    double_quotes: other_double,
+                },
+            ) => Some(Self {
+                kind: QuoteMetadataKind::Regular {
+                    single_quotes: self_single + other_single,
+                    double_quotes: self_double + other_double,
+                },
+                source_style: self.source_style,
+            }),
+            // Can't merge quotes from raw strings (even when both strings are raw)
+            (QuoteMetadataKind::Raw { .. }, _) | (_, QuoteMetadataKind::Raw { .. }) => None,
+            // Can't merge quotes from triple quoted strings (even when both strings are triple quoted)
+            (QuoteMetadataKind::Triple { .. }, _) | (_, QuoteMetadataKind::Triple { .. }) => None,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+enum QuoteMetadataKind {
+    /// A raw string.
+    Raw {
+        contains_preferred: bool,
+    },
+
+    Triple {
+        contains_preferred: bool,
+    },
+
+    /// A single quoted string that uses either double or single quotes.
+    Regular {
+        single_quotes: u32,
+        double_quotes: u32,
+    },
+}
+
 #[derive(Debug)]
 pub(crate) struct NormalizedString<'a> {
     /// Holds data about the quotes and prefix of the string
@@ -407,7 +464,7 @@ fn choose_quotes_impl(
 /// Adds the necessary quote escapes and removes unnecessary escape sequences when quoting `input`
 /// with the provided [`StringQuotes`] style.
 ///
-/// Returns the normalized string and whether it contains new lines.
+/// Returns the normalized string .
 pub(crate) fn normalize_string(
     input: &str,
     start_offset: usize,

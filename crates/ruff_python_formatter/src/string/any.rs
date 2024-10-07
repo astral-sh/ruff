@@ -136,6 +136,7 @@ impl<'a> From<&'a ExprFString> for AnyString<'a> {
     }
 }
 
+#[derive(Clone)]
 pub(super) enum AnyStringPartsIter<'a> {
     String(std::slice::Iter<'a, StringLiteral>),
     Bytes(std::slice::Iter<'a, ast::BytesLiteral>),
@@ -194,7 +195,7 @@ pub(super) enum AnyStringPart<'a> {
 }
 
 impl AnyStringPart<'_> {
-    fn flags(&self) -> AnyStringFlags {
+    pub(super) fn flags(&self) -> AnyStringFlags {
         match self {
             Self::String { part, .. } => part.flags.into(),
             Self::Bytes(bytes_literal) => bytes_literal.flags.into(),

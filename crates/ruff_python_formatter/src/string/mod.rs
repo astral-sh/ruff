@@ -37,6 +37,51 @@ impl<'a> FormatImplicitConcatenatedString<'a> {
             string: string.into(),
         }
     }
+
+    fn merged_prefix(
+        &self,
+        quoting: Quoting,
+        context: &PyFormatContext,
+    ) -> Option<AnyStringPrefix> {
+        if self.string.is_multiline(context.source()) {
+            return None;
+        }
+
+        let mut merged_flags: Option<AnyStringFlags> = None;
+
+        // TODO unify quote styles.
+        // Possibly run directly on entire string?
+
+        for part in self.string.parts(quoting) {
+            let comments = context.comments().leading_dangling_trailing(&part);
+
+            // Can't merge parts with comments.
+            if comments.has_leading() || comments.has_trailing() {
+                return None;
+            }
+
+            if let Some(merged) = merged_flags.as_mut() {
+                let flags = part.flags();
+
+                if flags.is_raw_string() {
+                    // Don't join raw strings
+                    return None;
+                }
+
+                if flags.is_triple_quoted() {
+                    // Don't join triple quoted strings.
+                    return None;
+                }
+
+                // FIXME: this is not correct.
+                *merged = merged.with_prefix(flags.prefix());
+            } else {
+                merged_flags = Some(part.flags());
+            }
+        }
+
+        merged_flags.map(StringFlags::prefix)
+    }
 }
 
 impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedString<'_> {
@@ -44,19 +89,28 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedString<'_> {
         let comments = f.context().comments().clone();
         let quoting = self.string.quoting(&f.context().locator());
 
-        let mut joiner = f.join_with(in_parentheses_only_soft_line_break_or_space());
+        let cant_collapse = self.string.is_multiline(f.context().source())
+            || self.string.parts(quoting).any(|part| {
+                let part_comments = comments.leading_dangling_trailing(&part);
+                part_comments.has_leading() || part_comments.has_trailing()
+            });
 
-        for part in self.string.parts(quoting) {
-            let part_comments = comments.leading_dangling_trailing(&part);
-            joiner.entry(&format_args![
-                line_suffix_boundary(),
-                leading_comments(part_comments.leading),
-                part,
-                trailing_comments(part_comments.trailing)
-            ]);
-        }
+        let format_expanded = format_with(|f| {
+            let mut joiner = f.join_with(in_parentheses_only_soft_line_break_or_space());
+            for part in self.string.parts(quoting) {
+                let part_comments = comments.leading_dangling_trailing(&part);
+                joiner.entry(&format_args![
+                    line_suffix_boundary(),
+                    leading_comments(part_comments.leading),
+                    part,
+                    trailing_comments(part_comments.trailing)
+                ]);
+            }
 
-        joiner.finish()
+            joiner.finish()
+        });
+
+        format_expanded.fmt(f)
     }
 }
 
