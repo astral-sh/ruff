@@ -1030,10 +1030,17 @@ impl<'db> TypeInferenceBuilder<'db> {
         } else {
             // TODO: anything that's a consistent subtype of
             // `type[BaseException] | tuple[type[BaseException], ...]` should be valid;
-            // anything else should be invalid --Alex
+            // anything else is invalid and should lead to a diagnostic being reported --Alex
             match node_ty {
                 Type::Any | Type::Unknown => node_ty,
                 Type::Class(class_ty) => Type::Instance(class_ty),
+                Type::Tuple(tuple) => UnionType::from_elements(
+                    self.db,
+                    tuple
+                        .elements(self.db)
+                        .iter()
+                        .map(|ty| ty.into_class_type().map_or(Type::Todo, Type::Instance)),
+                ),
                 _ => Type::Todo,
             }
         };
@@ -6151,11 +6158,54 @@ mod tests {
             ",
         )?;
 
-        // For these TODOs we need support for `tuple` types:
         let expected_diagnostics = &[
-            // TODO: Should be `RuntimeError | OSError` --Alex
+            "Revealed type is `RuntimeError | OSError`",
+            "Revealed type is `AttributeError | TypeError`",
+        ];
+
+        assert_file_diagnostics(&db, "src/a.py", expected_diagnostics);
+
+        Ok(())
+    }
+
+    #[test]
+    fn except_handler_dynamic_exceptions() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "src/a.py",
+            "
+            from typing_extensions import reveal_type
+
+            def foo(
+                x: type[AttributeError],
+                y: tuple[type[OSError], type[RuntimeError]],
+                z: tuple[type[BaseException], ...]
+            ):
+                try:
+                    w
+                except x as e:
+                    reveal_type(e)
+                except y as f:
+                    reveal_type(f)
+                except z as g:
+                    reveal_type(g)
+            ",
+        )?;
+
+        let expected_diagnostics = &[
+            // TODO: these `__class_getitem__` diagnostics are all false positives:
+            // (`builtins.type` is unique at runtime
+            //  as it can be subscripted even though it has no `__class_getitem__` method)
+            "Cannot subscript object of type `Literal[type]` with no `__class_getitem__` method",
+            "Cannot subscript object of type `Literal[type]` with no `__class_getitem__` method",
+            "Cannot subscript object of type `Literal[type]` with no `__class_getitem__` method",
+            "Cannot subscript object of type `Literal[type]` with no `__class_getitem__` method",
+            // Should be `AttributeError`:
             "Revealed type is `@Todo`",
-            // TODO: Should be `AttributeError | TypeError` --Alex
+            // Should be `OSError | RuntimeError`:
+            "Revealed type is `@Todo`",
+            // Should be `BaseException`:
             "Revealed type is `@Todo`",
         ];
 
