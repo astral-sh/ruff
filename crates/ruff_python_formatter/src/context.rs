@@ -8,7 +8,6 @@ use ruff_source_file::Locator;
 use std::fmt::{Debug, Formatter};
 use std::ops::{Deref, DerefMut};
 
-#[derive(Clone)]
 pub struct PyFormatContext<'a> {
     options: PyFormatOptions,
     contents: &'a str,
@@ -52,7 +51,6 @@ impl<'a> PyFormatContext<'a> {
         self.contents
     }
 
-    #[allow(unused)]
     pub(crate) fn locator(&self) -> Locator<'a> {
         Locator::new(self.contents)
     }

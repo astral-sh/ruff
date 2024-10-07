@@ -340,7 +340,7 @@ source_type                = Python
 ```
 
 ```python
-(f"{one}" f"{two}")
+(f"{one}{two}")
 
 
 rf"Not-so-tricky \"quote"
@@ -380,7 +380,7 @@ result_f = (
 )
 
 (
-    f"{1}" f"{2}"  # comment 3
+    f"{1}{2}"  # comment 3
 )
 
 (
@@ -1004,6 +1004,12 @@ _ = (
 ```diff
 --- Stable
 +++ Preview
+@@ -1,4 +1,4 @@
+-(f"{one}" f"{two}")
++(f"{one}{two}")
+ 
+ 
+ rf"Not-so-tricky \"quote"
 @@ -6,13 +6,13 @@
  # Regression test for fstrings dropping comments
  result_f = (
@@ -1022,6 +1028,15 @@ _ = (
      "    f()\n"
      # XXX: The following line changes depending on whether the tests
      # are run through the interactive interpreter or with -m
+@@ -38,7 +38,7 @@
+ )
+ 
+ (
+-    f"{1}" f"{2}"  # comment 3
++    f"{1}{2}"  # comment 3
+ )
+ 
+ (
 @@ -67,64 +67,72 @@
  x = f"{a}"
  x = f"{

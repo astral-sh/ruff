@@ -689,7 +689,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
 +                (
 +                    "xxxxxxxxxx xxxx xx xxxxxx(%x) xx %x xxxx xx xxx %x.xx"
 +                    % (len(self) + 1, xxxx.xxxxxxxxxx, xxxx.xxxxxxxxxx)
-+                )
+                 )
 +                + (
 +                    " %.3f (%s) to %.3f (%s).\n"
 +                    % (
@@ -698,7 +698,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
 +                        x,
 +                        xxxx.xxxxxxxxxxxxxx(xx),
 +                    )
-                 )
++                )
              )
  
  
@@ -832,7 +832,11 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
  
  some_commented_string = (  # This comment stays at the top.
      "This string is long but not so long that it needs hahahah toooooo be so greatttt"
+<<<<<<< HEAD
 @@ -279,37 +280,26 @@
+=======
+@@ -279,37 +282,26 @@
+>>>>>>> ba5bd1d2d (All tests are passing)
  )
  
  lpar_and_rpar_have_comments = func_call(  # LPAR Comment
@@ -878,7 +882,11 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
  
  class A:
      class B:
+<<<<<<< HEAD
 @@ -364,10 +354,7 @@
+=======
+@@ -364,10 +356,7 @@
+>>>>>>> ba5bd1d2d (All tests are passing)
          def foo():
              if not hasattr(module, name):
                  raise ValueError(
