@@ -170,3 +170,31 @@ def ignore_step():
     if text.startswith("!"):
         text = text[1::2]
     print(text)
+
+def handle_unicode():
+    # should be skipped!
+    text = "řetězec"
+    if text.startswith("ř"): 
+        text = text[2:]
+
+    # should be linted
+    # with fix `text = text.removeprefix("ř")`
+    text = "řetězec"
+    if text.startswith("ř"): 
+        text = text[1:]
+
+
+def handle_surrogates():
+    # should be linted
+    text = "\ud800\udc00heythere"
+    if text.startswith("\ud800\udc00"):
+        text = text[2:]
+    text = "\U00010000heythere"
+    if text.startswith("\U00010000"):
+        text = text[1:]
+    
+    # should not be linted
+    text = "\ud800\udc00heythere"
+    if text.startswith("\ud800\udc00"):
+        text = text[1:]
+    
