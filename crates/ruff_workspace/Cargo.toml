@@ -34,7 +34,7 @@ glob = { workspace = true }
 globset = { workspace = true }
 path-absolutize = { workspace = true }
 path-slash = { workspace = true }
-pep440_rs = { workspace = true, features = ["serde"] }
+pep440_rs = { workspace = true }
 regex = { workspace = true }
 rustc-hash = { workspace = true }
 schemars = { workspace = true, optional = true }
