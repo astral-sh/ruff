@@ -2,8 +2,7 @@ use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_python_ast::{AnyNodeRef, CmpOp, Expr, ExprCall, ExprCompare, ExprStringLiteral};
+use ruff_python_ast::{CmpOp, Expr, ExprCompare, ExprStringLiteral};
 use ruff_text_size::TextRange;
 
 /// ## What it does
