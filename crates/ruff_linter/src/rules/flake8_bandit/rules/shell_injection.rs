@@ -207,7 +207,8 @@ impl Violation for StartProcessWithAShell {
 /// ```python
 /// import os
 ///
-/// def unsecure_function(arbitrary_user_input: str):
+///
+/// def insecure_function(arbitrary_user_input: str):
 ///     os.spawnlp(os.P_NOWAIT, "/bin/mycmd", "mycmd", arbitrary_user_input)
 /// ```
 ///
