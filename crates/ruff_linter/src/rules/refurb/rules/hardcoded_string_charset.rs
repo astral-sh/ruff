@@ -3,7 +3,7 @@ use crate::importer::ImportRequest;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_python_ast::{CmpOp, Expr, ExprCall, ExprCompare, ExprStringLiteral};
+use ruff_python_ast::{AnyNodeRef, CmpOp, Expr, ExprCall, ExprCompare, ExprStringLiteral};
 use ruff_text_size::TextRange;
 
 /// ## What it does
@@ -161,37 +161,12 @@ pub(crate) fn hardcoded_string_charset_comparison(checker: &mut Checker, compare
         return;
     }
 
-    let range = parenthesized_range(
-        string_literal.into(),
-        compare.into(),
-        checker.comment_ranges(),
-        checker.locator().contents(),
-    )
-    .unwrap_or(string_literal.range);
-
-    push_diagnostic(checker, range, charset);
+    push_diagnostic(checker, string_literal.range, charset);
 }
 
 /// FURB156
 pub(crate) fn hardcoded_string_charset_literal(checker: &mut Checker, expr: &ExprStringLiteral) {
     if let Some(charset) = check_charset_exact(expr.value.to_str().as_bytes()) {
-        let range = parenthesized_range(
-            expr.into(),
-            checker.semantic().current_expression_parent().map_or_else(
-                || checker.semantic().current_statement().into(),
-                |parent| {
-                    if let Expr::Call(ExprCall { arguments, .. }) = parent {
-                        arguments.into()
-                    } else {
-                        parent.into()
-                    }
-                },
-            ),
-            checker.comment_ranges(),
-            checker.locator().contents(),
-        )
-        .unwrap_or(expr.range);
-
-        push_diagnostic(checker, range, charset);
+        push_diagnostic(checker, expr.range, charset);
     }
 }
