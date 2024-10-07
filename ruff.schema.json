@@ -17,7 +17,7 @@
       }
     },
     "allowed-unused-imports": {
-      "description": "A list of modules which is allowed even thought they are not used in the code.\n\nThis is useful when a module has a side effect when imported.",
+      "description": "A list of modules which is allowed even though they are not used in the code.\n\nThis is useful when a module has a side effect when imported.",
       "deprecated": true,
       "type": [
         "array",
@@ -1899,7 +1899,7 @@
           }
         },
         "allowed-unused-imports": {
-          "description": "A list of modules which is allowed even thought they are not used in the code.\n\nThis is useful when a module has a side effect when imported.",
+          "description": "A list of modules which is allowed even though they are not used in the code.\n\nThis is useful when a module has a side effect when imported.",
           "type": [
             "array",
             "null"

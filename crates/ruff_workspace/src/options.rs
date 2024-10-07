@@ -796,7 +796,7 @@ pub struct LintCommonOptions {
     )]
     pub typing_modules: Option<Vec<String>>,
 
-    /// A list of modules which is allowed even thought they are not used
+    /// A list of modules which is allowed even though they are not used
     /// in the code.
     ///
     /// This is useful when a module has a side effect when imported.
