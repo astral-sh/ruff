@@ -334,9 +334,8 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
             }),
         ) => num
             .as_int()
-            // Only support prefix removal for size at most `u32::MAX`
-            .and_then(ast::Int::as_u32)
-            .and_then(|x| usize::try_from(x).ok())
+            // Only support prefix removal for size at most `usize::MAX`
+            .and_then(ast::Int::as_usize)
             .is_some_and(|x| x == string_val.to_str().chars().count()),
         (
             AffixKind::StartsWith,
@@ -371,8 +370,7 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
                 // Only support prefix removal for size at most `u32::MAX`
                 value
                     .as_int()
-                    .and_then(ast::Int::as_u32)
-                    .and_then(|x| usize::try_from(x).ok())
+                    .and_then(ast::Int::as_usize)
                     .is_some_and(|x| x == string_val.to_str().chars().count())
             },
         ),
