@@ -47,7 +47,7 @@ impl AlwaysFixableViolation for ZipWithoutExplicitStrict {
     }
 
     fn fix_title(&self) -> String {
-        "Add explicit `strict=False`".to_string()
+        "Add explicit value for parameter `strict=`".to_string()
     }
 }
 
