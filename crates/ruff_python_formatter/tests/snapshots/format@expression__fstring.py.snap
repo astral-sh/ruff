@@ -319,6 +319,7 @@ hello {
 _ = (
     'This string should change its quotes to double quotes'
     f'This string uses double quotes in an expression {"woah"}'
+    f'This f-string does not use any quotes.'
 )
 ```
 
@@ -662,6 +663,7 @@ hello {
 _ = (
     "This string should change its quotes to double quotes"
     f'This string uses double quotes in an expression {"woah"}'
+    f"This f-string does not use any quotes."
 )
 ```
 
@@ -993,6 +995,7 @@ hello {
 _ = (
     'This string should change its quotes to double quotes'
     f'This string uses double quotes in an expression {"woah"}'
+    f'This f-string does not use any quotes.'
 )
 ```
 
@@ -1300,7 +1303,7 @@ _ = (
      # comment 27
      # comment 28
  } woah {x}"
-@@ -287,26 +299,26 @@
+@@ -287,27 +299,27 @@
          if indent2:
              foo = f"""hello world
  hello {
@@ -1342,5 +1345,7 @@ _ = (
 -    'This string should change its quotes to double quotes'
 +    "This string should change its quotes to double quotes"
      f'This string uses double quotes in an expression {"woah"}'
+-    f'This f-string does not use any quotes.'
++    f"This f-string does not use any quotes."
  )
 ```

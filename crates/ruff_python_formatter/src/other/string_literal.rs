@@ -48,8 +48,11 @@ impl StringLiteralKind {
             StringLiteralKind::String | StringLiteralKind::Docstring => Quoting::CanChange,
             #[allow(deprecated)]
             StringLiteralKind::InImplicitlyConcatenatedFString(quoting) => {
+                // Allow string literals to pick the "optimal" quote character
+                // even if any other fstring in the implicit concatenation uses an expression
+                // containing a quote character.
                 // TODO: Remove StringLiteralKind::InImplicitlyConcatenatedFString when promoting
-                //   this style to stable
+                //   this style to stable and remove the layout from `AnyStringPart::String`.
                 if is_f_string_implicit_concatenated_string_literal_quotes_enabled(context) {
                     Quoting::CanChange
                 } else {
