@@ -2828,6 +2828,13 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                 // Otherwise, if the value is itself a class and defines `__class_getitem__`,
                 // return its return type.
+                //
+                // TODO: lots of classes are only subscriptable at runtime on Python 3.9+,
+                // *but* we should also allow them to be subscripted in stubs
+                // (and in annotations if `from __future__ import annotations` is enabled),
+                // even if the target version is Python 3.8 or lower,
+                // despite the fact that there will be no corresponding `__class_getitem__`
+                // method in these `sys.version_info` branches.
                 if value_ty.is_class(self.db) {
                     let dunder_class_getitem_method = value_ty.member(self.db, "__class_getitem__");
                     if !dunder_class_getitem_method.is_unbound() {
@@ -2846,6 +2853,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 );
                                 err.return_ty()
                             });
+                    }
+
+                    if matches!(value_ty, Type::Class(class) if class.is_known(self.db, KnownClass::Type))
+                    {
+                        return KnownClass::GenericAlias.to_instance(self.db);
                     }
 
                     self.non_subscriptable_diagnostic(
@@ -6194,13 +6206,6 @@ mod tests {
         )?;
 
         let expected_diagnostics = &[
-            // TODO: these `__class_getitem__` diagnostics are all false positives:
-            // (`builtins.type` is unique at runtime
-            //  as it can be subscripted even though it has no `__class_getitem__` method)
-            "Cannot subscript object of type `Literal[type]` with no `__class_getitem__` method",
-            "Cannot subscript object of type `Literal[type]` with no `__class_getitem__` method",
-            "Cannot subscript object of type `Literal[type]` with no `__class_getitem__` method",
-            "Cannot subscript object of type `Literal[type]` with no `__class_getitem__` method",
             // Should be `AttributeError`:
             "Revealed type is `@Todo`",
             // Should be `OSError | RuntimeError`:
