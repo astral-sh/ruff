@@ -1004,6 +1004,14 @@ impl Visitor<'_> for AwaitVisitor {
             crate::visitor::walk_expr(self, expr);
         }
     }
+
+    fn visit_comprehension(&mut self, comprehension: &'_ crate::Comprehension) {
+        if comprehension.is_async {
+            self.seen_await = true;
+        } else {
+            crate::visitor::walk_comprehension(self, comprehension);
+        }
+    }
 }
 
 /// Return `true` if a `Stmt` is a docstring.
