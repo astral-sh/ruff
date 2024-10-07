@@ -336,7 +336,7 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
             .as_int()
             // Only support prefix removal for size at most `usize::MAX`
             .and_then(ast::Int::as_usize)
-            .is_some_and(|x| x == string_val.to_str().chars().count()),
+            .is_some_and(|x| x == string_val.chars().count()),
         (
             AffixKind::StartsWith,
             ast::Expr::Call(ast::ExprCall {
@@ -371,7 +371,7 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
                 value
                     .as_int()
                     .and_then(ast::Int::as_usize)
-                    .is_some_and(|x| x == string_val.to_str().chars().count())
+                    .is_some_and(|x| x == string_val.chars().count())
             },
         ),
         (
