@@ -45,8 +45,9 @@ def func(
  
  def func(
 -    argument: "int |" "str",
-+    argument: ("int |" "str"),
- ) -> Set["int |" " str"]:
+-) -> Set["int |" " str"]:
++    argument: ("int |str"),
++) -> Set["int | str"]:
      pass
 ```
 
@@ -76,8 +77,8 @@ def func(
 
 
 def func(
-    argument: ("int |" "str"),
-) -> Set["int |" " str"]:
+    argument: ("int |str"),
+) -> Set["int | str"]:
     pass
 ```
 
@@ -111,5 +112,3 @@ def func(
 ) -> Set["int |" " str"]:
     pass
 ```
-
-

@@ -6,7 +6,11 @@ use {
 
 use ruff_python_ast::visitor::transformer;
 use ruff_python_ast::visitor::transformer::Transformer;
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{
+    self as ast, BytesLiteralFlags, Expr, FStringElement, FStringFlags, FStringLiteralElement,
+    FStringPart, Stmt, StringFlags, StringLiteralFlags,
+};
+use ruff_text_size::{Ranged, TextRange};
 
 /// A struct to normalize AST nodes for the purpose of comparing formatted representations for
 /// semantic equivalence.
@@ -57,6 +61,135 @@ impl Transformer for Normalizer {
         }
 
         transformer::walk_stmt(self, stmt);
+    }
+
+    fn visit_expr(&self, expr: &mut Expr) {
+        // Ruff supports joining implicitly concatenated strings. The code below implements this
+        // at an AST level by joining the string literals in the AST if they can be joined (it doesn't mean that
+        // they'll be joined in the formatted output but they could).
+        // Comparable expression handles some of this by comparing the concatenated string
+        // but not joining here doesn't play nicely with other string normalizations done in the
+        // Normalizer.
+        match expr {
+            Expr::StringLiteral(string) => {
+                if string.value.is_implicit_concatenated() {
+                    let can_join = string.value.iter().all(|literal| {
+                        !literal.flags.is_triple_quoted() && !literal.flags.prefix().is_raw()
+                    });
+
+                    if can_join {
+                        string.value = ast::StringLiteralValue::single(ast::StringLiteral {
+                            value: string.value.to_str().to_string().into_boxed_str(),
+                            range: string.range,
+                            flags: StringLiteralFlags::default(),
+                        });
+                    }
+                }
+            }
+
+            Expr::BytesLiteral(bytes) => {
+                if bytes.value.is_implicit_concatenated() {
+                    let can_join = bytes.value.iter().all(|literal| {
+                        !literal.flags.is_triple_quoted() && !literal.flags.prefix().is_raw()
+                    });
+
+                    if can_join {
+                        bytes.value = ast::BytesLiteralValue::single(ast::BytesLiteral {
+                            value: bytes.value.bytes().collect(),
+                            range: bytes.range,
+                            flags: BytesLiteralFlags::default(),
+                        });
+                    }
+                }
+            }
+
+            Expr::FString(fstring) => {
+                if fstring.value.is_implicit_concatenated() {
+                    let can_join = fstring.value.iter().all(|part| match part {
+                        FStringPart::Literal(literal) => {
+                            !literal.flags.is_triple_quoted() && !literal.flags.prefix().is_raw()
+                        }
+                        FStringPart::FString(string) => {
+                            !string.flags.is_triple_quoted() && !string.flags.prefix().is_raw()
+                        }
+                    });
+
+                    if can_join {
+                        #[derive(Default)]
+                        struct Collector {
+                            elements: Vec<FStringElement>,
+                        }
+
+                        impl Collector {
+                            // The logic for concatenating adjacent string literals
+                            // occurs here, implicitly: when we encounter a sequence
+                            // of string literals, the first gets pushed to the
+                            // `elements` vector, while subsequent strings
+                            // are concatenated onto this top string.
+                            fn push_literal(&mut self, literal: &str, range: TextRange) {
+                                if let Some(FStringElement::Literal(existing_literal)) =
+                                    self.elements.last_mut()
+                                {
+                                    let value = std::mem::take(&mut existing_literal.value);
+                                    let mut value = value.into_string();
+                                    value.push_str(literal);
+                                    existing_literal.value = value.into_boxed_str();
+                                    existing_literal.range =
+                                        TextRange::new(existing_literal.start(), range.end());
+                                } else {
+                                    self.elements.push(FStringElement::Literal(
+                                        FStringLiteralElement {
+                                            range,
+                                            value: literal.into(),
+                                        },
+                                    ));
+                                }
+                            }
+
+                            fn push_expression(
+                                &mut self,
+                                expression: ast::FStringExpressionElement,
+                            ) {
+                                self.elements.push(FStringElement::Expression(expression));
+                            }
+                        }
+
+                        let mut collector = Collector::default();
+
+                        for part in fstring.value.iter() {
+                            match part {
+                                ast::FStringPart::Literal(string_literal) => {
+                                    collector
+                                        .push_literal(&string_literal.value, string_literal.range);
+                                }
+                                ast::FStringPart::FString(fstring) => {
+                                    for element in &fstring.elements {
+                                        match element {
+                                            ast::FStringElement::Literal(literal) => {
+                                                collector
+                                                    .push_literal(&literal.value, literal.range);
+                                            }
+                                            ast::FStringElement::Expression(expression) => {
+                                                collector.push_expression(expression.clone());
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        fstring.value = ast::FStringValue::single(ast::FString {
+                            elements: collector.elements.into(),
+                            range: fstring.range,
+                            flags: FStringFlags::default(),
+                        });
+                    }
+                }
+            }
+
+            _ => {}
+        }
+        transformer::walk_expr(self, expr);
     }
 
     fn visit_string_literal(&self, string_literal: &mut ast::StringLiteral) {

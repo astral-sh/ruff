@@ -813,11 +813,10 @@ log.info(f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share
 +backslashes = "This is a really long string with \"embedded\" double quotes and 'single' quotes that also handles checking for an even number of backslashes \\\\"
 +backslashes = "This is a really 'long' string with \"embedded double quotes\" and 'single' quotes that also handles checking for an odd number of backslashes \\\", like this...\\\\\\"
  
--short_string = "Hi there."
-+short_string = "Hi" " there."
+ short_string = "Hi there."
  
 -func_call(short_string="Hi there.")
-+func_call(short_string=("Hi" " there."))
++func_call(short_string=("Hi there."))
  
  raw_strings = r"Don't" " get" r" merged" " unless they are all raw."
  
@@ -1326,9 +1325,9 @@ backslashes = "This is a really long string with \"embedded\" double quotes and 
 backslashes = "This is a really long string with \"embedded\" double quotes and 'single' quotes that also handles checking for an even number of backslashes \\\\"
 backslashes = "This is a really 'long' string with \"embedded double quotes\" and 'single' quotes that also handles checking for an odd number of backslashes \\\", like this...\\\\\\"
 
-short_string = "Hi" " there."
+short_string = "Hi there."
 
-func_call(short_string=("Hi" " there."))
+func_call(short_string=("Hi there."))
 
 raw_strings = r"Don't" " get" r" merged" " unless they are all raw."
 

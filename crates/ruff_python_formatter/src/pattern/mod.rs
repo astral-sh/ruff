@@ -289,18 +289,22 @@ impl<'a> CanOmitOptionalParenthesesVisitor<'a> {
 
             Pattern::MatchValue(value) => match &*value.value {
                 Expr::StringLiteral(string) => {
-                    self.update_max_precedence(OperatorPrecedence::String, string.value.len());
+                    // TODO update?
+
+                    // self.update_max_precedence(OperatorPrecedence::String, string.value.len());
                 }
                 Expr::BytesLiteral(bytes) => {
-                    self.update_max_precedence(OperatorPrecedence::String, bytes.value.len());
+                    // TODO update?
+                    // self.update_max_precedence(OperatorPrecedence::String, bytes.value.len());
                 }
                 // F-strings are allowed according to python's grammar but fail with a syntax error at runtime.
                 // That's why we need to support them for formatting.
                 Expr::FString(string) => {
-                    self.update_max_precedence(
-                        OperatorPrecedence::String,
-                        string.value.as_slice().len(),
-                    );
+                    // TODO update?
+                    // self.update_max_precedence(
+                    //     OperatorPrecedence::String,
+                    //     string.value.as_slice().len(),
+                    // );
                 }
 
                 Expr::NumberLiteral(_) | Expr::Attribute(_) | Expr::UnaryOp(_) => {
