@@ -837,6 +837,7 @@ pub enum KnownClass {
     Set,
     Dict,
     // Types
+    GenericAlias,
     ModuleType,
     FunctionType,
     // Typeshed
@@ -857,6 +858,7 @@ impl<'db> KnownClass {
             Self::Dict => "dict",
             Self::List => "list",
             Self::Type => "type",
+            Self::GenericAlias => "GenericAlias",
             Self::ModuleType => "ModuleType",
             Self::FunctionType => "FunctionType",
             Self::NoneType => "NoneType",
@@ -880,7 +882,9 @@ impl<'db> KnownClass {
             | Self::Tuple
             | Self::Set
             | Self::Dict => builtins_symbol_ty(db, self.as_str()),
-            Self::ModuleType | Self::FunctionType => types_symbol_ty(db, self.as_str()),
+            Self::GenericAlias | Self::ModuleType | Self::FunctionType => {
+                types_symbol_ty(db, self.as_str())
+            }
             Self::NoneType => typeshed_symbol_ty(db, self.as_str()),
         }
     }
@@ -910,6 +914,7 @@ impl<'db> KnownClass {
             "set" => Some(Self::Set),
             "dict" => Some(Self::Dict),
             "list" => Some(Self::List),
+            "GenericAlias" => Some(Self::GenericAlias),
             "NoneType" => Some(Self::NoneType),
             "ModuleType" => Some(Self::ModuleType),
             "FunctionType" => Some(Self::FunctionType),
@@ -934,7 +939,7 @@ impl<'db> KnownClass {
             | Self::Tuple
             | Self::Set
             | Self::Dict => module.name() == "builtins",
-            Self::ModuleType | Self::FunctionType => module.name() == "types",
+            Self::GenericAlias | Self::ModuleType | Self::FunctionType => module.name() == "types",
             Self::NoneType => matches!(module.name().as_str(), "_typeshed" | "types"),
         }
     }
