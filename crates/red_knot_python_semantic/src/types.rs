@@ -614,10 +614,6 @@ impl<'db> Type<'db> {
                 // More info in https://docs.python.org/3/library/stdtypes.html#truth-value-testing
                 Truthiness::Ambiguous
             }
-            // Temporary special case for `None` until we handle generic instances
-            Type::Instance(class) if class.is_known(db, KnownClass::NoneType) => {
-                Truthiness::AlwaysFalse
-            }
             // Temporary special case for `FunctionType` until we handle generic instances
             Type::Instance(class) if class.is_known(db, KnownClass::FunctionType) => {
                 Truthiness::AlwaysTrue
