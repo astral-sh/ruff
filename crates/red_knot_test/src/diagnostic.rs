@@ -5,6 +5,7 @@
 use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::Ranged;
 use smallvec::SmallVec;
+use std::ops::Deref;
 
 #[derive(Debug)]
 pub(crate) struct SortedDiagnostics<T>(Vec<DiagnosticWithLine<T>>);
@@ -87,9 +88,11 @@ pub(crate) struct LineDiagnostics<T> {
     pub(crate) diagnostics: DiagnosticVec<T>,
 }
 
-impl<'a, T> From<&'a LineDiagnostics<T>> for &'a [T] {
-    fn from(value: &'a LineDiagnostics<T>) -> Self {
-        &value.diagnostics[..]
+impl<T> Deref for LineDiagnostics<T> {
+    type Target = [T];
+
+    fn deref(&self) -> &Self::Target {
+        &self.diagnostics
     }
 }
 

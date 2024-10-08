@@ -164,8 +164,8 @@ impl Unmatched for Assertion<'_> {
     }
 }
 
-fn unmatched<'a, T: Unmatched + 'a>(unmatched: impl Into<&'a [T]>) -> Vec<String> {
-    unmatched.into().iter().map(Unmatched::unmatched).collect()
+fn unmatched<'a, T: Unmatched + 'a>(unmatched: &'a [T]) -> Vec<String> {
+    unmatched.iter().map(Unmatched::unmatched).collect()
 }
 
 struct Matcher {
@@ -186,15 +186,15 @@ impl Matcher {
     /// Return vector of [`Unmatched`] for any unmatched diagnostics or assertions.
     fn match_line<'a, 'b, T: Diagnostic + 'a>(
         &self,
-        diagnostics: impl Into<&'a [T]>,
-        assertions: impl Into<&'a [Assertion<'b>]>,
+        diagnostics: &'a [T],
+        assertions: &'a [Assertion<'b>],
     ) -> Result<(), Vec<String>>
     where
         'b: 'a,
     {
         let mut failures = vec![];
-        let mut unmatched = diagnostics.into().iter().collect::<Vec<_>>();
-        for assertion in assertions.into() {
+        let mut unmatched = diagnostics.iter().collect::<Vec<_>>();
+        for assertion in assertions {
             if !self.matches(assertion, &mut unmatched) {
                 failures.push(assertion.unmatched());
             }

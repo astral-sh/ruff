@@ -229,9 +229,11 @@ pub(crate) struct LineAssertions<'a> {
     pub(crate) assertions: AssertionVec<'a>,
 }
 
-impl<'a, 'b> From<&'a LineAssertions<'b>> for &'a [Assertion<'b>] {
-    fn from(value: &'a LineAssertions<'b>) -> Self {
-        &value.assertions[..]
+impl<'a> Deref for LineAssertions<'a> {
+    type Target = [Assertion<'a>];
+
+    fn deref(&self) -> &Self::Target {
+        &self.assertions
     }
 }
 
