@@ -1,20 +1,20 @@
 //! Parse type and type-error assertions in Python comment form.
 //!
-//! Parses comments of the form `# Type: SomeType` and `# Error: 8 [rule-code] "message text"`. In
-//! the latter case, the `8` is a column number, and `"message text"` asserts that the full
-//! diagnostic message contains the text `"message text"`; all three are optional (`# Error:` will
+//! Parses comments of the form `# revealed: SomeType` and `# error: 8 [rule-code] "message text"`.
+//! In the latter case, the `8` is a column number, and `"message text"` asserts that the full
+//! diagnostic message contains the text `"message text"`; all three are optional (`# error:` will
 //! match any error.)
 //!
 //! Assertion comments may be placed at end-of-line:
 //!
 //! ```py
-//! x: int = "foo"  # Error: [invalid-assignment]
+//! x: int = "foo"  # error: [invalid-assignment]
 //! ```
 //!
 //! Or as a full-line comment on the preceding line:
 //!
 //! ```py
-//! # Error: [invalid-assignment]
+//! # error: [invalid-assignment]
 //! x: int = "foo"
 //! ```
 //!
@@ -22,15 +22,15 @@
 //! must be full-line comments:
 //!
 //! ```py
-//! # Error: [unbound-name]
-//! reveal_type(x)  # Type: Unbound
+//! # error: [unbound-name]
+//! reveal_type(x)  # revealed: Unbound
 //! ```
 //!
 //! or
 //!
 //! ```py
-//! # Error: [unbound-name]
-//! # Type: Unbound
+//! # error: [unbound-name]
+//! # revealed: Unbound
 //! reveal_type(x)
 //! ```
 use crate::db::Db;
@@ -166,8 +166,8 @@ impl<'a> Iterator for LineAssertionsIterator<'a> {
         // code. For example:
         //
         // ```py
-        // # Error: [unbound-name]
-        // # Type: Unbound
+        // # error: [unbound-name]
+        // # revealed: Unbound
         // reveal_type(x)
         // ```
         //
@@ -187,9 +187,9 @@ impl<'a> Iterator for LineAssertionsIterator<'a> {
                     // line:
                     //
                     // ```py
-                    // # Error:
-                    // foo  # Error:
-                    // bar  # Error:
+                    // # error:
+                    // foo  # error:
+                    // bar  # error:
                     // ```
                     //
                     if !only_own_line {
@@ -236,11 +236,11 @@ impl<'a, 'b> From<&'a LineAssertions<'b>> for &'a [Assertion<'b>] {
 }
 
 static TYPE_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^#\s*Type:\s*(?<ty_display>.+?)\s*$").unwrap());
+    Lazy::new(|| Regex::new(r"^#\s*revealed:\s*(?<ty_display>.+?)\s*$").unwrap());
 
 static ERROR_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
-        r#"^#\s*Error:(\s*(?<column>\d+))?(\s*\[(?<rule>.+?)\])?(\s*"(?<message>.+?)")?\s*$"#,
+        r#"^#\s*error:(\s*(?<column>\d+))?(\s*\[(?<rule>.+?)\])?(\s*"(?<message>.+?)")?\s*$"#,
     )
     .unwrap()
 });
@@ -248,17 +248,17 @@ static ERROR_RE: Lazy<Regex> = Lazy::new(|| {
 /// A single diagnostic assertion comment.
 #[derive(Debug)]
 pub(crate) enum Assertion<'a> {
-    /// A `Type: ` assertion.
-    Type(&'a str),
+    /// A `revealed: ` assertion.
+    Revealed(&'a str),
 
-    /// An `Error: ` assertion.
+    /// An `error: ` assertion.
     Error(ErrorAssertion<'a>),
 }
 
 impl<'a> Assertion<'a> {
     fn from_comment(comment: &'a str) -> Option<Self> {
         if let Some(caps) = TYPE_RE.captures(comment) {
-            Some(Self::Type(caps.name("ty_display").unwrap().as_str()))
+            Some(Self::Revealed(caps.name("ty_display").unwrap().as_str()))
         } else {
             ERROR_RE.captures(comment).map(|caps| {
                 Self::Error(ErrorAssertion {
@@ -274,13 +274,13 @@ impl<'a> Assertion<'a> {
 impl std::fmt::Display for Assertion<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Type(expected_type) => write!(f, "Type: {expected_type}"),
+            Self::Revealed(expected_type) => write!(f, "revealed: {expected_type}"),
             Self::Error(assertion) => assertion.fmt(f),
         }
     }
 }
 
-/// An `Error: ` assertion comment.
+/// An `error: ` assertion comment.
 #[derive(Debug)]
 pub(crate) struct ErrorAssertion<'a> {
     /// The diagnostic rule code we expect.
@@ -295,7 +295,7 @@ pub(crate) struct ErrorAssertion<'a> {
 
 impl std::fmt::Display for ErrorAssertion<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("Error:")?;
+        f.write_str("error:")?;
         if let Some(column) = self.column {
             write!(f, " {column}")?;
         }
@@ -332,7 +332,7 @@ mod tests {
     fn ty_display() {
         let assertions = get_assertions(&dedent(
             "
-            reveal_type(1)  # Type: Literal[1]
+            reveal_type(1)  # revealed: Literal[1]
             ",
         ));
 
@@ -346,14 +346,14 @@ mod tests {
             panic!("expected one assertion");
         };
 
-        assert_eq!(format!("{assert}"), "Type: Literal[1]");
+        assert_eq!(format!("{assert}"), "revealed: Literal[1]");
     }
 
     #[test]
     fn error() {
         let assertions = get_assertions(&dedent(
             "
-            x  # Error:
+            x  # error:
             ",
         ));
 
@@ -367,14 +367,14 @@ mod tests {
             panic!("expected one assertion");
         };
 
-        assert_eq!(format!("{assert}"), "Error:");
+        assert_eq!(format!("{assert}"), "error:");
     }
 
     #[test]
     fn prior_line() {
         let assertions = get_assertions(&dedent(
             "
-            # Type: Literal[1]
+            # revealed: Literal[1]
             reveal_type(1)
             ",
         ));
@@ -389,15 +389,15 @@ mod tests {
             panic!("expected one assertion");
         };
 
-        assert_eq!(format!("{assert}"), "Type: Literal[1]");
+        assert_eq!(format!("{assert}"), "revealed: Literal[1]");
     }
 
     #[test]
     fn stacked_prior_line() {
         let assertions = get_assertions(&dedent(
             "
-            # Type: Unbound
-            # Error: [unbound-name]
+            # revealed: Unbound
+            # error: [unbound-name]
             reveal_type(x)
             ",
         ));
@@ -412,16 +412,16 @@ mod tests {
             panic!("expected two assertions");
         };
 
-        assert_eq!(format!("{assert1}"), "Type: Unbound");
-        assert_eq!(format!("{assert2}"), "Error: [unbound-name]");
+        assert_eq!(format!("{assert1}"), "revealed: Unbound");
+        assert_eq!(format!("{assert2}"), "error: [unbound-name]");
     }
 
     #[test]
     fn stacked_mixed() {
         let assertions = get_assertions(&dedent(
             "
-            # Type: Unbound
-            reveal_type(x) # Error: [unbound-name]
+            # revealed: Unbound
+            reveal_type(x) # error: [unbound-name]
             ",
         ));
 
@@ -435,17 +435,17 @@ mod tests {
             panic!("expected two assertions");
         };
 
-        assert_eq!(format!("{assert1}"), "Type: Unbound");
-        assert_eq!(format!("{assert2}"), "Error: [unbound-name]");
+        assert_eq!(format!("{assert1}"), "revealed: Unbound");
+        assert_eq!(format!("{assert2}"), "error: [unbound-name]");
     }
 
     #[test]
     fn multiple_lines() {
         let assertions = get_assertions(&dedent(
             r#"
-            # Error: [invalid-assignment]
+            # error: [invalid-assignment]
             x: int = "foo"
-            y  # Error: [unbound-name]
+            y  # error: [unbound-name]
             "#,
         ));
 
@@ -457,13 +457,13 @@ mod tests {
         assert_eq!(line2.line_number, OneIndexed::from_zero_indexed(3));
 
         let [Assertion::Error(error1)] = &line1.assertions[..] else {
-            panic!("expected one Error assertion");
+            panic!("expected one error assertion");
         };
 
         assert_eq!(error1.rule, Some("invalid-assignment"));
 
         let [Assertion::Error(error2)] = &line2.assertions[..] else {
-            panic!("expected one Error assertion");
+            panic!("expected one error assertion");
         };
 
         assert_eq!(error2.rule, Some("unbound-name"));
@@ -473,9 +473,9 @@ mod tests {
     fn multiple_lines_mixed_stack() {
         let assertions = get_assertions(&dedent(
             r#"
-            # Error: [invalid-assignment]
-            x: int = reveal_type("foo")  # Type: str
-            y  # Error: [unbound-name]
+            # error: [invalid-assignment]
+            x: int = reveal_type("foo")  # revealed: str
+            y  # error: [unbound-name]
             "#,
         ));
 
@@ -486,15 +486,16 @@ mod tests {
         assert_eq!(line1.line_number, OneIndexed::from_zero_indexed(2));
         assert_eq!(line2.line_number, OneIndexed::from_zero_indexed(3));
 
-        let [Assertion::Error(error1), Assertion::Type(expected_ty)] = &line1.assertions[..] else {
-            panic!("expected one Error assertion and one Type assertion");
+        let [Assertion::Error(error1), Assertion::Revealed(expected_ty)] = &line1.assertions[..]
+        else {
+            panic!("expected one error assertion and one Revealed assertion");
         };
 
         assert_eq!(error1.rule, Some("invalid-assignment"));
         assert_eq!(*expected_ty, "str");
 
         let [Assertion::Error(error2)] = &line2.assertions[..] else {
-            panic!("expected one Error assertion");
+            panic!("expected one error assertion");
         };
 
         assert_eq!(error2.rule, Some("unbound-name"));
@@ -504,7 +505,7 @@ mod tests {
     fn error_with_rule() {
         let assertions = get_assertions(&dedent(
             "
-            x  # Error: [unbound-name]
+            x  # error: [unbound-name]
             ",
         ));
 
@@ -518,14 +519,14 @@ mod tests {
             panic!("expected one assertion");
         };
 
-        assert_eq!(format!("{assert}"), "Error: [unbound-name]");
+        assert_eq!(format!("{assert}"), "error: [unbound-name]");
     }
 
     #[test]
     fn error_with_rule_and_column() {
         let assertions = get_assertions(&dedent(
             "
-            x  # Error: 1 [unbound-name]
+            x  # error: 1 [unbound-name]
             ",
         ));
 
@@ -539,14 +540,14 @@ mod tests {
             panic!("expected one assertion");
         };
 
-        assert_eq!(format!("{assert}"), "Error: 1 [unbound-name]");
+        assert_eq!(format!("{assert}"), "error: 1 [unbound-name]");
     }
 
     #[test]
     fn error_with_rule_and_message() {
         let assertions = get_assertions(&dedent(
             r#"
-            # Error: [unbound-name] "`x` is unbound"
+            # error: [unbound-name] "`x` is unbound"
             x
             "#,
         ));
@@ -563,7 +564,7 @@ mod tests {
 
         assert_eq!(
             format!("{assert}"),
-            r#"Error: [unbound-name] "`x` is unbound""#
+            r#"error: [unbound-name] "`x` is unbound""#
         );
     }
 
@@ -571,7 +572,7 @@ mod tests {
     fn error_with_message_and_column() {
         let assertions = get_assertions(&dedent(
             r#"
-            # Error: 1 "`x` is unbound"
+            # error: 1 "`x` is unbound"
             x
             "#,
         ));
@@ -586,14 +587,14 @@ mod tests {
             panic!("expected one assertion");
         };
 
-        assert_eq!(format!("{assert}"), r#"Error: 1 "`x` is unbound""#);
+        assert_eq!(format!("{assert}"), r#"error: 1 "`x` is unbound""#);
     }
 
     #[test]
     fn error_with_rule_and_message_and_column() {
         let assertions = get_assertions(&dedent(
             r#"
-            # Error: 1 [unbound-name] "`x` is unbound"
+            # error: 1 [unbound-name] "`x` is unbound"
             x
             "#,
         ));
@@ -610,7 +611,7 @@ mod tests {
 
         assert_eq!(
             format!("{assert}"),
-            r#"Error: 1 [unbound-name] "`x` is unbound""#
+            r#"error: 1 [unbound-name] "`x` is unbound""#
         );
     }
 }
