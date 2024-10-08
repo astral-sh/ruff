@@ -239,7 +239,7 @@ static ERROR_RE: Lazy<Regex> = Lazy::new(|| {
 #[derive(Debug)]
 pub(crate) enum Assertion<'a> {
     /// A `Type: ` assertion.
-    Type(TypeAssertion<'a>),
+    Type(&'a str),
 
     /// An `Error: ` assertion.
     Error(ErrorAssertion<'a>),
@@ -248,9 +248,7 @@ pub(crate) enum Assertion<'a> {
 impl<'a> Assertion<'a> {
     fn from_comment(comment: &'a str) -> Option<Self> {
         if let Some(caps) = TYPE_RE.captures(comment) {
-            Some(Self::Type(TypeAssertion {
-                ty_display: caps.name("ty_display").unwrap().as_str(),
-            }))
+            Some(Self::Type(caps.name("ty_display").unwrap().as_str()))
         } else {
             ERROR_RE.captures(comment).map(|caps| {
                 Self::Error(ErrorAssertion {
@@ -266,22 +264,9 @@ impl<'a> Assertion<'a> {
 impl std::fmt::Display for Assertion<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Type(assertion) => assertion.fmt(f),
+            Self::Type(expected_type) => write!(f, "Type: {expected_type}"),
             Self::Error(assertion) => assertion.fmt(f),
         }
-    }
-}
-
-/// A `Type: ` assertion comment.
-#[derive(Debug)]
-pub(crate) struct TypeAssertion<'a> {
-    /// The type name we expect to be revealed.
-    pub(crate) ty_display: &'a str,
-}
-
-impl std::fmt::Display for TypeAssertion<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Type: {}", self.ty_display)
     }
 }
 
@@ -491,12 +476,12 @@ mod tests {
         assert_eq!(line1.line, OneIndexed::from_zero_indexed(2));
         assert_eq!(line2.line, OneIndexed::from_zero_indexed(3));
 
-        let [Assertion::Error(error1), Assertion::Type(ta)] = &line1.assertions[..] else {
+        let [Assertion::Error(error1), Assertion::Type(expected_ty)] = &line1.assertions[..] else {
             panic!("expected one Error assertion and one Type assertion");
         };
 
         assert_eq!(error1.rule, Some("invalid-assignment"));
-        assert_eq!(ta.ty_display, "str");
+        assert_eq!(*expected_ty, "str");
 
         let [Assertion::Error(error2)] = &line2.assertions[..] else {
             panic!("expected one Error assertion");

@@ -209,9 +209,9 @@ impl Matcher {
         }
     }
 
-    fn column<T: Diagnostic>(&self, diagnostic: &T) -> OneIndexed {
+    fn column<T: Ranged>(&self, ranged: &T) -> OneIndexed {
         self.line_index
-            .source_location(diagnostic.range().start(), &self.source)
+            .source_location(ranged.range().start(), &self.source)
             .column
     }
 
@@ -249,13 +249,13 @@ impl Matcher {
                 });
                 found
             }
-            Assertion::Type(ta) => {
+            Assertion::Type(expected_type) => {
                 let mut matched_revealed_type = None;
                 let mut matched_undefined_reveal = None;
                 for (index, diagnostic) in unmatched.iter().enumerate() {
                     if matched_revealed_type.is_none()
                         && diagnostic.rule() == "revealed-type"
-                        && diagnostic.message() == format!("Revealed type is `{}`", ta.ty_display)
+                        && diagnostic.message() == format!("Revealed type is `{expected_type}`")
                     {
                         matched_revealed_type = Some(index);
                         if matched_undefined_reveal.is_some() {
