@@ -273,7 +273,7 @@ impl<'s> Parser<'s> {
         });
 
         if let Some(current_files) = &mut self.current_section_files {
-            if current_files.contains(path) {
+            if !current_files.insert(path) {
                 if path == "test.py" {
                     return Err(anyhow::anyhow!(
                         "Test `{}` has duplicate files named `{path}`. \
@@ -286,8 +286,7 @@ impl<'s> Parser<'s> {
                     "Test `{}` has duplicate files named `{path}`.",
                     self.sections[parent].title
                 ));
-            }
-            current_files.insert(path);
+            };
         } else {
             self.current_section_files = Some(FxHashSet::from_iter([path]));
         }
