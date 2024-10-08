@@ -1,4 +1,6 @@
-use red_knot_python_semantic::{Db, Program, ProgramSettings, PythonVersion, SearchPathSettings};
+use red_knot_python_semantic::{
+    Db as SemanticDb, Program, ProgramSettings, PythonVersion, SearchPathSettings,
+};
 use ruff_db::files::{File, Files};
 use ruff_db::system::SystemPathBuf;
 use ruff_db::system::{DbWithTestSystem, System, TestSystem};
@@ -6,14 +8,14 @@ use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Upcast};
 
 #[salsa::db]
-pub(crate) struct TestDb {
+pub(crate) struct Db {
     storage: salsa::Storage<Self>,
     files: Files,
     system: TestSystem,
     vendored: VendoredFileSystem,
 }
 
-impl TestDb {
+impl Db {
     pub(crate) fn new() -> Self {
         Self {
             storage: salsa::Storage::default(),
@@ -43,7 +45,7 @@ impl TestDb {
     }
 }
 
-impl DbWithTestSystem for TestDb {
+impl DbWithTestSystem for Db {
     fn test_system(&self) -> &TestSystem {
         &self.system
     }
@@ -54,7 +56,7 @@ impl DbWithTestSystem for TestDb {
 }
 
 #[salsa::db]
-impl SourceDb for TestDb {
+impl SourceDb for Db {
     fn vendored(&self) -> &VendoredFileSystem {
         &self.vendored
     }
@@ -68,7 +70,7 @@ impl SourceDb for TestDb {
     }
 }
 
-impl Upcast<dyn SourceDb> for TestDb {
+impl Upcast<dyn SourceDb> for Db {
     fn upcast(&self) -> &(dyn SourceDb + 'static) {
         self
     }
@@ -78,13 +80,13 @@ impl Upcast<dyn SourceDb> for TestDb {
 }
 
 #[salsa::db]
-impl Db for TestDb {
+impl SemanticDb for Db {
     fn is_file_open(&self, file: File) -> bool {
         !file.path(self).is_vendored_path()
     }
 }
 
 #[salsa::db]
-impl salsa::Database for TestDb {
+impl salsa::Database for Db {
     fn salsa_event(&self, _event: &dyn Fn() -> salsa::Event) {}
 }

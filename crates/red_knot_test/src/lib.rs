@@ -50,7 +50,7 @@ pub fn run(path: &PathBuf, title: &str) {
 
 fn run_test(test: &parser::MarkdownTest) -> Result<(), Failures> {
     let workspace_root = SystemPathBuf::from("/src");
-    let mut db = db::TestDb::setup(workspace_root.clone());
+    let mut db = db::Db::setup(workspace_root.clone());
 
     let mut system_paths = vec![];
 

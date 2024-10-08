@@ -1,7 +1,7 @@
 //! Match [`TypeCheckDiagnostic`]s against [`Assertion`]s and produce test failure messages for any
 //! mismatches.
 use crate::assertion::{Assertion, FileAssertions};
-use crate::db::TestDb;
+use crate::db::Db;
 use crate::diagnostic::SortedDiagnostics;
 use red_knot_python_semantic::types::TypeCheckDiagnostic;
 use ruff_db::files::File;
@@ -49,7 +49,7 @@ struct LineFailures {
 }
 
 pub(super) fn match_file<T>(
-    db: &TestDb,
+    db: &Db,
     file: File,
     diagnostics: impl IntoIterator<Item = T>,
 ) -> Result<(), FailuresByLine>
@@ -174,7 +174,7 @@ struct Matcher {
 }
 
 impl Matcher {
-    fn from_file(db: &TestDb, file: File) -> Self {
+    fn from_file(db: &Db, file: File) -> Self {
         Self {
             line_index: line_index(db, file),
             source: source_text(db, file),
@@ -330,7 +330,7 @@ mod tests {
     }
 
     fn get_result(source: &str, diagnostics: Vec<TestDiagnostic>) -> Result<(), FailuresByLine> {
-        let mut db = crate::db::TestDb::setup(SystemPathBuf::from("/src"));
+        let mut db = crate::db::Db::setup(SystemPathBuf::from("/src"));
         db.write_file("/src/test.py", source).unwrap();
         let file = system_path_to_file(&db, "/src/test.py").unwrap();
 

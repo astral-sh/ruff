@@ -33,7 +33,7 @@
 //! # Type: Unbound
 //! reveal_type(x)
 //! ```
-use crate::db::TestDb;
+use crate::db::Db;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use ruff_db::files::File;
@@ -54,7 +54,7 @@ pub(crate) struct FileAssertions {
 }
 
 impl FileAssertions {
-    pub(crate) fn from_file(db: &TestDb, file: File) -> Self {
+    pub(crate) fn from_file(db: &Db, file: File) -> Self {
         let source = source_text(db, file);
         let lines = line_index(db, file);
         let parsed = parsed_module(db, file);
@@ -323,7 +323,7 @@ mod tests {
     use ruff_source_file::OneIndexed;
 
     fn get_assertions(source: &str) -> FileAssertions {
-        let mut db = crate::db::TestDb::setup(SystemPathBuf::from("/src"));
+        let mut db = crate::db::Db::setup(SystemPathBuf::from("/src"));
         db.write_file("/src/test.py", source).unwrap();
         let file = system_path_to_file(&db, "/src/test.py").unwrap();
         FileAssertions::from_file(&db, file)

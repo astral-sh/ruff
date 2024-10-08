@@ -90,7 +90,7 @@ struct DiagnosticWithLine<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::db::TestDb;
+    use crate::db::Db;
     use ruff_db::files::system_path_to_file;
     use ruff_db::source::line_index;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
@@ -99,7 +99,7 @@ mod tests {
 
     #[test]
     fn sort_and_group() {
-        let mut db = TestDb::setup(SystemPathBuf::from("/src"));
+        let mut db = Db::setup(SystemPathBuf::from("/src"));
         db.write_file("/src/test.py", "one\ntwo\n").unwrap();
         let file = system_path_to_file(&db, "/src/test.py").unwrap();
         let lines = line_index(&db, file);
