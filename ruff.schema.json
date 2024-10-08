@@ -2423,31 +2423,20 @@
       "type": "string"
     },
     "OutputFormat": {
-      "oneOf": [
-        {
-          "type": "string",
-          "enum": [
-            "concise",
-            "full",
-            "json",
-            "json-lines",
-            "junit",
-            "grouped",
-            "github",
-            "gitlab",
-            "pylint",
-            "rdjson",
-            "azure",
-            "sarif"
-          ]
-        },
-        {
-          "deprecated": true,
-          "type": "string",
-          "enum": [
-            "text"
-          ]
-        }
+      "type": "string",
+      "enum": [
+        "concise",
+        "full",
+        "json",
+        "json-lines",
+        "junit",
+        "grouped",
+        "github",
+        "gitlab",
+        "pylint",
+        "rdjson",
+        "azure",
+        "sarif"
       ]
     },
     "ParametrizeNameType": {
