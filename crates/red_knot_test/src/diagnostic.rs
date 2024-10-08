@@ -6,10 +6,15 @@ use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::Ranged;
 use std::ops::{Deref, Range};
 
+/// All diagnostics for one embedded Python file, sorted and grouped by start line number.
+///
+/// The diagnostics are kept in a flat vector, sorted by line number. A separate vector of
+/// [`LineDiagnosticRange`] has one entry for each contiguous slice of the diagnostics vector
+/// containing diagnostics which all start on the same line.
 #[derive(Debug)]
 pub(crate) struct SortedDiagnostics<T> {
     diagnostics: Vec<T>,
-    lines: Vec<LineDiagnosticRange>,
+    line_ranges: Vec<LineDiagnosticRange>,
 }
 
 impl<T> SortedDiagnostics<T>
@@ -24,11 +29,11 @@ where
                 diagnostic,
             })
             .collect();
-        diagnostics.sort_by_key(|diagnostic_with_line| diagnostic_with_line.line_number);
+        diagnostics.sort_unstable_by_key(|diagnostic_with_line| diagnostic_with_line.line_number);
 
         let mut diags = Self {
             diagnostics: Vec::with_capacity(diagnostics.len()),
-            lines: vec![],
+            line_ranges: vec![],
         };
 
         let mut current_line_number = None;
@@ -45,9 +50,9 @@ where
                 Some(current) => {
                     if line_number != current {
                         let end = diags.diagnostics.len();
-                        diags.lines.push(LineDiagnosticRange {
+                        diags.line_ranges.push(LineDiagnosticRange {
                             line_number: current,
-                            diagnostic_range: start..end,
+                            diagnostic_index_range: start..end,
                         });
                         start = end;
                         current_line_number = Some(line_number);
@@ -56,10 +61,10 @@ where
             }
             diags.diagnostics.push(diagnostic);
         }
-        if let Some(current_line) = current_line_number {
-            diags.lines.push(LineDiagnosticRange {
-                line_number: current_line,
-                diagnostic_range: start..diags.diagnostics.len(),
+        if let Some(line_number) = current_line_number {
+            diags.line_ranges.push(LineDiagnosticRange {
+                line_number,
+                diagnostic_index_range: start..diags.diagnostics.len(),
             });
         }
 
@@ -69,7 +74,7 @@ where
     pub(crate) fn iter_lines(&self) -> LineDiagnosticsIterator<T> {
         LineDiagnosticsIterator {
             diagnostics: self.diagnostics.as_slice(),
-            inner: self.lines.iter(),
+            inner: self.line_ranges.iter(),
         }
     }
 }
@@ -78,7 +83,7 @@ where
 #[derive(Debug)]
 struct LineDiagnosticRange {
     line_number: OneIndexed,
-    diagnostic_range: Range<usize>,
+    diagnostic_index_range: Range<usize>,
 }
 
 /// Iterator to group sorted diagnostics by line.
@@ -96,17 +101,18 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let LineDiagnosticRange {
             line_number,
-            diagnostic_range,
+            diagnostic_index_range,
         } = self.inner.next()?;
         Some(LineDiagnostics {
             line_number: *line_number,
-            diagnostics: &self.diagnostics[diagnostic_range.clone()],
+            diagnostics: &self.diagnostics[diagnostic_index_range.clone()],
         })
     }
 }
 
 impl<T> std::iter::FusedIterator for LineDiagnosticsIterator<'_, T> where T: Clone + Ranged {}
 
+/// All diagnostics that start on a single line of source code in one embedded Python file.
 #[derive(Debug)]
 pub(crate) struct LineDiagnostics<'a, T> {
     /// Line number on which these diagnostics start.

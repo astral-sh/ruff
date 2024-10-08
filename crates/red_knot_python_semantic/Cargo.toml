@@ -26,7 +26,6 @@ compact_str = { workspace = true }
 countme = { workspace = true }
 itertools = { workspace = true}
 ordermap = { workspace = true }
-rstest = { workspace = true }
 salsa = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
@@ -44,6 +43,7 @@ red_knot_vendored = { workspace = true }
 
 anyhow = { workspace = true }
 insta = { workspace = true }
+rstest = { workspace = true }
 tempfile = { workspace = true }
 
 [lints]

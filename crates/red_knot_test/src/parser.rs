@@ -22,7 +22,7 @@ pub(crate) struct MarkdownTestSuite<'s> {
 }
 
 impl<'s> MarkdownTestSuite<'s> {
-    pub(crate) fn tests<'m>(&'m self) -> MarkdownTestIterator<'m, 's> {
+    pub(crate) fn tests(&self) -> MarkdownTestIterator<'_, 's> {
         MarkdownTestIterator {
             suite: self,
             current_file_index: 0,
@@ -30,6 +30,11 @@ impl<'s> MarkdownTestSuite<'s> {
     }
 }
 
+/// A single test inside a [`MarkdownTestSuite`].
+///
+/// A test is a single header section (or the implicit root section, if there are no Markdown
+/// headers in the file), containing one or more embedded Python files as fenced code blocks, and
+/// containing no nested header subsections.
 #[derive(Debug)]
 pub(crate) struct MarkdownTest<'m, 's> {
     suite: &'m MarkdownTestSuite<'s>,
@@ -61,6 +66,7 @@ impl<'m, 's> MarkdownTest<'m, 's> {
     }
 }
 
+/// Iterator yielding all [`MarkdownTest`]s in a [`MarkdownTestSuite`].
 #[derive(Debug)]
 pub(crate) struct MarkdownTestIterator<'m, 's> {
     suite: &'m MarkdownTestSuite<'s>,
@@ -92,6 +98,15 @@ impl<'m, 's> Iterator for MarkdownTestIterator<'m, 's> {
 #[newtype_index]
 struct SectionId;
 
+/// A single header section of a [`MarkdownTestSuite`], or the implicit root "section".
+///
+/// A header section is the part of a Markdown file beginning with a `#`-prefixed header line, and
+/// extending until the next header line at the same or higher outline level (that is, with the
+/// same number or fewer `#` characters).
+///
+/// A header section may either contain one or more embedded Python files (making it a
+/// [`MarkdownTest`]), or it may contain nested sections (headers with more `#` characters), but
+/// not both.
 #[derive(Debug)]
 struct Section<'s> {
     title: &'s str,
@@ -102,6 +117,14 @@ struct Section<'s> {
 #[newtype_index]
 struct EmbeddedFileId;
 
+/// A single file embedded in a [`Section`] as a fenced code block.
+///
+/// Currently must be a Python file (`py` language) or type stub (`pyi`). In the future we plan
+/// support other kinds of files as well (TOML configuration, typeshed VERSIONS, `pth` files...).
+///
+/// A Python embedded file makes its containing [`Section`] into a [`MarkdownTest`], and will be
+/// type-checked and searched for inline-comment assertions to match against the diagnostics from
+/// type checking.
 #[derive(Debug)]
 pub(crate) struct EmbeddedFile<'s> {
     section: SectionId,
@@ -134,7 +157,13 @@ impl SectionStack {
     }
 
     fn pop(&mut self) -> Option<SectionId> {
-        self.0.pop()
+        let popped = self.0.pop();
+        debug_assert_ne!(popped, None, "Should never pop the implicit root section");
+        debug_assert!(
+            !self.0.is_empty(),
+            "Should never pop the implicit root section"
+        );
+        popped
     }
 
     fn parent(&mut self) -> SectionId {
@@ -145,6 +174,7 @@ impl SectionStack {
     }
 }
 
+/// Parse the source of a Markdown file into a [`MarkdownTestSuite`].
 #[derive(Debug)]
 struct Parser<'s> {
     /// [`Section`]s of the final [`MarkdownTestSuite`].
@@ -181,7 +211,7 @@ impl<'s> Parser<'s> {
     }
 
     fn parse(mut self) -> anyhow::Result<MarkdownTestSuite<'s>> {
-        self.start()?;
+        self.parse_impl()?;
         Ok(self.finish())
     }
 
@@ -195,7 +225,7 @@ impl<'s> Parser<'s> {
         }
     }
 
-    fn start(&mut self) -> anyhow::Result<()> {
+    fn parse_impl(&mut self) -> anyhow::Result<()> {
         while !self.unparsed.is_empty() {
             if let Some(captures) = self.scan(&HEADER_RE) {
                 self.parse_header(&captures)?;
@@ -259,10 +289,9 @@ impl<'s> Parser<'s> {
                 if parts.next().is_some() {
                     return Err(anyhow::anyhow!("Invalid config item `{}`.", item));
                 }
-                if config.contains_key(key) {
+                if config.insert(key, val).is_some() {
                     return Err(anyhow::anyhow!("Duplicate config item `{}`.", item));
                 }
-                config.insert(key, val);
             }
         }
 

@@ -33,6 +33,7 @@
 //! # revealed: Unbound
 //! reveal_type(x)
 //! ```
+
 use crate::db::Db;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -119,6 +120,7 @@ impl<'a> From<AssertionWithRange<'a>> for Assertion<'a> {
     }
 }
 
+/// Iterator that yields all assertions within a single embedded Python file.
 #[derive(Debug)]
 struct AssertionWithRangeIterator<'a> {
     file_assertions: &'a InlineFileAssertions,

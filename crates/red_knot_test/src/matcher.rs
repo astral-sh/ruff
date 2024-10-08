@@ -193,7 +193,7 @@ impl Matcher {
         'b: 'a,
     {
         let mut failures = vec![];
-        let mut unmatched = diagnostics.iter().collect::<Vec<_>>();
+        let mut unmatched: Vec<_> = diagnostics.iter().collect();
         for assertion in assertions {
             if !self.matches(assertion, &mut unmatched) {
                 failures.push(assertion.unmatched());
@@ -211,7 +211,7 @@ impl Matcher {
 
     fn column<T: Ranged>(&self, ranged: &T) -> OneIndexed {
         self.line_index
-            .source_location(ranged.range().start(), &self.source)
+            .source_location(ranged.start(), &self.source)
             .column
     }
 
@@ -228,46 +228,39 @@ impl Matcher {
     fn matches<T: Diagnostic>(&self, assertion: &Assertion, unmatched: &mut Vec<&T>) -> bool {
         match assertion {
             Assertion::Error(error) => {
-                let mut found = false;
-                unmatched.retain(|diagnostic| {
-                    if found {
-                        return true;
-                    }
-                    if !error.rule.is_some_and(|rule| rule != diagnostic.rule())
+                let position = unmatched.iter().position(|diagnostic| {
+                    !error.rule.is_some_and(|rule| rule != diagnostic.rule())
                         && !error
                             .column
                             .is_some_and(|col| col != self.column(*diagnostic))
                         && !error
                             .message_contains
                             .is_some_and(|needle| !diagnostic.message().contains(needle))
-                    {
-                        found = true;
-                        false
-                    } else {
-                        true
-                    }
                 });
-                found
+                if let Some(position) = position {
+                    unmatched.swap_remove(position);
+                    true
+                } else {
+                    false
+                }
             }
             Assertion::Revealed(expected_type) => {
                 let mut matched_revealed_type = None;
                 let mut matched_undefined_reveal = None;
+                let expected_reveal_type_message = format!("Revealed type is `{expected_type}`");
                 for (index, diagnostic) in unmatched.iter().enumerate() {
                     if matched_revealed_type.is_none()
                         && diagnostic.rule() == "revealed-type"
-                        && diagnostic.message() == format!("Revealed type is `{expected_type}`")
+                        && diagnostic.message() == expected_reveal_type_message
                     {
                         matched_revealed_type = Some(index);
-                        if matched_undefined_reveal.is_some() {
-                            break;
-                        }
                     } else if matched_undefined_reveal.is_none()
                         && diagnostic.rule() == "undefined-reveal"
                     {
                         matched_undefined_reveal = Some(index);
-                        if matched_revealed_type.is_some() {
-                            break;
-                        }
+                    }
+                    if matched_revealed_type.is_some() && matched_undefined_reveal.is_some() {
+                        break;
                     }
                 }
                 if matched_revealed_type.is_some() {
