@@ -641,9 +641,9 @@ impl<'db> Type<'db> {
             Type::Intersection(intersection) => {
                 // The truthiness of the intersection is the intersection of the truthiness of its
                 // elements:
-                // - `Ambiguous` ∩ `Truthy` = `Truthy`
-                // - `Ambiguous` ∩ `Falsy` = `Falsy`
-                // - `Truthy` ∩ `Falsy` = `Never`  -- this should be impossible to build
+                // - `Ambiguous` & `Truthy` == `Truthy`
+                // - `Ambiguous` & `Falsy` == `Falsy`
+                // - `Truthy` & `Falsy` == `Never`  -- this should be impossible to build
                 intersection
                     // Negative elements (what this intersection should not be) do not have an
                     // influence on the truthiness of the intersection.
