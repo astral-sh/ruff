@@ -1355,6 +1355,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::SingleItemMembershipTest) {
                 refurb::rules::single_item_membership_test(checker, expr, left, ops, comparators);
             }
+            if checker.enabled(Rule::HardcodedStringCharset) {
+                refurb::rules::hardcoded_string_charset_comparison(checker, compare);
+            }
         }
         Expr::NumberLiteral(number_literal @ ast::ExprNumberLiteral { .. }) => {
             if checker.source_type.is_stub() && checker.enabled(Rule::NumericLiteralTooLong) {
@@ -1364,7 +1367,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 refurb::rules::math_constant(checker, number_literal);
             }
         }
-        Expr::StringLiteral(ast::ExprStringLiteral { value, range: _ }) => {
+        Expr::StringLiteral(string_like @ ast::ExprStringLiteral { value, range: _ }) => {
             if checker.enabled(Rule::UnicodeKindPrefix) {
                 for string_part in value {
                     pyupgrade::rules::unicode_kind_prefix(checker, string_part);
@@ -1374,6 +1377,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 for string_literal in value.as_slice() {
                     ruff::rules::missing_fstring_syntax(checker, string_literal);
                 }
+            }
+            if checker.enabled(Rule::HardcodedStringCharset) {
+                refurb::rules::hardcoded_string_charset_literal(checker, string_like);
             }
         }
         Expr::If(
@@ -1406,6 +1412,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::UselessIfElse) {
                 ruff::rules::useless_if_else(checker, if_exp);
+            }
+            if checker.enabled(Rule::SliceToRemovePrefixOrSuffix) {
+                refurb::rules::slice_to_remove_affix_expr(checker, if_exp);
             }
         }
         Expr::ListComp(
@@ -1534,6 +1543,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
         }
         Expr::BoolOp(bool_op) => {
+            if checker.enabled(Rule::BooleanChainedComparison) {
+                pylint::rules::boolean_chained_comparison(checker, bool_op);
+            }
             if checker.enabled(Rule::MultipleStartsEndsWith) {
                 flake8_pie::rules::multiple_starts_ends_with(checker, expr);
             }

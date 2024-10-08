@@ -5,15 +5,13 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
 
-use anyhow::{anyhow, bail};
+use anyhow::bail;
 use clap::builder::{TypedValueParser, ValueParserFactory};
-use clap::{command, Parser};
+use clap::{command, Parser, Subcommand};
 use colored::Colorize;
 use path_absolutize::path_dedot;
 use regex::Regex;
-use rustc_hash::FxHashMap;
-use toml;
-
+use ruff_graph::Direction;
 use ruff_linter::line_width::LineLength;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::registry::Rule;
@@ -27,6 +25,8 @@ use ruff_text_size::TextRange;
 use ruff_workspace::configuration::{Configuration, RuleSelection};
 use ruff_workspace::options::{Options, PycodestyleOptions};
 use ruff_workspace::resolver::ConfigurationTransformer;
+use rustc_hash::FxHashMap;
+use toml;
 
 /// All configuration options that can be passed "globally",
 /// i.e., can be passed to all subcommands
@@ -132,11 +132,43 @@ pub enum Command {
     Format(FormatCommand),
     /// Run the language server.
     Server(ServerCommand),
+    /// Run analysis over Python source code.
+    #[clap(subcommand)]
+    Analyze(AnalyzeCommand),
     /// Display Ruff's version
     Version {
         #[arg(long, value_enum, default_value = "text")]
         output_format: HelpFormat,
     },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum AnalyzeCommand {
+    /// Generate a map of Python file dependencies or dependents.
+    Graph(AnalyzeGraphCommand),
+}
+
+#[derive(Clone, Debug, clap::Parser)]
+pub struct AnalyzeGraphCommand {
+    /// List of files or directories to include.
+    #[clap(help = "List of files or directories to include [default: .]")]
+    files: Vec<PathBuf>,
+    /// The direction of the import map. By default, generates a dependency map, i.e., a map from
+    /// file to files that it depends on. Use `--direction dependents` to generate a map from file
+    /// to files that depend on it.
+    #[clap(long, value_enum, default_value_t)]
+    direction: Direction,
+    /// Attempt to detect imports from string literals.
+    #[clap(long)]
+    detect_string_imports: bool,
+    /// Enable preview mode. Use `--no-preview` to disable.
+    #[arg(long, overrides_with("no_preview"))]
+    preview: bool,
+    #[clap(long, overrides_with("preview"), hide = true)]
+    no_preview: bool,
+    /// The minimum Python version that should be supported.
+    #[arg(long, value_enum)]
+    target_version: Option<PythonVersion>,
 }
 
 // The `Parser` derive is for ruff_dev, for ruff `Args` would be sufficient
@@ -697,9 +729,10 @@ impl CheckCommand {
             unsafe_fixes: resolve_bool_arg(self.unsafe_fixes, self.no_unsafe_fixes)
                 .map(UnsafeFixes::from),
             force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
-            output_format: resolve_output_format(self.output_format)?,
+            output_format: self.output_format,
             show_fixes: resolve_bool_arg(self.show_fixes, self.no_show_fixes),
             extension: self.extension,
+            ..ExplicitConfigOverrides::default()
         };
 
         let config_args = ConfigArguments::from_cli_arguments(global_options, cli_overrides)?;
@@ -732,8 +765,34 @@ impl FormatCommand {
             target_version: self.target_version,
             cache_dir: self.cache_dir,
             extension: self.extension,
+            ..ExplicitConfigOverrides::default()
+        };
 
-            // Unsupported on the formatter CLI, but required on `Overrides`.
+        let config_args = ConfigArguments::from_cli_arguments(global_options, cli_overrides)?;
+        Ok((format_arguments, config_args))
+    }
+}
+
+impl AnalyzeGraphCommand {
+    /// Partition the CLI into command-line arguments and configuration
+    /// overrides.
+    pub fn partition(
+        self,
+        global_options: GlobalConfigArgs,
+    ) -> anyhow::Result<(AnalyzeGraphArgs, ConfigArguments)> {
+        let format_arguments = AnalyzeGraphArgs {
+            files: self.files,
+            direction: self.direction,
+        };
+
+        let cli_overrides = ExplicitConfigOverrides {
+            detect_string_imports: if self.detect_string_imports {
+                Some(true)
+            } else {
+                None
+            },
+            preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
+            target_version: self.target_version,
             ..ExplicitConfigOverrides::default()
         };
 
@@ -896,7 +955,7 @@ A `--config` flag must either be a path to a `.toml` configuration file
         // the user was trying to pass in a path to a configuration file
         // or some inline TOML.
         // We want to display the most helpful error to the user as possible.
-        if std::path::Path::new(value)
+        if Path::new(value)
             .extension()
             .map_or(false, |ext| ext.eq_ignore_ascii_case("toml"))
         {
@@ -922,17 +981,6 @@ The path `{value}` does not point to a configuration file"
         );
 
         Err(new_error)
-    }
-}
-
-#[allow(deprecated)]
-fn resolve_output_format(
-    output_format: Option<OutputFormat>,
-) -> anyhow::Result<Option<OutputFormat>> {
-    if let Some(OutputFormat::Text) = output_format {
-        Err(anyhow!("`--output-format=text` is no longer supported. Use `--output-format=full` or `--output-format=concise` instead."))
-    } else {
-        Ok(output_format)
     }
 }
 
@@ -1156,6 +1204,13 @@ impl LineColumnParseError {
     }
 }
 
+/// CLI settings that are distinct from configuration (commands, lists of files, etc.).
+#[derive(Clone, Debug)]
+pub struct AnalyzeGraphArgs {
+    pub files: Vec<PathBuf>,
+    pub direction: Direction,
+}
+
 /// Configuration overrides provided via dedicated CLI flags:
 /// `--line-length`, `--respect-gitignore`, etc.
 #[derive(Clone, Default)]
@@ -1187,6 +1242,7 @@ struct ExplicitConfigOverrides {
     output_format: Option<OutputFormat>,
     show_fixes: Option<bool>,
     extension: Option<Vec<ExtensionPair>>,
+    detect_string_imports: Option<bool>,
 }
 
 impl ConfigurationTransformer for ExplicitConfigOverrides {
@@ -1270,6 +1326,9 @@ impl ConfigurationTransformer for ExplicitConfigOverrides {
         }
         if let Some(extension) = &self.extension {
             config.extension = Some(extension.iter().cloned().collect());
+        }
+        if let Some(detect_string_imports) = &self.detect_string_imports {
+            config.analyze.detect_string_imports = Some(*detect_string_imports);
         }
 
         config

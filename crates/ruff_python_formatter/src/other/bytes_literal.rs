@@ -8,11 +8,9 @@ pub struct FormatBytesLiteral;
 
 impl FormatNodeRule<BytesLiteral> for FormatBytesLiteral {
     fn fmt_fields(&self, item: &BytesLiteral, f: &mut PyFormatter) -> FormatResult<()> {
-        let locator = f.context().locator();
-
         StringNormalizer::from_context(f.context())
             .with_preferred_quote_style(f.options().quote_style())
-            .normalize(item.into(), &locator)
+            .normalize(item.into())
             .fmt(f)
     }
 }

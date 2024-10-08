@@ -38,6 +38,7 @@ pub(crate) fn fix_all(
             file_resolver_settings,
             Some(linter_settings),
             None,
+            query.text_document_language_id(),
         ) {
             return Ok(Fixes::default());
         }

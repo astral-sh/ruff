@@ -25,7 +25,7 @@ jobs:
         run: ruff check --output-format=github .
 ```
 
-Ruff can also be used as a GitHub Action via [`ruff-action`](https://github.com/chartboost/ruff-action).
+Ruff can also be used as a GitHub Action via [`ruff-action`](https://github.com/astral-sh/ruff-action).
 
 By default, `ruff-action` runs as a pass-fail test to ensure that a given repository doesn't contain
 any lint rule violations as per its [configuration](configuration.md).
@@ -46,13 +46,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: chartboost/ruff-action@v1
+      - uses: astral-sh/ruff-action@v1
 ```
 
 Alternatively, you can include `ruff-action` as a step in any other workflow file:
 
 ```yaml
-      - uses: chartboost/ruff-action@v1
+      - uses: astral-sh/ruff-action@v1
 ```
 
 `ruff-action` accepts optional configuration parameters via `with:`, including:
@@ -64,7 +64,7 @@ Alternatively, you can include `ruff-action` as a step in any other workflow fil
 For example, to run `ruff check --select B ./src` using Ruff version `0.0.259`:
 
 ```yaml
-- uses: chartboost/ruff-action@v1
+- uses: astral-sh/ruff-action@v1
   with:
     version: 0.0.259
     args: check --select B
@@ -78,7 +78,7 @@ Ruff can be used as a [pre-commit](https://pre-commit.com) hook via [`ruff-pre-c
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.6.4
+  rev: v0.6.9
   hooks:
     # Run the linter.
     - id: ruff
@@ -91,7 +91,7 @@ To enable lint fixes, add the `--fix` argument to the lint hook:
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.6.4
+  rev: v0.6.9
   hooks:
     # Run the linter.
     - id: ruff
@@ -105,7 +105,7 @@ To run the hooks over Jupyter Notebooks too, add `jupyter` to the list of allowe
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.6.4
+  rev: v0.6.9
   hooks:
     # Run the linter.
     - id: ruff

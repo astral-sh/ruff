@@ -24,7 +24,7 @@ bitflags = { workspace = true }
 camino = { workspace = true }
 compact_str = { workspace = true }
 countme = { workspace = true }
-once_cell = { workspace = true }
+itertools = { workspace = true}
 ordermap = { workspace = true }
 salsa = { workspace = true }
 thiserror = { workspace = true }
@@ -33,21 +33,16 @@ rustc-hash = { workspace = true }
 hashbrown = { workspace = true }
 smallvec = { workspace = true }
 static_assertions = { workspace = true }
-
-[build-dependencies]
-path-slash = { workspace = true }
-walkdir = { workspace = true }
-zip = { workspace = true, features = ["zstd", "deflate"] }
+test-case = { workspace = true }
 
 [dev-dependencies]
 ruff_db = { workspace = true, features = ["os", "testing"] }
 ruff_python_parser = { workspace = true }
+red_knot_vendored = { workspace = true }
 
 anyhow = { workspace = true }
 insta = { workspace = true }
 tempfile = { workspace = true }
-walkdir = { workspace = true }
-zip = { workspace = true }
 
 [lints]
 workspace = true

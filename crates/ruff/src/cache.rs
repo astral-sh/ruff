@@ -111,7 +111,7 @@ impl Cache {
                 return Cache::empty(path, package_root);
             }
             Err(err) => {
-                warn_user!("Failed to open cache file '{}': {err}", path.display());
+                warn_user!("Failed to open cache file `{}`: {err}", path.display());
                 return Cache::empty(path, package_root);
             }
         };
@@ -119,7 +119,7 @@ impl Cache {
         let mut package: PackageCache = match bincode::deserialize_from(BufReader::new(file)) {
             Ok(package) => package,
             Err(err) => {
-                warn_user!("Failed parse cache file '{}': {err}", path.display());
+                warn_user!("Failed parse cache file `{}`: {err}", path.display());
                 return Cache::empty(path, package_root);
             }
         };
@@ -127,7 +127,7 @@ impl Cache {
         // Sanity check.
         if package.package_root != package_root {
             warn_user!(
-                "Different package root in cache: expected '{}', got '{}'",
+                "Different package root in cache: expected `{}`, got `{}`",
                 package_root.display(),
                 package.package_root.display(),
             );
@@ -185,7 +185,7 @@ impl Cache {
             // the user is running Ruff from multiple processes over the same directory).
             if cfg!(windows) && err.error.kind() == io::ErrorKind::PermissionDenied {
                 warn_user!(
-                    "Failed to write cache file '{}': {}",
+                    "Failed to write cache file `{}`: {}",
                     self.path.display(),
                     err.error
                 );
@@ -674,7 +674,7 @@ mod tests {
 
             assert!(
                 cache.package.files.contains_key(relative_path),
-                "missing file from cache: '{}'",
+                "missing file from cache: `{}`",
                 relative_path.display()
             );
         }

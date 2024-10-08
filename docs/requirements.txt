@@ -1,5 +1,5 @@
 PyYAML==6.0.2
-ruff==0.6.4
+ruff==0.6.9
 mkdocs==1.6.1
 mkdocs-material==9.1.18
 mkdocs-redirects==1.2.1

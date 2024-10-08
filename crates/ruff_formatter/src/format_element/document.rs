@@ -878,9 +878,9 @@ mod tests {
                     [group(&format_args![
                         token("("),
                         soft_block_indent(&format_args![
-                            source_text_slice(TextRange::at(TextSize::new(0), TextSize::new(19)),),
+                            source_text_slice(TextRange::at(TextSize::new(0), TextSize::new(19))),
                             space(),
-                            source_text_slice(TextRange::at(TextSize::new(20), TextSize::new(28)),),
+                            source_text_slice(TextRange::at(TextSize::new(20), TextSize::new(28))),
                         ])
                     ])]
                 )

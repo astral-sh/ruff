@@ -181,7 +181,7 @@ impl AlwaysFixableViolation for MissingTrailingComma {
 /// import json
 ///
 ///
-/// foo = (json.dumps({"bar": 1}),)
+/// foo = (json.dumps({"bar": 1}))
 /// ```
 #[violation]
 pub struct TrailingCommaOnBareTuple;

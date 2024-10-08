@@ -47,7 +47,7 @@ impl AlwaysFixableViolation for UnnecessaryGeneratorSet {
     #[derive_message_formats]
     fn message(&self) -> String {
         if self.short_circuit {
-            format!("Unnecessary generator (rewrite using `set()`")
+            format!("Unnecessary generator (rewrite using `set()`)")
         } else {
             format!("Unnecessary generator (rewrite as a `set` comprehension)")
         }

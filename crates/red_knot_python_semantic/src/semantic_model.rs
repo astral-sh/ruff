@@ -8,7 +8,7 @@ use crate::module_name::ModuleName;
 use crate::module_resolver::{resolve_module, Module};
 use crate::semantic_index::ast_ids::HasScopedAstId;
 use crate::semantic_index::semantic_index;
-use crate::types::{definition_ty, global_symbol_ty, infer_scope_types, Type};
+use crate::types::{binding_ty, global_symbol_ty, infer_scope_types, Type};
 use crate::Db;
 
 pub struct SemanticModel<'db> {
@@ -147,24 +147,24 @@ impl HasTy for ast::Expr {
     }
 }
 
-macro_rules! impl_definition_has_ty {
+macro_rules! impl_binding_has_ty {
     ($ty: ty) => {
         impl HasTy for $ty {
             #[inline]
             fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
                 let index = semantic_index(model.db, model.file);
-                let definition = index.definition(self);
-                definition_ty(model.db, definition)
+                let binding = index.definition(self);
+                binding_ty(model.db, binding)
             }
         }
     };
 }
 
-impl_definition_has_ty!(ast::StmtFunctionDef);
-impl_definition_has_ty!(ast::StmtClassDef);
-impl_definition_has_ty!(ast::Alias);
-impl_definition_has_ty!(ast::Parameter);
-impl_definition_has_ty!(ast::ParameterWithDefault);
+impl_binding_has_ty!(ast::StmtFunctionDef);
+impl_binding_has_ty!(ast::StmtClassDef);
+impl_binding_has_ty!(ast::Alias);
+impl_binding_has_ty!(ast::Parameter);
+impl_binding_has_ty!(ast::ParameterWithDefault);
 
 #[cfg(test)]
 mod tests {

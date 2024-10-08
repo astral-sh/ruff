@@ -158,15 +158,15 @@ fn check_default_files() -> Result<()> {
     let tempdir = TempDir::new()?;
     fs::write(
         tempdir.path().join("foo.py"),
-        r#"
+        r"
 import foo   # unused import
-"#,
+",
     )?;
     fs::write(
         tempdir.path().join("bar.py"),
-        r#"
+        r"
 import bar   # unused import
-"#,
+",
     )?;
 
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
@@ -906,10 +906,10 @@ fn full_output_preview_config() -> Result<()> {
     let pyproject_toml = tempdir.path().join("pyproject.toml");
     fs::write(
         &pyproject_toml,
-        r#"
+        r"
 [tool.ruff]
 preview = true
-"#,
+",
     )?;
     let mut cmd = RuffCheck::default().config(&pyproject_toml).build();
     assert_cmd_snapshot!(cmd.pass_stdin("l = 1"), @r###"

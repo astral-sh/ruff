@@ -19,14 +19,18 @@ use crate::semantic_index::definition::{
 };
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{
-    FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopedSymbolId, SymbolFlags,
+    FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopedSymbolId,
     SymbolTableBuilder,
 };
 use crate::semantic_index::use_def::{FlowSnapshot, UseDefMapBuilder};
 use crate::semantic_index::SemanticIndex;
 use crate::Db;
 
-use super::definition::{MatchPatternDefinitionNodeRef, WithItemDefinitionNodeRef};
+use super::constraint::{Constraint, PatternConstraint};
+use super::definition::{
+    DefinitionCategory, ExceptHandlerDefinitionNodeRef, MatchPatternDefinitionNodeRef,
+    WithItemDefinitionNodeRef,
+};
 
 pub(super) struct SemanticIndexBuilder<'db> {
     // Builder state
@@ -40,6 +44,9 @@ pub(super) struct SemanticIndexBuilder<'db> {
     current_match_case: Option<CurrentMatchCase<'db>>,
     /// Flow states at each `break` in the current loop.
     loop_break_states: Vec<FlowSnapshot>,
+
+    /// Flags about the file's global scope
+    has_future_annotations: bool,
 
     // Semantic Index fields
     scopes: IndexVec<FileScopeId, Scope>,
@@ -63,6 +70,8 @@ impl<'db> SemanticIndexBuilder<'db> {
             current_assignment: None,
             current_match_case: None,
             loop_break_states: vec![],
+
+            has_future_annotations: false,
 
             scopes: IndexVec::new(),
             symbol_tables: IndexVec::new(),
@@ -165,14 +174,20 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_use_def_map_mut().merge(state);
     }
 
-    fn add_or_update_symbol(&mut self, name: Name, flags: SymbolFlags) -> ScopedSymbolId {
-        let symbol_table = self.current_symbol_table();
-        let (symbol_id, added) = symbol_table.add_or_update_symbol(name, flags);
+    fn add_symbol(&mut self, name: Name) -> ScopedSymbolId {
+        let (symbol_id, added) = self.current_symbol_table().add_symbol(name);
         if added {
-            let use_def_map = self.current_use_def_map_mut();
-            use_def_map.add_symbol(symbol_id);
+            self.current_use_def_map_mut().add_symbol(symbol_id);
         }
         symbol_id
+    }
+
+    fn mark_symbol_bound(&mut self, id: ScopedSymbolId) {
+        self.current_symbol_table().mark_symbol_bound(id);
+    }
+
+    fn mark_symbol_used(&mut self, id: ScopedSymbolId) {
+        self.current_symbol_table().mark_symbol_used(id);
     }
 
     fn add_definition<'a>(
@@ -181,15 +196,16 @@ impl<'db> SemanticIndexBuilder<'db> {
         definition_node: impl Into<DefinitionNodeRef<'a>>,
     ) -> Definition<'db> {
         let definition_node: DefinitionNodeRef<'_> = definition_node.into();
+        #[allow(unsafe_code)]
+        // SAFETY: `definition_node` is guaranteed to be a child of `self.module`
+        let kind = unsafe { definition_node.into_owned(self.module.clone()) };
+        let category = kind.category();
         let definition = Definition::new(
             self.db,
             self.file,
             self.current_scope(),
             symbol,
-            #[allow(unsafe_code)]
-            unsafe {
-                definition_node.into_owned(self.module.clone())
-            },
+            kind,
             countme::Count::default(),
         );
 
@@ -198,17 +214,53 @@ impl<'db> SemanticIndexBuilder<'db> {
             .insert(definition_node.key(), definition);
         debug_assert_eq!(existing_definition, None);
 
-        self.current_use_def_map_mut()
-            .record_definition(symbol, definition);
+        if category.is_binding() {
+            self.mark_symbol_bound(symbol);
+        }
+
+        let use_def = self.current_use_def_map_mut();
+        match category {
+            DefinitionCategory::DeclarationAndBinding => {
+                use_def.record_declaration_and_binding(symbol, definition);
+            }
+            DefinitionCategory::Declaration => use_def.record_declaration(symbol, definition),
+            DefinitionCategory::Binding => use_def.record_binding(symbol, definition),
+        }
 
         definition
     }
 
-    fn add_constraint(&mut self, constraint_node: &ast::Expr) -> Expression<'db> {
+    fn add_expression_constraint(&mut self, constraint_node: &ast::Expr) -> Expression<'db> {
         let expression = self.add_standalone_expression(constraint_node);
-        self.current_use_def_map_mut().record_constraint(expression);
+        self.current_use_def_map_mut()
+            .record_constraint(Constraint::Expression(expression));
 
         expression
+    }
+
+    fn add_pattern_constraint(
+        &mut self,
+        subject: &ast::Expr,
+        pattern: &ast::Pattern,
+    ) -> PatternConstraint<'db> {
+        #[allow(unsafe_code)]
+        let (subject, pattern) = unsafe {
+            (
+                AstNodeRef::new(self.module.clone(), subject),
+                AstNodeRef::new(self.module.clone(), pattern),
+            )
+        };
+        let pattern_constraint = PatternConstraint::new(
+            self.db,
+            self.file,
+            self.current_scope(),
+            subject,
+            pattern,
+            countme::Count::default(),
+        );
+        self.current_use_def_map_mut()
+            .record_constraint(Constraint::Pattern(pattern_constraint));
+        pattern_constraint
     }
 
     /// Record an expression that needs to be a Salsa ingredient, because we need to infer its type
@@ -255,10 +307,13 @@ impl<'db> SemanticIndexBuilder<'db> {
                         ..
                     }) => (name, &None, default),
                 };
-                // TODO create Definition for typevars
-                self.add_or_update_symbol(name.id.clone(), SymbolFlags::IS_DEFINED);
-                if let Some(bound) = bound {
-                    self.visit_expr(bound);
+                let symbol = self.add_symbol(name.id.clone());
+                // TODO create Definition for PEP 695 typevars
+                // note that the "bound" on the typevar is a totally different thing than whether
+                // or not a name is "bound" by a typevar declaration; the latter is always true.
+                self.mark_symbol_bound(symbol);
+                if let Some(bounds) = bound {
+                    self.visit_expr(bounds);
                 }
                 if let Some(default) = default {
                     self.visit_expr(default);
@@ -275,11 +330,23 @@ impl<'db> SemanticIndexBuilder<'db> {
         nested_scope
     }
 
-    /// Visit a list of [`Comprehension`] nodes, assumed to be the "generators" that compose a
-    /// comprehension (that is, the `for x in y` and `for y in z` parts of `x for x in y for y in z`.)
+    /// This method does several things:
+    /// - It pushes a new scope onto the stack for visiting
+    ///   a list/dict/set comprehension or generator expression
+    /// - Inside that scope, it visits a list of [`Comprehension`] nodes,
+    ///   assumed to be the "generators" that compose a comprehension
+    ///   (that is, the `for x in y` and `for y in z` parts of `x for x in y for y in z`).
+    /// - Inside that scope, it also calls a closure for visiting the outer `elt`
+    ///   of a list/dict/set comprehension or generator expression
+    /// - It then pops the new scope off the stack
     ///
     /// [`Comprehension`]: ast::Comprehension
-    fn visit_generators(&mut self, scope: NodeWithScopeRef, generators: &'db [ast::Comprehension]) {
+    fn with_generators_scope(
+        &mut self,
+        scope: NodeWithScopeRef,
+        generators: &'db [ast::Comprehension],
+        visit_outer_elt: impl FnOnce(&mut Self),
+    ) {
         let mut generators_iter = generators.iter();
 
         let Some(generator) = generators_iter.next() else {
@@ -318,11 +385,13 @@ impl<'db> SemanticIndexBuilder<'db> {
                 self.visit_expr(expr);
             }
         }
+
+        visit_outer_elt(self);
+        self.pop_scope();
     }
 
     fn declare_parameter(&mut self, parameter: AnyParameterRef) {
-        let symbol =
-            self.add_or_update_symbol(parameter.name().id().clone(), SymbolFlags::IS_DEFINED);
+        let symbol = self.add_symbol(parameter.name().id().clone());
 
         let definition = self.add_definition(symbol, parameter);
 
@@ -386,6 +455,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             scopes_by_expression: self.scopes_by_expression,
             scopes_by_node: self.scopes_by_node,
             use_def_maps,
+            has_future_annotations: self.has_future_annotations,
         }
     }
 }
@@ -433,8 +503,7 @@ where
                 // The symbol for the function name itself has to be evaluated
                 // at the end to match the runtime evaluation of parameter defaults
                 // and return-type annotations.
-                let symbol = self
-                    .add_or_update_symbol(function_def.name.id.clone(), SymbolFlags::IS_DEFINED);
+                let symbol = self.add_symbol(function_def.name.id.clone());
                 self.add_definition(symbol, function_def);
             }
             ast::Stmt::ClassDef(class) => {
@@ -442,8 +511,7 @@ where
                     self.visit_decorator(decorator);
                 }
 
-                let symbol =
-                    self.add_or_update_symbol(class.name.id.clone(), SymbolFlags::IS_DEFINED);
+                let symbol = self.add_symbol(class.name.id.clone());
                 self.add_definition(symbol, class);
 
                 self.with_type_params(
@@ -469,7 +537,7 @@ where
                         Name::new(alias.name.id.split('.').next().unwrap())
                     };
 
-                    let symbol = self.add_or_update_symbol(symbol_name, SymbolFlags::IS_DEFINED);
+                    let symbol = self.add_symbol(symbol_name);
                     self.add_definition(symbol, alias);
                 }
             }
@@ -481,8 +549,16 @@ where
                         &alias.name.id
                     };
 
-                    let symbol =
-                        self.add_or_update_symbol(symbol_name.clone(), SymbolFlags::IS_DEFINED);
+                    // Look for imports `from __future__ import annotations`, ignore `as ...`
+                    // We intentionally don't enforce the rules about location of `__future__`
+                    // imports here, we assume the user's intent was to apply the `__future__`
+                    // import, so we still check using it (and will also emit a diagnostic about a
+                    // miss-placed `__future__` import.)
+                    self.has_future_annotations |= alias.name.id == "annotations"
+                        && node.module.as_deref() == Some("__future__");
+
+                    let symbol = self.add_symbol(symbol_name.clone());
+
                     self.add_definition(symbol, ImportFromDefinitionNodeRef { node, alias_index });
                 }
             }
@@ -523,7 +599,7 @@ where
             ast::Stmt::If(node) => {
                 self.visit_expr(&node.test);
                 let pre_if = self.flow_snapshot();
-                self.add_constraint(&node.test);
+                self.add_expression_constraint(&node.test);
                 self.visit_body(&node.body);
                 let mut post_clauses: Vec<FlowSnapshot> = vec![];
                 for clause in &node.elif_else_clauses {
@@ -548,14 +624,23 @@ where
                     self.flow_merge(pre_if);
                 }
             }
-            ast::Stmt::While(node) => {
-                self.visit_expr(&node.test);
+            ast::Stmt::While(ast::StmtWhile {
+                test,
+                body,
+                orelse,
+                range: _,
+            }) => {
+                self.visit_expr(test);
 
                 let pre_loop = self.flow_snapshot();
 
                 // Save aside any break states from an outer loop
                 let saved_break_states = std::mem::take(&mut self.loop_break_states);
-                self.visit_body(&node.body);
+
+                // TODO: definitions created inside the body should be fully visible
+                // to other statements/expressions inside the body --Alex/Carl
+                self.visit_body(body);
+
                 // Get the break states from the body of this loop, and restore the saved outer
                 // ones.
                 let break_states =
@@ -564,7 +649,7 @@ where
                 // We may execute the `else` clause without ever executing the body, so merge in
                 // the pre-loop state before visiting `else`.
                 self.flow_merge(pre_loop);
-                self.visit_body(&node.orelse);
+                self.visit_body(orelse);
 
                 // Breaking out of a while loop bypasses the `else` clause, so merge in the break
                 // states after visiting `else`.
@@ -598,15 +683,35 @@ where
                     orelse,
                 },
             ) => {
-                // TODO add control flow similar to `ast::Stmt::While` above
                 self.add_standalone_expression(iter);
                 self.visit_expr(iter);
+
+                let pre_loop = self.flow_snapshot();
+                let saved_break_states = std::mem::take(&mut self.loop_break_states);
+
                 debug_assert!(self.current_assignment.is_none());
                 self.current_assignment = Some(for_stmt.into());
                 self.visit_expr(target);
                 self.current_assignment = None;
+
+                // TODO: Definitions created by loop variables
+                // (and definitions created inside the body)
+                // are fully visible to other statements/expressions inside the body --Alex/Carl
                 self.visit_body(body);
+
+                let break_states =
+                    std::mem::replace(&mut self.loop_break_states, saved_break_states);
+
+                // We may execute the `else` clause without ever executing the body, so merge in
+                // the pre-loop state before visiting `else`.
+                self.flow_merge(pre_loop);
                 self.visit_body(orelse);
+
+                // Breaking out of a `for` loop bypasses the `else` clause, so merge in the break
+                // states after visiting `else`.
+                for break_state in break_states {
+                    self.flow_merge(break_state);
+                }
             }
             ast::Stmt::Match(ast::StmtMatch {
                 subject,
@@ -615,9 +720,74 @@ where
             }) => {
                 self.add_standalone_expression(subject);
                 self.visit_expr(subject);
-                for case in cases {
+
+                let after_subject = self.flow_snapshot();
+                let Some((first, remaining)) = cases.split_first() else {
+                    return;
+                };
+                self.add_pattern_constraint(subject, &first.pattern);
+                self.visit_match_case(first);
+
+                let mut post_case_snapshots = vec![];
+                for case in remaining {
+                    post_case_snapshots.push(self.flow_snapshot());
+                    self.flow_restore(after_subject.clone());
+                    self.add_pattern_constraint(subject, &case.pattern);
                     self.visit_match_case(case);
                 }
+                for post_clause_state in post_case_snapshots {
+                    self.flow_merge(post_clause_state);
+                }
+                if !cases
+                    .last()
+                    .is_some_and(|case| case.guard.is_none() && case.pattern.is_wildcard())
+                {
+                    self.flow_merge(after_subject);
+                }
+            }
+            ast::Stmt::Try(ast::StmtTry {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+                is_star,
+                range: _,
+            }) => {
+                self.visit_body(body);
+
+                for except_handler in handlers {
+                    let ast::ExceptHandler::ExceptHandler(except_handler) = except_handler;
+                    let ast::ExceptHandlerExceptHandler {
+                        name: symbol_name,
+                        type_: handled_exceptions,
+                        body: handler_body,
+                        range: _,
+                    } = except_handler;
+
+                    if let Some(handled_exceptions) = handled_exceptions {
+                        self.visit_expr(handled_exceptions);
+                    }
+
+                    // If `handled_exceptions` above was `None`, it's something like `except as e:`,
+                    // which is invalid syntax. However, it's still pretty obvious here that the user
+                    // *wanted* `e` to be bound, so we should still create a definition here nonetheless.
+                    if let Some(symbol_name) = symbol_name {
+                        let symbol = self.add_symbol(symbol_name.id.clone());
+
+                        self.add_definition(
+                            symbol,
+                            DefinitionNodeRef::ExceptHandler(ExceptHandlerDefinitionNodeRef {
+                                handler: except_handler,
+                                is_star: *is_star,
+                            }),
+                        );
+                    }
+
+                    self.visit_body(handler_body);
+                }
+
+                self.visit_body(orelse);
+                self.visit_body(finalbody);
             }
             _ => {
                 walk_stmt(self, stmt);
@@ -632,24 +802,18 @@ where
 
         match expr {
             ast::Expr::Name(name_node @ ast::ExprName { id, ctx, .. }) => {
-                let flags = match (ctx, self.current_assignment) {
+                let (is_use, is_definition) = match (ctx, self.current_assignment) {
                     (ast::ExprContext::Store, Some(CurrentAssignment::AugAssign(_))) => {
                         // For augmented assignment, the target expression is also used.
-                        SymbolFlags::IS_DEFINED | SymbolFlags::IS_USED
+                        (true, true)
                     }
-                    (ast::ExprContext::Store, Some(CurrentAssignment::AnnAssign(ann_assign)))
-                        if ann_assign.value.is_none() =>
-                    {
-                        // An annotated assignment that doesn't assign a value is not a Definition
-                        SymbolFlags::empty()
-                    }
-                    (ast::ExprContext::Load, _) => SymbolFlags::IS_USED,
-                    (ast::ExprContext::Store, _) => SymbolFlags::IS_DEFINED,
-                    (ast::ExprContext::Del, _) => SymbolFlags::IS_DEFINED,
-                    (ast::ExprContext::Invalid, _) => SymbolFlags::empty(),
+                    (ast::ExprContext::Load, _) => (true, false),
+                    (ast::ExprContext::Store, _) => (false, true),
+                    (ast::ExprContext::Del, _) => (false, true),
+                    (ast::ExprContext::Invalid, _) => (false, false),
                 };
-                let symbol = self.add_or_update_symbol(id.clone(), flags);
-                if flags.contains(SymbolFlags::IS_DEFINED) {
+                let symbol = self.add_symbol(id.clone());
+                if is_definition {
                     match self.current_assignment {
                         Some(CurrentAssignment::Assign(assignment)) => {
                             self.add_definition(
@@ -689,6 +853,7 @@ where
                                     iterable: &node.iter,
                                     target: name_node,
                                     first,
+                                    is_async: node.is_async,
                                 },
                             );
                         }
@@ -705,7 +870,8 @@ where
                     }
                 }
 
-                if flags.contains(SymbolFlags::IS_USED) {
+                if is_use {
+                    self.mark_symbol_used(symbol);
                     let use_id = self.current_ast_ids().record_use(expr);
                     self.current_use_def_map_mut().record_use(symbol, use_id);
                 }
@@ -742,6 +908,7 @@ where
                 }
 
                 self.visit_expr(lambda.body.as_ref());
+                self.pop_scope();
             }
             ast::Expr::If(ast::ExprIf {
                 body, test, orelse, ..
@@ -762,30 +929,33 @@ where
                     elt, generators, ..
                 },
             ) => {
-                self.visit_generators(
+                self.with_generators_scope(
                     NodeWithScopeRef::ListComprehension(list_comprehension),
                     generators,
+                    |builder| builder.visit_expr(elt),
                 );
-                self.visit_expr(elt);
             }
             ast::Expr::SetComp(
                 set_comprehension @ ast::ExprSetComp {
                     elt, generators, ..
                 },
             ) => {
-                self.visit_generators(
+                self.with_generators_scope(
                     NodeWithScopeRef::SetComprehension(set_comprehension),
                     generators,
+                    |builder| builder.visit_expr(elt),
                 );
-                self.visit_expr(elt);
             }
             ast::Expr::Generator(
                 generator @ ast::ExprGenerator {
                     elt, generators, ..
                 },
             ) => {
-                self.visit_generators(NodeWithScopeRef::GeneratorExpression(generator), generators);
-                self.visit_expr(elt);
+                self.with_generators_scope(
+                    NodeWithScopeRef::GeneratorExpression(generator),
+                    generators,
+                    |builder| builder.visit_expr(elt),
+                );
             }
             ast::Expr::DictComp(
                 dict_comprehension @ ast::ExprDictComp {
@@ -795,27 +965,18 @@ where
                     ..
                 },
             ) => {
-                self.visit_generators(
+                self.with_generators_scope(
                     NodeWithScopeRef::DictComprehension(dict_comprehension),
                     generators,
+                    |builder| {
+                        builder.visit_expr(key);
+                        builder.visit_expr(value);
+                    },
                 );
-                self.visit_expr(key);
-                self.visit_expr(value);
             }
             _ => {
                 walk_expr(self, expr);
             }
-        }
-
-        if matches!(
-            expr,
-            ast::Expr::Lambda(_)
-                | ast::Expr::ListComp(_)
-                | ast::Expr::SetComp(_)
-                | ast::Expr::Generator(_)
-                | ast::Expr::DictComp(_)
-        ) {
-            self.pop_scope();
         }
     }
 
@@ -845,7 +1006,7 @@ where
             range: _,
         }) = pattern
         {
-            let symbol = self.add_or_update_symbol(name.id().clone(), SymbolFlags::IS_DEFINED);
+            let symbol = self.add_symbol(name.id().clone());
             let state = self.current_match_case.as_ref().unwrap();
             self.add_definition(
                 symbol,
@@ -866,7 +1027,7 @@ where
             rest: Some(name), ..
         }) = pattern
         {
-            let symbol = self.add_or_update_symbol(name.id().clone(), SymbolFlags::IS_DEFINED);
+            let symbol = self.add_symbol(name.id().clone());
             let state = self.current_match_case.as_ref().unwrap();
             self.add_definition(
                 symbol,
@@ -879,30 +1040,6 @@ where
         }
 
         self.current_match_case.as_mut().unwrap().index += 1;
-    }
-
-    fn visit_except_handler(&mut self, except_handler: &'ast ast::ExceptHandler) {
-        let ast::ExceptHandler::ExceptHandler(except_handler) = except_handler;
-        let ast::ExceptHandlerExceptHandler {
-            name: symbol_name,
-            type_: handled_exceptions,
-            body,
-            range: _,
-        } = except_handler;
-
-        if let Some(handled_exceptions) = handled_exceptions {
-            self.visit_expr(handled_exceptions);
-        }
-
-        // If `handled_exceptions` above was `None`, it's something like `except as e:`,
-        // which is invalid syntax. However, it's still pretty obvious here that the user
-        // *wanted* `e` to be bound, so we should still create a definition here nonetheless.
-        if let Some(symbol_name) = symbol_name {
-            let symbol = self.add_or_update_symbol(symbol_name.id.clone(), SymbolFlags::IS_DEFINED);
-            self.add_definition(symbol, except_handler);
-        }
-
-        self.visit_body(body);
     }
 }
 

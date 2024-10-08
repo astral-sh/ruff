@@ -3,6 +3,7 @@
 //! the various parameters.
 
 use std::borrow::Cow;
+use std::collections::BTreeMap;
 use std::env::VarError;
 use std::num::{NonZeroU16, NonZeroU8};
 use std::path::{Path, PathBuf};
@@ -19,6 +20,7 @@ use strum::IntoEnumIterator;
 
 use ruff_cache::cache_dir;
 use ruff_formatter::IndentStyle;
+use ruff_graph::{AnalyzeSettings, Direction};
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::registry::RuleNamespace;
 use ruff_linter::registry::{Rule, RuleSet, INCOMPATIBLE_CODES};
@@ -40,11 +42,11 @@ use ruff_python_formatter::{
 };
 
 use crate::options::{
-    Flake8AnnotationsOptions, Flake8BanditOptions, Flake8BooleanTrapOptions, Flake8BugbearOptions,
-    Flake8BuiltinsOptions, Flake8ComprehensionsOptions, Flake8CopyrightOptions,
-    Flake8ErrMsgOptions, Flake8GetTextOptions, Flake8ImplicitStrConcatOptions,
-    Flake8ImportConventionsOptions, Flake8PytestStyleOptions, Flake8QuotesOptions,
-    Flake8SelfOptions, Flake8TidyImportsOptions, Flake8TypeCheckingOptions,
+    AnalyzeOptions, Flake8AnnotationsOptions, Flake8BanditOptions, Flake8BooleanTrapOptions,
+    Flake8BugbearOptions, Flake8BuiltinsOptions, Flake8ComprehensionsOptions,
+    Flake8CopyrightOptions, Flake8ErrMsgOptions, Flake8GetTextOptions,
+    Flake8ImplicitStrConcatOptions, Flake8ImportConventionsOptions, Flake8PytestStyleOptions,
+    Flake8QuotesOptions, Flake8SelfOptions, Flake8TidyImportsOptions, Flake8TypeCheckingOptions,
     Flake8UnusedArgumentsOptions, FormatOptions, IsortOptions, LintCommonOptions, LintOptions,
     McCabeOptions, Options, Pep8NamingOptions, PyUpgradeOptions, PycodestyleOptions,
     PydocstyleOptions, PyflakesOptions, PylintOptions, RuffOptions,
@@ -142,6 +144,7 @@ pub struct Configuration {
 
     pub lint: LintConfiguration,
     pub format: FormatConfiguration,
+    pub analyze: AnalyzeConfiguration,
 }
 
 impl Configuration {
@@ -205,6 +208,23 @@ impl Configuration {
             docstring_code_line_width: format
                 .docstring_code_line_width
                 .unwrap_or(format_defaults.docstring_code_line_width),
+        };
+
+        let analyze = self.analyze;
+        let analyze_preview = analyze.preview.unwrap_or(global_preview);
+        let analyze_defaults = AnalyzeSettings::default();
+
+        let analyze = AnalyzeSettings {
+            exclude: FilePatternSet::try_from_iter(analyze.exclude.unwrap_or_default())?,
+            preview: analyze_preview,
+            target_version,
+            extension: self.extension.clone().unwrap_or_default(),
+            detect_string_imports: analyze
+                .detect_string_imports
+                .unwrap_or(analyze_defaults.detect_string_imports),
+            include_dependencies: analyze
+                .include_dependencies
+                .unwrap_or(analyze_defaults.include_dependencies),
         };
 
         let lint = self.lint;
@@ -399,6 +419,7 @@ impl Configuration {
             },
 
             formatter,
+            analyze,
         })
     }
 
@@ -421,26 +442,6 @@ impl Configuration {
                 ..LintOptions::default()
             }
         };
-
-        #[allow(deprecated)]
-        if options.tab_size.is_some() {
-            let config_to_update = path.map_or_else(
-                || String::from("your `--config` CLI arguments"),
-                |path| format!("`{}`", fs::relativize_path(path)),
-            );
-            return Err(anyhow!("The `tab-size` option has been renamed to `indent-width` to emphasize that it configures the indentation used by the formatter as well as the tab width. Please update {config_to_update} to use `indent-width = <value>` instead."));
-        }
-
-        #[allow(deprecated)]
-        if options.output_format == Some(OutputFormat::Text) {
-            let config_to_update = path.map_or_else(
-                || String::from("your `--config` CLI arguments"),
-                |path| format!("`{}`", fs::relativize_path(path)),
-            );
-            return Err(anyhow!(
-                r#"The option `output_format=text` is no longer supported. Update {config_to_update} to use `output-format="concise"` or  `output-format="full"` instead."#
-            ));
-        }
 
         Ok(Self {
             builtins: options.builtins,
@@ -532,6 +533,10 @@ impl Configuration {
                 options.format.unwrap_or_default(),
                 project_root,
             )?,
+            analyze: AnalyzeConfiguration::from_options(
+                options.analyze.unwrap_or_default(),
+                project_root,
+            )?,
         })
     }
 
@@ -571,6 +576,7 @@ impl Configuration {
 
             lint: self.lint.combine(config.lint),
             format: self.format.combine(config.format),
+            analyze: self.analyze.combine(config.analyze),
         }
     }
 }
@@ -598,6 +604,7 @@ pub struct LintConfiguration {
     pub logger_objects: Option<Vec<String>>,
     pub task_tags: Option<Vec<String>>,
     pub typing_modules: Option<Vec<String>>,
+    pub allowed_unused_imports: Option<Vec<String>>,
 
     // Plugins
     pub flake8_annotations: Option<Flake8AnnotationsOptions>,
@@ -710,6 +717,7 @@ impl LintConfiguration {
             task_tags: options.common.task_tags,
             logger_objects: options.common.logger_objects,
             typing_modules: options.common.typing_modules,
+            allowed_unused_imports: options.common.allowed_unused_imports,
             // Plugins
             flake8_annotations: options.common.flake8_annotations,
             flake8_bandit: options.common.flake8_bandit,
@@ -1078,6 +1086,9 @@ impl LintConfiguration {
                 .or(config.explicit_preview_rules),
             task_tags: self.task_tags.or(config.task_tags),
             typing_modules: self.typing_modules.or(config.typing_modules),
+            allowed_unused_imports: self
+                .allowed_unused_imports
+                .or(config.allowed_unused_imports),
             // Plugins
             flake8_annotations: self.flake8_annotations.combine(config.flake8_annotations),
             flake8_bandit: self.flake8_bandit.combine(config.flake8_bandit),
@@ -1189,6 +1200,57 @@ impl FormatConfiguration {
         }
     }
 }
+
+#[derive(Clone, Debug, Default)]
+pub struct AnalyzeConfiguration {
+    pub exclude: Option<Vec<FilePattern>>,
+    pub preview: Option<PreviewMode>,
+
+    pub direction: Option<Direction>,
+    pub detect_string_imports: Option<bool>,
+    pub include_dependencies: Option<BTreeMap<PathBuf, (PathBuf, Vec<String>)>>,
+}
+
+impl AnalyzeConfiguration {
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn from_options(options: AnalyzeOptions, project_root: &Path) -> Result<Self> {
+        Ok(Self {
+            exclude: options.exclude.map(|paths| {
+                paths
+                    .into_iter()
+                    .map(|pattern| {
+                        let absolute = fs::normalize_path_to(&pattern, project_root);
+                        FilePattern::User(pattern, absolute)
+                    })
+                    .collect()
+            }),
+            preview: options.preview.map(PreviewMode::from),
+            direction: options.direction,
+            detect_string_imports: options.detect_string_imports,
+            include_dependencies: options.include_dependencies.map(|dependencies| {
+                dependencies
+                    .into_iter()
+                    .map(|(key, value)| {
+                        (project_root.join(key), (project_root.to_path_buf(), value))
+                    })
+                    .collect::<BTreeMap<_, _>>()
+            }),
+        })
+    }
+
+    #[must_use]
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn combine(self, config: Self) -> Self {
+        Self {
+            exclude: self.exclude.or(config.exclude),
+            preview: self.preview.or(config.preview),
+            direction: self.direction.or(config.direction),
+            detect_string_imports: self.detect_string_imports.or(config.detect_string_imports),
+            include_dependencies: self.include_dependencies.or(config.include_dependencies),
+        }
+    }
+}
+
 pub(crate) trait CombinePluginOptions {
     #[must_use]
     fn combine(self, other: Self) -> Self;
@@ -1248,6 +1310,7 @@ fn warn_about_deprecated_top_level_lint_options(
         explicit_preview_rules,
         task_tags,
         typing_modules,
+        allowed_unused_imports,
         unfixable,
         flake8_annotations,
         flake8_bandit,
@@ -1345,6 +1408,9 @@ fn warn_about_deprecated_top_level_lint_options(
 
     if typing_modules.is_some() {
         used_options.push("typing-modules");
+    }
+    if allowed_unused_imports.is_some() {
+        used_options.push("allowed-unused-imports");
     }
 
     if unfixable.is_some() {

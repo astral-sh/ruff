@@ -3,6 +3,7 @@ use ruff_db::parsed::ParsedModule;
 use ruff_python_ast as ast;
 
 use crate::ast_node_ref::AstNodeRef;
+use crate::module_resolver::file_to_module;
 use crate::node_key::NodeKey;
 use crate::semantic_index::symbol::{FileScopeId, ScopeId, ScopedSymbolId};
 use crate::Db;
@@ -23,7 +24,7 @@ pub struct Definition<'db> {
 
     #[no_eq]
     #[return_ref]
-    pub(crate) node: DefinitionKind,
+    pub(crate) kind: DefinitionKind,
 
     #[no_eq]
     count: countme::Count<Definition<'static>>,
@@ -32,6 +33,26 @@ pub struct Definition<'db> {
 impl<'db> Definition<'db> {
     pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         self.file_scope(db).to_scope_id(db, self.file(db))
+    }
+
+    pub(crate) fn category(self, db: &'db dyn Db) -> DefinitionCategory {
+        self.kind(db).category()
+    }
+
+    pub(crate) fn is_declaration(self, db: &'db dyn Db) -> bool {
+        self.kind(db).category().is_declaration()
+    }
+
+    pub(crate) fn is_binding(self, db: &'db dyn Db) -> bool {
+        self.kind(db).category().is_binding()
+    }
+
+    /// Return true if this is a symbol was defined in the `typing` or `typing_extensions` modules
+    pub(crate) fn is_typing_definition(self, db: &'db dyn Db) -> bool {
+        file_to_module(db, self.file(db)).is_some_and(|module| {
+            module.search_path().is_standard_library()
+                && matches!(&**module.name(), "typing" | "typing_extensions")
+        })
     }
 }
 
@@ -50,7 +71,7 @@ pub(crate) enum DefinitionNodeRef<'a> {
     Parameter(ast::AnyParameterRef<'a>),
     WithItem(WithItemDefinitionNodeRef<'a>),
     MatchPattern(MatchPatternDefinitionNodeRef<'a>),
-    ExceptHandler(&'a ast::ExceptHandlerExceptHandler),
+    ExceptHandler(ExceptHandlerDefinitionNodeRef<'a>),
 }
 
 impl<'a> From<&'a ast::StmtFunctionDef> for DefinitionNodeRef<'a> {
@@ -131,12 +152,6 @@ impl<'a> From<MatchPatternDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
     }
 }
 
-impl<'a> From<&'a ast::ExceptHandlerExceptHandler> for DefinitionNodeRef<'a> {
-    fn from(node: &'a ast::ExceptHandlerExceptHandler) -> Self {
-        Self::ExceptHandler(node)
-    }
-}
-
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ImportFromDefinitionNodeRef<'a> {
     pub(crate) node: &'a ast::StmtImportFrom,
@@ -163,10 +178,17 @@ pub(crate) struct ForStmtDefinitionNodeRef<'a> {
 }
 
 #[derive(Copy, Clone, Debug)]
+pub(crate) struct ExceptHandlerDefinitionNodeRef<'a> {
+    pub(crate) handler: &'a ast::ExceptHandlerExceptHandler,
+    pub(crate) is_star: bool,
+}
+
+#[derive(Copy, Clone, Debug)]
 pub(crate) struct ComprehensionDefinitionNodeRef<'a> {
     pub(crate) iterable: &'a ast::Expr,
     pub(crate) target: &'a ast::ExprName,
     pub(crate) first: bool,
+    pub(crate) is_async: bool,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -227,10 +249,12 @@ impl DefinitionNodeRef<'_> {
                 iterable,
                 target,
                 first,
+                is_async,
             }) => DefinitionKind::Comprehension(ComprehensionDefinitionKind {
                 iterable: AstNodeRef::new(parsed.clone(), iterable),
                 target: AstNodeRef::new(parsed, target),
                 first,
+                is_async,
             }),
             DefinitionNodeRef::Parameter(parameter) => match parameter {
                 ast::AnyParameterRef::Variadic(parameter) => {
@@ -255,9 +279,13 @@ impl DefinitionNodeRef<'_> {
                 identifier: AstNodeRef::new(parsed, identifier),
                 index,
             }),
-            DefinitionNodeRef::ExceptHandler(handler) => {
-                DefinitionKind::ExceptHandler(AstNodeRef::new(parsed, handler))
-            }
+            DefinitionNodeRef::ExceptHandler(ExceptHandlerDefinitionNodeRef {
+                handler,
+                is_star,
+            }) => DefinitionKind::ExceptHandler(ExceptHandlerDefinitionKind {
+                handler: AstNodeRef::new(parsed.clone(), handler),
+                is_star,
+            }),
         }
     }
 
@@ -290,8 +318,43 @@ impl DefinitionNodeRef<'_> {
             Self::MatchPattern(MatchPatternDefinitionNodeRef { identifier, .. }) => {
                 identifier.into()
             }
-            Self::ExceptHandler(handler) => handler.into(),
+            Self::ExceptHandler(ExceptHandlerDefinitionNodeRef { handler, .. }) => handler.into(),
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum DefinitionCategory {
+    /// A Definition which binds a value to a name (e.g. `x = 1`).
+    Binding,
+    /// A Definition which declares the upper-bound of acceptable types for this name (`x: int`).
+    Declaration,
+    /// A Definition which both declares a type and binds a value (e.g. `x: int = 1`).
+    DeclarationAndBinding,
+}
+
+impl DefinitionCategory {
+    /// True if this definition establishes a "declared type" for the symbol.
+    ///
+    /// If so, any assignments reached by this definition are in error if they assign a value of a
+    /// type not assignable to the declared type.
+    ///
+    /// Annotations establish a declared type. So do function and class definitions, and imports.
+    pub(crate) fn is_declaration(self) -> bool {
+        matches!(
+            self,
+            DefinitionCategory::Declaration | DefinitionCategory::DeclarationAndBinding
+        )
+    }
+
+    /// True if this definition assigns a value to the symbol.
+    ///
+    /// False only for annotated assignments without a RHS.
+    pub(crate) fn is_binding(self) -> bool {
+        matches!(
+            self,
+            DefinitionCategory::Binding | DefinitionCategory::DeclarationAndBinding
+        )
     }
 }
 
@@ -311,7 +374,52 @@ pub enum DefinitionKind {
     ParameterWithDefault(AstNodeRef<ast::ParameterWithDefault>),
     WithItem(WithItemDefinitionKind),
     MatchPattern(MatchPatternDefinitionKind),
-    ExceptHandler(AstNodeRef<ast::ExceptHandlerExceptHandler>),
+    ExceptHandler(ExceptHandlerDefinitionKind),
+}
+
+impl DefinitionKind {
+    pub(crate) fn category(&self) -> DefinitionCategory {
+        match self {
+            // functions, classes, and imports always bind, and we consider them declarations
+            DefinitionKind::Function(_)
+            | DefinitionKind::Class(_)
+            | DefinitionKind::Import(_)
+            | DefinitionKind::ImportFrom(_) => DefinitionCategory::DeclarationAndBinding,
+            // a parameter always binds a value, but is only a declaration if annotated
+            DefinitionKind::Parameter(parameter) => {
+                if parameter.annotation.is_some() {
+                    DefinitionCategory::DeclarationAndBinding
+                } else {
+                    DefinitionCategory::Binding
+                }
+            }
+            // presence of a default is irrelevant, same logic as for a no-default parameter
+            DefinitionKind::ParameterWithDefault(parameter_with_default) => {
+                if parameter_with_default.parameter.annotation.is_some() {
+                    DefinitionCategory::DeclarationAndBinding
+                } else {
+                    DefinitionCategory::Binding
+                }
+            }
+            // annotated assignment is always a declaration, only a binding if there is a RHS
+            DefinitionKind::AnnotatedAssignment(ann_assign) => {
+                if ann_assign.value.is_some() {
+                    DefinitionCategory::DeclarationAndBinding
+                } else {
+                    DefinitionCategory::Declaration
+                }
+            }
+            // all of these bind values without declaring a type
+            DefinitionKind::NamedExpression(_)
+            | DefinitionKind::Assignment(_)
+            | DefinitionKind::AugmentedAssignment(_)
+            | DefinitionKind::For(_)
+            | DefinitionKind::Comprehension(_)
+            | DefinitionKind::WithItem(_)
+            | DefinitionKind::MatchPattern(_)
+            | DefinitionKind::ExceptHandler(_) => DefinitionCategory::Binding,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -337,6 +445,7 @@ pub struct ComprehensionDefinitionKind {
     iterable: AstNodeRef<ast::Expr>,
     target: AstNodeRef<ast::ExprName>,
     first: bool,
+    is_async: bool,
 }
 
 impl ComprehensionDefinitionKind {
@@ -350,6 +459,10 @@ impl ComprehensionDefinitionKind {
 
     pub(crate) fn is_first(&self) -> bool {
         self.first
+    }
+
+    pub(crate) fn is_async(&self) -> bool {
+        self.is_async
     }
 }
 
@@ -419,6 +532,26 @@ impl ForStmtDefinitionKind {
 
     pub(crate) fn is_async(&self) -> bool {
         self.is_async
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ExceptHandlerDefinitionKind {
+    handler: AstNodeRef<ast::ExceptHandlerExceptHandler>,
+    is_star: bool,
+}
+
+impl ExceptHandlerDefinitionKind {
+    pub(crate) fn node(&self) -> &ast::ExceptHandlerExceptHandler {
+        self.handler.node()
+    }
+
+    pub(crate) fn handled_exceptions(&self) -> Option<&ast::Expr> {
+        self.node().type_.as_deref()
+    }
+
+    pub(crate) fn is_star(&self) -> bool {
+        self.is_star
     }
 }
 

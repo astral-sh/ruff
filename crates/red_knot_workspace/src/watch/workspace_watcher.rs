@@ -62,7 +62,7 @@ impl WorkspaceWatcher {
         // ```
         for path in self.watched_paths.drain(..) {
             if let Err(error) = self.watcher.unwatch(&path) {
-                info!("Failed to remove the file watcher for the path '{path}: {error}.");
+                info!("Failed to remove the file watcher for path `{path}`: {error}");
             }
         }
 
@@ -90,7 +90,7 @@ impl WorkspaceWatcher {
             // Ruff otherwise stills works as expected.
             if let Err(error) = self.watcher.watch(&path) {
                 // TODO: Log a user-facing warning.
-                tracing::warn!("Failed to setup watcher for path '{path}': {error}. You have to restart Ruff after making changes to files under this path or you might see stale results.");
+                tracing::warn!("Failed to setup watcher for path `{path}`: {error}. You have to restart Ruff after making changes to files under this path or you might see stale results.");
                 self.has_errored_paths = true;
             } else {
                 self.watched_paths.push(path);

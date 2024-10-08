@@ -114,22 +114,19 @@ fn lint_maybe_undefined(context: &SemanticLintContext, name: &ast::ExprName) {
         return;
     }
     let semantic = &context.semantic;
-    match name.ty(semantic) {
-        Type::Unbound => {
-            context.push_diagnostic(format_diagnostic(
-                context,
-                &format!("Name '{}' used when not defined.", &name.id),
-                name.start(),
-            ));
-        }
-        Type::Union(union) if union.contains(semantic.db(), Type::Unbound) => {
-            context.push_diagnostic(format_diagnostic(
-                context,
-                &format!("Name '{}' used when possibly not defined.", &name.id),
-                name.start(),
-            ));
-        }
-        _ => {}
+    let ty = name.ty(semantic);
+    if ty.is_unbound() {
+        context.push_diagnostic(format_diagnostic(
+            context,
+            &format!("Name `{}` used when not defined", &name.id),
+            name.start(),
+        ));
+    } else if ty.may_be_unbound(semantic.db()) {
+        context.push_diagnostic(format_diagnostic(
+            context,
+            &format!("Name `{}` used when possibly not defined", &name.id),
+            name.start(),
+        ));
     }
 }
 
@@ -307,13 +304,13 @@ mod tests {
             *messages,
             if cfg!(windows) {
                 vec![
-                    "\\src\\a.py:3:4: Name 'flag' used when not defined.",
-                    "\\src\\a.py:5:1: Name 'y' used when possibly not defined.",
+                    "\\src\\a.py:3:4: Name `flag` used when not defined",
+                    "\\src\\a.py:5:1: Name `y` used when possibly not defined",
                 ]
             } else {
                 vec![
-                    "/src/a.py:3:4: Name 'flag' used when not defined.",
-                    "/src/a.py:5:1: Name 'y' used when possibly not defined.",
+                    "/src/a.py:3:4: Name `flag` used when not defined",
+                    "/src/a.py:5:1: Name `y` used when possibly not defined",
                 ]
             }
         );

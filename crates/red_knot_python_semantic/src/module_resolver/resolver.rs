@@ -1,19 +1,20 @@
-use rustc_hash::{FxBuildHasher, FxHashSet};
 use std::borrow::Cow;
 use std::iter::FusedIterator;
-use std::ops::Deref;
+
+use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_db::files::{File, FilePath, FileRootKind};
 use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::{VendoredFileSystem, VendoredPath};
 
-use super::module::{Module, ModuleKind};
-use super::path::{ModulePath, SearchPath, SearchPathValidationError};
 use crate::db::Db;
 use crate::module_name::ModuleName;
 use crate::module_resolver::typeshed::{vendored_typeshed_versions, TypeshedVersions};
 use crate::site_packages::VirtualEnvironment;
 use crate::{Program, PythonVersion, SearchPathSettings, SitePackages};
+
+use super::module::{Module, ModuleKind};
+use super::path::{ModulePath, SearchPath, SearchPathValidationError};
 
 /// Resolves a module name to a module.
 pub fn resolve_module(db: &dyn Db, module_name: ModuleName) -> Option<Module> {
@@ -35,14 +36,14 @@ pub(crate) fn resolve_module_query<'db>(
     let _span = tracing::trace_span!("resolve_module", %name).entered();
 
     let Some((search_path, module_file, kind)) = resolve_name(db, name) else {
-        tracing::debug!("Module '{name}' not found in the search paths.");
+        tracing::debug!("Module `{name}` not found in search paths");
         return None;
     };
 
     let module = Module::new(name.clone(), kind, search_path, module_file);
 
     tracing::trace!(
-        "Resolved module '{name}' to '{path}'.",
+        "Resolved module `{name}` to `{path}`",
         path = module_file.path(db)
     );
 
@@ -136,7 +137,7 @@ pub(crate) struct SearchPaths {
     /// for the first `site-packages` path
     site_packages: Vec<SearchPath>,
 
-    typeshed_versions: ResolvedTypeshedVersions,
+    typeshed_versions: TypeshedVersions,
 }
 
 impl SearchPaths {
@@ -202,11 +203,11 @@ impl SearchPaths {
 
             let search_path = SearchPath::custom_stdlib(db, &custom_typeshed)?;
 
-            (ResolvedTypeshedVersions::Custom(parsed), search_path)
+            (parsed, search_path)
         } else {
             tracing::debug!("Using vendored stdlib");
             (
-                ResolvedTypeshedVersions::Vendored(vendored_typeshed_versions()),
+                vendored_typeshed_versions(db),
                 SearchPath::vendored_stdlib(),
             )
         };
@@ -279,23 +280,6 @@ impl SearchPaths {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
-enum ResolvedTypeshedVersions {
-    Vendored(&'static TypeshedVersions),
-    Custom(TypeshedVersions),
-}
-
-impl Deref for ResolvedTypeshedVersions {
-    type Target = TypeshedVersions;
-
-    fn deref(&self) -> &Self::Target {
-        match self {
-            ResolvedTypeshedVersions::Vendored(versions) => versions,
-            ResolvedTypeshedVersions::Custom(versions) => versions,
-        }
-    }
-}
-
 /// Collect all dynamic search paths. For each `site-packages` path:
 /// - Collect that `site-packages` path
 /// - Collect any search paths listed in `.pth` files in that `site-packages` directory
@@ -340,7 +324,7 @@ pub(crate) fn dynamic_resolution_paths(db: &dyn Db) -> Vec<SearchPath> {
 
         let site_packages_root = files
             .root(db.upcast(), site_packages_dir)
-            .expect("Site-package root to have been created.");
+            .expect("Site-package root to have been created");
 
         // This query needs to be re-executed each time a `.pth` file
         // is added, modified or removed from the `site-packages` directory.

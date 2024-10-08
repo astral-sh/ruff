@@ -1,0 +1,313 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+boolean_chained_comparison.py:8:4: PLR1716 [*] Contains chained boolean comparison that can be simplified
+  |
+6 | b = int(input())
+7 | c = int(input())
+8 | if a < b and b < c:  # [boolean-chained-comparison]
+  |    ^^^^^^^^^^^^^^^ PLR1716
+9 |     pass
+  |
+  = help: Use a single compare expression
+
+ℹ Safe fix
+5 5 | a = int(input())
+6 6 | b = int(input())
+7 7 | c = int(input())
+8   |-if a < b and b < c:  # [boolean-chained-comparison]
+  8 |+if a < b < c:  # [boolean-chained-comparison]
+9 9 |     pass
+10 10 | 
+11 11 | a = int(input())
+
+boolean_chained_comparison.py:14:4: PLR1716 [*] Contains chained boolean comparison that can be simplified
+   |
+12 | b = int(input())
+13 | c = int(input())
+14 | if a < b and b <= c:  # [boolean-chained-comparison]
+   |    ^^^^^^^^^^^^^^^^ PLR1716
+15 |     pass
+   |
+   = help: Use a single compare expression
+
+ℹ Safe fix
+11 11 | a = int(input())
+12 12 | b = int(input())
+13 13 | c = int(input())
+14    |-if a < b and b <= c:  # [boolean-chained-comparison]
+   14 |+if a < b <= c:  # [boolean-chained-comparison]
+15 15 |     pass
+16 16 | 
+17 17 | a = int(input())
+
+boolean_chained_comparison.py:20:4: PLR1716 [*] Contains chained boolean comparison that can be simplified
+   |
+18 | b = int(input())
+19 | c = int(input())
+20 | if a <= b and b < c:  # [boolean-chained-comparison]
+   |    ^^^^^^^^^^^^^^^^ PLR1716
+21 |     pass
+   |
+   = help: Use a single compare expression
+
+ℹ Safe fix
+17 17 | a = int(input())
+18 18 | b = int(input())
+19 19 | c = int(input())
+20    |-if a <= b and b < c:  # [boolean-chained-comparison]
+   20 |+if a <= b < c:  # [boolean-chained-comparison]
+21 21 |     pass
+22 22 | 
+23 23 | a = int(input())
+
+boolean_chained_comparison.py:26:4: PLR1716 [*] Contains chained boolean comparison that can be simplified
+   |
+24 | b = int(input())
+25 | c = int(input())
+26 | if a <= b and b <= c:  # [boolean-chained-comparison]
+   |    ^^^^^^^^^^^^^^^^^ PLR1716
+27 |     pass
+   |
+   = help: Use a single compare expression
+
+ℹ Safe fix
+23 23 | a = int(input())
+24 24 | b = int(input())
+25 25 | c = int(input())
+26    |-if a <= b and b <= c:  # [boolean-chained-comparison]
+   26 |+if a <= b <= c:  # [boolean-chained-comparison]
+27 27 |     pass
+28 28 | 
+29 29 | # ---------------------
+
+boolean_chained_comparison.py:36:4: PLR1716 [*] Contains chained boolean comparison that can be simplified
+   |
+34 | b = int(input())
+35 | c = int(input())
+36 | if a > b and b > c:  # [boolean-chained-comparison]
+   |    ^^^^^^^^^^^^^^^ PLR1716
+37 |     pass
+   |
+   = help: Use a single compare expression
+
+ℹ Safe fix
+33 33 | a = int(input())
+34 34 | b = int(input())
+35 35 | c = int(input())
+36    |-if a > b and b > c:  # [boolean-chained-comparison]
+   36 |+if a > b > c:  # [boolean-chained-comparison]
+37 37 |     pass
+38 38 | 
+39 39 | a = int(input())
+
+boolean_chained_comparison.py:42:4: PLR1716 [*] Contains chained boolean comparison that can be simplified
+   |
+40 | b = int(input())
+41 | c = int(input())
+42 | if a >= b and b > c:  # [boolean-chained-comparison]
+   |    ^^^^^^^^^^^^^^^^ PLR1716
+43 |     pass
+   |
+   = help: Use a single compare expression
+
+ℹ Safe fix
+39 39 | a = int(input())
+40 40 | b = int(input())
+41 41 | c = int(input())
+42    |-if a >= b and b > c:  # [boolean-chained-comparison]
+   42 |+if a >= b > c:  # [boolean-chained-comparison]
+43 43 |     pass
+44 44 | 
+45 45 | a = int(input())
+
+boolean_chained_comparison.py:48:4: PLR1716 [*] Contains chained boolean comparison that can be simplified
+   |
+46 | b = int(input())
+47 | c = int(input())
+48 | if a > b and b >= c:  # [boolean-chained-comparison]
+   |    ^^^^^^^^^^^^^^^^ PLR1716
+49 |     pass
+   |
+   = help: Use a single compare expression
+
+ℹ Safe fix
+45 45 | a = int(input())
+46 46 | b = int(input())
+47 47 | c = int(input())
+48    |-if a > b and b >= c:  # [boolean-chained-comparison]
+   48 |+if a > b >= c:  # [boolean-chained-comparison]
+49 49 |     pass
+50 50 | 
+51 51 | a = int(input())
+
+boolean_chained_comparison.py:54:4: PLR1716 [*] Contains chained boolean comparison that can be simplified
+   |
+52 | b = int(input())
+53 | c = int(input())
+54 | if a >= b and b >= c:  # [boolean-chained-comparison]
+   |    ^^^^^^^^^^^^^^^^^ PLR1716
+55 |     pass
+   |
+   = help: Use a single compare expression
+
+ℹ Safe fix
+51 51 | a = int(input())
+52 52 | b = int(input())
+53 53 | c = int(input())
+54    |-if a >= b and b >= c:  # [boolean-chained-comparison]
+   54 |+if a >= b >= c:  # [boolean-chained-comparison]
+55 55 |     pass
+56 56 | 
+57 57 | # -----------------------
+
+boolean_chained_comparison.py:65:4: PLR1716 [*] Contains chained boolean comparison that can be simplified
+   |
+63 | c = int(input())
+64 | d = int(input())
+65 | if a < b and b < c and c < d:  # [boolean-chained-comparison]
+   |    ^^^^^^^^^^^^^^^ PLR1716
+66 |     pass
+   |
+   = help: Use a single compare expression
+
+ℹ Safe fix
+62 62 | b = int(input())
+63 63 | c = int(input())
+64 64 | d = int(input())
+65    |-if a < b and b < c and c < d:  # [boolean-chained-comparison]
+   65 |+if a < b < c and c < d:  # [boolean-chained-comparison]
+66 66 |     pass
+67 67 | 
+68 68 | a = int(input())
+
+boolean_chained_comparison.py:65:14: PLR1716 [*] Contains chained boolean comparison that can be simplified
+   |
+63 | c = int(input())
+64 | d = int(input())
+65 | if a < b and b < c and c < d:  # [boolean-chained-comparison]
+   |              ^^^^^^^^^^^^^^^ PLR1716
+66 |     pass
+   |
+   = help: Use a single compare expression
+
+ℹ Safe fix
+62 62 | b = int(input())
+63 63 | c = int(input())
+64 64 | d = int(input())
+65    |-if a < b and b < c and c < d:  # [boolean-chained-comparison]
+   65 |+if a < b and b < c < d:  # [boolean-chained-comparison]
+66 66 |     pass
+67 67 | 
+68 68 | a = int(input())
+
+boolean_chained_comparison.py:73:4: PLR1716 [*] Contains chained boolean comparison that can be simplified
+   |
+71 | d = int(input())
+72 | e = int(input())
+73 | if a < b and b < c and c < d and d < e:  # [boolean-chained-comparison]
+   |    ^^^^^^^^^^^^^^^ PLR1716
+74 |     pass
+   |
+   = help: Use a single compare expression
+
+ℹ Safe fix
+70 70 | c = int(input())
+71 71 | d = int(input())
+72 72 | e = int(input())
+73    |-if a < b and b < c and c < d and d < e:  # [boolean-chained-comparison]
+   73 |+if a < b < c and c < d and d < e:  # [boolean-chained-comparison]
+74 74 |     pass
+75 75 | 
+76 76 | # ------------
+
+boolean_chained_comparison.py:73:14: PLR1716 [*] Contains chained boolean comparison that can be simplified
+   |
+71 | d = int(input())
+72 | e = int(input())
+73 | if a < b and b < c and c < d and d < e:  # [boolean-chained-comparison]
+   |              ^^^^^^^^^^^^^^^ PLR1716
+74 |     pass
+   |
+   = help: Use a single compare expression
+
+ℹ Safe fix
+70 70 | c = int(input())
+71 71 | d = int(input())
+72 72 | e = int(input())
+73    |-if a < b and b < c and c < d and d < e:  # [boolean-chained-comparison]
+   73 |+if a < b and b < c < d and d < e:  # [boolean-chained-comparison]
+74 74 |     pass
+75 75 | 
+76 76 | # ------------
+
+boolean_chained_comparison.py:73:24: PLR1716 [*] Contains chained boolean comparison that can be simplified
+   |
+71 | d = int(input())
+72 | e = int(input())
+73 | if a < b and b < c and c < d and d < e:  # [boolean-chained-comparison]
+   |                        ^^^^^^^^^^^^^^^ PLR1716
+74 |     pass
+   |
+   = help: Use a single compare expression
+
+ℹ Safe fix
+70 70 | c = int(input())
+71 71 | d = int(input())
+72 72 | e = int(input())
+73    |-if a < b and b < c and c < d and d < e:  # [boolean-chained-comparison]
+   73 |+if a < b and b < c and c < d < e:  # [boolean-chained-comparison]
+74 74 |     pass
+75 75 | 
+76 76 | # ------------
+
+boolean_chained_comparison.py:124:2: PLR1716 Contains chained boolean comparison that can be simplified
+    |
+123 | # Unfixable due to parentheses.
+124 | (a < b) and b < c
+    |  ^^^^^^^^^^^^^^^^ PLR1716
+125 | a < b and (b < c)
+126 | ((a < b) and b < c)
+    |
+    = help: Use a single compare expression
+
+boolean_chained_comparison.py:125:1: PLR1716 Contains chained boolean comparison that can be simplified
+    |
+123 | # Unfixable due to parentheses.
+124 | (a < b) and b < c
+125 | a < b and (b < c)
+    | ^^^^^^^^^^^^^^^^ PLR1716
+126 | ((a < b) and b < c)
+127 | (a < b) and (b < c)
+    |
+    = help: Use a single compare expression
+
+boolean_chained_comparison.py:126:3: PLR1716 Contains chained boolean comparison that can be simplified
+    |
+124 | (a < b) and b < c
+125 | a < b and (b < c)
+126 | ((a < b) and b < c)
+    |   ^^^^^^^^^^^^^^^^ PLR1716
+127 | (a < b) and (b < c)
+128 | (((a < b))) and (b < c)
+    |
+    = help: Use a single compare expression
+
+boolean_chained_comparison.py:127:2: PLR1716 Contains chained boolean comparison that can be simplified
+    |
+125 | a < b and (b < c)
+126 | ((a < b) and b < c)
+127 | (a < b) and (b < c)
+    |  ^^^^^^^^^^^^^^^^^ PLR1716
+128 | (((a < b))) and (b < c)
+    |
+    = help: Use a single compare expression
+
+boolean_chained_comparison.py:128:4: PLR1716 Contains chained boolean comparison that can be simplified
+    |
+126 | ((a < b) and b < c)
+127 | (a < b) and (b < c)
+128 | (((a < b))) and (b < c)
+    |    ^^^^^^^^^^^^^^^^^^^ PLR1716
+    |
+    = help: Use a single compare expression

@@ -6,7 +6,8 @@ use ruff_diagnostics::Fix;
 use ruff_diagnostics::{Diagnostic, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
-use ruff_python_semantic::Modules;
+use ruff_python_ast::{Expr, Parameter, ParameterWithDefault};
+use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::{Ranged, TextSize};
 
@@ -141,7 +142,10 @@ pub(crate) fn fastapi_unused_path_parameter(
         .args
         .iter()
         .chain(function_def.parameters.kwonlyargs.iter())
-        .map(|arg| arg.parameter.name.as_str())
+        .map(|ParameterWithDefault { parameter, .. }| {
+            parameter_alias(parameter, checker.semantic())
+                .unwrap_or_else(|| parameter.name.as_str())
+        })
         .collect();
 
     // Check if any of the path parameters are not in the function signature.
@@ -188,6 +192,52 @@ pub(crate) fn fastapi_unused_path_parameter(
     }
 
     checker.diagnostics.extend(diagnostics);
+}
+
+/// Extract the expected in-route name for a given parameter, if it has an alias.
+/// For example, given `document_id: Annotated[str, Path(alias="documentId")]`, returns `"documentId"`.
+fn parameter_alias<'a>(parameter: &'a Parameter, semantic: &SemanticModel) -> Option<&'a str> {
+    let Some(annotation) = &parameter.annotation else {
+        return None;
+    };
+
+    let Expr::Subscript(subscript) = annotation.as_ref() else {
+        return None;
+    };
+
+    let Expr::Tuple(tuple) = subscript.slice.as_ref() else {
+        return None;
+    };
+
+    let Some(Expr::Call(path)) = tuple.elts.get(1) else {
+        return None;
+    };
+
+    // Find the `alias` keyword argument.
+    let alias = path
+        .arguments
+        .find_keyword("alias")
+        .map(|alias| &alias.value)?;
+
+    // Ensure that it's a literal string.
+    let Expr::StringLiteral(alias) = alias else {
+        return None;
+    };
+
+    // Verify that the subscript was a `typing.Annotated`.
+    if !semantic.match_typing_expr(&subscript.value, "Annotated") {
+        return None;
+    }
+
+    // Verify that the call was a `fastapi.Path`.
+    if !semantic
+        .resolve_qualified_name(&path.func)
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["fastapi", "Path"]))
+    {
+        return None;
+    }
+
+    Some(alias.value.to_str())
 }
 
 /// An iterator to extract parameters from FastAPI route paths.

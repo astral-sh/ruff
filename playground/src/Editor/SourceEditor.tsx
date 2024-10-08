@@ -15,6 +15,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { Diagnostic } from "../pkg";
 import { Theme } from "./theme";
 import CodeActionProvider = languages.CodeActionProvider;
+import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;
 
 type MonacoEditorState = {
   monaco: Monaco;
@@ -28,12 +29,14 @@ export default function SourceEditor({
   theme,
   diagnostics,
   onChange,
+  onMount,
 }: {
   visible: boolean;
   source: string;
   diagnostics: Diagnostic[];
   theme: Theme;
-  onChange: (pythonSource: string) => void;
+  onChange(pythonSource: string): void;
+  onMount(editor: IStandaloneCodeEditor): void;
 }) {
   const monacoRef = useRef<MonacoEditorState | null>(null);
 
@@ -70,7 +73,7 @@ export default function SourceEditor({
   );
 
   const handleMount: OnMount = useCallback(
-    (_editor, instance) => {
+    (editor, instance) => {
       const ruffActionsProvider = new RuffCodeActionProvider(diagnostics);
       const disposeCodeActionProvider =
         instance.languages.registerCodeActionProvider(
@@ -85,9 +88,11 @@ export default function SourceEditor({
         codeActionProvider: ruffActionsProvider,
         disposeCodeActionProvider,
       };
+
+      onMount(editor);
     },
 
-    [diagnostics],
+    [diagnostics, onMount],
   );
 
   return (
@@ -100,7 +105,7 @@ export default function SourceEditor({
         fontSize: 14,
         roundedSelection: false,
         scrollBeyondLastLine: false,
-        contextmenu: false,
+        contextmenu: true,
       }}
       language={"python"}
       wrapperProps={visible ? {} : { style: { display: "none" } }}

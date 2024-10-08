@@ -1,19 +1,20 @@
 //! Display implementations for types.
 
-use std::fmt::{Display, Formatter};
+use std::fmt::{self, Display, Formatter};
 
+use ruff_db::display::FormatterJoinExtension;
 use ruff_python_ast::str::Quote;
 use ruff_python_literal::escape::AsciiEscape;
 
 use crate::types::{IntersectionType, Type, UnionType};
-use crate::{Db, FxOrderMap};
+use crate::Db;
+use rustc_hash::FxHashMap;
 
 impl<'db> Type<'db> {
-    pub fn display(&'db self, db: &'db dyn Db) -> DisplayType<'db> {
+    pub fn display(&self, db: &'db dyn Db) -> DisplayType {
         DisplayType { ty: self, db }
     }
-
-    fn representation(&'db self, db: &'db dyn Db) -> DisplayRepresentation<'db> {
+    fn representation(self, db: &'db dyn Db) -> DisplayRepresentation<'db> {
         DisplayRepresentation { db, ty: self }
     }
 }
@@ -25,7 +26,7 @@ pub struct DisplayType<'db> {
 }
 
 impl Display for DisplayType<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let representation = self.ty.representation(self.db);
         if matches!(
             self.ty,
@@ -36,16 +37,16 @@ impl Display for DisplayType<'_> {
                 | Type::Class(_)
                 | Type::Function(_)
         ) {
-            write!(f, "Literal[{representation}]",)
+            write!(f, "Literal[{representation}]")
         } else {
             representation.fmt(f)
         }
     }
 }
 
-impl std::fmt::Debug for DisplayType<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Display::fmt(self, f)
+impl fmt::Debug for DisplayType<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        Display::fmt(self, f)
     }
 }
 
@@ -53,18 +54,21 @@ impl std::fmt::Debug for DisplayType<'_> {
 /// `Literal[<repr>]` or `Literal[<repr1>, <repr2>]` for literal types or as `<repr>` for
 /// non literals
 struct DisplayRepresentation<'db> {
-    ty: &'db Type<'db>,
+    ty: Type<'db>,
     db: &'db dyn Db,
 }
 
-impl std::fmt::Display for DisplayRepresentation<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl Display for DisplayRepresentation<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.ty {
             Type::Any => f.write_str("Any"),
             Type::Never => f.write_str("Never"),
             Type::Unknown => f.write_str("Unknown"),
             Type::Unbound => f.write_str("Unbound"),
             Type::None => f.write_str("None"),
+            // `[Type::Todo]`'s display should be explicit that is not a valid display of
+            // any other type
+            Type::Todo => f.write_str("@Todo"),
             Type::Module(file) => {
                 write!(f, "<module '{:?}'>", file.path(self.db))
             }
@@ -74,8 +78,8 @@ impl std::fmt::Display for DisplayRepresentation<'_> {
             Type::Function(function) => f.write_str(function.name(self.db)),
             Type::Union(union) => union.display(self.db).fmt(f),
             Type::Intersection(intersection) => intersection.display(self.db).fmt(f),
-            Type::IntLiteral(n) => write!(f, "{n}"),
-            Type::BooleanLiteral(boolean) => f.write_str(if *boolean { "True" } else { "False" }),
+            Type::IntLiteral(n) => n.fmt(f),
+            Type::BooleanLiteral(boolean) => f.write_str(if boolean { "True" } else { "False" }),
             Type::StringLiteral(string) => {
                 write!(f, r#""{}""#, string.value(self.db).replace('"', r#"\""#))
             }
@@ -85,6 +89,16 @@ impl std::fmt::Display for DisplayRepresentation<'_> {
                     AsciiEscape::with_preferred_quote(bytes.value(self.db).as_ref(), Quote::Double);
 
                 escape.bytes_repr().write(f)
+            }
+            Type::Tuple(tuple) => {
+                f.write_str("tuple[")?;
+                let elements = tuple.elements(self.db);
+                if elements.is_empty() {
+                    f.write_str("()")?;
+                } else {
+                    elements.display(self.db).fmt(f)?;
+                }
+                f.write_str("]")
             }
         }
     }
@@ -102,11 +116,11 @@ struct DisplayUnionType<'db> {
 }
 
 impl Display for DisplayUnionType<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let elements = self.ty.elements(self.db);
 
         // Group literal types by kind.
-        let mut grouped_literals = FxOrderMap::default();
+        let mut grouped_literals = FxHashMap::default();
 
         for element in elements {
             if let Ok(literal_kind) = LiteralTypeKind::try_from(*element) {
@@ -117,42 +131,26 @@ impl Display for DisplayUnionType<'_> {
             }
         }
 
-        let mut first = true;
+        let mut join = f.join(" | ");
 
-        // Print all types, but write all literals together (while preserving their position).
-        for ty in elements {
-            if let Ok(literal_kind) = LiteralTypeKind::try_from(*ty) {
+        for element in elements {
+            if let Ok(literal_kind) = LiteralTypeKind::try_from(*element) {
                 let Some(mut literals) = grouped_literals.remove(&literal_kind) else {
                     continue;
                 };
-
-                if !first {
-                    f.write_str(" | ")?;
-                };
-
-                f.write_str("Literal[")?;
-
                 if literal_kind == LiteralTypeKind::IntLiteral {
                     literals.sort_unstable_by_key(|ty| ty.expect_int_literal());
                 }
-
-                for (i, literal_ty) in literals.iter().enumerate() {
-                    if i > 0 {
-                        f.write_str(", ")?;
-                    }
-                    literal_ty.representation(self.db).fmt(f)?;
-                }
-                f.write_str("]")?;
+                join.entry(&DisplayLiteralGroup {
+                    literals,
+                    db: self.db,
+                });
             } else {
-                if !first {
-                    f.write_str(" | ")?;
-                };
-
-                ty.display(self.db).fmt(f)?;
+                join.entry(&element.display(self.db));
             }
-
-            first = false;
         }
+
+        join.finish()?;
 
         debug_assert!(grouped_literals.is_empty());
 
@@ -160,9 +158,24 @@ impl Display for DisplayUnionType<'_> {
     }
 }
 
-impl std::fmt::Debug for DisplayUnionType<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Display::fmt(self, f)
+impl fmt::Debug for DisplayUnionType<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        Display::fmt(self, f)
+    }
+}
+
+struct DisplayLiteralGroup<'db> {
+    literals: Vec<Type<'db>>,
+    db: &'db dyn Db,
+}
+
+impl Display for DisplayLiteralGroup<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str("Literal[")?;
+        f.join(", ")
+            .entries(self.literals.iter().map(|ty| ty.representation(self.db)))
+            .finish()?;
+        f.write_str("]")
     }
 }
 
@@ -202,31 +215,77 @@ struct DisplayIntersectionType<'db> {
 }
 
 impl Display for DisplayIntersectionType<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut first = true;
-        for (neg, ty) in self
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let tys = self
             .ty
             .positive(self.db)
             .iter()
-            .map(|ty| (false, ty))
-            .chain(self.ty.negative(self.db).iter().map(|ty| (true, ty)))
-        {
-            if !first {
-                f.write_str(" & ")?;
-            };
-            first = false;
-            if neg {
-                f.write_str("~")?;
-            };
-            write!(f, "{}", ty.display(self.db))?;
-        }
-        Ok(())
+            .map(|&ty| DisplayMaybeNegatedType {
+                ty,
+                db: self.db,
+                negated: false,
+            })
+            .chain(
+                self.ty
+                    .negative(self.db)
+                    .iter()
+                    .map(|&ty| DisplayMaybeNegatedType {
+                        ty,
+                        db: self.db,
+                        negated: true,
+                    }),
+            );
+        f.join(" & ").entries(tys).finish()
     }
 }
 
-impl std::fmt::Debug for DisplayIntersectionType<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Display::fmt(self, f)
+impl fmt::Debug for DisplayIntersectionType<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        Display::fmt(self, f)
+    }
+}
+
+struct DisplayMaybeNegatedType<'db> {
+    ty: Type<'db>,
+    db: &'db dyn Db,
+    negated: bool,
+}
+
+impl<'db> Display for DisplayMaybeNegatedType<'db> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        if self.negated {
+            f.write_str("~")?;
+        }
+        self.ty.display(self.db).fmt(f)
+    }
+}
+
+pub(crate) trait TypeArrayDisplay<'db> {
+    fn display(&self, db: &'db dyn Db) -> DisplayTypeArray;
+}
+
+impl<'db> TypeArrayDisplay<'db> for Box<[Type<'db>]> {
+    fn display(&self, db: &'db dyn Db) -> DisplayTypeArray {
+        DisplayTypeArray { types: self, db }
+    }
+}
+
+impl<'db> TypeArrayDisplay<'db> for Vec<Type<'db>> {
+    fn display(&self, db: &'db dyn Db) -> DisplayTypeArray {
+        DisplayTypeArray { types: self, db }
+    }
+}
+
+pub(crate) struct DisplayTypeArray<'b, 'db> {
+    types: &'b [Type<'db>],
+    db: &'db dyn Db,
+}
+
+impl<'db> Display for DisplayTypeArray<'_, 'db> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.join(", ")
+            .entries(self.types.iter().map(|ty| ty.display(self.db)))
+            .finish()
     }
 }
 
@@ -236,7 +295,7 @@ mod tests {
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
     use crate::db::tests::TestDb;
-    use crate::types::{global_symbol_ty, BytesLiteralType, StringLiteralType, Type, UnionBuilder};
+    use crate::types::{global_symbol_ty, BytesLiteralType, StringLiteralType, Type, UnionType};
     use crate::{Program, ProgramSettings, PythonVersion, SearchPathSettings};
 
     fn setup_db() -> TestDb {
@@ -276,9 +335,9 @@ mod tests {
             class B: ...
             ",
         )?;
-        let mod_file = system_path_to_file(&db, "src/main.py").expect("Expected file to exist.");
+        let mod_file = system_path_to_file(&db, "src/main.py").expect("file to exist");
 
-        let vec: Vec<Type<'_>> = vec![
+        let union_elements = &[
             Type::Unknown,
             Type::IntLiteral(-1),
             global_symbol_ty(&db, mod_file, "A"),
@@ -294,10 +353,7 @@ mod tests {
             Type::BooleanLiteral(true),
             Type::None,
         ];
-        let builder = vec.iter().fold(UnionBuilder::new(&db), |builder, literal| {
-            builder.add(*literal)
-        });
-        let union = builder.build().expect_union();
+        let union = UnionType::from_elements(&db, union_elements).expect_union();
         let display = format!("{}", union.display(&db));
         assert_eq!(
             display,

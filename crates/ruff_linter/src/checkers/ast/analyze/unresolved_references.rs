@@ -1,5 +1,6 @@
 use ruff_diagnostics::Diagnostic;
 use ruff_python_semantic::Exceptions;
+use ruff_python_stdlib::builtins::version_builtin_was_added;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
@@ -35,9 +36,12 @@ pub(crate) fn unresolved_references(checker: &mut Checker) {
                     }
                 }
 
+                let symbol_name = reference.name(checker.locator);
+
                 checker.diagnostics.push(Diagnostic::new(
                     pyflakes::rules::UndefinedName {
-                        name: reference.name(checker.locator).to_string(),
+                        name: symbol_name.to_string(),
+                        minor_version_builtin_added: version_builtin_was_added(symbol_name),
                     },
                     reference.range(),
                 ));

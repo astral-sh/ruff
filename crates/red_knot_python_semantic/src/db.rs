@@ -11,7 +11,6 @@ pub trait Db: SourceDb + Upcast<dyn SourceDb> {
 pub(crate) mod tests {
     use std::sync::Arc;
 
-    use crate::module_resolver::vendored_typeshed_stubs;
     use ruff_db::files::{File, Files};
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
@@ -33,7 +32,7 @@ pub(crate) mod tests {
             Self {
                 storage: salsa::Storage::default(),
                 system: TestSystem::default(),
-                vendored: vendored_typeshed_stubs().clone(),
+                vendored: red_knot_vendored::file_system().clone(),
                 events: std::sync::Arc::default(),
                 files: Files::default(),
             }
