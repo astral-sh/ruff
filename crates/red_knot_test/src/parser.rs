@@ -117,8 +117,6 @@ static CODE_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^```(?<lang>\w+)(?<config>( +\S+)*)\s*\n(?<code>(.|\n)*?)\n```\s*\n").unwrap()
 });
 
-static IGNORE_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"^.*\n?").unwrap());
-
 #[derive(Debug)]
 struct Parser<'s> {
     /// [`Section`]s of the final [`MarkdownTestSuite`].
@@ -248,7 +246,11 @@ impl<'s> Parser<'s> {
                     self.current_section_files = Some(FxHashSet::from_iter([path]));
                 }
             } else {
-                self.scan(&IGNORE_RE);
+                if let Some(next_newline) = self.unparsed.find('\n') {
+                    (_, self.unparsed) = self.unparsed.split_at(next_newline + 1);
+                } else {
+                    break;
+                }
             }
         }
 
