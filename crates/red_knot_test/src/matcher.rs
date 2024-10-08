@@ -1,6 +1,6 @@
 //! Match [`TypeCheckDiagnostic`]s against [`Assertion`]s and produce test failure messages for any
 //! mismatches.
-use crate::assertion::{Assertion, FileAssertions};
+use crate::assertion::{Assertion, InlineFileAssertions};
 use crate::db::Db;
 use crate::diagnostic::SortedDiagnostics;
 use red_knot_python_semantic::types::TypeCheckDiagnostic;
@@ -58,7 +58,7 @@ where
 {
     // Parse assertions from comments in the file, and get diagnostics from the file; both
     // ordered by line number.
-    let assertions = FileAssertions::from_file(db, file);
+    let assertions = InlineFileAssertions::from_file(db, file);
     let diagnostics = SortedDiagnostics::new(diagnostics, &line_index(db, file));
 
     // Get iterators over assertions and diagnostics grouped by line, in ascending line order.
@@ -74,7 +74,7 @@ where
     loop {
         match (&current_assertions, &current_diagnostics) {
             (Some(assertions), Some(diagnostics)) => {
-                match assertions.line.cmp(&diagnostics.line_number) {
+                match assertions.line_number.cmp(&diagnostics.line_number) {
                     Ordering::Equal => {
                         // We have assertions and diagnostics on the same line; check for
                         // matches and error on any that don't match, then advance both
@@ -82,7 +82,7 @@ where
                         matcher
                             .match_line(diagnostics, assertions)
                             .unwrap_or_else(|messages| {
-                                failures.push(assertions.line, messages);
+                                failures.push(assertions.line_number, messages);
                             });
                         current_assertions = line_assertions.next();
                         current_diagnostics = line_diagnostics.next();
@@ -90,7 +90,7 @@ where
                     Ordering::Less => {
                         // We have assertions on an earlier line than diagnostics; report these
                         // assertions as all unmatched, and advance the assertions iterator.
-                        failures.push(assertions.line, unmatched(assertions));
+                        failures.push(assertions.line_number, unmatched(assertions));
                         current_assertions = line_assertions.next();
                     }
                     Ordering::Greater => {
@@ -104,7 +104,7 @@ where
             (Some(assertions), None) => {
                 // We've exhausted diagnostics but still have assertions; report these assertions
                 // as unmatched and advance the assertions iterator.
-                failures.push(assertions.line, unmatched(assertions));
+                failures.push(assertions.line_number, unmatched(assertions));
                 current_assertions = line_assertions.next();
             }
             (None, Some(diagnostics)) => {

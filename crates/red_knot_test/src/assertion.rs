@@ -45,15 +45,15 @@ use ruff_text_size::{Ranged, TextRange};
 use smallvec::SmallVec;
 use std::ops::Deref;
 
-/// Diagnostic assertion comments in a file.
+/// Diagnostic assertion comments in a single embedded file.
 #[derive(Debug)]
-pub(crate) struct FileAssertions {
+pub(crate) struct InlineFileAssertions {
     comment_ranges: CommentRanges,
     source: SourceText,
     lines: LineIndex,
 }
 
-impl FileAssertions {
+impl InlineFileAssertions {
     pub(crate) fn from_file(db: &Db, file: File) -> Self {
         let source = source_text(db, file);
         let lines = line_index(db, file);
@@ -66,16 +66,20 @@ impl FileAssertions {
         }
     }
 
+    fn locator(&self) -> Locator {
+        Locator::with_index(&self.source, self.lines.clone())
+    }
+
     fn line_number(&self, range: &impl Ranged) -> OneIndexed {
         self.lines.line_index(range.start())
     }
 
-    fn is_own_line(&self, range: &impl Ranged) -> bool {
-        CommentRanges::is_own_line(range.start(), &Locator::new(&self.source))
+    fn is_own_line_comment(&self, ranged_assertion: &AssertionWithRange) -> bool {
+        CommentRanges::is_own_line(ranged_assertion.start(), &self.locator())
     }
 }
 
-impl<'a> IntoIterator for &'a FileAssertions {
+impl<'a> IntoIterator for &'a InlineFileAssertions {
     type Item = LineAssertions<'a>;
     type IntoIter = LineAssertionsIterator<'a>;
 
@@ -91,31 +95,9 @@ impl<'a> IntoIterator for &'a FileAssertions {
     }
 }
 
+/// An [`Assertion`] with the [`TextRange`] of its original inline comment.
 #[derive(Debug)]
 struct AssertionWithRange<'a>(Assertion<'a>, TextRange);
-
-#[derive(Debug)]
-struct AssertionWithRangeIterator<'a> {
-    file_assertions: &'a FileAssertions,
-    inner: std::iter::Copied<std::slice::Iter<'a, TextRange>>,
-}
-
-impl<'a> Iterator for AssertionWithRangeIterator<'a> {
-    type Item = AssertionWithRange<'a>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let locator = Locator::new(&self.file_assertions.source);
-        loop {
-            let inner_next = self.inner.next()?;
-            let comment = locator.slice(inner_next);
-            if let Some(assertion) = Assertion::from_comment(comment) {
-                return Some(AssertionWithRange(assertion, inner_next));
-            };
-        }
-    }
-}
-
-impl std::iter::FusedIterator for AssertionWithRangeIterator<'_> {}
 
 impl<'a> Deref for AssertionWithRange<'a> {
     type Target = Assertion<'a>;
@@ -137,6 +119,29 @@ impl<'a> From<AssertionWithRange<'a>> for Assertion<'a> {
     }
 }
 
+#[derive(Debug)]
+struct AssertionWithRangeIterator<'a> {
+    file_assertions: &'a InlineFileAssertions,
+    inner: std::iter::Copied<std::slice::Iter<'a, TextRange>>,
+}
+
+impl<'a> Iterator for AssertionWithRangeIterator<'a> {
+    type Item = AssertionWithRange<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let locator = self.file_assertions.locator();
+        loop {
+            let inner_next = self.inner.next()?;
+            let comment = locator.slice(inner_next);
+            if let Some(assertion) = Assertion::from_comment(comment) {
+                return Some(AssertionWithRange(assertion, inner_next));
+            };
+        }
+    }
+}
+
+impl std::iter::FusedIterator for AssertionWithRangeIterator<'_> {}
+
 /// A vector of [`Assertion`]s belonging to a single line.
 ///
 /// Most lines will have zero or one assertion, so we use a [`SmallVec`] optimized for a single
@@ -145,7 +150,7 @@ type AssertionVec<'a> = SmallVec<[Assertion<'a>; 1]>;
 
 #[derive(Debug)]
 pub(crate) struct LineAssertionsIterator<'a> {
-    file_assertions: &'a FileAssertions,
+    file_assertions: &'a InlineFileAssertions,
     inner: std::iter::Peekable<AssertionWithRangeIterator<'a>>,
 }
 
@@ -156,32 +161,37 @@ impl<'a> Iterator for LineAssertionsIterator<'a> {
         let file = self.file_assertions;
         let ranged_assertion = self.inner.next()?;
         let mut collector = AssertionVec::new();
-        let mut line = file.line_number(&ranged_assertion);
+        let mut line_number = file.line_number(&ranged_assertion);
         // Collect all own-line comments on consecutive lines; these all apply to the same line of
         // code. For example:
         //
-        //     # Error: [unbound-name]
-        //     # Type: Unbound
-        //     reveal_type(x)
+        // ```py
+        // # Error: [unbound-name]
+        // # Type: Unbound
+        // reveal_type(x)
+        // ```
         //
-        if file.is_own_line(&ranged_assertion) {
+        if file.is_own_line_comment(&ranged_assertion) {
             collector.push(ranged_assertion.into());
             let mut only_own_line = true;
             while let Some(ranged_assertion) = self.inner.peek() {
-                let next_line = line.saturating_add(1);
-                if file.line_number(ranged_assertion) == next_line {
-                    if !file.is_own_line(ranged_assertion) {
+                let next_line_number = line_number.saturating_add(1);
+                if file.line_number(ranged_assertion) == next_line_number {
+                    if !file.is_own_line_comment(ranged_assertion) {
                         only_own_line = false;
                     }
-                    line = next_line;
+                    line_number = next_line_number;
                     collector.push(self.inner.next().unwrap().into());
                     // If we see an end-of-line comment, it has to be the end of the stack,
                     // otherwise we'd botch this case, attributing all three errors to the `bar`
                     // line:
                     //
-                    //     # Error:
-                    //     foo  # Error:
-                    //     bar  # Error:
+                    // ```py
+                    // # Error:
+                    // foo  # Error:
+                    // bar  # Error:
+                    // ```
+                    //
                     if !only_own_line {
                         break;
                     }
@@ -191,14 +201,14 @@ impl<'a> Iterator for LineAssertionsIterator<'a> {
             }
             if only_own_line {
                 // The collected comments apply to the _next_ line in the code.
-                line = line.saturating_add(1);
+                line_number = line_number.saturating_add(1);
             }
         } else {
             // We have a line-trailing comment; it applies to its own line, and is not grouped.
             collector.push(ranged_assertion.into());
         }
         Some(LineAssertions {
-            line,
+            line_number,
             assertions: collector,
         })
     }
@@ -213,7 +223,7 @@ pub(crate) struct LineAssertions<'a> {
     ///
     /// Not necessarily the same line the assertion comment is located on; for an own-line comment,
     /// it's the next non-assertion line.
-    pub(crate) line: OneIndexed,
+    pub(crate) line_number: OneIndexed,
 
     /// The assertions referring to this line.
     pub(crate) assertions: AssertionVec<'a>,
@@ -301,20 +311,20 @@ impl std::fmt::Display for ErrorAssertion<'_> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Assertion, FileAssertions, LineAssertions};
+    use super::{Assertion, InlineFileAssertions, LineAssertions};
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::OneIndexed;
 
-    fn get_assertions(source: &str) -> FileAssertions {
+    fn get_assertions(source: &str) -> InlineFileAssertions {
         let mut db = crate::db::Db::setup(SystemPathBuf::from("/src"));
         db.write_file("/src/test.py", source).unwrap();
         let file = system_path_to_file(&db, "/src/test.py").unwrap();
-        FileAssertions::from_file(&db, file)
+        InlineFileAssertions::from_file(&db, file)
     }
 
-    fn as_vec(assertions: &FileAssertions) -> Vec<LineAssertions> {
+    fn as_vec(assertions: &InlineFileAssertions) -> Vec<LineAssertions> {
         assertions.into_iter().collect()
     }
 
@@ -330,7 +340,7 @@ mod tests {
             panic!("expected one line");
         };
 
-        assert_eq!(line.line, OneIndexed::from_zero_indexed(1));
+        assert_eq!(line.line_number, OneIndexed::from_zero_indexed(1));
 
         let [assert] = &line.assertions[..] else {
             panic!("expected one assertion");
@@ -351,7 +361,7 @@ mod tests {
             panic!("expected one line");
         };
 
-        assert_eq!(line.line, OneIndexed::from_zero_indexed(1));
+        assert_eq!(line.line_number, OneIndexed::from_zero_indexed(1));
 
         let [assert] = &line.assertions[..] else {
             panic!("expected one assertion");
@@ -373,7 +383,7 @@ mod tests {
             panic!("expected one line");
         };
 
-        assert_eq!(line.line, OneIndexed::from_zero_indexed(2));
+        assert_eq!(line.line_number, OneIndexed::from_zero_indexed(2));
 
         let [assert] = &line.assertions[..] else {
             panic!("expected one assertion");
@@ -396,7 +406,7 @@ mod tests {
             panic!("expected one line");
         };
 
-        assert_eq!(line.line, OneIndexed::from_zero_indexed(3));
+        assert_eq!(line.line_number, OneIndexed::from_zero_indexed(3));
 
         let [assert1, assert2] = &line.assertions[..] else {
             panic!("expected two assertions");
@@ -419,7 +429,7 @@ mod tests {
             panic!("expected one line");
         };
 
-        assert_eq!(line.line, OneIndexed::from_zero_indexed(2));
+        assert_eq!(line.line_number, OneIndexed::from_zero_indexed(2));
 
         let [assert1, assert2] = &line.assertions[..] else {
             panic!("expected two assertions");
@@ -443,8 +453,8 @@ mod tests {
             panic!("expected two lines");
         };
 
-        assert_eq!(line1.line, OneIndexed::from_zero_indexed(2));
-        assert_eq!(line2.line, OneIndexed::from_zero_indexed(3));
+        assert_eq!(line1.line_number, OneIndexed::from_zero_indexed(2));
+        assert_eq!(line2.line_number, OneIndexed::from_zero_indexed(3));
 
         let [Assertion::Error(error1)] = &line1.assertions[..] else {
             panic!("expected one Error assertion");
@@ -473,8 +483,8 @@ mod tests {
             panic!("expected two lines");
         };
 
-        assert_eq!(line1.line, OneIndexed::from_zero_indexed(2));
-        assert_eq!(line2.line, OneIndexed::from_zero_indexed(3));
+        assert_eq!(line1.line_number, OneIndexed::from_zero_indexed(2));
+        assert_eq!(line2.line_number, OneIndexed::from_zero_indexed(3));
 
         let [Assertion::Error(error1), Assertion::Type(expected_ty)] = &line1.assertions[..] else {
             panic!("expected one Error assertion and one Type assertion");
@@ -502,7 +512,7 @@ mod tests {
             panic!("expected one line");
         };
 
-        assert_eq!(line.line, OneIndexed::from_zero_indexed(1));
+        assert_eq!(line.line_number, OneIndexed::from_zero_indexed(1));
 
         let [assert] = &line.assertions[..] else {
             panic!("expected one assertion");
@@ -523,7 +533,7 @@ mod tests {
             panic!("expected one line");
         };
 
-        assert_eq!(line.line, OneIndexed::from_zero_indexed(1));
+        assert_eq!(line.line_number, OneIndexed::from_zero_indexed(1));
 
         let [assert] = &line.assertions[..] else {
             panic!("expected one assertion");
@@ -545,7 +555,7 @@ mod tests {
             panic!("expected one line");
         };
 
-        assert_eq!(line.line, OneIndexed::from_zero_indexed(2));
+        assert_eq!(line.line_number, OneIndexed::from_zero_indexed(2));
 
         let [assert] = &line.assertions[..] else {
             panic!("expected one assertion");
@@ -570,7 +580,7 @@ mod tests {
             panic!("expected one line");
         };
 
-        assert_eq!(line.line, OneIndexed::from_zero_indexed(2));
+        assert_eq!(line.line_number, OneIndexed::from_zero_indexed(2));
 
         let [assert] = &line.assertions[..] else {
             panic!("expected one assertion");
@@ -592,7 +602,7 @@ mod tests {
             panic!("expected one line");
         };
 
-        assert_eq!(line.line, OneIndexed::from_zero_indexed(2));
+        assert_eq!(line.line_number, OneIndexed::from_zero_indexed(2));
 
         let [assert] = &line.assertions[..] else {
             panic!("expected one assertion");
