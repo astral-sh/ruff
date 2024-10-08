@@ -40,9 +40,7 @@ impl Format<PyFormatContext<'_>> for FormatFString<'_> {
                 self.quoting
             };
 
-        let normalizer = StringNormalizer::from_context(f.context())
-            .with_quoting(quoting)
-            .with_preferred_quote_style(f.options().quote_style());
+        let normalizer = StringNormalizer::from_context(f.context()).with_quoting(quoting);
 
         // If f-string formatting is disabled (not in preview), then we will
         // fall back to the previous behavior of normalizing the f-string.
