@@ -347,9 +347,7 @@ impl Configuration {
                     .unwrap_or_default(),
                 flake8_pytest_style: lint
                     .flake8_pytest_style
-                    .map(|options| {
-                        Flake8PytestStyleOptions::try_into_settings(options, lint_preview)
-                    })
+                    .map(Flake8PytestStyleOptions::try_into_settings)
                     .transpose()?
                     .unwrap_or_default(),
                 flake8_quotes: lint
