@@ -855,9 +855,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Tryceratops, "004") => (RuleGroup::Stable, rules::tryceratops::rules::TypeCheckWithoutTypeError),
         (Tryceratops, "200") => (RuleGroup::Removed, rules::tryceratops::rules::ReraiseNoCause),
         (Tryceratops, "201") => (RuleGroup::Stable, rules::tryceratops::rules::VerboseRaise),
+        (Tryceratops, "203") => (RuleGroup::Stable, rules::tryceratops::rules::UselessTryExcept),
         (Tryceratops, "300") => (RuleGroup::Stable, rules::tryceratops::rules::TryConsiderElse),
         (Tryceratops, "301") => (RuleGroup::Stable, rules::tryceratops::rules::RaiseWithinTry),
-        (Tryceratops, "302") => (RuleGroup::Stable, rules::tryceratops::rules::UselessTryExcept),
         (Tryceratops, "400") => (RuleGroup::Stable, rules::tryceratops::rules::ErrorInsteadOfException),
         (Tryceratops, "401") => (RuleGroup::Stable, rules::tryceratops::rules::VerboseLogMessage),
 
