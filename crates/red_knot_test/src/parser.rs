@@ -255,6 +255,9 @@ impl<'s> Parser<'s> {
                 if parts.next().is_some() {
                     return Err(anyhow::anyhow!("Invalid config item `{}`.", item));
                 }
+                if config.contains_key(key) {
+                    return Err(anyhow::anyhow!("Duplicate config item `{}`.", item));
+                }
                 config.insert(key, val);
             }
         }
@@ -482,6 +485,19 @@ mod tests {
         );
         let err = super::parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(err.to_string(), "Invalid config item `foo=bar=baz`.");
+    }
+
+    #[test]
+    fn invalid_config_item_duplicate() {
+        let source = dedent(
+            "
+            ```py foo=bar foo=baz
+            x = 1
+            ```
+            ",
+        );
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        assert_eq!(err.to_string(), "Duplicate config item `foo=baz`.");
     }
 
     #[test]
