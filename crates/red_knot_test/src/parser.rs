@@ -118,6 +118,30 @@ static CODE_RE: Lazy<Regex> = Lazy::new(|| {
 });
 
 #[derive(Debug)]
+struct SectionStack(Vec<SectionId>);
+
+impl SectionStack {
+    fn new(root_section_id: SectionId) -> Self {
+        Self(vec![root_section_id])
+    }
+
+    fn push(&mut self, section_id: SectionId) {
+        self.0.push(section_id);
+    }
+
+    fn pop(&mut self) -> Option<SectionId> {
+        self.0.pop()
+    }
+
+    fn parent(&mut self) -> SectionId {
+        *self
+            .0
+            .last()
+            .expect("Should never pop the implicit root section")
+    }
+}
+
+#[derive(Debug)]
 struct Parser<'s> {
     /// [`Section`]s of the final [`MarkdownTestSuite`].
     sections: IndexVec<SectionId, Section<'s>>,
@@ -129,7 +153,7 @@ struct Parser<'s> {
     unparsed: &'s str,
 
     /// Stack of ancestor sections.
-    stack: Vec<SectionId>,
+    stack: SectionStack,
 
     /// Names of embedded files in current active section.
     current_section_files: Option<FxHashSet<&'s str>>,
@@ -147,7 +171,7 @@ impl<'s> Parser<'s> {
             sections,
             files: IndexVec::default(),
             unparsed: source,
-            stack: vec![root_section_id],
+            stack: SectionStack::new(root_section_id),
             current_section_files: None,
         }
     }
@@ -190,21 +214,20 @@ impl<'s> Parser<'s> {
         let header_level = captures["level"].len();
         self.pop_sections_to_level(header_level);
 
-        // We never pop the implicit root section.
-        let parent = self.stack.last().unwrap();
+        let parent = self.stack.parent();
 
         let section = Section {
             // HEADER_RE can't match without a match for group 'title'.
             title: captures.name("title").unwrap().into(),
             level: header_level.try_into()?,
-            parent_id: Some(*parent),
+            parent_id: Some(parent),
         };
 
         if self.current_section_files.is_some() {
             return Err(anyhow::anyhow!(
                 "Header '{}' not valid inside a test case; parent '{}' has code files.",
                 section.title,
-                self.sections[*parent].title,
+                self.sections[parent].title,
             ));
         }
 
@@ -218,7 +241,7 @@ impl<'s> Parser<'s> {
 
     fn parse_code_block(&mut self, captures: &Captures<'s>) -> anyhow::Result<()> {
         // We never pop the implicit root section.
-        let parent = self.stack.last().unwrap();
+        let parent = self.stack.parent();
 
         let mut config: FxHashMap<&'s str, &'s str> = FxHashMap::default();
 
@@ -240,7 +263,7 @@ impl<'s> Parser<'s> {
 
         self.files.push(EmbeddedFile {
             path,
-            section: *parent,
+            section: parent,
             // CODE_RE can't match without matches for 'lang' and 'code'.
             lang: captures.name("lang").unwrap().into(),
             code: captures.name("code").unwrap().into(),
@@ -248,18 +271,17 @@ impl<'s> Parser<'s> {
 
         if let Some(current_files) = &mut self.current_section_files {
             if current_files.contains(path) {
-                let current = &self.sections[*self.stack.last().unwrap()];
                 if path == "test.py" {
                     return Err(anyhow::anyhow!(
                         "Test `{}` has duplicate files named `{path}`. \
                                 (This is the default filename; \
                                  consider giving some files an explicit name with `path=...`.)",
-                        current.title
+                        self.sections[parent].title
                     ));
                 }
                 return Err(anyhow::anyhow!(
                     "Test `{}` has duplicate files named `{path}`.",
-                    current.title
+                    self.sections[parent].title
                 ));
             }
             current_files.insert(path);
@@ -271,11 +293,7 @@ impl<'s> Parser<'s> {
     }
 
     fn pop_sections_to_level(&mut self, level: usize) {
-        while self
-            .stack
-            .last()
-            .is_some_and(|section_id| level <= self.sections[*section_id].level.into())
-        {
+        while level <= self.sections[self.stack.parent()].level.into() {
             self.stack.pop();
             // We would have errored before pushing a child section if there were files, so we know
             // no parent section can have files.
