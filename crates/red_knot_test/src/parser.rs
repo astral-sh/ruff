@@ -9,12 +9,6 @@ pub(crate) fn parse<'s>(title: &'s str, source: &'s str) -> anyhow::Result<Markd
     parser.parse()
 }
 
-#[newtype_index]
-struct SectionId;
-
-#[newtype_index]
-struct FileId;
-
 /// A parsed markdown file containing tests.
 ///
 /// Borrows from the source string and filepath it was created from.
@@ -24,7 +18,7 @@ pub(crate) struct MarkdownTestSuite<'s> {
     sections: IndexVec<SectionId, Section<'s>>,
 
     /// Test files embedded within the Markdown file.
-    files: IndexVec<FileId, File<'s>>,
+    files: IndexVec<EmbeddedFileId, EmbeddedFile<'s>>,
 }
 
 impl<'s> MarkdownTestSuite<'s> {
@@ -40,22 +34,29 @@ impl<'s> MarkdownTestSuite<'s> {
 pub(crate) struct MarkdownTest<'m, 's> {
     suite: &'m MarkdownTestSuite<'s>,
     section: &'m Section<'s>,
-    files: &'m [File<'s>],
+    files: &'m [EmbeddedFile<'s>],
 }
 
 impl<'m, 's> MarkdownTest<'m, 's> {
     pub(crate) fn name(&self) -> String {
-        let mut name = self.section.title.to_string();
+        let mut name = String::new();
         let mut parent_id = self.section.parent_id;
-        while let Some(parent) = parent_id.map(|section_id| &self.suite.sections[section_id]) {
+        while let Some(next_id) = parent_id {
+            let parent = &self.suite.sections[next_id];
             parent_id = parent.parent_id;
-            name.insert_str(0, " - ");
+            if !name.is_empty() {
+                name.insert_str(0, " - ");
+            }
             name.insert_str(0, parent.title);
         }
+        if !name.is_empty() {
+            name.push_str(" - ");
+        }
+        name.push_str(self.section.title);
         name
     }
 
-    pub(crate) fn files(&self) -> impl Iterator<Item = &'m File<'s>> {
+    pub(crate) fn files(&self) -> impl Iterator<Item = &'m EmbeddedFile<'s>> {
         self.files.iter()
     }
 }
@@ -77,8 +78,8 @@ impl<'m, 's> Iterator for MarkdownTestIterator<'m, 's> {
             current_file_index += 1;
             file = self.suite.files.get(current_file_index.into());
         }
-        let files = &self.suite.files
-            [FileId::from_usize(self.current_file_index)..FileId::from_usize(current_file_index)];
+        let files = &self.suite.files[EmbeddedFileId::from_usize(self.current_file_index)
+            ..EmbeddedFileId::from_usize(current_file_index)];
         self.current_file_index = current_file_index;
         Some(MarkdownTest {
             suite: self.suite,
@@ -88,15 +89,21 @@ impl<'m, 's> Iterator for MarkdownTestIterator<'m, 's> {
     }
 }
 
+#[newtype_index]
+struct SectionId;
+
 #[derive(Debug)]
 struct Section<'s> {
     title: &'s str,
-    level: usize,
+    level: u8,
     parent_id: Option<SectionId>,
 }
 
+#[newtype_index]
+struct EmbeddedFileId;
+
 #[derive(Debug)]
-pub(crate) struct File<'s> {
+pub(crate) struct EmbeddedFile<'s> {
     section: SectionId,
     pub(crate) path: &'s str,
     pub(crate) lang: &'s str,
@@ -114,19 +121,19 @@ static IGNORE_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"^.*\n?").unwrap());
 
 #[derive(Debug)]
 struct Parser<'s> {
-    /// Sections of the final [`MarkdownTestSuite`].
+    /// [`Section`]s of the final [`MarkdownTestSuite`].
     sections: IndexVec<SectionId, Section<'s>>,
 
-    /// Files of the final [`MarkdownTestSuite`].
-    files: IndexVec<FileId, File<'s>>,
+    /// [`EmbeddedFile`]s of the final [`MarkdownTestSuite`].
+    files: IndexVec<EmbeddedFileId, EmbeddedFile<'s>>,
 
     /// The unparsed remainder of the Markdown source.
-    rest: &'s str,
+    unparsed: &'s str,
 
     /// Stack of ancestor sections.
     stack: Vec<SectionId>,
 
-    /// True if current active section (last in stack) has files.
+    /// Names of embedded files in current active section.
     current_section_files: Option<FxHashSet<&'s str>>,
 }
 
@@ -141,7 +148,7 @@ impl<'s> Parser<'s> {
         Self {
             sections,
             files: IndexVec::default(),
-            rest: source,
+            unparsed: source,
             stack: vec![root_section_id],
             current_section_files: None,
         }
@@ -163,9 +170,9 @@ impl<'s> Parser<'s> {
     }
 
     fn start(&mut self) -> anyhow::Result<()> {
-        while !self.rest.is_empty() {
-            if let Some(caps) = self.scan(&HEADER_RE) {
-                let header_level = caps["level"].len();
+        while !self.unparsed.is_empty() {
+            if let Some(captures) = self.scan(&HEADER_RE) {
+                let header_level = captures["level"].len();
                 self.pop_sections_to_level(header_level);
 
                 // We never pop the implicit root section.
@@ -173,8 +180,8 @@ impl<'s> Parser<'s> {
 
                 let section = Section {
                     // HEADER_RE can't match without a match for group 'title'.
-                    title: caps.name("title").unwrap().into(),
-                    level: header_level,
+                    title: captures.name("title").unwrap().into(),
+                    level: header_level.try_into()?,
                     parent_id: Some(*parent),
                 };
 
@@ -190,13 +197,13 @@ impl<'s> Parser<'s> {
                 self.stack.push(section_id);
 
                 self.current_section_files = None;
-            } else if let Some(caps) = self.scan(&CODE_RE) {
+            } else if let Some(captures) = self.scan(&CODE_RE) {
                 // We never pop the implicit root section.
                 let parent = self.stack.last().unwrap();
 
                 let mut config: FxHashMap<&'s str, &'s str> = FxHashMap::default();
 
-                if let Some(config_match) = caps.name("config") {
+                if let Some(config_match) = captures.name("config") {
                     for item in config_match.as_str().split_whitespace() {
                         let mut parts = item.split('=');
                         let key = parts.next().unwrap();
@@ -210,20 +217,20 @@ impl<'s> Parser<'s> {
                     }
                 }
 
-                let path = config.get("path").unwrap_or(&"test.py");
+                let path = config.get("path").copied().unwrap_or("test.py");
 
-                self.files.push(File {
+                self.files.push(EmbeddedFile {
                     path,
                     section: *parent,
                     // CODE_RE can't match without matches for 'lang' and 'code'.
-                    lang: caps.name("lang").unwrap().into(),
-                    code: caps.name("code").unwrap().into(),
+                    lang: captures.name("lang").unwrap().into(),
+                    code: captures.name("code").unwrap().into(),
                 });
 
                 if let Some(current_files) = &mut self.current_section_files {
-                    if current_files.contains(*path) {
+                    if current_files.contains(path) {
                         let current = &self.sections[*self.stack.last().unwrap()];
-                        if *path == "test.py" {
+                        if path == "test.py" {
                             return Err(anyhow::anyhow!(
                                 "Test `{}` has duplicate files named `{path}`. \
                                 (This is the default filename; \
@@ -236,9 +243,9 @@ impl<'s> Parser<'s> {
                             current.title
                         ));
                     }
-                    current_files.insert(*path);
+                    current_files.insert(path);
                 } else {
-                    self.current_section_files = Some(FxHashSet::from_iter([*path]));
+                    self.current_section_files = Some(FxHashSet::from_iter([path]));
                 }
             } else {
                 self.scan(&IGNORE_RE);
@@ -252,7 +259,7 @@ impl<'s> Parser<'s> {
         while self
             .stack
             .last()
-            .is_some_and(|section_id| level <= self.sections[*section_id].level)
+            .is_some_and(|section_id| level <= self.sections[*section_id].level.into())
         {
             self.stack.pop();
             // We would have errored before pushing a child section if there were files, so we know
@@ -261,11 +268,12 @@ impl<'s> Parser<'s> {
         }
     }
 
+    /// Get capture groups and advance cursor past match if unparsed text matches `pattern`.
     fn scan(&mut self, pattern: &Regex) -> Option<Captures<'s>> {
-        if let Some(caps) = pattern.captures(self.rest) {
-            let (_, rest) = self.rest.split_at(caps.get(0).unwrap().end());
-            self.rest = rest;
-            Some(caps)
+        if let Some(captures) = pattern.captures(self.unparsed) {
+            let (_, unparsed) = self.unparsed.split_at(captures.get(0).unwrap().end());
+            self.unparsed = unparsed;
+            Some(captures)
         } else {
             None
         }
