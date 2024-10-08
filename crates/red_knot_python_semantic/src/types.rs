@@ -418,26 +418,28 @@ impl<'db> Type<'db> {
     #[must_use]
     pub fn falsy_set(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
-            // Some builtin types have known falsy values
-            Self::Instance(class) if class.is_known(db, KnownClass::Bool) => {
-                Some(Self::BooleanLiteral(false))
-            }
-            Self::Instance(class) if class.is_known(db, KnownClass::Int) => {
-                Some(Self::IntLiteral(0))
-            }
-            Self::Instance(class) if class.is_known(db, KnownClass::Str) => {
-                Some(Self::StringLiteral(StringLiteralType::new(db, "".into())))
-            }
-            Self::Instance(class) if class.is_known(db, KnownClass::Bytes) => {
-                Some(Self::BytesLiteral(BytesLiteralType::new(db, vec![].into())))
-            }
-            Self::Instance(class) if class.is_known(db, KnownClass::Tuple) => {
-                Some(Self::Tuple(TupleType::new(db, vec![].into())))
-            }
-            Type::LiteralString => KnownClass::Str.to_instance(db).falsy_set(db),
-            Type::IntLiteral(_) => KnownClass::Int.to_instance(db).falsy_set(db),
-            Type::BooleanLiteral(_) => KnownClass::Bool.to_instance(db).falsy_set(db),
-            _ => None,
+            Self::Instance(class) => match class.known(db) {
+                // For the following types, we know the logic for falsiness and can represent
+                // specific instances of that type, so we can give back a precise subset.
+                Some(KnownClass::Bool) => Some(Self::BooleanLiteral(false)),
+                Some(KnownClass::Int) => Some(Self::IntLiteral(0)),
+                Some(KnownClass::Bytes) => Some(Self::BytesLiteral(BytesLiteralType::empty(db))),
+                Some(KnownClass::Str) => Some(Self::StringLiteral(StringLiteralType::empty(db))),
+                Some(KnownClass::Tuple) => Some(Self::Tuple(TupleType::empty(db))),
+                _ => match self.bool(db) {
+                    // When a `__bool__` signature is `AlwaysFalse`, it means that the falsy set is
+                    // the whole type (that we had as input), and the truthy set is empty.
+                    Truthiness::AlwaysFalse => Some(*self),
+                    Truthiness::AlwaysTrue => Some(Type::Never),
+                    Truthiness::Ambiguous => None,
+                },
+            },
+            Type::LiteralString => Some(Self::StringLiteral(StringLiteralType::empty(db))),
+            _ => match self.bool(db) {
+                Truthiness::AlwaysFalse => Some(*self),
+                Truthiness::AlwaysTrue => Some(Type::Never),
+                Truthiness::Ambiguous => None,
+            },
         }
     }
 
@@ -446,12 +448,17 @@ impl<'db> Type<'db> {
     #[must_use]
     pub fn truthy_set(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
-            Type::Instance(class) if class.is_known(db, KnownClass::Bool) => {
-                Some(Type::BooleanLiteral(true))
-            }
-            Type::BooleanLiteral(_) => KnownClass::Bool.to_instance(db).truthy_set(db),
-            // There is no instance of `NoneType` that is truthy
-            Type::Instance(class) if class.is_known(db, KnownClass::NoneType) => Some(Type::Never),
+            Type::None => Some(Type::Never),
+            Type::Instance(class) => match class.known(db) {
+                Some(KnownClass::Bool) => Some(Type::BooleanLiteral(true)),
+                _ => match self.bool(db) {
+                    // When a `__bool__` signature is `AlwaysTrue`, it means that the truthy set is
+                    // the whole type (that we had as input), and the falsy set is empty.
+                    Truthiness::AlwaysTrue => Some(*self),
+                    Truthiness::AlwaysFalse => Some(Type::Never),
+                    Truthiness::Ambiguous => None,
+                },
+            },
             _ => None,
         }
     }
@@ -1589,16 +1596,34 @@ pub struct StringLiteralType<'db> {
     value: Box<str>,
 }
 
+impl<'db> StringLiteralType<'db> {
+    pub fn empty(db: &'db dyn Db) -> Self {
+        Self::new(db, Box::default())
+    }
+}
+
 #[salsa::interned]
 pub struct BytesLiteralType<'db> {
     #[return_ref]
     value: Box<[u8]>,
 }
 
+impl<'db> BytesLiteralType<'db> {
+    pub fn empty(db: &'db dyn Db) -> Self {
+        Self::new(db, Box::default())
+    }
+}
+
 #[salsa::interned]
 pub struct TupleType<'db> {
     #[return_ref]
     elements: Box<[Type<'db>]>,
+}
+
+impl<'db> TupleType<'db> {
+    pub fn empty(db: &'db dyn Db) -> Self {
+        Self::new(db, Box::default())
+    }
 }
 
 #[cfg(test)]

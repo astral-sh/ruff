@@ -772,7 +772,7 @@ mod tests {
         let falsy_int = IntersectionBuilder::build_falsy(&db, KnownClass::Int.to_instance(&db));
         assert_eq!(falsy_int, Type::IntLiteral(0));
 
-        let empty_str = Type::StringLiteral(StringLiteralType::new(&db, "".into()));
+        let empty_str = Type::StringLiteral(StringLiteralType::empty(&db));
         let falsy_str = IntersectionBuilder::build_falsy(&db, KnownClass::Str.to_instance(&db));
         assert_eq!(falsy_str, empty_str);
 
@@ -782,11 +782,11 @@ mod tests {
         let falsy_bool = IntersectionBuilder::build_falsy(&db, KnownClass::Bool.to_instance(&db));
         assert_eq!(falsy_bool, Type::BooleanLiteral(false));
 
-        let empty_tuple = Type::Tuple(TupleType::new(&db, vec![].into()));
+        let empty_tuple = Type::Tuple(TupleType::empty(&db));
         let falsy_tuple = IntersectionBuilder::build_falsy(&db, KnownClass::Tuple.to_instance(&db));
         assert_eq!(falsy_tuple, empty_tuple);
 
-        let empty_bytes = Type::BytesLiteral(BytesLiteralType::new(&db, vec![].into()));
+        let empty_bytes = Type::BytesLiteral(BytesLiteralType::empty(&db));
         let falsy_bytes = IntersectionBuilder::build_falsy(&db, KnownClass::Bytes.to_instance(&db));
         assert_eq!(falsy_bytes, empty_bytes);
 
@@ -833,13 +833,13 @@ mod tests {
         // `X` -> `AlwaysFalse` => `X & Truthy` = `Never`
         // TODO: add a test case for `NoneType` when supported
 
-        let empty_string = Type::StringLiteral(StringLiteralType::new(&db, "".into()));
+        let empty_string = Type::StringLiteral(StringLiteralType::empty(&db));
         assert_eq!(
             IntersectionBuilder::build_truthy(&db, empty_string),
             Type::Never
         );
 
-        let empty_bytes = Type::BytesLiteral(BytesLiteralType::new(&db, vec![].into()));
+        let empty_bytes = Type::BytesLiteral(BytesLiteralType::empty(&db));
         assert_eq!(
             IntersectionBuilder::build_truthy(
                 &db,
@@ -849,7 +849,7 @@ mod tests {
         );
 
         // `X` -> `AlwaysFalse` => `X & Falsy` = `X`
-        let empty_tuple = Type::Tuple(TupleType::new(&db, vec![].into()));
+        let empty_tuple = Type::Tuple(TupleType::empty(&db));
         assert_eq!(
             IntersectionBuilder::build_falsy(&db, empty_tuple),
             empty_tuple
@@ -948,7 +948,7 @@ mod tests {
         );
 
         let str_instance = KnownClass::Str.to_instance(&db);
-        let empty_str = Type::StringLiteral(StringLiteralType::new(&db, "".into()));
+        let empty_str = Type::StringLiteral(StringLiteralType::empty(&db));
         assert_eq!(
             UnionBuilder::new(&db)
                 .add(empty_str)
