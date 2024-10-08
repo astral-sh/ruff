@@ -418,11 +418,10 @@ mod tests {
             ## Two
             ",
         );
-        let mf = super::parse("file.md", &source);
-        assert!(
-            mf.as_ref().is_err_and(|err| err.to_string()
-                == "Header 'Two' not valid inside a test case; parent 'One' has code files."),
-            "Unexpected parse result: {mf:?}",
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        assert_eq!(
+            err.to_string(),
+            "Header 'Two' not valid inside a test case; parent 'One' has code files."
         );
     }
 
@@ -435,12 +434,8 @@ mod tests {
             ```
             ",
         );
-        let mf = super::parse("file.md", &source);
-        assert!(
-            mf.as_ref()
-                .is_err_and(|err| err.to_string() == "Invalid config item `foo`."),
-            "Unexpected parse result: {mf:?}",
-        );
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        assert_eq!(err.to_string(), "Invalid config item `foo`.");
     }
 
     #[test]
@@ -452,12 +447,8 @@ mod tests {
             ```
             ",
         );
-        let mf = super::parse("file.md", &source);
-        assert!(
-            mf.as_ref()
-                .is_err_and(|err| err.to_string() == "Invalid config item `foo=bar=baz`."),
-            "Unexpected parse result: {mf:?}",
-        );
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        assert_eq!(err.to_string(), "Invalid config item `foo=bar=baz`.");
     }
 
     #[test]
@@ -473,13 +464,12 @@ mod tests {
             ```
             ",
         );
-        let mf = super::parse("file.md", &source);
-        assert!(
-            mf.as_ref().is_err_and(|err| err.to_string()
-                == "Test `file.md` has duplicate files named `test.py`. \
-                (This is the default filename; consider giving some files an explicit name \
-                 with `path=...`.)"),
-            "Unexpected parse result: {mf:?}",
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        assert_eq!(
+            err.to_string(),
+            "Test `file.md` has duplicate files named `test.py`. \
+            (This is the default filename; consider giving some files an explicit name \
+            with `path=...`.)"
         );
     }
 
@@ -496,12 +486,10 @@ mod tests {
             ```
             ",
         );
-        let mf = super::parse("file.md", &source);
-        assert!(
-            mf.as_ref().is_err_and(
-                |err| err.to_string() == "Test `file.md` has duplicate files named `foo.py`."
-            ),
-            "Unexpected parse result: {mf:?}",
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        assert_eq!(
+            err.to_string(),
+            "Test `file.md` has duplicate files named `foo.py`."
         );
     }
 }
