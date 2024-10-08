@@ -2,6 +2,7 @@ use std::path::Path;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::PySourceType;
 use ruff_python_stdlib::path::is_module_file;
 use ruff_python_stdlib::sys::is_known_standard_library;
 use ruff_text_size::TextRange;
@@ -42,10 +43,10 @@ pub(crate) fn builtin_module_shadowing(
     allowed_modules: &[String],
     target_version: PythonVersion,
 ) -> Option<Diagnostic> {
-    if !path
-        .extension()
-        .is_some_and(|ext| ext == "py" || ext == "pyi")
-    {
+    if !matches!(
+        PySourceType::try_from_path(path),
+        Some(PySourceType::Python | PySourceType::Stub)
+    ) {
         return None;
     }
 

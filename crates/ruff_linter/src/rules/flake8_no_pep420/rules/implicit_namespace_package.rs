@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::PySourceType;
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 use ruff_text_size::{TextRange, TextSize};
@@ -51,7 +52,7 @@ pub(crate) fn implicit_namespace_package(
 ) -> Option<Diagnostic> {
     if package.is_none()
         // Ignore non-`.py` files, which don't require an `__init__.py`.
-        && path.extension().is_some_and( |ext| ext == "py")
+        && PySourceType::try_from_path(path).is_some_and(|source_type|source_type.is_python())
         // Ignore any files that are direct children of the project root.
         && !path
             .parent()

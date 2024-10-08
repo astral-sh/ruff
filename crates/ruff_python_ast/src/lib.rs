@@ -99,13 +99,17 @@ impl PySourceType {
 
         Some(ty)
     }
+
+    pub fn try_from_path(path: impl AsRef<Path>) -> Option<Self> {
+        path.as_ref()
+            .extension()
+            .and_then(OsStr::to_str)
+            .and_then(Self::try_from_extension)
+    }
 }
 
 impl<P: AsRef<Path>> From<P> for PySourceType {
     fn from(path: P) -> Self {
-        path.as_ref()
-            .extension()
-            .and_then(OsStr::to_str)
-            .map_or(Self::Python, Self::from_extension)
+        Self::try_from_path(path).unwrap_or_default()
     }
 }
