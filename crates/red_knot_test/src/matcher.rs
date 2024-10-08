@@ -8,7 +8,6 @@ use ruff_db::files::File;
 use ruff_db::source::{line_index, source_text, SourceText};
 use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::Ranged;
-use rustc_hash::FxHashSet;
 use std::cmp::Ordering;
 use std::ops::Range;
 use std::sync::Arc;
@@ -227,10 +226,13 @@ impl Matcher {
     /// A `Type` assertion must match a revealed-type diagnostic, and may also match an
     /// undefined-reveal diagnostic, if present.
     fn matches<T: Diagnostic>(&self, assertion: &Assertion, unmatched: &mut Vec<&T>) -> bool {
-        let mut matched: FxHashSet<usize> = FxHashSet::default();
         match assertion {
             Assertion::Error(error) => {
-                for (index, diagnostic) in unmatched.iter().enumerate() {
+                let mut found = false;
+                unmatched.retain(|diagnostic| {
+                    if found {
+                        return true;
+                    }
                     if !error.rule.is_some_and(|rule| rule != diagnostic.rule())
                         && !error
                             .column
@@ -239,44 +241,49 @@ impl Matcher {
                             .message_contains
                             .is_some_and(|needle| !diagnostic.message().contains(needle))
                     {
-                        matched.insert(index);
-                        break;
+                        found = true;
+                        false
+                    } else {
+                        true
                     }
-                }
+                });
+                found
             }
             Assertion::Type(ta) => {
-                let mut matched_revealed_type = false;
+                let mut matched_revealed_type = None;
                 let mut matched_undefined_reveal = None;
                 for (index, diagnostic) in unmatched.iter().enumerate() {
-                    if !matched_revealed_type
+                    if matched_revealed_type.is_none()
                         && diagnostic.rule() == "revealed-type"
                         && diagnostic.message() == format!("Revealed type is `{}`", ta.ty_display)
                     {
-                        matched_revealed_type = true;
-                        matched.insert(index);
-                        if let Some(index) = matched_undefined_reveal {
-                            matched.insert(index);
+                        matched_revealed_type = Some(index);
+                        if matched_undefined_reveal.is_some() {
                             break;
                         }
                     } else if matched_undefined_reveal.is_none()
                         && diagnostic.rule() == "undefined-reveal"
                     {
-                        if matched_revealed_type {
-                            matched.insert(index);
+                        matched_undefined_reveal = Some(index);
+                        if matched_revealed_type.is_some() {
                             break;
                         }
-                        matched_undefined_reveal = Some(index);
                     }
+                }
+                if matched_revealed_type.is_some() {
+                    let mut idx = 0;
+                    unmatched.retain(|_| {
+                        let retain = Some(idx) != matched_revealed_type
+                            && Some(idx) != matched_undefined_reveal;
+                        idx += 1;
+                        retain
+                    });
+                    true
+                } else {
+                    false
                 }
             }
         }
-        let mut idx = 0;
-        unmatched.retain(|_| {
-            let ret = !matched.contains(&idx);
-            idx += 1;
-            ret
-        });
-        !matched.is_empty()
     }
 }
 
