@@ -1,6 +1,7 @@
 //! Sort and group diagnostics by line number, so they can be correlated with assertions.
 //!
 //! We don't assume that we will get the diagnostics in source order.
+
 use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::Ranged;
 use smallvec::SmallVec;
@@ -13,28 +14,28 @@ where
     T: Ranged + Clone,
 {
     pub(crate) fn new(diagnostics: impl IntoIterator<Item = T>, line_index: &LineIndex) -> Self {
-        let mut diagnostics = diagnostics
+        let mut diagnostics: Vec<_> = diagnostics
             .into_iter()
             .map(|diagnostic| DiagnosticWithLine {
-                line: line_index.line_index(diagnostic.range().start()),
+                line_number: line_index.line_index(diagnostic.start()),
                 diagnostic,
             })
-            .collect::<Vec<_>>();
-        diagnostics.sort_by_key(|diag| diag.line);
+            .collect();
+        diagnostics.sort_by_key(|diagnostic_with_line| diagnostic_with_line.line_number);
 
         Self(diagnostics)
     }
 
     pub(crate) fn iter_lines(&self) -> LineDiagnosticsIterator<T> {
         LineDiagnosticsIterator {
-            inner: self.0.iter().peekable(),
+            inner: self.0.iter(),
         }
     }
 }
 
 /// Iterator to group sorted diagnostics by line.
 pub(crate) struct LineDiagnosticsIterator<'a, T> {
-    inner: std::iter::Peekable<std::slice::Iter<'a, DiagnosticWithLine<T>>>,
+    inner: std::slice::Iter<'a, DiagnosticWithLine<T>>,
 }
 
 impl<T> Iterator for LineDiagnosticsIterator<'_, T>
@@ -44,18 +45,28 @@ where
     type Item = LineDiagnostics<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let diag = self.inner.next()?;
-        let line = diag.line;
+        let DiagnosticWithLine {
+            line_number: current_line_number,
+            diagnostic,
+        } = self.inner.next()?;
         let mut diagnostics = DiagnosticVec::new();
-        diagnostics.push(diag.diagnostic.clone());
-        while let Some(diag) = self.inner.peek() {
-            if diag.line == line {
-                diagnostics.push(self.inner.next().unwrap().diagnostic.clone());
+        diagnostics.push(diagnostic.clone());
+        while let Some(DiagnosticWithLine {
+            line_number,
+            diagnostic,
+        }) = self.inner.clone().next()
+        {
+            if line_number == current_line_number {
+                diagnostics.push(diagnostic.clone());
+                self.inner.next();
             } else {
                 break;
             }
         }
-        Some(LineDiagnostics { line, diagnostics })
+        Some(LineDiagnostics {
+            line_number: *current_line_number,
+            diagnostics,
+        })
     }
 }
 
@@ -70,7 +81,7 @@ type DiagnosticVec<T> = SmallVec<[T; 1]>;
 #[derive(Debug)]
 pub(crate) struct LineDiagnostics<T> {
     /// Line number on which these diagnostics start.
-    pub(crate) line: OneIndexed,
+    pub(crate) line_number: OneIndexed,
 
     /// Diagnostics starting on this line.
     pub(crate) diagnostics: DiagnosticVec<T>,
@@ -84,7 +95,7 @@ impl<'a, T> From<&'a LineDiagnostics<T>> for &'a [T] {
 
 #[derive(Debug)]
 struct DiagnosticWithLine<T> {
-    line: OneIndexed,
+    line_number: OneIndexed,
     diagnostic: T,
 }
 
@@ -117,9 +128,9 @@ mod tests {
             panic!("expected two lines");
         };
 
-        assert_eq!(line1.line, OneIndexed::from_zero_indexed(0));
+        assert_eq!(line1.line_number, OneIndexed::from_zero_indexed(0));
         assert_eq!(line1.diagnostics.len(), 2);
-        assert_eq!(line2.line, OneIndexed::from_zero_indexed(1));
+        assert_eq!(line2.line_number, OneIndexed::from_zero_indexed(1));
         assert_eq!(line2.diagnostics.len(), 1);
     }
 }

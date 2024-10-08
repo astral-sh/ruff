@@ -74,7 +74,7 @@ where
     loop {
         match (&current_assertions, &current_diagnostics) {
             (Some(assertions), Some(diagnostics)) => {
-                match assertions.line.cmp(&diagnostics.line) {
+                match assertions.line.cmp(&diagnostics.line_number) {
                     Ordering::Equal => {
                         // We have assertions and diagnostics on the same line; check for
                         // matches and error on any that don't match, then advance both
@@ -96,7 +96,7 @@ where
                     Ordering::Greater => {
                         // We have diagnostics on an earlier line than assertions; report these
                         // diagnostics as all unmatched, and advance the diagnostics iterator.
-                        failures.push(diagnostics.line, unmatched(diagnostics));
+                        failures.push(diagnostics.line_number, unmatched(diagnostics));
                         current_diagnostics = line_diagnostics.next();
                     }
                 }
@@ -110,7 +110,7 @@ where
             (None, Some(diagnostics)) => {
                 // We've exhausted assertions but still have diagnostics; report these
                 // diagnostics as unmatched and advance the diagnostics iterator.
-                failures.push(diagnostics.line, unmatched(diagnostics));
+                failures.push(diagnostics.line_number, unmatched(diagnostics));
                 current_diagnostics = line_diagnostics.next();
             }
             // When we've exhausted both diagnostics and assertions, break.
