@@ -1,7 +1,7 @@
 use ruff_python_ast::FStringPart;
 
 use crate::other::f_string::FormatFString;
-use crate::other::string_literal::{FormatStringLiteral, StringLiteralKind};
+use crate::other::string_literal::StringLiteralKind;
 use crate::prelude::*;
 use crate::string::Quoting;
 
@@ -25,14 +25,13 @@ impl<'a> FormatFStringPart<'a> {
 impl Format<PyFormatContext<'_>> for FormatFStringPart<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         match self.part {
-            FStringPart::Literal(string_literal) => FormatStringLiteral::new(
-                string_literal,
-                // If an f-string part is a string literal, the f-string is always
-                // implicitly concatenated e.g., `"foo" f"bar {x}"`. A standalone
-                // string literal would be a string expression, not an f-string.
-                StringLiteralKind::InImplicitlyConcatenatedFString(self.quoting),
-            )
-            .fmt(f),
+            #[allow(deprecated)]
+            FStringPart::Literal(string_literal) => string_literal
+                .format()
+                .with_options(StringLiteralKind::InImplicitlyConcatenatedFString(
+                    self.quoting,
+                ))
+                .fmt(f),
             FStringPart::FString(f_string) => FormatFString::new(f_string, self.quoting).fmt(f),
         }
     }

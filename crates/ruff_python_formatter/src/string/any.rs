@@ -11,7 +11,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::expression::expr_f_string::f_string_quoting;
 use crate::other::f_string::FormatFString;
-use crate::other::string_literal::{FormatStringLiteral, StringLiteralKind};
+use crate::other::string_literal::StringLiteralKind;
 use crate::prelude::*;
 use crate::string::Quoting;
 
@@ -160,6 +160,7 @@ impl<'a> Iterator for AnyStringPartsIter<'a> {
                 match part {
                     ast::FStringPart::Literal(string_literal) => AnyStringPart::String {
                         part: string_literal,
+                        #[allow(deprecated)]
                         layout: StringLiteralKind::InImplicitlyConcatenatedFString(*quoting),
                     },
                     ast::FStringPart::FString(f_string) => AnyStringPart::FString {
@@ -226,9 +227,7 @@ impl Ranged for AnyStringPart<'_> {
 impl Format<PyFormatContext<'_>> for AnyStringPart<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         match self {
-            AnyStringPart::String { part, layout } => {
-                FormatStringLiteral::new(part, *layout).fmt(f)
-            }
+            AnyStringPart::String { part, layout } => part.format().with_options(*layout).fmt(f),
             AnyStringPart::Bytes(bytes_literal) => bytes_literal.format().fmt(f),
             AnyStringPart::FString { part, quoting } => FormatFString::new(part, *quoting).fmt(f),
         }
