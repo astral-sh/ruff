@@ -415,17 +415,6 @@ pub struct Options {
     )]
     pub indent_width: Option<IndentWidth>,
 
-    /// The number of spaces a tab is equal to when enforcing long-line violations (like `E501`)
-    /// or formatting code with the formatter.
-    ///
-    /// This option changes the number of spaces inserted by the formatter when
-    /// using soft-tabs (`indent-style = space`).
-    #[deprecated(
-        since = "0.1.2",
-        note = "The `tab-size` option has been renamed to `indent-width` to emphasize that it configures the indentation used by the formatter as well as the tab width. Please update your configuration to use `indent-width = <value>` instead."
-    )]
-    pub tab_size: Option<IndentWidth>,
-
     #[option_group]
     pub lint: Option<LintOptions>,
 
