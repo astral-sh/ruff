@@ -170,88 +170,101 @@ impl<'s> Parser<'s> {
     fn start(&mut self) -> anyhow::Result<()> {
         while !self.unparsed.is_empty() {
             if let Some(captures) = self.scan(&HEADER_RE) {
-                let header_level = captures["level"].len();
-                self.pop_sections_to_level(header_level);
-
-                // We never pop the implicit root section.
-                let parent = self.stack.last().unwrap();
-
-                let section = Section {
-                    // HEADER_RE can't match without a match for group 'title'.
-                    title: captures.name("title").unwrap().into(),
-                    level: header_level.try_into()?,
-                    parent_id: Some(*parent),
-                };
-
-                if self.current_section_files.is_some() {
-                    return Err(anyhow::anyhow!(
-                        "Header '{}' not valid inside a test case; parent '{}' has code files.",
-                        section.title,
-                        self.sections[*parent].title,
-                    ));
-                }
-
-                let section_id = self.sections.push(section);
-                self.stack.push(section_id);
-
-                self.current_section_files = None;
+                self.parse_header(&captures)?;
             } else if let Some(captures) = self.scan(&CODE_RE) {
-                // We never pop the implicit root section.
-                let parent = self.stack.last().unwrap();
-
-                let mut config: FxHashMap<&'s str, &'s str> = FxHashMap::default();
-
-                if let Some(config_match) = captures.name("config") {
-                    for item in config_match.as_str().split_whitespace() {
-                        let mut parts = item.split('=');
-                        let key = parts.next().unwrap();
-                        let Some(val) = parts.next() else {
-                            return Err(anyhow::anyhow!("Invalid config item `{}`.", item));
-                        };
-                        if parts.next().is_some() {
-                            return Err(anyhow::anyhow!("Invalid config item `{}`.", item));
-                        }
-                        config.insert(key, val);
-                    }
-                }
-
-                let path = config.get("path").copied().unwrap_or("test.py");
-
-                self.files.push(EmbeddedFile {
-                    path,
-                    section: *parent,
-                    // CODE_RE can't match without matches for 'lang' and 'code'.
-                    lang: captures.name("lang").unwrap().into(),
-                    code: captures.name("code").unwrap().into(),
-                });
-
-                if let Some(current_files) = &mut self.current_section_files {
-                    if current_files.contains(path) {
-                        let current = &self.sections[*self.stack.last().unwrap()];
-                        if path == "test.py" {
-                            return Err(anyhow::anyhow!(
-                                "Test `{}` has duplicate files named `{path}`. \
-                                (This is the default filename; \
-                                 consider giving some files an explicit name with `path=...`.)",
-                                current.title
-                            ));
-                        }
-                        return Err(anyhow::anyhow!(
-                            "Test `{}` has duplicate files named `{path}`.",
-                            current.title
-                        ));
-                    }
-                    current_files.insert(path);
-                } else {
-                    self.current_section_files = Some(FxHashSet::from_iter([path]));
-                }
+                self.parse_code_block(&captures)?;
             } else {
+                // ignore other Markdown syntax (paragraphs, etc) used as comments in the test
                 if let Some(next_newline) = self.unparsed.find('\n') {
                     (_, self.unparsed) = self.unparsed.split_at(next_newline + 1);
                 } else {
                     break;
                 }
             }
+        }
+
+        Ok(())
+    }
+
+    fn parse_header(&mut self, captures: &Captures<'s>) -> anyhow::Result<()> {
+        let header_level = captures["level"].len();
+        self.pop_sections_to_level(header_level);
+
+        // We never pop the implicit root section.
+        let parent = self.stack.last().unwrap();
+
+        let section = Section {
+            // HEADER_RE can't match without a match for group 'title'.
+            title: captures.name("title").unwrap().into(),
+            level: header_level.try_into()?,
+            parent_id: Some(*parent),
+        };
+
+        if self.current_section_files.is_some() {
+            return Err(anyhow::anyhow!(
+                "Header '{}' not valid inside a test case; parent '{}' has code files.",
+                section.title,
+                self.sections[*parent].title,
+            ));
+        }
+
+        let section_id = self.sections.push(section);
+        self.stack.push(section_id);
+
+        self.current_section_files = None;
+
+        Ok(())
+    }
+
+    fn parse_code_block(&mut self, captures: &Captures<'s>) -> anyhow::Result<()> {
+        // We never pop the implicit root section.
+        let parent = self.stack.last().unwrap();
+
+        let mut config: FxHashMap<&'s str, &'s str> = FxHashMap::default();
+
+        if let Some(config_match) = captures.name("config") {
+            for item in config_match.as_str().split_whitespace() {
+                let mut parts = item.split('=');
+                let key = parts.next().unwrap();
+                let Some(val) = parts.next() else {
+                    return Err(anyhow::anyhow!("Invalid config item `{}`.", item));
+                };
+                if parts.next().is_some() {
+                    return Err(anyhow::anyhow!("Invalid config item `{}`.", item));
+                }
+                config.insert(key, val);
+            }
+        }
+
+        let path = config.get("path").copied().unwrap_or("test.py");
+
+        self.files.push(EmbeddedFile {
+            path,
+            section: *parent,
+            // CODE_RE can't match without matches for 'lang' and 'code'.
+            lang: captures.name("lang").unwrap().into(),
+            code: captures.name("code").unwrap().into(),
+        });
+
+        if let Some(current_files) = &mut self.current_section_files {
+            if current_files.contains(path) {
+                let current = &self.sections[*self.stack.last().unwrap()];
+                if path == "test.py" {
+                    return Err(anyhow::anyhow!(
+                        "Test `{}` has duplicate files named `{path}`. \
+                                (This is the default filename; \
+                                 consider giving some files an explicit name with `path=...`.)",
+                        current.title
+                    ));
+                }
+                return Err(anyhow::anyhow!(
+                    "Test `{}` has duplicate files named `{path}`.",
+                    current.title
+                ));
+            }
+            current_files.insert(path);
+        } else {
+            self.current_section_files = Some(FxHashSet::from_iter([path]));
         }
 
         Ok(())
