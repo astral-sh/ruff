@@ -16,17 +16,13 @@ pub(crate) struct Db {
 }
 
 impl Db {
-    pub(crate) fn new() -> Self {
-        Self {
+    pub(crate) fn setup(workspace_root: SystemPathBuf) -> Self {
+        let db = Self {
             storage: salsa::Storage::default(),
             system: TestSystem::default(),
             vendored: red_knot_vendored::file_system().clone(),
             files: Files::default(),
-        }
-    }
-
-    pub(crate) fn setup(workspace_root: SystemPathBuf) -> Self {
-        let db = Self::new();
+        };
 
         db.memory_file_system()
             .create_directory_all(&workspace_root)
@@ -39,7 +35,7 @@ impl Db {
                 search_paths: SearchPathSettings::new(workspace_root),
             },
         )
-        .expect("Valid search path settings");
+        .expect("Invalid search path settings");
 
         db
     }
