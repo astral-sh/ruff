@@ -14,13 +14,9 @@ use crate::checkers::ast::Checker;
 /// ## Why is this bad?
 /// If a file is opened without a context manager, it is not guaranteed that
 /// the file will be closed (e.g., if an exception is raised), which can cause
-/// resource leaks.
-///
-/// ## Preview-mode behavior
-/// If [preview] mode is enabled, this rule will detect a wide array of IO calls where
-/// context managers could be used, such as `tempfile.TemporaryFile()` or
-/// `tarfile.TarFile(...).gzopen()`. If preview mode is not enabled, only `open()`,
-/// `builtins.open()` and `pathlib.Path(...).open()` are detected.
+/// resource leaks. The rule detects a wide array of IO calls where context managers
+/// could be used, such as `open`, `pathlib.Path(...).open()`, `tempfile.TemporaryFile()`
+/// or`tarfile.TarFile(...).gzopen()`.
 ///
 /// ## Example
 /// ```python
@@ -118,36 +114,9 @@ fn match_exit_stack(semantic: &SemanticModel) -> bool {
     false
 }
 
-/// Return `true` if `func` is the builtin `open` or `pathlib.Path(...).open`.
-fn is_open(semantic: &SemanticModel, call: &ast::ExprCall) -> bool {
-    // Ex) `open(...)`
-    if semantic.match_builtin_expr(&call.func, "open") {
-        return true;
-    }
-
-    // Ex) `pathlib.Path(...).open()`
-    let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = &*call.func else {
-        return false;
-    };
-
-    if attr != "open" {
-        return false;
-    }
-
-    let Expr::Call(ast::ExprCall {
-        func: value_func, ..
-    }) = &**value
-    else {
-        return false;
-    };
-
-    semantic
-        .resolve_qualified_name(value_func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pathlib", "Path"]))
-}
-
-/// Return `true` if the expression is an `open` call or temporary file constructor.
-fn is_open_preview(semantic: &SemanticModel, call: &ast::ExprCall) -> bool {
+/// Return `true` if the expression is a call to `open()`,
+/// or a call to some other standard-library function that opens a file.
+fn is_open_call(semantic: &SemanticModel, call: &ast::ExprCall) -> bool {
     let func = &*call.func;
 
     // Ex) `open(...)`
@@ -203,8 +172,8 @@ fn is_open_preview(semantic: &SemanticModel, call: &ast::ExprCall) -> bool {
     )
 }
 
-/// Return `true` if the current expression is followed by a `close` call.
-fn is_closed(semantic: &SemanticModel) -> bool {
+/// Return `true` if the current expression is immediately followed by a `.close()` call.
+fn is_immediately_closed(semantic: &SemanticModel) -> bool {
     let Some(expr) = semantic.current_expression_grandparent() else {
         return false;
     };
@@ -231,18 +200,12 @@ fn is_closed(semantic: &SemanticModel) -> bool {
 pub(crate) fn open_file_with_context_handler(checker: &mut Checker, call: &ast::ExprCall) {
     let semantic = checker.semantic();
 
-    if checker.settings.preview.is_disabled() {
-        if !is_open(semantic, call) {
-            return;
-        }
-    } else {
-        if !is_open_preview(semantic, call) {
-            return;
-        }
+    if !is_open_call(semantic, call) {
+        return;
     }
 
     // Ex) `open("foo.txt").close()`
-    if is_closed(semantic) {
+    if is_immediately_closed(semantic) {
         return;
     }
 
