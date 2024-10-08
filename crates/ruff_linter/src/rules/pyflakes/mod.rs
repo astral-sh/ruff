@@ -208,6 +208,18 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn f821_with_builtin_added_on_new_py_version_but_old_target_version_specified() {
+        let diagnostics = test_snippet(
+            "PythonFinalizationError",
+            &LinterSettings {
+                target_version: crate::settings::types::PythonVersion::Py312,
+                ..LinterSettings::for_rule(Rule::UndefinedName)
+            },
+        );
+        assert_messages!(diagnostics);
+    }
+
     #[test_case(Rule::UnusedVariable, Path::new("F841_4.py"))]
     #[test_case(Rule::UnusedImport, Path::new("__init__.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_24/__init__.py"))]
@@ -315,6 +327,21 @@ mod tests {
         assert_messages!(snapshot, diagnostics);
         Ok(())
     }
+    #[test_case(Rule::UnusedImport, Path::new("F401_31.py"))]
+    fn f401_allowed_unused_imports_option(rule_code: Rule, path: &Path) -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyflakes").join(path).as_path(),
+            &LinterSettings {
+                pyflakes: pyflakes::settings::Settings {
+                    allowed_unused_imports: vec!["hvplot.pandas".to_string()],
+                    ..pyflakes::settings::Settings::default()
+                },
+                ..LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
 
     #[test]
     fn f841_dummy_variable_rgx() -> Result<()> {
@@ -415,7 +442,7 @@ mod tests {
             Path::new("pyflakes/project/foo/bar.py"),
             &LinterSettings {
                 typing_modules: vec!["foo.typical".to_string()],
-                ..LinterSettings::for_rules(vec![Rule::UndefinedName])
+                ..LinterSettings::for_rule(Rule::UndefinedName)
             },
         )?;
         assert_messages!(diagnostics);
@@ -428,7 +455,7 @@ mod tests {
             Path::new("pyflakes/project/foo/bop/baz.py"),
             &LinterSettings {
                 typing_modules: vec!["foo.typical".to_string()],
-                ..LinterSettings::for_rules(vec![Rule::UndefinedName])
+                ..LinterSettings::for_rule(Rule::UndefinedName)
             },
         )?;
         assert_messages!(diagnostics);
@@ -443,8 +470,9 @@ mod tests {
             &LinterSettings {
                 pyflakes: pyflakes::settings::Settings {
                     extend_generics: vec!["django.db.models.ForeignKey".to_string()],
+                    ..pyflakes::settings::Settings::default()
                 },
-                ..LinterSettings::for_rules(vec![Rule::UnusedImport])
+                ..LinterSettings::for_rule(Rule::UnusedImport)
             },
         )?;
         assert_messages!(snapshot, diagnostics);

@@ -3,6 +3,7 @@ use std::fmt::{Debug, Display, Formatter};
 
 use anyhow::Result;
 
+use itertools::Itertools;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::any_over_expr;
@@ -16,14 +17,14 @@ use crate::checkers::ast::Checker;
 use crate::importer::{ImportRequest, Importer};
 
 /// ## What it does
-/// Checks for lambda expressions and function definitions that can be replaced
-/// with a function from the `operator` module.
+/// Checks for lambda expressions and function definitions that can be replaced with a function from
+/// the `operator` module.
 ///
 /// ## Why is this bad?
-/// The `operator` module provides functions that implement the same functionality
-/// as the corresponding operators. For example, `operator.add` is equivalent to
-/// `lambda x, y: x + y`. Using the functions from the `operator` module is more
-/// concise and communicates the intent of the code more clearly.
+/// The `operator` module provides functions that implement the same functionality as the
+/// corresponding operators. For example, `operator.add` is equivalent to `lambda x, y: x + y`.
+/// Using the functions from the `operator` module is more concise and communicates the intent of
+/// the code more clearly.
 ///
 /// ## Example
 /// ```python
@@ -41,6 +42,12 @@ use crate::importer::{ImportRequest, Importer};
 /// nums = [1, 2, 3]
 /// total = functools.reduce(operator.add, nums)
 /// ```
+///
+/// ## Fix safety
+/// This fix is usually safe, but if the lambda is called with keyword arguments, e.g.,
+/// `add = lambda x, y: x + y; add(x=1, y=2)`, replacing the lambda with an operator function, e.g.,
+/// `operator.add`, will cause the call to raise a `TypeError`, as functions in `operator` do not allow
+/// keyword arguments.
 #[violation]
 pub struct ReimplementedOperator {
     operator: Operator,
@@ -176,7 +183,7 @@ impl FunctionLike<'_> {
                 } else {
                     format!("{binding}({})", operator.args.join(", "))
                 };
-                Ok(Some(Fix::safe_edits(
+                Ok(Some(Fix::unsafe_edits(
                     Edit::range_replacement(content, self.range()),
                     [edit],
                 )))
@@ -213,7 +220,18 @@ fn subscript_slice_to_string<'a>(expr: &Expr, locator: &Locator<'a>) -> Cow<'a, 
     if let Expr::Slice(expr_slice) = expr {
         Cow::Owned(slice_expr_to_slice_call(expr_slice, locator))
     } else if let Expr::Tuple(tuple) = expr {
-        if tuple.parenthesized {
+        if locator.slice(tuple).contains(':') {
+            // We cannot perform a trivial replacement if there's a `:` in the expression
+            let inner = tuple
+                .iter()
+                .map(|expr| match expr {
+                    Expr::Slice(expr) => Cow::Owned(slice_expr_to_slice_call(expr, locator)),
+                    _ => Cow::Borrowed(locator.slice(expr)),
+                })
+                .join(", ");
+
+            Cow::Owned(format!("({inner})"))
+        } else if tuple.parenthesized {
             Cow::Borrowed(locator.slice(expr))
         } else {
             Cow::Owned(format!("({})", locator.slice(tuple)))
@@ -254,13 +272,12 @@ fn itemgetter_op_tuple(
     let [arg] = params.args.as_slice() else {
         return None;
     };
-    if expr.elts.is_empty() || expr.elts.len() == 1 {
+    if expr.len() <= 1 {
         return None;
     }
     Some(Operator {
         name: "itemgetter",
         args: expr
-            .elts
             .iter()
             .map(|expr| {
                 expr.as_subscript_expr()

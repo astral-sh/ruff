@@ -6,6 +6,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use anyhow::Result;
+use itertools::Itertools;
 use regex::{Captures, Regex};
 use strum::IntoEnumIterator;
 
@@ -33,7 +34,26 @@ pub(crate) fn main(args: &Args) -> Result<()> {
 
             let (linter, _) = Linter::parse_code(&rule.noqa_code().to_string()).unwrap();
             if linter.url().is_some() {
-                output.push_str(&format!("Derived from the **{}** linter.", linter.name()));
+                let common_prefix: String = match linter.common_prefix() {
+                    "" => linter
+                        .upstream_categories()
+                        .unwrap()
+                        .iter()
+                        .map(|c| c.prefix)
+                        .join("-"),
+                    prefix => prefix.to_string(),
+                };
+                let anchor = format!(
+                    "{}-{}",
+                    linter.name().to_lowercase(),
+                    common_prefix.to_lowercase()
+                );
+
+                output.push_str(&format!(
+                    "Derived from the **[{}](../rules.md#{})** linter.",
+                    linter.name(),
+                    anchor
+                ));
                 output.push('\n');
                 output.push('\n');
             }

@@ -14,12 +14,26 @@
     rangeStrategy: "update-lockfile",
   },
   pep621: {
+    // The default for this package manager is to only search for `pyproject.toml` files
+    // found at the repository root: https://docs.renovatebot.com/modules/manager/pep621/#file-matching
     fileMatch: ["^(python|scripts)/.*pyproject\\.toml$"],
   },
   pip_requirements: {
-    fileMatch: ["^docs/requirements.*\\.txt$"],
+    // The default for this package manager is to run on all requirements.txt files:
+    // https://docs.renovatebot.com/modules/manager/pip_requirements/#file-matching
+    // `fileMatch` doesn't work for excluding files; to exclude `requirements.txt` files
+    // outside the `doc/` directory, we instead have to use `ignorePaths`. Unlike `fileMatch`,
+    // which takes a regex string, `ignorePaths` takes a glob string, so we have to use
+    // a "negative glob pattern".
+    // See:
+    // - https://docs.renovatebot.com/modules/manager/#ignoring-files-that-match-the-default-filematch
+    // - https://docs.renovatebot.com/configuration-options/#ignorepaths
+    // - https://docs.renovatebot.com/string-pattern-matching/#negative-matching
+    ignorePaths: ["!docs/requirements*.txt"]
   },
   npm: {
+    // The default for this package manager is to only search for `package.json` files
+    // found at the repository root: https://docs.renovatebot.com/modules/manager/npm/#file-matching
     fileMatch: ["^playground/.*package\\.json$"],
   },
   "pre-commit": {

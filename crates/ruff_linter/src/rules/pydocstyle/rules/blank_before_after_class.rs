@@ -34,6 +34,7 @@ use crate::registry::Rule;
 ///
 /// ```python
 /// class PhotoMetadata:
+///
 ///     """Metadata about a photo."""
 /// ```
 ///
@@ -125,6 +126,7 @@ impl AlwaysFixableViolation for OneBlankLineAfterClass {
 ///
 /// ```python
 /// class PhotoMetadata:
+///
 ///     """Metadata about a photo."""
 /// ```
 ///

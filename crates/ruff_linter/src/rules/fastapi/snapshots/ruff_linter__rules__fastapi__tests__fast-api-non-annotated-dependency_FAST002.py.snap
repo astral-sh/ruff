@@ -261,3 +261,72 @@ FAST002.py:38:5: FAST002 [*] FastAPI dependency without `Annotated`
 39 40 | ):
 40 41 |     # do stuff
 41 42 |     pass
+
+FAST002.py:47:5: FAST002 [*] FastAPI dependency without `Annotated`
+   |
+45 |     skip: int,
+46 |     limit: int,
+47 |     current_user: User = Depends(get_current_user),
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
+48 | ):
+49 |     pass
+   |
+   = help: Replace with `Annotated`
+
+ℹ Unsafe fix
+12 12 |     Security,
+13 13 | )
+14 14 | from pydantic import BaseModel
+   15 |+from typing import Annotated
+15 16 | 
+16 17 | app = FastAPI()
+17 18 | router = APIRouter()
+--------------------------------------------------------------------------------
+44 45 | def get_users(
+45 46 |     skip: int,
+46 47 |     limit: int,
+47    |-    current_user: User = Depends(get_current_user),
+   48 |+    current_user: Annotated[User, Depends(get_current_user)],
+48 49 | ):
+49 50 |     pass
+50 51 | 
+
+FAST002.py:53:5: FAST002 [*] FastAPI dependency without `Annotated`
+   |
+51 | @app.get("/users/")
+52 | def get_users(
+53 |     current_user: User = Depends(get_current_user),
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
+54 |     skip: int = 0,
+55 |     limit: int = 10,
+   |
+   = help: Replace with `Annotated`
+
+ℹ Unsafe fix
+12 12 |     Security,
+13 13 | )
+14 14 | from pydantic import BaseModel
+   15 |+from typing import Annotated
+15 16 | 
+16 17 | app = FastAPI()
+17 18 | router = APIRouter()
+--------------------------------------------------------------------------------
+50 51 | 
+51 52 | @app.get("/users/")
+52 53 | def get_users(
+53    |-    current_user: User = Depends(get_current_user),
+   54 |+    current_user: Annotated[User, Depends(get_current_user)],
+54 55 |     skip: int = 0,
+55 56 |     limit: int = 10,
+56 57 | ):
+
+FAST002.py:67:5: FAST002 FastAPI dependency without `Annotated`
+   |
+65 |     skip: int = 0,
+66 |     limit: int = 10,
+67 |     current_user: User = Depends(get_current_user),
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
+68 | ):
+69 |     pass
+   |
+   = help: Replace with `Annotated`

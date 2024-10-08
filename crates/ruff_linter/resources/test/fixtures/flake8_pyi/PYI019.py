@@ -44,3 +44,11 @@ class PEP695BadDunderNew[T]:
 
 class PEP695GoodDunderNew[T]:
   def __new__(cls, *args: Any, **kwargs: Any) -> Self: ...
+
+
+class CustomClassMethod:
+   # Should be recognised as a classmethod decorator
+   # due to `foo_classmethod being listed in `pep8_naming.classmethod-decorators`
+   # in the settings for this test:
+   @foo_classmethod
+   def foo[S](cls: type[S]) -> S: ...  # PYI019

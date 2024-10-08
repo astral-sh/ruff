@@ -1,17 +1,15 @@
 use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 
-use red_knot_python_semantic::{
-    vendored_typeshed_stubs, Db as SemanticDb, Program, ProgramSettings,
-};
+use salsa::plumbing::ZalsaDatabase;
+use salsa::{Cancelled, Event};
+
+use red_knot_python_semantic::{Db as SemanticDb, Program};
 use ruff_db::files::{File, Files};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Upcast};
-use salsa::plumbing::ZalsaDatabase;
-use salsa::{Cancelled, Event};
 
-use crate::lint::Diagnostics;
 use crate::workspace::{check_file, Workspace, WorkspaceMetadata};
 
 mod changes;
@@ -28,11 +26,7 @@ pub struct RootDatabase {
 }
 
 impl RootDatabase {
-    pub fn new<S>(
-        workspace: WorkspaceMetadata,
-        settings: ProgramSettings,
-        system: S,
-    ) -> anyhow::Result<Self>
+    pub fn new<S>(workspace: WorkspaceMetadata, system: S) -> anyhow::Result<Self>
     where
         S: System + 'static + Send + Sync + RefUnwindSafe,
     {
@@ -43,11 +37,11 @@ impl RootDatabase {
             system: Arc::new(system),
         };
 
-        let workspace = Workspace::from_metadata(&db, workspace);
         // Initialize the `Program` singleton
-        Program::from_settings(&db, settings)?;
+        Program::from_settings(&db, workspace.settings().program())?;
 
-        db.workspace = Some(workspace);
+        db.workspace = Some(Workspace::from_metadata(&db, workspace));
+
         Ok(db)
     }
 
@@ -61,7 +55,9 @@ impl RootDatabase {
         self.with_db(|db| db.workspace().check(db))
     }
 
-    pub fn check_file(&self, file: File) -> Result<Diagnostics, Cancelled> {
+    pub fn check_file(&self, file: File) -> Result<Vec<String>, Cancelled> {
+        let _span = tracing::debug_span!("check_file", file=%file.path(self)).entered();
+
         self.with_db(|db| check_file(db, file))
     }
 
@@ -115,12 +111,20 @@ impl Upcast<dyn SourceDb> for RootDatabase {
 }
 
 #[salsa::db]
-impl SemanticDb for RootDatabase {}
+impl SemanticDb for RootDatabase {
+    fn is_file_open(&self, file: File) -> bool {
+        let Some(workspace) = &self.workspace else {
+            return false;
+        };
+
+        workspace.is_file_open(self, file)
+    }
+}
 
 #[salsa::db]
 impl SourceDb for RootDatabase {
     fn vendored(&self) -> &VendoredFileSystem {
-        vendored_typeshed_stubs()
+        red_knot_vendored::file_system()
     }
 
     fn system(&self) -> &dyn System {
@@ -153,10 +157,11 @@ impl Db for RootDatabase {}
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use salsa::Event;
     use std::sync::Arc;
 
-    use red_knot_python_semantic::{vendored_typeshed_stubs, Db as SemanticDb};
+    use salsa::Event;
+
+    use red_knot_python_semantic::Db as SemanticDb;
     use ruff_db::files::Files;
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
@@ -178,7 +183,7 @@ pub(crate) mod tests {
             Self {
                 storage: salsa::Storage::default(),
                 system: TestSystem::default(),
-                vendored: vendored_typeshed_stubs().clone(),
+                vendored: red_knot_vendored::file_system().clone(),
                 files: Files::default(),
                 events: Arc::default(),
             }
@@ -242,7 +247,12 @@ pub(crate) mod tests {
     }
 
     #[salsa::db]
-    impl red_knot_python_semantic::Db for TestDb {}
+    impl red_knot_python_semantic::Db for TestDb {
+        fn is_file_open(&self, file: ruff_db::files::File) -> bool {
+            !file.path(self).is_vendored_path()
+        }
+    }
+
     #[salsa::db]
     impl Db for TestDb {}
 

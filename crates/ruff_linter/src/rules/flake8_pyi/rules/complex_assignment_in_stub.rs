@@ -20,26 +20,23 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 ///
-/// ```python
+/// ```pyi
 /// from typing import TypeAlias
 ///
 /// a = b = int
 ///
-///
 /// class Klass: ...
-///
 ///
 /// Klass.X: TypeAlias = int
 /// ```
 ///
 /// Use instead:
 ///
-/// ```python
+/// ```pyi
 /// from typing import TypeAlias
 ///
 /// a: TypeAlias = int
 /// b: TypeAlias = int
-///
 ///
 /// class Klass:
 ///     X: TypeAlias = int

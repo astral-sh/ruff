@@ -2,7 +2,8 @@ use lsp_server::ErrorCode;
 use lsp_types::notification::DidOpenNotebookDocument;
 use lsp_types::DidOpenNotebookDocumentParams;
 
-use ruff_db::files::system_path_to_file;
+use red_knot_workspace::watch::ChangeEvent;
+use ruff_db::Db;
 
 use crate::edit::NotebookDocument;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
@@ -10,7 +11,7 @@ use crate::server::api::LSPResult;
 use crate::server::client::{Notifier, Requester};
 use crate::server::Result;
 use crate::session::Session;
-use crate::system::url_to_system_path;
+use crate::system::{url_to_any_system_path, AnySystemPath};
 
 pub(crate) struct DidOpenNotebookHandler;
 
@@ -25,7 +26,7 @@ impl SyncNotificationHandler for DidOpenNotebookHandler {
         _requester: &mut Requester,
         params: DidOpenNotebookDocumentParams,
     ) -> Result<()> {
-        let Ok(path) = url_to_system_path(&params.notebook_document.uri) else {
+        let Ok(path) = url_to_any_system_path(&params.notebook_document.uri) else {
             return Ok(());
         };
 
@@ -38,10 +39,18 @@ impl SyncNotificationHandler for DidOpenNotebookHandler {
         .with_failure_code(ErrorCode::InternalError)?;
         session.open_notebook_document(params.notebook_document.uri.clone(), notebook);
 
-        if let Some(db) = session.workspace_db_for_path_mut(path.as_std_path()) {
-            // TODO(dhruvmanila): Store the `file` in `DocumentController`
-            let file = system_path_to_file(db, &path).unwrap();
-            file.sync(db);
+        match path {
+            AnySystemPath::System(path) => {
+                let db = match session.workspace_db_for_path_mut(path.as_std_path()) {
+                    Some(db) => db,
+                    None => session.default_workspace_db_mut(),
+                };
+                db.apply_changes(vec![ChangeEvent::Opened(path)], None);
+            }
+            AnySystemPath::SystemVirtual(virtual_path) => {
+                let db = session.default_workspace_db_mut();
+                db.files().virtual_file(db, &virtual_path);
+            }
         }
 
         // TODO(dhruvmanila): Publish diagnostics if the client doesn't support pull diagnostics

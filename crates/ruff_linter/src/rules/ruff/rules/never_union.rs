@@ -112,25 +112,19 @@ pub(crate) fn never_union(checker: &mut Checker, expr: &Expr) {
             ctx: _,
             range: _,
         }) if checker.semantic().match_typing_expr(value, "Union") => {
-            let Expr::Tuple(ast::ExprTuple {
-                elts,
-                ctx: _,
-                range: _,
-                parenthesized: _,
-            }) = slice.as_ref()
-            else {
+            let Expr::Tuple(tuple_slice) = &**slice else {
                 return;
             };
 
             // Analyze each element of the `Union`.
-            for elt in elts {
+            for elt in tuple_slice {
                 if let Some(never_like) = NeverLike::from_expr(elt, checker.semantic()) {
                     // Collect the other elements of the `Union`.
-                    let rest = elts
+                    let rest: Vec<Expr> = tuple_slice
                         .iter()
                         .filter(|other| *other != elt)
                         .cloned()
-                        .collect::<Vec<_>>();
+                        .collect();
 
                     // Ignore, e.g., `typing.Union[typing.NoReturn]`.
                     if rest.is_empty() {

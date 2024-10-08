@@ -26,6 +26,9 @@ mod tests {
     #[test_case(Rule::AmbiguousClassName, Path::new("E742.py"))]
     #[test_case(Rule::AmbiguousFunctionName, Path::new("E743.py"))]
     #[test_case(Rule::AmbiguousVariableName, Path::new("E741.py"))]
+    // E741 has different behaviour for `.pyi` files in preview mode;
+    // this test case checks it still has the old behaviour in stable mode
+    #[test_case(Rule::AmbiguousVariableName, Path::new("E741.pyi"))]
     #[test_case(Rule::LambdaAssignment, Path::new("E731.py"))]
     #[test_case(Rule::BareExcept, Path::new("E722.py"))]
     #[test_case(Rule::BlankLineWithWhitespace, Path::new("W29.py"))]
@@ -75,6 +78,8 @@ mod tests {
     #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_2.py"))]
     #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_3.py"))]
     #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_4.py"))]
+    // E741 has different behaviour for `.pyi` files in preview mode
+    #[test_case(Rule::AmbiguousVariableName, Path::new("E741.pyi"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

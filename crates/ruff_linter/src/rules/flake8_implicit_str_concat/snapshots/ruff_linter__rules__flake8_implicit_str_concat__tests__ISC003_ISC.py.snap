@@ -50,6 +50,6 @@ ISC.py:80:10: ISC003 Explicitly concatenated string should be implicitly concate
    |  __________^
 81 | |     + f"second"} d"
    | |_______________^ ISC003
+82 |   
+83 |   # See https://github.com/astral-sh/ruff/issues/12936
    |
-
-

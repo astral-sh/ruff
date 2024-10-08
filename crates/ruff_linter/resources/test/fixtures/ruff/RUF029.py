@@ -78,3 +78,13 @@ async def test():
 async def test() -> str:
     vals = [str(val) for val in await async_func(1)]
     return ",".join(vals)
+
+
+from fastapi import FastAPI
+
+app = FastAPI()
+
+
+@app.post("/count")
+async def fastapi_route(): # Ok: FastApi routes can be async without actually using await
+    return 1

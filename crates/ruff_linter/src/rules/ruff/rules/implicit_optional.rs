@@ -7,7 +7,6 @@ use ruff_macros::{derive_message_formats, violation};
 
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr, Operator, ParameterWithDefault, Parameters};
-use ruff_python_parser::typing::parse_type_annotation;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -180,13 +179,10 @@ pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) 
 
         if let Expr::StringLiteral(string_expr) = annotation.as_ref() {
             // Quoted annotation.
-            if let Ok((parsed_annotation, kind)) =
-                parse_type_annotation(string_expr, checker.locator().contents())
-            {
+            if let Some(parsed_annotation) = checker.parse_type_annotation(string_expr) {
                 let Some(expr) = type_hint_explicitly_allows_none(
-                    parsed_annotation.expr(),
-                    checker.semantic(),
-                    checker.locator(),
+                    parsed_annotation.expression(),
+                    checker,
                     checker.settings.target_version.minor(),
                 ) else {
                     continue;
@@ -195,7 +191,7 @@ pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) 
 
                 let mut diagnostic =
                     Diagnostic::new(ImplicitOptional { conversion_type }, expr.range());
-                if kind.is_simple() {
+                if parsed_annotation.kind().is_simple() {
                     diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
                 }
                 checker.diagnostics.push(diagnostic);
@@ -204,8 +200,7 @@ pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) 
             // Unquoted annotation.
             let Some(expr) = type_hint_explicitly_allows_none(
                 annotation,
-                checker.semantic(),
-                checker.locator(),
+                checker,
                 checker.settings.target_version.minor(),
             ) else {
                 continue;

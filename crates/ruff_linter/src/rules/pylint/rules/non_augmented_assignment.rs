@@ -14,12 +14,12 @@ use crate::checkers::ast::Checker;
 /// statements.
 ///
 /// ## Why is this bad?
-/// If an assignment statement consists of a binary operation in which one
-/// operand is the same as the assignment target, it can be rewritten as an
-/// augmented assignment. For example, `x = x + 1` can be rewritten as
-/// `x += 1`.
+/// If the right-hand side of an assignment statement consists of a binary
+/// operation in which one operand is the same as the assignment target,
+/// it can be rewritten as an augmented assignment. For example, `x = x + 1
+/// can be rewritten as `x += 1`.
 ///
-/// When performing such an operation, augmented assignments are more concise
+/// When performing such an operation, an augmented assignment is more concise
 /// and idiomatic.
 ///
 /// ## Known problems
@@ -31,7 +31,7 @@ use crate::checkers::ast::Checker;
 /// For example, `x = "prefix-" + x` is not equivalent to `x += "prefix-"`,
 /// while `x = 1 + x` is equivalent to `x += 1`.
 ///
-/// If the type of the left-hand side cannot be inferred trivially, the rule
+/// If the type of the left-hand side cannot be trivially inferred, the rule
 /// will ignore the assignment.
 ///
 /// ## Example

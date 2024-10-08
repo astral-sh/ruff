@@ -24,16 +24,16 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pylint::rules::global_at_module_level(checker, stmt);
             }
             if checker.enabled(Rule::AmbiguousVariableName) {
-                checker.diagnostics.extend(names.iter().filter_map(|name| {
-                    pycodestyle::rules::ambiguous_variable_name(name, name.range())
-                }));
+                for name in names {
+                    pycodestyle::rules::ambiguous_variable_name(checker, name, name.range());
+                }
             }
         }
         Stmt::Nonlocal(nonlocal @ ast::StmtNonlocal { names, range: _ }) => {
             if checker.enabled(Rule::AmbiguousVariableName) {
-                checker.diagnostics.extend(names.iter().filter_map(|name| {
-                    pycodestyle::rules::ambiguous_variable_name(name, name.range())
-                }));
+                for name in names {
+                    pycodestyle::rules::ambiguous_variable_name(checker, name, name.range());
+                }
             }
             if checker.enabled(Rule::NonlocalWithoutBinding) {
                 if !checker.semantic.scope_id.is_global() {
@@ -93,6 +93,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::FastApiNonAnnotatedDependency) {
                 fastapi::rules::fastapi_non_annotated_dependency(checker, function_def);
+            }
+            if checker.enabled(Rule::FastApiUnusedPathParameter) {
+                fastapi::rules::fastapi_unused_path_parameter(checker, function_def);
             }
             if checker.enabled(Rule::AmbiguousFunctionName) {
                 if let Some(diagnostic) = pycodestyle::rules::ambiguous_function_name(name) {
@@ -229,12 +232,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 Rule::SuperfluousElseContinue,
                 Rule::SuperfluousElseBreak,
             ]) {
-                flake8_return::rules::function(
-                    checker,
-                    body,
-                    decorator_list,
-                    returns.as_ref().map(AsRef::as_ref),
-                );
+                flake8_return::rules::function(checker, function_def);
             }
             if checker.enabled(Rule::UselessReturn) {
                 pylint::rules::useless_return(
@@ -268,8 +266,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::TooManyArguments) {
                 pylint::rules::too_many_arguments(checker, function_def);
             }
-            if checker.enabled(Rule::TooManyPositional) {
-                pylint::rules::too_many_positional(checker, function_def);
+            if checker.enabled(Rule::TooManyPositionalArguments) {
+                pylint::rules::too_many_positional_arguments(checker, function_def);
             }
             if checker.enabled(Rule::TooManyReturnStatements) {
                 if let Some(diagnostic) = pylint::rules::too_many_return_statements(
@@ -381,6 +379,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::WhitespaceAfterDecorator) {
                 pycodestyle::rules::whitespace_after_decorator(checker, decorator_list);
+            }
+            if checker.enabled(Rule::PostInitDefault) {
+                ruff::rules::post_init_default(checker, function_def);
             }
         }
         Stmt::Return(_) => {
@@ -709,11 +710,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     }
                     if checker.enabled(Rule::CamelcaseImportedAsAcronym) {
                         if let Some(diagnostic) = pep8_naming::rules::camelcase_imported_as_acronym(
-                            name,
-                            asname,
-                            alias,
-                            stmt,
-                            &checker.settings.pep8_naming.ignore_names,
+                            name, asname, alias, stmt, checker,
                         ) {
                             checker.diagnostics.push(diagnostic);
                         }
@@ -1028,7 +1025,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                             asname,
                             alias,
                             stmt,
-                            &checker.settings.pep8_naming.ignore_names,
+                            checker,
                         ) {
                             checker.diagnostics.push(diagnostic);
                         }
@@ -1118,9 +1115,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         Stmt::AugAssign(aug_assign @ ast::StmtAugAssign { target, .. }) => {
-            if checker.enabled(Rule::SelfOrClsAssignment) {
-                pylint::rules::self_or_cls_assignment(checker, target);
-            }
             if checker.enabled(Rule::GlobalStatement) {
                 if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
                     pylint::rules::global_statement(checker, id);
@@ -1183,6 +1177,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::CheckAndRemoveFromSet) {
                 refurb::rules::check_and_remove_from_set(checker, if_);
+            }
+            if checker.enabled(Rule::SliceToRemovePrefixOrSuffix) {
+                refurb::rules::slice_to_remove_affix_stmt(checker, if_);
             }
             if checker.enabled(Rule::TooManyBooleanExpressions) {
                 pylint::rules::too_many_boolean_expressions(checker, if_);

@@ -3,6 +3,7 @@ pub(crate) use assert_with_print_message::*;
 pub(crate) use assignment_in_assert::*;
 pub(crate) use asyncio_dangling_task::*;
 pub(crate) use collection_literal_concatenation::*;
+pub(crate) use decimal_from_float_literal::*;
 pub(crate) use default_factory_kwarg::*;
 pub(crate) use explicit_f_string_type_conversion::*;
 pub(crate) use function_call_in_dataclass_default::*;
@@ -24,11 +25,11 @@ pub(crate) use sort_dunder_slots::*;
 pub(crate) use static_key_dict_comprehension::*;
 #[cfg(any(feature = "test-rules", test))]
 pub(crate) use test_rules::*;
-pub(crate) use unnecessary_dict_comprehension_for_iterable::*;
 pub(crate) use unnecessary_iterable_allocation_for_first_element::*;
 pub(crate) use unnecessary_key_check::*;
 pub(crate) use unused_async::*;
 pub(crate) use unused_noqa::*;
+pub(crate) use useless_if_else::*;
 pub(crate) use zip_instead_of_pairwise::*;
 
 mod ambiguous_unicode_character;
@@ -37,6 +38,7 @@ mod assignment_in_assert;
 mod asyncio_dangling_task;
 mod collection_literal_concatenation;
 mod confusables;
+mod decimal_from_float_literal;
 mod default_factory_kwarg;
 mod explicit_f_string_type_conversion;
 mod function_call_in_dataclass_default;
@@ -61,11 +63,11 @@ mod static_key_dict_comprehension;
 mod suppression_comment_visitor;
 #[cfg(any(feature = "test-rules", test))]
 pub(crate) mod test_rules;
-mod unnecessary_dict_comprehension_for_iterable;
 mod unnecessary_iterable_allocation_for_first_element;
 mod unnecessary_key_check;
 mod unused_async;
 mod unused_noqa;
+mod useless_if_else;
 mod zip_instead_of_pairwise;
 
 #[derive(Clone, Copy)]
@@ -74,3 +76,6 @@ pub(crate) enum Context {
     Docstring,
     Comment,
 }
+pub(crate) use post_init_default::*;
+
+mod post_init_default;

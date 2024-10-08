@@ -1,5 +1,43 @@
 # Breaking Changes
 
+## 0.6.0
+
+- Detect imports in `src` layouts by default for `isort` rules ([#12848](https://github.com/astral-sh/ruff/pull/12848))
+
+- The pytest rules `PT001` and `PT023` now default to omitting the decorator parentheses when there are no arguments ([#12838](https://github.com/astral-sh/ruff/pull/12838)).
+
+- Lint and format Jupyter Notebook by default ([#12878](https://github.com/astral-sh/ruff/pull/12878)).
+
+    You can disable specific rules for notebooks using [`per-file-ignores`](https://docs.astral.sh/ruff/settings/#lint_per-file-ignores):
+
+    ```toml
+    [tool.ruff.lint.per-file-ignores]
+    "*.ipynb" = ["E501"] # disable line-too-long in notebooks
+    ```
+
+    If you'd prefer to either only lint or only format Jupyter Notebook files, you can use the
+    section-specific `exclude` option to do so. For example, the following would only lint Jupyter
+    Notebook files and not format them:
+
+    ```toml
+    [tool.ruff.format]
+    exclude = ["*.ipynb"]
+    ```
+
+    And, conversely, the following would only format Jupyter Notebook files and not lint them:
+
+    ```toml
+    [tool.ruff.lint]
+    exclude = ["*.ipynb"]
+    ```
+
+    You can completely disable Jupyter Notebook support by updating the [`extend-exclude`](https://docs.astral.sh/ruff/settings/#extend-exclude) setting:
+
+    ```toml
+    [tool.ruff]
+    extend-exclude = ["*.ipynb"]
+    ```
+
 ## 0.5.0
 
 - Follow the XDG specification to discover user-level configurations on macOS (same as on other Unix platforms)

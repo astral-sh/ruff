@@ -1,52 +1,67 @@
-use memchr::memchr2_iter;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast};
+use ruff_python_ast as ast;
 use ruff_python_literal::format::FormatSpec;
 use ruff_python_parser::parse_expression;
-use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::logging::is_logger_candidate;
+use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
+
+use memchr::memchr2_iter;
 use rustc_hash::FxHashSet;
 
+use crate::checkers::ast::Checker;
+use crate::rules::fastapi::rules::is_fastapi_route_call;
+
 /// ## What it does
-/// Checks for strings that contain f-string syntax but are not f-strings.
+/// Searches for strings that look like they were meant to be f-strings, but are missing an `f` prefix.
 ///
 /// ## Why is this bad?
-/// An f-string missing an `f` at the beginning won't format anything, and instead
-/// treat the interpolation syntax as literal.
+/// Expressions inside curly braces are only evaluated if the string has an `f` prefix.
 ///
-/// Since there are many possible string literals which contain syntax similar to f-strings yet are not intended to be,
-/// this lint will disqualify any literal that satisfies any of the following conditions:
+/// ## Details
 ///
-/// 1. The string literal is a standalone expression. For example, a docstring.
-/// 2. The literal is part of a function call with argument names that match at least one variable (for example: `format("Message: {value}", value = "Hello World")`)
-/// 3. The literal (or a parent expression of the literal) has a direct method call on it (for example: `"{value}".format(...)`)
+/// There are many possible string literals which are not meant to be f-strings
+/// despite containing f-string-like syntax. As such, this lint ignores all strings
+/// where one of the following conditions applies:
+///
+/// 1. The string is a standalone expression. For example, the rule ignores all docstrings.
+/// 2. The string is part of a function call with argument names that match at least one variable
+///    (for example: `format("Message: {value}", value="Hello World")`)
+/// 3. The string (or a parent expression of the string) has a direct method call on it
+///    (for example: `"{value}".format(...)`)
 /// 4. The string has no `{...}` expression sections, or uses invalid f-string syntax.
 /// 5. The string references variables that are not in scope, or it doesn't capture variables at all.
 /// 6. Any format specifiers in the potential f-string are invalid.
+/// 7. The string is part of a function call that is known to expect a template string rather than an
+///    evaluated f-string: for example, a [`logging`] call, a [`gettext`] call, or a [fastAPI path].
 ///
 /// ## Example
 ///
 /// ```python
 /// name = "Sarah"
-/// dayofweek = "Tuesday"
-/// msg = "Hello {name}! It is {dayofweek} today!"
+/// day_of_week = "Tuesday"
+/// print("Hello {name}! It is {day_of_week} today!")
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// name = "Sarah"
-/// dayofweek = "Tuesday"
-/// msg = f"Hello {name}! It is {dayofweek} today!"
+/// day_of_week = "Tuesday"
+/// print(f"Hello {name}! It is {day_of_week} today!")
 /// ```
+///
+/// [logging]: https://docs.python.org/3/howto/logging-cookbook.html#using-particular-formatting-styles-throughout-your-application
+/// [gettext]: https://docs.python.org/3/library/gettext.html
+/// [fastAPI path]: https://fastapi.tiangolo.com/tutorial/path-params/
 #[violation]
 pub struct MissingFStringSyntax;
 
 impl AlwaysFixableViolation for MissingFStringSyntax {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(r#"Possible f-string without an `f` prefix"#)
+        format!(r"Possible f-string without an `f` prefix")
     }
 
     fn fix_title(&self) -> String {
@@ -55,12 +70,9 @@ impl AlwaysFixableViolation for MissingFStringSyntax {
 }
 
 /// RUF027
-pub(crate) fn missing_fstring_syntax(
-    diagnostics: &mut Vec<Diagnostic>,
-    literal: &ast::StringLiteral,
-    locator: &Locator,
-    semantic: &SemanticModel,
-) {
+pub(crate) fn missing_fstring_syntax(checker: &mut Checker, literal: &ast::StringLiteral) {
+    let semantic = checker.semantic();
+
     // we want to avoid statement expressions that are just a string literal.
     // there's no reason to have standalone f-strings and this lets us avoid docstrings too
     if let ast::Stmt::Expr(ast::StmtExpr { value, .. }) = semantic.current_statement() {
@@ -70,18 +82,32 @@ pub(crate) fn missing_fstring_syntax(
         }
     }
 
-    // We also want to avoid expressions that are intended to be translated.
+    let logger_objects = &checker.settings.logger_objects;
+    let fastapi_seen = semantic.seen_module(Modules::FASTAPI);
+
+    // We also want to avoid:
+    // - Expressions inside `gettext()` calls
+    // - Expressions passed to logging calls (since the `logging` module evaluates them lazily:
+    //   https://docs.python.org/3/howto/logging-cookbook.html#using-particular-formatting-styles-throughout-your-application)
+    // - `fastAPI` paths: https://fastapi.tiangolo.com/tutorial/path-params/
+    // - Expressions where a method is immediately called on the string literal
     if semantic
         .current_expressions()
-        .any(|expr| is_gettext(expr, semantic))
+        .filter_map(ast::Expr::as_call_expr)
+        .any(|call_expr| {
+            is_method_call_on_literal(call_expr, literal)
+                || is_gettext(call_expr, semantic)
+                || is_logger_candidate(&call_expr.func, semantic, logger_objects)
+                || (fastapi_seen && is_fastapi_route_call(call_expr, semantic))
+        })
     {
         return;
     }
 
-    if should_be_fstring(literal, locator, semantic) {
+    if should_be_fstring(literal, checker.locator(), semantic) {
         let diagnostic = Diagnostic::new(MissingFStringSyntax, literal.range())
             .with_fix(fix_fstring_syntax(literal.range()));
-        diagnostics.push(diagnostic);
+        checker.diagnostics.push(diagnostic);
     }
 }
 
@@ -95,12 +121,9 @@ pub(crate) fn missing_fstring_syntax(
 /// and replace the original string with its translated counterpart. If the
 /// string contains variable placeholders or formatting, it can complicate the
 /// translation process, lead to errors or incorrect translations.
-fn is_gettext(expr: &ast::Expr, semantic: &SemanticModel) -> bool {
-    let ast::Expr::Call(ast::ExprCall { func, .. }) = expr else {
-        return false;
-    };
-
-    let short_circuit = match func.as_ref() {
+fn is_gettext(call_expr: &ast::ExprCall, semantic: &SemanticModel) -> bool {
+    let func = &*call_expr.func;
+    let short_circuit = match func {
         ast::Expr::Name(ast::ExprName { id, .. }) => {
             matches!(id.as_str(), "gettext" | "ngettext" | "_")
         }
@@ -119,9 +142,24 @@ fn is_gettext(expr: &ast::Expr, semantic: &SemanticModel) -> bool {
         .is_some_and(|qualified_name| {
             matches!(
                 qualified_name.segments(),
-                ["gettext", "gettext" | "ngettext"]
+                ["gettext", "gettext" | "ngettext"] | ["builtins", "_"]
             )
         })
+}
+
+/// Return `true` if `call_expr` is a method call on an [`ast::ExprStringLiteral`]
+/// in which `literal` is one of the [`ast::StringLiteral`] parts.
+///
+/// For example: `expr` is a node representing the expression `"{foo}".format(foo="bar")`,
+/// and `literal` is the node representing the string literal `"{foo}"`.
+fn is_method_call_on_literal(call_expr: &ast::ExprCall, literal: &ast::StringLiteral) -> bool {
+    let ast::Expr::Attribute(ast::ExprAttribute { value, .. }) = &*call_expr.func else {
+        return false;
+    };
+    let ast::Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &**value else {
+        return false;
+    };
+    value.as_slice().contains(literal)
 }
 
 /// Returns `true` if `literal` is likely an f-string with a missing `f` prefix.
@@ -146,55 +184,28 @@ fn should_be_fstring(
     };
 
     let mut arg_names = FxHashSet::default();
-    let mut last_expr: Option<&ast::Expr> = None;
-    for expr in semantic.current_expressions() {
-        match expr {
-            ast::Expr::Call(ast::ExprCall {
-                arguments: ast::Arguments { keywords, args, .. },
-                func,
-                ..
-            }) => {
-                if let ast::Expr::Attribute(ast::ExprAttribute { value, .. }) = func.as_ref() {
-                    match value.as_ref() {
-                        // if the first part of the attribute is the string literal,
-                        // we want to ignore this literal from the lint.
-                        // for example: `"{x}".some_method(...)`
-                        ast::Expr::StringLiteral(expr_literal)
-                            if expr_literal.value.as_slice().contains(literal) =>
-                        {
-                            return false;
-                        }
-                        // if the first part of the attribute was the expression we
-                        // just went over in the last iteration, then we also want to pass
-                        // this over in the lint.
-                        // for example: `some_func("{x}").some_method(...)`
-                        value if last_expr == Some(value) => {
-                            return false;
-                        }
-                        _ => {}
-                    }
-                }
-                for keyword in &**keywords {
-                    if let Some(ident) = keyword.arg.as_ref() {
-                        arg_names.insert(ident.as_str());
-                    }
-                }
-                for arg in &**args {
-                    if let ast::Expr::Name(ast::ExprName { id, .. }) = arg {
-                        arg_names.insert(id.as_str());
-                    }
-                }
+    for expr in semantic
+        .current_expressions()
+        .filter_map(ast::Expr::as_call_expr)
+    {
+        let ast::Arguments { keywords, args, .. } = &expr.arguments;
+        for keyword in &**keywords {
+            if let Some(ident) = keyword.arg.as_ref() {
+                arg_names.insert(&ident.id);
             }
-            _ => continue,
         }
-        last_expr.replace(expr);
+        for arg in &**args {
+            if let ast::Expr::Name(ast::ExprName { id, .. }) = arg {
+                arg_names.insert(id);
+            }
+        }
     }
 
     for f_string in value.f_strings() {
         let mut has_name = false;
         for element in f_string.elements.expressions() {
             if let ast::Expr::Name(ast::ExprName { id, .. }) = element.expression.as_ref() {
-                if arg_names.contains(id.as_str()) {
+                if arg_names.contains(id) {
                     return false;
                 }
                 if semantic

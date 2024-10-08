@@ -130,10 +130,10 @@ impl Violation for MultiValueRepeatedKeyVariable {
 pub(crate) fn repeated_keys(checker: &mut Checker, dict: &ast::ExprDict) {
     // Generate a map from key to (index, value).
     let mut seen: FxHashMap<ComparableExpr, FxHashSet<ComparableExpr>> =
-        FxHashMap::with_capacity_and_hasher(dict.items.len(), FxBuildHasher);
+        FxHashMap::with_capacity_and_hasher(dict.len(), FxBuildHasher);
 
     // Detect duplicate keys.
-    for (i, ast::DictItem { key, value }) in dict.items.iter().enumerate() {
+    for (i, ast::DictItem { key, value }) in dict.iter().enumerate() {
         let Some(key) = key else {
             continue;
         };

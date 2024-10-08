@@ -17,12 +17,12 @@ use crate::checkers::ast::Checker;
 /// annotation, but is cleaner and more concise.
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// field: type[int] | type[float] | str
 /// ```
 ///
 /// Use instead:
-/// ```python
+/// ```pyi
 /// field: type[int | float] | str
 /// ```
 #[violation]

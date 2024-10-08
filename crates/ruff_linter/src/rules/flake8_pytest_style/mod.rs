@@ -28,10 +28,10 @@ mod tests {
         Rule::PytestFixtureIncorrectParenthesesStyle,
         Path::new("PT001.py"),
         Settings {
-            fixture_parentheses: false,
+            fixture_parentheses: true,
             ..Settings::default()
         },
-        "PT001_no_parentheses"
+        "PT001_parentheses"
     )]
     #[test_case(
         Rule::PytestFixturePositionalArgs,
@@ -252,10 +252,10 @@ mod tests {
         Rule::PytestIncorrectMarkParenthesesStyle,
         Path::new("PT023.py"),
         Settings {
-            mark_parentheses: false,
+            mark_parentheses: true,
             ..Settings::default()
         },
-        "PT023_no_parentheses"
+        "PT023_parentheses"
     )]
     #[test_case(
         Rule::PytestUnnecessaryAsyncioMarkOnFixture,

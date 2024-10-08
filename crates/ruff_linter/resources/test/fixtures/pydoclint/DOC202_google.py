@@ -73,3 +73,15 @@ class A(metaclass=abc.abcmeta):
             dict: The values
         """
         return
+
+
+# DOC202 -- never explicitly returns anything, just short-circuits
+def foo(s: str, condition: bool):
+    """Fooey things.
+
+    Returns:
+        None
+    """
+    if not condition:
+        return
+    print(s)

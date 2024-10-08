@@ -16,6 +16,28 @@
         "minLength": 1
       }
     },
+    "allowed-unused-imports": {
+      "description": "A list of modules which is allowed even though they are not used in the code.\n\nThis is useful when a module has a side effect when imported.",
+      "deprecated": true,
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "analyze": {
+      "description": "Options to configure import map generation.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/AnalyzeOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "builtins": {
       "description": "A list of builtins to treat as defined references, in addition to the system builtins.",
       "type": [
@@ -444,7 +466,7 @@
       ]
     },
     "include": {
-      "description": "A list of file patterns to include when linting.\n\nInclusion are based on globs, and should be single-path patterns, like `*.pyw`, to include any file with the `.pyw` extension. `pyproject.toml` is included here not for configuration but because we lint whether e.g. the `[project]` matches the schema.\n\nIf [preview](https://docs.astral.sh/ruff/preview/) is enabled, the default includes notebook files (`.ipynb` extension). You can exclude them by adding `*.ipynb` to [`extend-exclude`](#extend-exclude).\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
+      "description": "A list of file patterns to include when linting.\n\nInclusion are based on globs, and should be single-path patterns, like `*.pyw`, to include any file with the `.pyw` extension. `pyproject.toml` is included here not for configuration but because we lint whether e.g. the `[project]` matches the schema.\n\nNotebook files (`.ipynb` extension) are included by default on Ruff 0.6.0+.\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
       "type": [
         "array",
         "null"
@@ -671,7 +693,7 @@
       ]
     },
     "src": {
-      "description": "The directories to consider when resolving first- vs. third-party imports.\n\nAs an example: given a Python package structure like:\n\n```text my_project ├── pyproject.toml └── src └── my_package ├── __init__.py ├── foo.py └── bar.py ```\n\nThe `./src` directory should be included in the `src` option (e.g., `src = [\"src\"]`), such that when resolving imports, `my_package.foo` is considered a first-party import.\n\nWhen omitted, the `src` directory will typically default to the directory containing the nearest `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file (the \"project root\"), unless a configuration file is explicitly provided (e.g., via the `--config` command-line flag).\n\nThis field supports globs. For example, if you have a series of Python packages in a `python_modules` directory, `src = [\"python_modules/*\"]` would expand to incorporate all of the packages in that directory. User home directory and environment variables will also be expanded.",
+      "description": "The directories to consider when resolving first- vs. third-party imports.\n\nWhen omitted, the `src` directory will typically default to including both:\n\n1. The directory containing the nearest `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file (the \"project root\"). 2. The `\"src\"` subdirectory of the project root.\n\nThese defaults ensure that uv supports both flat layouts and `src` layouts out-of-the-box. (If a configuration file is explicitly provided (e.g., via the `--config` command-line flag), the current working directory will be considered the project root.)\n\nAs an example, consider an alternative project structure, like:\n\n```text my_project ├── pyproject.toml └── lib └── my_package ├── __init__.py ├── foo.py └── bar.py ```\n\nIn this case, the `./lib` directory should be included in the `src` option (e.g., `src = [\"lib\"]`), such that when resolving imports, `my_package.foo` is considered first-party.\n\nThis field supports globs. For example, if you have a series of Python packages in a `python_modules` directory, `src = [\"python_modules/*\"]` would expand to incorporate all packages in that directory. User home directory and environment variables will also be expanded.",
       "type": [
         "array",
         "null"
@@ -693,7 +715,7 @@
       ]
     },
     "target-version": {
-      "description": "The minimum Python version to target, e.g., when considering automatic code upgrades, like rewriting type annotations. Ruff will not propose changes using features that are not available in the given version.\n\nFor example, to represent supporting Python >=3.10 or ==3.10 specify `target-version = \"py310\"`.\n\nIf you're already using a `pyproject.toml` file, we recommend `project.requires-python` instead, as it's based on Python packaging standards, and will be respected by other tools. For example, Ruff treats the following as identical to `target-version = \"py38\"`:\n\n```toml [project] requires-python = \">=3.8\" ```\n\nIf both are specified, `target-version` takes precedence over `requires-python`.",
+      "description": "The minimum Python version to target, e.g., when considering automatic code upgrades, like rewriting type annotations. Ruff will not propose changes using features that are not available in the given version.\n\nFor example, to represent supporting Python >=3.10 or ==3.10 specify `target-version = \"py310\"`.\n\nIf you're already using a `pyproject.toml` file, we recommend `project.requires-python` instead, as it's based on Python packaging standards, and will be respected by other tools. For example, Ruff treats the following as identical to `target-version = \"py38\"`:\n\n```toml [project] requires-python = \">=3.8\" ```\n\nIf both are specified, `target-version` takes precedence over `requires-python`.\n\nNote that a stub file can [sometimes make use of a typing feature](https://typing.readthedocs.io/en/latest/spec/distributing.html#syntax) before it is available at runtime, as long as the stub does not make use of new *syntax*. For example, a type checker will understand `int | str` in a stub as being a `Union` type annotation, even if the type checker is run using Python 3.9, despite the fact that the `|` operator can only be used to create union types at runtime on Python 3.10+. As such, Ruff will often recommend newer features in a stub file than it would for an equivalent runtime file with the same target version.",
       "anyOf": [
         {
           "$ref": "#/definitions/PythonVersion"
@@ -746,6 +768,61 @@
   },
   "additionalProperties": false,
   "definitions": {
+    "AnalyzeOptions": {
+      "description": "Configures Ruff's `analyze` command.",
+      "type": "object",
+      "properties": {
+        "detect-string-imports": {
+          "description": "Whether to detect imports from string literals. When enabled, Ruff will search for string literals that \"look like\" import paths, and include them in the import map, if they resolve to valid Python modules.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "direction": {
+          "description": "Whether to generate a map from file to files that it depends on (dependencies) or files that depend on it (dependents).",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Direction"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "exclude": {
+          "description": "A list of file patterns to exclude from analysis in addition to the files excluded globally (see [`exclude`](#exclude), and [`extend-exclude`](#extend-exclude)).\n\nExclusions are based on globs, and can be either:\n\n- Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ). - Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py` (to exclude any Python files in `directory`). Note that these paths are relative to the project root (e.g., the directory containing your `pyproject.toml`).\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "include-dependencies": {
+          "description": "A map from file path to the list of file paths or globs that should be considered dependencies of that file, regardless of whether relevant imports are detected.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "preview": {
+          "description": "Whether to enable preview mode. When preview mode is enabled, Ruff will expose unstable commands.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
     "ApiBan": {
       "type": "object",
       "required": [
@@ -796,6 +873,24 @@
           "type": "string",
           "enum": [
             "pep257"
+          ]
+        }
+      ]
+    },
+    "Direction": {
+      "oneOf": [
+        {
+          "description": "Construct a map from module to its dependencies (i.e., the modules that it imports).",
+          "type": "string",
+          "enum": [
+            "Dependencies"
+          ]
+        },
+        {
+          "description": "Construct a map from module to its dependents (i.e., the modules that import it).",
+          "type": "string",
+          "enum": [
+            "Dependents"
           ]
         }
       ]
@@ -1103,14 +1198,14 @@
       "type": "object",
       "properties": {
         "fixture-parentheses": {
-          "description": "Boolean flag specifying whether `@pytest.fixture()` without parameters should have parentheses. If the option is set to `true` (the default), `@pytest.fixture()` is valid and `@pytest.fixture` is invalid. If set to `false`, `@pytest.fixture` is valid and `@pytest.fixture()` is invalid.\n\nIf [preview](https://docs.astral.sh/ruff/preview/) is enabled, defaults to `false`.",
+          "description": "Boolean flag specifying whether `@pytest.fixture()` without parameters should have parentheses. If the option is set to `false` (the default), `@pytest.fixture` is valid and `@pytest.fixture()` is invalid. If set to `true`, `@pytest.fixture()` is valid and `@pytest.fixture` is invalid.",
           "type": [
             "boolean",
             "null"
           ]
         },
         "mark-parentheses": {
-          "description": "Boolean flag specifying whether `@pytest.mark.foo()` without parameters should have parentheses. If the option is set to `true` (the default), `@pytest.mark.foo()` is valid and `@pytest.mark.foo` is invalid. If set to `false`, `@pytest.mark.foo` is valid and `@pytest.mark.foo()` is invalid.\n\nIf [preview](https://docs.astral.sh/ruff/preview/) is enabled, defaults to `false`.",
+          "description": "Boolean flag specifying whether `@pytest.mark.foo()` without parameters should have parentheses. If the option is set to `false` (the default), `@pytest.mark.foo` is valid and `@pytest.mark.foo()` is invalid. If set to `true`, `@pytest.mark.foo()` is valid and `@pytest.mark.foo` is invalid.",
           "type": [
             "boolean",
             "null"
@@ -1803,6 +1898,16 @@
             "minLength": 1
           }
         },
+        "allowed-unused-imports": {
+          "description": "A list of modules which is allowed even though they are not used in the code.\n\nThis is useful when a module has a side effect when imported.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "dummy-variable-rgx": {
           "description": "A regular expression used to identify \"dummy\" variables, or those which should be ignored when enforcing (e.g.) unused-variable rules. The default expression matches `_`, `__`, and `_var`, but not `_var_`.",
           "type": [
@@ -2419,7 +2524,7 @@
       "type": "object",
       "properties": {
         "ignore-overlong-task-comments": {
-          "description": "Whether line-length violations (`E501`) should be triggered for comments starting with [`task-tags`](#lint_task-tags) (by default: \\[\"TODO\", \"FIXME\", and \"XXX\"\\]).",
+          "description": "Whether line-length violations (`E501`) should be triggered for comments starting with [`task-tags`](#lint_task-tags) (by default: \"TODO\", \"FIXME\", and \"XXX\").",
           "type": [
             "boolean",
             "null"
@@ -2490,6 +2595,16 @@
     "PyflakesOptions": {
       "type": "object",
       "properties": {
+        "allowed-unused-imports": {
+          "description": "A list of modules to ignore when considering unused imports.\n\nUsed to prevent violations for specific modules that are known to have side effects on import (e.g., `hvplot.pandas`).\n\nModules in this list are expected to be fully-qualified names (e.g., `hvplot.pandas`). Any submodule of a given module will also be ignored (e.g., given `hvplot`, `hvplot.pandas` will also be ignored).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "extend-generics": {
           "description": "Additional functions or classes to consider generic, such that any subscripts should be treated as type annotation (e.g., `ForeignKey` in `django.db.models.ForeignKey[\"User\"]`.\n\nExpects to receive a list of fully-qualified names (e.g., `django.db.models.ForeignKey`, rather than `ForeignKey`).",
           "type": [
@@ -2822,6 +2937,8 @@
         "C417",
         "C418",
         "C419",
+        "C42",
+        "C420",
         "C9",
         "C90",
         "C901",
@@ -3108,6 +3225,7 @@
         "FAST00",
         "FAST001",
         "FAST002",
+        "FAST003",
         "FBT",
         "FBT0",
         "FBT00",
@@ -3150,6 +3268,7 @@
         "FURB15",
         "FURB152",
         "FURB154",
+        "FURB156",
         "FURB157",
         "FURB16",
         "FURB161",
@@ -3166,6 +3285,7 @@
         "FURB180",
         "FURB181",
         "FURB187",
+        "FURB188",
         "FURB19",
         "FURB192",
         "G",
@@ -3449,6 +3569,7 @@
         "PLR171",
         "PLR1711",
         "PLR1714",
+        "PLR1716",
         "PLR172",
         "PLR1722",
         "PLR173",
@@ -3717,7 +3838,6 @@
         "RUF022",
         "RUF023",
         "RUF024",
-        "RUF025",
         "RUF026",
         "RUF027",
         "RUF028",
@@ -3725,6 +3845,9 @@
         "RUF03",
         "RUF030",
         "RUF031",
+        "RUF032",
+        "RUF033",
+        "RUF034",
         "RUF1",
         "RUF10",
         "RUF100",

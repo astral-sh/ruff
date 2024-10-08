@@ -1,5 +1,6 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
+use std::borrow::Cow;
 use std::fmt;
 use std::fmt::Debug;
 use std::iter::FusedIterator;
@@ -856,6 +857,27 @@ impl ExprDict {
     pub fn value(&self, n: usize) -> &Expr {
         self.items[n].value()
     }
+
+    pub fn iter(&self) -> std::slice::Iter<'_, DictItem> {
+        self.items.iter()
+    }
+
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+}
+
+impl<'a> IntoIterator for &'a ExprDict {
+    type IntoIter = std::slice::Iter<'a, DictItem>;
+    type Item = &'a DictItem;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
 }
 
 impl From<ExprDict> for Expr {
@@ -953,6 +975,29 @@ impl<'a> ExactSizeIterator for DictValueIterator<'a> {}
 pub struct ExprSet {
     pub range: TextRange,
     pub elts: Vec<Expr>,
+}
+
+impl ExprSet {
+    pub fn iter(&self) -> std::slice::Iter<'_, Expr> {
+        self.elts.iter()
+    }
+
+    pub fn len(&self) -> usize {
+        self.elts.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.elts.is_empty()
+    }
+}
+
+impl<'a> IntoIterator for &'a ExprSet {
+    type IntoIter = std::slice::Iter<'a, Expr>;
+    type Item = &'a Expr;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
 }
 
 impl From<ExprSet> for Expr {
@@ -2108,7 +2153,7 @@ impl BytesLiteralValue {
     }
 
     /// Returns an iterator over the bytes of the concatenated bytes.
-    fn bytes(&self) -> impl Iterator<Item = u8> + '_ {
+    pub fn bytes(&self) -> impl Iterator<Item = u8> + '_ {
         self.iter().flat_map(|part| part.as_slice().iter().copied())
     }
 }
@@ -2139,6 +2184,22 @@ impl PartialEq<[u8]> for BytesLiteralValue {
         self.bytes()
             .zip(other.iter().copied())
             .all(|(b1, b2)| b1 == b2)
+    }
+}
+
+impl<'a> From<&'a BytesLiteralValue> for Cow<'a, [u8]> {
+    fn from(value: &'a BytesLiteralValue) -> Self {
+        match &value.inner {
+            BytesLiteralValueInner::Single(BytesLiteral {
+                value: bytes_value, ..
+            }) => Cow::from(bytes_value.as_ref()),
+            BytesLiteralValueInner::Concatenated(bytes_literal_vec) => Cow::Owned(
+                bytes_literal_vec
+                    .iter()
+                    .flat_map(|bytes_literal| bytes_literal.value.to_vec())
+                    .collect::<Vec<u8>>(),
+            ),
+        }
     }
 }
 
@@ -2759,6 +2820,29 @@ pub struct ExprList {
     pub ctx: ExprContext,
 }
 
+impl ExprList {
+    pub fn iter(&self) -> std::slice::Iter<'_, Expr> {
+        self.elts.iter()
+    }
+
+    pub fn len(&self) -> usize {
+        self.elts.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.elts.is_empty()
+    }
+}
+
+impl<'a> IntoIterator for &'a ExprList {
+    type IntoIter = std::slice::Iter<'a, Expr>;
+    type Item = &'a Expr;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 impl From<ExprList> for Expr {
     fn from(payload: ExprList) -> Self {
         Expr::List(payload)
@@ -2774,6 +2858,29 @@ pub struct ExprTuple {
 
     /// Whether the tuple is parenthesized in the source code.
     pub parenthesized: bool,
+}
+
+impl ExprTuple {
+    pub fn iter(&self) -> std::slice::Iter<'_, Expr> {
+        self.elts.iter()
+    }
+
+    pub fn len(&self) -> usize {
+        self.elts.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.elts.is_empty()
+    }
+}
+
+impl<'a> IntoIterator for &'a ExprTuple {
+    type IntoIter = std::slice::Iter<'a, Expr>;
+    type Item = &'a Expr;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
 }
 
 impl From<ExprTuple> for Expr {
@@ -3030,6 +3137,29 @@ impl Pattern {
             Pattern::MatchAs(PatternMatchAs { pattern: None, .. }) => true,
             Pattern::MatchOr(PatternMatchOr { patterns, .. }) => {
                 patterns.iter().any(Pattern::is_irrefutable)
+            }
+            _ => false,
+        }
+    }
+
+    /// Checks if the [`Pattern`] is a [wildcard pattern].
+    ///
+    /// The following are wildcard patterns:
+    /// ```python
+    /// match subject:
+    ///     case _ as x: ...
+    ///     case _ | _: ...
+    ///     case _: ...
+    /// ```
+    ///
+    /// [wildcard pattern]: https://docs.python.org/3/reference/compound_stmts.html#wildcard-patterns
+    pub fn is_wildcard(&self) -> bool {
+        match self {
+            Pattern::MatchAs(PatternMatchAs { pattern, .. }) => {
+                pattern.as_deref().map_or(true, Pattern::is_wildcard)
+            }
+            Pattern::MatchOr(PatternMatchOr { patterns, .. }) => {
+                patterns.iter().all(Pattern::is_wildcard)
             }
             _ => false,
         }

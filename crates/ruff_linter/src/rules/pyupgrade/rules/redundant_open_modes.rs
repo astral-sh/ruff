@@ -61,7 +61,16 @@ impl AlwaysFixableViolation for RedundantOpenModes {
 
 /// UP015
 pub(crate) fn redundant_open_modes(checker: &mut Checker, call: &ast::ExprCall) {
-    if !checker.semantic().match_builtin_expr(&call.func, "open") {
+    if !checker
+        .semantic()
+        .resolve_qualified_name(&call.func)
+        .is_some_and(|qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                ["" | "builtins" | "aiofiles", "open"]
+            )
+        })
+    {
         return;
     }
 

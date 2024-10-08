@@ -119,3 +119,98 @@ class A(metaclass=abc.abcmeta):
     def f(self):
         """Lorem ipsum."""
         return True
+
+
+# OK - implicit None early return
+def foo(obj: object) -> None:
+    """A very helpful docstring.
+
+    Args:
+        obj (object): An object.
+    """
+    if obj is None:
+        return
+    print(obj)
+
+
+# OK - explicit None early return
+def foo(obj: object) -> None:
+    """A very helpful docstring.
+
+    Args:
+        obj (object): An object.
+    """
+    if obj is None:
+        return None
+    print(obj)
+
+
+# OK - explicit None early return w/o useful type annotations
+def foo(obj):
+    """A very helpful docstring.
+
+    Args:
+        obj (object): An object.
+    """
+    if obj is None:
+        return None
+    print(obj)
+
+
+# OK - multiple explicit None early returns
+def foo(obj: object) -> None:
+    """A very helpful docstring.
+
+    Args:
+        obj (object): An object.
+    """
+    if obj is None:
+        return None
+    if obj == "None":
+        return
+    if obj == 0:
+        return None
+    print(obj)
+
+
+# DOC201 - non-early return explicit None
+def foo(x: int) -> int | None:
+    """A very helpful docstring.
+
+    Args:
+        x (int): An interger.
+    """
+    if x < 0:
+        return None
+    else:
+        return x
+
+
+# DOC201 - non-early return explicit None w/o useful type annotations
+def foo(x):
+    """A very helpful docstring.
+
+    Args:
+        x (int): An interger.
+    """
+    if x < 0:
+        return None
+    else:
+        return x
+
+
+# DOC201 - only returns None, but return annotation is not None
+def foo(s: str) -> str | None:
+    """A very helpful docstring.
+
+    Args:
+        s (str): A string.
+    """
+    return None
+
+
+class Spam:
+    # OK
+    def __new__(cls) -> 'Spam':
+        """New!!"""
+        return cls()

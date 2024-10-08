@@ -45,3 +45,17 @@ A004.py:4:25: A004 Import `exec` is shadowing a Python builtin
   |                         ^^^^ A004
 5 | from directory import new as dir
   |
+
+A004.py:11:32: A004 Import `BaseExceptionGroup` is shadowing a Python builtin
+   |
+10 | if sys.version_info < (3, 11):
+11 |     from exceptiongroup import BaseExceptionGroup, ExceptionGroup
+   |                                ^^^^^^^^^^^^^^^^^^ A004
+   |
+
+A004.py:11:52: A004 Import `ExceptionGroup` is shadowing a Python builtin
+   |
+10 | if sys.version_info < (3, 11):
+11 |     from exceptiongroup import BaseExceptionGroup, ExceptionGroup
+   |                                                    ^^^^^^^^^^^^^^ A004
+   |

@@ -49,7 +49,6 @@ mod tests {
     #[test_case(Rule::UnsortedDunderAll, Path::new("RUF022.py"))]
     #[test_case(Rule::UnsortedDunderSlots, Path::new("RUF023.py"))]
     #[test_case(Rule::MutableFromkeysValue, Path::new("RUF024.py"))]
-    #[test_case(Rule::UnnecessaryDictComprehensionForIterable, Path::new("RUF025.py"))]
     #[test_case(Rule::DefaultFactoryKwarg, Path::new("RUF026.py"))]
     #[test_case(Rule::MissingFStringSyntax, Path::new("RUF027_0.py"))]
     #[test_case(Rule::MissingFStringSyntax, Path::new("RUF027_1.py"))]
@@ -58,7 +57,10 @@ mod tests {
     #[test_case(Rule::UnusedAsync, Path::new("RUF029.py"))]
     #[test_case(Rule::AssertWithPrintMessage, Path::new("RUF030.py"))]
     #[test_case(Rule::IncorrectlyParenthesizedTupleInSubscript, Path::new("RUF031.py"))]
+    #[test_case(Rule::DecimalFromFloatLiteral, Path::new("RUF032.py"))]
+    #[test_case(Rule::UselessIfElse, Path::new("RUF034.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101.py"))]
+    #[test_case(Rule::PostInitDefault, Path::new("RUF033.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

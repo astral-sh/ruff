@@ -11,11 +11,14 @@ fn check() {
     };
     let mut workspace = Workspace::new("/", &settings).expect("Workspace to be created");
 
-    let test = workspace
+    workspace
         .open_file("test.py", "import random22\n")
         .expect("File to be opened");
 
-    let result = workspace.check_file(&test).expect("Check to succeed");
+    let result = workspace.check().expect("Check to succeed");
 
-    assert_eq!(result, vec!["Unresolved import 'random22'"]);
+    assert_eq!(
+        result,
+        vec!["/test.py:1:8: Cannot resolve import `random22`"]
+    );
 }

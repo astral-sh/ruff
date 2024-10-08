@@ -19,7 +19,7 @@ use crate::fix::edits::delete_stmt;
 ///
 /// ## Example
 ///
-/// ```python
+/// ```pyi
 /// class Foo:
 ///     def __repr__(self) -> str: ...
 /// ```

@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr, ExprAttribute, ExprDict, ExprList};
+use ruff_python_ast::{self as ast, Expr, ExprAttribute};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -65,8 +65,8 @@ fn is_call_insecure(call: &ast::ExprCall) -> bool {
         if let Some(argument) = call.arguments.find_argument(argument_name, position) {
             match argument_name {
                 "select" => match argument {
-                    Expr::Dict(ExprDict { items, .. }) => {
-                        if items.iter().any(|ast::DictItem { key, value }| {
+                    Expr::Dict(dict) => {
+                        if dict.iter().any(|ast::DictItem { key, value }| {
                             key.as_ref()
                                 .is_some_and(|key| !key.is_string_literal_expr())
                                 || !value.is_string_literal_expr()
@@ -77,8 +77,8 @@ fn is_call_insecure(call: &ast::ExprCall) -> bool {
                     _ => return true,
                 },
                 "where" | "tables" => match argument {
-                    Expr::List(ExprList { elts, .. }) => {
-                        if !elts.iter().all(Expr::is_string_literal_expr) {
+                    Expr::List(list) => {
+                        if !list.iter().all(Expr::is_string_literal_expr) {
                             return true;
                         }
                     }

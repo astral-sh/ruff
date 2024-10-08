@@ -20,6 +20,23 @@ pub struct TextDocument {
     /// The latest version of the document, set by the LSP client. The server will panic in
     /// debug mode if we attempt to update the document with an 'older' version.
     version: DocumentVersion,
+    /// The language ID of the document as provided by the client.
+    language_id: Option<LanguageId>,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum LanguageId {
+    Python,
+    Other,
+}
+
+impl From<&str> for LanguageId {
+    fn from(language_id: &str) -> Self {
+        match language_id {
+            "python" => Self::Python,
+            _ => Self::Other,
+        }
+    }
 }
 
 impl TextDocument {
@@ -29,7 +46,14 @@ impl TextDocument {
             contents,
             index,
             version,
+            language_id: None,
         }
+    }
+
+    #[must_use]
+    pub fn with_language_id(mut self, language_id: &str) -> Self {
+        self.language_id = Some(LanguageId::from(language_id));
+        self
     }
 
     pub fn into_contents(self) -> String {
@@ -46,6 +70,10 @@ impl TextDocument {
 
     pub fn version(&self) -> DocumentVersion {
         self.version
+    }
+
+    pub fn language_id(&self) -> Option<LanguageId> {
+        self.language_id
     }
 
     pub fn apply_changes(

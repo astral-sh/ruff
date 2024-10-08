@@ -476,46 +476,31 @@ impl From<ExtensionPair> for (String, Language) {
         (value.extension, value.language)
     }
 }
+
 #[derive(Debug, Clone, Default, CacheKey)]
-pub struct ExtensionMapping {
-    mapping: FxHashMap<String, Language>,
-}
+pub struct ExtensionMapping(FxHashMap<String, Language>);
 
 impl ExtensionMapping {
     /// Return the [`Language`] for the given file.
     pub fn get(&self, path: &Path) -> Option<Language> {
         let ext = path.extension()?.to_str()?;
-        self.mapping.get(ext).copied()
-    }
-}
-
-impl Display for ExtensionMapping {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        display_settings! {
-            formatter = f,
-            namespace = "linter.extension",
-            fields = [
-                self.mapping | debug
-            ]
-        }
-        Ok(())
+        self.0.get(ext).copied()
     }
 }
 
 impl From<FxHashMap<String, Language>> for ExtensionMapping {
     fn from(value: FxHashMap<String, Language>) -> Self {
-        Self { mapping: value }
+        Self(value)
     }
 }
 
 impl FromIterator<ExtensionPair> for ExtensionMapping {
     fn from_iter<T: IntoIterator<Item = ExtensionPair>>(iter: T) -> Self {
-        Self {
-            mapping: iter
-                .into_iter()
+        Self(
+            iter.into_iter()
                 .map(|pair| (pair.extension, pair.language))
                 .collect(),
-        }
+        )
     }
 }
 

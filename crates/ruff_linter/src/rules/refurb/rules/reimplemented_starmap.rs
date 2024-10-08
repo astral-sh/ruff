@@ -134,9 +134,9 @@ pub(crate) fn reimplemented_starmap(checker: &mut Checker, target: &StarmapCandi
         }
         // Ex) `f(x, y, z) for x, y, z in iter`
         ComprehensionTarget::Tuple(tuple) => {
-            if tuple.elts.len() != args.len()
-                || !std::iter::zip(&tuple.elts, args)
-                    .all(|(x, y)| ComparableExpr::from(x) == ComparableExpr::from(y))
+            if tuple.len() != args.len()
+                || std::iter::zip(tuple, args)
+                    .any(|(x, y)| ComparableExpr::from(x) != ComparableExpr::from(y))
             {
                 return;
             }
@@ -144,9 +144,8 @@ pub(crate) fn reimplemented_starmap(checker: &mut Checker, target: &StarmapCandi
             // If any of the members are used outside the function call, we can't replace it.
             if any_over_expr(func, &|expr| {
                 tuple
-                    .elts
                     .iter()
-                    .any(|elt| ComparableExpr::from(expr) == ComparableExpr::from(elt))
+                    .any(|elem| ComparableExpr::from(expr) == ComparableExpr::from(elem))
             }) {
                 return;
             }

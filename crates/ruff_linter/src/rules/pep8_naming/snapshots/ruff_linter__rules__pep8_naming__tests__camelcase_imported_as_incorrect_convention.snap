@@ -1,0 +1,41 @@
+---
+source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
+---
+N817.py:1:8: N817 CamelCase `CaMel` imported as acronym `CM`
+  |
+1 | import mod.CaMel as CM
+  |        ^^^^^^^^^^^^^^^ N817
+2 | from mod import CamelCase as CC
+  |
+
+N817.py:2:17: N817 CamelCase `CamelCase` imported as acronym `CC`
+  |
+1 | import mod.CaMel as CM
+2 | from mod import CamelCase as CC
+  |                 ^^^^^^^^^^^^^^^ N817
+  |
+
+N817.py:6:8: N817 CamelCase `ElementTree` imported as acronym `ET`
+  |
+5 | # OK depending on configured import convention
+6 | import xml.etree.ElementTree as ET
+  |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^ N817
+7 | from xml.etree import ElementTree as ET
+  |
+
+N817.py:7:23: N817 CamelCase `ElementTree` imported as acronym `ET`
+  |
+5 | # OK depending on configured import convention
+6 | import xml.etree.ElementTree as ET
+7 | from xml.etree import ElementTree as ET
+  |                       ^^^^^^^^^^^^^^^^^ N817
+8 | 
+9 | # Always an error (relative import)
+  |
+
+N817.py:10:26: N817 CamelCase `ElementTree` imported as acronym `ET`
+   |
+ 9 | # Always an error (relative import)
+10 | from ..xml.eltree import ElementTree as ET
+   |                          ^^^^^^^^^^^^^^^^^ N817
+   |

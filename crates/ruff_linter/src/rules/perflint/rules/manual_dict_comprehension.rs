@@ -102,16 +102,16 @@ pub(crate) fn manual_dict_comprehension(checker: &mut Checker, target: &Expr, bo
     };
 
     match target {
-        Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-            if !elts
+        Expr::Tuple(tuple) => {
+            if !tuple
                 .iter()
-                .any(|elt| ComparableExpr::from(slice) == ComparableExpr::from(elt))
+                .any(|element| ComparableExpr::from(slice) == ComparableExpr::from(element))
             {
                 return;
             }
-            if !elts
+            if !tuple
                 .iter()
-                .any(|elt| ComparableExpr::from(value) == ComparableExpr::from(elt))
+                .any(|element| ComparableExpr::from(value) == ComparableExpr::from(element))
             {
                 return;
             }
@@ -128,7 +128,7 @@ pub(crate) fn manual_dict_comprehension(checker: &mut Checker, target: &Expr, bo
     }
 
     // Exclude non-dictionary value.
-    let Some(name) = subscript_value.as_name_expr() else {
+    let Expr::Name(name) = &**subscript_value else {
         return;
     };
     let Some(binding) = checker

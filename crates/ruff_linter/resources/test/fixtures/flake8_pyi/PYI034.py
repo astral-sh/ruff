@@ -317,3 +317,7 @@ def __ne__(self, other: Any) -> bool:
 
 def __imul__(self, other: Any) -> list[str]:
     ...
+
+class UsesStringizedAnnotations:
+    def __iadd__(self, other: "UsesStringizedAnnotations") -> "typing.Self":
+        return self

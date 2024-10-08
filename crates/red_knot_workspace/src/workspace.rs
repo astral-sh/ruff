@@ -4,21 +4,27 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 use salsa::{Durability, Setter as _};
 
 pub use metadata::{PackageMetadata, WorkspaceMetadata};
-use ruff_db::source::{source_text, SourceDiagnostic};
+use red_knot_python_semantic::types::check_types;
+use red_knot_python_semantic::SearchPathSettings;
+use ruff_db::parsed::parsed_module;
+use ruff_db::source::{line_index, source_text, SourceDiagnostic};
 use ruff_db::{
     files::{system_path_to_file, File},
     system::{walk_directory::WalkState, SystemPath, SystemPathBuf},
 };
 use ruff_python_ast::{name::Name, PySourceType};
+use ruff_text_size::Ranged;
 
-use crate::workspace::files::{Index, IndexedFiles, PackageFiles};
+use crate::db::RootDatabase;
+use crate::workspace::files::{Index, Indexed, IndexedIter, PackageFiles};
 use crate::{
     db::Db,
-    lint::{lint_semantic, lint_syntax, Diagnostics},
+    lint::{lint_semantic, lint_syntax},
 };
 
 mod files;
 mod metadata;
+pub mod settings;
 
 /// The project workspace as a Salsa ingredient.
 ///
@@ -79,6 +85,10 @@ pub struct Workspace {
     /// The (first-party) packages in this workspace.
     #[return_ref]
     package_tree: BTreeMap<SystemPathBuf, Package>,
+
+    /// The unresolved search path configuration.
+    #[return_ref]
+    pub search_path_settings: SearchPathSettings,
 }
 
 /// A first-party package in a workspace.
@@ -92,8 +102,8 @@ pub struct Package {
     root_buf: SystemPathBuf,
 
     /// The files that are part of this package.
-    #[return_ref]
     #[default]
+    #[return_ref]
     file_set: PackageFiles,
     // TODO: Add the loaded settings.
 }
@@ -107,10 +117,14 @@ impl Workspace {
             packages.insert(package.root.clone(), Package::from_metadata(db, package));
         }
 
-        Workspace::builder(metadata.root, packages)
-            .durability(Durability::MEDIUM)
-            .open_fileset_durability(Durability::LOW)
-            .new(db)
+        Workspace::builder(
+            metadata.root,
+            packages,
+            metadata.settings.program.search_paths,
+        )
+        .durability(Durability::MEDIUM)
+        .open_fileset_durability(Durability::LOW)
+        .new(db)
     }
 
     pub fn root(self, db: &dyn Db) -> &SystemPath {
@@ -141,9 +155,12 @@ impl Workspace {
             new_packages.insert(path, package);
         }
 
-        self.set_package_tree(db)
-            .with_durability(Durability::MEDIUM)
-            .to(new_packages);
+        if &metadata.settings.program.search_paths != self.search_path_settings(db) {
+            self.set_search_path_settings(db)
+                .to(metadata.settings.program.search_paths);
+        }
+
+        self.set_package_tree(db).to(new_packages);
     }
 
     pub fn update_package(self, db: &mut dyn Db, metadata: PackageMetadata) -> anyhow::Result<()> {
@@ -174,30 +191,42 @@ impl Workspace {
     }
 
     /// Checks all open files in the workspace and its dependencies.
-    #[tracing::instrument(level = "debug", skip_all)]
-    pub fn check(self, db: &dyn Db) -> Vec<String> {
+    pub fn check(self, db: &RootDatabase) -> Vec<String> {
+        let workspace_span = tracing::debug_span!("check_workspace");
+        let _span = workspace_span.enter();
+
         tracing::debug!("Checking workspace");
+        let files = WorkspaceFiles::new(db, self);
+        let result = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let inner_result = Arc::clone(&result);
 
-        let mut result = Vec::new();
+        let db = db.snapshot();
+        let workspace_span = workspace_span.clone();
 
-        if let Some(open_files) = self.open_files(db) {
-            for file in open_files {
-                result.extend_from_slice(&check_file(db, *file));
+        rayon::scope(move |scope| {
+            for file in &files {
+                let result = inner_result.clone();
+                let db = db.snapshot();
+                let workspace_span = workspace_span.clone();
+
+                scope.spawn(move |_| {
+                    let check_file_span = tracing::debug_span!(parent: &workspace_span, "check_file", file=%file.path(&db));
+                    let _entered = check_file_span.entered();
+
+                    let file_diagnostics = check_file(&db, file);
+                    result.lock().unwrap().extend(file_diagnostics);
+                });
             }
-        } else {
-            for package in self.packages(db) {
-                result.extend(package.check(db));
-            }
-        }
+        });
 
-        result
+        Arc::into_inner(result).unwrap().into_inner().unwrap()
     }
 
     /// Opens a file in the workspace.
     ///
     /// This changes the behavior of `check` to only check the open files rather than all files in the workspace.
     pub fn open_file(self, db: &mut dyn Db, file: File) {
-        tracing::debug!("Opening file {}", file.path(db));
+        tracing::debug!("Opening file `{}`", file.path(db));
 
         let mut open_files = self.take_open_files(db);
         open_files.insert(file);
@@ -206,7 +235,7 @@ impl Workspace {
 
     /// Closes a file in the workspace.
     pub fn close_file(self, db: &mut dyn Db, file: File) -> bool {
-        tracing::debug!("Closing file {}", file.path(db));
+        tracing::debug!("Closing file `{}`", file.path(db));
 
         let mut open_files = self.take_open_files(db);
         let removed = open_files.remove(&file);
@@ -249,9 +278,25 @@ impl Workspace {
             FxHashSet::default()
         }
     }
+
+    /// Returns `true` if the file is open in the workspace.
+    ///
+    /// A file is considered open when:
+    /// * explicitly set as an open file using [`open_file`](Self::open_file)
+    /// * It has a [`SystemPath`] and belongs to a package's `src` files
+    /// * It has a [`SystemVirtualPath`](ruff_db::system::SystemVirtualPath)
+    pub fn is_file_open(self, db: &dyn Db, file: File) -> bool {
+        if let Some(open_files) = self.open_files(db) {
+            open_files.contains(&file)
+        } else if let Some(system_path) = file.path(db).as_system_path() {
+            self.package(db, system_path)
+                .map_or(false, |package| package.contains_file(db, file))
+        } else {
+            file.path(db).is_system_virtual_path()
+        }
+    }
 }
 
-#[salsa::tracked]
 impl Package {
     pub fn root(self, db: &dyn Db) -> &SystemPath {
         self.root_buf(db)
@@ -259,13 +304,13 @@ impl Package {
 
     /// Returns `true` if `file` is a first-party file part of this package.
     pub fn contains_file(self, db: &dyn Db, file: File) -> bool {
-        self.files(db).read().contains(&file)
+        self.files(db).contains(&file)
     }
 
     #[tracing::instrument(level = "debug", skip(db))]
     pub fn remove_file(self, db: &mut dyn Db, file: File) {
         tracing::debug!(
-            "Remove file {} from package {}",
+            "Removing file `{}` from package `{}`",
             file.path(db),
             self.name(db)
         );
@@ -278,7 +323,11 @@ impl Package {
     }
 
     pub fn add_file(self, db: &mut dyn Db, file: File) {
-        tracing::debug!("Add file {} to package {}", file.path(db), self.name(db));
+        tracing::debug!(
+            "Adding file `{}` to package `{}`",
+            file.path(db),
+            self.name(db)
+        );
 
         let Some(mut index) = PackageFiles::indexed_mut(db, self) else {
             return;
@@ -287,29 +336,17 @@ impl Package {
         index.insert(file);
     }
 
-    #[tracing::instrument(level = "debug", skip(db))]
-    pub(crate) fn check(self, db: &dyn Db) -> Vec<String> {
-        tracing::debug!("Checking package {}", self.root(db));
-
-        let mut result = Vec::new();
-        for file in &self.files(db).read() {
-            let diagnostics = check_file(db, file);
-            result.extend_from_slice(&diagnostics);
-        }
-
-        result
-    }
-
     /// Returns the files belonging to this package.
-    #[salsa::tracked]
-    pub fn files(self, db: &dyn Db) -> IndexedFiles {
-        let _entered = tracing::debug_span!("files").entered();
+    pub fn files(self, db: &dyn Db) -> Indexed<'_> {
         let files = self.file_set(db);
 
         let indexed = match files.get() {
             Index::Lazy(vacant) => {
-                tracing::debug!("Indexing files for package {}", self.name(db));
+                let _entered =
+                    tracing::debug_span!("index_package_files", package = %self.name(db)).entered();
+
                 let files = discover_package_files(db, self.root(db));
+                tracing::info!("Found {} files in package `{}`", files.len(), self.name(db));
                 vacant.set(files)
             }
             Index::Indexed(indexed) => indexed,
@@ -330,14 +367,12 @@ impl Package {
         assert_eq!(root, metadata.root());
 
         if self.name(db) != metadata.name() {
-            self.set_name(db)
-                .with_durability(Durability::MEDIUM)
-                .to(metadata.name);
+            self.set_name(db).to(metadata.name);
         }
     }
 
     pub fn reload_files(self, db: &mut dyn Db) {
-        tracing::debug!("Reload files for package {}", self.name(db));
+        tracing::debug!("Reloading files for package `{}`", self.name(db));
 
         if !self.file_set(db).is_lazy() {
             // Force a re-index of the files in the next revision.
@@ -347,10 +382,8 @@ impl Package {
 }
 
 #[salsa::tracked]
-pub(super) fn check_file(db: &dyn Db, file: File) -> Diagnostics {
-    let path = file.path(db);
-    let _span = tracing::debug_span!("check_file", file=%path).entered();
-    tracing::debug!("Checking file {path}");
+pub(super) fn check_file(db: &dyn Db, file: File) -> Vec<String> {
+    tracing::debug!("Checking file '{path}'", path = file.path(db));
 
     let mut diagnostics = Vec::new();
 
@@ -363,13 +396,36 @@ pub(super) fn check_file(db: &dyn Db, file: File) -> Diagnostics {
     );
 
     // Abort checking if there are IO errors.
-    if source_text(db.upcast(), file).has_read_error() {
-        return Diagnostics::from(diagnostics);
+    let source = source_text(db.upcast(), file);
+
+    if source.has_read_error() {
+        return diagnostics;
+    }
+
+    let parsed = parsed_module(db.upcast(), file);
+
+    if !parsed.errors().is_empty() {
+        let path = file.path(db);
+        let line_index = line_index(db.upcast(), file);
+        diagnostics.extend(parsed.errors().iter().map(|err| {
+            let source_location = line_index.source_location(err.location.start(), source.as_str());
+            format!("{path}:{source_location}: {message}", message = err.error)
+        }));
+    }
+
+    for diagnostic in check_types(db.upcast(), file) {
+        let index = line_index(db.upcast(), diagnostic.file());
+        let location = index.source_location(diagnostic.start(), source.as_str());
+        diagnostics.push(format!(
+            "{path}:{location}: {message}",
+            path = file.path(db),
+            message = diagnostic.message()
+        ));
     }
 
     diagnostics.extend_from_slice(lint_syntax(db, file));
     diagnostics.extend_from_slice(lint_semantic(db, file));
-    Diagnostics::from(diagnostics)
+    diagnostics
 }
 
 fn discover_package_files(db: &dyn Db, path: &SystemPath) -> FxHashSet<File> {
@@ -415,6 +471,73 @@ fn discover_package_files(db: &dyn Db, path: &SystemPath) -> FxHashSet<File> {
     files
 }
 
+#[derive(Debug)]
+enum WorkspaceFiles<'a> {
+    OpenFiles(&'a FxHashSet<File>),
+    PackageFiles(Vec<Indexed<'a>>),
+}
+
+impl<'a> WorkspaceFiles<'a> {
+    fn new(db: &'a dyn Db, workspace: Workspace) -> Self {
+        if let Some(open_files) = workspace.open_files(db) {
+            WorkspaceFiles::OpenFiles(open_files)
+        } else {
+            WorkspaceFiles::PackageFiles(
+                workspace
+                    .packages(db)
+                    .map(|package| package.files(db))
+                    .collect(),
+            )
+        }
+    }
+}
+
+impl<'a> IntoIterator for &'a WorkspaceFiles<'a> {
+    type Item = File;
+    type IntoIter = WorkspaceFilesIter<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match self {
+            WorkspaceFiles::OpenFiles(files) => WorkspaceFilesIter::OpenFiles(files.iter()),
+            WorkspaceFiles::PackageFiles(package_files) => {
+                let mut package_files = package_files.iter();
+                WorkspaceFilesIter::PackageFiles {
+                    current: package_files.next().map(IntoIterator::into_iter),
+                    package_files,
+                }
+            }
+        }
+    }
+}
+
+enum WorkspaceFilesIter<'db> {
+    OpenFiles(std::collections::hash_set::Iter<'db, File>),
+    PackageFiles {
+        package_files: std::slice::Iter<'db, Indexed<'db>>,
+        current: Option<IndexedIter<'db>>,
+    },
+}
+
+impl Iterator for WorkspaceFilesIter<'_> {
+    type Item = File;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            WorkspaceFilesIter::OpenFiles(files) => files.next().copied(),
+            WorkspaceFilesIter::PackageFiles {
+                package_files,
+                current,
+            } => loop {
+                if let Some(file) = current.as_mut().and_then(Iterator::next) {
+                    return Some(file);
+                }
+
+                *current = Some(package_files.next()?.into_iter());
+            },
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use ruff_db::files::system_path_to_file;
@@ -423,7 +546,7 @@ mod tests {
     use ruff_db::testing::assert_function_query_was_not_run;
 
     use crate::db::tests::TestDb;
-    use crate::lint::{lint_syntax, Diagnostics};
+    use crate::lint::lint_syntax;
     use crate::workspace::check_file;
 
     #[test]
@@ -441,9 +564,7 @@ mod tests {
         assert_eq!(source_text(&db, file).as_str(), "");
         assert_eq!(
             check_file(&db, file),
-            Diagnostics::List(vec![
-                "Failed to read file: No such file or directory".to_string()
-            ])
+            vec!["Failed to read file: No such file or directory".to_string()]
         );
 
         let events = db.take_salsa_events();
@@ -454,7 +575,7 @@ mod tests {
         db.write_file(path, "").unwrap();
 
         assert_eq!(source_text(&db, file).as_str(), "");
-        assert_eq!(check_file(&db, file), Diagnostics::Empty);
+        assert_eq!(check_file(&db, file), vec![] as Vec<String>);
 
         Ok(())
     }

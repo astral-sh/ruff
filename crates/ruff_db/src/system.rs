@@ -63,9 +63,6 @@ pub trait System: Debug {
     /// representation fall-back to deserializing the notebook from a string.
     fn read_to_notebook(&self, path: &SystemPath) -> std::result::Result<Notebook, NotebookError>;
 
-    /// Reads the metadata of the virtual file at `path`.
-    fn virtual_path_metadata(&self, path: &SystemVirtualPath) -> Result<Metadata>;
-
     /// Reads the content of the virtual file at `path` into a [`String`].
     fn read_virtual_path_to_string(&self, path: &SystemVirtualPath) -> Result<String>;
 

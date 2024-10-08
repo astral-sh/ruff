@@ -605,3 +605,17 @@ def test_lowercase_sub_section_header_different_kind(returns: int):
        some value
 
    """
+
+
+# We used to incorrectly infer this as a numpy-style docstring,
+# which caused us to emit D406 and D407 on it;
+# see https://github.com/astral-sh/ruff/issues/13139
+def another_valid_google_style_docstring(a: str) -> str:
+    """Foo bar.
+
+    Examples:
+        Some explanation here.
+        >>> bla bla bla
+
+    """
+    return a

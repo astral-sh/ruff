@@ -27,13 +27,13 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 ///
-/// ```python
+/// ```pyi
 /// def foo(x: float | int | str) -> None: ...
 /// ```
 ///
 /// Use instead:
 ///
-/// ```python
+/// ```pyi
 /// def foo(x: float | str) -> None: ...
 /// ```
 ///

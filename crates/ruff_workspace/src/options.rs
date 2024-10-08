@@ -1,11 +1,14 @@
 use regex::Regex;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+use std::path::PathBuf;
 use strum::IntoEnumIterator;
 
 use crate::options_base::{OptionsMetadata, Visit};
 use crate::settings::LineEnding;
 use ruff_formatter::IndentStyle;
+use ruff_graph::Direction;
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::rules::flake8_import_conventions::settings::BannedAliases;
 use ruff_linter::rules::flake8_pytest_style::settings::SettingsError;
@@ -47,7 +50,7 @@ pub struct Options {
     /// This setting will override even the `RUFF_CACHE_DIR` environment
     /// variable, if set.
     #[option(
-        default = ".ruff_cache",
+        default = r#"".ruff_cache""#,
         value_type = "str",
         example = r#"cache-dir = "~/.cache/ruff""#
     )]
@@ -241,13 +244,11 @@ pub struct Options {
     /// included here not for configuration but because we lint whether e.g. the
     /// `[project]` matches the schema.
     ///
-    /// If [preview](https://docs.astral.sh/ruff/preview/) is enabled, the default
-    /// includes notebook files (`.ipynb` extension). You can exclude them by adding
-    /// `*.ipynb` to [`extend-exclude`](#extend-exclude).
+    /// Notebook files (`.ipynb` extension) are included by default on Ruff 0.6.0+.
     ///
     /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     #[option(
-        default = r#"["*.py", "*.pyi", "**/pyproject.toml"]"#,
+        default = r#"["*.py", "*.pyi", "*.ipynb", "**/pyproject.toml"]"#,
         value_type = "list[str]",
         example = r#"
             include = ["*.py"]
@@ -310,6 +311,16 @@ pub struct Options {
     ///
     /// If both are specified, `target-version` takes precedence over
     /// `requires-python`.
+    ///
+    /// Note that a stub file can [sometimes make use of a typing feature](https://typing.readthedocs.io/en/latest/spec/distributing.html#syntax)
+    /// before it is available at runtime, as long as the stub does not make
+    /// use of new *syntax*. For example, a type checker will understand
+    /// `int | str` in a stub as being a `Union` type annotation, even if the
+    /// type checker is run using Python 3.9, despite the fact that the `|`
+    /// operator can only be used to create union types at runtime on Python
+    /// 3.10+. As such, Ruff will often recommend newer features in a stub
+    /// file than it would for an equivalent runtime file with the same target
+    /// version.
     #[option(
         default = r#""py38""#,
         value_type = r#""py37" | "py38" | "py39" | "py310" | "py311" | "py312""#,
@@ -323,33 +334,37 @@ pub struct Options {
     /// The directories to consider when resolving first- vs. third-party
     /// imports.
     ///
-    /// As an example: given a Python package structure like:
+    /// When omitted, the `src` directory will typically default to including both:
+    ///
+    /// 1. The directory containing the nearest `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file (the "project root").
+    /// 2. The `"src"` subdirectory of the project root.
+    ///
+    /// These defaults ensure that uv supports both flat layouts and `src` layouts out-of-the-box.
+    /// (If a configuration file is explicitly provided (e.g., via the `--config` command-line
+    /// flag), the current working directory will be considered the project root.)
+    ///
+    /// As an example, consider an alternative project structure, like:
     ///
     /// ```text
     /// my_project
     /// ├── pyproject.toml
-    /// └── src
+    /// └── lib
     ///     └── my_package
     ///         ├── __init__.py
     ///         ├── foo.py
     ///         └── bar.py
     /// ```
     ///
-    /// The `./src` directory should be included in the `src` option
-    /// (e.g., `src = ["src"]`), such that when resolving imports,
-    /// `my_package.foo` is considered a first-party import.
-    ///
-    /// When omitted, the `src` directory will typically default to the
-    /// directory containing the nearest `pyproject.toml`, `ruff.toml`, or
-    /// `.ruff.toml` file (the "project root"), unless a configuration file
-    /// is explicitly provided (e.g., via the `--config` command-line flag).
+    /// In this case, the `./lib` directory should be included in the `src` option
+    /// (e.g., `src = ["lib"]`), such that when resolving imports, `my_package.foo`
+    /// is considered first-party.
     ///
     /// This field supports globs. For example, if you have a series of Python
     /// packages in a `python_modules` directory, `src = ["python_modules/*"]`
-    /// would expand to incorporate all of the packages in that directory. User
-    /// home directory and environment variables will also be expanded.
+    /// would expand to incorporate all packages in that directory. User home
+    /// directory and environment variables will also be expanded.
     #[option(
-        default = r#"["."]"#,
+        default = r#"[".", "src"]"#,
         value_type = "list[str]",
         example = r#"
             # Allow imports relative to the "src" and "test" directories.
@@ -421,6 +436,10 @@ pub struct Options {
     /// Options to configure code formatting.
     #[option_group]
     pub format: Option<FormatOptions>,
+
+    /// Options to configure import map generation.
+    #[option_group]
+    pub analyze: Option<AnalyzeOptions>,
 }
 
 /// Configures how Ruff checks your code.
@@ -551,7 +570,7 @@ pub struct LintCommonOptions {
     /// default expression matches `_`, `__`, and `_var`, but not `_var_`.
     #[option(
         default = r#""^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$""#,
-        value_type = "re.Pattern",
+        value_type = "str",
         example = r#"
             # Only ignore variables named "_".
             dummy-variable-rgx = "^_$"
@@ -777,6 +796,16 @@ pub struct LintCommonOptions {
     )]
     pub typing_modules: Option<Vec<String>>,
 
+    /// A list of modules which is allowed even though they are not used
+    /// in the code.
+    ///
+    /// This is useful when a module has a side effect when imported.
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"allowed-unused-imports = ["hvplot.pandas"]"#
+    )]
+    pub allowed_unused_imports: Option<Vec<String>>,
     /// A list of rule codes or prefixes to consider non-fixable.
     #[option(
         default = "[]",
@@ -1169,7 +1198,7 @@ pub struct Flake8CopyrightOptions {
     /// - `Copyright (C) 2021-2023`
     /// - `Copyright (C) 2021, 2023`
     #[option(
-        default = r#"(?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*"#,
+        default = r#""(?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*""#,
         value_type = "str",
         example = r#"notice-rgx = "(?i)Copyright \\(C\\) \\d{4}""#
     )]
@@ -1306,7 +1335,7 @@ pub struct Flake8ImportConventionsOptions {
     /// The conventional aliases for imports. These aliases can be extended by
     /// the [`extend-aliases`](#lint_flake8-import-conventions_extend-aliases) option.
     #[option(
-        default = r#"{"altair": "alt", "matplotlib": "mpl", "matplotlib.pyplot": "plt", "numpy": "np", "pandas": "pd", "seaborn": "sns", "tensorflow": "tf", "tkinter":  "tk", "holoviews": "hv", "panel": "pn", "plotly.express": "px", "polars": "pl", "pyarrow": "pa"}"#,
+        default = r#"{"altair": "alt", "matplotlib": "mpl", "matplotlib.pyplot": "plt", "numpy": "np", "pandas": "pd", "seaborn": "sns", "tensorflow": "tf", "tkinter":  "tk", "holoviews": "hv", "panel": "pn", "plotly.express": "px", "polars": "pl", "pyarrow": "pa", "xml.etree.ElementTree": "ET"}"#,
         value_type = "dict[str, str]",
         scope = "aliases",
         example = r#"
@@ -1386,15 +1415,12 @@ impl Flake8ImportConventionsOptions {
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Flake8PytestStyleOptions {
     /// Boolean flag specifying whether `@pytest.fixture()` without parameters
-    /// should have parentheses. If the option is set to `true` (the
-    /// default), `@pytest.fixture()` is valid and `@pytest.fixture` is
-    /// invalid. If set to `false`, `@pytest.fixture` is valid and
-    /// `@pytest.fixture()` is invalid.
-    ///
-    /// If [preview](https://docs.astral.sh/ruff/preview/) is enabled, defaults to
-    /// `false`.
+    /// should have parentheses. If the option is set to `false` (the default),
+    /// `@pytest.fixture` is valid and `@pytest.fixture()` is invalid. If set
+    /// to `true`, `@pytest.fixture()` is valid and `@pytest.fixture` is
+    /// invalid.
     #[option(
-        default = "true",
+        default = "false",
         value_type = "bool",
         example = "fixture-parentheses = true"
     )]
@@ -1472,15 +1498,12 @@ pub struct Flake8PytestStyleOptions {
     pub raises_extend_require_match_for: Option<Vec<String>>,
 
     /// Boolean flag specifying whether `@pytest.mark.foo()` without parameters
-    /// should have parentheses. If the option is set to `true` (the
-    /// default), `@pytest.mark.foo()` is valid and `@pytest.mark.foo` is
-    /// invalid. If set to `false`, `@pytest.mark.foo` is valid and
-    /// `@pytest.mark.foo()` is invalid.
-    ///
-    /// If [preview](https://docs.astral.sh/ruff/preview/) is enabled, defaults to
-    /// `false`.
+    /// should have parentheses. If the option is set to `false` (the
+    /// default), `@pytest.mark.foo` is valid and `@pytest.mark.foo()` is
+    /// invalid. If set to `true`, `@pytest.mark.foo()` is valid and
+    /// `@pytest.mark.foo` is invalid.
     #[option(
-        default = "true",
+        default = "false",
         value_type = "bool",
         example = "mark-parentheses = true"
     )]
@@ -2033,7 +2056,7 @@ pub struct IsortOptions {
     /// this to "closest-to-furthest" is equivalent to isort's
     /// `reverse-relative = true`.
     #[option(
-        default = r#"furthest-to-closest"#,
+        default = r#""furthest-to-closest""#,
         value_type = r#""furthest-to-closest" | "closest-to-furthest""#,
         example = r#"
             relative-imports-order = "closest-to-furthest"
@@ -2150,7 +2173,7 @@ pub struct IsortOptions {
 
     /// Define a default section for any imports that don't fit into the specified [`section-order`](#lint_isort_section-order).
     #[option(
-        default = r#"third-party"#,
+        default = r#""third-party""#,
         value_type = "str",
         example = r#"
             default-section = "first-party"
@@ -2664,8 +2687,8 @@ pub struct PycodestyleOptions {
     pub max_doc_length: Option<LineLength>,
 
     /// Whether line-length violations (`E501`) should be triggered for
-    /// comments starting with [`task-tags`](#lint_task-tags) (by default: \["TODO", "FIXME",
-    /// and "XXX"\]).
+    /// comments starting with [`task-tags`](#lint_task-tags) (by default: "TODO", "FIXME",
+    /// and "XXX").
     #[option(
         default = "false",
         value_type = "bool",
@@ -2799,12 +2822,28 @@ pub struct PyflakesOptions {
         example = "extend-generics = [\"django.db.models.ForeignKey\"]"
     )]
     pub extend_generics: Option<Vec<String>>,
+
+    /// A list of modules to ignore when considering unused imports.
+    ///
+    /// Used to prevent violations for specific modules that are known to have side effects on
+    /// import (e.g., `hvplot.pandas`).
+    ///
+    /// Modules in this list are expected to be fully-qualified names (e.g., `hvplot.pandas`). Any
+    /// submodule of a given module will also be ignored (e.g., given `hvplot`, `hvplot.pandas`
+    /// will also be ignored).
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"allowed-unused-imports = ["hvplot.pandas"]"#
+    )]
+    pub allowed_unused_imports: Option<Vec<String>>,
 }
 
 impl PyflakesOptions {
     pub fn into_settings(self) -> pyflakes::settings::Settings {
         pyflakes::settings::Settings {
             extend_generics: self.extend_generics.unwrap_or_default(),
+            allowed_unused_imports: self.allowed_unused_imports.unwrap_or_default(),
         }
     }
 }
@@ -3063,7 +3102,7 @@ pub struct FormatOptions {
     ///
     /// See [`indent-width`](#indent-width) to configure the number of spaces per indentation and the tab width.
     #[option(
-        default = "space",
+        default = r#""space""#,
         value_type = r#""space" | "tab""#,
         example = r#"
             # Use tabs instead of 4 space indentation.
@@ -3096,7 +3135,7 @@ pub struct FormatOptions {
     /// a mixture of single and double quotes and can't migrate to the `double` or `single` style.
     /// The quote style `preserve` leaves the quotes of all strings unchanged.
     #[option(
-        default = r#"double"#,
+        default = r#""double""#,
         value_type = r#""double" | "single" | "preserve""#,
         example = r#"
             # Prefer single quotes over double quotes.
@@ -3140,7 +3179,7 @@ pub struct FormatOptions {
     /// * `cr-lf`: Line endings will be converted to `\r\n`. The default line ending on Windows.
     /// * `native`: Line endings will be converted to `\n` on Unix and `\r\n` on Windows.
     #[option(
-        default = r#"auto"#,
+        default = r#""auto""#,
         value_type = r#""auto" | "lf" | "cr-lf" | "native""#,
         example = r#"
             # Use `\n` line endings for all files
@@ -3298,6 +3337,80 @@ pub struct FormatOptions {
         "#
     )]
     pub docstring_code_line_length: Option<DocstringCodeLineWidth>,
+}
+
+/// Configures Ruff's `analyze` command.
+#[derive(
+    Clone, Debug, PartialEq, Eq, Default, Deserialize, Serialize, OptionsMetadata, CombineOptions,
+)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct AnalyzeOptions {
+    /// A list of file patterns to exclude from analysis in addition to the files excluded globally (see [`exclude`](#exclude), and [`extend-exclude`](#extend-exclude)).
+    ///
+    /// Exclusions are based on globs, and can be either:
+    ///
+    /// - Single-path patterns, like `.mypy_cache` (to exclude any directory
+    ///   named `.mypy_cache` in the tree), `foo.py` (to exclude any file named
+    ///   `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ).
+    /// - Relative patterns, like `directory/foo.py` (to exclude that specific
+    ///   file) or `directory/*.py` (to exclude any Python files in
+    ///   `directory`). Note that these paths are relative to the project root
+    ///   (e.g., the directory containing your `pyproject.toml`).
+    ///
+    /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"
+            exclude = ["generated"]
+        "#
+    )]
+    pub exclude: Option<Vec<String>>,
+    /// Whether to enable preview mode. When preview mode is enabled, Ruff will expose unstable
+    /// commands.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # Enable preview features.
+            preview = true
+        "#
+    )]
+    pub preview: Option<bool>,
+    /// Whether to generate a map from file to files that it depends on (dependencies) or files that
+    /// depend on it (dependents).
+    #[option(
+        default = r#""dependencies""#,
+        value_type = r#""dependents" | "dependencies""#,
+        example = r#"
+            direction = "dependencies"
+        "#
+    )]
+    pub direction: Option<Direction>,
+    /// Whether to detect imports from string literals. When enabled, Ruff will search for string
+    /// literals that "look like" import paths, and include them in the import map, if they resolve
+    /// to valid Python modules.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            detect-string-imports = true
+        "#
+    )]
+    pub detect_string_imports: Option<bool>,
+    /// A map from file path to the list of file paths or globs that should be considered
+    /// dependencies of that file, regardless of whether relevant imports are detected.
+    #[option(
+        default = "{}",
+        value_type = "dict[str, list[str]]",
+        example = r#"
+            include-dependencies = {
+                "foo/bar.py": ["foo/baz/*.py"],
+            }
+        "#
+    )]
+    pub include_dependencies: Option<BTreeMap<PathBuf, Vec<String>>>,
 }
 
 #[cfg(test)]

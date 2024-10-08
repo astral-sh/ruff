@@ -52,4 +52,20 @@ A004.py:5:30: A004 Import `dir` is shadowing a Python builtin
 4 | from some import input, exec
 5 | from directory import new as dir
   |                              ^^^ A004
+6 | 
+7 | # See: https://github.com/astral-sh/ruff/issues/13037
   |
+
+A004.py:11:32: A004 Import `BaseExceptionGroup` is shadowing a Python builtin
+   |
+10 | if sys.version_info < (3, 11):
+11 |     from exceptiongroup import BaseExceptionGroup, ExceptionGroup
+   |                                ^^^^^^^^^^^^^^^^^^ A004
+   |
+
+A004.py:11:52: A004 Import `ExceptionGroup` is shadowing a Python builtin
+   |
+10 | if sys.version_info < (3, 11):
+11 |     from exceptiongroup import BaseExceptionGroup, ExceptionGroup
+   |                                                    ^^^^^^^^^^^^^^ A004
+   |

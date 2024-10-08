@@ -69,13 +69,6 @@ impl System for TestSystem {
         }
     }
 
-    fn virtual_path_metadata(&self, path: &SystemVirtualPath) -> Result<Metadata> {
-        match &self.inner {
-            TestSystemInner::Stub(fs) => fs.virtual_path_metadata(path),
-            TestSystemInner::System(system) => system.virtual_path_metadata(path),
-        }
-    }
-
     fn read_virtual_path_to_string(&self, path: &SystemVirtualPath) -> Result<String> {
         match &self.inner {
             TestSystemInner::Stub(fs) => fs.read_virtual_path_to_string(path),

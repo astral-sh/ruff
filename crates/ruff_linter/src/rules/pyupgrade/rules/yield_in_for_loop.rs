@@ -101,7 +101,9 @@ pub(crate) fn yield_in_for_loop(checker: &mut Checker, stmt_for: &ast::StmtFor) 
             .semantic()
             .current_scope()
             .get_all(name.id.as_str())
-            .any(|binding_id| {
+            // Skip unbound bindings like `del x`
+            .find(|&id| !checker.semantic().binding(id).is_unbound())
+            .is_some_and(|binding_id| {
                 let binding = checker.semantic().binding(binding_id);
                 binding.references.iter().any(|reference_id| {
                     checker.semantic().reference(*reference_id).range() != name.range()
@@ -135,11 +137,10 @@ fn is_same_expr(left: &Expr, right: &Expr) -> bool {
     match (&left, &right) {
         (Expr::Name(left), Expr::Name(right)) => left.id == right.id,
         (Expr::Tuple(left), Expr::Tuple(right)) => {
-            left.elts.len() == right.elts.len()
+            left.len() == right.len()
                 && left
-                    .elts
                     .iter()
-                    .zip(right.elts.iter())
+                    .zip(right)
                     .all(|(left, right)| is_same_expr(left, right))
         }
         _ => false,
@@ -153,7 +154,7 @@ fn collect_names<'a>(expr: &'a Expr) -> Box<dyn Iterator<Item = &ast::ExprName> 
         expr.as_name_expr().into_iter().chain(
             expr.as_tuple_expr()
                 .into_iter()
-                .flat_map(|tuple| tuple.elts.iter().flat_map(collect_names)),
+                .flat_map(|tuple| tuple.iter().flat_map(collect_names)),
         ),
     )
 }

@@ -1,12 +1,14 @@
-use ruff_db::files::File;
+use ruff_db::files::{File, FilePath};
+use ruff_db::source::line_index;
 use ruff_python_ast as ast;
-use ruff_python_ast::{Expr, ExpressionRef, StmtClassDef};
+use ruff_python_ast::{Expr, ExpressionRef};
+use ruff_source_file::LineIndex;
 
 use crate::module_name::ModuleName;
 use crate::module_resolver::{resolve_module, Module};
 use crate::semantic_index::ast_ids::HasScopedAstId;
 use crate::semantic_index::semantic_index;
-use crate::types::{definition_ty, global_symbol_ty_by_name, infer_scope_types, Type};
+use crate::types::{binding_ty, global_symbol_ty, infer_scope_types, Type};
 use crate::Db;
 
 pub struct SemanticModel<'db> {
@@ -25,12 +27,20 @@ impl<'db> SemanticModel<'db> {
         self.db
     }
 
+    pub fn file_path(&self) -> &FilePath {
+        self.file.path(self.db)
+    }
+
+    pub fn line_index(&self) -> LineIndex {
+        line_index(self.db.upcast(), self.file)
+    }
+
     pub fn resolve_module(&self, module_name: ModuleName) -> Option<Module> {
         resolve_module(self.db, module_name)
     }
 
     pub fn global_symbol_ty(&self, module: &Module, symbol_name: &str) -> Type<'db> {
-        global_symbol_ty_by_name(self.db, module.file(), symbol_name)
+        global_symbol_ty(self.db, module.file(), symbol_name)
     }
 }
 
@@ -137,29 +147,24 @@ impl HasTy for ast::Expr {
     }
 }
 
-impl HasTy for ast::StmtFunctionDef {
-    fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
-        let index = semantic_index(model.db, model.file);
-        let definition = index.definition(self);
-        definition_ty(model.db, definition)
-    }
+macro_rules! impl_binding_has_ty {
+    ($ty: ty) => {
+        impl HasTy for $ty {
+            #[inline]
+            fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
+                let index = semantic_index(model.db, model.file);
+                let binding = index.definition(self);
+                binding_ty(model.db, binding)
+            }
+        }
+    };
 }
 
-impl HasTy for StmtClassDef {
-    fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
-        let index = semantic_index(model.db, model.file);
-        let definition = index.definition(self);
-        definition_ty(model.db, definition)
-    }
-}
-
-impl HasTy for ast::Alias {
-    fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
-        let index = semantic_index(model.db, model.file);
-        let definition = index.definition(self);
-        definition_ty(model.db, definition)
-    }
-}
+impl_binding_has_ty!(ast::StmtFunctionDef);
+impl_binding_has_ty!(ast::StmtClassDef);
+impl_binding_has_ty!(ast::Alias);
+impl_binding_has_ty!(ast::Parameter);
+impl_binding_has_ty!(ast::ParameterWithDefault);
 
 #[cfg(test)]
 mod tests {
@@ -179,14 +184,9 @@ mod tests {
 
         Program::from_settings(
             &db,
-            ProgramSettings {
+            &ProgramSettings {
                 target_version: PythonVersion::default(),
-                search_paths: SearchPathSettings {
-                    extra_paths: vec![],
-                    src_root: SystemPathBuf::from("/src"),
-                    site_packages: vec![],
-                    custom_typeshed: None,
-                },
+                search_paths: SearchPathSettings::new(SystemPathBuf::from("/src")),
             },
         )?;
 

@@ -16,7 +16,7 @@ use super::walk_directory::{
 };
 
 /// A system implementation that uses the OS file system.
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct OsSystem {
     inner: Arc<OsSystemInner>,
 }
@@ -75,10 +75,6 @@ impl System for OsSystem {
 
     fn read_to_notebook(&self, path: &SystemPath) -> std::result::Result<Notebook, NotebookError> {
         Notebook::from_path(path.as_std_path())
-    }
-
-    fn virtual_path_metadata(&self, _path: &SystemVirtualPath) -> Result<Metadata> {
-        Err(not_found())
     }
 
     fn read_virtual_path_to_string(&self, _path: &SystemVirtualPath) -> Result<String> {

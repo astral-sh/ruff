@@ -899,4 +899,55 @@ UP015.py:70:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
 72 72 | open = 1
 73 73 | open("foo", "U")
 
+UP015.py:85:1: UP015 [*] Unnecessary open mode parameters
+   |
+83 | import aiofiles
+84 | 
+85 | aiofiles.open("foo", "U")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
+86 | aiofiles.open("foo", "r")
+87 | aiofiles.open("foo", mode="r")
+   |
+   = help: Remove open mode parameters
 
+ℹ Safe fix
+82 82 | 
+83 83 | import aiofiles
+84 84 | 
+85    |-aiofiles.open("foo", "U")
+   85 |+aiofiles.open("foo")
+86 86 | aiofiles.open("foo", "r")
+87 87 | aiofiles.open("foo", mode="r")
+
+UP015.py:86:1: UP015 [*] Unnecessary open mode parameters
+   |
+85 | aiofiles.open("foo", "U")
+86 | aiofiles.open("foo", "r")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
+87 | aiofiles.open("foo", mode="r")
+   |
+   = help: Remove open mode parameters
+
+ℹ Safe fix
+83 83 | import aiofiles
+84 84 | 
+85 85 | aiofiles.open("foo", "U")
+86    |-aiofiles.open("foo", "r")
+   86 |+aiofiles.open("foo")
+87 87 | aiofiles.open("foo", mode="r")
+
+UP015.py:87:1: UP015 [*] Unnecessary open mode parameters
+   |
+85 | aiofiles.open("foo", "U")
+86 | aiofiles.open("foo", "r")
+87 | aiofiles.open("foo", mode="r")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
+   |
+   = help: Remove open mode parameters
+
+ℹ Safe fix
+84 84 | 
+85 85 | aiofiles.open("foo", "U")
+86 86 | aiofiles.open("foo", "r")
+87    |-aiofiles.open("foo", mode="r")
+   87 |+aiofiles.open("foo")

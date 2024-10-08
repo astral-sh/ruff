@@ -77,3 +77,9 @@ pub enum ModuleKind {
     /// A python package (`foo/__init__.py` or `foo/__init__.pyi`)
     Package,
 }
+
+impl ModuleKind {
+    pub const fn is_package(self) -> bool {
+        matches!(self, ModuleKind::Package)
+    }
+}

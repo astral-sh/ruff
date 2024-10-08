@@ -2,7 +2,6 @@ use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustc_hash::FxHashSet;
-use std::ops::Add;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
@@ -11,8 +10,8 @@ use ruff_python_ast::docstrings::{clean_space, leading_space};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::ParameterWithDefault;
 use ruff_python_semantic::analyze::visibility::is_staticmethod;
-use ruff_python_trivia::{textwrap::dedent, Cursor};
-use ruff_source_file::{Line, NewlineWithTrailingNewline};
+use ruff_python_trivia::textwrap::dedent;
+use ruff_source_file::NewlineWithTrailingNewline;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -20,6 +19,7 @@ use crate::docstrings::sections::{SectionContext, SectionContexts, SectionKind};
 use crate::docstrings::styles::SectionStyle;
 use crate::docstrings::Docstring;
 use crate::registry::Rule;
+use crate::rules::pydocstyle::helpers::find_underline;
 use crate::rules::pydocstyle::settings::Convention;
 
 /// ## What it does
@@ -1341,6 +1341,7 @@ fn blanks_and_section_underline(
     checker: &mut Checker,
     docstring: &Docstring,
     context: &SectionContext,
+    style: SectionStyle,
 ) {
     let mut num_blank_lines_after_header = 0u32;
     let mut blank_lines_end = context.following_range().start();
@@ -1510,7 +1511,7 @@ fn blanks_and_section_underline(
                 }
             }
         } else {
-            if checker.enabled(Rule::DashedUnderlineAfterSection) {
+            if style.is_numpy() && checker.enabled(Rule::DashedUnderlineAfterSection) {
                 if let Some(equal_line) = find_underline(&non_blank_line, '=') {
                     let mut diagnostic = Diagnostic::new(
                         DashedUnderlineAfterSection {
@@ -1608,7 +1609,7 @@ fn blanks_and_section_underline(
         }
     } else {
         // Nothing but blank lines after the section header.
-        if checker.enabled(Rule::DashedUnderlineAfterSection) {
+        if style.is_numpy() && checker.enabled(Rule::DashedUnderlineAfterSection) {
             let mut diagnostic = Diagnostic::new(
                 DashedUnderlineAfterSection {
                     name: context.section_name().to_string(),
@@ -1646,6 +1647,7 @@ fn common_section(
     docstring: &Docstring,
     context: &SectionContext,
     next: Option<&SectionContext>,
+    style: SectionStyle,
 ) {
     if checker.enabled(Rule::CapitalizeSectionName) {
         let capitalized_section_name = context.kind().as_str();
@@ -1776,7 +1778,7 @@ fn common_section(
         }
     }
 
-    blanks_and_section_underline(checker, docstring, context);
+    blanks_and_section_underline(checker, docstring, context, style);
 }
 
 fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &FxHashSet<String>) {
@@ -1946,7 +1948,7 @@ fn numpy_section(
     context: &SectionContext,
     next: Option<&SectionContext>,
 ) {
-    common_section(checker, docstring, context, next);
+    common_section(checker, docstring, context, next, SectionStyle::Numpy);
 
     if checker.enabled(Rule::NewLineAfterSectionName) {
         let suffix = context.summary_after_section_name();
@@ -1981,7 +1983,7 @@ fn google_section(
     context: &SectionContext,
     next: Option<&SectionContext>,
 ) {
-    common_section(checker, docstring, context, next);
+    common_section(checker, docstring, context, next, SectionStyle::Google);
 
     if checker.enabled(Rule::SectionNameEndsInColon) {
         let suffix = context.summary_after_section_name();
@@ -2048,37 +2050,4 @@ fn parse_google_sections(
             missing_args(checker, docstring, &documented_args);
         }
     }
-}
-
-/// Returns the [`TextRange`] of the underline, if a line consists of only dashes.
-fn find_underline(line: &Line, dash: char) -> Option<TextRange> {
-    let mut cursor = Cursor::new(line.as_str());
-
-    // Eat leading whitespace.
-    cursor.eat_while(char::is_whitespace);
-
-    // Determine the start of the dashes.
-    let offset = cursor.token_len();
-
-    // Consume the dashes.
-    cursor.start_token();
-    cursor.eat_while(|c| c == dash);
-
-    // Determine the end of the dashes.
-    let len = cursor.token_len();
-
-    // If there are no dashes, return None.
-    if len == TextSize::new(0) {
-        return None;
-    }
-
-    // Eat trailing whitespace.
-    cursor.eat_while(char::is_whitespace);
-
-    // If there are any characters after the dashes, return None.
-    if !cursor.is_eof() {
-        return None;
-    }
-
-    Some(TextRange::at(offset, len).add(line.start()))
 }

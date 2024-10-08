@@ -79,8 +79,9 @@ mod tests {
     use crate::parsed::parsed_module;
     use crate::system::{DbWithTestSystem, SystemPath, SystemVirtualPath};
     use crate::tests::TestDb;
-    use crate::vendored::{tests::VendoredFileSystemBuilder, VendoredPath};
+    use crate::vendored::{VendoredFileSystemBuilder, VendoredPath};
     use crate::Db;
+    use zip::CompressionMethod;
 
     #[test]
     fn python_file() -> crate::system::Result<()> {
@@ -121,9 +122,9 @@ mod tests {
 
         db.write_virtual_file(path, "x = 10");
 
-        let file = db.files().add_virtual_file(&db, path).unwrap();
+        let virtual_file = db.files().virtual_file(&db, path);
 
-        let parsed = parsed_module(&db, file);
+        let parsed = parsed_module(&db, virtual_file.file());
 
         assert!(parsed.is_valid());
 
@@ -137,9 +138,9 @@ mod tests {
 
         db.write_virtual_file(path, "%timeit a = b");
 
-        let file = db.files().add_virtual_file(&db, path).unwrap();
+        let virtual_file = db.files().virtual_file(&db, path);
 
-        let parsed = parsed_module(&db, file);
+        let parsed = parsed_module(&db, virtual_file.file());
 
         assert!(parsed.is_valid());
 
@@ -150,7 +151,7 @@ mod tests {
     fn vendored_file() {
         let mut db = TestDb::new();
 
-        let mut vendored_builder = VendoredFileSystemBuilder::new();
+        let mut vendored_builder = VendoredFileSystemBuilder::new(CompressionMethod::Stored);
         vendored_builder
             .add_file(
                 "path.pyi",

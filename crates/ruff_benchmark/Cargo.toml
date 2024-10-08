@@ -37,13 +37,15 @@ name = "red_knot"
 harness = false
 
 [dependencies]
+codspeed-criterion-compat = { workspace = true, default-features = false, optional = true }
+criterion = { workspace = true, default-features = false }
 once_cell = { workspace = true }
+rayon = { workspace = true }
+rustc-hash = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 url = { workspace = true }
 ureq = { workspace = true }
-criterion = { workspace = true, default-features = false }
-codspeed-criterion-compat = { workspace = true, default-features = false, optional = true }
 
 [dev-dependencies]
 ruff_db = { workspace = true }

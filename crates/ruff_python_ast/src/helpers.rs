@@ -582,8 +582,8 @@ pub const fn is_singleton(expr: &Expr) -> bool {
 
 /// Return `true` if the [`Expr`] is a literal or tuple of literals.
 pub fn is_constant(expr: &Expr) -> bool {
-    if let Expr::Tuple(ast::ExprTuple { elts, .. }) = expr {
-        elts.iter().all(is_constant)
+    if let Expr::Tuple(tuple) = expr {
+        tuple.iter().all(is_constant)
     } else {
         expr.is_literal_expr()
     }
@@ -630,8 +630,8 @@ pub fn extract_handled_exceptions(handlers: &[ExceptHandler]) -> Vec<&Expr> {
         match handler {
             ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { type_, .. }) => {
                 if let Some(type_) = type_ {
-                    if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &type_.as_ref() {
-                        for type_ in elts {
+                    if let Expr::Tuple(tuple) = &**type_ {
+                        for type_ in tuple {
                             handled_exceptions.push(type_);
                         }
                     } else {
@@ -1004,6 +1004,14 @@ impl Visitor<'_> for AwaitVisitor {
             crate::visitor::walk_expr(self, expr);
         }
     }
+
+    fn visit_comprehension(&mut self, comprehension: &'_ crate::Comprehension) {
+        if comprehension.is_async {
+            self.seen_await = true;
+        } else {
+            crate::visitor::walk_comprehension(self, comprehension);
+        }
+    }
 }
 
 /// Return `true` if a `Stmt` is a docstring.
@@ -1185,8 +1193,8 @@ impl Truthiness {
                     Self::Truthy
                 }
             }
-            Expr::Dict(ast::ExprDict { items, .. }) => {
-                if items.is_empty() {
+            Expr::Dict(dict) => {
+                if dict.is_empty() {
                     Self::Falsey
                 } else {
                     Self::Truthy

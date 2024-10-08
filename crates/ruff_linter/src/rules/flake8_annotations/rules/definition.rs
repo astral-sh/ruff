@@ -4,7 +4,6 @@ use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, ParameterWithDefault, Stmt};
-use ruff_python_parser::typing::parse_type_annotation;
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::Definition;
 use ruff_python_stdlib::typing::simple_magic_return_type;
@@ -514,13 +513,10 @@ fn check_dynamically_typed<F>(
 {
     if let Expr::StringLiteral(string_expr) = annotation {
         // Quoted annotations
-        if let Ok((parsed_annotation, _)) =
-            parse_type_annotation(string_expr, checker.locator().contents())
-        {
+        if let Some(parsed_annotation) = checker.parse_type_annotation(string_expr) {
             if type_hint_resolves_to_any(
-                parsed_annotation.expr(),
-                checker.semantic(),
-                checker.locator(),
+                parsed_annotation.expression(),
+                checker,
                 checker.settings.target_version.minor(),
             ) {
                 diagnostics.push(Diagnostic::new(
@@ -530,12 +526,7 @@ fn check_dynamically_typed<F>(
             }
         }
     } else {
-        if type_hint_resolves_to_any(
-            annotation,
-            checker.semantic(),
-            checker.locator(),
-            checker.settings.target_version.minor(),
-        ) {
+        if type_hint_resolves_to_any(annotation, checker, checker.settings.target_version.minor()) {
             diagnostics.push(Diagnostic::new(
                 AnyType { name: func() },
                 annotation.range(),

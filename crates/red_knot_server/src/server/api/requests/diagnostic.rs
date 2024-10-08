@@ -2,8 +2,9 @@ use std::borrow::Cow;
 
 use lsp_types::request::DocumentDiagnosticRequest;
 use lsp_types::{
-    Diagnostic, DocumentDiagnosticParams, DocumentDiagnosticReport, DocumentDiagnosticReportResult,
-    FullDocumentDiagnosticReport, Range, RelatedFullDocumentDiagnosticReport, Url,
+    Diagnostic, DiagnosticSeverity, DocumentDiagnosticParams, DocumentDiagnosticReport,
+    DocumentDiagnosticReportResult, FullDocumentDiagnosticReport, Position, Range,
+    RelatedFullDocumentDiagnosticReport, Url,
 };
 
 use red_knot_workspace::db::RootDatabase;
@@ -25,13 +26,11 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
 
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
-        db: Option<RootDatabase>,
+        db: RootDatabase,
         _notifier: Notifier,
         _params: DocumentDiagnosticParams,
     ) -> Result<DocumentDiagnosticReportResult> {
-        let diagnostics = db
-            .map(|db| compute_diagnostics(&snapshot, &db))
-            .unwrap_or_default();
+        let diagnostics = compute_diagnostics(&snapshot, &db);
 
         Ok(DocumentDiagnosticReportResult::Report(
             DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport {
@@ -47,25 +46,55 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
 
 fn compute_diagnostics(snapshot: &DocumentSnapshot, db: &RootDatabase) -> Vec<Diagnostic> {
     let Some(file) = snapshot.file(db) else {
+        tracing::info!(
+            "No file found for snapshot for `{}`",
+            snapshot.query().file_url()
+        );
         return vec![];
     };
-    let Ok(diagnostics) = db.check_file(file) else {
-        return vec![];
+
+    let diagnostics = match db.check_file(file) {
+        Ok(diagnostics) => diagnostics,
+        Err(cancelled) => {
+            tracing::info!("Diagnostics computation {cancelled}");
+            return vec![];
+        }
     };
 
     diagnostics
         .as_slice()
         .iter()
-        .map(|message| Diagnostic {
-            range: Range::default(),
-            severity: None,
-            tags: None,
-            code: None,
-            code_description: None,
-            source: Some("red-knot".into()),
-            message: message.to_string(),
-            related_information: None,
-            data: None,
-        })
+        .map(|message| to_lsp_diagnostic(message))
         .collect()
+}
+
+fn to_lsp_diagnostic(message: &str) -> Diagnostic {
+    let words = message.split(':').collect::<Vec<_>>();
+
+    let (range, message) = match words.as_slice() {
+        [_, _, line, column, message] | [_, line, column, message] => {
+            let line = line.parse::<u32>().unwrap_or_default().saturating_sub(1);
+            let column = column.parse::<u32>().unwrap_or_default();
+            (
+                Range::new(
+                    Position::new(line, column.saturating_sub(1)),
+                    Position::new(line, column),
+                ),
+                message.trim(),
+            )
+        }
+        _ => (Range::default(), message),
+    };
+
+    Diagnostic {
+        range,
+        severity: Some(DiagnosticSeverity::ERROR),
+        tags: None,
+        code: None,
+        code_description: None,
+        source: Some("red-knot".into()),
+        message: message.to_string(),
+        related_information: None,
+        data: None,
+    }
 }

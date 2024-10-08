@@ -63,16 +63,16 @@ impl AlwaysFixableViolation for IncorrectlyParenthesizedTupleInSubscript {
 pub(crate) fn subscript_with_parenthesized_tuple(checker: &mut Checker, subscript: &ExprSubscript) {
     let prefer_parentheses = checker.settings.ruff.parenthesize_tuple_in_subscript;
 
-    let Some(tuple_subscript) = subscript.slice.as_tuple_expr() else {
+    let Expr::Tuple(tuple_subscript) = &*subscript.slice else {
         return;
     };
 
-    if tuple_subscript.parenthesized == prefer_parentheses || tuple_subscript.elts.is_empty() {
+    if tuple_subscript.parenthesized == prefer_parentheses || tuple_subscript.is_empty() {
         return;
     }
 
     // Adding parentheses in the presence of a slice leads to a syntax error.
-    if prefer_parentheses && tuple_subscript.elts.iter().any(Expr::is_slice_expr) {
+    if prefer_parentheses && tuple_subscript.iter().any(Expr::is_slice_expr) {
         return;
     }
 
@@ -82,7 +82,7 @@ pub(crate) fn subscript_with_parenthesized_tuple(checker: &mut Checker, subscrip
     // see https://peps.python.org/pep-0646/#change-1-star-expressions-in-indexes
     if checker.settings.target_version <= PythonVersion::Py310
         && !prefer_parentheses
-        && tuple_subscript.elts.iter().any(Expr::is_starred_expr)
+        && tuple_subscript.iter().any(Expr::is_starred_expr)
     {
         return;
     }

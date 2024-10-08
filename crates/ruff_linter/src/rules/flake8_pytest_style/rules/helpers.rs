@@ -1,3 +1,5 @@
+use std::fmt;
+
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{self as ast, Decorator, Expr, Keyword};
@@ -92,4 +94,19 @@ pub(super) fn split_names(names: &str) -> Vec<&str> {
             }
         })
         .collect::<Vec<&str>>()
+}
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub(super) enum Parentheses {
+    None,
+    Empty,
+}
+
+impl fmt::Display for Parentheses {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Parentheses::None => fmt.write_str(""),
+            Parentheses::Empty => fmt.write_str("()"),
+        }
+    }
 }

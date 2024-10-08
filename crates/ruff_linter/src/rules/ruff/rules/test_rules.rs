@@ -21,7 +21,7 @@ use ruff_text_size::TextSize;
 
 use crate::registry::Rule;
 
-/// Check if a comment exists anywhere in a the given file
+/// Check if a comment exists anywhere in a given file
 fn comment_exists(text: &str, locator: &Locator, comment_ranges: &CommentRanges) -> bool {
     for range in comment_ranges {
         let comment_text = locator.slice(range);

@@ -168,9 +168,14 @@ impl<'a> StringLiteralDisplay<'a> {
                     kind,
                 }
             }
-            ast::Expr::Tuple(tuple_node @ ast::ExprTuple { elts, range, .. }) => {
+            ast::Expr::Tuple(ast::ExprTuple {
+                elts,
+                range,
+                parenthesized,
+                ..
+            }) => {
                 let kind = DisplayKind::Sequence(SequenceKind::Tuple {
-                    parenthesized: tuple_node.parenthesized,
+                    parenthesized: *parenthesized,
                 });
                 Self {
                     elts: Cow::Borrowed(elts),
@@ -186,8 +191,8 @@ impl<'a> StringLiteralDisplay<'a> {
                     kind,
                 }
             }
-            ast::Expr::Dict(dict @ ast::ExprDict { items, range }) => {
-                let mut narrowed_keys = Vec::with_capacity(items.len());
+            ast::Expr::Dict(dict) => {
+                let mut narrowed_keys = Vec::with_capacity(dict.len());
                 for key in dict.iter_keys() {
                     if let Some(key) = key {
                         // This is somewhat unfortunate,
@@ -201,11 +206,11 @@ impl<'a> StringLiteralDisplay<'a> {
                 // `__slots__ = {"foo": "bar", **other_dict}`
                 // If `None` wasn't present in the keys,
                 // the length of the keys should always equal the length of the values
-                assert_eq!(narrowed_keys.len(), items.len());
+                assert_eq!(narrowed_keys.len(), dict.len());
                 Self {
                     elts: Cow::Owned(narrowed_keys),
-                    range: *range,
-                    kind: DisplayKind::Dict { items },
+                    range: dict.range(),
+                    kind: DisplayKind::Dict { items: &dict.items },
                 }
             }
             _ => return None,

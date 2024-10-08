@@ -7,23 +7,30 @@ use ruff_db::parsed::ParsedModule;
 use ruff_index::IndexVec;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
-use ruff_python_ast::visitor::{walk_expr, walk_stmt, Visitor};
+use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
+use ruff_python_ast::AnyParameterRef;
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
 use crate::semantic_index::definition::{
-    AssignmentDefinitionNodeRef, Definition, DefinitionNodeKey, DefinitionNodeRef,
-    ImportFromDefinitionNodeRef,
+    AssignmentDefinitionNodeRef, ComprehensionDefinitionNodeRef, Definition, DefinitionNodeKey,
+    DefinitionNodeRef, ForStmtDefinitionNodeRef, ImportFromDefinitionNodeRef,
 };
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{
-    FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopedSymbolId, SymbolFlags,
+    FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopedSymbolId,
     SymbolTableBuilder,
 };
 use crate::semantic_index::use_def::{FlowSnapshot, UseDefMapBuilder};
 use crate::semantic_index::SemanticIndex;
 use crate::Db;
+
+use super::constraint::{Constraint, PatternConstraint};
+use super::definition::{
+    DefinitionCategory, ExceptHandlerDefinitionNodeRef, MatchPatternDefinitionNodeRef,
+    WithItemDefinitionNodeRef,
+};
 
 pub(super) struct SemanticIndexBuilder<'db> {
     // Builder state
@@ -33,8 +40,13 @@ pub(super) struct SemanticIndexBuilder<'db> {
     scope_stack: Vec<FileScopeId>,
     /// The assignment we're currently visiting.
     current_assignment: Option<CurrentAssignment<'db>>,
+    /// The match case we're currently visiting.
+    current_match_case: Option<CurrentMatchCase<'db>>,
     /// Flow states at each `break` in the current loop.
     loop_break_states: Vec<FlowSnapshot>,
+
+    /// Flags about the file's global scope
+    has_future_annotations: bool,
 
     // Semantic Index fields
     scopes: IndexVec<FileScopeId, Scope>,
@@ -56,7 +68,10 @@ impl<'db> SemanticIndexBuilder<'db> {
             module: parsed,
             scope_stack: Vec::new(),
             current_assignment: None,
+            current_match_case: None,
             loop_break_states: vec![],
+
+            has_future_annotations: false,
 
             scopes: IndexVec::new(),
             symbol_tables: IndexVec::new(),
@@ -155,18 +170,24 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_use_def_map_mut().restore(state);
     }
 
-    fn flow_merge(&mut self, state: &FlowSnapshot) {
+    fn flow_merge(&mut self, state: FlowSnapshot) {
         self.current_use_def_map_mut().merge(state);
     }
 
-    fn add_or_update_symbol(&mut self, name: Name, flags: SymbolFlags) -> ScopedSymbolId {
-        let symbol_table = self.current_symbol_table();
-        let (symbol_id, added) = symbol_table.add_or_update_symbol(name, flags);
+    fn add_symbol(&mut self, name: Name) -> ScopedSymbolId {
+        let (symbol_id, added) = self.current_symbol_table().add_symbol(name);
         if added {
-            let use_def_map = self.current_use_def_map_mut();
-            use_def_map.add_symbol(symbol_id);
+            self.current_use_def_map_mut().add_symbol(symbol_id);
         }
         symbol_id
+    }
+
+    fn mark_symbol_bound(&mut self, id: ScopedSymbolId) {
+        self.current_symbol_table().mark_symbol_bound(id);
+    }
+
+    fn mark_symbol_used(&mut self, id: ScopedSymbolId) {
+        self.current_symbol_table().mark_symbol_used(id);
     }
 
     fn add_definition<'a>(
@@ -174,30 +195,77 @@ impl<'db> SemanticIndexBuilder<'db> {
         symbol: ScopedSymbolId,
         definition_node: impl Into<DefinitionNodeRef<'a>>,
     ) -> Definition<'db> {
-        let definition_node = definition_node.into();
+        let definition_node: DefinitionNodeRef<'_> = definition_node.into();
+        #[allow(unsafe_code)]
+        // SAFETY: `definition_node` is guaranteed to be a child of `self.module`
+        let kind = unsafe { definition_node.into_owned(self.module.clone()) };
+        let category = kind.category();
         let definition = Definition::new(
             self.db,
             self.file,
             self.current_scope(),
             symbol,
-            #[allow(unsafe_code)]
-            unsafe {
-                definition_node.into_owned(self.module.clone())
-            },
+            kind,
             countme::Count::default(),
         );
 
-        self.definitions_by_node
+        let existing_definition = self
+            .definitions_by_node
             .insert(definition_node.key(), definition);
-        self.current_use_def_map_mut()
-            .record_definition(symbol, definition);
+        debug_assert_eq!(existing_definition, None);
+
+        if category.is_binding() {
+            self.mark_symbol_bound(symbol);
+        }
+
+        let use_def = self.current_use_def_map_mut();
+        match category {
+            DefinitionCategory::DeclarationAndBinding => {
+                use_def.record_declaration_and_binding(symbol, definition);
+            }
+            DefinitionCategory::Declaration => use_def.record_declaration(symbol, definition),
+            DefinitionCategory::Binding => use_def.record_binding(symbol, definition),
+        }
 
         definition
     }
 
+    fn add_expression_constraint(&mut self, constraint_node: &ast::Expr) -> Expression<'db> {
+        let expression = self.add_standalone_expression(constraint_node);
+        self.current_use_def_map_mut()
+            .record_constraint(Constraint::Expression(expression));
+
+        expression
+    }
+
+    fn add_pattern_constraint(
+        &mut self,
+        subject: &ast::Expr,
+        pattern: &ast::Pattern,
+    ) -> PatternConstraint<'db> {
+        #[allow(unsafe_code)]
+        let (subject, pattern) = unsafe {
+            (
+                AstNodeRef::new(self.module.clone(), subject),
+                AstNodeRef::new(self.module.clone(), pattern),
+            )
+        };
+        let pattern_constraint = PatternConstraint::new(
+            self.db,
+            self.file,
+            self.current_scope(),
+            subject,
+            pattern,
+            countme::Count::default(),
+        );
+        self.current_use_def_map_mut()
+            .record_constraint(Constraint::Pattern(pattern_constraint));
+        pattern_constraint
+    }
+
     /// Record an expression that needs to be a Salsa ingredient, because we need to infer its type
     /// standalone (type narrowing tests, RHS of an assignment.)
-    fn add_standalone_expression(&mut self, expression_node: &ast::Expr) {
+    fn add_standalone_expression(&mut self, expression_node: &ast::Expr) -> Expression<'db> {
         let expression = Expression::new(
             self.db,
             self.file,
@@ -210,6 +278,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         );
         self.expressions_by_node
             .insert(expression_node.into(), expression);
+        expression
     }
 
     fn with_type_params(
@@ -238,10 +307,13 @@ impl<'db> SemanticIndexBuilder<'db> {
                         ..
                     }) => (name, &None, default),
                 };
-                // TODO create Definition for typevars
-                self.add_or_update_symbol(name.id.clone(), SymbolFlags::IS_DEFINED);
-                if let Some(bound) = bound {
-                    self.visit_expr(bound);
+                let symbol = self.add_symbol(name.id.clone());
+                // TODO create Definition for PEP 695 typevars
+                // note that the "bound" on the typevar is a totally different thing than whether
+                // or not a name is "bound" by a typevar declaration; the latter is always true.
+                self.mark_symbol_bound(symbol);
+                if let Some(bounds) = bound {
+                    self.visit_expr(bounds);
                 }
                 if let Some(default) = default {
                     self.visit_expr(default);
@@ -256,6 +328,83 @@ impl<'db> SemanticIndexBuilder<'db> {
         }
 
         nested_scope
+    }
+
+    /// This method does several things:
+    /// - It pushes a new scope onto the stack for visiting
+    ///   a list/dict/set comprehension or generator expression
+    /// - Inside that scope, it visits a list of [`Comprehension`] nodes,
+    ///   assumed to be the "generators" that compose a comprehension
+    ///   (that is, the `for x in y` and `for y in z` parts of `x for x in y for y in z`).
+    /// - Inside that scope, it also calls a closure for visiting the outer `elt`
+    ///   of a list/dict/set comprehension or generator expression
+    /// - It then pops the new scope off the stack
+    ///
+    /// [`Comprehension`]: ast::Comprehension
+    fn with_generators_scope(
+        &mut self,
+        scope: NodeWithScopeRef,
+        generators: &'db [ast::Comprehension],
+        visit_outer_elt: impl FnOnce(&mut Self),
+    ) {
+        let mut generators_iter = generators.iter();
+
+        let Some(generator) = generators_iter.next() else {
+            unreachable!("Expression must contain at least one generator");
+        };
+
+        // The `iter` of the first generator is evaluated in the outer scope, while all subsequent
+        // nodes are evaluated in the inner scope.
+        self.add_standalone_expression(&generator.iter);
+        self.visit_expr(&generator.iter);
+        self.push_scope(scope);
+
+        self.current_assignment = Some(CurrentAssignment::Comprehension {
+            node: generator,
+            first: true,
+        });
+        self.visit_expr(&generator.target);
+        self.current_assignment = None;
+
+        for expr in &generator.ifs {
+            self.visit_expr(expr);
+        }
+
+        for generator in generators_iter {
+            self.add_standalone_expression(&generator.iter);
+            self.visit_expr(&generator.iter);
+
+            self.current_assignment = Some(CurrentAssignment::Comprehension {
+                node: generator,
+                first: false,
+            });
+            self.visit_expr(&generator.target);
+            self.current_assignment = None;
+
+            for expr in &generator.ifs {
+                self.visit_expr(expr);
+            }
+        }
+
+        visit_outer_elt(self);
+        self.pop_scope();
+    }
+
+    fn declare_parameter(&mut self, parameter: AnyParameterRef) {
+        let symbol = self.add_symbol(parameter.name().id().clone());
+
+        let definition = self.add_definition(symbol, parameter);
+
+        if let AnyParameterRef::NonVariadic(with_default) = parameter {
+            // Insert a mapping from the parameter to the same definition.
+            // This ensures that calling `HasTy::ty` on the inner parameter returns
+            // a valid type (and doesn't panic)
+            let existing_definition = self.definitions_by_node.insert(
+                DefinitionNodeRef::from(AnyParameterRef::Variadic(&with_default.parameter)).key(),
+                definition,
+            );
+            debug_assert_eq!(existing_definition, None);
+        }
     }
 
     pub(super) fn build(mut self) -> SemanticIndex<'db> {
@@ -306,6 +455,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             scopes_by_expression: self.scopes_by_expression,
             scopes_by_node: self.scopes_by_node,
             use_def_maps,
+            has_future_annotations: self.has_future_annotations,
         }
     }
 }
@@ -321,10 +471,6 @@ where
                     self.visit_decorator(decorator);
                 }
 
-                let symbol = self
-                    .add_or_update_symbol(function_def.name.id.clone(), SymbolFlags::IS_DEFINED);
-                self.add_definition(symbol, function_def);
-
                 self.with_type_params(
                     NodeWithScopeRef::FunctionTypeParameters(function_def),
                     function_def.type_params.as_deref(),
@@ -335,18 +481,37 @@ where
                         }
 
                         builder.push_scope(NodeWithScopeRef::Function(function_def));
+
+                        // Add symbols and definitions for the parameters to the function scope.
+                        for parameter in &*function_def.parameters {
+                            builder.declare_parameter(parameter);
+                        }
+
                         builder.visit_body(&function_def.body);
                         builder.pop_scope()
                     },
                 );
+                // The default value of the parameters needs to be evaluated in the
+                // enclosing scope.
+                for default in function_def
+                    .parameters
+                    .iter_non_variadic_params()
+                    .filter_map(|param| param.default.as_deref())
+                {
+                    self.visit_expr(default);
+                }
+                // The symbol for the function name itself has to be evaluated
+                // at the end to match the runtime evaluation of parameter defaults
+                // and return-type annotations.
+                let symbol = self.add_symbol(function_def.name.id.clone());
+                self.add_definition(symbol, function_def);
             }
             ast::Stmt::ClassDef(class) => {
                 for decorator in &class.decorator_list {
                     self.visit_decorator(decorator);
                 }
 
-                let symbol =
-                    self.add_or_update_symbol(class.name.id.clone(), SymbolFlags::IS_DEFINED);
+                let symbol = self.add_symbol(class.name.id.clone());
                 self.add_definition(symbol, class);
 
                 self.with_type_params(
@@ -372,7 +537,7 @@ where
                         Name::new(alias.name.id.split('.').next().unwrap())
                     };
 
-                    let symbol = self.add_or_update_symbol(symbol_name, SymbolFlags::IS_DEFINED);
+                    let symbol = self.add_symbol(symbol_name);
                     self.add_definition(symbol, alias);
                 }
             }
@@ -384,8 +549,16 @@ where
                         &alias.name.id
                     };
 
-                    let symbol =
-                        self.add_or_update_symbol(symbol_name.clone(), SymbolFlags::IS_DEFINED);
+                    // Look for imports `from __future__ import annotations`, ignore `as ...`
+                    // We intentionally don't enforce the rules about location of `__future__`
+                    // imports here, we assume the user's intent was to apply the `__future__`
+                    // import, so we still check using it (and will also emit a diagnostic about a
+                    // miss-placed `__future__` import.)
+                    self.has_future_annotations |= alias.name.id == "annotations"
+                        && node.module.as_deref() == Some("__future__");
+
+                    let symbol = self.add_symbol(symbol_name.clone());
+
                     self.add_definition(symbol, ImportFromDefinitionNodeRef { node, alias_index });
                 }
             }
@@ -401,7 +574,6 @@ where
             }
             ast::Stmt::AnnAssign(node) => {
                 debug_assert!(self.current_assignment.is_none());
-                // TODO deferred annotation visiting
                 self.visit_expr(&node.annotation);
                 if let Some(value) = &node.value {
                     self.visit_expr(value);
@@ -410,9 +582,24 @@ where
                 self.visit_expr(&node.target);
                 self.current_assignment = None;
             }
+            ast::Stmt::AugAssign(
+                aug_assign @ ast::StmtAugAssign {
+                    range: _,
+                    target,
+                    op: _,
+                    value,
+                },
+            ) => {
+                debug_assert!(self.current_assignment.is_none());
+                self.visit_expr(value);
+                self.current_assignment = Some(aug_assign.into());
+                self.visit_expr(target);
+                self.current_assignment = None;
+            }
             ast::Stmt::If(node) => {
                 self.visit_expr(&node.test);
                 let pre_if = self.flow_snapshot();
+                self.add_expression_constraint(&node.test);
                 self.visit_body(&node.body);
                 let mut post_clauses: Vec<FlowSnapshot> = vec![];
                 for clause in &node.elif_else_clauses {
@@ -425,7 +612,7 @@ where
                     self.visit_elif_else_clause(clause);
                 }
                 for post_clause_state in post_clauses {
-                    self.flow_merge(&post_clause_state);
+                    self.flow_merge(post_clause_state);
                 }
                 let has_else = node
                     .elif_else_clauses
@@ -434,17 +621,26 @@ where
                 if !has_else {
                     // if there's no else clause, then it's possible we took none of the branches,
                     // and the pre_if state can reach here
-                    self.flow_merge(&pre_if);
+                    self.flow_merge(pre_if);
                 }
             }
-            ast::Stmt::While(node) => {
-                self.visit_expr(&node.test);
+            ast::Stmt::While(ast::StmtWhile {
+                test,
+                body,
+                orelse,
+                range: _,
+            }) => {
+                self.visit_expr(test);
 
                 let pre_loop = self.flow_snapshot();
 
                 // Save aside any break states from an outer loop
                 let saved_break_states = std::mem::take(&mut self.loop_break_states);
-                self.visit_body(&node.body);
+
+                // TODO: definitions created inside the body should be fully visible
+                // to other statements/expressions inside the body --Alex/Carl
+                self.visit_body(body);
+
                 // Get the break states from the body of this loop, and restore the saved outer
                 // ones.
                 let break_states =
@@ -452,17 +648,146 @@ where
 
                 // We may execute the `else` clause without ever executing the body, so merge in
                 // the pre-loop state before visiting `else`.
-                self.flow_merge(&pre_loop);
-                self.visit_body(&node.orelse);
+                self.flow_merge(pre_loop);
+                self.visit_body(orelse);
 
                 // Breaking out of a while loop bypasses the `else` clause, so merge in the break
                 // states after visiting `else`.
                 for break_state in break_states {
-                    self.flow_merge(&break_state);
+                    self.flow_merge(break_state);
                 }
+            }
+            ast::Stmt::With(ast::StmtWith { items, body, .. }) => {
+                for item in items {
+                    self.visit_expr(&item.context_expr);
+                    if let Some(optional_vars) = item.optional_vars.as_deref() {
+                        self.add_standalone_expression(&item.context_expr);
+                        self.current_assignment = Some(item.into());
+                        self.visit_expr(optional_vars);
+                        self.current_assignment = None;
+                    }
+                }
+                self.visit_body(body);
             }
             ast::Stmt::Break(_) => {
                 self.loop_break_states.push(self.flow_snapshot());
+            }
+
+            ast::Stmt::For(
+                for_stmt @ ast::StmtFor {
+                    range: _,
+                    is_async: _,
+                    target,
+                    iter,
+                    body,
+                    orelse,
+                },
+            ) => {
+                self.add_standalone_expression(iter);
+                self.visit_expr(iter);
+
+                let pre_loop = self.flow_snapshot();
+                let saved_break_states = std::mem::take(&mut self.loop_break_states);
+
+                debug_assert!(self.current_assignment.is_none());
+                self.current_assignment = Some(for_stmt.into());
+                self.visit_expr(target);
+                self.current_assignment = None;
+
+                // TODO: Definitions created by loop variables
+                // (and definitions created inside the body)
+                // are fully visible to other statements/expressions inside the body --Alex/Carl
+                self.visit_body(body);
+
+                let break_states =
+                    std::mem::replace(&mut self.loop_break_states, saved_break_states);
+
+                // We may execute the `else` clause without ever executing the body, so merge in
+                // the pre-loop state before visiting `else`.
+                self.flow_merge(pre_loop);
+                self.visit_body(orelse);
+
+                // Breaking out of a `for` loop bypasses the `else` clause, so merge in the break
+                // states after visiting `else`.
+                for break_state in break_states {
+                    self.flow_merge(break_state);
+                }
+            }
+            ast::Stmt::Match(ast::StmtMatch {
+                subject,
+                cases,
+                range: _,
+            }) => {
+                self.add_standalone_expression(subject);
+                self.visit_expr(subject);
+
+                let after_subject = self.flow_snapshot();
+                let Some((first, remaining)) = cases.split_first() else {
+                    return;
+                };
+                self.add_pattern_constraint(subject, &first.pattern);
+                self.visit_match_case(first);
+
+                let mut post_case_snapshots = vec![];
+                for case in remaining {
+                    post_case_snapshots.push(self.flow_snapshot());
+                    self.flow_restore(after_subject.clone());
+                    self.add_pattern_constraint(subject, &case.pattern);
+                    self.visit_match_case(case);
+                }
+                for post_clause_state in post_case_snapshots {
+                    self.flow_merge(post_clause_state);
+                }
+                if !cases
+                    .last()
+                    .is_some_and(|case| case.guard.is_none() && case.pattern.is_wildcard())
+                {
+                    self.flow_merge(after_subject);
+                }
+            }
+            ast::Stmt::Try(ast::StmtTry {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+                is_star,
+                range: _,
+            }) => {
+                self.visit_body(body);
+
+                for except_handler in handlers {
+                    let ast::ExceptHandler::ExceptHandler(except_handler) = except_handler;
+                    let ast::ExceptHandlerExceptHandler {
+                        name: symbol_name,
+                        type_: handled_exceptions,
+                        body: handler_body,
+                        range: _,
+                    } = except_handler;
+
+                    if let Some(handled_exceptions) = handled_exceptions {
+                        self.visit_expr(handled_exceptions);
+                    }
+
+                    // If `handled_exceptions` above was `None`, it's something like `except as e:`,
+                    // which is invalid syntax. However, it's still pretty obvious here that the user
+                    // *wanted* `e` to be bound, so we should still create a definition here nonetheless.
+                    if let Some(symbol_name) = symbol_name {
+                        let symbol = self.add_symbol(symbol_name.id.clone());
+
+                        self.add_definition(
+                            symbol,
+                            DefinitionNodeRef::ExceptHandler(ExceptHandlerDefinitionNodeRef {
+                                handler: except_handler,
+                                is_star: *is_star,
+                            }),
+                        );
+                    }
+
+                    self.visit_body(handler_body);
+                }
+
+                self.visit_body(orelse);
+                self.visit_body(finalbody);
             }
             _ => {
                 walk_stmt(self, stmt);
@@ -476,16 +801,19 @@ where
         self.current_ast_ids().record_expression(expr);
 
         match expr {
-            ast::Expr::Name(name_node) => {
-                let ast::ExprName { id, ctx, .. } = name_node;
-                let flags = match ctx {
-                    ast::ExprContext::Load => SymbolFlags::IS_USED,
-                    ast::ExprContext::Store => SymbolFlags::IS_DEFINED,
-                    ast::ExprContext::Del => SymbolFlags::IS_DEFINED,
-                    ast::ExprContext::Invalid => SymbolFlags::empty(),
+            ast::Expr::Name(name_node @ ast::ExprName { id, ctx, .. }) => {
+                let (is_use, is_definition) = match (ctx, self.current_assignment) {
+                    (ast::ExprContext::Store, Some(CurrentAssignment::AugAssign(_))) => {
+                        // For augmented assignment, the target expression is also used.
+                        (true, true)
+                    }
+                    (ast::ExprContext::Load, _) => (true, false),
+                    (ast::ExprContext::Store, _) => (false, true),
+                    (ast::ExprContext::Del, _) => (false, true),
+                    (ast::ExprContext::Invalid, _) => (false, false),
                 };
-                let symbol = self.add_or_update_symbol(id.clone(), flags);
-                if flags.contains(SymbolFlags::IS_DEFINED) {
+                let symbol = self.add_symbol(id.clone());
+                if is_definition {
                     match self.current_assignment {
                         Some(CurrentAssignment::Assign(assignment)) => {
                             self.add_definition(
@@ -499,14 +827,51 @@ where
                         Some(CurrentAssignment::AnnAssign(ann_assign)) => {
                             self.add_definition(symbol, ann_assign);
                         }
+                        Some(CurrentAssignment::AugAssign(aug_assign)) => {
+                            self.add_definition(symbol, aug_assign);
+                        }
+                        Some(CurrentAssignment::For(node)) => {
+                            self.add_definition(
+                                symbol,
+                                ForStmtDefinitionNodeRef {
+                                    iterable: &node.iter,
+                                    target: name_node,
+                                    is_async: node.is_async,
+                                },
+                            );
+                        }
                         Some(CurrentAssignment::Named(named)) => {
+                            // TODO(dhruvmanila): If the current scope is a comprehension, then the
+                            // named expression is implicitly nonlocal. This is yet to be
+                            // implemented.
                             self.add_definition(symbol, named);
+                        }
+                        Some(CurrentAssignment::Comprehension { node, first }) => {
+                            self.add_definition(
+                                symbol,
+                                ComprehensionDefinitionNodeRef {
+                                    iterable: &node.iter,
+                                    target: name_node,
+                                    first,
+                                    is_async: node.is_async,
+                                },
+                            );
+                        }
+                        Some(CurrentAssignment::WithItem(with_item)) => {
+                            self.add_definition(
+                                symbol,
+                                WithItemDefinitionNodeRef {
+                                    node: with_item,
+                                    target: name_node,
+                                },
+                            );
                         }
                         None => {}
                     }
                 }
 
-                if flags.contains(SymbolFlags::IS_USED) {
+                if is_use {
+                    self.mark_symbol_used(symbol);
                     let use_id = self.current_ast_ids().record_use(expr);
                     self.current_use_def_map_mut().record_use(symbol, use_id);
                 }
@@ -515,17 +880,33 @@ where
             }
             ast::Expr::Named(node) => {
                 debug_assert!(self.current_assignment.is_none());
-                self.current_assignment = Some(node.into());
                 // TODO walrus in comprehensions is implicitly nonlocal
+                self.visit_expr(&node.value);
+                self.current_assignment = Some(node.into());
                 self.visit_expr(&node.target);
                 self.current_assignment = None;
-                self.visit_expr(&node.value);
             }
             ast::Expr::Lambda(lambda) => {
                 if let Some(parameters) = &lambda.parameters {
+                    // The default value of the parameters needs to be evaluated in the
+                    // enclosing scope.
+                    for default in parameters
+                        .iter_non_variadic_params()
+                        .filter_map(|param| param.default.as_deref())
+                    {
+                        self.visit_expr(default);
+                    }
                     self.visit_parameters(parameters);
                 }
                 self.push_scope(NodeWithScopeRef::Lambda(lambda));
+
+                // Add symbols and definitions for the parameters to the lambda scope.
+                if let Some(parameters) = &lambda.parameters {
+                    for parameter in &**parameters {
+                        self.declare_parameter(parameter);
+                    }
+                }
+
                 self.visit_expr(lambda.body.as_ref());
                 self.pop_scope();
             }
@@ -541,12 +922,124 @@ where
                 let post_body = self.flow_snapshot();
                 self.flow_restore(pre_if);
                 self.visit_expr(orelse);
-                self.flow_merge(&post_body);
+                self.flow_merge(post_body);
+            }
+            ast::Expr::ListComp(
+                list_comprehension @ ast::ExprListComp {
+                    elt, generators, ..
+                },
+            ) => {
+                self.with_generators_scope(
+                    NodeWithScopeRef::ListComprehension(list_comprehension),
+                    generators,
+                    |builder| builder.visit_expr(elt),
+                );
+            }
+            ast::Expr::SetComp(
+                set_comprehension @ ast::ExprSetComp {
+                    elt, generators, ..
+                },
+            ) => {
+                self.with_generators_scope(
+                    NodeWithScopeRef::SetComprehension(set_comprehension),
+                    generators,
+                    |builder| builder.visit_expr(elt),
+                );
+            }
+            ast::Expr::Generator(
+                generator @ ast::ExprGenerator {
+                    elt, generators, ..
+                },
+            ) => {
+                self.with_generators_scope(
+                    NodeWithScopeRef::GeneratorExpression(generator),
+                    generators,
+                    |builder| builder.visit_expr(elt),
+                );
+            }
+            ast::Expr::DictComp(
+                dict_comprehension @ ast::ExprDictComp {
+                    key,
+                    value,
+                    generators,
+                    ..
+                },
+            ) => {
+                self.with_generators_scope(
+                    NodeWithScopeRef::DictComprehension(dict_comprehension),
+                    generators,
+                    |builder| {
+                        builder.visit_expr(key);
+                        builder.visit_expr(value);
+                    },
+                );
             }
             _ => {
                 walk_expr(self, expr);
             }
         }
+    }
+
+    fn visit_parameters(&mut self, parameters: &'ast ast::Parameters) {
+        // Intentionally avoid walking default expressions, as we handle them in the enclosing
+        // scope.
+        for parameter in parameters.iter().map(ast::AnyParameterRef::as_parameter) {
+            self.visit_parameter(parameter);
+        }
+    }
+
+    fn visit_match_case(&mut self, match_case: &'ast ast::MatchCase) {
+        debug_assert!(self.current_match_case.is_none());
+        self.current_match_case = Some(CurrentMatchCase::new(&match_case.pattern));
+        self.visit_pattern(&match_case.pattern);
+        self.current_match_case = None;
+
+        if let Some(expr) = &match_case.guard {
+            self.visit_expr(expr);
+        }
+        self.visit_body(&match_case.body);
+    }
+
+    fn visit_pattern(&mut self, pattern: &'ast ast::Pattern) {
+        if let ast::Pattern::MatchStar(ast::PatternMatchStar {
+            name: Some(name),
+            range: _,
+        }) = pattern
+        {
+            let symbol = self.add_symbol(name.id().clone());
+            let state = self.current_match_case.as_ref().unwrap();
+            self.add_definition(
+                symbol,
+                MatchPatternDefinitionNodeRef {
+                    pattern: state.pattern,
+                    identifier: name,
+                    index: state.index,
+                },
+            );
+        }
+
+        walk_pattern(self, pattern);
+
+        if let ast::Pattern::MatchAs(ast::PatternMatchAs {
+            name: Some(name), ..
+        })
+        | ast::Pattern::MatchMapping(ast::PatternMatchMapping {
+            rest: Some(name), ..
+        }) = pattern
+        {
+            let symbol = self.add_symbol(name.id().clone());
+            let state = self.current_match_case.as_ref().unwrap();
+            self.add_definition(
+                symbol,
+                MatchPatternDefinitionNodeRef {
+                    pattern: state.pattern,
+                    identifier: name,
+                    index: state.index,
+                },
+            );
+        }
+
+        self.current_match_case.as_mut().unwrap().index += 1;
     }
 }
 
@@ -554,7 +1047,14 @@ where
 enum CurrentAssignment<'a> {
     Assign(&'a ast::StmtAssign),
     AnnAssign(&'a ast::StmtAnnAssign),
+    AugAssign(&'a ast::StmtAugAssign),
+    For(&'a ast::StmtFor),
     Named(&'a ast::ExprNamed),
+    Comprehension {
+        node: &'a ast::Comprehension,
+        first: bool,
+    },
+    WithItem(&'a ast::WithItem),
 }
 
 impl<'a> From<&'a ast::StmtAssign> for CurrentAssignment<'a> {
@@ -569,8 +1069,50 @@ impl<'a> From<&'a ast::StmtAnnAssign> for CurrentAssignment<'a> {
     }
 }
 
+impl<'a> From<&'a ast::StmtAugAssign> for CurrentAssignment<'a> {
+    fn from(value: &'a ast::StmtAugAssign) -> Self {
+        Self::AugAssign(value)
+    }
+}
+
+impl<'a> From<&'a ast::StmtFor> for CurrentAssignment<'a> {
+    fn from(value: &'a ast::StmtFor) -> Self {
+        Self::For(value)
+    }
+}
+
 impl<'a> From<&'a ast::ExprNamed> for CurrentAssignment<'a> {
     fn from(value: &'a ast::ExprNamed) -> Self {
         Self::Named(value)
+    }
+}
+
+impl<'a> From<&'a ast::WithItem> for CurrentAssignment<'a> {
+    fn from(value: &'a ast::WithItem) -> Self {
+        Self::WithItem(value)
+    }
+}
+
+struct CurrentMatchCase<'a> {
+    /// The pattern that's part of the current match case.
+    pattern: &'a ast::Pattern,
+
+    /// The index of the sub-pattern that's being currently visited within the pattern.
+    ///
+    /// For example:
+    /// ```py
+    /// match subject:
+    ///     case a as b: ...
+    ///     case [a, b]: ...
+    ///     case a | b: ...
+    /// ```
+    ///
+    /// In all of the above cases, the index would be 0 for `a` and 1 for `b`.
+    index: u32,
+}
+
+impl<'a> CurrentMatchCase<'a> {
+    fn new(pattern: &'a ast::Pattern) -> Self {
+        Self { pattern, index: 0 }
     }
 }

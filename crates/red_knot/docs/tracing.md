@@ -13,11 +13,16 @@ The CLI supports different verbosity levels.
 - `-vv` activates `debug!` and timestamps: This should be enough information to get to the bottom of bug reports. When you're processing many packages or files, you'll get pages and pages of output, but each line is link to a specific action or state change.
 - `-vvv` activates `trace!` (only in debug builds) and shows tracing-spans: At this level, you're logging everything. Most of this is wasted, it's really slow, we dump e.g. the entire resolution graph. Only useful to developers, and you almost certainly want to use `RED_KNOT_LOG` to filter it down to the area your investigating.
 
-## `RED_KNOT_LOG`
+## Better logging with `RED_KNOT_LOG` and `RAYON_NUM_THREADS`
 
 By default, the CLI shows messages from the `ruff` and `red_knot` crates. Tracing messages from other crates are not shown.
 The `RED_KNOT_LOG` environment variable allows you to customize which messages are shown by specifying one
 or more [filter directives](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#directives).
+
+The `RAYON_NUM_THREADS` environment variable, meanwhile, can be used to control the level of concurrency red-knot uses.
+By default, red-knot will attempt to parallelize its work so that multiple files are checked simultaneously,
+but this can result in a confused logging output where messages from different threads are intertwined.
+To switch off concurrency entirely and have more readable logs, use `RAYON_NUM_THREADS=1`.
 
 ### Examples
 

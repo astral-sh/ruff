@@ -24,9 +24,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 ///
-/// ```python
+/// ```pyi
 /// from types import TracebackType
-///
 ///
 /// class Foo:
 ///     def __exit__(
@@ -36,9 +35,8 @@ use crate::checkers::ast::Checker;
 ///
 /// Use instead:
 ///
-/// ```python
+/// ```pyi
 /// from types import TracebackType
-///
 ///
 /// class Foo:
 ///     def __exit__(

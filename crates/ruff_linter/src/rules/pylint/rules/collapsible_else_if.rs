@@ -108,7 +108,11 @@ fn convert_to_elif(
     let inner_if_line_start = locator.line_start(first.start());
     let inner_if_line_end = locator.line_end(first.end());
 
-    // Identify the indentation of the loop itself (e.g., the `while` or `for`).
+    // Capture the trivia between the `else` and the `if`.
+    let else_line_end = locator.full_line_end(else_clause.start());
+    let trivia_range = TextRange::new(else_line_end, inner_if_line_start);
+
+    // Identify the indentation of the outer clause
     let Some(indentation) = indentation(locator, else_clause) else {
         return Err(anyhow::anyhow!("`else` is expected to be on its own line"));
     };
@@ -122,15 +126,30 @@ fn convert_to_elif(
         stylist,
     )?;
 
+    // If there's trivia, restore it
+    let trivia = if trivia_range.is_empty() {
+        None
+    } else {
+        let indented_trivia =
+            adjust_indentation(trivia_range, indentation, locator, indexer, stylist)?;
+        Some(Edit::insertion(
+            indented_trivia,
+            locator.line_start(else_clause.start()),
+        ))
+    };
+
     // Strip the indent from the first line of the `if` statement, and add `el` to the start.
     let Some(unindented) = indented.strip_prefix(indentation) else {
         return Err(anyhow::anyhow!("indented block to start with indentation"));
     };
     let indented = format!("{indentation}el{unindented}");
 
-    Ok(Fix::safe_edit(Edit::replacement(
-        indented,
-        locator.line_start(else_clause.start()),
-        inner_if_line_end,
-    )))
+    Ok(Fix::safe_edits(
+        Edit::replacement(
+            indented,
+            locator.line_start(else_clause.start()),
+            inner_if_line_end,
+        ),
+        trivia,
+    ))
 }

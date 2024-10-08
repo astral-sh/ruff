@@ -9,6 +9,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
+    use crate::rules::pep8_naming;
     use crate::settings::types::{PreviewMode, PythonVersion};
     use crate::test::test_path;
     use crate::{assert_messages, settings};
@@ -33,8 +34,6 @@ mod tests {
     #[test_case(Rule::ComplexAssignmentInStub, Path::new("PYI017.pyi"))]
     #[test_case(Rule::ComplexIfStatementInStub, Path::new("PYI002.py"))]
     #[test_case(Rule::ComplexIfStatementInStub, Path::new("PYI002.pyi"))]
-    #[test_case(Rule::CustomTypeVarReturnType, Path::new("PYI019.py"))]
-    #[test_case(Rule::CustomTypeVarReturnType, Path::new("PYI019.pyi"))]
     #[test_case(Rule::DocstringInStub, Path::new("PYI021.py"))]
     #[test_case(Rule::DocstringInStub, Path::new("PYI021.pyi"))]
     #[test_case(Rule::DuplicateLiteralMember, Path::new("PYI062.py"))]
@@ -130,6 +129,24 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_pyi").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::CustomTypeVarReturnType, Path::new("PYI019.py"))]
+    #[test_case(Rule::CustomTypeVarReturnType, Path::new("PYI019.pyi"))]
+    fn custom_classmethod_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_pyi").join(path).as_path(),
+            &settings::LinterSettings {
+                pep8_naming: pep8_naming::settings::Settings {
+                    classmethod_decorators: vec!["foo_classmethod".to_string()],
+                    ..pep8_naming::settings::Settings::default()
+                },
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

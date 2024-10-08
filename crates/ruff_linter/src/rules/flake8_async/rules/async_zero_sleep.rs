@@ -83,11 +83,7 @@ pub(crate) fn async_zero_sleep(checker: &mut Checker, call: &ExprCall) {
     };
 
     if let Some(module) = AsyncModule::try_from(&qualified_name) {
-        let is_relevant_module = if checker.settings.preview.is_enabled() {
-            matches!(module, AsyncModule::Trio | AsyncModule::AnyIo)
-        } else {
-            matches!(module, AsyncModule::Trio)
-        };
+        let is_relevant_module = matches!(module, AsyncModule::Trio | AsyncModule::AnyIo);
 
         let is_sleep = is_relevant_module && matches!(qualified_name.segments(), [_, "sleep"]);
 

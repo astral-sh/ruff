@@ -36,8 +36,9 @@ pub(crate) fn builtin_import_shadowing(checker: &mut Checker, alias: &Alias) {
     let name = alias.asname.as_ref().unwrap_or(&alias.name);
     if shadows_builtin(
         name.as_str(),
-        &checker.settings.flake8_builtins.builtins_ignorelist,
         checker.source_type,
+        &checker.settings.flake8_builtins.builtins_ignorelist,
+        checker.settings.target_version,
     ) {
         checker.diagnostics.push(Diagnostic::new(
             BuiltinImportShadowing {

@@ -23,13 +23,13 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 ///
-/// ```python
+/// ```pyi
 /// def foo(arg: str = "51 character stringgggggggggggggggggggggggggggggggg") -> None: ...
 /// ```
 ///
 /// Use instead:
 ///
-/// ```python
+/// ```pyi
 /// def foo(arg: str = ...) -> None: ...
 /// ```
 #[violation]
@@ -56,6 +56,10 @@ pub(crate) fn string_or_bytes_too_long(checker: &mut Checker, string: StringLike
     }
 
     if is_warnings_dot_deprecated(semantic.current_expression_parent(), semantic) {
+        return;
+    }
+
+    if semantic.in_annotation() {
         return;
     }
 

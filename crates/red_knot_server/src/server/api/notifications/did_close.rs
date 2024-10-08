@@ -1,8 +1,7 @@
 use lsp_server::ErrorCode;
 use lsp_types::notification::DidCloseTextDocument;
 use lsp_types::DidCloseTextDocumentParams;
-
-use ruff_db::files::File;
+use red_knot_workspace::watch::ChangeEvent;
 
 use crate::server::api::diagnostics::clear_diagnostics;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
@@ -10,7 +9,7 @@ use crate::server::api::LSPResult;
 use crate::server::client::{Notifier, Requester};
 use crate::server::Result;
 use crate::session::Session;
-use crate::system::url_to_system_path;
+use crate::system::{url_to_any_system_path, AnySystemPath};
 
 pub(crate) struct DidCloseTextDocumentHandler;
 
@@ -25,7 +24,7 @@ impl SyncNotificationHandler for DidCloseTextDocumentHandler {
         _requester: &mut Requester,
         params: DidCloseTextDocumentParams,
     ) -> Result<()> {
-        let Ok(path) = url_to_system_path(&params.text_document.uri) else {
+        let Ok(path) = url_to_any_system_path(&params.text_document.uri) else {
             return Ok(());
         };
 
@@ -34,8 +33,9 @@ impl SyncNotificationHandler for DidCloseTextDocumentHandler {
             .close_document(&key)
             .with_failure_code(ErrorCode::InternalError)?;
 
-        if let Some(db) = session.workspace_db_for_path_mut(path.as_std_path()) {
-            File::sync_path(db, &path);
+        if let AnySystemPath::SystemVirtual(virtual_path) = path {
+            let db = session.default_workspace_db_mut();
+            db.apply_changes(vec![ChangeEvent::DeletedVirtual(virtual_path)], None);
         }
 
         clear_diagnostics(key.url(), &notifier)?;

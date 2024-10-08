@@ -168,6 +168,24 @@ impl ModuleName {
         };
         Some(Self(name))
     }
+
+    /// Extend `self` with the components of `other`
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use red_knot_python_semantic::ModuleName;
+    ///
+    /// let mut module_name = ModuleName::new_static("foo").unwrap();
+    /// module_name.extend(&ModuleName::new_static("bar").unwrap());
+    /// assert_eq!(&module_name, "foo.bar");
+    /// module_name.extend(&ModuleName::new_static("baz.eggs.ham").unwrap());
+    /// assert_eq!(&module_name, "foo.bar.baz.eggs.ham");
+    /// ```
+    pub fn extend(&mut self, other: &ModuleName) {
+        self.0.push('.');
+        self.0.push_str(other);
+    }
 }
 
 impl Deref for ModuleName {

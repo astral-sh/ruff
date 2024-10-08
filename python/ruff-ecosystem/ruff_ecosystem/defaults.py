@@ -119,15 +119,13 @@ DEFAULT_TARGETS = [
         check_options=CheckOptions(select=JUPYTER_NOTEBOOK_SELECT),
         config_overrides={
             "include": ["*.ipynb"],
-            # TODO(dhruvmanila): Re-enable after fixing the notebook.
+            # These notebooks contain syntax errors because certain plain text / markdown
+            # cells are marked as code cells.
             "exclude": [
-                "examples/gpt_actions_library/.gpt_action_getting_started.ipynb",
-                "examples/gpt_actions_library/gpt_action_bigquery.ipynb",
-                "examples/chatgpt/gpt_actions_library/gpt_action_canvaslms.ipynb",
-                "examples/chatgpt/gpt_actions_library/.gpt_action_getting_started.ipynb",
-                "examples/chatgpt/gpt_actions_library/gpt_action_outlook.ipynb",
+                "examples/Chat_finetuning_data_prep.ipynb",
+                "examples/chatgpt/gpt_actions_library/gpt_action_google_drive.ipynb",
+                "examples/chatgpt/gpt_actions_library/gpt_action_redshift.ipynb",
                 "examples/chatgpt/gpt_actions_library/gpt_action_salesforce.ipynb",
-                "examples/chatgpt/gpt_actions_library/gpt_action_bigquery.ipynb",
             ],
         },
     ),

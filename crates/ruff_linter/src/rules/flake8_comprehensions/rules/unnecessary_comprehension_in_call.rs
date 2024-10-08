@@ -100,12 +100,19 @@ pub(crate) fn unnecessary_comprehension_in_call(
     let Some(arg) = args.first() else {
         return;
     };
-    let (Expr::ListComp(ast::ExprListComp { elt, .. })
-    | Expr::SetComp(ast::ExprSetComp { elt, .. })) = arg
+    let (Expr::ListComp(ast::ExprListComp {
+        elt, generators, ..
+    })
+    | Expr::SetComp(ast::ExprSetComp {
+        elt, generators, ..
+    })) = arg
     else {
         return;
     };
     if contains_await(elt) {
+        return;
+    }
+    if generators.iter().any(|generator| generator.is_async) {
         return;
     }
     let Some(Ok(builtin_function)) = checker

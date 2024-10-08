@@ -34,19 +34,17 @@ use crate::registry::Rule;
 /// ```
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// import sys
 ///
-/// if sys.version_info > (3, 8):
-///     ...
+/// if sys.version_info > (3, 8): ...
 /// ```
 ///
 /// Use instead:
-/// ```python
+/// ```pyi
 /// import sys
 ///
-/// if sys.version_info >= (3, 9):
-///     ...
+/// if sys.version_info >= (3, 9): ...
 /// ```
 #[violation]
 pub struct BadVersionInfoComparison;
@@ -70,27 +68,23 @@ impl Violation for BadVersionInfoComparison {
 ///
 /// ## Example
 ///
-/// ```python
+/// ```pyi
 /// import sys
 ///
 /// if sys.version_info < (3, 10):
-///
 ///     def read_data(x, *, preserve_order=True): ...
 ///
 /// else:
-///
 ///     def read_data(x): ...
 /// ```
 ///
 /// Use instead:
 ///
-/// ```python
+/// ```pyi
 /// if sys.version_info >= (3, 10):
-///
 ///     def read_data(x): ...
 ///
 /// else:
-///
 ///     def read_data(x, *, preserve_order=True): ...
 /// ```
 #[violation]

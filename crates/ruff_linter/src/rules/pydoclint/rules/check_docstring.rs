@@ -3,6 +3,7 @@ use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::map_callable;
+use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, visitor, Expr, Stmt};
@@ -25,7 +26,8 @@ use crate::rules::pydocstyle::settings::Convention;
 /// Docstrings missing return sections are a sign of incomplete documentation
 /// or refactors.
 ///
-/// This rule is not enforced for abstract methods and stubs functions.
+/// This rule is not enforced for abstract methods, stubs functions, or
+/// functions that only return `None`.
 ///
 /// ## Example
 /// ```python
@@ -125,7 +127,8 @@ impl Violation for DocstringExtraneousReturns {
 /// Docstrings missing yields sections are a sign of incomplete documentation
 /// or refactors.
 ///
-/// This rule is not enforced for abstract methods and stubs functions.
+/// This rule is not enforced for abstract methods, stubs functions, or
+/// functions that only yield `None`.
 ///
 /// ## Example
 /// ```python
@@ -494,13 +497,48 @@ fn parse_entries_numpy(content: &str) -> Vec<QualifiedName> {
     entries
 }
 
-/// An individual documentable statement in a function body.
+/// An individual `yield` expression in a function body.
 #[derive(Debug)]
-struct Entry {
+struct YieldEntry {
     range: TextRange,
+    is_none_yield: bool,
 }
 
-impl Ranged for Entry {
+impl Ranged for YieldEntry {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+#[allow(clippy::enum_variant_names)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ReturnEntryKind {
+    NotNone,
+    ImplicitNone,
+    ExplicitNone,
+}
+
+/// An individual `return` statement in a function body.
+#[derive(Debug)]
+struct ReturnEntry {
+    range: TextRange,
+    kind: ReturnEntryKind,
+}
+
+impl ReturnEntry {
+    const fn is_none_return(&self) -> bool {
+        matches!(
+            &self.kind,
+            ReturnEntryKind::ExplicitNone | ReturnEntryKind::ImplicitNone
+        )
+    }
+
+    const fn is_implicit(&self) -> bool {
+        matches!(&self.kind, ReturnEntryKind::ImplicitNone)
+    }
+}
+
+impl Ranged for ReturnEntry {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -522,15 +560,15 @@ impl Ranged for ExceptionEntry<'_> {
 /// A summary of documentable statements from the function body
 #[derive(Debug)]
 struct BodyEntries<'a> {
-    returns: Vec<Entry>,
-    yields: Vec<Entry>,
+    returns: Vec<ReturnEntry>,
+    yields: Vec<YieldEntry>,
     raised_exceptions: Vec<ExceptionEntry<'a>>,
 }
 
 /// An AST visitor to extract a summary of documentable statements from a function body.
 struct BodyVisitor<'a> {
-    returns: Vec<Entry>,
-    yields: Vec<Entry>,
+    returns: Vec<ReturnEntry>,
+    yields: Vec<YieldEntry>,
     currently_suspended_exceptions: Option<&'a ast::Expr>,
     raised_exceptions: Vec<ExceptionEntry<'a>>,
     semantic: &'a SemanticModel<'a>,
@@ -613,7 +651,7 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
                     };
 
                     if let ast::Expr::Tuple(tuple) = exceptions {
-                        for exception in &tuple.elts {
+                        for exception in tuple {
                             maybe_store_exception(exception);
                         }
                     } else {
@@ -623,9 +661,22 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
             }
             Stmt::Return(ast::StmtReturn {
                 range,
-                value: Some(_),
+                value: Some(value),
             }) => {
-                self.returns.push(Entry { range: *range });
+                self.returns.push(ReturnEntry {
+                    range: *range,
+                    kind: if value.is_none_literal_expr() {
+                        ReturnEntryKind::ExplicitNone
+                    } else {
+                        ReturnEntryKind::NotNone
+                    },
+                });
+            }
+            Stmt::Return(ast::StmtReturn { range, value: None }) => {
+                self.returns.push(ReturnEntry {
+                    range: *range,
+                    kind: ReturnEntryKind::ImplicitNone,
+                });
             }
             Stmt::FunctionDef(_) | Stmt::ClassDef(_) => return,
             _ => {}
@@ -638,12 +689,24 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
         match expr {
             Expr::Yield(ast::ExprYield {
                 range,
-                value: Some(_),
+                value: Some(value),
             }) => {
-                self.yields.push(Entry { range: *range });
+                self.yields.push(YieldEntry {
+                    range: *range,
+                    is_none_yield: value.is_none_literal_expr(),
+                });
+            }
+            Expr::Yield(ast::ExprYield { range, value: None }) => {
+                self.yields.push(YieldEntry {
+                    range: *range,
+                    is_none_yield: true,
+                });
             }
             Expr::YieldFrom(ast::ExprYieldFrom { range, .. }) => {
-                self.yields.push(Entry { range: *range });
+                self.yields.push(YieldEntry {
+                    range: *range,
+                    is_none_yield: false,
+                });
             }
             Expr::Lambda(_) => return,
             _ => {}
@@ -678,6 +741,10 @@ fn returns_documented(
         || (matches!(convention, Some(Convention::Google)) && starts_with_returns(docstring))
 }
 
+fn should_document_returns(function_def: &ast::StmtFunctionDef) -> bool {
+    !matches!(function_def.name.as_str(), "__new__")
+}
+
 fn starts_with_yields(docstring: &Docstring) -> bool {
     if let Some(first_word) = docstring.body().as_str().split(' ').next() {
         return matches!(first_word, "Yield" | "Yields");
@@ -692,6 +759,76 @@ fn yields_documented(
 ) -> bool {
     docstring_sections.yields.is_some()
         || (matches!(convention, Some(Convention::Google)) && starts_with_yields(docstring))
+}
+
+#[derive(Debug, Copy, Clone)]
+enum GeneratorOrIteratorArguments<'a> {
+    Unparameterized,
+    Single(&'a Expr),
+    Several(&'a [Expr]),
+}
+
+impl<'a> GeneratorOrIteratorArguments<'a> {
+    fn first(self) -> Option<&'a Expr> {
+        match self {
+            Self::Unparameterized => None,
+            Self::Single(element) => Some(element),
+            Self::Several(elements) => elements.first(),
+        }
+    }
+
+    fn indicates_none_returned(self) -> bool {
+        match self {
+            Self::Unparameterized => true,
+            Self::Single(_) => true,
+            Self::Several(elements) => elements.get(2).map_or(true, Expr::is_none_literal_expr),
+        }
+    }
+}
+
+/// Returns the arguments to a generator annotation, if it exists.
+fn generator_annotation_arguments<'a>(
+    expr: &'a Expr,
+    semantic: &'a SemanticModel,
+) -> Option<GeneratorOrIteratorArguments<'a>> {
+    let qualified_name = semantic.resolve_qualified_name(map_subscript(expr))?;
+    match qualified_name.segments() {
+        ["typing" | "typing_extensions", "Iterable" | "AsyncIterable" | "Iterator" | "AsyncIterator"]
+        | ["collections", "abc", "Iterable" | "AsyncIterable" | "Iterator" | "AsyncIterator"] => {
+            match expr {
+                Expr::Subscript(ast::ExprSubscript { slice, .. }) => {
+                    Some(GeneratorOrIteratorArguments::Single(slice))
+                }
+                _ => Some(GeneratorOrIteratorArguments::Unparameterized),
+            }
+        }
+        ["typing" | "typing_extensions", "Generator" | "AsyncGenerator"]
+        | ["collections", "abc", "Generator" | "AsyncGenerator"] => match expr {
+            Expr::Subscript(ast::ExprSubscript { slice, .. }) => {
+                if let Expr::Tuple(tuple) = &**slice {
+                    Some(GeneratorOrIteratorArguments::Several(tuple.elts.as_slice()))
+                } else {
+                    // `Generator[int]` implies `Generator[int, None, None]`
+                    // as it uses a PEP-696 TypeVar with default values
+                    Some(GeneratorOrIteratorArguments::Single(slice))
+                }
+            }
+            _ => Some(GeneratorOrIteratorArguments::Unparameterized),
+        },
+        _ => None,
+    }
+}
+
+fn is_generator_function_annotated_as_returning_none(
+    entries: &BodyEntries,
+    return_annotations: &Expr,
+    semantic: &SemanticModel,
+) -> bool {
+    if entries.yields.is_empty() {
+        return false;
+    }
+    generator_annotation_arguments(return_annotations, semantic)
+        .is_some_and(GeneratorOrIteratorArguments::indicates_none_returned)
 }
 
 /// DOC201, DOC202, DOC402, DOC403, DOC501, DOC502
@@ -709,8 +846,10 @@ pub(crate) fn check_docstring(
         return;
     };
 
+    let semantic = checker.semantic();
+
     // Ignore stubs.
-    if function_type::is_stub(function_def, checker.semantic()) {
+    if function_type::is_stub(function_def, semantic) {
         return;
     }
 
@@ -726,19 +865,49 @@ pub(crate) fn check_docstring(
     };
 
     let body_entries = {
-        let mut visitor = BodyVisitor::new(checker.semantic());
+        let mut visitor = BodyVisitor::new(semantic);
         visitor.visit_body(&function_def.body);
         visitor.finish()
     };
 
     // DOC201
     if checker.enabled(Rule::DocstringMissingReturns) {
-        if !returns_documented(docstring, &docstring_sections, convention) {
+        if should_document_returns(function_def)
+            && !returns_documented(docstring, &docstring_sections, convention)
+        {
             let extra_property_decorators = checker.settings.pydocstyle.property_decorators();
-            if !definition.is_property(extra_property_decorators, checker.semantic()) {
+            if !definition.is_property(extra_property_decorators, semantic) {
                 if let Some(body_return) = body_entries.returns.first() {
-                    let diagnostic = Diagnostic::new(DocstringMissingReturns, body_return.range());
-                    diagnostics.push(diagnostic);
+                    match function_def.returns.as_deref() {
+                        Some(returns) => {
+                            // Ignore it if it's annotated as returning `None`
+                            // or it's a generator function annotated as returning `None`,
+                            // i.e. any of `-> None`, `-> Iterator[...]` or `-> Generator[..., ..., None]`
+                            if !returns.is_none_literal_expr()
+                                && !is_generator_function_annotated_as_returning_none(
+                                    &body_entries,
+                                    returns,
+                                    semantic,
+                                )
+                            {
+                                diagnostics.push(Diagnostic::new(
+                                    DocstringMissingReturns,
+                                    body_return.range(),
+                                ));
+                            }
+                        }
+                        None if body_entries
+                            .returns
+                            .iter()
+                            .any(|entry| !entry.is_none_return()) =>
+                        {
+                            diagnostics.push(Diagnostic::new(
+                                DocstringMissingReturns,
+                                body_return.range(),
+                            ));
+                        }
+                        _ => {}
+                    }
                 }
             }
         }
@@ -748,8 +917,21 @@ pub(crate) fn check_docstring(
     if checker.enabled(Rule::DocstringMissingYields) {
         if !yields_documented(docstring, &docstring_sections, convention) {
             if let Some(body_yield) = body_entries.yields.first() {
-                let diagnostic = Diagnostic::new(DocstringMissingYields, body_yield.range());
-                diagnostics.push(diagnostic);
+                match function_def.returns.as_deref() {
+                    Some(returns)
+                        if !generator_annotation_arguments(returns, semantic).is_some_and(
+                            |arguments| arguments.first().map_or(true, Expr::is_none_literal_expr),
+                        ) =>
+                    {
+                        diagnostics
+                            .push(Diagnostic::new(DocstringMissingYields, body_yield.range()));
+                    }
+                    None if body_entries.yields.iter().any(|entry| !entry.is_none_yield) => {
+                        diagnostics
+                            .push(Diagnostic::new(DocstringMissingYields, body_yield.range()));
+                    }
+                    _ => {}
+                }
             }
         }
     }
@@ -786,11 +968,13 @@ pub(crate) fn check_docstring(
 
     // Avoid applying "extraneous" rules to abstract methods. An abstract method's docstring _could_
     // document that it raises an exception without including the exception in the implementation.
-    if !visibility::is_abstract(&function_def.decorator_list, checker.semantic()) {
+    if !visibility::is_abstract(&function_def.decorator_list, semantic) {
         // DOC202
         if checker.enabled(Rule::DocstringExtraneousReturns) {
             if let Some(ref docstring_returns) = docstring_sections.returns {
-                if body_entries.returns.is_empty() {
+                if body_entries.returns.is_empty()
+                    || body_entries.returns.iter().all(ReturnEntry::is_implicit)
+                {
                     let diagnostic =
                         Diagnostic::new(DocstringExtraneousReturns, docstring_returns.range());
                     diagnostics.push(diagnostic);

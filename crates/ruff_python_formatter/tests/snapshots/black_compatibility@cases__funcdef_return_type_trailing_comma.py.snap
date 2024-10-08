@@ -155,20 +155,7 @@ def SimplePyFn(
 ```diff
 --- Black
 +++ Ruff
-@@ -29,14 +29,18 @@
- 
- 
- # magic trailing comma in return type, no params
--def a() -> tuple[
--    a,
--    b,
--]: ...
-+def a() -> (
-+    tuple[
-+        a,
-+        b,
-+    ]
-+): ...
+@@ -36,7 +36,9 @@
  
  
  # magic trailing comma in return type, params
@@ -179,26 +166,7 @@ def SimplePyFn(
      p,
      q,
  ]:
-@@ -68,11 +72,13 @@
- 
- 
- # long return type, no param list
--def foo() -> list[
--    Loooooooooooooooooooooooooooooooooooong,
--    Loooooooooooooooooooong,
--    Looooooooooooong,
--]: ...
-+def foo() -> (
-+    list[
-+        Loooooooooooooooooooooooooooooooooooong,
-+        Loooooooooooooooooooong,
-+        Looooooooooooong,
-+    ]
-+): ...
- 
- 
- # long function name, no param list, no return value
-@@ -93,7 +99,11 @@
+@@ -93,7 +95,11 @@
  
  
  # unskippable type hint (??)
@@ -211,7 +179,7 @@ def SimplePyFn(
      pass
  
  
-@@ -112,7 +122,13 @@
+@@ -112,7 +118,13 @@
  
  
  # don't lose any comments (no magic)
@@ -226,7 +194,7 @@ def SimplePyFn(
      ...  # 6
  
  
-@@ -120,12 +136,18 @@
+@@ -120,12 +132,18 @@
  def foo(  # 1
      a,  # 2
      b,
@@ -283,12 +251,10 @@ def foo(
 
 
 # magic trailing comma in return type, no params
-def a() -> (
-    tuple[
-        a,
-        b,
-    ]
-): ...
+def a() -> tuple[
+    a,
+    b,
+]: ...
 
 
 # magic trailing comma in return type, params
@@ -326,13 +292,11 @@ def aaaaaaaaaaaaaaaaa(
 
 
 # long return type, no param list
-def foo() -> (
-    list[
-        Loooooooooooooooooooooooooooooooooooong,
-        Loooooooooooooooooooong,
-        Looooooooooooong,
-    ]
-): ...
+def foo() -> list[
+    Loooooooooooooooooooooooooooooooooooong,
+    Loooooooooooooooooooong,
+    Looooooooooooong,
+]: ...
 
 
 # long function name, no param list, no return value
@@ -592,5 +556,3 @@ def SimplePyFn(
     Buffer[UInt8, 2],
 ]: ...
 ```
-
-

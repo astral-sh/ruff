@@ -84,27 +84,27 @@ pub(crate) fn assert_raises_exception(checker: &mut Checker, items: &[WithItem])
             range: _,
         }) = &item.context_expr
         else {
-            return;
+            continue;
         };
 
         if item.optional_vars.is_some() {
-            return;
+            continue;
         }
 
         let [arg] = &*arguments.args else {
-            return;
+            continue;
         };
 
         let semantic = checker.semantic();
 
         let Some(builtin_symbol) = semantic.resolve_builtin_symbol(arg) else {
-            return;
+            continue;
         };
 
         let exception = match builtin_symbol {
             "Exception" => ExceptionKind::Exception,
             "BaseException" => ExceptionKind::BaseException,
-            _ => return,
+            _ => continue,
         };
 
         let assertion = if matches!(func.as_ref(), Expr::Attribute(ast::ExprAttribute { attr, .. }) if attr == "assertRaises")
@@ -117,7 +117,7 @@ pub(crate) fn assert_raises_exception(checker: &mut Checker, items: &[WithItem])
         {
             AssertionKind::PytestRaises
         } else {
-            return;
+            continue;
         };
 
         checker.diagnostics.push(Diagnostic::new(

@@ -16,13 +16,13 @@ use crate::fix::snippet::SourceCodeSnippet;
 ///
 /// ## Example
 ///
-/// ```python
+/// ```pyi
 /// x: Final[Literal[42]]
 /// y: Final[Literal[42]] = 42
 /// ```
 ///
 /// Use instead:
-/// ```python
+/// ```pyi
 /// x: Final = 42
 /// y: Final = 42
 /// ```

@@ -6,8 +6,8 @@ use std::collections::BTreeMap;
 
 use ruff_diagnostics::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast as ast;
-use ruff_python_ast::{Stmt, StmtImportFrom};
+use ruff_python_ast::name::QualifiedName;
+use ruff_python_ast::{self as ast, Stmt};
 use ruff_python_semantic::{
     AnyImport, BindingKind, Exceptions, Imported, NodeId, Scope, SemanticModel, SubmoduleImport,
 };
@@ -218,10 +218,11 @@ enum UnusedImportContext {
     Other,
 }
 
-fn is_first_party(qualified_name: &str, level: u32, checker: &Checker) -> bool {
+fn is_first_party(import: &AnyImport, checker: &Checker) -> bool {
+    let qualified_name = import.qualified_name();
     let category = isort::categorize(
-        qualified_name,
-        level,
+        &qualified_name.to_string(),
+        qualified_name.is_unresolved_import(),
         &checker.settings.src,
         checker.package(),
         checker.settings.isort.detect_same_package,
@@ -308,6 +309,20 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             continue;
         }
 
+        // If an import was marked as allowed, avoid treating it as unused.
+        if checker
+            .settings
+            .pyflakes
+            .allowed_unused_imports
+            .iter()
+            .any(|allowed_unused_import| {
+                let allowed_unused_import = QualifiedName::from_dotted_name(allowed_unused_import);
+                import.qualified_name().starts_with(&allowed_unused_import)
+            })
+        {
+            continue;
+        }
+
         let import = ImportBinding {
             name,
             import,
@@ -343,13 +358,6 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
         let in_except_handler =
             exceptions.intersects(Exceptions::MODULE_NOT_FOUND_ERROR | Exceptions::IMPORT_ERROR);
         let multiple = bindings.len() > 1;
-        let level = match checker.semantic().statement(import_statement) {
-            Stmt::Import(_) => 0,
-            Stmt::ImportFrom(StmtImportFrom { level, .. }) => *level,
-            _ => {
-                continue;
-            }
-        };
 
         // pair each binding with context; divide them by how we want to fix them
         let (to_reexport, to_remove): (Vec<_>, Vec<_>) = bindings
@@ -357,9 +365,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             .map(|binding| {
                 let context = if in_except_handler {
                     UnusedImportContext::ExceptHandler
-                } else if in_init
-                    && is_first_party(&binding.import.qualified_name().to_string(), level, checker)
-                {
+                } else if in_init && is_first_party(&binding.import, checker) {
                     UnusedImportContext::DunderInitFirstParty {
                         dunder_all_count: DunderAllCount::from(dunder_all_exprs.len()),
                         submodule_import: binding.import.is_submodule_import(),

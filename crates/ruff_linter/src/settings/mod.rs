@@ -285,7 +285,7 @@ impl Display for LinterSettings {
                 self.target_version | debug,
                 self.preview,
                 self.explicit_preview_rules,
-                self.extension | nested,
+                self.extension | debug,
 
                 self.allowed_confusables | array,
                 self.builtins | array,
@@ -398,7 +398,7 @@ impl LinterSettings {
             per_file_ignores: CompiledPerFileIgnoreList::default(),
             fix_safety: FixSafetyTable::default(),
 
-            src: vec![path_dedot::CWD.clone()],
+            src: vec![path_dedot::CWD.clone(), path_dedot::CWD.join("src")],
             // Needs duplicating
             tab_size: IndentWidth::default(),
             line_length: LineLength::default(),

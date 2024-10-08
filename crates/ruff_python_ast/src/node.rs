@@ -126,6 +126,7 @@ pub enum AnyNode {
     FString(ast::FString),
     StringLiteral(ast::StringLiteral),
     BytesLiteral(ast::BytesLiteral),
+    Identifier(ast::Identifier),
 }
 
 impl AnyNode {
@@ -226,6 +227,7 @@ impl AnyNode {
             | AnyNode::FString(_)
             | AnyNode::StringLiteral(_)
             | AnyNode::BytesLiteral(_)
+            | AnyNode::Identifier(_)
             | AnyNode::ElifElseClause(_) => None,
         }
     }
@@ -323,6 +325,7 @@ impl AnyNode {
             | AnyNode::FString(_)
             | AnyNode::StringLiteral(_)
             | AnyNode::BytesLiteral(_)
+            | AnyNode::Identifier(_)
             | AnyNode::ElifElseClause(_) => None,
         }
     }
@@ -420,6 +423,7 @@ impl AnyNode {
             | AnyNode::FString(_)
             | AnyNode::StringLiteral(_)
             | AnyNode::BytesLiteral(_)
+            | AnyNode::Identifier(_)
             | AnyNode::ElifElseClause(_) => None,
         }
     }
@@ -517,6 +521,7 @@ impl AnyNode {
             | AnyNode::FString(_)
             | AnyNode::StringLiteral(_)
             | AnyNode::BytesLiteral(_)
+            | AnyNode::Identifier(_)
             | AnyNode::ElifElseClause(_) => None,
         }
     }
@@ -634,6 +639,7 @@ impl AnyNode {
             Self::StringLiteral(node) => AnyNodeRef::StringLiteral(node),
             Self::BytesLiteral(node) => AnyNodeRef::BytesLiteral(node),
             Self::ElifElseClause(node) => AnyNodeRef::ElifElseClause(node),
+            Self::Identifier(node) => AnyNodeRef::Identifier(node),
         }
     }
 
@@ -4884,6 +4890,47 @@ impl AstNode for ast::BytesLiteral {
     }
 }
 
+impl AstNode for ast::Identifier {
+    type Ref<'a> = &'a Self;
+
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::Identifier(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef<'_>) -> Option<Self::Ref<'_>> {
+        if let AnyNodeRef::Identifier(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn can_cast(kind: NodeKind) -> bool {
+        matches!(kind, NodeKind::Identifier)
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+
+    fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+    }
+}
+
 impl AstNode for Stmt {
     type Ref<'a> = StatementRef<'a>;
 
@@ -4980,6 +5027,7 @@ impl AstNode for Stmt {
             | AnyNode::FString(_)
             | AnyNode::StringLiteral(_)
             | AnyNode::BytesLiteral(_)
+            | AnyNode::Identifier(_)
             | AnyNode::ElifElseClause(_) => None,
         }
     }
@@ -5078,6 +5126,7 @@ impl AstNode for Stmt {
             | AnyNodeRef::FString(_)
             | AnyNodeRef::StringLiteral(_)
             | AnyNodeRef::BytesLiteral(_)
+            | AnyNodeRef::Identifier(_)
             | AnyNodeRef::ElifElseClause(_) => None,
         }
     }
@@ -5177,6 +5226,7 @@ impl AstNode for Stmt {
             | NodeKind::TypeParamParamSpec
             | NodeKind::FString
             | NodeKind::StringLiteral
+            | NodeKind::Identifier
             | NodeKind::BytesLiteral => false,
         }
     }
@@ -5983,6 +6033,12 @@ impl From<ast::BytesLiteral> for AnyNode {
     }
 }
 
+impl From<ast::Identifier> for AnyNode {
+    fn from(node: ast::Identifier) -> Self {
+        AnyNode::Identifier(node)
+    }
+}
+
 impl Ranged for AnyNode {
     fn range(&self) -> TextRange {
         match self {
@@ -6077,6 +6133,7 @@ impl Ranged for AnyNode {
             AnyNode::StringLiteral(node) => node.range(),
             AnyNode::BytesLiteral(node) => node.range(),
             AnyNode::ElifElseClause(node) => node.range(),
+            AnyNode::Identifier(node) => node.range(),
         }
     }
 }
@@ -6174,6 +6231,7 @@ pub enum AnyNodeRef<'a> {
     StringLiteral(&'a ast::StringLiteral),
     BytesLiteral(&'a ast::BytesLiteral),
     ElifElseClause(&'a ast::ElifElseClause),
+    Identifier(&'a ast::Identifier),
 }
 
 impl<'a> AnyNodeRef<'a> {
@@ -6270,6 +6328,7 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::StringLiteral(node) => NonNull::from(*node).cast(),
             AnyNodeRef::BytesLiteral(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ElifElseClause(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::Identifier(node) => NonNull::from(*node).cast(),
         }
     }
 
@@ -6372,6 +6431,7 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::StringLiteral(_) => NodeKind::StringLiteral,
             AnyNodeRef::BytesLiteral(_) => NodeKind::BytesLiteral,
             AnyNodeRef::ElifElseClause(_) => NodeKind::ElifElseClause,
+            AnyNodeRef::Identifier(_) => NodeKind::Identifier,
         }
     }
 
@@ -6468,6 +6528,7 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::FString(_)
             | AnyNodeRef::StringLiteral(_)
             | AnyNodeRef::BytesLiteral(_)
+            | AnyNodeRef::Identifier(_)
             | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
@@ -6565,6 +6626,7 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::FString(_)
             | AnyNodeRef::StringLiteral(_)
             | AnyNodeRef::BytesLiteral(_)
+            | AnyNodeRef::Identifier(_)
             | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
@@ -6661,6 +6723,7 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::FString(_)
             | AnyNodeRef::StringLiteral(_)
             | AnyNodeRef::BytesLiteral(_)
+            | AnyNodeRef::Identifier(_)
             | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
@@ -6758,6 +6821,7 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::FString(_)
             | AnyNodeRef::StringLiteral(_)
             | AnyNodeRef::BytesLiteral(_)
+            | AnyNodeRef::Identifier(_)
             | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
@@ -6855,6 +6919,7 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::FString(_)
             | AnyNodeRef::StringLiteral(_)
             | AnyNodeRef::BytesLiteral(_)
+            | AnyNodeRef::Identifier(_)
             | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
@@ -6966,6 +7031,7 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::StringLiteral(node) => node.visit_source_order(visitor),
             AnyNodeRef::BytesLiteral(node) => node.visit_source_order(visitor),
             AnyNodeRef::ElifElseClause(node) => node.visit_source_order(visitor),
+            AnyNodeRef::Identifier(node) => node.visit_source_order(visitor),
         }
     }
 
@@ -7804,6 +7870,11 @@ impl<'a> From<&'a MatchCase> for AnyNodeRef<'a> {
         AnyNodeRef::MatchCase(node)
     }
 }
+impl<'a> From<&'a ast::Identifier> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::Identifier) -> Self {
+        AnyNodeRef::Identifier(node)
+    }
+}
 
 impl Ranged for AnyNodeRef<'_> {
     fn range(&self) -> TextRange {
@@ -7899,6 +7970,7 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::FString(node) => node.range(),
             AnyNodeRef::StringLiteral(node) => node.range(),
             AnyNodeRef::BytesLiteral(node) => node.range(),
+            AnyNodeRef::Identifier(node) => node.range(),
         }
     }
 }
@@ -7999,6 +8071,7 @@ pub enum NodeKind {
     FString,
     StringLiteral,
     BytesLiteral,
+    Identifier,
 }
 
 // FIXME: The `StatementRef` here allows us to implement `AstNode` for `Stmt` which otherwise wouldn't be possible

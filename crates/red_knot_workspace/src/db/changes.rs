@@ -1,22 +1,33 @@
-use rustc_hash::FxHashSet;
-
+use red_knot_python_semantic::Program;
 use ruff_db::files::{system_path_to_file, File, Files};
 use ruff_db::system::walk_directory::WalkState;
 use ruff_db::system::SystemPath;
 use ruff_db::Db;
+use rustc_hash::FxHashSet;
 
 use crate::db::RootDatabase;
 use crate::watch;
 use crate::watch::{CreatedKind, DeletedKind};
+use crate::workspace::settings::Configuration;
 use crate::workspace::WorkspaceMetadata;
 
 impl RootDatabase {
-    #[tracing::instrument(level = "debug", skip(self, changes))]
-    pub fn apply_changes(&mut self, changes: Vec<watch::ChangeEvent>) {
+    #[tracing::instrument(level = "debug", skip(self, changes, base_configuration))]
+    pub fn apply_changes(
+        &mut self,
+        changes: Vec<watch::ChangeEvent>,
+        base_configuration: Option<&Configuration>,
+    ) {
         let workspace = self.workspace();
         let workspace_path = workspace.root(self).to_path_buf();
+        let program = Program::get(self);
+        let custom_stdlib_versions_path = program
+            .custom_stdlib_search_path(self)
+            .map(|path| path.join("VERSIONS"));
 
         let mut workspace_change = false;
+        // Changes to a custom stdlib path's VERSIONS
+        let mut custom_stdlib_change = false;
         // Packages that need reloading
         let mut changed_packages = FxHashSet::default();
         // Paths that were added
@@ -39,7 +50,7 @@ impl RootDatabase {
         };
 
         for change in changes {
-            if let Some(path) = change.path() {
+            if let Some(path) = change.system_path() {
                 if matches!(
                     path.file_name(),
                     Some(".gitignore" | ".ignore" | "ruff.toml" | ".ruff.toml" | "pyproject.toml")
@@ -54,10 +65,15 @@ impl RootDatabase {
 
                     continue;
                 }
+
+                if Some(path) == custom_stdlib_versions_path.as_deref() {
+                    custom_stdlib_change = true;
+                }
             }
 
             match change {
-                watch::ChangeEvent::Changed { path, kind: _ } => sync_path(self, &path),
+                watch::ChangeEvent::Changed { path, kind: _ }
+                | watch::ChangeEvent::Opened(path) => sync_path(self, &path),
 
                 watch::ChangeEvent::Created { kind, path } => {
                     match kind {
@@ -100,12 +116,29 @@ impl RootDatabase {
                     } else {
                         sync_recursively(self, &path);
 
-                        // TODO: Remove after converting `package.files()` to a salsa query.
+                        if custom_stdlib_versions_path
+                            .as_ref()
+                            .is_some_and(|versions_path| versions_path.starts_with(&path))
+                        {
+                            custom_stdlib_change = true;
+                        }
+
                         if let Some(package) = workspace.package(self, &path) {
                             changed_packages.insert(package);
                         } else {
                             workspace_change = true;
                         }
+                    }
+                }
+
+                watch::ChangeEvent::CreatedVirtual(path)
+                | watch::ChangeEvent::ChangedVirtual(path) => {
+                    File::sync_virtual_path(self, &path);
+                }
+
+                watch::ChangeEvent::DeletedVirtual(path) => {
+                    if let Some(virtual_file) = self.files().try_virtual_file(&path) {
+                        virtual_file.close(self);
                     }
                 }
 
@@ -118,9 +151,13 @@ impl RootDatabase {
         }
 
         if workspace_change {
-            match WorkspaceMetadata::from_path(&workspace_path, self.system()) {
+            match WorkspaceMetadata::from_path(
+                &workspace_path,
+                self.system(),
+                base_configuration.cloned(),
+            ) {
                 Ok(metadata) => {
-                    tracing::debug!("Reload workspace after structural change.");
+                    tracing::debug!("Reloading workspace after structural change");
                     // TODO: Handle changes in the program settings.
                     workspace.reload(self, metadata);
                 }
@@ -130,6 +167,11 @@ impl RootDatabase {
             }
 
             return;
+        } else if custom_stdlib_change {
+            let search_paths = workspace.search_path_settings(self).clone();
+            if let Err(error) = program.update_search_paths(self, &search_paths) {
+                tracing::error!("Failed to set the new search paths: {error}");
+            }
         }
 
         let mut added_paths = added_paths.into_iter().filter(|path| {

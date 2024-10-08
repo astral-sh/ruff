@@ -151,15 +151,15 @@ impl Printer {
                     let fix_prefix = format!("[{}]", "*".cyan());
 
                     if self.unsafe_fixes.is_hint() {
-                        if fixables.applicable > 0 && fixables.unapplicable_unsafe > 0 {
-                            let es = if fixables.unapplicable_unsafe == 1 {
+                        if fixables.applicable > 0 && fixables.inapplicable_unsafe > 0 {
+                            let es = if fixables.inapplicable_unsafe == 1 {
                                 ""
                             } else {
                                 "es"
                             };
                             writeln!(writer,
                                 "{fix_prefix} {} fixable with the `--fix` option ({} hidden fix{es} can be enabled with the `--unsafe-fixes` option).",
-                                fixables.applicable, fixables.unapplicable_unsafe
+                                fixables.applicable, fixables.inapplicable_unsafe
                             )?;
                         } else if fixables.applicable > 0 {
                             // Only applicable fixes
@@ -169,15 +169,15 @@ impl Printer {
                                 fixables.applicable,
                             )?;
                         } else {
-                            // Only unapplicable fixes
-                            let es = if fixables.unapplicable_unsafe == 1 {
+                            // Only inapplicable fixes
+                            let es = if fixables.inapplicable_unsafe == 1 {
                                 ""
                             } else {
                                 "es"
                             };
                             writeln!(writer,
                                 "No fixes available ({} hidden fix{es} can be enabled with the `--unsafe-fixes` option).",
-                                fixables.unapplicable_unsafe
+                                fixables.inapplicable_unsafe
                             )?;
                         }
                     } else {
@@ -194,7 +194,7 @@ impl Printer {
                 // Check if there are unapplied fixes
                 let unapplied = {
                     if let Some(fixables) = fixables {
-                        fixables.unapplicable_unsafe
+                        fixables.inapplicable_unsafe
                     } else {
                         0
                     }
@@ -539,33 +539,33 @@ fn print_fix_summary(writer: &mut dyn Write, fixed: &FixMap) -> Result<()> {
 #[derive(Debug)]
 struct FixableStatistics {
     applicable: u32,
-    unapplicable_unsafe: u32,
+    inapplicable_unsafe: u32,
 }
 
 impl FixableStatistics {
     fn try_from(diagnostics: &Diagnostics, unsafe_fixes: UnsafeFixes) -> Option<Self> {
         let mut applicable = 0;
-        let mut unapplicable_unsafe = 0;
+        let mut inapplicable_unsafe = 0;
 
         for message in &diagnostics.messages {
             if let Some(fix) = message.fix() {
                 if fix.applies(unsafe_fixes.required_applicability()) {
                     applicable += 1;
                 } else {
-                    // Do not include unapplicable fixes at other levels that do not provide an opt-in
+                    // Do not include inapplicable fixes at other levels that do not provide an opt-in
                     if fix.applicability().is_unsafe() {
-                        unapplicable_unsafe += 1;
+                        inapplicable_unsafe += 1;
                     }
                 }
             }
         }
 
-        if applicable == 0 && unapplicable_unsafe == 0 {
+        if applicable == 0 && inapplicable_unsafe == 0 {
             None
         } else {
             Some(Self {
                 applicable,
-                unapplicable_unsafe,
+                inapplicable_unsafe,
             })
         }
     }

@@ -55,7 +55,7 @@ pub(crate) fn blanket_type_ignore(
     locator: &Locator,
 ) {
     for range in comment_ranges {
-        let line = locator.slice(*range);
+        let line = locator.slice(range);
 
         // Match, e.g., `# type: ignore` or `# type: ignore[attr-defined]`.
         // See: https://github.com/python/mypy/blob/b43e0d34247a6d1b3b9d9094d184bbfcb9808bb9/mypy/fastparse.py#L248

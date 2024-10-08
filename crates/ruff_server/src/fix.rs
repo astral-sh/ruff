@@ -38,6 +38,7 @@ pub(crate) fn fix_all(
             file_resolver_settings,
             Some(linter_settings),
             None,
+            query.text_document_language_id(),
         ) {
             return Ok(Fixes::default());
         }
@@ -123,11 +124,7 @@ pub(crate) fn fix_all(
             fixes.insert(
                 url.clone(),
                 vec![lsp_types::TextEdit {
-                    range: source_range.to_range(
-                        source_kind.source_code(),
-                        &source_index,
-                        encoding,
-                    ),
+                    range: source_range.to_range(&source, &source_index, encoding),
                     new_text: modified[modified_range].to_owned(),
                 }],
             );

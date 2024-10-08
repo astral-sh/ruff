@@ -122,17 +122,15 @@ fn is_identical_types(
     return_value: &Expr,
     semantic: &SemanticModel,
 ) -> bool {
-    if let (Some(response_mode_name_expr), Some(return_value_name_expr)) = (
-        response_model_arg.as_name_expr(),
-        return_value.as_name_expr(),
-    ) {
+    if let (Expr::Name(response_mode_name_expr), Expr::Name(return_value_name_expr)) =
+        (response_model_arg, return_value)
+    {
         return semantic.resolve_name(response_mode_name_expr)
             == semantic.resolve_name(return_value_name_expr);
     }
-    if let (Some(response_mode_subscript), Some(return_value_subscript)) = (
-        response_model_arg.as_subscript_expr(),
-        return_value.as_subscript_expr(),
-    ) {
+    if let (Expr::Subscript(response_mode_subscript), Expr::Subscript(return_value_subscript)) =
+        (response_model_arg, return_value)
+    {
         return is_identical_types(
             &response_mode_subscript.value,
             &return_value_subscript.value,
@@ -143,15 +141,13 @@ fn is_identical_types(
             semantic,
         );
     }
-    if let (Some(response_mode_tuple), Some(return_value_tuple)) = (
-        response_model_arg.as_tuple_expr(),
-        return_value.as_tuple_expr(),
-    ) {
-        return response_mode_tuple.elts.len() == return_value_tuple.elts.len()
+    if let (Expr::Tuple(response_mode_tuple), Expr::Tuple(return_value_tuple)) =
+        (response_model_arg, return_value)
+    {
+        return response_mode_tuple.len() == return_value_tuple.len()
             && response_mode_tuple
-                .elts
                 .iter()
-                .zip(return_value_tuple.elts.iter())
+                .zip(return_value_tuple)
                 .all(|(x, y)| is_identical_types(x, y, semantic));
     }
     false

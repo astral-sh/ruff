@@ -31,10 +31,10 @@ impl<T> AstNodeRef<T> {
     /// which the `AstNodeRef` belongs.
     ///
     /// ## Safety
+    ///
     /// Dereferencing the `node` can result in undefined behavior if `parsed` isn't the
     /// [`ParsedModule`] to which `node` belongs. It's the caller's responsibility to ensure that
     /// the invariant `node belongs to parsed` is upheld.
-
     pub(super) unsafe fn new(parsed: ParsedModule, node: &T) -> Self {
         Self {
             _parsed: parsed,

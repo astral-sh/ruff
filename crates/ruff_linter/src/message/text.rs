@@ -150,7 +150,7 @@ impl Display for RuleCodeAndBody<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         if self.show_fix_status {
             if let Some(fix) = self.message.fix() {
-                // Do not display an indicator for unapplicable fixes
+                // Do not display an indicator for inapplicable fixes
                 if fix.applies(self.unsafe_fixes.required_applicability()) {
                     if let Some(rule) = self.message.rule() {
                         write!(f, "{} ", rule.noqa_code().to_string().red().bold())?;

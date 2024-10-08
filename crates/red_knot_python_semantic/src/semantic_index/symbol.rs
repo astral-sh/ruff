@@ -44,16 +44,16 @@ impl Symbol {
     }
 
     /// Is the symbol defined in its containing scope?
-    pub fn is_defined(&self) -> bool {
-        self.flags.contains(SymbolFlags::IS_DEFINED)
+    pub fn is_bound(&self) -> bool {
+        self.flags.contains(SymbolFlags::IS_BOUND)
     }
 }
 
 bitflags! {
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-    pub(super) struct SymbolFlags: u8 {
+    struct SymbolFlags: u8 {
         const IS_USED         = 1 << 0;
-        const IS_DEFINED      = 1 << 1;
+        const IS_BOUND      = 1 << 1;
         /// TODO: This flag is not yet set by anything
         const MARKED_GLOBAL   = 1 << 2;
         /// TODO: This flag is not yet set by anything
@@ -114,6 +114,10 @@ impl<'db> ScopeId<'db> {
             NodeWithScopeKind::ClassTypeParameters(_)
                 | NodeWithScopeKind::FunctionTypeParameters(_)
                 | NodeWithScopeKind::Function(_)
+                | NodeWithScopeKind::ListComprehension(_)
+                | NodeWithScopeKind::SetComprehension(_)
+                | NodeWithScopeKind::DictComprehension(_)
+                | NodeWithScopeKind::GeneratorExpression(_)
         )
     }
 
@@ -127,6 +131,10 @@ impl<'db> ScopeId<'db> {
             NodeWithScopeKind::Function(function)
             | NodeWithScopeKind::FunctionTypeParameters(function) => function.name.as_str(),
             NodeWithScopeKind::Lambda(_) => "<lambda>",
+            NodeWithScopeKind::ListComprehension(_) => "<listcomp>",
+            NodeWithScopeKind::SetComprehension(_) => "<setcomp>",
+            NodeWithScopeKind::DictComprehension(_) => "<dictcomp>",
+            NodeWithScopeKind::GeneratorExpression(_) => "<generator>",
         }
     }
 }
@@ -139,6 +147,10 @@ impl FileScopeId {
     /// Returns the scope id of the module-global scope.
     pub fn global() -> Self {
         FileScopeId::from_u32(0)
+    }
+
+    pub fn is_global(self) -> bool {
+        self == FileScopeId::global()
     }
 
     pub fn to_scope_id(self, db: &dyn Db, file: File) -> ScopeId<'_> {
@@ -170,6 +182,13 @@ pub enum ScopeKind {
     Annotation,
     Class,
     Function,
+    Comprehension,
+}
+
+impl ScopeKind {
+    pub const fn is_comprehension(self) -> bool {
+        matches!(self, ScopeKind::Comprehension)
+    }
 }
 
 /// Symbol table for a specific [`Scope`].
@@ -253,11 +272,7 @@ impl SymbolTableBuilder {
         }
     }
 
-    pub(super) fn add_or_update_symbol(
-        &mut self,
-        name: Name,
-        flags: SymbolFlags,
-    ) -> (ScopedSymbolId, bool) {
+    pub(super) fn add_symbol(&mut self, name: Name) -> (ScopedSymbolId, bool) {
         let hash = SymbolTable::hash_name(&name);
         let entry = self
             .table
@@ -266,15 +281,9 @@ impl SymbolTableBuilder {
             .from_hash(hash, |id| self.table.symbols[*id].name() == &name);
 
         match entry {
-            RawEntryMut::Occupied(entry) => {
-                let symbol = &mut self.table.symbols[*entry.key()];
-                symbol.insert_flags(flags);
-
-                (*entry.key(), false)
-            }
+            RawEntryMut::Occupied(entry) => (*entry.key(), false),
             RawEntryMut::Vacant(entry) => {
-                let mut symbol = Symbol::new(name);
-                symbol.insert_flags(flags);
+                let symbol = Symbol::new(name);
 
                 let id = self.table.symbols.push(symbol);
                 entry.insert_with_hasher(hash, id, (), |id| {
@@ -283,6 +292,14 @@ impl SymbolTableBuilder {
                 (id, true)
             }
         }
+    }
+
+    pub(super) fn mark_symbol_bound(&mut self, id: ScopedSymbolId) {
+        self.table.symbols[id].insert_flags(SymbolFlags::IS_BOUND);
+    }
+
+    pub(super) fn mark_symbol_used(&mut self, id: ScopedSymbolId) {
+        self.table.symbols[id].insert_flags(SymbolFlags::IS_USED);
     }
 
     pub(super) fn finish(mut self) -> SymbolTable {
@@ -300,6 +317,10 @@ pub(crate) enum NodeWithScopeRef<'a> {
     Lambda(&'a ast::ExprLambda),
     FunctionTypeParameters(&'a ast::StmtFunctionDef),
     ClassTypeParameters(&'a ast::StmtClassDef),
+    ListComprehension(&'a ast::ExprListComp),
+    SetComprehension(&'a ast::ExprSetComp),
+    DictComprehension(&'a ast::ExprDictComp),
+    GeneratorExpression(&'a ast::ExprGenerator),
 }
 
 impl NodeWithScopeRef<'_> {
@@ -326,6 +347,18 @@ impl NodeWithScopeRef<'_> {
             NodeWithScopeRef::ClassTypeParameters(class) => {
                 NodeWithScopeKind::ClassTypeParameters(AstNodeRef::new(module, class))
             }
+            NodeWithScopeRef::ListComprehension(comprehension) => {
+                NodeWithScopeKind::ListComprehension(AstNodeRef::new(module, comprehension))
+            }
+            NodeWithScopeRef::SetComprehension(comprehension) => {
+                NodeWithScopeKind::SetComprehension(AstNodeRef::new(module, comprehension))
+            }
+            NodeWithScopeRef::DictComprehension(comprehension) => {
+                NodeWithScopeKind::DictComprehension(AstNodeRef::new(module, comprehension))
+            }
+            NodeWithScopeRef::GeneratorExpression(generator) => {
+                NodeWithScopeKind::GeneratorExpression(AstNodeRef::new(module, generator))
+            }
         }
     }
 
@@ -337,6 +370,10 @@ impl NodeWithScopeRef<'_> {
             NodeWithScopeRef::Lambda(_) => ScopeKind::Function,
             NodeWithScopeRef::FunctionTypeParameters(_)
             | NodeWithScopeRef::ClassTypeParameters(_) => ScopeKind::Annotation,
+            NodeWithScopeRef::ListComprehension(_)
+            | NodeWithScopeRef::SetComprehension(_)
+            | NodeWithScopeRef::DictComprehension(_)
+            | NodeWithScopeRef::GeneratorExpression(_) => ScopeKind::Comprehension,
         }
     }
 
@@ -356,6 +393,18 @@ impl NodeWithScopeRef<'_> {
             NodeWithScopeRef::ClassTypeParameters(class) => {
                 NodeWithScopeKey::ClassTypeParameters(NodeKey::from_node(class))
             }
+            NodeWithScopeRef::ListComprehension(comprehension) => {
+                NodeWithScopeKey::ListComprehension(NodeKey::from_node(comprehension))
+            }
+            NodeWithScopeRef::SetComprehension(comprehension) => {
+                NodeWithScopeKey::SetComprehension(NodeKey::from_node(comprehension))
+            }
+            NodeWithScopeRef::DictComprehension(comprehension) => {
+                NodeWithScopeKey::DictComprehension(NodeKey::from_node(comprehension))
+            }
+            NodeWithScopeRef::GeneratorExpression(generator) => {
+                NodeWithScopeKey::GeneratorExpression(NodeKey::from_node(generator))
+            }
         }
     }
 }
@@ -369,6 +418,10 @@ pub enum NodeWithScopeKind {
     Function(AstNodeRef<ast::StmtFunctionDef>),
     FunctionTypeParameters(AstNodeRef<ast::StmtFunctionDef>),
     Lambda(AstNodeRef<ast::ExprLambda>),
+    ListComprehension(AstNodeRef<ast::ExprListComp>),
+    SetComprehension(AstNodeRef<ast::ExprSetComp>),
+    DictComprehension(AstNodeRef<ast::ExprDictComp>),
+    GeneratorExpression(AstNodeRef<ast::ExprGenerator>),
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
@@ -379,4 +432,8 @@ pub(crate) enum NodeWithScopeKey {
     Function(NodeKey),
     FunctionTypeParameters(NodeKey),
     Lambda(NodeKey),
+    ListComprehension(NodeKey),
+    SetComprehension(NodeKey),
+    DictComprehension(NodeKey),
+    GeneratorExpression(NodeKey),
 }

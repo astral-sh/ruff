@@ -53,6 +53,9 @@ use crate::registry::Rule;
 /// def calculate_speed(distance: float, time: float) -> float: ...
 /// ```
 ///
+/// ## Notebook behavior
+/// This rule is ignored for Jupyter Notebooks.
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
@@ -215,6 +218,9 @@ impl Violation for UndocumentedPublicClass {
 ///             raise ValueError("Tried to greet an unhappy cat.")
 /// ```
 ///
+/// ## Options
+/// - `lint.pydocstyle.ignore-decorators`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
@@ -301,6 +307,9 @@ impl Violation for UndocumentedPublicMethod {
 ///     except ZeroDivisionError as exc:
 ///         raise FasterThanLightError from exc
 /// ```
+///
+/// ## Options
+/// - `lint.pydocstyle.ignore-decorators`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -398,6 +407,9 @@ impl Violation for UndocumentedPublicPackage {
 /// cat = Cat("Dusty")
 /// print(cat)  # "Cat: Dusty"
 /// ```
+///
+/// ## Options
+/// - `lint.pydocstyle.ignore-decorators`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -498,6 +510,9 @@ impl Violation for UndocumentedPublicNestedClass {
 ///         self.name: str = name
 ///         self.population: int = population
 /// ```
+///
+/// ## Options
+/// - `lint.pydocstyle.ignore-decorators`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)

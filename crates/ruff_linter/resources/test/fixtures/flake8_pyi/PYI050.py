@@ -30,3 +30,11 @@ def foo_no_return_pos_only(arg: int, /, arg2: NoReturn):
 
 def foo_never(arg: Never):
     ...
+
+
+def stringized(arg: "NoReturn"):
+    ...
+
+
+def stringized_good(arg: "Never"):
+    ...

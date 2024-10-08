@@ -62,10 +62,10 @@ pub(crate) fn unnecessary_list_comprehension_dict(
     let Expr::ListComp(ast::ExprListComp { elt, .. }) = argument else {
         return;
     };
-    let Expr::Tuple(ast::ExprTuple { elts, .. }) = elt.as_ref() else {
+    let Expr::Tuple(tuple) = &**elt else {
         return;
     };
-    if elts.len() != 2 {
+    if tuple.len() != 2 {
         return;
     }
     let mut diagnostic = Diagnostic::new(UnnecessaryListComprehensionDict, expr.range());

@@ -97,9 +97,8 @@ impl StringParser {
 
     #[inline]
     fn next_char(&mut self) -> Option<char> {
-        self.source[self.cursor..].chars().next().map(|c| {
+        self.source[self.cursor..].chars().next().inspect(|c| {
             self.cursor += c.len_utf8();
-            c
         })
     }
 

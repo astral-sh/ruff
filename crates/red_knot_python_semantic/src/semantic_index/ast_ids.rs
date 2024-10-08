@@ -26,9 +26,9 @@ use crate::Db;
 /// ```
 #[derive(Debug)]
 pub(crate) struct AstIds {
-    /// Maps expressions to their expression id. Uses `NodeKey` because it avoids cloning [`Parsed`].
+    /// Maps expressions to their expression id.
     expressions_map: FxHashMap<ExpressionNodeKey, ScopedExpressionId>,
-    /// Maps expressions which "use" a symbol (that is, [`ExprName`]) to a use id.
+    /// Maps expressions which "use" a symbol (that is, [`ast::ExprName`]) to a use id.
     uses_map: FxHashMap<ExpressionNodeKey, ScopedUseId>,
 }
 

@@ -7,7 +7,7 @@ use crate::expression::parentheses::{
 };
 use crate::other::f_string_part::FormatFStringPart;
 use crate::prelude::*;
-use crate::string::{AnyString, FormatStringContinuation, Quoting};
+use crate::string::{AnyString, FormatImplicitConcatenatedString, Quoting};
 
 #[derive(Default)]
 pub struct FormatExprFString;
@@ -22,10 +22,7 @@ impl FormatNodeRule<ExprFString> for FormatExprFString {
                 f_string_quoting(item, &f.context().locator()),
             )
             .fmt(f),
-            _ => {
-                in_parentheses_only_group(&FormatStringContinuation::new(&AnyString::FString(item)))
-                    .fmt(f)
-            }
+            _ => in_parentheses_only_group(&FormatImplicitConcatenatedString::new(item)).fmt(f),
         }
     }
 }

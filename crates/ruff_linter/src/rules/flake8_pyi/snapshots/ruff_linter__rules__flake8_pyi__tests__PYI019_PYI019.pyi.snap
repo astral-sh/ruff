@@ -42,4 +42,10 @@ PYI019.pyi:42:46: PYI019 Methods like `generic_instance_method` should return `t
    |                                              ^ PYI019
    |
 
-
+PYI019.pyi:54:32: PYI019 Methods like `foo` should return `typing.Self` instead of a custom `TypeVar`
+   |
+52 |    # in the settings for this test:
+53 |    @foo_classmethod
+54 |    def foo[S](cls: type[S]) -> S: ...  # PYI019
+   |                                ^ PYI019
+   |

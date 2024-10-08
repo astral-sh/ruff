@@ -339,23 +339,9 @@ For example, `ruff check /path/to/excluded/file.py` will always lint `file.py`.
 
 ### Default inclusions
 
-By default, Ruff will discover files matching `*.py`, `*.ipy`, or `pyproject.toml`.
+By default, Ruff will discover files matching `*.py`, `*.pyi`, `*.ipynb`, or `pyproject.toml`.
 
 To lint or format files with additional file extensions, use the [`extend-include`](settings.md#extend-include) setting.
-
-=== "pyproject.toml"
-
-    ```toml
-    [tool.ruff]
-    extend-include = ["*.ipynb"]
-    ```
-
-=== "ruff.toml"
-
-    ```toml
-    extend-include = ["*.ipynb"]
-    ```
-
 You can also change the default selection using the [`include`](settings.md#include) setting.
 
 
@@ -378,41 +364,16 @@ You can also change the default selection using the [`include`](settings.md#incl
 
 ## Jupyter Notebook discovery
 
-Ruff has built-in support for [Jupyter Notebooks](https://jupyter.org/).
-
-!!! info
-    Notebooks are linted and formatted by default when using [preview mode](preview.md).
-    You can opt-out of notebook linting and formatting by adding `*.ipynb` to [`extend-exclude`](settings.md#extend-exclude).
-
-To opt in to linting and formatting Jupyter Notebook (`.ipynb`) files, add the `*.ipynb` pattern to
-your [`extend-include`](settings.md#extend-include) setting, like so:
-
-=== "pyproject.toml"
-
-    ```toml
-    [tool.ruff]
-    extend-include = ["*.ipynb"]
-    ```
-
-=== "ruff.toml"
-
-    ```toml
-    extend-include = ["*.ipynb"]
-    ```
-
-This will prompt Ruff to discover Jupyter Notebook (`.ipynb`) files in any specified
-directories, then lint and format them accordingly.
+Ruff has built-in support for linting and formatting [Jupyter Notebooks](https://jupyter.org/),
+which are linted and formatted by default on version `0.6.0` and higher.
 
 If you'd prefer to either only lint or only format Jupyter Notebook files, you can use the
-section specific `exclude` option to do so. For example, the following would only lint Jupyter
+section-specific `exclude` option to do so. For example, the following would only lint Jupyter
 Notebook files and not format them:
 
 === "pyproject.toml"
 
     ```toml
-    [tool.ruff]
-    extend-include = ["*.ipynb"]
-
     [tool.ruff.format]
     exclude = ["*.ipynb"]
     ```
@@ -420,8 +381,6 @@ Notebook files and not format them:
 === "ruff.toml"
 
     ```toml
-    extend-include = ["*.ipynb"]
-
     [format]
     exclude = ["*.ipynb"]
     ```
@@ -431,9 +390,6 @@ And, conversely, the following would only format Jupyter Notebook files and not 
 === "pyproject.toml"
 
     ```toml
-    [tool.ruff]
-    extend-include = ["*.ipynb"]
-
     [tool.ruff.lint]
     exclude = ["*.ipynb"]
     ```
@@ -441,15 +397,49 @@ And, conversely, the following would only format Jupyter Notebook files and not 
 === "ruff.toml"
 
     ```toml
-    extend-include = ["*.ipynb"]
-
     [lint]
     exclude = ["*.ipynb"]
     ```
 
-Alternatively, pass the notebook file(s) to `ruff` on the command-line directly. For example,
-`ruff check /path/to/notebook.ipynb` will always lint `notebook.ipynb`. Similarly,
-`ruff format /path/to/notebook.ipynb` will always format `notebook.ipynb`.
+You can completely disable Jupyter Notebook support by updating the
+[`extend-exclude`](settings.md#extend-exclude) setting:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff]
+    extend-exclude = ["*.ipynb"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    extend-exclude = ["*.ipynb"]
+    ```
+
+If you'd like to ignore certain rules specifically for Jupyter Notebook files, you can do so by
+using the [`per-file-ignores`](settings.md#per-file-ignores) setting:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff.lint.per-file-ignores]
+    "*.ipynb" = ["T20"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    [lint.per-file-ignores]
+    "*.ipynb" = ["T20"]
+    ```
+
+Some rules have different behavior when applied to Jupyter Notebook files. For
+example, when applied to `.py` files the
+[`module-import-not-at-top-of-file` (`E402`)](rules/module-import-not-at-top-of-file.md)
+rule detect imports at the top of a file, but for notebooks it detects imports at the top of a
+**cell**. For a given rule, the rule's documentation will always specify if it has different
+behavior when applied to Jupyter Notebook files.
 
 ## Command-line interface
 
@@ -532,6 +522,7 @@ Commands:
   clean    Clear any caches in the current directory and any subdirectories
   format   Run the Ruff formatter on the given files or directories
   server   Run the language server
+  analyze  Run analysis over Python source code
   version  Display Ruff's version
   help     Print this message or the help of the given subcommand(s)
 

@@ -37,7 +37,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: tj-actions/changed-files@v44
+      - uses: tj-actions/changed-files@v45
         id: changed
         with:
           files_yaml: |
@@ -142,6 +142,13 @@ jobs:
 
       # Check for broken links in the documentation.
       - run: cargo doc --all --no-deps
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+      # Use --document-private-items so that all our doc comments are kept in
+      # sync, not just public items. Eventually we should do this for all
+      # crates; for now add crates here as they are warning-clean to prevent
+      # regression.
+      - run: cargo doc --no-deps -p red_knot_python_semantic -p red_knot -p ruff_db --document-private-items
         env:
           # Setting RUSTDOCFLAGS because `cargo doc --check` isn't yet implemented (https://github.com/rust-lang/cargo/issues/10025).
           RUSTDOCFLAGS: "-D warnings"
