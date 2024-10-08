@@ -448,7 +448,6 @@ impl<'db> Type<'db> {
     #[must_use]
     pub fn truthy_set(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
-            Type::None => Some(Type::Never),
             Type::Instance(class) => match class.known(db) {
                 Some(KnownClass::Bool) => Some(Type::BooleanLiteral(true)),
                 _ => match self.bool(db) {
@@ -459,7 +458,11 @@ impl<'db> Type<'db> {
                     Truthiness::Ambiguous => None,
                 },
             },
-            _ => None,
+            _ => match self.bool(db) {
+                Truthiness::AlwaysFalse => Some(*self),
+                Truthiness::AlwaysTrue => Some(Type::Never),
+                Truthiness::Ambiguous => None,
+            },
         }
     }
 
