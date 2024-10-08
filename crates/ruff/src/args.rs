@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
 
-use anyhow::{anyhow, bail};
+use anyhow::bail;
 use clap::builder::{TypedValueParser, ValueParserFactory};
 use clap::{command, Parser, Subcommand};
 use colored::Colorize;
@@ -729,7 +729,7 @@ impl CheckCommand {
             unsafe_fixes: resolve_bool_arg(self.unsafe_fixes, self.no_unsafe_fixes)
                 .map(UnsafeFixes::from),
             force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
-            output_format: resolve_output_format(self.output_format)?,
+            output_format: self.output_format,
             show_fixes: resolve_bool_arg(self.show_fixes, self.no_show_fixes),
             extension: self.extension,
             ..ExplicitConfigOverrides::default()
@@ -981,17 +981,6 @@ The path `{value}` does not point to a configuration file"
         );
 
         Err(new_error)
-    }
-}
-
-#[allow(deprecated)]
-fn resolve_output_format(
-    output_format: Option<OutputFormat>,
-) -> anyhow::Result<Option<OutputFormat>> {
-    if let Some(OutputFormat::Text) = output_format {
-        Err(anyhow!("`--output-format=text` is no longer supported. Use `--output-format=full` or `--output-format=concise` instead."))
-    } else {
-        Ok(output_format)
     }
 }
 
