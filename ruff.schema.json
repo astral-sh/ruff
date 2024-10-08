@@ -16,17 +16,6 @@
         "minLength": 1
       }
     },
-    "allowed-unused-imports": {
-      "description": "A list of modules which is allowed even though they are not used in the code.\n\nThis is useful when a module has a side effect when imported.",
-      "deprecated": true,
-      "type": [
-        "array",
-        "null"
-      ],
-      "items": {
-        "type": "string"
-      }
-    },
     "analyze": {
       "description": "Options to configure import map generation.",
       "anyOf": [
@@ -1884,16 +1873,6 @@
             "type": "string",
             "maxLength": 1,
             "minLength": 1
-          }
-        },
-        "allowed-unused-imports": {
-          "description": "A list of modules which is allowed even though they are not used in the code.\n\nThis is useful when a module has a side effect when imported.",
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
           }
         },
         "dummy-variable-rgx": {
