@@ -4,11 +4,13 @@
 
 use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::Ranged;
-use smallvec::SmallVec;
-use std::ops::Deref;
+use std::ops::{Deref, Range};
 
 #[derive(Debug)]
-pub(crate) struct SortedDiagnostics<T>(Vec<DiagnosticWithLine<T>>);
+pub(crate) struct SortedDiagnostics<T> {
+    diagnostics: Vec<T>,
+    lines: Vec<LineDiagnosticRange>,
+}
 
 impl<T> SortedDiagnostics<T>
 where
@@ -24,75 +26,101 @@ where
             .collect();
         diagnostics.sort_by_key(|diagnostic_with_line| diagnostic_with_line.line_number);
 
-        Self(diagnostics)
+        let mut diags = Self {
+            diagnostics: Vec::with_capacity(diagnostics.len()),
+            lines: vec![],
+        };
+
+        let mut current_line_number = None;
+        let mut start = 0;
+        for DiagnosticWithLine {
+            line_number,
+            diagnostic,
+        } in diagnostics
+        {
+            match current_line_number {
+                None => {
+                    current_line_number = Some(line_number);
+                }
+                Some(current) => {
+                    if line_number != current {
+                        let end = diags.diagnostics.len();
+                        diags.lines.push(LineDiagnosticRange {
+                            line_number: current,
+                            diagnostic_range: start..end,
+                        });
+                        start = end;
+                        current_line_number = Some(line_number);
+                    }
+                }
+            }
+            diags.diagnostics.push(diagnostic);
+        }
+        if let Some(current_line) = current_line_number {
+            diags.lines.push(LineDiagnosticRange {
+                line_number: current_line,
+                diagnostic_range: start..diags.diagnostics.len(),
+            });
+        }
+
+        diags
     }
 
     pub(crate) fn iter_lines(&self) -> LineDiagnosticsIterator<T> {
         LineDiagnosticsIterator {
-            inner: self.0.iter(),
+            diagnostics: self.diagnostics.as_slice(),
+            inner: self.lines.iter(),
         }
     }
 }
 
-/// Iterator to group sorted diagnostics by line.
-pub(crate) struct LineDiagnosticsIterator<'a, T> {
-    inner: std::slice::Iter<'a, DiagnosticWithLine<T>>,
+/// Range delineating diagnostics in [`SortedDiagnostics`] that begin on a single line.
+#[derive(Debug)]
+struct LineDiagnosticRange {
+    line_number: OneIndexed,
+    diagnostic_range: Range<usize>,
 }
 
-impl<T> Iterator for LineDiagnosticsIterator<'_, T>
+/// Iterator to group sorted diagnostics by line.
+pub(crate) struct LineDiagnosticsIterator<'a, T> {
+    diagnostics: &'a [T],
+    inner: std::slice::Iter<'a, LineDiagnosticRange>,
+}
+
+impl<'a, T> Iterator for LineDiagnosticsIterator<'a, T>
 where
     T: Ranged + Clone,
 {
-    type Item = LineDiagnostics<T>;
+    type Item = LineDiagnostics<'a, T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let DiagnosticWithLine {
-            line_number: current_line_number,
-            diagnostic,
-        } = self.inner.next()?;
-        let mut diagnostics = DiagnosticVec::new();
-        diagnostics.push(diagnostic.clone());
-        while let Some(DiagnosticWithLine {
+        let LineDiagnosticRange {
             line_number,
-            diagnostic,
-        }) = self.inner.clone().next()
-        {
-            if line_number == current_line_number {
-                diagnostics.push(diagnostic.clone());
-                self.inner.next();
-            } else {
-                break;
-            }
-        }
+            diagnostic_range,
+        } = self.inner.next()?;
         Some(LineDiagnostics {
-            line_number: *current_line_number,
-            diagnostics,
+            line_number: *line_number,
+            diagnostics: &self.diagnostics[diagnostic_range.clone()],
         })
     }
 }
 
 impl<T> std::iter::FusedIterator for LineDiagnosticsIterator<'_, T> where T: Clone + Ranged {}
 
-/// A vector of diagnostics belonging to a single line.
-///
-/// Most lines will have zero or one diagnostics, so we use a [`SmallVec`] optimized for a single
-/// element to avoid most heap vector allocations.
-type DiagnosticVec<T> = SmallVec<[T; 1]>;
-
 #[derive(Debug)]
-pub(crate) struct LineDiagnostics<T> {
+pub(crate) struct LineDiagnostics<'a, T> {
     /// Line number on which these diagnostics start.
     pub(crate) line_number: OneIndexed,
 
     /// Diagnostics starting on this line.
-    pub(crate) diagnostics: DiagnosticVec<T>,
+    pub(crate) diagnostics: &'a [T],
 }
 
-impl<T> Deref for LineDiagnostics<T> {
+impl<T> Deref for LineDiagnostics<'_, T> {
     type Target = [T];
 
     fn deref(&self) -> &Self::Target {
-        &self.diagnostics
+        self.diagnostics
     }
 }
 
