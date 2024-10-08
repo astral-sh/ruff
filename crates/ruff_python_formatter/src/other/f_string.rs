@@ -1,10 +1,12 @@
+use crate::prelude::*;
+use crate::preview::{
+    is_f_string_formatting_enabled, is_f_string_implicit_concatenated_string_literal_quotes_enabled,
+};
+use crate::string::{Quoting, StringNormalizer, StringQuotes};
 use ruff_formatter::write;
 use ruff_python_ast::{AnyStringFlags, FString, StringFlags};
 use ruff_source_file::Locator;
-
-use crate::prelude::*;
-use crate::preview::is_f_string_formatting_enabled;
-use crate::string::{Quoting, StringNormalizer, StringQuotes};
+use ruff_text_size::Ranged;
 
 use super::f_string_element::FormatFStringElement;
 
@@ -29,8 +31,17 @@ impl Format<PyFormatContext<'_>> for FormatFString<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let locator = f.context().locator();
 
+        // If the preview style is enabled, make the decision on what quotes to use locally for each
+        // f-string instead of globally for the entire f-string expression.
+        let quoting =
+            if is_f_string_implicit_concatenated_string_literal_quotes_enabled(f.context()) {
+                f_string_quoting(self.value, &locator)
+            } else {
+                self.quoting
+            };
+
         let normalizer = StringNormalizer::from_context(f.context())
-            .with_quoting(self.quoting)
+            .with_quoting(quoting)
             .with_preferred_quote_style(f.options().quote_style());
 
         // If f-string formatting is disabled (not in preview), then we will
@@ -138,5 +149,22 @@ impl FStringLayout {
 
     pub(crate) const fn is_multiline(self) -> bool {
         matches!(self, FStringLayout::Multiline)
+    }
+}
+
+fn f_string_quoting(f_string: &FString, locator: &Locator) -> Quoting {
+    let triple_quoted = f_string.flags.is_triple_quoted();
+
+    if f_string.elements.expressions().any(|expression| {
+        let string_content = locator.slice(expression.range());
+        if triple_quoted {
+            string_content.contains(r#"""""#) || string_content.contains("'''")
+        } else {
+            string_content.contains(['"', '\''])
+        }
+    }) {
+        Quoting::Preserve
+    } else {
+        Quoting::CanChange
     }
 }
