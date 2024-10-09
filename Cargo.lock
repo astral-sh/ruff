@@ -2466,7 +2466,6 @@ dependencies = [
  "ruff_python_codegen",
  "ruff_python_formatter",
  "ruff_python_parser",
- "ruff_python_stdlib",
  "ruff_python_trivia",
  "ruff_workspace",
  "schemars",
