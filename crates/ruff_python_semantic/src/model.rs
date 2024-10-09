@@ -5,7 +5,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_python_ast::helpers::from_relative_import;
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
-use ruff_python_ast::{self as ast, Expr, ExprContext, Operator, Stmt};
+use ruff_python_ast::{self as ast, traversal, Expr, ExprContext, Operator, Stmt};
 use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -1243,6 +1243,28 @@ impl<'a> SemanticModel<'a> {
             .ancestor_ids(node_id)
             .filter(|id| self.nodes[*id].is_statement())
             .nth(1)
+    }
+
+    pub fn previous_statement(&self, stmt: &'a Stmt) -> Option<&Stmt> {
+        self.previous_statements(stmt)?.next()
+    }
+
+    pub fn previous_statements(&self, stmt: &'a Stmt) -> Option<impl Iterator<Item = &Stmt>> {
+        let statements: &[Stmt] = if self.at_top_level() {
+            self.definitions.python_ast()?
+        } else {
+            let current_statement_parent = self.current_statement_parent()?;
+            traversal::suite(stmt, current_statement_parent)?
+        };
+
+        Some(
+            statements
+                .iter()
+                .take_while(|ast_stmt| *ast_stmt != stmt)
+                .collect::<Vec<&Stmt>>()
+                .into_iter()
+                .rev(),
+        )
     }
 
     /// Return the [`Expr`] corresponding to the given [`NodeId`].
