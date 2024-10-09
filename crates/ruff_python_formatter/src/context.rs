@@ -8,10 +8,9 @@ use ruff_source_file::Locator;
 use std::fmt::{Debug, Formatter};
 use std::ops::{Deref, DerefMut};
 
-#[derive(Clone)]
 pub struct PyFormatContext<'a> {
     options: PyFormatOptions,
-    contents: &'a str,
+    contents: Locator<'a>,
     comments: Comments<'a>,
     tokens: &'a Tokens,
     node_level: NodeLevel,
@@ -38,7 +37,7 @@ impl<'a> PyFormatContext<'a> {
     ) -> Self {
         Self {
             options,
-            contents,
+            contents: Locator::new(contents),
             comments,
             tokens,
             node_level: NodeLevel::TopLevel(TopLevelStatementPosition::Other),
@@ -49,12 +48,12 @@ impl<'a> PyFormatContext<'a> {
     }
 
     pub(crate) fn source(&self) -> &'a str {
-        self.contents
+        self.contents.contents()
     }
 
     #[allow(unused)]
-    pub(crate) fn locator(&self) -> Locator<'a> {
-        Locator::new(self.contents)
+    pub(crate) fn locator(&self) -> &Locator<'a> {
+        &self.contents
     }
 
     pub(crate) fn set_node_level(&mut self, level: NodeLevel) {
@@ -125,7 +124,7 @@ impl FormatContext for PyFormatContext<'_> {
     }
 
     fn source_code(&self) -> SourceCode {
-        SourceCode::new(self.contents)
+        SourceCode::new(self.contents.contents())
     }
 }
 
