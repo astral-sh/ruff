@@ -43,10 +43,7 @@ pub(crate) fn builtin_module_shadowing(
     allowed_modules: &[String],
     target_version: PythonVersion,
 ) -> Option<Diagnostic> {
-    if !matches!(
-        PySourceType::try_from_path(path),
-        Some(PySourceType::Python | PySourceType::Stub)
-    ) {
+    if !PySourceType::try_from_path(path).is_some_and(PySourceType::is_py_file_or_stub) {
         return None;
     }
 

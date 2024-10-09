@@ -52,7 +52,7 @@ pub(crate) fn implicit_namespace_package(
 ) -> Option<Diagnostic> {
     if package.is_none()
         // Ignore non-`.py` files, which don't require an `__init__.py`.
-        && PySourceType::try_from_path(path).is_some_and(|source_type|source_type.is_python())
+        && PySourceType::try_from_path(path).is_some_and(PySourceType::is_py_file)
         // Ignore any files that are direct children of the project root.
         && !path
             .parent()

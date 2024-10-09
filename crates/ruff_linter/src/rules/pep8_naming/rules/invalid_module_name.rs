@@ -54,10 +54,7 @@ pub(crate) fn invalid_module_name(
     package: Option<&Path>,
     ignore_names: &IgnoreNames,
 ) -> Option<Diagnostic> {
-    if !matches!(
-        PySourceType::try_from_path(path),
-        Some(PySourceType::Python | PySourceType::Stub)
-    ) {
+    if !PySourceType::try_from_path(path).is_some_and(PySourceType::is_py_file_or_stub) {
         return None;
     }
 
