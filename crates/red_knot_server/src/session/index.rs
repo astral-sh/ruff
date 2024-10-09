@@ -3,7 +3,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use lsp_types::Url;
-use ruff_python_ast::PySourceType;
 use rustc_hash::FxHashMap;
 
 use crate::{
@@ -73,7 +72,10 @@ impl Index {
     pub(crate) fn key_from_url(&self, url: Url) -> DocumentKey {
         if self.notebook_cells.contains_key(&url) {
             DocumentKey::NotebookCell(url)
-        } else if PySourceType::from(url.path()).is_ipynb() {
+        } else if Path::new(url.path())
+            .extension()
+            .map_or(false, |ext| ext.eq_ignore_ascii_case("ipynb"))
+        {
             DocumentKey::Notebook(url)
         } else {
             DocumentKey::Text(url)

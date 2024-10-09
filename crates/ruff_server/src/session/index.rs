@@ -5,7 +5,6 @@ use std::{collections::BTreeMap, path::Path, sync::Arc};
 
 use anyhow::anyhow;
 use lsp_types::Url;
-use ruff_python_ast::PySourceType;
 use rustc_hash::FxHashMap;
 
 pub(crate) use ruff_settings::RuffSettings;
@@ -122,7 +121,10 @@ impl Index {
     pub(super) fn key_from_url(&self, url: Url) -> DocumentKey {
         if self.notebook_cells.contains_key(&url) {
             DocumentKey::NotebookCell(url)
-        } else if PySourceType::from(url.path()).is_ipynb() {
+        } else if Path::new(url.path())
+            .extension()
+            .map_or(false, |ext| ext.eq_ignore_ascii_case("ipynb"))
+        {
             DocumentKey::Notebook(url)
         } else {
             DocumentKey::Text(url)
