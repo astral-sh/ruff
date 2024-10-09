@@ -22,7 +22,7 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
     pub(crate) fn from_context(context: &'a PyFormatContext<'src>) -> Self {
         Self {
             quoting: Quoting::default(),
-            preferred_quote_style: QuoteStyle::default(),
+            preferred_quote_style: context.options().quote_style(),
             context,
         }
     }
