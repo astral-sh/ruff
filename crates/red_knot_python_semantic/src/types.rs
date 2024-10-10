@@ -1378,10 +1378,12 @@ impl<'db> ClassType<'db> {
 
     fn mro(self, db: &'db dyn Db) -> Box<[ClassBase<'db>]> {
         if self.bases(db).len() == 0 {
-            return Box::new([
-                ClassBase::Class(self),
-                ClassBase::Class(KnownClass::Object.to_class(db).expect_class()),
-            ]);
+            let object = KnownClass::Object.to_class(db).expect_class();
+            return if self == object {
+                Box::new([ClassBase::Class(self)])
+            } else {
+                Box::new([ClassBase::Class(self), ClassBase::Class(object)])
+            };
         }
         todo!()
     }
