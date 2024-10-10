@@ -263,7 +263,7 @@ A fenced code block with no language will always be an error.
 ### Configuration
 
 We will add the ability to specify non-default red-knot configurations to use in tests, by including
-a TOML fenced code block:
+a TOML code block:
 
 ````markdown
 ```toml
@@ -357,9 +357,9 @@ The inline comment diagnostic assertions are useful for making quick, readable a
 diagnostics in a particular location. But sometimes we will want to assert on the full diagnostic
 output of checking an embedded Python file. Or sometimes (see “incremental tests” below) we will
 want to assert on diagnostics in a file, without impacting the contents of that file by changing a
-comment in it. In these cases, a Python fenced code block in a test could be followed by a fenced
-code block with language `output`; this would contain the full diagnostic output for the preceding
-test file:
+comment in it. In these cases, a Python code block in a test could be followed by a fenced code
+block with language `output`; this would contain the full diagnostic output for the preceding test
+file:
 
 ````markdown
 # full output
