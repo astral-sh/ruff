@@ -65,6 +65,8 @@ mod tests {
     #[test_case(Rule::ReturnInGenerator, Path::new("B901.py"))]
     #[test_case(Rule::LoopIteratorMutation, Path::new("B909.py"))]
     #[test_case(Rule::MutableContextvarDefault, Path::new("B039.py"))]
+    #[test_case(Rule::UseDataclassesForDataClasses, Path::new("B903.py"))]
+    #[test_case(Rule::FStringSingleQuotes, Path::new("B907.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
