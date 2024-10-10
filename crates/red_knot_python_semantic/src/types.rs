@@ -1,7 +1,9 @@
 use infer::TypeInferenceBuilder;
+use itertools::Itertools;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 use std::collections::VecDeque;
+use std::fmt::Debug;
 
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::ast_ids::HasScopedAstId;
@@ -1361,41 +1363,62 @@ impl<'db> ClassType<'db> {
             })
     }
 
-    /// Return an iterator over the types of this class's bases.
+    /// Return an array of the types of this class's bases.
     ///
     /// # Panics:
     /// If `definition` is not a `DefinitionKind::Class`.
-    pub fn bases(&self, db: &'db dyn Db) -> impl ExactSizeIterator<Item = Type<'db>> {
+    pub fn bases(&self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         let definition = self.definition(db);
         let DefinitionKind::Class(class_stmt_node) = definition.kind(db) else {
             panic!("Class type definition must have DefinitionKind::Class");
         };
-        class_stmt_node
-            .bases()
-            .iter()
-            .map(move |base_expr| definition_expression_ty(db, definition, base_expr))
+        let base_nodes = class_stmt_node.bases();
+        let object = KnownClass::Object.to_class(db);
+
+        if *self == object.expect_class() {
+            // ```pycon
+            // >>> object.__bases__
+            // ()
+            // ```
+            Box::new([])
+        } else if base_nodes.is_empty() {
+            Box::new([KnownClass::Object.to_class(db)])
+        } else {
+            base_nodes
+                .iter()
+                .map(move |base_expr| definition_expression_ty(db, definition, base_expr))
+                .collect()
+        }
     }
 
-    fn mro(self, db: &'db dyn Db) -> Box<[ClassBase<'db>]> {
-        let mut bases = self.bases(db);
-        let num_bases = bases.len();
-        match bases.next() {
-            None => {
-                let object = KnownClass::Object.to_class(db).expect_class();
-                return if self == object {
-                    Box::new([ClassBase::Class(self)])
-                } else {
-                    Box::new([ClassBase::Class(self), ClassBase::Class(object)])
-                };
+    fn mro(self, db: &'db dyn Db) -> Option<Mro<'db>> {
+        let bases = self.bases(db);
+        match &*bases {
+            [] => {
+                debug_assert_eq!(self, KnownClass::Object.to_class(db).expect_class());
+                Some(Mro::from([ClassBase::Class(self)]))
             }
-            Some(first_base) => {
-                if num_bases == 1 {
-                    std::iter::once(ClassBase::Class(self))
-                        .chain(ClassBase::from(first_base).mro(db))
-                        .collect()
+            [single_base] => {
+                let object = KnownClass::Object.to_class(db);
+                return Some(if *single_base == object {
+                    Mro::from([
+                        ClassBase::Class(self),
+                        ClassBase::Class(object.expect_class()),
+                    ])
                 } else {
-                    todo!()
+                    Mro(std::iter::once(ClassBase::Class(self))
+                        .chain(ClassBase::from(single_base).mro(db)?.iter().copied())
+                        .collect())
+                });
+            }
+            _ => {
+                let bases: VecDeque<ClassBase<'_>> = bases.iter().map(ClassBase::from).collect();
+                let mut seqs = vec![VecDeque::from([ClassBase::Class(self)])];
+                for base in &bases {
+                    seqs.push(base.mro(db)?.into_deque());
                 }
+                seqs.push(bases);
+                c3_merge(seqs)
             }
         }
     }
@@ -1407,7 +1430,7 @@ impl<'db> ClassType<'db> {
         if name == "__mro__" {
             return Type::Tuple(TupleType::new(
                 db,
-                self.mro(db).iter().copied().map(Type::from).collect(),
+                self.mro(db).unwrap().0.iter().map(Type::from).collect(),
             ));
         }
         let member = self.own_class_member(db, name);
@@ -1436,7 +1459,7 @@ impl<'db> ClassType<'db> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum ClassBase<'db> {
     Class(ClassType<'db>),
     Any,
@@ -1449,13 +1472,22 @@ impl<'db> ClassBase<'db> {
         !matches!(self, ClassBase::Class(_))
     }
 
-    fn mro(self, db: &'db dyn Db) -> Box<[ClassBase<'db>]> {
+    fn mro(self, db: &'db dyn Db) -> Option<Mro<'db>> {
         match self {
             ClassBase::Class(class) => class.mro(db),
-            ClassBase::Any | ClassBase::Todo | ClassBase::Unknown => Box::new([
+            ClassBase::Any | ClassBase::Todo | ClassBase::Unknown => Some(Mro::from([
                 self,
-                ClassBase::Class(builtins_symbol_ty(db, "object").expect_class()),
-            ]),
+                ClassBase::Class(KnownClass::Object.to_class(db).expect_class()),
+            ])),
+        }
+    }
+
+    fn display(&self, db: &'db dyn Db) -> String {
+        match self {
+            Self::Any => "ClassBase(Any)".to_string(),
+            Self::Todo => "ClassBase(Todo)".to_string(),
+            Self::Unknown => "ClassBase(Unknown)".to_string(),
+            Self::Class(class) => format!("ClassBase(<class '{}'>)", class.name(db)),
         }
     }
 }
@@ -1491,6 +1523,12 @@ impl<'db> From<Type<'db>> for ClassBase<'db> {
     }
 }
 
+impl<'db> From<&Type<'db>> for ClassBase<'db> {
+    fn from(value: &Type<'db>) -> Self {
+        Self::from(*value)
+    }
+}
+
 impl<'db> From<ClassBase<'db>> for Type<'db> {
     fn from(value: ClassBase<'db>) -> Self {
         match value {
@@ -1502,20 +1540,49 @@ impl<'db> From<ClassBase<'db>> for Type<'db> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Default)]
-struct Mro<'db>(VecDeque<ClassType<'db>>);
-
-impl<'db> Mro<'db> {
-    fn push(&mut self, element: ClassType<'db>) {
-        self.0.push_back(element);
-    }
-
-    fn into_deque(self) -> VecDeque<ClassType<'db>> {
-        self.0
+impl<'db> From<&ClassBase<'db>> for Type<'db> {
+    fn from(value: &ClassBase<'db>) -> Self {
+        Self::from(*value)
     }
 }
 
-fn c3_merge<'db>(mut seqs: Vec<VecDeque<ClassType<'db>>>) -> Option<Mro<'db>> {
+#[derive(PartialEq, Eq, Default)]
+struct Mro<'db>(VecDeque<ClassBase<'db>>);
+
+impl<'db> Mro<'db> {
+    fn iter(&self) -> std::collections::vec_deque::Iter<'_, ClassBase<'db>> {
+        self.0.iter()
+    }
+
+    fn push(&mut self, element: ClassBase<'db>) {
+        self.0.push_back(element);
+    }
+
+    fn into_deque(self) -> VecDeque<ClassBase<'db>> {
+        self.0
+    }
+
+    fn display(&self, db: &'db dyn Db) -> Vec<String> {
+        self.0.iter().map(|base| base.display(db)).collect()
+    }
+}
+
+impl<'db, const N: usize> From<[ClassBase<'db>; N]> for Mro<'db> {
+    fn from(value: [ClassBase<'db>; N]) -> Self {
+        Self(VecDeque::from(value))
+    }
+}
+
+impl<'a, 'db> IntoIterator for &'a Mro<'db> {
+    type IntoIter = std::collections::vec_deque::Iter<'a, ClassBase<'db>>;
+    type Item = &'a ClassBase<'db>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+fn c3_merge(mut seqs: Vec<VecDeque<ClassBase>>) -> Option<Mro> {
     let mut mro = Mro::default();
 
     loop {
@@ -1525,14 +1592,14 @@ fn c3_merge<'db>(mut seqs: Vec<VecDeque<ClassType<'db>>>) -> Option<Mro<'db>> {
             return Some(mro);
         }
 
-        let mut candidate = None;
+        let mut candidate: Option<ClassBase> = None;
 
         for seq in &seqs {
             candidate = Some(seq[0]);
 
             let not_head = seqs
                 .iter()
-                .any(|seq| seq.iter().take(1).any(|class| Some(*class) == candidate));
+                .any(|seq| seq.iter().skip(1).any(|base| Some(*base) == candidate));
 
             if not_head {
                 candidate = None;
@@ -1544,21 +1611,12 @@ fn c3_merge<'db>(mut seqs: Vec<VecDeque<ClassType<'db>>>) -> Option<Mro<'db>> {
         let candidate = candidate?;
         mro.push(candidate);
 
-        for seq in seqs.iter_mut() {
+        for seq in &mut seqs {
             if seq[0] == candidate {
                 seq.pop_front();
             }
         }
     }
-}
-
-fn static_mro<'db>(db: &'db dyn Db, class: ClassType<'db>) -> Option<Mro<'db>> {
-    let mut seqs = vec![VecDeque::from([class])];
-    for base in class.bases(db) {
-        seqs.push(static_mro(db, base.expect_class())?.into_deque());
-    }
-    seqs.push(class.bases(db).map(Type::expect_class).collect());
-    c3_merge(seqs)
 }
 
 #[salsa::interned]

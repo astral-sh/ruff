@@ -3639,6 +3639,7 @@ mod tests {
 
         let base_names: Vec<_> = class
             .bases(&db)
+            .iter()
             .map(|base_ty| format!("{}", base_ty.display(&db)))
             .collect();
 
@@ -5054,12 +5055,12 @@ mod tests {
         let a = system_path_to_file(&db, "src/a.py").expect("file to exist");
         let c_ty = global_symbol_ty(&db, a, "C");
         let c_class = c_ty.expect_class();
-        let mut c_bases = c_class.bases(&db);
-        let b_ty = c_bases.next().unwrap();
+        let c_bases = c_class.bases(&db);
+        let b_ty = c_bases[0];
         let b_class = b_ty.expect_class();
         assert_eq!(b_class.name(&db), "B");
-        let mut b_bases = b_class.bases(&db);
-        let a_ty = b_bases.next().unwrap();
+        let b_bases = b_class.bases(&db);
+        let a_ty = b_bases[0];
         let a_class = a_ty.expect_class();
         assert_eq!(a_class.name(&db), "A");
 
@@ -5313,15 +5314,8 @@ mod tests {
         db.write_file("/src/a.pyi", "class C(object): pass")?;
         let file = system_path_to_file(&db, "/src/a.pyi").unwrap();
         let ty = global_symbol_ty(&db, file, "C");
-
-        let base = ty
-            .expect_class()
-            .bases(&db)
-            .next()
-            .expect("there should be at least one base");
-
+        let base = ty.expect_class().bases(&db)[0];
         assert_eq!(base.display(&db).to_string(), "Literal[object]");
-
         Ok(())
     }
 

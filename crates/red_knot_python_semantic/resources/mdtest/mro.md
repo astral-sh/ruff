@@ -35,3 +35,18 @@ class B(A):
 
 reveal_type(B.__mro__)  # revealed: tuple[Literal[B], Literal[A], Literal[object]]
 ```
+
+## Linearization of multiple bases
+
+```py
+class A:
+    pass
+
+class B:
+    pass
+
+class C(A, B):
+    pass
+
+reveal_type(C.__mro__)  # revealed: tuple[Literal[C], Literal[A], Literal[B], Literal[object]]
+```
