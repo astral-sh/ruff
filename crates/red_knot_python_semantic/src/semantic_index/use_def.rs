@@ -232,6 +232,7 @@ use ruff_index::IndexVec;
 use rustc_hash::FxHashMap;
 
 use super::constraint::Constraint;
+use super::definition::DefinitionCategory;
 
 mod bitset;
 mod symbol_state;
@@ -426,7 +427,7 @@ impl<'map, 'db> Iterator for DeclarationsIterator<'map, 'db> {
 impl std::iter::FusedIterator for DeclarationsIterator<'_, '_> {}
 
 /// A snapshot of the definitions and constraints state at a particular point in control flow.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct FlowSnapshot {
     symbol_states: IndexVec<ScopedSymbolId, SymbolState>,
 }
@@ -459,7 +460,29 @@ impl<'db> UseDefMapBuilder<'db> {
         debug_assert_eq!(symbol, new_symbol);
     }
 
-    pub(super) fn record_binding(&mut self, symbol: ScopedSymbolId, binding: Definition<'db>) {
+    pub(super) fn record_constraint(&mut self, constraint: Constraint<'db>) {
+        let constraint_id = self.all_constraints.push(constraint);
+        for state in &mut self.symbol_states {
+            state.record_constraint(constraint_id);
+        }
+    }
+
+    pub(super) fn record_definition(
+        &mut self,
+        symbol: ScopedSymbolId,
+        definition: Definition<'db>,
+        category: DefinitionCategory,
+    ) {
+        match category {
+            DefinitionCategory::Binding => self.record_binding(symbol, definition),
+            DefinitionCategory::Declaration => self.record_declaration(symbol, definition),
+            DefinitionCategory::DeclarationAndBinding => {
+                self.record_declaration_and_binding(symbol, definition);
+            }
+        }
+    }
+
+    fn record_binding(&mut self, symbol: ScopedSymbolId, binding: Definition<'db>) {
         let def_id = self.all_definitions.push(binding);
         let symbol_state = &mut self.symbol_states[symbol];
         self.definitions_by_definition.insert(
@@ -469,18 +492,7 @@ impl<'db> UseDefMapBuilder<'db> {
         symbol_state.record_binding(def_id);
     }
 
-    pub(super) fn record_constraint(&mut self, constraint: Constraint<'db>) {
-        let constraint_id = self.all_constraints.push(constraint);
-        for state in &mut self.symbol_states {
-            state.record_constraint(constraint_id);
-        }
-    }
-
-    pub(super) fn record_declaration(
-        &mut self,
-        symbol: ScopedSymbolId,
-        declaration: Definition<'db>,
-    ) {
+    fn record_declaration(&mut self, symbol: ScopedSymbolId, declaration: Definition<'db>) {
         let def_id = self.all_definitions.push(declaration);
         let symbol_state = &mut self.symbol_states[symbol];
         self.definitions_by_definition.insert(
@@ -490,7 +502,7 @@ impl<'db> UseDefMapBuilder<'db> {
         symbol_state.record_declaration(def_id);
     }
 
-    pub(super) fn record_declaration_and_binding(
+    fn record_declaration_and_binding(
         &mut self,
         symbol: ScopedSymbolId,
         definition: Definition<'db>,
