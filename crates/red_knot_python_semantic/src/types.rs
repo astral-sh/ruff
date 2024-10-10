@@ -1,6 +1,7 @@
 use infer::TypeInferenceBuilder;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
+use std::collections::VecDeque;
 
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::ast_ids::HasScopedAstId;
@@ -1375,10 +1376,20 @@ impl<'db> ClassType<'db> {
             .map(move |base_expr| definition_expression_ty(db, definition, base_expr))
     }
 
+    fn mro(&self, db: &'db dyn Db) -> Box<[ClassBase<'db>]> {
+        todo!()
+    }
+
     /// Returns the class member of this class named `name`.
     ///
     /// The member resolves to a member of the class itself or any of its bases.
     pub fn class_member(self, db: &'db dyn Db, name: &str) -> Type<'db> {
+        if name == "__mro__" {
+            return Type::Tuple(TupleType::new(
+                db,
+                self.mro(db).iter().copied().map(Type::from).collect(),
+            ));
+        }
         let member = self.own_class_member(db, name);
         if !member.is_unbound() {
             return member;
@@ -1403,6 +1414,131 @@ impl<'db> ClassType<'db> {
 
         Type::Unbound
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ClassBase<'db> {
+    Class(ClassType<'db>),
+    Any,
+    Todo,
+    Unknown,
+}
+
+impl<'db> ClassBase<'db> {
+    const fn is_dynamic(self) -> bool {
+        !matches!(self, ClassBase::Class(_))
+    }
+
+    fn mro(self, db: &'db dyn Db) -> Box<[ClassBase<'db>]> {
+        match self {
+            ClassBase::Class(class) => class.mro(db),
+            ClassBase::Any | ClassBase::Todo | ClassBase::Unknown => Box::new([
+                self,
+                ClassBase::Class(builtins_symbol_ty(db, "object").expect_class()),
+            ]),
+        }
+    }
+}
+
+impl<'db> From<Type<'db>> for ClassBase<'db> {
+    fn from(value: Type<'db>) -> Self {
+        match value {
+            Type::Any => ClassBase::Any,
+            Type::Todo => ClassBase::Todo,
+            Type::Unknown => ClassBase::Unknown,
+            Type::Class(class) => ClassBase::Class(class),
+            // TODO support `__mro_entries__`?? --Alex
+            Type::Instance(_) => ClassBase::Todo,
+            // These are all errors:
+            Type::Unbound
+            | Type::BooleanLiteral(_)
+            | Type::BytesLiteral(_)
+            | Type::Function(_)
+            | Type::IntLiteral(_)
+            | Type::LiteralString
+            | Type::Module(_)
+            | Type::Never
+            | Type::None
+            | Type::StringLiteral(_)
+            | Type::Tuple(_) => ClassBase::Unknown,
+            // It *might* be possible to support these,
+            // but it would make our logic much more complicated and less performant
+            // (we'd have to consider multiple possible mros for any given class definition).
+            // Neither mypy nor pyright supports these, so for now at least it seems reasonable
+            // to treat these as an error.
+            Type::Intersection(_) | Type::Union(_) => ClassBase::Unknown,
+        }
+    }
+}
+
+impl<'db> From<ClassBase<'db>> for Type<'db> {
+    fn from(value: ClassBase<'db>) -> Self {
+        match value {
+            ClassBase::Class(class) => Type::Class(class),
+            ClassBase::Any => Type::Any,
+            ClassBase::Todo => Type::Todo,
+            ClassBase::Unknown => Type::Unknown,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Default)]
+struct Mro<'db>(VecDeque<ClassType<'db>>);
+
+impl<'db> Mro<'db> {
+    fn push(&mut self, element: ClassType<'db>) {
+        self.0.push_back(element);
+    }
+
+    fn into_deque(self) -> VecDeque<ClassType<'db>> {
+        self.0
+    }
+}
+
+fn c3_merge<'db>(mut seqs: Vec<VecDeque<ClassType<'db>>>) -> Option<Mro<'db>> {
+    let mut mro = Mro::default();
+
+    loop {
+        seqs.retain(|seq| !seq.is_empty());
+
+        if seqs.is_empty() {
+            return Some(mro);
+        }
+
+        let mut candidate = None;
+
+        for seq in &seqs {
+            candidate = Some(seq[0]);
+
+            let not_head = seqs
+                .iter()
+                .any(|seq| seq.iter().take(1).any(|class| Some(*class) == candidate));
+
+            if not_head {
+                candidate = None;
+            } else {
+                break;
+            }
+        }
+
+        let candidate = candidate?;
+        mro.push(candidate);
+
+        for seq in seqs.iter_mut() {
+            if seq[0] == candidate {
+                seq.pop_front();
+            }
+        }
+    }
+}
+
+fn static_mro<'db>(db: &'db dyn Db, class: ClassType<'db>) -> Option<Mro<'db>> {
+    let mut seqs = vec![VecDeque::from([class])];
+    for base in class.bases(db) {
+        seqs.push(static_mro(db, base.expect_class())?.into_deque());
+    }
+    seqs.push(class.bases(db).map(Type::expect_class).collect());
+    c3_merge(seqs)
 }
 
 #[salsa::interned]
