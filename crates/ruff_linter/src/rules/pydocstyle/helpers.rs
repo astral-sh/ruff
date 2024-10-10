@@ -6,10 +6,12 @@ use ruff_python_trivia::Cursor;
 use ruff_source_file::{Line, UniversalNewlines};
 use ruff_text_size::{TextRange, TextSize};
 
+use crate::checkers::ast::Checker;
 use crate::docstrings::sections::{SectionContexts, SectionKind};
 use crate::docstrings::styles::SectionStyle;
 use crate::docstrings::Docstring;
 use crate::rules::pydocstyle::settings::{Convention, Settings};
+use crate::warn_user_once;
 
 /// Return the index of the first logical line in a string.
 pub(super) fn logical_line(content: &str) -> Option<usize> {
@@ -73,6 +75,7 @@ pub(crate) fn should_ignore_definition(
 pub(crate) fn get_section_contexts<'a>(
     docstring: &'a Docstring<'a>,
     convention: Option<Convention>,
+    checker: &mut Checker,
 ) -> SectionContexts<'a> {
     match convention {
         Some(Convention::Google) => {
@@ -81,7 +84,14 @@ pub(crate) fn get_section_contexts<'a>(
         Some(Convention::Numpy) => {
             return SectionContexts::from_docstring(docstring, SectionStyle::Numpy);
         }
-        Some(Convention::Pep257) | None => {
+        Some(Convention::Sphinx) if checker.settings.preview.is_enabled() => {
+            return SectionContexts::from_docstring(docstring, SectionStyle::Sphinx);
+        }
+        Some(Convention::Pep257 | Convention::Sphinx) | None => {
+            if matches!(convention, Some(Convention::Sphinx)) {
+                warn_user_once!("Sphinx support is currently in preview. Setting convention = \"sphinx\" will be ignored.");
+            }
+
             // There are some overlapping section names, between the Google and NumPy conventions
             // (e.g., "Returns", "Raises"). Break ties by checking for the presence of some of the
             // section names that are unique to each convention.

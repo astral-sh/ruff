@@ -1,0 +1,68 @@
+---
+source: crates/ruff_linter/src/rules/pydoclint/mod.rs
+---
+DOC402_sphinx.py:9:5: DOC402 `yield` is not documented in docstring
+  |
+7 |     :type num: int
+8 |     """
+9 |     yield 'test'
+  |     ^^^^^^^^^^^^ DOC402
+  |
+  = help: Add a "Yields" section to the docstring
+
+DOC402_sphinx.py:48:9: DOC402 `yield` is not documented in docstring
+   |
+46 |         :type num: int
+47 |         """
+48 |         yield 'test'
+   |         ^^^^^^^^^^^^ DOC402
+   |
+   = help: Add a "Yields" section to the docstring
+
+DOC402_sphinx.py:75:5: DOC402 `yield` is not documented in docstring
+   |
+73 |     Do something
+74 |     """
+75 |     yield None
+   |     ^^^^^^^^^^ DOC402
+76 |     yield 1
+   |
+   = help: Add a "Yields" section to the docstring
+
+DOC402_sphinx.py:84:5: DOC402 `yield` is not documented in docstring
+   |
+82 |     Do something
+83 |     """
+84 |     yield None
+   |     ^^^^^^^^^^ DOC402
+   |
+   = help: Add a "Yields" section to the docstring
+
+DOC402_sphinx.py:108:5: DOC402 `yield` is not documented in docstring
+    |
+106 |     Do something
+107 |     """
+108 |     yield None
+    |     ^^^^^^^^^^ DOC402
+109 |     yield 1
+    |
+    = help: Add a "Yields" section to the docstring
+
+DOC402_sphinx.py:117:5: DOC402 `yield` is not documented in docstring
+    |
+115 |     Do something
+116 |     """
+117 |     yield 1
+    |     ^^^^^^^ DOC402
+118 |     yield
+    |
+    = help: Add a "Yields" section to the docstring
+
+DOC402_sphinx.py:126:5: DOC402 `yield` is not documented in docstring
+    |
+124 |     Do something
+125 |     """
+126 |     yield
+    |     ^^^^^ DOC402
+    |
+    = help: Add a "Yields" section to the docstring

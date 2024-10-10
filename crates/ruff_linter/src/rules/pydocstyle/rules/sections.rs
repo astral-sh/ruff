@@ -1330,9 +1330,11 @@ pub(crate) fn sections(
     match convention {
         Some(Convention::Google) => parse_google_sections(checker, docstring, section_contexts),
         Some(Convention::Numpy) => parse_numpy_sections(checker, docstring, section_contexts),
+        Some(Convention::Sphinx) => parse_sphinx_sections(checker, docstring, section_contexts),
         Some(Convention::Pep257) | None => match section_contexts.style() {
             SectionStyle::Google => parse_google_sections(checker, docstring, section_contexts),
             SectionStyle::Numpy => parse_numpy_sections(checker, docstring, section_contexts),
+            SectionStyle::Sphinx => parse_sphinx_sections(checker, docstring, section_contexts),
         },
     }
 }
@@ -1631,7 +1633,7 @@ fn blanks_and_section_underline(
 
             checker.diagnostics.push(diagnostic);
         }
-        if checker.enabled(Rule::EmptyDocstringSection) {
+        if !style.is_sphinx() && checker.enabled(Rule::EmptyDocstringSection) {
             checker.diagnostics.push(Diagnostic::new(
                 EmptyDocstringSection {
                     name: context.section_name().to_string(),
@@ -1649,7 +1651,7 @@ fn common_section(
     next: Option<&SectionContext>,
     style: SectionStyle,
 ) {
-    if checker.enabled(Rule::CapitalizeSectionName) {
+    if !style.is_sphinx() && checker.enabled(Rule::CapitalizeSectionName) {
         let capitalized_section_name = context.kind().as_str();
         if context.section_name() != capitalized_section_name {
             let section_range = context.section_name_range();
@@ -2002,6 +2004,23 @@ fn google_section(
             )));
             checker.diagnostics.push(diagnostic);
         }
+    }
+}
+
+fn parse_sphinx_sections(
+    checker: &mut Checker,
+    docstring: &Docstring,
+    section_contexts: &SectionContexts,
+) {
+    let mut iterator = section_contexts.iter().peekable();
+    while let Some(context) = iterator.next() {
+        common_section(
+            checker,
+            docstring,
+            &context,
+            iterator.peek(),
+            SectionStyle::Sphinx,
+        );
     }
 }
 
