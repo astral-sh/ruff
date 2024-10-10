@@ -41,7 +41,7 @@ use crate::module_name::ModuleName;
 use crate::module_resolver::{file_to_module, resolve_module};
 use crate::semantic_index::ast_ids::{HasScopedAstId, HasScopedUseId, ScopedExpressionId};
 use crate::semantic_index::definition::{
-    Definition, DefinitionKind, DefinitionNodeKey, ExceptHandlerDefinitionKind,
+    AssignmentKind, Definition, DefinitionKind, DefinitionNodeKey, ExceptHandlerDefinitionKind,
 };
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::semantic_index;
@@ -415,7 +415,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             DefinitionKind::Assignment(assignment) => {
                 self.infer_assignment_definition(
                     assignment.target(),
-                    assignment.assignment(),
+                    assignment.value(),
+                    assignment.variable(),
+                    assignment.kind(),
                     definition,
                 );
             }
@@ -1147,18 +1149,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ast::StmtAssign {
             range: _,
             targets,
-            value,
+            value: _,
         } = assignment;
 
         for target in targets {
             if let ast::Expr::Name(name) = target {
                 self.infer_definition(name);
             } else {
-                // TODO infer definitions in unpacking assignment. When we do, this duplication of
-                // the "get `Expression`, call `infer_expression_types` on it, `self.extend`" dance
-                // will be removed; it'll all happen in `infer_assignment_definition` instead.
-                let expression = self.index.expression(value.as_ref());
-                self.extend(infer_expression_types(self.db, expression));
                 self.infer_expression(target);
             }
         }
@@ -1166,18 +1163,82 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_assignment_definition(
         &mut self,
-        target: &ast::ExprName,
-        assignment: &ast::StmtAssign,
+        target: &ast::Expr,
+        value: &ast::Expr,
+        variable: &ast::ExprName,
+        kind: AssignmentKind,
         definition: Definition<'db>,
     ) {
-        let expression = self.index.expression(assignment.value.as_ref());
+        let expression = self.index.expression(value);
         let result = infer_expression_types(self.db, expression);
         self.extend(result);
-        let value_ty = self.expression_ty(&assignment.value);
-        self.add_binding(assignment.into(), definition, value_ty);
+
+        let value_ty = self.expression_ty(value);
+
+        let target_ty = match (value_ty, kind) {
+            (
+                Type::Tuple(_) | Type::StringLiteral(_) | Type::LiteralString,
+                AssignmentKind::Sequence,
+            ) => self.infer_sequence_unpacking(target, value_ty, variable),
+            (_, AssignmentKind::Sequence) => value_ty
+                .iterate(self.db)
+                .unwrap_with_diagnostic(value.into(), self),
+            _ => value_ty,
+        };
+
+        self.add_binding(variable.into(), definition, target_ty);
         self.types
             .expressions
-            .insert(target.scoped_ast_id(self.db, self.scope), value_ty);
+            .insert(variable.scoped_ast_id(self.db, self.scope), target_ty);
+    }
+
+    fn infer_sequence_unpacking(
+        &mut self,
+        target: &ast::Expr,
+        value_ty: Type<'db>,
+        variable: &ast::ExprName,
+    ) -> Type<'db> {
+        fn inner<'db>(
+            builder: &mut TypeInferenceBuilder<'db>,
+            target: &ast::Expr,
+            value_ty: Type<'db>,
+            variable: &ast::ExprName,
+        ) -> Option<Type<'db>> {
+            match target {
+                // TODO: Handle other possible target expression like attribute, subscript,
+                // and starred.
+                ast::Expr::Name(name) if name == variable => {
+                    return Some(value_ty);
+                }
+                ast::Expr::List(ast::ExprList { elts, .. })
+                | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                    for (index, element) in elts.iter().enumerate() {
+                        let element_ty = match value_ty {
+                            Type::Tuple(tuple_ty) => {
+                                tuple_ty.get(builder.db, index).unwrap_or(Type::Unknown)
+                            }
+                            Type::StringLiteral(string_literal_ty) => {
+                                let string_length = string_literal_ty.len(builder.db);
+                                if index < string_length {
+                                    Type::LiteralString
+                                } else {
+                                    Type::Unknown
+                                }
+                            }
+                            Type::LiteralString => Type::LiteralString,
+                            _ => Type::Unknown,
+                        };
+                        if let Some(ty) = inner(builder, element, element_ty, variable) {
+                            return Some(ty);
+                        }
+                    }
+                }
+                _ => {}
+            }
+            None
+        }
+
+        inner(self, target, value_ty, variable).unwrap_or(Type::Unknown)
     }
 
     fn infer_annotated_assignment_statement(&mut self, assignment: &ast::StmtAnnAssign) {

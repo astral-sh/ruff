@@ -28,8 +28,8 @@ use crate::Db;
 
 use super::constraint::{Constraint, PatternConstraint};
 use super::definition::{
-    DefinitionCategory, ExceptHandlerDefinitionNodeRef, MatchPatternDefinitionNodeRef,
-    WithItemDefinitionNodeRef,
+    AssignmentKind, DefinitionCategory, ExceptHandlerDefinitionNodeRef,
+    MatchPatternDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
 
 pub(super) struct SemanticIndexBuilder<'db> {
@@ -566,8 +566,21 @@ where
                 debug_assert!(self.current_assignment.is_none());
                 self.visit_expr(&node.value);
                 self.add_standalone_expression(&node.value);
-                self.current_assignment = Some(node.into());
                 for target in &node.targets {
+                    let kind = match target {
+                        ast::Expr::List(_) | ast::Expr::Tuple(_) => AssignmentKind::Sequence,
+                        ast::Expr::Name(_)
+                        | ast::Expr::Starred(_)
+                        | ast::Expr::Attribute(_)
+                        | ast::Expr::Subscript(_) => AssignmentKind::Other,
+                        // TODO: is this a good default for an error recovery case like `1 = 2`?
+                        _ => continue,
+                    };
+                    self.current_assignment = Some(CurrentAssignment::Assign {
+                        target,
+                        value: &node.value,
+                        kind,
+                    });
                     self.visit_expr(target);
                 }
                 self.current_assignment = None;
@@ -815,12 +828,18 @@ where
                 let symbol = self.add_symbol(id.clone());
                 if is_definition {
                     match self.current_assignment {
-                        Some(CurrentAssignment::Assign(assignment)) => {
+                        Some(CurrentAssignment::Assign {
+                            target,
+                            value,
+                            kind,
+                        }) => {
                             self.add_definition(
                                 symbol,
                                 AssignmentDefinitionNodeRef {
-                                    assignment,
-                                    target: name_node,
+                                    target,
+                                    value,
+                                    variable: name_node,
+                                    kind,
                                 },
                             );
                         }
@@ -1045,7 +1064,11 @@ where
 
 #[derive(Copy, Clone, Debug)]
 enum CurrentAssignment<'a> {
-    Assign(&'a ast::StmtAssign),
+    Assign {
+        target: &'a ast::Expr,
+        value: &'a ast::Expr,
+        kind: AssignmentKind,
+    },
     AnnAssign(&'a ast::StmtAnnAssign),
     AugAssign(&'a ast::StmtAugAssign),
     For(&'a ast::StmtFor),
@@ -1055,12 +1078,6 @@ enum CurrentAssignment<'a> {
         first: bool,
     },
     WithItem(&'a ast::WithItem),
-}
-
-impl<'a> From<&'a ast::StmtAssign> for CurrentAssignment<'a> {
-    fn from(value: &'a ast::StmtAssign) -> Self {
-        Self::Assign(value)
-    }
 }
 
 impl<'a> From<&'a ast::StmtAnnAssign> for CurrentAssignment<'a> {
