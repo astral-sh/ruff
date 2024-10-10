@@ -576,13 +576,21 @@ where
             }
             ast::Stmt::AnnAssign(node) => {
                 debug_assert!(self.current_assignment.is_none());
-                self.visit_expr(&node.annotation);
-                if let Some(value) = &node.value {
-                    self.visit_expr(value);
+                let valid_target = matches!(
+                    *node.target,
+                    Expr::Attribute(_) | Expr::Subscript(_) | Expr::Name(_)
+                );
+                if valid_target {
+                    self.visit_expr(&node.annotation);
+                    if let Some(value) = &node.value {
+                        self.visit_expr(value);
+                    }
+                    self.current_assignment = Some(node.into());
+                    self.visit_expr(&node.target);
+                    self.current_assignment = None;
+                } else {
+                    tracing::warn!("Annotated assignment with invalid target received");
                 }
-                self.current_assignment = Some(node.into());
-                self.visit_expr(&node.target);
-                self.current_assignment = None;
             }
             ast::Stmt::AugAssign(
                 aug_assign @ ast::StmtAugAssign {
@@ -881,12 +889,17 @@ where
                 walk_expr(self, expr);
             }
             ast::Expr::Named(node) => {
-                debug_assert!(self.current_assignment.is_none());
-                // TODO walrus in comprehensions is implicitly nonlocal
-                self.visit_expr(&node.value);
-                self.current_assignment = Some(node.into());
-                self.visit_expr(&node.target);
-                self.current_assignment = None;
+                if self.current_assignment.is_some() {
+                    // This can happen if we have something like x = y := 2
+                    // which is invalid syntax but still is provided in the AST
+                    tracing::warn!("Current assignment is unexpectedly set");
+                } else {
+                    // TODO walrus in comprehensions is implicitly nonlocal
+                    self.visit_expr(&node.value);
+                    self.current_assignment = Some(node.into());
+                    self.visit_expr(&node.target);
+                    self.current_assignment = None;
+                }
             }
             ast::Expr::Lambda(lambda) => {
                 if let Some(parameters) = &lambda.parameters {
