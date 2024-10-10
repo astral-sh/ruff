@@ -606,7 +606,8 @@ E23.py:116:18: E231 [*] Missing whitespace after ':'
 115 | 
 116 | class PEP696Bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]:
     |                  ^ E231
-117 |     pass
+117 |     def pep_696_bad_method[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
+118 |         self,
     |
     = help: Add missing whitespace
 
@@ -616,9 +617,9 @@ E23.py:116:18: E231 [*] Missing whitespace after ':'
 115 115 | 
 116     |-class PEP696Bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]:
     116 |+class PEP696Bad[A: object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]:
-117 117 |     pass
-118 118 | 
-119 119 | class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
+117 117 |     def pep_696_bad_method[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
+118 118 |         self,
+119 119 |         x:A = "foo"[::-1],
 
 E23.py:116:40: E231 [*] Missing whitespace after ':'
     |
@@ -626,7 +627,8 @@ E23.py:116:40: E231 [*] Missing whitespace after ':'
 115 | 
 116 | class PEP696Bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]:
     |                                        ^ E231
-117 |     pass
+117 |     def pep_696_bad_method[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
+118 |         self,
     |
     = help: Add missing whitespace
 
@@ -636,9 +638,9 @@ E23.py:116:40: E231 [*] Missing whitespace after ':'
 115 115 | 
 116     |-class PEP696Bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]:
     116 |+class PEP696Bad[A:object="foo"[::-1], B: object =[[["foo", "bar"]]], C:object= bytes]:
-117 117 |     pass
-118 118 | 
-119 119 | class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
+117 117 |     def pep_696_bad_method[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
+118 118 |         self,
+119 119 |         x:A = "foo"[::-1],
 
 E23.py:116:70: E231 [*] Missing whitespace after ':'
     |
@@ -646,7 +648,8 @@ E23.py:116:70: E231 [*] Missing whitespace after ':'
 115 | 
 116 | class PEP696Bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]:
     |                                                                      ^ E231
-117 |     pass
+117 |     def pep_696_bad_method[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
+118 |         self,
     |
     = help: Add missing whitespace
 
@@ -656,126 +659,249 @@ E23.py:116:70: E231 [*] Missing whitespace after ':'
 115 115 | 
 116     |-class PEP696Bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]:
     116 |+class PEP696Bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C: object= bytes]:
-117 117 |     pass
-118 118 | 
-119 119 | class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
+117 117 |     def pep_696_bad_method[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
+118 118 |         self,
+119 119 |         x:A = "foo"[::-1],
 
-E23.py:119:32: E231 [*] Missing whitespace after ':'
+E23.py:117:29: E231 [*] Missing whitespace after ':'
     |
-117 |     pass
-118 | 
-119 | class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
+116 | class PEP696Bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]:
+117 |     def pep_696_bad_method[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
+    |                             ^ E231
+118 |         self,
+119 |         x:A = "foo"[::-1],
+    |
+    = help: Add missing whitespace
+
+ℹ Safe fix
+114 114 |     pass
+115 115 | 
+116 116 | class PEP696Bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]:
+117     |-    def pep_696_bad_method[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
+    117 |+    def pep_696_bad_method[A: object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
+118 118 |         self,
+119 119 |         x:A = "foo"[::-1],
+120 120 |         y:B = [[["foo", "bar"]]],
+
+E23.py:117:51: E231 [*] Missing whitespace after ':'
+    |
+116 | class PEP696Bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]:
+117 |     def pep_696_bad_method[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
+    |                                                   ^ E231
+118 |         self,
+119 |         x:A = "foo"[::-1],
+    |
+    = help: Add missing whitespace
+
+ℹ Safe fix
+114 114 |     pass
+115 115 | 
+116 116 | class PEP696Bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]:
+117     |-    def pep_696_bad_method[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
+    117 |+    def pep_696_bad_method[A:object="foo"[::-1], B: object =[[["foo", "bar"]]], C:object= bytes](
+118 118 |         self,
+119 119 |         x:A = "foo"[::-1],
+120 120 |         y:B = [[["foo", "bar"]]],
+
+E23.py:117:81: E231 [*] Missing whitespace after ':'
+    |
+116 | class PEP696Bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]:
+117 |     def pep_696_bad_method[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
+    |                                                                                 ^ E231
+118 |         self,
+119 |         x:A = "foo"[::-1],
+    |
+    = help: Add missing whitespace
+
+ℹ Safe fix
+114 114 |     pass
+115 115 | 
+116 116 | class PEP696Bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]:
+117     |-    def pep_696_bad_method[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
+    117 |+    def pep_696_bad_method[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C: object= bytes](
+118 118 |         self,
+119 119 |         x:A = "foo"[::-1],
+120 120 |         y:B = [[["foo", "bar"]]],
+
+E23.py:119:10: E231 [*] Missing whitespace after ':'
+    |
+117 |     def pep_696_bad_method[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
+118 |         self,
+119 |         x:A = "foo"[::-1],
+    |          ^ E231
+120 |         y:B = [[["foo", "bar"]]],
+121 |         z:object = "fooo",
+    |
+    = help: Add missing whitespace
+
+ℹ Safe fix
+116 116 | class PEP696Bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]:
+117 117 |     def pep_696_bad_method[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
+118 118 |         self,
+119     |-        x:A = "foo"[::-1],
+    119 |+        x: A = "foo"[::-1],
+120 120 |         y:B = [[["foo", "bar"]]],
+121 121 |         z:object = "fooo",
+122 122 |     ):
+
+E23.py:120:10: E231 [*] Missing whitespace after ':'
+    |
+118 |         self,
+119 |         x:A = "foo"[::-1],
+120 |         y:B = [[["foo", "bar"]]],
+    |          ^ E231
+121 |         z:object = "fooo",
+122 |     ):
+    |
+    = help: Add missing whitespace
+
+ℹ Safe fix
+117 117 |     def pep_696_bad_method[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
+118 118 |         self,
+119 119 |         x:A = "foo"[::-1],
+120     |-        y:B = [[["foo", "bar"]]],
+    120 |+        y: B = [[["foo", "bar"]]],
+121 121 |         z:object = "fooo",
+122 122 |     ):
+123 123 |         pass
+
+E23.py:121:10: E231 [*] Missing whitespace after ':'
+    |
+119 |         x:A = "foo"[::-1],
+120 |         y:B = [[["foo", "bar"]]],
+121 |         z:object = "fooo",
+    |          ^ E231
+122 |     ):
+123 |         pass
+    |
+    = help: Add missing whitespace
+
+ℹ Safe fix
+118 118 |         self,
+119 119 |         x:A = "foo"[::-1],
+120 120 |         y:B = [[["foo", "bar"]]],
+121     |-        z:object = "fooo",
+    121 |+        z: object = "fooo",
+122 122 |     ):
+123 123 |         pass
+124 124 | 
+
+E23.py:125:32: E231 [*] Missing whitespace after ':'
+    |
+123 |         pass
+124 | 
+125 | class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
     |                                ^ E231
-120 |     pass
+126 |     class IndentedPEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
+127 |         pass
     |
     = help: Add missing whitespace
 
 ℹ Safe fix
-116 116 | class PEP696Bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]:
-117 117 |     pass
-118 118 | 
-119     |-class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
-    119 |+class PEP696BadWithEmptyBases[A: object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
-120 120 |     pass
-121 121 | 
-122 122 | class PEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
+122 122 |     ):
+123 123 |         pass
+124 124 | 
+125     |-class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
+    125 |+class PEP696BadWithEmptyBases[A: object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
+126 126 |     class IndentedPEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
+127 127 |         pass
+128 128 | 
 
-E23.py:119:54: E231 [*] Missing whitespace after ':'
+E23.py:125:54: E231 [*] Missing whitespace after ':'
     |
-117 |     pass
-118 | 
-119 | class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
+123 |         pass
+124 | 
+125 | class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
     |                                                      ^ E231
-120 |     pass
+126 |     class IndentedPEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
+127 |         pass
     |
     = help: Add missing whitespace
 
 ℹ Safe fix
-116 116 | class PEP696Bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]:
-117 117 |     pass
-118 118 | 
-119     |-class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
-    119 |+class PEP696BadWithEmptyBases[A:object="foo"[::-1], B: object =[[["foo", "bar"]]], C:object= bytes]():
-120 120 |     pass
-121 121 | 
-122 122 | class PEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
+122 122 |     ):
+123 123 |         pass
+124 124 | 
+125     |-class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
+    125 |+class PEP696BadWithEmptyBases[A:object="foo"[::-1], B: object =[[["foo", "bar"]]], C:object= bytes]():
+126 126 |     class IndentedPEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
+127 127 |         pass
+128 128 | 
 
-E23.py:119:84: E231 [*] Missing whitespace after ':'
+E23.py:125:84: E231 [*] Missing whitespace after ':'
     |
-117 |     pass
-118 | 
-119 | class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
+123 |         pass
+124 | 
+125 | class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
     |                                                                                    ^ E231
-120 |     pass
+126 |     class IndentedPEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
+127 |         pass
     |
     = help: Add missing whitespace
 
 ℹ Safe fix
-116 116 | class PEP696Bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]:
-117 117 |     pass
-118 118 | 
-119     |-class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
-    119 |+class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C: object= bytes]():
-120 120 |     pass
-121 121 | 
-122 122 | class PEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
-
-E23.py:122:35: E231 [*] Missing whitespace after ':'
-    |
-120 |     pass
-121 | 
-122 | class PEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
-    |                                   ^ E231
-123 |     pass
-    |
-    = help: Add missing whitespace
-
-ℹ Safe fix
-119 119 | class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
-120 120 |     pass
-121 121 | 
-122     |-class PEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
-    122 |+class PEP696BadWithNonEmptyBases[A: object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
-123 123 |     pass
+122 122 |     ):
+123 123 |         pass
 124 124 | 
-125 125 | # Should be no E231 errors on any of these:
+125     |-class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
+    125 |+class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C: object= bytes]():
+126 126 |     class IndentedPEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
+127 127 |         pass
+128 128 | 
 
-E23.py:122:57: E231 [*] Missing whitespace after ':'
+E23.py:126:47: E231 [*] Missing whitespace after ':'
     |
-120 |     pass
-121 | 
-122 | class PEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
-    |                                                         ^ E231
-123 |     pass
-    |
-    = help: Add missing whitespace
-
-ℹ Safe fix
-119 119 | class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
-120 120 |     pass
-121 121 | 
-122     |-class PEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
-    122 |+class PEP696BadWithNonEmptyBases[A:object="foo"[::-1], B: object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
-123 123 |     pass
-124 124 | 
-125 125 | # Should be no E231 errors on any of these:
-
-E23.py:122:87: E231 [*] Missing whitespace after ':'
-    |
-120 |     pass
-121 | 
-122 | class PEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
-    |                                                                                       ^ E231
-123 |     pass
+125 | class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
+126 |     class IndentedPEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
+    |                                               ^ E231
+127 |         pass
     |
     = help: Add missing whitespace
 
 ℹ Safe fix
-119 119 | class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
-120 120 |     pass
-121 121 | 
-122     |-class PEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
-    122 |+class PEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C: object= bytes](object, something_dynamic[x::-1]):
-123 123 |     pass
+123 123 |         pass
 124 124 | 
-125 125 | # Should be no E231 errors on any of these:
+125 125 | class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
+126     |-    class IndentedPEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
+    126 |+    class IndentedPEP696BadWithNonEmptyBases[A: object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
+127 127 |         pass
+128 128 | 
+129 129 | # Should be no E231 errors on any of these:
+
+E23.py:126:69: E231 [*] Missing whitespace after ':'
+    |
+125 | class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
+126 |     class IndentedPEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
+    |                                                                     ^ E231
+127 |         pass
+    |
+    = help: Add missing whitespace
+
+ℹ Safe fix
+123 123 |         pass
+124 124 | 
+125 125 | class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
+126     |-    class IndentedPEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
+    126 |+    class IndentedPEP696BadWithNonEmptyBases[A:object="foo"[::-1], B: object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
+127 127 |         pass
+128 128 | 
+129 129 | # Should be no E231 errors on any of these:
+
+E23.py:126:99: E231 [*] Missing whitespace after ':'
+    |
+125 | class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
+126 |     class IndentedPEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
+    |                                                                                                   ^ E231
+127 |         pass
+    |
+    = help: Add missing whitespace
+
+ℹ Safe fix
+123 123 |         pass
+124 124 | 
+125 125 | class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
+126     |-    class IndentedPEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
+    126 |+    class IndentedPEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C: object= bytes](object, something_dynamic[x::-1]):
+127 127 |         pass
+128 128 | 
+129 129 | # Should be no E231 errors on any of these:

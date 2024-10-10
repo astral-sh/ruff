@@ -4,9 +4,7 @@ use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::logical_lines::LogicalLinesContext;
-use crate::rules::pycodestyle::rules::logical_lines::{
-    LogicalLine, LogicalLineToken, TypeParamsState,
-};
+use crate::rules::pycodestyle::rules::logical_lines::{DefinitionState, LogicalLine};
 
 /// ## What it does
 /// Checks for missing whitespace around the equals sign in an unannotated
@@ -86,18 +84,6 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundParameterEquals {
     }
 }
 
-fn is_in_def(tokens: &[LogicalLineToken]) -> bool {
-    for token in tokens {
-        match token.kind() {
-            TokenKind::Async | TokenKind::Indent | TokenKind::Dedent => continue,
-            TokenKind::Def => return true,
-            _ => return false,
-        }
-    }
-
-    false
-}
-
 /// E251, E252
 pub(crate) fn whitespace_around_named_parameter_equals(
     line: &LogicalLine,
@@ -108,13 +94,12 @@ pub(crate) fn whitespace_around_named_parameter_equals(
     let mut annotated_func_arg = false;
     let mut prev_end = TextSize::default();
 
-    let mut type_params_state = TypeParamsState::new();
-    let in_def = is_in_def(line.tokens());
+    let mut definition_state = DefinitionState::from_tokens(line.tokens());
     let mut iter = line.tokens().iter().peekable();
 
     while let Some(token) = iter.next() {
         let kind = token.kind();
-        type_params_state.visit_token_kind(kind);
+        definition_state.visit_token_kind(kind);
         match kind {
             TokenKind::NonLogicalNewline => continue,
             TokenKind::FStringStart => fstrings += 1,
@@ -128,16 +113,16 @@ pub(crate) fn whitespace_around_named_parameter_equals(
                     annotated_func_arg = false;
                 }
             }
-            TokenKind::Colon if parens == 1 && in_def => {
+            TokenKind::Colon if parens == 1 && definition_state.in_function_definition() => {
                 annotated_func_arg = true;
             }
             TokenKind::Comma if parens == 1 => {
                 annotated_func_arg = false;
             }
             TokenKind::Equal
-                if type_params_state.in_type_params() || (parens > 0 && fstrings == 0) =>
+                if definition_state.in_type_params() || (parens > 0 && fstrings == 0) =>
             {
-                if type_params_state.in_type_params() || (annotated_func_arg && parens == 1) {
+                if definition_state.in_type_params() || (annotated_func_arg && parens == 1) {
                     let start = token.start();
                     if start == prev_end && prev_end != TextSize::new(0) {
                         let mut diagnostic =

@@ -114,13 +114,17 @@ def pep_696_bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= by
     pass
 
 class PEP696Bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]:
-    pass
+    def pep_696_bad_method[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
+        self,
+        x:A = "foo"[::-1],
+        y:B = [[["foo", "bar"]]],
+        z:object = "fooo",
+    ):
+        pass
 
 class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
-    pass
-
-class PEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
-    pass
+    class IndentedPEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
+        pass
 
 # Should be no E231 errors on any of these:
 def pep_696_good[A: object="foo"[::-1], B: object =[[["foo", "bar"]]], C: object= bytes](

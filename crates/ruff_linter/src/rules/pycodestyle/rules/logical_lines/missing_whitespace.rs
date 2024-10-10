@@ -6,7 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::logical_lines::LogicalLinesContext;
 
-use super::{LogicalLine, TypeParamsState};
+use super::{DefinitionState, LogicalLine};
 
 /// ## What it does
 /// Checks for missing whitespace after `,`, `;`, and `:`.
@@ -42,13 +42,13 @@ impl AlwaysFixableViolation for MissingWhitespace {
 /// E231
 pub(crate) fn missing_whitespace(line: &LogicalLine, context: &mut LogicalLinesContext) {
     let mut fstrings = 0u32;
-    let mut type_params_state = TypeParamsState::new();
+    let mut definition_state = DefinitionState::from_tokens(line.tokens());
     let mut brackets = Vec::new();
     let mut iter = line.tokens().iter().peekable();
 
     while let Some(token) = iter.next() {
         let kind = token.kind();
-        type_params_state.visit_token_kind(kind);
+        definition_state.visit_token_kind(kind);
         match kind {
             TokenKind::FStringStart => fstrings += 1,
             TokenKind::FStringEnd => fstrings = fstrings.saturating_sub(1),
@@ -88,7 +88,7 @@ pub(crate) fn missing_whitespace(line: &LogicalLine, context: &mut LogicalLinesC
                         match (kind, next_token.kind()) {
                             (TokenKind::Colon, _)
                                 if matches!(brackets.last(), Some(TokenKind::Lsqb))
-                                    && !(type_params_state.in_type_params()
+                                    && !(definition_state.in_type_params()
                                         && brackets.len() == 1) =>
                             {
                                 continue; // Slice syntax, no space required

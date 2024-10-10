@@ -73,4 +73,5 @@ def pep_696_good[A = int, B: object = str, C:object = memoryview]():
     pass
 
 class PEP696Good[A = int, B: object = str, C:object = memoryview]:
-    pass
+    def pep_696_good_method[A = int, B: object = str, C:object = memoryview](self):
+        pass
