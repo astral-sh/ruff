@@ -114,12 +114,18 @@ fn definition_expression_ty<'db>(
     definition: Definition<'db>,
     expression: &ast::Expr,
 ) -> Type<'db> {
-    let expr_id = expression.scoped_ast_id(db, definition.scope(db));
-    let inference = infer_definition_types(db, definition);
-    if let Some(ty) = inference.try_expression_ty(expr_id) {
-        ty
+    if let Some(expr_id) = expression.scoped_ast_id(db, definition.scope(db)) {
+        let inference = infer_definition_types(db, definition);
+        if let Some(ty) = inference.try_expression_ty(expr_id) {
+            ty
+        } else {
+            infer_deferred_types(db, definition)
+                .try_expression_ty(expr_id)
+                .unwrap_or(Type::Unknown)
+        }
     } else {
-        infer_deferred_types(db, definition).expression_ty(expr_id)
+        tracing::warn!("Can't find expression ID");
+        Type::Unknown
     }
 }
 

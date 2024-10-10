@@ -33,12 +33,12 @@ pub(crate) struct AstIds {
 }
 
 impl AstIds {
-    fn expression_id(&self, key: impl Into<ExpressionNodeKey>) -> ScopedExpressionId {
-        self.expressions_map[&key.into()]
+    fn expression_id(&self, key: impl Into<ExpressionNodeKey>) -> Option<ScopedExpressionId> {
+        self.expressions_map.get(&key.into()).copied()
     }
 
-    fn use_id(&self, key: impl Into<ExpressionNodeKey>) -> ScopedUseId {
-        self.uses_map[&key.into()]
+    fn use_id(&self, key: impl Into<ExpressionNodeKey>) -> Option<ScopedUseId> {
+        self.uses_map.get(&key.into()).copied()
     }
 }
 
@@ -51,7 +51,7 @@ pub trait HasScopedUseId {
     type Id: Copy;
 
     /// Returns the ID that uniquely identifies the use in `scope`.
-    fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> Self::Id;
+    fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> Option<Self::Id>;
 }
 
 /// Uniquely identifies a use of a name in a [`crate::semantic_index::symbol::FileScopeId`].
@@ -61,7 +61,7 @@ pub struct ScopedUseId;
 impl HasScopedUseId for ast::ExprName {
     type Id = ScopedUseId;
 
-    fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> Self::Id {
+    fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> Option<Self::Id> {
         let expression_ref = ExpressionRef::from(self);
         expression_ref.scoped_use_id(db, scope)
     }
@@ -70,7 +70,7 @@ impl HasScopedUseId for ast::ExprName {
 impl HasScopedUseId for ast::ExpressionRef<'_> {
     type Id = ScopedUseId;
 
-    fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> Self::Id {
+    fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> Option<Self::Id> {
         let ast_ids = ast_ids(db, scope);
         ast_ids.use_id(*self)
     }
@@ -81,7 +81,7 @@ pub trait HasScopedAstId {
     type Id: Copy;
 
     /// Returns the ID that uniquely identifies the node in `scope`.
-    fn scoped_ast_id(&self, db: &dyn Db, scope: ScopeId) -> Self::Id;
+    fn scoped_ast_id(&self, db: &dyn Db, scope: ScopeId) -> Option<Self::Id>;
 }
 
 /// Uniquely identifies an [`ast::Expr`] in a [`crate::semantic_index::symbol::FileScopeId`].
@@ -93,7 +93,7 @@ macro_rules! impl_has_scoped_expression_id {
         impl HasScopedAstId for $ty {
             type Id = ScopedExpressionId;
 
-            fn scoped_ast_id(&self, db: &dyn Db, scope: ScopeId) -> Self::Id {
+            fn scoped_ast_id(&self, db: &dyn Db, scope: ScopeId) -> Option<Self::Id> {
                 let expression_ref = ExpressionRef::from(self);
                 expression_ref.scoped_ast_id(db, scope)
             }
@@ -138,7 +138,7 @@ impl_has_scoped_expression_id!(ast::Expr);
 impl HasScopedAstId for ast::ExpressionRef<'_> {
     type Id = ScopedExpressionId;
 
-    fn scoped_ast_id(&self, db: &dyn Db, scope: ScopeId) -> Self::Id {
+    fn scoped_ast_id(&self, db: &dyn Db, scope: ScopeId) -> Option<Self::Id> {
         let ast_ids = ast_ids(db, scope);
         ast_ids.expression_id(*self)
     }

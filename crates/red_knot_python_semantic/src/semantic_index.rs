@@ -198,8 +198,10 @@ impl<'db> SemanticIndex<'db> {
     pub(crate) fn definition(
         &self,
         definition_key: impl Into<DefinitionNodeKey>,
-    ) -> Definition<'db> {
-        self.definitions_by_node[&definition_key.into()]
+    ) -> Option<Definition<'db>> {
+        self.definitions_by_node
+            .get(&definition_key.into())
+            .copied()
     }
 
     /// Returns the [`Expression`] ingredient for an expression node.

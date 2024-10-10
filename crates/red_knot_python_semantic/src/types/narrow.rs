@@ -154,13 +154,22 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             let scope = self.scope();
             let inference = infer_expression_types(self.db, expression);
             for (op, comparator) in std::iter::zip(&**ops, &**comparators) {
-                let comp_ty = inference.expression_ty(comparator.scoped_ast_id(self.db, scope));
-                if matches!(op, ast::CmpOp::IsNot) {
-                    let ty = IntersectionBuilder::new(self.db)
-                        .add_negative(comp_ty)
-                        .build();
-                    self.constraints.insert(symbol, ty);
-                };
+                match comparator.scoped_ast_id(self.db, scope) {
+                    Some(comparator_id) => {
+                        let comp_ty = inference
+                            .try_expression_ty(comparator_id)
+                            .unwrap_or(Type::Unknown);
+                        if matches!(op, ast::CmpOp::IsNot) {
+                            let ty = IntersectionBuilder::new(self.db)
+                                .add_negative(comp_ty)
+                                .build();
+                            self.constraints.insert(symbol, ty);
+                        };
+                    }
+                    None => {
+                        tracing::warn!("Can't find ID for comparator");
+                    }
+                }
                 // TODO other comparison types
             }
         }
