@@ -64,14 +64,15 @@ match any diagnostic. The matching can be narrowed in three ways:
 
 - `# error: [invalid-assignment]` requires that the matched diagnostic have the rule code
     `invalid-assignment`. (The square brackets are required.)
-- `# error: "Some text"` requires that the matched diagnostic's full message contain the text `Some text`. (The double quotes are required in the assertion comment; they are not part of the matched
-    text.)
+- `# error: "Some text"` requires that the diagnostic's full message contain the text `Some text`.
+    (The double quotes are required in the assertion comment; they are not part of the matched text.)
 - `# error: 8 [rule-code]` or `# error: 8 "Some text"` additionally requires that the matched
     diagnostic's text span begins on column 8 (one-indexed) of this line.
 
 Assertions must contain either a rule code or a contains-text, or both, and may optionally also
-include a column. They must come in order: first column, if present; then rule code, if present;
-then contains-text, if present. For example, an assertion using all three would look like `# error: 8 [invalid-assignment] "Some text"`.
+include a column number. They must come in order: first column, if present; then rule code, if
+present; then contains-text, if present. For example, an assertion using all three would look like
+`# error: 8 [invalid-assignment] "Some text"`.
 
 Error assertions in tests intended to test type checker semantics should primarily use rule-code
 assertions, with occasional contains-text assertions where needed to disambiguate.
@@ -158,9 +159,9 @@ This test suite contains two tests, one named "Same-file invalid assignment" and
 "Cross-file invalid assignment". The first test involves only a single embedded file, and the second
 test involves two embedded files.
 
-The tests are run independently, in independent in-memory file systems and with new red-knot [Salsa](https://github.com/salsa-rs/salsa)
-databases. This means that each is a from-scratch run of the type checker, with no data persisting from any
-previous test.
+The tests are run independently, in independent in-memory file systems and with new red-knot
+[Salsa](https://github.com/salsa-rs/salsa) databases. This means that each is a from-scratch run of
+the type checker, with no data persisting from any previous test.
 
 Due to `cargo test` limitations, an entire test suite (Markdown file) is run as a single Rust test,
 so it's not possible to select individual tests within it to run.
@@ -276,10 +277,10 @@ def f(x: Any):  # error: [use-of-any]
 ```
 ````
 
-It should be possible to include a TOML-fenced code block in a single test (as shown), or in a
-grouping section, in which case it applies to all nested tests within that grouping section.
-Configurations at multiple level are allowed and merged, with the most-nested (closest to the test)
-taking precedence.
+It should be possible to include a TOML code block in a single test (as shown), or in a grouping
+section, in which case it applies to all nested tests within that grouping section. Configurations
+at multiple level are allowed and merged, with the most-nested (closest to the test) taking
+precedence.
 
 ### Running just a single test from a suite
 
