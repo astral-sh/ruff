@@ -198,8 +198,10 @@ impl<'db> SemanticIndex<'db> {
     pub(crate) fn definition(
         &self,
         definition_key: impl Into<DefinitionNodeKey>,
-    ) -> Definition<'db> {
-        self.definitions_by_node[&definition_key.into()]
+    ) -> Option<Definition<'db>> {
+        self.definitions_by_node
+            .get(&definition_key.into())
+            .copied()
     }
 
     /// Returns the [`Expression`] ingredient for an expression node.
@@ -734,8 +736,9 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             .elt
             .as_name_expr()
             .unwrap();
-        let element_use_id =
-            element.scoped_use_id(&db, comprehension_scope_id.to_scope_id(&db, file));
+        let element_use_id = element
+            .scoped_use_id(&db, comprehension_scope_id.to_scope_id(&db, file))
+            .unwrap();
 
         let binding = use_def.first_binding_at_use(element_use_id).unwrap();
         let DefinitionKind::Comprehension(comprehension) = binding.kind(&db) else {
@@ -985,7 +988,7 @@ class C[T]:
         let ast::Expr::Name(x_use_expr_name) = x_use_expr.as_ref() else {
             panic!("expected a Name");
         };
-        let x_use_id = x_use_expr_name.scoped_use_id(&db, scope);
+        let x_use_id = x_use_expr_name.scoped_use_id(&db, scope).unwrap();
         let use_def = use_def_map(&db, scope);
         let binding = use_def.first_binding_at_use(x_use_id).unwrap();
         let DefinitionKind::Assignment(assignment) = binding.kind(&db) else {

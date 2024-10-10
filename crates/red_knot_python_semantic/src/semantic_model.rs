@@ -58,8 +58,13 @@ impl HasTy for ast::ExpressionRef<'_> {
         let file_scope = index.expression_scope_id(*self);
         let scope = file_scope.to_scope_id(model.db, model.file);
 
-        let expression_id = self.scoped_ast_id(model.db, scope);
-        infer_scope_types(model.db, scope).expression_ty(expression_id)
+        if let Some(expression_id) = self.scoped_ast_id(model.db, scope) {
+            let lookup = infer_scope_types(model.db, scope).try_expression_ty(expression_id);
+            lookup.unwrap_or(Type::Unknown)
+        } else {
+            tracing::warn!("Couldn't find expression ID");
+            Type::Unknown
+        }
     }
 }
 
@@ -153,8 +158,10 @@ macro_rules! impl_binding_has_ty {
             #[inline]
             fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
                 let index = semantic_index(model.db, model.file);
-                let binding = index.definition(self);
-                binding_ty(model.db, binding)
+                match index.definition(self) {
+                    Some(binding) => binding_ty(model.db, binding),
+                    None => Type::Unknown,
+                }
             }
         }
     };
