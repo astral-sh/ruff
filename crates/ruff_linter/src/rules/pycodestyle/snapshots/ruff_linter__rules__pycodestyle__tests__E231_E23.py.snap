@@ -476,3 +476,306 @@ E23.py:102:24: E231 [*] Missing whitespace after ','
 103 103 |             },
 104 104 |         ]
 105 105 |     }
+
+E23.py:109:18: E231 [*] Missing whitespace after ':'
+    |
+108 | # Should be E231 errors on all of these type parameters and function parameters, but not on their (strange) defaults
+109 | def pep_696_bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
+    |                  ^ E231
+110 |     x:A = "foo"[::-1],
+111 |     y:B = [[["foo", "bar"]]],
+    |
+    = help: Add missing whitespace
+
+ℹ Safe fix
+106 106 | ]
+107 107 | 
+108 108 | # Should be E231 errors on all of these type parameters and function parameters, but not on their (strange) defaults
+109     |-def pep_696_bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
+    109 |+def pep_696_bad[A: object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
+110 110 |     x:A = "foo"[::-1],
+111 111 |     y:B = [[["foo", "bar"]]],
+112 112 |     z:object = "fooo",
+
+E23.py:109:40: E231 [*] Missing whitespace after ':'
+    |
+108 | # Should be E231 errors on all of these type parameters and function parameters, but not on their (strange) defaults
+109 | def pep_696_bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
+    |                                        ^ E231
+110 |     x:A = "foo"[::-1],
+111 |     y:B = [[["foo", "bar"]]],
+    |
+    = help: Add missing whitespace
+
+ℹ Safe fix
+106 106 | ]
+107 107 | 
+108 108 | # Should be E231 errors on all of these type parameters and function parameters, but not on their (strange) defaults
+109     |-def pep_696_bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
+    109 |+def pep_696_bad[A:object="foo"[::-1], B: object =[[["foo", "bar"]]], C:object= bytes](
+110 110 |     x:A = "foo"[::-1],
+111 111 |     y:B = [[["foo", "bar"]]],
+112 112 |     z:object = "fooo",
+
+E23.py:109:70: E231 [*] Missing whitespace after ':'
+    |
+108 | # Should be E231 errors on all of these type parameters and function parameters, but not on their (strange) defaults
+109 | def pep_696_bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
+    |                                                                      ^ E231
+110 |     x:A = "foo"[::-1],
+111 |     y:B = [[["foo", "bar"]]],
+    |
+    = help: Add missing whitespace
+
+ℹ Safe fix
+106 106 | ]
+107 107 | 
+108 108 | # Should be E231 errors on all of these type parameters and function parameters, but not on their (strange) defaults
+109     |-def pep_696_bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
+    109 |+def pep_696_bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C: object= bytes](
+110 110 |     x:A = "foo"[::-1],
+111 111 |     y:B = [[["foo", "bar"]]],
+112 112 |     z:object = "fooo",
+
+E23.py:110:6: E231 [*] Missing whitespace after ':'
+    |
+108 | # Should be E231 errors on all of these type parameters and function parameters, but not on their (strange) defaults
+109 | def pep_696_bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
+110 |     x:A = "foo"[::-1],
+    |      ^ E231
+111 |     y:B = [[["foo", "bar"]]],
+112 |     z:object = "fooo",
+    |
+    = help: Add missing whitespace
+
+ℹ Safe fix
+107 107 | 
+108 108 | # Should be E231 errors on all of these type parameters and function parameters, but not on their (strange) defaults
+109 109 | def pep_696_bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
+110     |-    x:A = "foo"[::-1],
+    110 |+    x: A = "foo"[::-1],
+111 111 |     y:B = [[["foo", "bar"]]],
+112 112 |     z:object = "fooo",
+113 113 | ):
+
+E23.py:111:6: E231 [*] Missing whitespace after ':'
+    |
+109 | def pep_696_bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
+110 |     x:A = "foo"[::-1],
+111 |     y:B = [[["foo", "bar"]]],
+    |      ^ E231
+112 |     z:object = "fooo",
+113 | ):
+    |
+    = help: Add missing whitespace
+
+ℹ Safe fix
+108 108 | # Should be E231 errors on all of these type parameters and function parameters, but not on their (strange) defaults
+109 109 | def pep_696_bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
+110 110 |     x:A = "foo"[::-1],
+111     |-    y:B = [[["foo", "bar"]]],
+    111 |+    y: B = [[["foo", "bar"]]],
+112 112 |     z:object = "fooo",
+113 113 | ):
+114 114 |     pass
+
+E23.py:112:6: E231 [*] Missing whitespace after ':'
+    |
+110 |     x:A = "foo"[::-1],
+111 |     y:B = [[["foo", "bar"]]],
+112 |     z:object = "fooo",
+    |      ^ E231
+113 | ):
+114 |     pass
+    |
+    = help: Add missing whitespace
+
+ℹ Safe fix
+109 109 | def pep_696_bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](
+110 110 |     x:A = "foo"[::-1],
+111 111 |     y:B = [[["foo", "bar"]]],
+112     |-    z:object = "fooo",
+    112 |+    z: object = "fooo",
+113 113 | ):
+114 114 |     pass
+115 115 | 
+
+E23.py:116:18: E231 [*] Missing whitespace after ':'
+    |
+114 |     pass
+115 | 
+116 | class PEP696Bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]:
+    |                  ^ E231
+117 |     pass
+    |
+    = help: Add missing whitespace
+
+ℹ Safe fix
+113 113 | ):
+114 114 |     pass
+115 115 | 
+116     |-class PEP696Bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]:
+    116 |+class PEP696Bad[A: object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]:
+117 117 |     pass
+118 118 | 
+119 119 | class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
+
+E23.py:116:40: E231 [*] Missing whitespace after ':'
+    |
+114 |     pass
+115 | 
+116 | class PEP696Bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]:
+    |                                        ^ E231
+117 |     pass
+    |
+    = help: Add missing whitespace
+
+ℹ Safe fix
+113 113 | ):
+114 114 |     pass
+115 115 | 
+116     |-class PEP696Bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]:
+    116 |+class PEP696Bad[A:object="foo"[::-1], B: object =[[["foo", "bar"]]], C:object= bytes]:
+117 117 |     pass
+118 118 | 
+119 119 | class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
+
+E23.py:116:70: E231 [*] Missing whitespace after ':'
+    |
+114 |     pass
+115 | 
+116 | class PEP696Bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]:
+    |                                                                      ^ E231
+117 |     pass
+    |
+    = help: Add missing whitespace
+
+ℹ Safe fix
+113 113 | ):
+114 114 |     pass
+115 115 | 
+116     |-class PEP696Bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]:
+    116 |+class PEP696Bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C: object= bytes]:
+117 117 |     pass
+118 118 | 
+119 119 | class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
+
+E23.py:119:32: E231 [*] Missing whitespace after ':'
+    |
+117 |     pass
+118 | 
+119 | class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
+    |                                ^ E231
+120 |     pass
+    |
+    = help: Add missing whitespace
+
+ℹ Safe fix
+116 116 | class PEP696Bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]:
+117 117 |     pass
+118 118 | 
+119     |-class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
+    119 |+class PEP696BadWithEmptyBases[A: object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
+120 120 |     pass
+121 121 | 
+122 122 | class PEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
+
+E23.py:119:54: E231 [*] Missing whitespace after ':'
+    |
+117 |     pass
+118 | 
+119 | class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
+    |                                                      ^ E231
+120 |     pass
+    |
+    = help: Add missing whitespace
+
+ℹ Safe fix
+116 116 | class PEP696Bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]:
+117 117 |     pass
+118 118 | 
+119     |-class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
+    119 |+class PEP696BadWithEmptyBases[A:object="foo"[::-1], B: object =[[["foo", "bar"]]], C:object= bytes]():
+120 120 |     pass
+121 121 | 
+122 122 | class PEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
+
+E23.py:119:84: E231 [*] Missing whitespace after ':'
+    |
+117 |     pass
+118 | 
+119 | class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
+    |                                                                                    ^ E231
+120 |     pass
+    |
+    = help: Add missing whitespace
+
+ℹ Safe fix
+116 116 | class PEP696Bad[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]:
+117 117 |     pass
+118 118 | 
+119     |-class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
+    119 |+class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C: object= bytes]():
+120 120 |     pass
+121 121 | 
+122 122 | class PEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
+
+E23.py:122:35: E231 [*] Missing whitespace after ':'
+    |
+120 |     pass
+121 | 
+122 | class PEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
+    |                                   ^ E231
+123 |     pass
+    |
+    = help: Add missing whitespace
+
+ℹ Safe fix
+119 119 | class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
+120 120 |     pass
+121 121 | 
+122     |-class PEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
+    122 |+class PEP696BadWithNonEmptyBases[A: object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
+123 123 |     pass
+124 124 | 
+125 125 | # Should be no E231 errors on any of these:
+
+E23.py:122:57: E231 [*] Missing whitespace after ':'
+    |
+120 |     pass
+121 | 
+122 | class PEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
+    |                                                         ^ E231
+123 |     pass
+    |
+    = help: Add missing whitespace
+
+ℹ Safe fix
+119 119 | class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
+120 120 |     pass
+121 121 | 
+122     |-class PEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
+    122 |+class PEP696BadWithNonEmptyBases[A:object="foo"[::-1], B: object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
+123 123 |     pass
+124 124 | 
+125 125 | # Should be no E231 errors on any of these:
+
+E23.py:122:87: E231 [*] Missing whitespace after ':'
+    |
+120 |     pass
+121 | 
+122 | class PEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
+    |                                                                                       ^ E231
+123 |     pass
+    |
+    = help: Add missing whitespace
+
+ℹ Safe fix
+119 119 | class PEP696BadWithEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes]():
+120 120 |     pass
+121 121 | 
+122     |-class PEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C:object= bytes](object, something_dynamic[x::-1]):
+    122 |+class PEP696BadWithNonEmptyBases[A:object="foo"[::-1], B:object =[[["foo", "bar"]]], C: object= bytes](object, something_dynamic[x::-1]):
+123 123 |     pass
+124 124 | 
+125 125 | # Should be no E231 errors on any of these:

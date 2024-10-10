@@ -4,7 +4,9 @@ use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::logical_lines::LogicalLinesContext;
-use crate::rules::pycodestyle::rules::logical_lines::{LogicalLine, LogicalLineToken};
+use crate::rules::pycodestyle::rules::logical_lines::{
+    LogicalLine, LogicalLineToken, TypeParamsState,
+};
 
 /// ## What it does
 /// Checks for missing whitespace around the equals sign in an unannotated
@@ -106,17 +108,15 @@ pub(crate) fn whitespace_around_named_parameter_equals(
     let mut annotated_func_arg = false;
     let mut prev_end = TextSize::default();
 
+    let mut type_params_state = TypeParamsState::new();
     let in_def = is_in_def(line.tokens());
     let mut iter = line.tokens().iter().peekable();
 
     while let Some(token) = iter.next() {
         let kind = token.kind();
-
-        if kind == TokenKind::NonLogicalNewline {
-            continue;
-        }
-
+        type_params_state.visit_token_kind(kind);
         match kind {
+            TokenKind::NonLogicalNewline => continue,
             TokenKind::FStringStart => fstrings += 1,
             TokenKind::FStringEnd => fstrings = fstrings.saturating_sub(1),
             TokenKind::Lpar | TokenKind::Lsqb => {
@@ -128,15 +128,16 @@ pub(crate) fn whitespace_around_named_parameter_equals(
                     annotated_func_arg = false;
                 }
             }
-
             TokenKind::Colon if parens == 1 && in_def => {
                 annotated_func_arg = true;
             }
             TokenKind::Comma if parens == 1 => {
                 annotated_func_arg = false;
             }
-            TokenKind::Equal if parens > 0 && fstrings == 0 => {
-                if annotated_func_arg && parens == 1 {
+            TokenKind::Equal
+                if type_params_state.in_type_params() || (parens > 0 && fstrings == 0) =>
+            {
+                if type_params_state.in_type_params() || (annotated_func_arg && parens == 1) {
                     let start = token.start();
                     if start == prev_end && prev_end != TextSize::new(0) {
                         let mut diagnostic =

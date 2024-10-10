@@ -470,6 +470,74 @@ struct Line {
     tokens_end: u32,
 }
 
+/// Keeps track of whether we are currently visiting the [type parameters]
+/// of a class or function definition in a [`LogicalLine`].
+///
+/// Call [`TypeParamsState::visit_token_kind`] on the [`TokenKind`] of each
+/// successive [`LogicalLineToken`] to ensure the state remains up to date.
+///
+/// [type parameters]: https://docs.python.org/3/reference/compound_stmts.html#type-params
+#[derive(Debug, Clone, Copy)]
+enum TypeParamsState {
+    BeforeClassOrDefKeyword,
+    BeforeTypeParams,
+    InTypeParams { inner_square_brackets: u32 },
+    TypeParamsEnded,
+}
+
+impl TypeParamsState {
+    const fn new() -> Self {
+        Self::BeforeClassOrDefKeyword
+    }
+
+    const fn in_class_or_function_def(self) -> bool {
+        !matches!(self, Self::BeforeClassOrDefKeyword)
+    }
+
+    const fn before_type_params(self) -> bool {
+        matches!(self, Self::BeforeTypeParams)
+    }
+
+    const fn in_type_params(self) -> bool {
+        matches!(self, Self::InTypeParams { .. })
+    }
+
+    fn visit_token_kind(&mut self, token: TokenKind) {
+        match token {
+            TokenKind::Class | TokenKind::Def if !self.in_class_or_function_def() => {
+                *self = TypeParamsState::BeforeTypeParams;
+            }
+            TokenKind::Lpar if self.before_type_params() => {
+                *self = TypeParamsState::TypeParamsEnded;
+            }
+            TokenKind::Lsqb => match self {
+                TypeParamsState::BeforeClassOrDefKeyword | TypeParamsState::TypeParamsEnded => {}
+                TypeParamsState::BeforeTypeParams => {
+                    *self = TypeParamsState::InTypeParams {
+                        inner_square_brackets: 0,
+                    };
+                }
+                TypeParamsState::InTypeParams {
+                    inner_square_brackets,
+                } => *inner_square_brackets += 1,
+            },
+            TokenKind::Rsqb => {
+                if let TypeParamsState::InTypeParams {
+                    inner_square_brackets,
+                } = self
+                {
+                    if *inner_square_brackets == 0 {
+                        *self = TypeParamsState::TypeParamsEnded;
+                    } else {
+                        *inner_square_brackets -= 1;
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use ruff_python_parser::parse_module;
