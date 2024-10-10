@@ -39,7 +39,7 @@ after `# revealed:` must match exactly with the displayed form of the revealed t
 expression.
 
 The `reveal_type` function can be imported from the `typing` standard library module (or, for older
-Python versions, from the `typing_extensions` pseudo-standard-library module[^1]):
+Python versions, from the `typing_extensions` pseudo-standard-library module[^extensions]):
 
 ```py
 from typing import reveal_type
@@ -443,5 +443,5 @@ in a later stage continue to exist with their previously-specified contents, and
 All stages should be run in order, incrementally, and then the final state should also be re-checked
 cold, to validate equivalence of cold and incremental check results.
 
-[^1]: `typing-extensions` is a third-party module, but typeshed, and thus type checkers
+[^extensions]: `typing-extensions` is a third-party module, but typeshed, and thus type checkers
     also, treat it as part of the standard library.
