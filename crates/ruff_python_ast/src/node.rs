@@ -7036,6 +7036,9 @@ impl<'a> AnyNodeRef<'a> {
     }
 
     /// The last child of the last branch, if the node has multiple branches.
+    ///
+    /// This is used to find the last child of the last branch in a control flow statement,
+    /// such as `if`, `for`, `while`, `try`, `except`, `else`, `finally`.
     pub fn last_child_in_body(&self) -> Option<AnyNodeRef<'a>> {
         let body = match self {
             AnyNodeRef::StmtFunctionDef(ast::StmtFunctionDef { body, .. })

@@ -4,9 +4,9 @@ expression: comments.debug(test_case.source_code)
 ---
 {
     Node {
-        kind: StmtExpr,
-        range: 46..56,
-        source: `do.stuff()`,
+        kind: StmtIf,
+        range: 16..56,
+        source: `if something.changed:⏎`,
     }: {
         "leading": [],
         "dangling": [],

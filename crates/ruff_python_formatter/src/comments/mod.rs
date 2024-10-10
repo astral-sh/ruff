@@ -837,6 +837,38 @@ def test(
 
         assert_debug_snapshot!(comments.debug(test_case.source_code));
     }
+    #[test]
+    fn fmt_skip_applies_to_entire_compound_statement() {
+        let source = r#"
+if True: x = 0  # fmt: skip
+
+def foo(self, lorem, ipsum, dolor, sit, amet, consectetur, adipiscing, elit, sed, do): ...  # fmt: skip
+
+while test:
+    pass
+
+def test(
+	a, 
+	b, 
+): ... # fmt: skip
+
+def test() -> List[
+	str,
+	int,
+]: ... # fmt: skip
+
+if True:  # fmt: skip
+    x = 0
+
+while test:  # fmt: skip
+    pass
+"#;
+
+        let test_case = CommentsTestCase::from_code(source);
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
 
     #[test]
     fn positional_argument_only_comment() {

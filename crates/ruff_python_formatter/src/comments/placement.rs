@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 
+use crate::statement::clause::ClauseHeader;
 use ast::helpers::comment_indentation_after;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{
@@ -7,7 +8,7 @@ use ruff_python_ast::{
 };
 use ruff_python_trivia::{
     find_only_token_in_range, first_non_trivia_token, indentation_at_offset, BackwardsTokenizer,
-    CommentRanges, SimpleToken, SimpleTokenKind, SimpleTokenizer,
+    CommentRanges, SimpleToken, SimpleTokenKind, SimpleTokenizer, SuppressionKind,
 };
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextLen, TextRange};
@@ -18,14 +19,13 @@ use crate::other::parameters::{
     assign_argument_separator_comment_placement, find_parameter_separators,
 };
 use crate::pattern::pattern_match_sequence::SequenceType;
-
-/// Manually attach comments to nodes that the default placement gets wrong.
 pub(super) fn place_comment<'a>(
     comment: DecoratedComment<'a>,
     comment_ranges: &CommentRanges,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    handle_parenthesized_comment(comment, locator)
+    handle_suppression_comment_on_clause_header(comment, locator)
+        .or_else(|comment| handle_parenthesized_comment(comment, locator))
         .or_else(|comment| handle_end_of_line_comment_around_body(comment, locator))
         .or_else(|comment| handle_own_line_comment_around_body(comment, locator))
         .or_else(|comment| handle_enclosed_comment(comment, comment_ranges, locator))
@@ -370,6 +370,13 @@ fn handle_end_of_line_comment_around_body<'a>(
         return CommentPlacement::Default(comment);
     }
 
+    // If it's an end-of-line comment before a body, attach it as a dangling comment
+    if let Some(preceding) = comment.preceding_node() {
+        if let Some(last_child) = preceding.last_child_in_body() {
+            return CommentPlacement::dangling(last_child, comment);
+        }
+    }
+
     // Handle comments before the first statement in a body
     // ```python
     // for x in range(10): # in the main body ...
@@ -409,6 +416,57 @@ fn handle_end_of_line_comment_around_body<'a>(
                     .last()
                     .unwrap_or(last_child);
             return CommentPlacement::trailing(innermost_child, comment);
+        }
+    }
+
+    CommentPlacement::Default(comment)
+}
+
+fn handle_suppression_comment_on_clause_header<'a>(
+    comment: DecoratedComment<'a>,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    // Ensure the comment is an end-of-line comment
+    if !comment.line_position().is_end_of_line() {
+        return CommentPlacement::Default(comment);
+    }
+
+    // Extract the comment text
+    let comment_text = locator.slice(comment.range());
+
+    // Check if the comment is a suppression comment (e.g., `# fmt: skip`)
+    if SuppressionKind::from_comment(comment_text).is_none() {
+        return CommentPlacement::Default(comment);
+    }
+
+    // Get the preceding node (e.g., `StmtIf`, `StmtFor`, etc.)
+    let Some(preceding_node) = comment.preceding_node() else {
+        return CommentPlacement::Default(comment);
+    };
+
+    // Handle clause headers with their own nodes (if, while, for, etc.)
+    if let Some(header) = ClauseHeader::from(preceding_node) {
+        // Check if the comment is within the range of the clause header
+        let source = locator.contents();
+        if let Ok(header_range) = ClauseHeader::range(header, source) {
+            if header_range.contains(comment.start()) {
+                // The comment is within the range of the clause header, apply fmt: skip to the entire clause
+                return CommentPlacement::dangling(comment.enclosing_node(), comment);
+            }
+        }
+    }
+
+    // Handle special cases like `else`, `except`, `finally` blocks that are not their own nodes
+    if let Some(parent) = comment.enclosing_parent() {
+        if let Some(header) = ClauseHeader::from(parent) {
+            // Check if the comment is within the range of the clause header
+            let source = locator.contents();
+            if let Ok(header_range) = ClauseHeader::range(header, source) {
+                if header_range.contains(comment.start()) {
+                    // The comment is within the range of the clause header, apply fmt: skip to the entire clause
+                    return CommentPlacement::dangling(comment.enclosing_node(), comment);
+                }
+            }
         }
     }
 

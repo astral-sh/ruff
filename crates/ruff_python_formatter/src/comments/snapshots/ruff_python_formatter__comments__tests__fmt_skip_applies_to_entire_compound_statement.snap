@@ -1,0 +1,96 @@
+---
+source: crates/ruff_python_formatter/src/comments/mod.rs
+expression: comments.debug(test_case.source_code)
+---
+{
+    Node {
+        kind: StmtAssign,
+        range: 10..15,
+        source: `x = 0`,
+    }: {
+        "leading": [],
+        "dangling": [
+            SourceComment {
+                text: "# fmt: skip",
+                position: EndOfLine,
+                formatted: false,
+            },
+        ],
+        "trailing": [],
+    },
+    Node {
+        kind: StmtExpr,
+        range: 117..120,
+        source: `...`,
+    }: {
+        "leading": [],
+        "dangling": [
+            SourceComment {
+                text: "# fmt: skip",
+                position: EndOfLine,
+                formatted: false,
+            },
+        ],
+        "trailing": [],
+    },
+    Node {
+        kind: StmtExpr,
+        range: 180..183,
+        source: `...`,
+    }: {
+        "leading": [],
+        "dangling": [
+            SourceComment {
+                text: "# fmt: skip",
+                position: EndOfLine,
+                formatted: false,
+            },
+        ],
+        "trailing": [],
+    },
+    Node {
+        kind: StmtExpr,
+        range: 232..235,
+        source: `...`,
+    }: {
+        "leading": [],
+        "dangling": [
+            SourceComment {
+                text: "# fmt: skip",
+                position: EndOfLine,
+                formatted: false,
+            },
+        ],
+        "trailing": [],
+    },
+    Node {
+        kind: StmtIf,
+        range: 249..280,
+        source: `if True:  # fmt: skip⏎`,
+    }: {
+        "leading": [],
+        "dangling": [
+            SourceComment {
+                text: "# fmt: skip",
+                position: EndOfLine,
+                formatted: false,
+            },
+        ],
+        "trailing": [],
+    },
+    Node {
+        kind: StmtWhile,
+        range: 282..315,
+        source: `while test:  # fmt: skip⏎`,
+    }: {
+        "leading": [],
+        "dangling": [
+            SourceComment {
+                text: "# fmt: skip",
+                position: EndOfLine,
+                formatted: false,
+            },
+        ],
+        "trailing": [],
+    },
+}
