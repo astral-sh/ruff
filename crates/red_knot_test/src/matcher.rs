@@ -1,6 +1,6 @@
 //! Match [`TypeCheckDiagnostic`]s against [`Assertion`]s and produce test failure messages for any
 //! mismatches.
-use crate::assertion::{Assertion, InlineFileAssertions};
+use crate::assertion::{Assertion, ErrorAssertion, InlineFileAssertions};
 use crate::db::Db;
 use crate::diagnostic::SortedDiagnostics;
 use red_knot_python_semantic::types::TypeCheckDiagnostic;
@@ -145,6 +145,20 @@ trait Unmatched {
     fn unmatched(&self) -> String;
 }
 
+fn unmatched<'a, T: Unmatched + 'a>(unmatched: &'a [T]) -> Vec<String> {
+    unmatched.iter().map(Unmatched::unmatched).collect()
+}
+
+trait UnmatchedWithColumn {
+    fn unmatched_with_column(&self, column: OneIndexed) -> String;
+}
+
+impl Unmatched for Assertion<'_> {
+    fn unmatched(&self) -> String {
+        format!("unmatched assertion: {self}")
+    }
+}
+
 impl<T> Unmatched for T
 where
     T: Diagnostic,
@@ -158,14 +172,17 @@ where
     }
 }
 
-impl Unmatched for Assertion<'_> {
-    fn unmatched(&self) -> String {
-        format!("unmatched assertion: {self}")
+impl<T> UnmatchedWithColumn for T
+where
+    T: Diagnostic,
+{
+    fn unmatched_with_column(&self, column: OneIndexed) -> String {
+        format!(
+            r#"unexpected error: {column} [{}] "{}""#,
+            self.rule(),
+            self.message()
+        )
     }
-}
-
-fn unmatched<'a, T: Unmatched + 'a>(unmatched: &'a [T]) -> Vec<String> {
-    unmatched.iter().map(Unmatched::unmatched).collect()
 }
 
 struct Matcher {
@@ -195,12 +212,23 @@ impl Matcher {
         let mut failures = vec![];
         let mut unmatched: Vec<_> = diagnostics.iter().collect();
         for assertion in assertions {
+            if matches!(
+                assertion,
+                Assertion::Error(ErrorAssertion {
+                    rule: None,
+                    message_contains: None,
+                    ..
+                })
+            ) {
+                failures.push("invalid assertion: no rule or message text".to_string());
+                continue;
+            }
             if !self.matches(assertion, &mut unmatched) {
                 failures.push(assertion.unmatched());
             }
         }
         for diagnostic in unmatched {
-            failures.push(diagnostic.unmatched());
+            failures.push(diagnostic.unmatched_with_column(self.column(diagnostic)));
         }
         if failures.is_empty() {
             Ok(())
@@ -285,6 +313,7 @@ mod tests {
     use super::FailuresByLine;
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+    use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::OneIndexed;
     use ruff_text_size::{Ranged, TextRange};
 
@@ -387,7 +416,7 @@ mod tests {
                 0,
                 &[
                     "unmatched assertion: revealed: Foo",
-                    r#"unexpected error: [not-revealed-type] "Revealed type is `Foo`""#,
+                    r#"unexpected error: 1 [not-revealed-type] "Revealed type is `Foo`""#,
                 ],
             )],
         );
@@ -406,7 +435,7 @@ mod tests {
                 0,
                 &[
                     "unmatched assertion: revealed: Foo",
-                    r#"unexpected error: [revealed-type] "Something else""#,
+                    r#"unexpected error: 1 [revealed-type] "Something else""#,
                 ],
             )],
         );
@@ -445,56 +474,17 @@ mod tests {
                 0,
                 &[
                     "unmatched assertion: revealed: Foo",
-                    r#"unexpected error: [undefined-reveal] "Doesn't matter""#,
+                    r#"unexpected error: 1 [undefined-reveal] "Doesn't matter""#,
                 ],
             )],
         );
-    }
-
-    #[test]
-    fn error_match() {
-        let result = get_result(
-            "x # error:",
-            vec![TestDiagnostic::new("anything", "Any message", 0)],
-        );
-
-        assert_ok(&result);
     }
 
     #[test]
     fn error_unmatched() {
-        let result = get_result("x # error:", vec![]);
+        let result = get_result("x # error: [rule]", vec![]);
 
-        assert_fail(result, &[(0, &["unmatched assertion: error:"])]);
-    }
-
-    #[test]
-    fn error_match_column() {
-        let result = get_result(
-            "x # error: 1",
-            vec![TestDiagnostic::new("anything", "Any message", 0)],
-        );
-
-        assert_ok(&result);
-    }
-
-    #[test]
-    fn error_wrong_column() {
-        let result = get_result(
-            "x # error: 2",
-            vec![TestDiagnostic::new("anything", "Any message", 0)],
-        );
-
-        assert_fail(
-            result,
-            &[(
-                0,
-                &[
-                    "unmatched assertion: error: 2",
-                    r#"unexpected error: [anything] "Any message""#,
-                ],
-            )],
-        );
+        assert_fail(result, &[(0, &["unmatched assertion: error: [rule]"])]);
     }
 
     #[test]
@@ -520,7 +510,7 @@ mod tests {
                 0,
                 &[
                     "unmatched assertion: error: [some-rule]",
-                    r#"unexpected error: [anything] "Any message""#,
+                    r#"unexpected error: 1 [anything] "Any message""#,
                 ],
             )],
         );
@@ -549,7 +539,7 @@ mod tests {
                 0,
                 &[
                     r#"unmatched assertion: error: "contains this""#,
-                    r#"unexpected error: [anything] "Any message""#,
+                    r#"unexpected error: 1 [anything] "Any message""#,
                 ],
             )],
         );
@@ -563,6 +553,25 @@ mod tests {
         );
 
         assert_ok(&result);
+    }
+
+    #[test]
+    fn error_wrong_column() {
+        let result = get_result(
+            "x # error: 2 [rule]",
+            vec![TestDiagnostic::new("rule", "Any message", 0)],
+        );
+
+        assert_fail(
+            result,
+            &[(
+                0,
+                &[
+                    "unmatched assertion: error: 2 [rule]",
+                    r#"unexpected error: 1 [rule] "Any message""#,
+                ],
+            )],
+        );
     }
 
     #[test]
@@ -608,7 +617,7 @@ mod tests {
                 0,
                 &[
                     r#"unmatched assertion: error: 2 [some-rule] "contains this""#,
-                    r#"unexpected error: [some-rule] "message contains this""#,
+                    r#"unexpected error: 1 [some-rule] "message contains this""#,
                 ],
             )],
         );
@@ -631,7 +640,7 @@ mod tests {
                 0,
                 &[
                     r#"unmatched assertion: error: 1 [some-rule] "contains this""#,
-                    r#"unexpected error: [other-rule] "message contains this""#,
+                    r#"unexpected error: 1 [other-rule] "message contains this""#,
                 ],
             )],
         );
@@ -650,7 +659,7 @@ mod tests {
                 0,
                 &[
                     r#"unmatched assertion: error: 1 [some-rule] "contains this""#,
-                    r#"unexpected error: [some-rule] "Any message""#,
+                    r#"unexpected error: 1 [some-rule] "Any message""#,
                 ],
             )],
         );
@@ -658,19 +667,21 @@ mod tests {
 
     #[test]
     fn interspersed_matches_and_mismatches() {
-        let source = r#"
+        let source = dedent(
+            r#"
             1 # error: [line-one]
             2
             3 # error: [line-three]
             4 # error: [line-four]
             5
             6: # error: [line-six]
-            "#;
+            "#,
+        );
         let two = source.find('2').unwrap();
         let three = source.find('3').unwrap();
         let five = source.find('5').unwrap();
         let result = get_result(
-            source,
+            &source,
             vec![
                 TestDiagnostic::new("line-two", "msg", two),
                 TestDiagnostic::new("line-three", "msg", three),
@@ -692,14 +703,16 @@ mod tests {
 
     #[test]
     fn more_diagnostics_than_assertions() {
-        let source = r#"
+        let source = dedent(
+            r#"
             1 # error: [line-one]
             2
-            "#;
+            "#,
+        );
         let one = source.find('1').unwrap();
         let two = source.find('2').unwrap();
         let result = get_result(
-            source,
+            &source,
             vec![
                 TestDiagnostic::new("line-one", "msg", one),
                 TestDiagnostic::new("line-two", "msg", two),
@@ -711,14 +724,16 @@ mod tests {
 
     #[test]
     fn multiple_assertions_and_diagnostics_same_line() {
-        let source = "
+        let source = dedent(
+            "
             # error: [one-rule]
             # error: [other-rule]
             x
-            ";
+            ",
+        );
         let x = source.find('x').unwrap();
         let result = get_result(
-            source,
+            &source,
             vec![
                 TestDiagnostic::new("one-rule", "msg", x),
                 TestDiagnostic::new("other-rule", "msg", x),
@@ -730,14 +745,16 @@ mod tests {
 
     #[test]
     fn multiple_assertions_and_diagnostics_same_line_all_same() {
-        let source = "
+        let source = dedent(
+            "
             # error: [one-rule]
             # error: [one-rule]
             x
-            ";
+            ",
+        );
         let x = source.find('x').unwrap();
         let result = get_result(
-            source,
+            &source,
             vec![
                 TestDiagnostic::new("one-rule", "msg", x),
                 TestDiagnostic::new("one-rule", "msg", x),
@@ -749,14 +766,16 @@ mod tests {
 
     #[test]
     fn multiple_assertions_and_diagnostics_same_line_mismatch() {
-        let source = "
+        let source = dedent(
+            "
             # error: [one-rule]
             # error: [other-rule]
             x
-            ";
+            ",
+        );
         let x = source.find('x').unwrap();
         let result = get_result(
-            source,
+            &source,
             vec![
                 TestDiagnostic::new("one-rule", "msg", x),
                 TestDiagnostic::new("other-rule", "msg", x),
@@ -764,20 +783,25 @@ mod tests {
             ],
         );
 
-        assert_fail(result, &[(3, &[r#"unexpected error: [third-rule] "msg""#])]);
+        assert_fail(
+            result,
+            &[(3, &[r#"unexpected error: 1 [third-rule] "msg""#])],
+        );
     }
 
     #[test]
     fn parenthesized_expression() {
-        let source = "
+        let source = dedent(
+            "
             a = b + (
                 error: [undefined-reveal]
                 reveal_type(5)  # revealed: Literal[5]
             )
-            ";
+            ",
+        );
         let reveal = source.find("reveal_type").unwrap();
         let result = get_result(
-            source,
+            &source,
             vec![
                 TestDiagnostic::new("undefined-reveal", "msg", reveal),
                 TestDiagnostic::new("revealed-type", "Revealed type is `Literal[5]`", reveal),
@@ -785,5 +809,47 @@ mod tests {
         );
 
         assert_ok(&result);
+    }
+
+    #[test]
+    fn bare_error_assertion_not_allowed() {
+        let source = "x  # error:";
+        let x = source.find('x').unwrap();
+        let result = get_result(
+            source,
+            vec![TestDiagnostic::new("some-rule", "some message", x)],
+        );
+
+        assert_fail(
+            result,
+            &[(
+                0,
+                &[
+                    "invalid assertion: no rule or message text",
+                    r#"unexpected error: 1 [some-rule] "some message""#,
+                ],
+            )],
+        );
+    }
+
+    #[test]
+    fn column_only_error_assertion_not_allowed() {
+        let source = "x  # error: 1";
+        let x = source.find('x').unwrap();
+        let result = get_result(
+            source,
+            vec![TestDiagnostic::new("some-rule", "some message", x)],
+        );
+
+        assert_fail(
+            result,
+            &[(
+                0,
+                &[
+                    "invalid assertion: no rule or message text",
+                    r#"unexpected error: 1 [some-rule] "some message""#,
+                ],
+            )],
+        );
     }
 }

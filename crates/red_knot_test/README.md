@@ -11,7 +11,7 @@ A Markdown test suite can contain any number of tests. A test consists of one or
 specifying its language; currently only `py` (Python files) and `pyi` (type stub files) are
 supported.
 
-The simplest possible test suite consists of just a single test, with a single file.
+The simplest possible test suite consists of just a single test, with a single embedded file:
 
 ````markdown
 ```py
@@ -39,8 +39,7 @@ after `# revealed:` must match exactly with the displayed form of the revealed t
 expression.
 
 The `reveal_type` function can be imported from the `typing` standard library module (or, for older
-Python versions, from the `typing_extensions` pseudo-standard-library module -- it is a third-party
-module, but typeshed, and thus type checkers also, treat it as part of the standard library):
+Python versions, from the `typing_extensions` pseudo-standard-library module\[^extensions\]):
 
 ```py
 from typing import reveal_type
@@ -54,8 +53,11 @@ without importing it, in addition to the diagnostic revealing the type of the ex
 
 The `# revealed:` assertion must always match a revealed-type diagnostic, and will also match the
 undefined-reveal diagnostic, if present, so it's safe to use `reveal_type` in tests either with or
-without importing it. (Style preference is to usually not import it in tests, unless specifically
-testing something about the behavior of importing it.)
+without importing it. (Style preference is to not import it in tests, unless specifically testing
+something about the behavior of importing it.)
+
+\[^extensions\]: `typing-extensions` is a third-party module, but typeshed, and thus type checkers
+also, treat it as part of the standard library.
 
 #### error
 
@@ -63,16 +65,16 @@ A comment beginning with `# error:` is an assertion that a type checker diagnost
 be emitted, with text span starting on that line. If the comment is simply `# error:`, this will
 match any diagnostic. The matching can be narrowed in three ways:
 
-- `# error: 8` requires that the matched diagnostic's text span begins on column 8 (one-indexed) of
-    this line.
 - `# error: [invalid-assignment]` requires that the matched diagnostic have the rule code
-    `invalid-assignment`.
-- `# error: "Some text"` requires that the matched diagnostic's full message contain the text `Some text`.
+    `invalid-assignment`. (The square brackets are required.)
+- `# error: "Some text"` requires that the matched diagnostic's full message contain the text `Some text`. (The double quotes are required in the assertion comment; they are not part of the matched
+    text.)
+- `# error: 8 [rule-code]` or `# error: 8 "Some text"` additionally requires that the matched
+    diagnostic's text span begins on column 8 (one-indexed) of this line.
 
-Any combination of some or all of these can be used in a single assertion, but they must come in
-order: first column, if present; then rule code, if present; then contains-text, if present. For
-example, an assertion using all three would look like
-`# error: 8 [invalid-assignment] "Some text"`.
+Assertions must contain either a rule code or a contains-text, or both, and may optionally also
+include a column. They must come in order: first column, if present; then rule code, if present;
+then contains-text, if present. For example, an assertion using all three would look like `# error: 8 [invalid-assignment] "Some text"`.
 
 Error assertions in tests intended to test type checker semantics should primarily use rule-code
 assertions, with occasional contains-text assertions where needed to disambiguate.
@@ -85,8 +87,8 @@ An assertion comment may be a line-trailing comment, in which case it applies to
 x: str = 1  # error: [invalid-assignment]
 ```
 
-Or it may be a comment on its own line, in which case it applies to the next non-assertion-comment
-line:
+Or it may be a comment on its own line, in which case it applies to the next line that does not
+contain an assertion comment:
 
 ```py
 # error: [invalid-assignment]
@@ -108,13 +110,13 @@ assertion as the line of source code on which the matched diagnostics are emitte
 ## Multi-file tests
 
 Some tests require multiple files, with imports from one file into another. Multiple fenced code
-blocks represent multiple embedded files. Since files must have unique names, only zero or one files
-can use the default name of `/src/test.py`. Other files must explicitly specify their file name:
+blocks represent multiple embedded files. Since files must have unique names, at most one file can
+use the default name of `/src/test.py`. Other files must explicitly specify their file name:
 
 ````markdown
 ```py
 from b import C
-reveal_type(C)  # Literal[C]
+reveal_type(C)  # revealed: Literal[C]
 ```
 
 ```py path=b.py
@@ -122,7 +124,8 @@ class C: pass
 ```
 ````
 
-Relative file names are always relative to the "workspace root", which is also an import root.
+Relative file names are always relative to the "workspace root", which is also an import root (that
+is, the equivalent of a runtime entry on `sys.path`).
 
 The default workspace root is `/src/`. Currently it is not possible to customize this in a test, but
 this is a feature we will want to add in the future.
@@ -132,7 +135,7 @@ So the above test creates two files, `/src/test.py` and `/src/b.py`, and sets th
 
 ## Multi-test suites
 
-A single test suite (markdown file) can contain multiple tests, by demarcating them using Markdown
+A single test suite (Markdown file) can contain multiple tests, by demarcating them using Markdown
 header lines:
 
 ````markdown
@@ -162,8 +165,8 @@ The tests are run independently, in independent in-memory file systems and with 
 databases. This means that each is a from-scratch run of the type checker, with no data persisting from any
 previous test.
 
-Due to Rust test runner limitations, an entire test suite (Markdown file) is run as a single Rust
-test, so it's not possible to select individual tests within it to run.
+Due to `cargo test` limitations, an entire test suite (Markdown file) is run as a single Rust test,
+so it's not possible to select individual tests within it to run.
 
 ## Structured test suites
 
@@ -233,15 +236,15 @@ an assertion:
 
 The column assertion `6` on the ending line should be optional.
 
-In cases of overlapping such assertions, resolve ambiguity using more brackets: `<<<<` begins an
-assertion ended by `>>>>`, etc.
+In cases of overlapping such assertions, resolve ambiguity using more angle brackets: `<<<<` begins
+an assertion ended by `>>>>`, etc.
 
 ### Non-Python files
 
 Some tests may need to specify non-Python embedded files: typeshed `stdlib/VERSIONS`, `pth` files,
 `py.typed` files, `pyvenv.cfg` files...
 
-We should allow specifying any of these using the `text` language in the code block tag string:
+We will allow specifying any of these using the `text` language in the code block tag string:
 
 ````markdown
 ```text path=/third-party/foo/py.typed
@@ -249,7 +252,8 @@ partial
 ```
 ````
 
-We may want to also support testing Jupyter notebooks as embedded files using the `json` language.
+We may want to also support testing Jupyter notebooks as embedded files; exact syntax for this is
+yet to be determined.
 
 Of course, red-knot is only run directly on `py` and `pyi` files, and assertion comments are only
 possible in these files.
@@ -258,8 +262,8 @@ A fenced code block with no language will always be an error.
 
 ### Configuration
 
-We should be able to specify non-default red-knot configurations to use in tests, by including a
-TOML fenced code block:
+We will add the ability to specify non-default red-knot configurations to use in tests, by including
+a TOML fenced code block:
 
 ````markdown
 ```toml
@@ -280,6 +284,15 @@ grouping section, in which case it applies to all nested tests within that group
 Configurations at multiple level are allowed and merged, with the most-nested (closest to the test)
 taking precedence.
 
+### Running just a single test from a suite
+
+Having each test in a suite always run as a distinct Rust test would require writing our own test
+runner or code-generating tests in a build script; neither of these is planned.
+
+We could still allow running just a single test from a suite, for debugging purposes, either via
+some "focus" syntax that could be easily temporarily added to a test, or via an environment
+variable.
+
 ### Configuring search paths and kinds
 
 The red-knot TOML config format hasn't been designed yet, and we may want to implement support in
@@ -291,7 +304,7 @@ as test-specific options.
 Other future planned changes to configuration include:
 
 - We should be able to configure the default workspace root to something other than `/src/` using a
-`workspace-root` config option.
+    `workspace-root` config option.
 
 - We should be able to add a third-party root using the `third-party-root` config option.
 
@@ -342,10 +355,11 @@ We could use an `error=` config option in the tag string to make a file cause an
 
 The inline comment diagnostic assertions are useful for making quick, readable assertions about
 diagnostics in a particular location. But sometimes we will want to assert on the full diagnostic
-output of a test. Or sometimes (see “incremental tests” below) we will want to assert on diagnostics
-in a file, without impacting the contents of that file by changing a comment in it. In these cases,
-a Python fenced code block in a test could be followed by a fenced code block with language
-`output`; this would contain the full diagnostic output for the preceding test file:
+output of checking an embedded Python file. Or sometimes (see “incremental tests” below) we will
+want to assert on diagnostics in a file, without impacting the contents of that file by changing a
+comment in it. In these cases, a Python fenced code block in a test could be followed by a fenced
+code block with language `output`; this would contain the full diagnostic output for the preceding
+test file:
 
 ````markdown
 # full output
@@ -422,12 +436,12 @@ inline-comment diagnostic assertions for `test.py` would require specifying new
 contents for `test.py` in stage 1, which we don't want to do in this test.)
 ````
 
-Any number of stages can be provided in an incremental test. If a stage re-specifies a filename that
-was specified in a previous stage (or the initial stage), that file is modified. A new filename
-appearing for the first time in a new stage will create a new file. To delete a previously created
-file, specify that file with the tag `delete` in its tag string (in this case, it is an error to
-provide non-empty contents). Any previously-created files that are not re-specified in a later stage
-continue to exist with their previously-specified contents, and are not "touched".
+It will be possible to provide any number of stages in an incremental test. If a stage re-specifies
+a filename that was specified in a previous stage (or the initial stage), that file is modified. A
+new filename appearing for the first time in a new stage will create a new file. To delete a
+previously created file, specify that file with the tag `delete` in its tag string (in this case, it
+is an error to provide non-empty contents). Any previously-created files that are not re-specified
+in a later stage continue to exist with their previously-specified contents, and are not "touched".
 
 All stages should be run in order, incrementally, and then the final state should also be re-checked
 cold, to validate equivalence of cold and incremental check results.
