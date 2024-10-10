@@ -159,15 +159,28 @@ impl Unmatched for Assertion<'_> {
     }
 }
 
+fn maybe_add_undefined_reveal_clarification<T: Diagnostic>(
+    diagnostic: &T,
+    original: std::fmt::Arguments,
+) -> String {
+    if diagnostic.rule() == "undefined-reveal" {
+        format!(
+            "used built-in `reveal_type`: add a `# revealed` assertion on this line \
+            (original diagnostic: {original})"
+        )
+    } else {
+        format!("unexpected error: {original}")
+    }
+}
+
 impl<T> Unmatched for T
 where
     T: Diagnostic,
 {
     fn unmatched(&self) -> String {
-        format!(
-            r#"unexpected error: [{}] "{}""#,
-            self.rule(),
-            self.message()
+        maybe_add_undefined_reveal_clarification(
+            self,
+            format_args!(r#"[{}] "{}""#, self.rule(), self.message()),
         )
     }
 }
@@ -177,10 +190,9 @@ where
     T: Diagnostic,
 {
     fn unmatched_with_column(&self, column: OneIndexed) -> String {
-        format!(
-            r#"unexpected error: {column} [{}] "{}""#,
-            self.rule(),
-            self.message()
+        maybe_add_undefined_reveal_clarification(
+            self,
+            format_args!(r#"{column} [{}] "{}""#, self.rule(), self.message()),
         )
     }
 }
@@ -291,18 +303,14 @@ impl Matcher {
                         break;
                     }
                 }
-                if matched_revealed_type.is_some() {
-                    let mut idx = 0;
-                    unmatched.retain(|_| {
-                        let retain = Some(idx) != matched_revealed_type
-                            && Some(idx) != matched_undefined_reveal;
-                        idx += 1;
-                        retain
-                    });
-                    true
-                } else {
-                    false
-                }
+                let mut idx = 0;
+                unmatched.retain(|_| {
+                    let retain =
+                        Some(idx) != matched_revealed_type && Some(idx) != matched_undefined_reveal;
+                    idx += 1;
+                    retain
+                });
+                matched_revealed_type.is_some()
             }
         }
     }
@@ -386,7 +394,7 @@ mod tests {
     }
 
     #[test]
-    fn type_match() {
+    fn revealed_match() {
         let result = get_result(
             "x # revealed: Foo",
             vec![TestDiagnostic::new(
@@ -400,7 +408,7 @@ mod tests {
     }
 
     #[test]
-    fn type_wrong_rule() {
+    fn revealed_wrong_rule() {
         let result = get_result(
             "x # revealed: Foo",
             vec![TestDiagnostic::new(
@@ -423,7 +431,7 @@ mod tests {
     }
 
     #[test]
-    fn type_wrong_message() {
+    fn revealed_wrong_message() {
         let result = get_result(
             "x # revealed: Foo",
             vec![TestDiagnostic::new("revealed-type", "Something else", 0)],
@@ -442,14 +450,14 @@ mod tests {
     }
 
     #[test]
-    fn type_unmatched() {
+    fn revealed_unmatched() {
         let result = get_result("x # revealed: Foo", vec![]);
 
         assert_fail(result, &[(0, &["unmatched assertion: revealed: Foo"])]);
     }
 
     #[test]
-    fn type_match_with_undefined() {
+    fn revealed_match_with_undefined() {
         let result = get_result(
             "x # revealed: Foo",
             vec![
@@ -462,10 +470,23 @@ mod tests {
     }
 
     #[test]
-    fn type_match_with_only_undefined() {
+    fn revealed_match_with_only_undefined() {
         let result = get_result(
             "x # revealed: Foo",
             vec![TestDiagnostic::new("undefined-reveal", "Doesn't matter", 0)],
+        );
+
+        assert_fail(result, &[(0, &["unmatched assertion: revealed: Foo"])]);
+    }
+
+    #[test]
+    fn revealed_mismatch_with_undefined() {
+        let result = get_result(
+            "x # revealed: Foo",
+            vec![
+                TestDiagnostic::new("revealed-type", "Revealed type is `Bar`", 0),
+                TestDiagnostic::new("undefined-reveal", "Doesn't matter", 0),
+            ],
         );
 
         assert_fail(
@@ -474,7 +495,54 @@ mod tests {
                 0,
                 &[
                     "unmatched assertion: revealed: Foo",
-                    r#"unexpected error: 1 [undefined-reveal] "Doesn't matter""#,
+                    r#"unexpected error: 1 [revealed-type] "Revealed type is `Bar`""#,
+                ],
+            )],
+        );
+    }
+
+    #[test]
+    fn undefined_reveal_type_unmatched() {
+        let result = get_result(
+            "reveal_type(1)",
+            vec![
+                TestDiagnostic::new("undefined-reveal", "undefined reveal message", 0),
+                TestDiagnostic::new("revealed-type", "Revealed type is `Literal[1]`", 12),
+            ],
+        );
+
+        assert_fail(
+            result,
+            &[(
+                0,
+                &[
+                    "used built-in `reveal_type`: add a `# revealed` assertion on this line (\
+                    original diagnostic: [undefined-reveal] \"undefined reveal message\")",
+                    r#"unexpected error: [revealed-type] "Revealed type is `Literal[1]`""#,
+                ],
+            )],
+        );
+    }
+
+    #[test]
+    fn undefined_reveal_type_mismatched() {
+        let result = get_result(
+            "reveal_type(1) # error: [something-else]",
+            vec![
+                TestDiagnostic::new("undefined-reveal", "undefined reveal message", 0),
+                TestDiagnostic::new("revealed-type", "Revealed type is `Literal[1]`", 12),
+            ],
+        );
+
+        assert_fail(
+            result,
+            &[(
+                0,
+                &[
+                    "unmatched assertion: error: [something-else]",
+                    "used built-in `reveal_type`: add a `# revealed` assertion on this line (\
+                    original diagnostic: 1 [undefined-reveal] \"undefined reveal message\")",
+                    r#"unexpected error: 13 [revealed-type] "Revealed type is `Literal[1]`""#,
                 ],
             )],
         );
