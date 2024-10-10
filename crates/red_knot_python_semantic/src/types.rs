@@ -1377,15 +1377,27 @@ impl<'db> ClassType<'db> {
     }
 
     fn mro(self, db: &'db dyn Db) -> Box<[ClassBase<'db>]> {
-        if self.bases(db).len() == 0 {
-            let object = KnownClass::Object.to_class(db).expect_class();
-            return if self == object {
-                Box::new([ClassBase::Class(self)])
-            } else {
-                Box::new([ClassBase::Class(self), ClassBase::Class(object)])
-            };
+        let mut bases = self.bases(db);
+        let num_bases = bases.len();
+        match bases.next() {
+            None => {
+                let object = KnownClass::Object.to_class(db).expect_class();
+                return if self == object {
+                    Box::new([ClassBase::Class(self)])
+                } else {
+                    Box::new([ClassBase::Class(self), ClassBase::Class(object)])
+                };
+            }
+            Some(first_base) => {
+                if num_bases == 1 {
+                    std::iter::once(ClassBase::Class(self))
+                        .chain(ClassBase::from(first_base).mro(db))
+                        .collect()
+                } else {
+                    todo!()
+                }
+            }
         }
-        todo!()
     }
 
     /// Returns the class member of this class named `name`.
