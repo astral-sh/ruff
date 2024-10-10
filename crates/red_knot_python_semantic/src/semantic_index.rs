@@ -994,7 +994,7 @@ class C[T]:
         let ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
             value: ast::Number::Int(num),
             ..
-        }) = &*assignment.assignment().value
+        }) = assignment.value()
         else {
             panic!("should be a number literal")
         };

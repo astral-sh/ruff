@@ -41,7 +41,7 @@ use crate::module_name::ModuleName;
 use crate::module_resolver::{file_to_module, resolve_module};
 use crate::semantic_index::ast_ids::{HasScopedAstId, HasScopedUseId, ScopedExpressionId};
 use crate::semantic_index::definition::{
-    Definition, DefinitionKind, DefinitionNodeKey, ExceptHandlerDefinitionKind,
+    AssignmentKind, Definition, DefinitionKind, DefinitionNodeKey, ExceptHandlerDefinitionKind,
 };
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::semantic_index;
@@ -415,7 +415,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             DefinitionKind::Assignment(assignment) => {
                 self.infer_assignment_definition(
                     assignment.target(),
-                    assignment.assignment(),
+                    assignment.value(),
+                    assignment.variable(),
+                    assignment.kind(),
                     definition,
                 );
             }
@@ -1147,18 +1149,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ast::StmtAssign {
             range: _,
             targets,
-            value,
+            value: _,
         } = assignment;
 
         for target in targets {
             if let ast::Expr::Name(name) = target {
                 self.infer_definition(name);
             } else {
-                // TODO infer definitions in unpacking assignment. When we do, this duplication of
-                // the "get `Expression`, call `infer_expression_types` on it, `self.extend`" dance
-                // will be removed; it'll all happen in `infer_assignment_definition` instead.
-                let expression = self.index.expression(value.as_ref());
-                self.extend(infer_expression_types(self.db, expression));
                 self.infer_expression(target);
             }
         }
@@ -1166,18 +1163,93 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_assignment_definition(
         &mut self,
-        target: &ast::ExprName,
-        assignment: &ast::StmtAssign,
+        target: &ast::Expr,
+        value: &ast::Expr,
+        variable: &ast::ExprName,
+        kind: AssignmentKind,
         definition: Definition<'db>,
     ) {
-        let expression = self.index.expression(assignment.value.as_ref());
+        let expression = self.index.expression(value);
         let result = infer_expression_types(self.db, expression);
         self.extend(result);
-        let value_ty = self.expression_ty(&assignment.value);
-        self.add_binding(assignment.into(), definition, value_ty);
+
+        let value_ty = self.expression_ty(value);
+
+        let target_ty = match (value_ty, kind) {
+            (
+                Type::Tuple(_) | Type::StringLiteral(_) | Type::LiteralString,
+                AssignmentKind::Sequence(node_index),
+            ) => self.infer_sequence_unpacking(target, node_index, value_ty),
+            (_, AssignmentKind::Sequence(_)) => value_ty
+                .iterate(self.db)
+                .unwrap_with_diagnostic(value.into(), self),
+            _ => value_ty,
+        };
+
+        self.add_binding(variable.into(), definition, target_ty);
         self.types
             .expressions
-            .insert(target.scoped_ast_id(self.db, self.scope), value_ty);
+            .insert(variable.scoped_ast_id(self.db, self.scope), target_ty);
+    }
+
+    fn infer_sequence_unpacking(
+        &mut self,
+        target: &ast::Expr,
+        target_node_index: usize,
+        value_ty: Type<'db>,
+    ) -> Type<'db> {
+        struct UnpackingState<'db> {
+            current_index: usize,
+            target_node_index: usize,
+            result: Option<Type<'db>>,
+        }
+
+        fn inner<'db>(
+            builder: &mut TypeInferenceBuilder<'db>,
+            lhs: &ast::Expr,
+            ty: Type<'db>,
+            state: &mut UnpackingState<'db>,
+        ) {
+            match lhs {
+                // TODO: Handle other possible target expression like attribute, subscript,
+                // and starred.
+                ast::Expr::Name(_) if state.current_index == state.target_node_index => {
+                    state.current_index += 1;
+                    state.result = Some(ty);
+                }
+                ast::Expr::List(ast::ExprList { elts, .. })
+                | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                    for (index, element) in elts.iter().enumerate() {
+                        let element_ty = match ty {
+                            Type::Tuple(tuple_ty) => {
+                                tuple_ty.get(builder.db, index).unwrap_or(Type::Unknown)
+                            }
+                            Type::StringLiteral(string_literal_ty) => {
+                                let string_length = string_literal_ty.len(builder.db);
+                                if index < string_length {
+                                    Type::LiteralString
+                                } else {
+                                    Type::Unknown
+                                }
+                            }
+                            Type::LiteralString => Type::LiteralString,
+                            _ => Type::Unknown,
+                        };
+                        inner(builder, element, element_ty, state);
+                    }
+                }
+                _ => state.current_index += 1,
+            }
+        }
+
+        let mut state = UnpackingState {
+            current_index: 0,
+            target_node_index,
+            result: None,
+        };
+
+        inner(self, target, value_ty, &mut state);
+        state.result.unwrap_or(Type::Unknown)
     }
 
     fn infer_annotated_assignment_statement(&mut self, assignment: &ast::StmtAnnAssign) {
@@ -5584,6 +5656,27 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    #[test]
+    fn unpacked_tuple_assignment() {
+        let mut db = setup_db();
+
+        db.write_dedented(
+            "/src/a.py",
+            "
+            x, y = 1, 2
+            (a, (b, c), d) = (3, (4, 5), 6)
+            ",
+        )
+        .unwrap();
+
+        //assert_public_ty(&db, "/src/a.py", "x", "Literal[1]");
+        //assert_public_ty(&db, "/src/a.py", "y", "Literal[2]");
+        assert_public_ty(&db, "/src/a.py", "a", "Literal[3]");
+        assert_public_ty(&db, "/src/a.py", "b", "Literal[4]");
+        //assert_public_ty(&db, "/src/a.py", "c", "Literal[5]");
+        //assert_public_ty(&db, "/src/a.py", "d", "Literal[6]");
     }
 
     #[test]
