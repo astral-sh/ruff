@@ -9,6 +9,7 @@ use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
 use ruff_python_ast::AnyParameterRef;
+use ruff_python_ast::Expr;
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
