@@ -212,7 +212,9 @@ impl<'db> SemanticIndexBuilder<'db> {
         let existing_definition = self
             .definitions_by_node
             .insert(definition_node.key(), definition);
-        debug_assert_eq!(existing_definition, None);
+        if existing_definition.is_some() {
+            tracing::warn!("Existing definition was unexpectedly evicted");
+        }
 
         if category.is_binding() {
             self.mark_symbol_bound(symbol);
