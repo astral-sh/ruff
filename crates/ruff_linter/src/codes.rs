@@ -944,6 +944,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "011") => (RuleGroup::Removed, rules::ruff::rules::RuffStaticKeyDictComprehension),
         (Ruff, "012") => (RuleGroup::Stable, rules::ruff::rules::MutableClassDefault),
         (Ruff, "013") => (RuleGroup::Stable, rules::ruff::rules::ImplicitOptional),
+        (Ruff, "014") => (RuleGroup::Preview, rules::ruff::rules::UnreachableCode),
         (Ruff, "015") => (RuleGroup::Stable, rules::ruff::rules::UnnecessaryIterableAllocationForFirstElement),
         (Ruff, "016") => (RuleGroup::Stable, rules::ruff::rules::InvalidIndexType),
         (Ruff, "017") => (RuleGroup::Stable, rules::ruff::rules::QuadraticListSummation),
