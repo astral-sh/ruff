@@ -2704,7 +2704,54 @@ impl<'db> TypeInferenceBuilder<'db> {
             (_, Type::BytesLiteral(_)) => {
                 self.infer_binary_type_comparison(left, op, KnownClass::Bytes.to_instance(self.db))
             }
+            (Type::Tuple(lhs), Type::Tuple(rhs)) => {
+                // Note: This only works on heterogeneous tuple types.
+                let lhs_elements = lhs.elements(self.db).as_ref();
+                let rhs_elements = rhs.elements(self.db).as_ref();
 
+                match op {
+                    ast::CmpOp::Eq
+                    | ast::CmpOp::NotEq
+                    | ast::CmpOp::Lt
+                    | ast::CmpOp::LtE
+                    | ast::CmpOp::Gt
+                    | ast::CmpOp::GtE => {
+                        self.infer_lexicographic_type_comparison(lhs_elements, op, rhs_elements)
+                    }
+                    ast::CmpOp::In | ast::CmpOp::NotIn => {
+                        // - `[ast::CmpOp::In]`: returns `true` if the element is definitely in the tuple, otherwise `bool`
+                        // - `[ast::CmpOp::NotIn]`: returns `false` if the element is definitely in the tuple, otherwise `bool`
+                        if rhs_elements.iter().any(|ty| {
+                            let eq_result_ty = self.infer_binary_type_comparison(
+                                Type::Tuple(lhs),
+                                ast::CmpOp::Eq,
+                                *ty,
+                            );
+
+                            matches!(eq_result_ty, Some(Type::BooleanLiteral(true)))
+                        }) {
+                            Some(Type::BooleanLiteral(op.is_in()))
+                        } else {
+                            Some(KnownClass::Bool.to_instance(self.db))
+                        }
+                    }
+                    ast::CmpOp::Is | ast::CmpOp::IsNot => {
+                        // - `[ast::CmpOp::Is]`: returns `false` if the elements are definitely unequal, otherwise `bool`
+                        // - `[ast::CmpOp::IsNot]`: returns `true` if the elements are definitely unequal, otherwise `bool`
+                        let eq_result_ty = self.infer_lexicographic_type_comparison(
+                            lhs_elements,
+                            ast::CmpOp::Eq,
+                            rhs_elements,
+                        );
+
+                        if let Some(Type::BooleanLiteral(false)) = eq_result_ty {
+                            Some(Type::BooleanLiteral(!op.is_is()))
+                        } else {
+                            Some(KnownClass::Bool.to_instance(self.db))
+                        }
+                    }
+                }
+            }
             // Lookup the rich comparison `__dunder__` methods on instances
             (Type::Instance(left_class_ty), Type::Instance(right_class_ty)) => match op {
                 ast::CmpOp::Lt => {
@@ -2716,6 +2763,73 @@ impl<'db> TypeInferenceBuilder<'db> {
             // TODO: handle more types
             _ => Some(Type::Todo),
         }
+    }
+
+    /// Performs lexicographic comparison between two slices of types.
+    ///
+    /// This comparison supports only equality and ordering operators: `==`, `!=`, `<`, `<=`, `>`, `>=`.
+    /// For lexicographic comparison, elements from both slices are compared pairwise using
+    /// `infer_binary_type_comparison`. If a conclusive result cannot be determined as a `BoolLiteral`,
+    /// it returns `bool`. If the comparison is undefined between types, it returns `None`.
+    fn infer_lexicographic_type_comparison(
+        &mut self,
+        left: &[Type<'db>],
+        op: ast::CmpOp,
+        right: &[Type<'db>],
+    ) -> Option<Type<'db>> {
+        if !matches!(
+            op,
+            ast::CmpOp::Eq
+                | ast::CmpOp::NotEq
+                | ast::CmpOp::Lt
+                | ast::CmpOp::LtE
+                | ast::CmpOp::Gt
+                | ast::CmpOp::GtE
+        ) {
+            return None;
+        }
+
+        // Compare paired elements from left and right slices
+        for (l_ty, r_ty) in left.iter().zip(right.iter()) {
+            let eq_result_ty = self.infer_binary_type_comparison(*l_ty, ast::CmpOp::Eq, *r_ty);
+
+            match eq_result_ty {
+                // Types are equal, continue to the next pair
+                Some(Type::BooleanLiteral(true)) => continue,
+
+                // Types are not equal, perform the specified comparison and return the result
+                Some(Type::BooleanLiteral(false)) => {
+                    return self.infer_binary_type_comparison(*l_ty, op, *r_ty)
+                }
+
+                // If the intermediate result is a bool instance, we cannot determine the final result using BoolLiteral.
+                // In this case, we simply return a bool instance.
+                Some(Type::Instance(class_ty)) if class_ty.is_known(self.db, KnownClass::Bool) => {
+                    return Some(KnownClass::Bool.to_instance(self.db));
+                }
+
+                // TODO: Todo propagation; it should be removed later.
+                Some(Type::Todo) => return Some(Type::Todo),
+
+                // If comparison is undefined, return None
+                _ => return None,
+            }
+        }
+
+        // At this point, the lengths of the two slices are different, but the prefix of
+        // left and right slices is entirely identical.
+        // We return a comparison of the slice lengths based on the operator.
+        let (l_len, r_len) = (left.len(), right.len());
+
+        Some(Type::BooleanLiteral(match op {
+            ast::CmpOp::Eq => l_len == r_len,
+            ast::CmpOp::NotEq => l_len != r_len,
+            ast::CmpOp::Lt => l_len < r_len,
+            ast::CmpOp::LtE => l_len <= r_len,
+            ast::CmpOp::Gt => l_len > r_len,
+            ast::CmpOp::GtE => l_len >= r_len,
+            _ => return None,
+        }))
     }
 
     fn infer_subscript_expression(&mut self, subscript: &ast::ExprSubscript) -> Type<'db> {
@@ -4227,6 +4341,89 @@ mod tests {
         // compare by order of declaration
         assert_public_ty(&db, "src/a.py", "j", "Literal[True]");
 
+        Ok(())
+    }
+
+    #[test]
+    fn comparison_tuples() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "src/a.py",
+            r#"
+            def int_instance() -> int: ...
+
+            eq1 = (1, (2, "s")) == (1, (2, "s"))
+            eq2 = (1, 2) == (1, 2, 3)
+            eq3 = (1, "s") == (1, 2)
+            eq4 = (int_instance(),) == (1,)
+
+            not_eq1 = (1, (2, "s")) != (1, (2, "s"))
+            not_eq2 = (1, 2) != (1, 2, 3)
+
+            lt1 = (1,) < (1, 2) < (1, 3)
+            lt2 = (1, 2) < (1, 2)
+            lte = (1,) <= (1,) <= (1, 2)
+
+            gt1 = (1, 3) > (1, 2) > (1,)
+            gt2 = (1, 2) > (1, 2)
+            gte = (1, 2) >= (1,) >= (1,)
+            "#,
+        )?;
+
+        assert_public_ty(&db, "src/a.py", "eq1", "Literal[True]");
+        assert_public_ty(&db, "src/a.py", "eq2", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "eq3", "@Todo"); // TODO: It should be `Unknown`
+        assert_public_ty(&db, "src/a.py", "eq4", "@Todo"); // TODO: It should be `bool`
+
+        assert_public_ty(&db, "src/a.py", "not_eq1", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "not_eq2", "Literal[True]");
+
+        assert_public_ty(&db, "src/a.py", "lt1", "Literal[True]");
+        assert_public_ty(&db, "src/a.py", "lt2", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "lte", "Literal[True]");
+
+        assert_public_ty(&db, "src/a.py", "gt1", "Literal[True]");
+        assert_public_ty(&db, "src/a.py", "gt2", "Literal[False]");
+        assert_public_ty(&db, "src/a.py", "gte", "Literal[True]");
+
+        db.write_dedented(
+            "src/b.py",
+            r#"
+            def int_instance() -> int: ...
+
+            in1 = (1, 2) in ((1, 2), "123")
+            in2 = (1, 2) in (1, 2, 3)
+            in3 = (1,) in ((int_instance(),),)
+
+            not_in1 = (1, 2) not in ((1, 2), "123")
+            not_in2 = (1, 2) not in (1, 2, 3)
+            not_in3 = (1,) not in ((int_instance(),),)
+
+            is1 = (1, 2) is (1, 2)
+            is2 = (1, 2) is ("a", "b")
+            is3 = (1,) is (1, 2)
+
+            is_not1 = (1, 2) is not (1, 2)
+            is_not2 = (1, 2) is not ("a", "b")
+            is_not3 = (1,) is not (1, 2)
+            "#,
+        )?;
+
+        assert_public_ty(&db, "src/b.py", "in1", "Literal[True]");
+        assert_public_ty(&db, "src/b.py", "in2", "bool");
+        assert_public_ty(&db, "src/b.py", "in3", "bool");
+
+        assert_public_ty(&db, "src/b.py", "not_in1", "Literal[False]");
+        assert_public_ty(&db, "src/b.py", "not_in2", "bool");
+        assert_public_ty(&db, "src/b.py", "not_in3", "bool");
+
+        assert_public_ty(&db, "src/b.py", "is1", "bool");
+        assert_public_ty(&db, "src/b.py", "is2", "bool");
+        assert_public_ty(&db, "src/b.py", "is3", "Literal[False]");
+
+        assert_public_ty(&db, "src/b.py", "is_not1", "bool");
+        assert_public_ty(&db, "src/b.py", "is_not2", "bool");
+        assert_public_ty(&db, "src/b.py", "is_not3", "Literal[True]");
         Ok(())
     }
 
