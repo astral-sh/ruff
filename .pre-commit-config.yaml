@@ -28,6 +28,7 @@ repos:
         additional_dependencies:
           - mdformat-mkdocs
           - mdformat-admon
+          - mdformat-footnote
         exclude: |
           (?x)^(
             docs/formatter/black\.md
