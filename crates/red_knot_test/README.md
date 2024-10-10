@@ -27,7 +27,7 @@ fails.
 
 ## Assertions
 
-Two kinds of assertions are supported, `# revealed:` (shown above) and `# error:`.
+Two kinds of assertions are supported: `# revealed:` (shown above) and `# error:`.
 
 ### Assertion kinds
 
@@ -69,15 +69,13 @@ match any diagnostic. The matching can be narrowed in three ways:
     `invalid-assignment`.
 - `# error: "Some text"` requires that the matched diagnostic's full message contain the text `Some text`.
 
-Any combination of two or all three of these can be used, but they must go in order: first column,
-if present; then rule code, if present, then contains-text, if present. For example, an assertion
-using all three would look like `# error: 8 [invalid-assignment] "Some text"`.
+Any combination of some or all of these can be used in a single assertion, but they must come in
+order: first column, if present; then rule code, if present; then contains-text, if present. For
+example, an assertion using all three would look like
+`# error: 8 [invalid-assignment] "Some text"`.
 
-Error assertions in tests intended to test type checker semantics should use primarily rule-code
+Error assertions in tests intended to test type checker semantics should primarily use rule-code
 assertions, with occasional contains-text assertions where needed to disambiguate.
-
-Some tests may exist in order to assert on the correct text-range or text of a diagnostic; these
-should use the appropriate assertions.
 
 ### Assertion locations
 
@@ -105,11 +103,11 @@ x: str = 1
 
 Intervening empty lines or non-assertion comments are not allowed; an assertion stack must be one
 assertion per line, immediately following each other, with the line immediately following the last
-assertion the line of source code emitting the matched diagnostics.
+assertion as the line of source code on which the matched diagnostics are emitted.
 
 ## Multi-file tests
 
-Some tests require multiple files, with imports from one file to another. Multiple fenced code
+Some tests require multiple files, with imports from one file into another. Multiple fenced code
 blocks represent multiple embedded files. Since files must have unique names, only zero or one files
 can use the default name of `/src/test.py`. Other files must explicitly specify their file name:
 
@@ -160,9 +158,9 @@ This test suite contains two tests, one named "Same-file invalid assignment" and
 "Cross-file invalid assignment". The first test involves only a single embedded file, and the second
 test involves two embedded files.
 
-The tests are run independently, in independent in-memory file-systems and with new red-knot salsa
-databases (so each is a from-scratch run of the type checker, with no data persisting from any
-previous test.)
+The tests are run independently, in independent in-memory file systems and with new red-knot [Salsa](https://github.com/salsa-rs/salsa)
+databases. This means that each is a from-scratch run of the type checker, with no data persisting from any
+previous test.
 
 Due to Rust test runner limitations, an entire test suite (Markdown file) is run as a single Rust
 test, so it's not possible to select individual tests within it to run.
@@ -198,14 +196,15 @@ reveal_type("foo")  # revealed: Literal["foo"]
 This test suite contains three tests, named "Literals - Numbers - Integer", "Literals - Numbers -
 Float", and "Literals - Strings".
 
-A header-demarcated section must either be a test or a grouping header, it cannot be both. That is,
+A header-demarcated section must either be a test or a grouping header; it cannot be both. That is,
 a header section can either contain embedded files (making it a test), or it can contain more
 deeply-nested headers (headers with more `#`), but it cannot contain both.
 
 ## Documentation of tests
 
 Arbitrary Markdown syntax (including of course normal prose paragraphs) is permitted (and ignored by
-the test framework) between fenced code blocks. This allows naturally documenting test intentions:
+the test framework) between fenced code blocks. This permits natural documentation of
+why a test exists, and what it intends to assert:
 
 ````markdown
 Assigning a string to a variable annotated as `int` is not permitted:
@@ -222,8 +221,8 @@ implemented:
 
 ### Multi-line diagnostic assertions
 
-We may want to be able to assert that a diagnostic spans multiple lines, and which columns it
-begins/ends on. The planned syntax for this uses `<<<` and `>>>` to mark the start and end lines for
+We may want to be able to assert that a diagnostic spans multiple lines, and to assert the columns it
+begins and/or ends on. The planned syntax for this will use `<<<` and `>>>` to mark the start and end lines for
 an assertion:
 
 ```py
@@ -252,10 +251,10 @@ partial
 
 We may want to also support testing Jupyter notebooks as embedded files using the `json` language.
 
-Of course red-knot is only run directly on `py` and `pyi` files, and assertion comments are only
+Of course, red-knot is only run directly on `py` and `pyi` files, and assertion comments are only
 possible in these files.
 
-(A fenced code block with no language should always be an error.)
+A fenced code block with no language will always be an error.
 
 ### Configuration
 
@@ -266,6 +265,7 @@ TOML fenced code block:
 ```toml
 [tool.knot]
 warn-on-any = true
+```
 
 ```py
 from typing import Any
@@ -275,32 +275,34 @@ def f(x: Any):  # error: [use-of-any]
 ```
 ````
 
-It should be possible to include a TOML fenced code block in a single test (as shown), or in a
-grouping section, in which case it applies to all nested tests within that grouping section. Configs
-at multiple level are allowed and merged, with the most-nested (closest to the test) taking
-precedence.
+It should be possible to include a TOML-fenced code block in a single test (as shown), or in a
+grouping section, in which case it applies to all nested tests within that grouping section.
+Configurations at multiple level are allowed and merged, with the most-nested (closest to the test)
+taking precedence.
 
 ### Configuring search paths and kinds
 
 The red-knot TOML config format hasn't been designed yet, and we may want to implement support in
 the test framework for configuring search paths before it is designed. If so, we can define some
 configuration options for now under the `[tool.knot.tests]` namespace. In the future, perhaps some
-of these can be replaced by real red-knot config options, maybe some of them will be kept long term
+of these can be replaced by real red-knot config options; some or all may also be kept long-term
 as test-specific options.
 
-We should be able to configure the default workspace root to something other than `/src/` using a
+Other future planned changes to configuration include:
+
+- We should be able to configure the default workspace root to something other than `/src/` using a
 `workspace-root` config option.
 
-We should be able to add a third-party root using the `third-party-root` config option.
+- We should be able to add a third-party root using the `third-party-root` config option.
 
-We may want to add additional config options for setting additional search path kinds.
+- We may want to add additional config options for setting additional search path kinds.
 
 Paths for `workspace-root` and `third-party-root` must be absolute.
 
 Relative embedded-file paths are relative to the workspace root, even if it is explicitly set to a
 non-default value using the `workspace-root` config.
 
-### Specifying custom typeshed
+### Specifying a custom typeshed
 
 Some tests will need to override the default typeshed with custom files. The `[tool.knot.tests]`
 config option `typeshed-root` should be usable for this:
@@ -323,6 +325,7 @@ file path is `test.py`:
 
 ```py
 reveal_type(I_AM_THE_ONLY_BUILTIN)  # revealed: Literal[1]
+```
 
 ````
 
@@ -342,7 +345,7 @@ diagnostics in a particular location. But sometimes we will want to assert on th
 output of a test. Or sometimes (see “incremental tests” below) we will want to assert on diagnostics
 in a file, without impacting the contents of that file by changing a comment in it. In these cases,
 a Python fenced code block in a test could be followed by a fenced code block with language
-`output`; this contains the full diagnostic output for the preceding test file:
+`output`; this would contain the full diagnostic output for the preceding test file:
 
 ````markdown
 # full output
@@ -352,7 +355,7 @@ x = 1
 reveal_type(x)
 ```
 
-This is just an example, not a proposal that red-knot would every actually output diagnostics in
+This is just an example, not a proposal that red-knot would ever actually output diagnostics in
 precisely this format:
 
 ```output
@@ -361,9 +364,9 @@ test.py, line 1, col 1: revealed type is 'Literal[1]'
 ````
 
 We will want to build tooling to automatically capture and update these “full diagnostic output”
-blocks, when tests are run in an update-output mode (probably specified by env var.)
+blocks, when tests are run in an update-output mode (probably specified by an environment variable.)
 
-By default, an `output` block specifies diagnostic output for the file `<workspace-root>/test.py`.
+By default, an `output` block will specify diagnostic output for the file `<workspace-root>/test.py`.
 An `output` block can have a `path=` option, to explicitly specify the Python file for which it
 asserts diagnostic output, and a `stage=` option, to specify which stage of an incremental test it
 specifies diagnostic output at. (See “incremental tests” below.)
@@ -420,10 +423,10 @@ contents for `test.py` in stage 1, which we don't want to do in this test.)
 ````
 
 Any number of stages can be provided in an incremental test. If a stage re-specifies a filename that
-was specified in a previous stage (or the initial state), that file is modified. A new filename
-appearing for the first time in a new stage will create a new file. To delete a previously-created
+was specified in a previous stage (or the initial stage), that file is modified. A new filename
+appearing for the first time in a new stage will create a new file. To delete a previously created
 file, specify that file with the tag `delete` in its tag string (in this case, it is an error to
-provide non-empty contents.) Any previously-created files that are not re-specified in a later stage
+provide non-empty contents). Any previously-created files that are not re-specified in a later stage
 continue to exist with their previously-specified contents, and are not "touched".
 
 All stages should be run in order, incrementally, and then the final state should also be re-checked
