@@ -1365,7 +1365,7 @@ impl<'db> ClassType<'db> {
     ///
     /// # Panics:
     /// If `definition` is not a `DefinitionKind::Class`.
-    pub fn bases(&self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
+    pub fn bases(&self, db: &'db dyn Db) -> impl ExactSizeIterator<Item = Type<'db>> {
         let definition = self.definition(db);
         let DefinitionKind::Class(class_stmt_node) = definition.kind(db) else {
             panic!("Class type definition must have DefinitionKind::Class");
@@ -1376,7 +1376,13 @@ impl<'db> ClassType<'db> {
             .map(move |base_expr| definition_expression_ty(db, definition, base_expr))
     }
 
-    fn mro(&self, db: &'db dyn Db) -> Box<[ClassBase<'db>]> {
+    fn mro(self, db: &'db dyn Db) -> Box<[ClassBase<'db>]> {
+        if self.bases(db).len() == 0 {
+            return Box::new([
+                ClassBase::Class(self),
+                ClassBase::Class(KnownClass::Object.to_class(db).expect_class()),
+            ]);
+        }
         todo!()
     }
 
