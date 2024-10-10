@@ -818,7 +818,13 @@ if True:
 
         ----- stderr -----
         ruff failed
-          Cause: The `tab-size` option has been renamed to `indent-width` to emphasize that it configures the indentation used by the formatter as well as the tab width. Please update `[RUFF-TOML-PATH]` to use `indent-width = <value>` instead.
+          Cause: Failed to parse [RUFF-TOML-PATH]
+          Cause: TOML parse error at line 1, column 1
+          |
+        1 | 
+          | ^
+        unknown field `tab-size`
+
         "###);
     });
     Ok(())

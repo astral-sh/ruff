@@ -347,9 +347,7 @@ impl Configuration {
                     .unwrap_or_default(),
                 flake8_pytest_style: lint
                     .flake8_pytest_style
-                    .map(|options| {
-                        Flake8PytestStyleOptions::try_into_settings(options, lint_preview)
-                    })
+                    .map(Flake8PytestStyleOptions::try_into_settings)
                     .transpose()?
                     .unwrap_or_default(),
                 flake8_quotes: lint
@@ -444,26 +442,6 @@ impl Configuration {
                 ..LintOptions::default()
             }
         };
-
-        #[allow(deprecated)]
-        if options.tab_size.is_some() {
-            let config_to_update = path.map_or_else(
-                || String::from("your `--config` CLI arguments"),
-                |path| format!("`{}`", fs::relativize_path(path)),
-            );
-            return Err(anyhow!("The `tab-size` option has been renamed to `indent-width` to emphasize that it configures the indentation used by the formatter as well as the tab width. Please update {config_to_update} to use `indent-width = <value>` instead."));
-        }
-
-        #[allow(deprecated)]
-        if options.output_format == Some(OutputFormat::Text) {
-            let config_to_update = path.map_or_else(
-                || String::from("your `--config` CLI arguments"),
-                |path| format!("`{}`", fs::relativize_path(path)),
-            );
-            return Err(anyhow!(
-                r#"The option `output_format=text` is no longer supported. Update {config_to_update} to use `output-format="concise"` or  `output-format="full"` instead."#
-            ));
-        }
 
         Ok(Self {
             builtins: options.builtins,
@@ -626,7 +604,6 @@ pub struct LintConfiguration {
     pub logger_objects: Option<Vec<String>>,
     pub task_tags: Option<Vec<String>>,
     pub typing_modules: Option<Vec<String>>,
-    pub allowed_unused_imports: Option<Vec<String>>,
 
     // Plugins
     pub flake8_annotations: Option<Flake8AnnotationsOptions>,
@@ -739,7 +716,7 @@ impl LintConfiguration {
             task_tags: options.common.task_tags,
             logger_objects: options.common.logger_objects,
             typing_modules: options.common.typing_modules,
-            allowed_unused_imports: options.common.allowed_unused_imports,
+
             // Plugins
             flake8_annotations: options.common.flake8_annotations,
             flake8_bandit: options.common.flake8_bandit,
@@ -1108,9 +1085,7 @@ impl LintConfiguration {
                 .or(config.explicit_preview_rules),
             task_tags: self.task_tags.or(config.task_tags),
             typing_modules: self.typing_modules.or(config.typing_modules),
-            allowed_unused_imports: self
-                .allowed_unused_imports
-                .or(config.allowed_unused_imports),
+
             // Plugins
             flake8_annotations: self.flake8_annotations.combine(config.flake8_annotations),
             flake8_bandit: self.flake8_bandit.combine(config.flake8_bandit),
@@ -1332,7 +1307,6 @@ fn warn_about_deprecated_top_level_lint_options(
         explicit_preview_rules,
         task_tags,
         typing_modules,
-        allowed_unused_imports,
         unfixable,
         flake8_annotations,
         flake8_bandit,
@@ -1430,9 +1404,6 @@ fn warn_about_deprecated_top_level_lint_options(
 
     if typing_modules.is_some() {
         used_options.push("typing-modules");
-    }
-    if allowed_unused_imports.is_some() {
-        used_options.push("allowed-unused-imports");
     }
 
     if unfixable.is_some() {

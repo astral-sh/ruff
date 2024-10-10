@@ -589,7 +589,7 @@ Options:
           Ignore any `# noqa` comments
       --output-format <OUTPUT_FORMAT>
           Output serialization format for violations. The default serialization
-          format is "full" [env: RUFF_OUTPUT_FORMAT=] [possible values: text,
+          format is "full" [env: RUFF_OUTPUT_FORMAT=] [possible values:
           concise, full, json, json-lines, junit, grouped, github, gitlab,
           pylint, rdjson, azure, sarif]
   -o, --output-file <OUTPUT_FILE>

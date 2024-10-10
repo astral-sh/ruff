@@ -58,7 +58,6 @@ mod tests {
     }
 
     #[test_case(Rule::IfElseBlockInsteadOfIfExp, Path::new("SIM108.py"))]
-    #[test_case(Rule::OpenFileWithContextHandler, Path::new("SIM115.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

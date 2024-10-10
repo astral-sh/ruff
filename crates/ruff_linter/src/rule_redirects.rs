@@ -125,5 +125,7 @@ static REDIRECTS: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
         ("PLW0117", "PLW0177"),
         // See: https://github.com/astral-sh/ruff/issues/12110
         ("RUF025", "C420"),
+        // See: https://github.com/astral-sh/ruff/issues/13492
+        ("TRY302", "TRY203"),
     ])
 });
