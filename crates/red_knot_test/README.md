@@ -148,7 +148,7 @@ x: int = "foo"  # error: [invalid-assignment]
 
 ```py
 from b import y
-x: int = y  3 error: [invalid-assignment]
+x: int = y  # error: [invalid-assignment]
 ```
 
 ```py path=b.py
