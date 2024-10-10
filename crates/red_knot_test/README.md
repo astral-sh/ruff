@@ -98,7 +98,7 @@ Multiple assertions applying to the same line may be stacked:
 ```py
 # error: [invalid-assignment]
 # revealed: Literal[1]
-x: str = 1
+x: str = reveal_type(1)
 ```
 
 Intervening empty lines or non-assertion comments are not allowed; an assertion stack must be one
@@ -293,20 +293,20 @@ variable.
 
 ### Configuring search paths and kinds
 
-The red-knot TOML config format hasn't been designed yet, and we may want to implement support in
-the test framework for configuring search paths before it is designed. If so, we can define some
-configuration options for now under the `[tool.knot.tests]` namespace. In the future, perhaps some
-of these can be replaced by real red-knot config options; some or all may also be kept long-term
-as test-specific options.
+The red-knot TOML configuration format hasn't been designed yet, and we may want to implement
+support in the test framework for configuring search paths before it is designed. If so, we can
+define some configuration options for now under the `[tool.knot.tests]` namespace. In the future,
+perhaps some of these can be replaced by real red-knot configuration options; some or all may also
+be kept long-term as test-specific options.
 
-Other future planned changes to configuration include:
+Some configuration options we will want to provide:
 
 - We should be able to configure the default workspace root to something other than `/src/` using a
-    `workspace-root` config option.
+    `workspace-root` configuration option.
 
-- We should be able to add a third-party root using the `third-party-root` config option.
+- We should be able to add a third-party root using the `third-party-root` configuration option.
 
-- We may want to add additional config options for setting additional search path kinds.
+- We may want to add additional configuration options for setting additional search path kinds.
 
 Paths for `workspace-root` and `third-party-root` must be absolute.
 
@@ -316,7 +316,7 @@ non-default value using the `workspace-root` config.
 ### Specifying a custom typeshed
 
 Some tests will need to override the default typeshed with custom files. The `[tool.knot.tests]`
-config option `typeshed-root` should be usable for this:
+configuration option `typeshed-root` should be usable for this:
 
 ````markdown
 ```toml
@@ -347,7 +347,8 @@ versions.
 
 ### I/O errors
 
-We could use an `error=` config option in the tag string to make a file cause an I/O error on read.
+We could use an `error=` configuration option in the tag string to make an embedded file cause an
+I/O error on read.
 
 ### Asserting on full diagnostic output
 
