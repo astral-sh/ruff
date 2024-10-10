@@ -59,7 +59,16 @@ pub(crate) fn string_or_bytes_too_long(checker: &mut Checker, string: StringLike
         return;
     }
 
-    if semantic.in_annotation() {
+    // Ignore strings in typing annotations like `Literal["YouAreHere"]` or `Annotated[int, "YouAreHere"]`
+    //
+    // This does not ignore other instances of strings in annotations, such as return types
+    // for long classes wrapped in quotes:
+    // ```python
+    // def f(x:int) -> "StillChecksThisString"
+    // ```
+    // If it becomes desirable to skip annotations more broadly, replace the
+    // below with `if semantic.in_annotation()`.
+    if semantic.in_typing_literal() | semantic.in_typing_annotated_pep593() {
         return;
     }
 
