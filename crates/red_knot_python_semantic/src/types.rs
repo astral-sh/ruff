@@ -1,6 +1,8 @@
 use infer::TypeInferenceBuilder;
+use itertools::Itertools;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
+use rustc_hash::FxHashSet;
 use std::collections::VecDeque;
 use std::fmt::Debug;
 
@@ -1383,15 +1385,16 @@ impl<'db> ClassType<'db> {
         let object = KnownClass::Object.to_class(db);
 
         if Type::Class(*self) == object {
-            // Uniquely among Python classes,
-            // `object` has no bases:
+            // Uniquely among Python classes, `object` has no bases:
             //
             // ```pycon
             // >>> object.__bases__
             // ()
             // ```
-            Box::new([])
+            Box::default()
         } else if base_nodes.is_empty() {
+            // All Python classes that have an empty bases list in their AST
+            // implicitly inherit from `object`:
             Box::new([KnownClass::Object.to_class(db)])
         } else {
             base_nodes
@@ -1401,49 +1404,89 @@ impl<'db> ClassType<'db> {
         }
     }
 
-    /// Return the [method resolution order] for this class.
+    /// Return the possible [method resolution order]s ("MRO"s) for this class.
     ///
-    /// This is the tuple of classes that can be retrieved as the `__mro__`
-    /// attribute on a class at runtime.
+    /// The MRO is the tuple of classes that can be retrieved as the `__mro__`
+    /// attribute on a class at runtime. Because the inferred type of a class base
+    /// could be a union, any class could have multiple possible MROs.
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
-    fn mro(self, db: &'db dyn Db) -> Option<Mro<'db>> {
-        let bases = self.bases(db);
-        match &*bases {
-            // fast path for a common case: no explicit bases given:
-            [] => {
-                debug_assert_eq!(Type::Class(self), KnownClass::Object.to_class(db));
-                Some(Mro::from([ClassBase::Class(self)]))
-            }
-            // fast path for a common case: only inherits from a single base
-            [single_base] => {
-                let object = KnownClass::Object.to_class(db);
-                return Some(if *single_base == object {
-                    Mro::from([
-                        ClassBase::Class(self),
-                        ClassBase::Class(object.expect_class()),
-                    ])
-                } else {
-                    Mro(std::iter::once(ClassBase::Class(self))
-                        .chain(ClassBase::from(single_base).mro(db)?.iter().copied())
-                        .collect())
-                });
-            }
-            // slow path: fall back to full C3 linearisation algorithm
-            // as described in https://docs.python.org/3/howto/mro.html#python-2-3-mro
-            //
-            // For a Python-3 translation of the algorithm described in that document,
-            // see https://gist.github.com/AlexWaygood/674db1fce6856a90f251f63e73853639
-            _ => {
-                let bases: VecDeque<ClassBase<'_>> = bases.iter().map(ClassBase::from).collect();
-                let mut seqs = vec![VecDeque::from([ClassBase::Class(self)])];
-                for base in &bases {
-                    seqs.push(base.mro(db)?.into_deque());
+    fn mro_possibilities(self, db: &'db dyn Db) -> FxHashSet<Option<Mro<'db>>> {
+        let bases_possibilities = fork_bases(db, &self.bases(db));
+        debug_assert_ne!(bases_possibilities.len(), 0);
+        let mut mro_possibilities = FxHashSet::default();
+        for bases_possibility in bases_possibilities {
+            match &*bases_possibility {
+                // fast path for a common case: no explicit bases given:
+                [] => {
+                    debug_assert_eq!(Type::Class(self), KnownClass::Object.to_class(db));
+                    mro_possibilities.insert(Some(Mro::from([ClassBase::Class(self)])));
                 }
-                seqs.push(bases);
-                c3_merge(seqs)
+                // fast path for a common case: only inherits from a single base
+                [single_base] => {
+                    let object = KnownClass::Object.to_class(db);
+                    if *single_base == object {
+                        mro_possibilities.insert(Some(Mro::from([
+                            ClassBase::Class(self),
+                            ClassBase::Class(object.expect_class()),
+                        ])));
+                    } else {
+                        for possibility in ClassBase::from(single_base).mro_possibilities(db) {
+                            let Some(possibility) = possibility else {
+                                mro_possibilities.insert(None);
+                                continue;
+                            };
+                            mro_possibilities.insert(Some(Mro(std::iter::once(ClassBase::Class(
+                                self,
+                            ))
+                            .chain(possibility)
+                            .collect())));
+                        }
+                    }
+                }
+                // slow path: fall back to full C3 linearisation algorithm
+                // as described in https://docs.python.org/3/howto/mro.html#python-2-3-mro
+                //
+                // For a Python-3 translation of the algorithm described in that document,
+                // see https://gist.github.com/AlexWaygood/674db1fce6856a90f251f63e73853639
+                _ => {
+                    let bases: VecDeque<ClassBase<'_>> =
+                        bases_possibility.iter().map(ClassBase::from).collect();
+
+                    let possible_mros_per_base = bases
+                        .iter()
+                        .map(|base| base.mro_possibilities(db))
+                        .collect_vec();
+                    let cartesian_product = possible_mros_per_base
+                        .iter()
+                        .map(|mro_set| mro_set.iter())
+                        .multi_cartesian_product();
+
+                    // Each `possible_mros_of_bases` is a concrete possibility of the list of mros of all of the bases:
+                    // where the bases are `[B1, B2, B..N]`, `possible_mros_of_bases` represents one possibility of
+                    // `[mro_of_B1, mro_of_B2, mro_of_B..N]`
+                    for possible_mros_of_bases in cartesian_product {
+                        let Some(possible_mros_of_bases) = possible_mros_of_bases
+                            .into_iter()
+                            .map(|maybe_mro| maybe_mro.to_owned().map(Mro::into_deque))
+                            .collect::<Option<Vec<_>>>()
+                        else {
+                            mro_possibilities.insert(None);
+                            continue;
+                        };
+                        let linearized = c3_merge(
+                            std::iter::once(VecDeque::from([ClassBase::Class(self)]))
+                                .chain(possible_mros_of_bases)
+                                .chain(std::iter::once(bases.clone()))
+                                .collect(),
+                        );
+                        mro_possibilities.insert(linearized);
+                    }
+                }
             }
         }
+        debug_assert_ne!(mro_possibilities.len(), 0);
+        mro_possibilities
     }
 
     /// Returns the class member of this class named `name`.
@@ -1451,8 +1494,16 @@ impl<'db> ClassType<'db> {
     /// The member resolves to a member of the class itself or any of its bases.
     pub fn class_member(self, db: &'db dyn Db, name: &str) -> Type<'db> {
         if name == "__mro__" {
-            let elements = self.mro(db).unwrap().iter().map(Type::from).collect();
-            return Type::Tuple(TupleType::new(db, elements));
+            let mro_possibilities = self.mro_possibilities(db);
+            let mut union_builder = UnionBuilder::new(db);
+            for mro in mro_possibilities {
+                let Some(mro) = mro else {
+                    continue; // TODO
+                };
+                let elements = mro.iter().map(Type::from).collect();
+                union_builder = union_builder.add(Type::Tuple(TupleType::new(db, elements)));
+            }
+            return union_builder.build();
         }
 
         let member = self.own_class_member(db, name);
@@ -1470,18 +1521,63 @@ impl<'db> ClassType<'db> {
     }
 
     pub fn inherited_class_member(self, db: &'db dyn Db, name: &str) -> Type<'db> {
-        for base in &self.mro(db).unwrap() {
-            let member = base.own_class_member(db, name);
-            if !member.is_unbound() {
-                return member;
+        let mro_possibilities = self.mro_possibilities(db);
+        let mut union_builder = UnionBuilder::new(db);
+        'outer: for mro in mro_possibilities {
+            let Some(mro) = mro else {
+                continue; // TODO
+            };
+            for base in &mro {
+                let member = base.own_class_member(db, name);
+                if !member.is_unbound() {
+                    union_builder = union_builder.add(member);
+                    continue 'outer;
+                }
             }
+            union_builder = union_builder.add(Type::Unbound);
         }
-
-        Type::Unbound
+        union_builder.build()
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+fn fork_bases<'db>(db: &'db dyn Db, bases: &[Type<'db>]) -> FxHashSet<Box<[Type<'db>]>> {
+    let mut possibilities = FxHashSet::from_iter([Box::default()]);
+    for base in bases {
+        possibilities = add_next_base(db, &possibilities, *base);
+    }
+    debug_assert_ne!(possibilities.len(), 0);
+    possibilities
+}
+
+fn add_next_base<'db>(
+    db: &'db dyn Db,
+    bases_possibilities: &FxHashSet<Box<[Type<'db>]>>,
+    next_base: Type<'db>,
+) -> FxHashSet<Box<[Type<'db>]>> {
+    debug_assert_ne!(bases_possibilities.len(), 0);
+    let mut new_possibilities = FxHashSet::default();
+    let mut add_non_union_base = |fork: &[Type<'db>], base: Type<'db>| {
+        new_possibilities.insert(fork.iter().copied().chain(std::iter::once(base)).collect());
+    };
+    match next_base {
+        Type::Union(union) => {
+            for element in union.elements(db) {
+                for existing_possibility in bases_possibilities {
+                    add_non_union_base(existing_possibility, *element);
+                }
+            }
+        }
+        _ => {
+            for possibility in bases_possibilities {
+                add_non_union_base(possibility, next_base);
+            }
+        }
+    }
+    debug_assert_ne!(new_possibilities.len(), 0);
+    new_possibilities
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 enum ClassBase<'db> {
     Class(ClassType<'db>),
     Any,
@@ -1490,13 +1586,15 @@ enum ClassBase<'db> {
 }
 
 impl<'db> ClassBase<'db> {
-    fn mro(self, db: &'db dyn Db) -> Option<Mro<'db>> {
+    fn mro_possibilities(self, db: &'db dyn Db) -> FxHashSet<Option<Mro<'db>>> {
         match self {
-            ClassBase::Class(class) => class.mro(db),
-            ClassBase::Any | ClassBase::Todo | ClassBase::Unknown => Some(Mro::from([
-                self,
-                ClassBase::Class(KnownClass::Object.to_class(db).expect_class()),
-            ])),
+            ClassBase::Class(class) => class.mro_possibilities(db),
+            ClassBase::Any | ClassBase::Todo | ClassBase::Unknown => {
+                FxHashSet::from_iter([Some(Mro::from([
+                    self,
+                    ClassBase::Class(KnownClass::Object.to_class(db).expect_class()),
+                ]))])
+            }
         }
     }
 
@@ -1573,7 +1671,7 @@ impl<'db> From<&ClassBase<'db>> for Type<'db> {
     }
 }
 
-#[derive(PartialEq, Eq, Default)]
+#[derive(PartialEq, Eq, Default, Hash, Clone)]
 struct Mro<'db>(VecDeque<ClassBase<'db>>);
 
 impl<'db> Mro<'db> {
@@ -1606,6 +1704,15 @@ impl<'a, 'db> IntoIterator for &'a Mro<'db> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
+    }
+}
+
+impl<'db> IntoIterator for Mro<'db> {
+    type IntoIter = std::collections::vec_deque::IntoIter<ClassBase<'db>>;
+    type Item = ClassBase<'db>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
     }
 }
 
