@@ -25,9 +25,11 @@ match the resulting diagnostics with the assertions in the test. Assertions are 
 Python comments. If all diagnostics and all assertions are matched, the test passes; otherwise, it
 fails.
 
+<!---
 (If you are reading this document in raw Markdown source rather than rendered Markdown, note that
 the quadruple-backtick-fenced "markdown" language code block above is NOT itself part of the mdtest
 syntax, it's just how this README embeds an example mdtest Markdown document.)
+--->
 
 See actual example mdtest suites in
 [`crates/red_knot_python_semantic/resources/mdtest`](https://github.com/astral-sh/ruff/tree/main/crates/red_knot_python_semantic/resources/mdtest).
