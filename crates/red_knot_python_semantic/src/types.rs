@@ -1457,6 +1457,7 @@ impl<'db> ClassType<'db> {
                         .iter()
                         .map(|base| base.mro_possibilities(db))
                         .collect_vec();
+
                     let cartesian_product = possible_mros_per_base
                         .iter()
                         .map(|mro_set| mro_set.iter())

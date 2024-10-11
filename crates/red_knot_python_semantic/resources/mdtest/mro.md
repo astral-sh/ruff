@@ -206,3 +206,24 @@ reveal_type(D.__mro__)  # revealed: tuple[Literal[D], Literal[A], Unknown, Liter
 reveal_type(E.__mro__)  # revealed: tuple[Literal[E], Literal[B], Literal[C], Literal[object]]
 reveal_type(F.__mro__)  # revealed: tuple[Literal[F], Literal[E], Literal[B], Literal[C], Literal[A], Unknown, Literal[object]]
 ```
+
+## `__bases__` includes a `Union`
+
+```py
+def returns_bool() -> bool:
+    return True
+
+if returns_bool():
+    x = float
+else:
+    x = int
+
+reveal_type(x)  # revealed: Literal[float, int]
+
+class Foo(x):
+    pass
+
+reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Literal[float], Literal[object]] | tuple[Literal[Foo], Literal[int], Literal[object]]
+```
+
+
