@@ -1470,8 +1470,8 @@ impl<'db> ClassType<'db> {
     }
 
     pub fn inherited_class_member(self, db: &'db dyn Db, name: &str) -> Type<'db> {
-        for base in self.bases(db) {
-            let member = base.member(db, name);
+        for base in &self.mro(db).unwrap() {
+            let member = base.own_class_member(db, name);
             if !member.is_unbound() {
                 return member;
             }
@@ -1497,6 +1497,15 @@ impl<'db> ClassBase<'db> {
                 self,
                 ClassBase::Class(KnownClass::Object.to_class(db).expect_class()),
             ])),
+        }
+    }
+
+    fn own_class_member(self, db: &'db dyn Db, member: &str) -> Type<'db> {
+        match self {
+            Self::Any => Type::Any,
+            Self::Todo => Type::Todo,
+            Self::Unknown => Type::Unknown,
+            Self::Class(class) => class.own_class_member(db, member),
         }
     }
 
