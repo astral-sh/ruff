@@ -28,6 +28,7 @@
 //! definitions once the rest of the types in the scope have been inferred.
 use itertools::Itertools;
 use std::num::NonZeroU32;
+use std::slice::Iter;
 
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
@@ -1198,6 +1199,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         value_ty: Type<'db>,
         variable: &ast::ExprName,
     ) -> Type<'db> {
+        // The inner function is recursive and only differs in the return type which is an `Option`
+        // where if the variable is found, the corresponding type is returned otherwise `None`.
         fn inner<'db>(
             builder: &mut TypeInferenceBuilder<'db>,
             target: &ast::Expr,
@@ -1211,28 +1214,44 @@ impl<'db> TypeInferenceBuilder<'db> {
                     return Some(value_ty);
                 }
                 ast::Expr::List(ast::ExprList { elts, .. })
-                | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                    for (index, element) in elts.iter().enumerate() {
-                        let element_ty = match value_ty {
-                            Type::Tuple(tuple_ty) => {
-                                tuple_ty.get(builder.db, index).unwrap_or(Type::Unknown)
+                | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => match value_ty {
+                    Type::Tuple(tuple_ty) => {
+                        let mut unpack_types_iter =
+                            UnpackTypesIter::new(elts, tuple_ty.elements(builder.db));
+                        for element in elts {
+                            if let Some(ty) = inner(
+                                builder,
+                                element,
+                                unpack_types_iter.next().unwrap_or(Type::Unknown),
+                                variable,
+                            ) {
+                                return Some(ty);
                             }
-                            Type::StringLiteral(string_literal_ty) => {
-                                let string_length = string_literal_ty.len(builder.db);
-                                if index < string_length {
-                                    Type::LiteralString
-                                } else {
-                                    Type::Unknown
-                                }
-                            }
-                            Type::LiteralString => Type::LiteralString,
-                            _ => Type::Unknown,
-                        };
-                        if let Some(ty) = inner(builder, element, element_ty, variable) {
-                            return Some(ty);
                         }
                     }
-                }
+                    Type::StringLiteral(string_literal_ty) => {
+                        for (index, element) in elts.iter().enumerate() {
+                            let string_length = string_literal_ty.len(builder.db);
+                            let element_ty = if index < string_length {
+                                Type::LiteralString
+                            } else {
+                                Type::Unknown
+                            };
+                            if let Some(ty) = inner(builder, element, element_ty, variable) {
+                                return Some(ty);
+                            }
+                        }
+                    }
+                    Type::LiteralString => {
+                        for element in elts {
+                            if let Some(ty) = inner(builder, element, Type::LiteralString, variable)
+                            {
+                                return Some(ty);
+                            }
+                        }
+                    }
+                    _ => {}
+                },
                 _ => {}
             }
             None
@@ -3330,6 +3349,78 @@ fn perform_rich_comparison<'db>(
 
     // TODO: reflected dunder -- (==, ==), (!=, !=), (<, >), (>, <), (<=, >=), (>=, <=)
     None
+}
+
+#[derive(Debug, PartialEq)]
+enum StarredExprKind {
+    Any,
+    Combine,
+    Other,
+}
+
+struct UnpackTypesIter<'db, 'a> {
+    types: Iter<'a, Type<'db>>,
+    current_index: usize,
+    targets_len: usize,
+    starred_index: Option<usize>,
+    starred_expr_kind: StarredExprKind,
+}
+
+impl<'db, 'a> UnpackTypesIter<'db, 'a> {
+    fn new(elements: &'a [ast::Expr], types: &'a [Type<'db>]) -> Self {
+        let starred_index = elements.iter().position(ast::Expr::is_starred_expr);
+
+        let starred_expr_kind = if starred_index.is_some() {
+            if types.len() >= elements.len() {
+                StarredExprKind::Combine
+            } else if types.len() == elements.len() - 1 {
+                StarredExprKind::Any
+            } else {
+                StarredExprKind::Other
+            }
+        } else {
+            StarredExprKind::Other
+        };
+
+        Self {
+            types: types.iter(),
+            current_index: 0,
+            targets_len: elements.len(),
+            starred_index,
+            starred_expr_kind,
+        }
+    }
+}
+
+impl<'db, 'a> Iterator for UnpackTypesIter<'db, 'a> {
+    type Item = Type<'db>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let at_starred = self.starred_index == Some(self.current_index);
+        self.current_index += 1;
+        if at_starred && self.starred_expr_kind == StarredExprKind::Any {
+            return Some(Type::Any);
+        }
+
+        let next_ty = self.types.next().copied()?;
+
+        if at_starred && self.starred_expr_kind == StarredExprKind::Combine {
+            let mut types = vec![next_ty];
+            let remaining = self.targets_len - self.current_index;
+            while self.types.len() != remaining {
+                let Some(next_ty) = self.types.next().copied() else {
+                    break;
+                };
+                types.push(next_ty);
+            }
+
+            // TODO: combine_types(types)
+
+            Some(Type::Todo)
+        } else {
+            Some(next_ty)
+        }
+    }
 }
 
 #[cfg(test)]

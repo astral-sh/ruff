@@ -1539,6 +1539,10 @@ impl<'db> TupleType<'db> {
     pub fn get(&self, db: &'db dyn Db, index: usize) -> Option<Type<'db>> {
         self.elements(db).get(index).copied()
     }
+
+    pub fn len(&self, db: &'db dyn Db) -> usize {
+        self.elements(db).len()
+    }
 }
 
 #[cfg(test)]
