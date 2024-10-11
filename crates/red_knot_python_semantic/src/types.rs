@@ -1,5 +1,4 @@
 use infer::TypeInferenceBuilder;
-use itertools::Itertools;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 use std::collections::VecDeque;
@@ -1365,6 +1364,14 @@ impl<'db> ClassType<'db> {
 
     /// Return an array of the types of this class's bases.
     ///
+    /// The returned array should exactly match the result of `t.__bases__`
+    /// at runtime in Python, where `t` is the runtime Python class
+    /// represented by `self` in this method. Note that this means that
+    /// it will not necessarily match the arguments passed as bases in the
+    /// class definition: `class C: pass` creates a class `C` where
+    /// `C.__bases__ == (object,)`, even though there were no bases passed
+    /// in the class definition.
+    ///
     /// # Panics:
     /// If `definition` is not a `DefinitionKind::Class`.
     pub fn bases(&self, db: &'db dyn Db) -> Box<[Type<'db>]> {
@@ -1375,7 +1382,10 @@ impl<'db> ClassType<'db> {
         let base_nodes = class_stmt_node.bases();
         let object = KnownClass::Object.to_class(db);
 
-        if *self == object.expect_class() {
+        if Type::Class(*self) == object {
+            // Uniquely among Python classes,
+            // `object` has no bases:
+            //
             // ```pycon
             // >>> object.__bases__
             // ()
@@ -1391,13 +1401,21 @@ impl<'db> ClassType<'db> {
         }
     }
 
+    /// Return the [method resolution order] for this class.
+    ///
+    /// This is the tuple of classes that can be retrieved as the `__mro__`
+    /// attribute on a class at runtime.
+    ///
+    /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
     fn mro(self, db: &'db dyn Db) -> Option<Mro<'db>> {
         let bases = self.bases(db);
         match &*bases {
+            // fast path for a common case: no explicit bases given:
             [] => {
-                debug_assert_eq!(self, KnownClass::Object.to_class(db).expect_class());
+                debug_assert_eq!(Type::Class(self), KnownClass::Object.to_class(db));
                 Some(Mro::from([ClassBase::Class(self)]))
             }
+            // fast path for a common case: only inherits from a single base
             [single_base] => {
                 let object = KnownClass::Object.to_class(db);
                 return Some(if *single_base == object {
@@ -1411,6 +1429,11 @@ impl<'db> ClassType<'db> {
                         .collect())
                 });
             }
+            // slow path: fall back to full C3 linearisation algorithm
+            // as described in https://docs.python.org/3/howto/mro.html#python-2-3-mro
+            //
+            // For a Python-3 translation of the algorithm described in that document,
+            // see https://gist.github.com/AlexWaygood/674db1fce6856a90f251f63e73853639
             _ => {
                 let bases: VecDeque<ClassBase<'_>> = bases.iter().map(ClassBase::from).collect();
                 let mut seqs = vec![VecDeque::from([ClassBase::Class(self)])];
@@ -1428,11 +1451,10 @@ impl<'db> ClassType<'db> {
     /// The member resolves to a member of the class itself or any of its bases.
     pub fn class_member(self, db: &'db dyn Db, name: &str) -> Type<'db> {
         if name == "__mro__" {
-            return Type::Tuple(TupleType::new(
-                db,
-                self.mro(db).unwrap().0.iter().map(Type::from).collect(),
-            ));
+            let elements = self.mro(db).unwrap().iter().map(Type::from).collect();
+            return Type::Tuple(TupleType::new(db, elements));
         }
+
         let member = self.own_class_member(db, name);
         if !member.is_unbound() {
             return member;
@@ -1468,10 +1490,6 @@ enum ClassBase<'db> {
 }
 
 impl<'db> ClassBase<'db> {
-    const fn is_dynamic(self) -> bool {
-        !matches!(self, ClassBase::Class(_))
-    }
-
     fn mro(self, db: &'db dyn Db) -> Option<Mro<'db>> {
         match self {
             ClassBase::Class(class) => class.mro(db),
@@ -1482,7 +1500,7 @@ impl<'db> ClassBase<'db> {
         }
     }
 
-    fn display(&self, db: &'db dyn Db) -> String {
+    fn display(self, db: &'db dyn Db) -> String {
         match self {
             Self::Any => "ClassBase(Any)".to_string(),
             Self::Todo => "ClassBase(Todo)".to_string(),
@@ -1582,6 +1600,11 @@ impl<'a, 'db> IntoIterator for &'a Mro<'db> {
     }
 }
 
+/// Implementation of the [C3-merge algorithm] for calculating a Python class's
+/// [method resolution order].
+///
+/// [C3-merge algorithm]: https://docs.python.org/3/howto/mro.html#python-2-3-mro
+/// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
 fn c3_merge(mut seqs: Vec<VecDeque<ClassBase>>) -> Option<Mro> {
     let mut mro = Mro::default();
 
@@ -1595,20 +1618,20 @@ fn c3_merge(mut seqs: Vec<VecDeque<ClassBase>>) -> Option<Mro> {
         let mut candidate: Option<ClassBase> = None;
 
         for seq in &seqs {
-            candidate = Some(seq[0]);
+            let maybe_candidate = seq[0];
 
-            let not_head = seqs
+            let is_valid_candidate = !seqs
                 .iter()
-                .any(|seq| seq.iter().skip(1).any(|base| Some(*base) == candidate));
+                .any(|seq| seq.iter().skip(1).any(|base| base == &maybe_candidate));
 
-            if not_head {
-                candidate = None;
-            } else {
+            if is_valid_candidate {
+                candidate = Some(maybe_candidate);
                 break;
             }
         }
 
         let candidate = candidate?;
+
         mro.push(candidate);
 
         for seq in &mut seqs {
