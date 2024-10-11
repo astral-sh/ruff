@@ -3,9 +3,9 @@ use itertools::Itertools;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 use rustc_hash::FxHashSet;
+use std::borrow::Cow;
 use std::collections::VecDeque;
 use std::fmt::Debug;
-use std::borrow::Cow;
 
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::ast_ids::HasScopedAstId;
@@ -1367,7 +1367,11 @@ impl<'db> ClassType<'db> {
             match &*bases_possibility {
                 // fast path for a common case: no explicit bases given:
                 [] => {
-                    debug_assert_eq!(Type::Class(self), KnownClass::Object.to_class(db));
+                    debug_assert_eq!(
+                        Type::Class(self),
+                        KnownClass::Object.to_class(db),
+                        "Only `object` should have 0 bases in Python"
+                    );
                     mro_possibilities.insert(Some(Mro::from([ClassBase::Class(self)])));
                 }
                 // fast path for a common case: only inherits from a single base
@@ -1551,7 +1555,6 @@ fn fork_bases<'db>(db: &'db dyn Db, bases: &[Type<'db>]) -> FxHashSet<Box<[Type<
     for base in bases {
         possibilities = add_next_base(db, &possibilities, *base);
     }
-    debug_assert_ne!(possibilities.len(), 0);
     possibilities
 }
 
@@ -1560,7 +1563,6 @@ fn add_next_base<'db>(
     bases_possibilities: &FxHashSet<Box<[Type<'db>]>>,
     next_base: Type<'db>,
 ) -> FxHashSet<Box<[Type<'db>]>> {
-    debug_assert_ne!(bases_possibilities.len(), 0);
     let mut new_possibilities = FxHashSet::default();
     let mut add_non_union_base = |fork: &[Type<'db>], base: Type<'db>| {
         new_possibilities.insert(fork.iter().copied().chain(std::iter::once(base)).collect());
