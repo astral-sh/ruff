@@ -26,7 +26,7 @@ impl<'db> MroPossibilities<'db> {
     pub(super) fn of_class(db: &'db dyn Db, class: ClassType<'db>) -> Self {
         let bases = class.bases(db);
 
-        // Start with some fast paths for some common occurences:
+        // Start with some fast paths for some common occurrences:
         if !bases.iter().any(Type::is_union) {
             if let Some(short_circuit) = mro_of_class_fast_path(db, class, &bases) {
                 return short_circuit;
@@ -247,7 +247,7 @@ fn add_next_base<'db>(
 /// The possible value of `__bases__` for a given class.
 ///
 /// Whereas [`ClassType::bases`] returns a list of types in which any type
-/// might be a [`Type::Union`], this enum tranforms the list of types so that we
+/// might be a [`Type::Union`], this enum transforms the list of types so that we
 /// have a union of possible `__bases__` lists rather than a single list
 /// that could contain a union.
 enum BasesPossibilities<'db> {

@@ -1,4 +1,12 @@
-# Mro tests
+# Method Resolution Order tests
+
+Tests that assert that we can infer the correct type for a class's
+`__mro__` attribute.
+
+This attribute is rarely accessed directly at runtime. However, it's
+extremely important for *us* to know the precise possible values of
+a class's Method Resolution Order, or we won't be able to infer the
+correct type of attributes accessed from instances.
 
 ## No bases
 
