@@ -4,7 +4,11 @@ use itertools::Itertools;
 use rustc_hash::FxHashSet;
 use std::borrow::Cow;
 use std::collections::VecDeque;
+use std::iter::FusedIterator;
 
+/// The resolved possible [method resolution order]s for a single class.
+///
+/// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum MroPossibilities<'db> {
     /// It can be statically determined that there is only exactly 1
@@ -16,6 +20,9 @@ pub(super) enum MroPossibilities<'db> {
 }
 
 impl<'db> MroPossibilities<'db> {
+    /// Return the possible Method Resolution Orders ("MRO"s) for this class.
+    ///
+    /// See [`ClassType::mro_possibilities`] for more details.
     pub(super) fn of_class(db: &'db dyn Db, class: ClassType<'db>) -> Self {
         let bases = class.bases(db);
 
@@ -29,10 +36,6 @@ impl<'db> MroPossibilities<'db> {
         mro_of_class_slow_path(db, class, &bases)
     }
 
-    fn known(mro: impl Into<Mro<'db>>) -> Self {
-        Self::Known(mro.into())
-    }
-
     pub(super) fn iter<'s>(&'s self) -> MroPossibilityIterator<'s, 'db> {
         match self {
             Self::Known(single_mro) => MroPossibilityIterator::Single(std::iter::once(single_mro)),
@@ -40,6 +43,10 @@ impl<'db> MroPossibilities<'db> {
                 MroPossibilityIterator::Multiple(multiple_mros.iter())
             }
         }
+    }
+
+    fn known(mro: impl Into<Mro<'db>>) -> Self {
+        Self::Known(mro.into())
     }
 }
 
@@ -190,6 +197,10 @@ fn mro_of_class_slow_path<'db>(
     MroPossibilities::Ambiguous(mro_possibilities)
 }
 
+/// Given a list of types representing the bases of a class,
+/// of which one or more types could be a [`Type::Union`] variant,
+/// resolve the list into a "union of bases lists", where each list in the union
+/// is guaranteed not to hold any bases that are a [`Type::Union`].
 fn fork_bases<'db>(db: &'db dyn Db, bases: &[Type<'db>]) -> BasesPossibilities<'db> {
     if !bases.iter().any(Type::is_union) {
         return BasesPossibilities::Single(bases.iter().map(ClassBase::from).collect());
@@ -233,8 +244,17 @@ fn add_next_base<'db>(
     new_possibilities
 }
 
+/// The possible value of `__bases__` for a given class.
+///
+/// Whereas [`ClassType::bases`] returns a list of types in which any type
+/// might be a [`Type::Union`], this enum tranforms the list of types so that we
+/// have a union of possible `__bases__` lists rather than a single list
+/// that could contain a union.
 enum BasesPossibilities<'db> {
+    /// There is only one possible value for the class's `__bases__`; here it is
     Single(Box<[ClassBase<'db>]>),
+
+    /// There are multiple possible values for the class's `__bases__` tuple
     Multiple(FxHashSet<Box<[ClassBase<'db>]>>),
 }
 
@@ -279,6 +299,8 @@ impl<'a, 'db> Iterator for BasesPossibilityIterator<'a, 'db> {
     }
 }
 
+impl FusedIterator for BasesPossibilityIterator<'_, '_> {}
+
 #[derive(Clone)]
 pub(super) enum MroPossibilityIterator<'a, 'db> {
     Single(std::iter::Once<&'a Mro<'db>>),
@@ -296,6 +318,13 @@ impl<'a, 'db> Iterator for MroPossibilityIterator<'a, 'db> {
     }
 }
 
+impl FusedIterator for MroPossibilityIterator<'_, '_> {}
+
+/// Enumeration of the possible kinds of types we allow in class bases.
+///
+/// This is much more limited than the [`Type`] enum:
+/// all types that would be invalid to have as a class base are
+/// transformed into [`ClassBase::Unknown`]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub(super) enum ClassBase<'db> {
     Class(ClassType<'db>),
@@ -305,16 +334,6 @@ pub(super) enum ClassBase<'db> {
 }
 
 impl<'db> ClassBase<'db> {
-    fn mro_possibilities(self, db: &'db dyn Db) -> Cow<MroPossibilities<'db>> {
-        match self {
-            ClassBase::Class(class) => Cow::Borrowed(class.mro_possibilities(db)),
-            ClassBase::Any | ClassBase::Todo | ClassBase::Unknown => {
-                let object = ClassBase::Class(KnownClass::Object.to_class(db).expect_class());
-                Cow::Owned(MroPossibilities::known([self, object]))
-            }
-        }
-    }
-
     pub(super) fn own_class_member(self, db: &'db dyn Db, member: &str) -> Type<'db> {
         match self {
             Self::Any => Type::Any,
@@ -332,6 +351,16 @@ impl<'db> ClassBase<'db> {
             Self::Class(class) => format!("ClassBase(<class '{}'>)", class.name(db)),
         }
     }
+
+    fn mro_possibilities(self, db: &'db dyn Db) -> Cow<MroPossibilities<'db>> {
+        match self {
+            ClassBase::Class(class) => Cow::Borrowed(class.mro_possibilities(db)),
+            ClassBase::Any | ClassBase::Todo | ClassBase::Unknown => {
+                let object = ClassBase::Class(KnownClass::Object.to_class(db).expect_class());
+                Cow::Owned(MroPossibilities::known([self, object]))
+            }
+        }
+    }
 }
 
 impl<'db> From<Type<'db>> for ClassBase<'db> {
@@ -343,6 +372,14 @@ impl<'db> From<Type<'db>> for ClassBase<'db> {
             Type::Class(class) => ClassBase::Class(class),
             // TODO support `__mro_entries__`?? --Alex
             Type::Instance(_) => ClassBase::Todo,
+            // TODO: ??
+            Type::Intersection(_) => ClassBase::Todo,
+            Type::Union(_) => {
+                panic!(
+                    "Should never call `ClassBase::from` on a `Type::Union` variant; \
+                    unions have custom handling throughout"
+                )
+            }
             // These are all errors:
             Type::Unbound
             | Type::BooleanLiteral(_)
@@ -355,12 +392,6 @@ impl<'db> From<Type<'db>> for ClassBase<'db> {
             | Type::None
             | Type::StringLiteral(_)
             | Type::Tuple(_) => ClassBase::Unknown,
-            // It *might* be possible to support these,
-            // but it would make our logic much more complicated and less performant
-            // (we'd have to consider multiple possible mros for any given class definition).
-            // Neither mypy nor pyright supports these, so for now at least it seems reasonable
-            // to treat these as an error.
-            Type::Intersection(_) | Type::Union(_) => ClassBase::Unknown,
         }
     }
 }
@@ -388,6 +419,9 @@ impl<'db> From<&ClassBase<'db>> for Type<'db> {
     }
 }
 
+/// A single possible method resolution order of a given class.
+///
+/// See [`ClassType::mro_possibilities`] for more details.
 #[derive(PartialEq, Eq, Default, Hash, Clone, Debug)]
 pub(super) struct Mro<'db>(VecDeque<ClassBase<'db>>);
 
@@ -423,27 +457,12 @@ impl<'db> FromIterator<ClassBase<'db>> for Mro<'db> {
     }
 }
 
-impl<'db> From<Mro<'db>> for VecDeque<ClassBase<'db>> {
-    fn from(value: Mro<'db>) -> Self {
-        value.0
-    }
-}
-
 impl<'a, 'db> IntoIterator for &'a Mro<'db> {
     type IntoIter = std::collections::vec_deque::Iter<'a, ClassBase<'db>>;
     type Item = &'a ClassBase<'db>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
-    }
-}
-
-impl<'db> IntoIterator for Mro<'db> {
-    type IntoIter = std::collections::vec_deque::IntoIter<ClassBase<'db>>;
-    type Item = ClassBase<'db>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
     }
 }
 
