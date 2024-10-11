@@ -177,3 +177,32 @@ reveal_type(K2.__mro__)  # revealed: tuple[Literal[K2], Literal[D], Literal[B], 
 reveal_type(K3.__mro__)  # revealed: tuple[Literal[K3], Literal[D], Literal[A], Literal[O], Literal[object]]
 reveal_type(Z.__mro__)  # revealed: tuple[Literal[Z], Literal[K1], Literal[K2], Literal[K3], Literal[D], Literal[A], Literal[B], Literal[C], Literal[E], Literal[O], Literal[object]]
 ```
+
+## Inheritance from `Unknown`
+
+```py
+from does_not_exist import DoesNotExist  # error: [unresolved-import]
+
+class A(DoesNotExist):
+    pass
+
+class B:
+    pass
+
+class C:
+    pass
+
+class D(A, B, C):
+    pass
+
+class E(B, C):
+    pass
+
+class F(E, A):
+    pass
+
+reveal_type(A.__mro__)  # revealed: tuple[Literal[A], Unknown, Literal[object]]
+reveal_type(D.__mro__)  # revealed: tuple[Literal[D], Literal[A], Unknown, Literal[B], Literal[C], Literal[object]]
+reveal_type(E.__mro__)  # revealed: tuple[Literal[E], Literal[B], Literal[C], Literal[object]]
+reveal_type(F.__mro__)  # revealed: tuple[Literal[F], Literal[E], Literal[B], Literal[C], Literal[A], Unknown, Literal[object]]
+```
