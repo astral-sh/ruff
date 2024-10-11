@@ -29,6 +29,8 @@ fails.
 the quadruple-backtick-fenced "markdown" language code block above is NOT itself part of the mdtest
 syntax, it's just how this README embeds an example mdtest Markdown document.)
 
+See [a real example](https://github.com/astral-sh/ruff/blob/main/crates/red_knot_python_semantic/resources/mdtest/numbers.md) mdtest suite.
+
 ## Assertions
 
 Two kinds of assertions are supported: `# revealed:` (shown above) and `# error:`.
