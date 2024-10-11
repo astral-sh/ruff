@@ -3,7 +3,6 @@ use itertools::Itertools;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 use rustc_hash::FxHashSet;
-use std::borrow::Cow;
 use std::collections::VecDeque;
 use std::fmt::Debug;
 
@@ -1376,14 +1375,11 @@ impl<'db> ClassType<'db> {
                 }
                 // fast path for a common case: only inherits from a single base
                 [single_base] => {
-                    let object = KnownClass::Object.to_class(db);
+                    let object = ClassBase::Class(KnownClass::Object.to_class(db).expect_class());
                     if *single_base == object {
-                        mro_possibilities.insert(Some(Mro::from([
-                            ClassBase::Class(self),
-                            ClassBase::Class(object.expect_class()),
-                        ])));
+                        mro_possibilities.insert(Some(Mro::from([ClassBase::Class(self), object])));
                     } else {
-                        for possibility in &*ClassBase::from(single_base).mro_possibilities(db) {
+                        for possibility in &single_base.mro_possibilities(db) {
                             let Some(possibility) = possibility else {
                                 mro_possibilities.insert(None);
                                 continue;
@@ -1402,8 +1398,7 @@ impl<'db> ClassType<'db> {
                 // For a Python-3 translation of the algorithm described in that document,
                 // see https://gist.github.com/AlexWaygood/674db1fce6856a90f251f63e73853639
                 _ => {
-                    let bases: VecDeque<ClassBase<'_>> =
-                        bases_possibility.iter().map(ClassBase::from).collect();
+                    let bases = VecDeque::from_iter(bases_possibility);
 
                     let possible_mros_per_base = bases
                         .iter()
@@ -1550,7 +1545,7 @@ impl<'db> ClassType<'db> {
     }
 }
 
-fn fork_bases<'db>(db: &'db dyn Db, bases: &[Type<'db>]) -> FxHashSet<Box<[Type<'db>]>> {
+fn fork_bases<'db>(db: &'db dyn Db, bases: &[Type<'db>]) -> FxHashSet<Box<[ClassBase<'db>]>> {
     let mut possibilities = FxHashSet::from_iter([Box::default()]);
     for base in bases {
         possibilities = add_next_base(db, &possibilities, *base);
@@ -1560,12 +1555,17 @@ fn fork_bases<'db>(db: &'db dyn Db, bases: &[Type<'db>]) -> FxHashSet<Box<[Type<
 
 fn add_next_base<'db>(
     db: &'db dyn Db,
-    bases_possibilities: &FxHashSet<Box<[Type<'db>]>>,
+    bases_possibilities: &FxHashSet<Box<[ClassBase<'db>]>>,
     next_base: Type<'db>,
-) -> FxHashSet<Box<[Type<'db>]>> {
+) -> FxHashSet<Box<[ClassBase<'db>]>> {
     let mut new_possibilities = FxHashSet::default();
-    let mut add_non_union_base = |fork: &[Type<'db>], base: Type<'db>| {
-        new_possibilities.insert(fork.iter().copied().chain(std::iter::once(base)).collect());
+    let mut add_non_union_base = |fork: &[ClassBase<'db>], base: Type<'db>| {
+        new_possibilities.insert(
+            fork.iter()
+                .copied()
+                .chain(std::iter::once(ClassBase::from(base)))
+                .collect(),
+        );
     };
     match next_base {
         Type::Union(union) => {
@@ -1585,6 +1585,47 @@ fn add_next_base<'db>(
     new_possibilities
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum MroPossibilities<'db> {
+    Single(Option<Mro<'db>>),
+    Multiple(&'db FxHashSet<Option<Mro<'db>>>),
+}
+
+impl<'db> MroPossibilities<'db> {
+    fn iter<'s>(&'s self) -> MroPossibilityIterator<'s, 'db> {
+        match self {
+            Self::Single(single_mro) => MroPossibilityIterator::Single(std::iter::once(single_mro)),
+            Self::Multiple(multiple_mros) => MroPossibilityIterator::Multiple(multiple_mros.iter()),
+        }
+    }
+}
+
+impl<'s, 'db> IntoIterator for &'s MroPossibilities<'db> {
+    type IntoIter = MroPossibilityIterator<'s, 'db>;
+    type Item = &'s Option<Mro<'db>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+#[derive(Clone)]
+enum MroPossibilityIterator<'a, 'db> {
+    Single(std::iter::Once<&'a Option<Mro<'db>>>),
+    Multiple(std::collections::hash_set::Iter<'a, Option<Mro<'db>>>),
+}
+
+impl<'a, 'db> Iterator for MroPossibilityIterator<'a, 'db> {
+    type Item = &'a Option<Mro<'db>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Single(iter) => iter.next(),
+            Self::Multiple(iter) => iter.next(),
+        }
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 enum ClassBase<'db> {
     Class(ClassType<'db>),
@@ -1594,14 +1635,12 @@ enum ClassBase<'db> {
 }
 
 impl<'db> ClassBase<'db> {
-    fn mro_possibilities(self, db: &'db dyn Db) -> Cow<FxHashSet<Option<Mro<'db>>>> {
+    fn mro_possibilities(self, db: &'db dyn Db) -> MroPossibilities<'db> {
         match self {
-            ClassBase::Class(class) => Cow::Borrowed(class.mro_possibilities(db)),
+            ClassBase::Class(class) => MroPossibilities::Multiple(class.mro_possibilities(db)),
             ClassBase::Any | ClassBase::Todo | ClassBase::Unknown => {
-                Cow::Owned(FxHashSet::from_iter([Some(Mro::from([
-                    self,
-                    ClassBase::Class(KnownClass::Object.to_class(db).expect_class()),
-                ]))]))
+                let object = KnownClass::Object.to_class(db).expect_class();
+                MroPossibilities::Single(Some(Mro::from([self, ClassBase::Class(object)])))
             }
         }
     }
