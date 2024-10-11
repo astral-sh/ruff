@@ -5,6 +5,7 @@ use ruff_python_ast as ast;
 use rustc_hash::FxHashSet;
 use std::collections::VecDeque;
 use std::fmt::Debug;
+use std::borrow::Cow;
 
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::ast_ids::HasScopedAstId;
@@ -1348,6 +1349,96 @@ pub struct ClassType<'db> {
     known: Option<KnownClass>,
 }
 
+#[salsa::tracked]
+impl<'db> ClassType<'db> {
+    /// Return the possible [method resolution order]s ("MRO"s) for this class.
+    ///
+    /// The MRO is the tuple of classes that can be retrieved as the `__mro__`
+    /// attribute on a class at runtime. Because the inferred type of a class base
+    /// could be a union, any class could have multiple possible MROs.
+    ///
+    /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
+    #[salsa::tracked(return_ref)]
+    fn mro_possibilities(self, db: &'db dyn Db) -> FxHashSet<Option<Mro<'db>>> {
+        let bases_possibilities = fork_bases(db, &self.bases(db));
+        debug_assert_ne!(bases_possibilities.len(), 0);
+        let mut mro_possibilities = FxHashSet::default();
+        for bases_possibility in bases_possibilities {
+            match &*bases_possibility {
+                // fast path for a common case: no explicit bases given:
+                [] => {
+                    debug_assert_eq!(Type::Class(self), KnownClass::Object.to_class(db));
+                    mro_possibilities.insert(Some(Mro::from([ClassBase::Class(self)])));
+                }
+                // fast path for a common case: only inherits from a single base
+                [single_base] => {
+                    let object = KnownClass::Object.to_class(db);
+                    if *single_base == object {
+                        mro_possibilities.insert(Some(Mro::from([
+                            ClassBase::Class(self),
+                            ClassBase::Class(object.expect_class()),
+                        ])));
+                    } else {
+                        for possibility in &*ClassBase::from(single_base).mro_possibilities(db) {
+                            let Some(possibility) = possibility else {
+                                mro_possibilities.insert(None);
+                                continue;
+                            };
+                            mro_possibilities.insert(Some(Mro(std::iter::once(ClassBase::Class(
+                                self,
+                            ))
+                            .chain(possibility.iter().copied())
+                            .collect())));
+                        }
+                    }
+                }
+                // slow path: fall back to full C3 linearisation algorithm
+                // as described in https://docs.python.org/3/howto/mro.html#python-2-3-mro
+                //
+                // For a Python-3 translation of the algorithm described in that document,
+                // see https://gist.github.com/AlexWaygood/674db1fce6856a90f251f63e73853639
+                _ => {
+                    let bases: VecDeque<ClassBase<'_>> =
+                        bases_possibility.iter().map(ClassBase::from).collect();
+
+                    let possible_mros_per_base = bases
+                        .iter()
+                        .map(|base| base.mro_possibilities(db))
+                        .collect_vec();
+
+                    let cartesian_product = possible_mros_per_base
+                        .iter()
+                        .map(|mro_set| mro_set.iter())
+                        .multi_cartesian_product();
+
+                    // Each `possible_mros_of_bases` is a concrete possibility of the list of mros of all of the bases:
+                    // where the bases are `[B1, B2, B..N]`, `possible_mros_of_bases` represents one possibility of
+                    // `[mro_of_B1, mro_of_B2, mro_of_B..N]`
+                    for possible_mros_of_bases in cartesian_product {
+                        let Some(possible_mros_of_bases) = possible_mros_of_bases
+                            .into_iter()
+                            .map(|maybe_mro| maybe_mro.to_owned().map(Mro::into_deque))
+                            .collect::<Option<Vec<_>>>()
+                        else {
+                            mro_possibilities.insert(None);
+                            continue;
+                        };
+                        let linearized = c3_merge(
+                            std::iter::once(VecDeque::from([ClassBase::Class(self)]))
+                                .chain(possible_mros_of_bases)
+                                .chain(std::iter::once(bases.clone()))
+                                .collect(),
+                        );
+                        mro_possibilities.insert(linearized);
+                    }
+                }
+            }
+        }
+        debug_assert_ne!(mro_possibilities.len(), 0);
+        mro_possibilities
+    }
+}
+
 impl<'db> ClassType<'db> {
     pub fn is_known(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
         match self.known(db) {
@@ -1404,92 +1495,6 @@ impl<'db> ClassType<'db> {
         }
     }
 
-    /// Return the possible [method resolution order]s ("MRO"s) for this class.
-    ///
-    /// The MRO is the tuple of classes that can be retrieved as the `__mro__`
-    /// attribute on a class at runtime. Because the inferred type of a class base
-    /// could be a union, any class could have multiple possible MROs.
-    ///
-    /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
-    fn mro_possibilities(self, db: &'db dyn Db) -> FxHashSet<Option<Mro<'db>>> {
-        let bases_possibilities = fork_bases(db, &self.bases(db));
-        debug_assert_ne!(bases_possibilities.len(), 0);
-        let mut mro_possibilities = FxHashSet::default();
-        for bases_possibility in bases_possibilities {
-            match &*bases_possibility {
-                // fast path for a common case: no explicit bases given:
-                [] => {
-                    debug_assert_eq!(Type::Class(self), KnownClass::Object.to_class(db));
-                    mro_possibilities.insert(Some(Mro::from([ClassBase::Class(self)])));
-                }
-                // fast path for a common case: only inherits from a single base
-                [single_base] => {
-                    let object = KnownClass::Object.to_class(db);
-                    if *single_base == object {
-                        mro_possibilities.insert(Some(Mro::from([
-                            ClassBase::Class(self),
-                            ClassBase::Class(object.expect_class()),
-                        ])));
-                    } else {
-                        for possibility in ClassBase::from(single_base).mro_possibilities(db) {
-                            let Some(possibility) = possibility else {
-                                mro_possibilities.insert(None);
-                                continue;
-                            };
-                            mro_possibilities.insert(Some(Mro(std::iter::once(ClassBase::Class(
-                                self,
-                            ))
-                            .chain(possibility)
-                            .collect())));
-                        }
-                    }
-                }
-                // slow path: fall back to full C3 linearisation algorithm
-                // as described in https://docs.python.org/3/howto/mro.html#python-2-3-mro
-                //
-                // For a Python-3 translation of the algorithm described in that document,
-                // see https://gist.github.com/AlexWaygood/674db1fce6856a90f251f63e73853639
-                _ => {
-                    let bases: VecDeque<ClassBase<'_>> =
-                        bases_possibility.iter().map(ClassBase::from).collect();
-
-                    let possible_mros_per_base = bases
-                        .iter()
-                        .map(|base| base.mro_possibilities(db))
-                        .collect_vec();
-
-                    let cartesian_product = possible_mros_per_base
-                        .iter()
-                        .map(|mro_set| mro_set.iter())
-                        .multi_cartesian_product();
-
-                    // Each `possible_mros_of_bases` is a concrete possibility of the list of mros of all of the bases:
-                    // where the bases are `[B1, B2, B..N]`, `possible_mros_of_bases` represents one possibility of
-                    // `[mro_of_B1, mro_of_B2, mro_of_B..N]`
-                    for possible_mros_of_bases in cartesian_product {
-                        let Some(possible_mros_of_bases) = possible_mros_of_bases
-                            .into_iter()
-                            .map(|maybe_mro| maybe_mro.to_owned().map(Mro::into_deque))
-                            .collect::<Option<Vec<_>>>()
-                        else {
-                            mro_possibilities.insert(None);
-                            continue;
-                        };
-                        let linearized = c3_merge(
-                            std::iter::once(VecDeque::from([ClassBase::Class(self)]))
-                                .chain(possible_mros_of_bases)
-                                .chain(std::iter::once(bases.clone()))
-                                .collect(),
-                        );
-                        mro_possibilities.insert(linearized);
-                    }
-                }
-            }
-        }
-        debug_assert_ne!(mro_possibilities.len(), 0);
-        mro_possibilities
-    }
-
     /// Returns the class member of this class named `name`.
     ///
     /// The member resolves to a member of the class itself or any of its bases.
@@ -1528,7 +1533,7 @@ impl<'db> ClassType<'db> {
             let Some(mro) = mro else {
                 continue; // TODO
             };
-            for base in &mro {
+            for base in mro {
                 let member = base.own_class_member(db, name);
                 if !member.is_unbound() {
                     union_builder = union_builder.add(member);
@@ -1578,7 +1583,7 @@ fn add_next_base<'db>(
     new_possibilities
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 enum ClassBase<'db> {
     Class(ClassType<'db>),
     Any,
@@ -1587,14 +1592,14 @@ enum ClassBase<'db> {
 }
 
 impl<'db> ClassBase<'db> {
-    fn mro_possibilities(self, db: &'db dyn Db) -> FxHashSet<Option<Mro<'db>>> {
+    fn mro_possibilities(self, db: &'db dyn Db) -> Cow<FxHashSet<Option<Mro<'db>>>> {
         match self {
-            ClassBase::Class(class) => class.mro_possibilities(db),
+            ClassBase::Class(class) => Cow::Borrowed(class.mro_possibilities(db)),
             ClassBase::Any | ClassBase::Todo | ClassBase::Unknown => {
-                FxHashSet::from_iter([Some(Mro::from([
+                Cow::Owned(FxHashSet::from_iter([Some(Mro::from([
                     self,
                     ClassBase::Class(KnownClass::Object.to_class(db).expect_class()),
-                ]))])
+                ]))]))
             }
         }
     }
@@ -1672,7 +1677,7 @@ impl<'db> From<&ClassBase<'db>> for Type<'db> {
     }
 }
 
-#[derive(PartialEq, Eq, Default, Hash, Clone)]
+#[derive(PartialEq, Eq, Default, Hash, Clone, Debug)]
 struct Mro<'db>(VecDeque<ClassBase<'db>>);
 
 impl<'db> Mro<'db> {
