@@ -213,17 +213,58 @@ reveal_type(F.__mro__)  # revealed: tuple[Literal[F], Literal[E], Literal[B], Li
 def returns_bool() -> bool:
     return True
 
-if returns_bool():
-    x = float
-else:
-    x = int
+class A:
+    pass
 
-reveal_type(x)  # revealed: Literal[float, int]
+class B:
+    pass
+
+if returns_bool():
+    x = A
+else:
+    x = B
+
+reveal_type(x)  # revealed: Literal[A, B]
 
 class Foo(x):
     pass
 
-reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Literal[float], Literal[object]] | tuple[Literal[Foo], Literal[int], Literal[object]]
+reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Literal[A], Literal[object]] | tuple[Literal[Foo], Literal[B], Literal[object]]
 ```
 
+## `__bases__` includes multiple `Union`s
 
+```py
+def returns_bool() -> bool:
+    return True
+
+class A:
+    pass
+
+class B:
+    pass
+
+class C:
+    pass
+
+class D:
+    pass
+
+if returns_bool():
+    x = A
+else:
+    x = B
+
+if returns_bool():
+    y = C
+else:
+    y = D
+
+reveal_type(x)  # revealed: Literal[A, B]
+reveal_type(y)  # revealed: Literal[C, D]
+
+class Foo(x, y):
+    pass
+
+reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Literal[A], Literal[D], Literal[object]] | tuple[Literal[Foo], Literal[B], Literal[D], Literal[object]] | tuple[Literal[Foo], Literal[A], Literal[C], Literal[object]] | tuple[Literal[Foo], Literal[B], Literal[C], Literal[object]]
+```
