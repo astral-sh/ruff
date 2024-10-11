@@ -471,38 +471,30 @@ impl<'a, 'db> IntoIterator for &'a Mro<'db> {
 ///
 /// [C3-merge algorithm]: https://docs.python.org/3/howto/mro.html#python-2-3-mro
 /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
-fn c3_merge(mut seqs: Vec<VecDeque<ClassBase>>) -> Option<Mro> {
+fn c3_merge(mut sequences: Vec<VecDeque<ClassBase>>) -> Option<Mro> {
     let mut mro = Mro::default();
 
     loop {
-        seqs.retain(|seq| !seq.is_empty());
+        sequences.retain(|sequence| !sequence.is_empty());
 
-        if seqs.is_empty() {
+        if sequences.is_empty() {
             return Some(mro);
         }
 
-        let mut candidate: Option<ClassBase> = None;
+        let mro_entry = sequences
+            .iter()
+            .map(|sequence| sequence[0])
+            .find(|candidate| {
+                sequences
+                    .iter()
+                    .all(|sequence| sequence.iter().skip(1).all(|base| base != candidate))
+            })?;
 
-        for seq in &seqs {
-            let maybe_candidate = seq[0];
+        mro.push(mro_entry);
 
-            let is_valid_candidate = !seqs
-                .iter()
-                .any(|seq| seq.iter().skip(1).any(|base| base == &maybe_candidate));
-
-            if is_valid_candidate {
-                candidate = Some(maybe_candidate);
-                break;
-            }
-        }
-
-        let candidate = candidate?;
-
-        mro.push(candidate);
-
-        for seq in &mut seqs {
-            if seq[0] == candidate {
-                seq.pop_front();
+        for sequence in &mut sequences {
+            if sequence[0] == mro_entry {
+                sequence.pop_front();
             }
         }
     }
