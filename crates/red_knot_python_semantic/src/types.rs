@@ -1379,18 +1379,14 @@ impl<'db> ClassType<'db> {
                         KnownClass::Object.to_class(db),
                         "Only `object` should have 0 bases in Python"
                     );
-                    short_circuit =
-                        Some(MroPossibilities::Known(Mro::from([ClassBase::Class(self)])));
+                    short_circuit = Some(MroPossibilities::known([self]));
                 }
 
                 // Only inherits directly from `object`:
                 [single_base] => {
                     let object = KnownClass::Object.to_class(db);
                     let mro = if single_base == &object {
-                        MroPossibilities::Known(Mro::from([
-                            ClassBase::Class(self),
-                            ClassBase::Class(object.expect_class()),
-                        ]))
+                        MroPossibilities::known([self, object.expect_class()])
                     } else {
                         let mut possibilities = FxHashSet::default();
                         for possibility in &*ClassBase::from(single_base).mro_possibilities(db) {
@@ -1450,12 +1446,12 @@ impl<'db> ClassType<'db> {
                 _ => {
                     let bases = VecDeque::from_iter(bases_possibility);
 
-                    let possible_mros_per_base = bases
+                    let possible_mros_per_base: Vec<_> = bases
                         .iter()
                         .map(|base| base.mro_possibilities(db))
-                        .collect_vec();
+                        .collect();
 
-                    let cartesian_product = possible_mros_per_base
+                    let mro_cartesian_product = possible_mros_per_base
                         .iter()
                         .map(|mro_set| mro_set.iter())
                         .multi_cartesian_product();
@@ -1463,10 +1459,10 @@ impl<'db> ClassType<'db> {
                     // Each `possible_mros_of_bases` is a concrete possibility of the list of mros of all of the bases:
                     // where the bases are `[B1, B2, B..N]`, `possible_mros_of_bases` represents one possibility of
                     // `[mro_of_B1, mro_of_B2, mro_of_B..N]`
-                    for possible_mros_of_bases in cartesian_product {
+                    for possible_mros_of_bases in mro_cartesian_product {
                         let Some(possible_mros_of_bases) = possible_mros_of_bases
                             .into_iter()
-                            .map(|maybe_mro| maybe_mro.map(|mro|VecDeque::from(mro.to_owned())))
+                            .map(|maybe_mro| maybe_mro.map(|mro|mro.iter().copied().collect()))
                             .collect::<Option<Vec<_>>>()
                         else {
                             mro_possibilities.insert(None);

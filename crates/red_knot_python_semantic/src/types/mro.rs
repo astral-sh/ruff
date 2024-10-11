@@ -58,6 +58,10 @@ pub(super) enum MroPossibilities<'db> {
 }
 
 impl<'db> MroPossibilities<'db> {
+    pub(super) fn known(mro: impl Into<Mro<'db>>) -> Self {
+        Self::Known(mro.into())
+    }
+
     pub(super) fn iter<'s>(&'s self) -> MroPossibilityIterator<'s, 'db> {
         match self {
             Self::Known(single_mro) => MroPossibilityIterator::Single(std::iter::once(single_mro)),
@@ -108,7 +112,7 @@ impl<'db> ClassBase<'db> {
             ClassBase::Class(class) => Cow::Borrowed(class.mro_possibilities(db)),
             ClassBase::Any | ClassBase::Todo | ClassBase::Unknown => {
                 let object = ClassBase::Class(KnownClass::Object.to_class(db).expect_class());
-                Cow::Owned(MroPossibilities::Known(Mro::from([self, object])))
+                Cow::Owned(MroPossibilities::known([self, object]))
             }
         }
     }
@@ -206,6 +210,12 @@ impl<'db> Mro<'db> {
 impl<'db, const N: usize> From<[ClassBase<'db>; N]> for Mro<'db> {
     fn from(value: [ClassBase<'db>; N]) -> Self {
         Self(VecDeque::from(value))
+    }
+}
+
+impl<'db, const N: usize> From<[ClassType<'db>; N]> for Mro<'db> {
+    fn from(value: [ClassType<'db>; N]) -> Self {
+        value.into_iter().map(ClassBase::Class).collect()
     }
 }
 
