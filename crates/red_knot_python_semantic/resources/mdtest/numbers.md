@@ -10,6 +10,13 @@ We can infer an integer literal type:
 reveal_type(1)  # revealed: Literal[1]
 ```
 
+We can track that variable as an integer:
+
+```py path=a.py
+x = 1
+reveal_type(x)  # revealed: Literal[1]
+```
+
 ### Overflow
 
 We only track integer literals within the range of an i64:
