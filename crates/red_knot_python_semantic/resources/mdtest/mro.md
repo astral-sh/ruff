@@ -53,7 +53,7 @@ reveal_type(C.__mro__)  # revealed: tuple[Literal[C], Literal[A], Literal[B], Li
 
 ## Complex diamond inheritance (1)
 
-This is "ex_2" from https://docs.python.org/3/howto/mro.html#the-end
+This is "ex_2" from <https://docs.python.org/3/howto/mro.html#the-end>
 
 ```py
 class O:
@@ -77,7 +77,7 @@ reveal_type(B.__mro__)  # revealed: tuple[Literal[B], Literal[Y], Literal[X], Li
 
 ## Complex diamond inheritance (2)
 
-This is "ex_5" from https://docs.python.org/3/howto/mro.html#the-end
+This is "ex_5" from <https://docs.python.org/3/howto/mro.html#the-end>
 
 ```py
 class O:
@@ -108,7 +108,7 @@ reveal_type(A.__mro__)  # revealed: tuple[Literal[A], Literal[B], Literal[C], Li
 
 ## Complex diamond inheritance (3)
 
-This is "ex_6" from https://docs.python.org/3/howto/mro.html#the-end
+This is "ex_6" from <https://docs.python.org/3/howto/mro.html#the-end>
 
 ```py
 class O:
@@ -139,7 +139,7 @@ reveal_type(A.__mro__)  # revealed: tuple[Literal[A], Literal[B], Literal[E], Li
 
 ## Complex diamond inheritance (4)
 
-This is "ex_9" from https://docs.python.org/3/howto/mro.html#the-end
+This is "ex_9" from <https://docs.python.org/3/howto/mro.html#the-end>
 
 ```py
 class O:
