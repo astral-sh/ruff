@@ -187,8 +187,8 @@ fn mro_of_class_slow_path<'db>(
     let mut mro_possibilities = FxHashSet::default();
     let mut mro_errors = FxHashSet::default();
 
-    for bases_possibility in &bases_possibilities {
-        match bases_possibility {
+    for bases_possibility in bases_possibilities {
+        match &*bases_possibility {
             [] => panic!("Only `object` should ever have 0 bases, which should have been handled in a fast path"),
 
             // fast path for a common case: only inherits from a single base
@@ -213,11 +213,9 @@ fn mro_of_class_slow_path<'db>(
             // For a Python-3 translation of the algorithm described in that document,
             // see https://gist.github.com/AlexWaygood/674db1fce6856a90f251f63e73853639
             _ => {
-                let bases = VecDeque::from_iter(bases_possibility);
-
-                let possible_mros_per_base: Vec<(ClassBase, Cow<MroPossibilities>)> = bases
+                let possible_mros_per_base: Vec<(ClassBase, Cow<MroPossibilities>)> = bases_possibility
                     .iter()
-                    .map(|base| (**base, base.mro_possibilities(db)))
+                    .map(|base| (*base, base.mro_possibilities(db)))
                     .collect();
 
                 let mro_cartesian_product = possible_mros_per_base
@@ -236,12 +234,18 @@ fn mro_of_class_slow_path<'db>(
                     let linearized = c3_merge(
                         std::iter::once(VecDeque::from([ClassBase::Class(class)]))
                             .chain(possible_mros_of_bases)
-                            .chain(std::iter::once(bases.iter().map(|base|**base).collect()))
+                            .chain(std::iter::once(bases_possibility.iter().copied().collect()))
                             .collect(),
                     );
                     match linearized {
-                        Some(mro) => mro_possibilities.insert(mro),
-                        None => mro_errors.insert(bases_possibility.iter().copied().collect()),
+                        Some(mro) => {
+                            mro_possibilities.insert(mro);
+                        },
+                        None => {
+                            if !mro_errors.contains(&bases_possibility) {
+                                mro_errors.insert(bases_possibility.clone());
+                            }
+                        },
                     };
                 }
             }
@@ -322,41 +326,37 @@ impl<'db> BasesPossibilities<'db> {
             Self::Multiple(possibilities) => possibilities.len(),
         }
     }
+}
 
-    fn iter<'s>(&'s self) -> BasesPossibilityIterator<'s, 'db> {
+impl<'db> IntoIterator for BasesPossibilities<'db> {
+    type IntoIter = BasesPossibilityIterator<'db>;
+    type Item = Box<[ClassBase<'db>]>;
+
+    fn into_iter(self) -> Self::IntoIter {
         match self {
-            Self::Single(bases) => BasesPossibilityIterator::Single(std::iter::once(&**bases)),
-            Self::Multiple(bases) => BasesPossibilityIterator::Multiple(bases.iter()),
+            Self::Single(bases) => BasesPossibilityIterator::Single(std::iter::once(bases)),
+            Self::Multiple(bases) => BasesPossibilityIterator::Multiple(bases.into_iter()),
         }
     }
 }
 
-impl<'a, 'db> IntoIterator for &'a BasesPossibilities<'db> {
-    type IntoIter = BasesPossibilityIterator<'a, 'db>;
-    type Item = &'a [ClassBase<'db>];
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter()
-    }
+enum BasesPossibilityIterator<'db> {
+    Single(std::iter::Once<Box<[ClassBase<'db>]>>),
+    Multiple(hash_set::IntoIter<Box<[ClassBase<'db>]>>),
 }
 
-enum BasesPossibilityIterator<'a, 'db> {
-    Single(std::iter::Once<&'a [ClassBase<'db>]>),
-    Multiple(std::collections::hash_set::Iter<'a, Box<[ClassBase<'db>]>>),
-}
-
-impl<'a, 'db> Iterator for BasesPossibilityIterator<'a, 'db> {
-    type Item = &'a [ClassBase<'db>];
+impl<'db> Iterator for BasesPossibilityIterator<'db> {
+    type Item = Box<[ClassBase<'db>]>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             Self::Single(iter) => iter.next(),
-            Self::Multiple(iter) => iter.next().map(Box::as_ref),
+            Self::Multiple(iter) => iter.next(),
         }
     }
 }
 
-impl FusedIterator for BasesPossibilityIterator<'_, '_> {}
+impl FusedIterator for BasesPossibilityIterator<'_> {}
 
 #[derive(Clone)]
 pub(super) enum MroPossibilityIterator<'a, 'db> {
