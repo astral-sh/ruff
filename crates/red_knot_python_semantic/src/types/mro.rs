@@ -421,12 +421,12 @@ impl<'db> ClassBase<'db> {
         }
     }
 
-    pub(super) fn display(self, db: &'db dyn Db) -> String {
+    pub(super) fn display(self, db: &'db dyn Db) -> Cow<'static, str> {
         match self {
-            Self::Any => "ClassBase(Any)".to_string(),
-            Self::Todo => "ClassBase(Todo)".to_string(),
-            Self::Unknown => "ClassBase(Unknown)".to_string(),
-            Self::Class(class) => format!("ClassBase(<class '{}'>)", class.name(db)),
+            Self::Any => Cow::Borrowed("Any"),
+            Self::Todo => Cow::Borrowed("Todo"),
+            Self::Unknown => Cow::Borrowed("Unknown"),
+            Self::Class(class) => Cow::Owned(format!("<class '{}'>", class.name(db))),
         }
     }
 
@@ -514,10 +514,6 @@ impl<'db> Mro<'db> {
 
     pub(super) fn iter(&self) -> std::collections::vec_deque::Iter<'_, ClassBase<'db>> {
         self.0.iter()
-    }
-
-    pub(super) fn display(&self, db: &'db dyn Db) -> Vec<String> {
-        self.0.iter().map(|base| base.display(db)).collect()
     }
 
     fn push(&mut self, element: ClassBase<'db>) {

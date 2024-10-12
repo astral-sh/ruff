@@ -284,7 +284,7 @@ and therefore the class creation to fail, we infer the class's `__mro__`
 as being `[<class>, Unknown, object]`:
 
 ```py
-class Foo(object, int):
+class Foo(object, int):  # error: [inconsistent-mro] "Cannot create a consistent method resolution order (MRO) for class `Foo` with possible bases list `[<class 'object'>, <class 'int'>]`"
     pass
 
 reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Unknown, Literal[object]]
@@ -315,7 +315,7 @@ class B(Y, X):
 reveal_type(A.__mro__)  # revealed: tuple[Literal[A], Literal[X], Literal[Y], Literal[O], Literal[object]]
 reveal_type(B.__mro__)  # revealed: tuple[Literal[B], Literal[Y], Literal[X], Literal[O], Literal[object]]
 
-class Z(A, B):
+class Z(A, B):  # error: [inconsistent-mro] "Cannot create a consistent method resolution order (MRO) for class `Z` with possible bases list `[<class 'A'>, <class 'B'>]`"
     pass
 
 reveal_type(Z.__mro__)  # revealed: tuple[Literal[Z], Unknown, Literal[object]]
@@ -346,7 +346,7 @@ if bool():
 else:
     foo = object
 
-class PossibleError(foo, X):
+class PossibleError(foo, X):  # error: [inconsistent-mro] "Cannot create a consistent method resolution order (MRO) for class `PossibleError` with possible bases list `[<class 'object'>, <class 'X'>]`"
     pass
 
 reveal_type(PossibleError.__mro__)  # revealed: tuple[Literal[PossibleError], Literal[Y], Literal[X], Literal[O], Literal[object]] | tuple[Literal[PossibleError], Unknown, Literal[object]]
@@ -365,7 +365,7 @@ else:
 
 reveal_type(B.__mro__)  # revealed: tuple[Literal[B], Literal[X], Literal[Y], Literal[O], Literal[object]] | tuple[Literal[B], Literal[Y], Literal[X], Literal[O], Literal[object]]
 
-class Z(A, B):
+class Z(A, B):  # error: [inconsistent-mro] "Cannot create a consistent method resolution order (MRO) for class `Z` with possible bases list `[<class 'A'>, <class 'B'>]`"
     pass
 
 reveal_type(Z.__mro__)  # revealed: tuple[Literal[Z], Literal[A], Literal[B], Literal[X], Literal[Y], Literal[O], Literal[object]] | tuple[Literal[Z], Unknown, Literal[object]]

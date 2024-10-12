@@ -1381,6 +1381,13 @@ impl<'db> ClassType<'db> {
             })
     }
 
+    pub(crate) fn node(&self, db: &'db dyn Db) -> &ast::StmtClassDef {
+        let DefinitionKind::Class(class_stmt_node) = self.definition(db).kind(db) else {
+            panic!("Class type definition must have DefinitionKind::Class");
+        };
+        class_stmt_node
+    }
+
     /// Return an array of the types of this class's bases.
     ///
     /// The returned array should exactly match the result of `t.__bases__`
@@ -1394,11 +1401,7 @@ impl<'db> ClassType<'db> {
     /// # Panics:
     /// If `definition` is not a `DefinitionKind::Class`.
     pub fn bases(&self, db: &'db dyn Db) -> Box<[Type<'db>]> {
-        let definition = self.definition(db);
-        let DefinitionKind::Class(class_stmt_node) = definition.kind(db) else {
-            panic!("Class type definition must have DefinitionKind::Class");
-        };
-        let base_nodes = class_stmt_node.bases();
+        let base_nodes = self.node(db).bases();
         let object = KnownClass::Object.to_class(db);
 
         if Type::Class(*self) == object {
@@ -1416,7 +1419,7 @@ impl<'db> ClassType<'db> {
         } else {
             base_nodes
                 .iter()
-                .map(move |base_expr| definition_expression_ty(db, definition, base_expr))
+                .map(move |base_expr| definition_expression_ty(db, self.definition(db), base_expr))
                 .collect()
         }
     }

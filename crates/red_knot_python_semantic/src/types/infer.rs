@@ -394,6 +394,29 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .expressions
                 .extend(deferred_expression_types.iter());
         }
+
+        let class_definitions: Vec<ClassType<'db>> = self
+            .types
+            .declarations
+            .values()
+            .filter_map(|ty| ty.into_class_type())
+            .collect();
+
+        for class in class_definitions {
+            if let Some(mro_errors) = class.mro_possibilities(self.db).possible_errors() {
+                for error in mro_errors {
+                    self.add_diagnostic(
+                        class.node(self.db).into(),
+                        "inconsistent-mro",
+                        format_args!(
+                            "Cannot create a consistent method resolution order (MRO) for class `{}` with possible bases list `[{}]`",
+                            class.name(self.db),
+                            error.iter().map(|base|base.display(self.db)).join(", ")
+                        )
+                    );
+                }
+            }
+        }
     }
 
     fn infer_region_definition(&mut self, definition: Definition<'db>) {
