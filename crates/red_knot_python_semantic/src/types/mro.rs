@@ -5,6 +5,7 @@ use rustc_hash::FxHashSet;
 use std::borrow::Cow;
 use std::collections::{hash_set, VecDeque};
 use std::iter::{FusedIterator, Once};
+use std::ops::Deref;
 
 /// The resolved possible [method resolution order]s for a single class.
 ///
@@ -24,14 +25,14 @@ pub(super) enum MroPossibilities<'db> {
     /// It can be statically determined that the `__mro__` possibilities for this class
     /// (possibly one, possibly many) always fail. Here are the various possible
     /// bases that all lead to class creation failing:
-    CertainFailure(FxHashSet<Box<[ClassBase<'db>]>>),
+    CertainFailure(FxHashSet<BasesList<'db>>),
 
     /// There are multiple possible `__mro__`s for this class. Some of these
     /// possibilities result in the class being successfully created; some of them
     /// result in class creation failure.
     PossibleSuccess {
         possible_mros: FxHashSet<Mro<'db>>,
-        failure_cases: FxHashSet<Box<[ClassBase<'db>]>>,
+        failure_cases: FxHashSet<BasesList<'db>>,
     },
 }
 
@@ -77,7 +78,7 @@ impl<'db> MroPossibilities<'db> {
         }
     }
 
-    pub(super) fn possible_errors(&self) -> Option<&FxHashSet<Box<[ClassBase<'db>]>>> {
+    pub(super) fn possible_errors(&self) -> Option<&FxHashSet<BasesList<'db>>> {
         match self {
             Self::CertainFailure(failure_cases) | Self::PossibleSuccess { failure_cases, .. } => {
                 Some(failure_cases)
@@ -92,7 +93,7 @@ impl<'db> MroPossibilities<'db> {
 
     fn possibly_many(
         mut possibilities: FxHashSet<Mro<'db>>,
-        mut errors: FxHashSet<Box<[ClassBase<'db>]>>,
+        mut errors: FxHashSet<BasesList<'db>>,
     ) -> Self {
         debug_assert_ne!(
             possibilities.len().saturating_add(errors.len()),
@@ -266,7 +267,7 @@ fn fork_bases<'db>(db: &'db dyn Db, bases: &[Type<'db>]) -> BasesPossibilities<'
     }
 
     // Slow path: one or more of the bases is a [`Type::Union`]
-    let mut possibilities = FxHashSet::from_iter([Box::default()]);
+    let mut possibilities = FxHashSet::from_iter([BasesList::default()]);
     for base in bases {
         possibilities = add_next_base(db, &possibilities, *base);
     }
@@ -275,9 +276,9 @@ fn fork_bases<'db>(db: &'db dyn Db, bases: &[Type<'db>]) -> BasesPossibilities<'
 
 fn add_next_base<'db>(
     db: &'db dyn Db,
-    bases_possibilities: &FxHashSet<Box<[ClassBase<'db>]>>,
+    bases_possibilities: &FxHashSet<BasesList<'db>>,
     next_base: Type<'db>,
-) -> FxHashSet<Box<[ClassBase<'db>]>> {
+) -> FxHashSet<BasesList<'db>> {
     let mut new_possibilities = FxHashSet::default();
     let mut add_non_union_base = |fork: &[ClassBase<'db>], base: Type<'db>| {
         new_possibilities.insert(
@@ -313,10 +314,10 @@ fn add_next_base<'db>(
 /// that could contain a union.
 enum BasesPossibilities<'db> {
     /// There is only one possible value for the class's `__bases__`; here it is
-    Single(Box<[ClassBase<'db>]>),
+    Single(BasesList<'db>),
 
     /// There are multiple possible values for the class's `__bases__` tuple
-    Multiple(FxHashSet<Box<[ClassBase<'db>]>>),
+    Multiple(FxHashSet<BasesList<'db>>),
 }
 
 impl<'db> BasesPossibilities<'db> {
@@ -330,7 +331,7 @@ impl<'db> BasesPossibilities<'db> {
 
 impl<'db> IntoIterator for BasesPossibilities<'db> {
     type IntoIter = BasesPossibilityIterator<'db>;
-    type Item = Box<[ClassBase<'db>]>;
+    type Item = BasesList<'db>;
 
     fn into_iter(self) -> Self::IntoIter {
         match self {
@@ -341,12 +342,12 @@ impl<'db> IntoIterator for BasesPossibilities<'db> {
 }
 
 enum BasesPossibilityIterator<'db> {
-    Single(std::iter::Once<Box<[ClassBase<'db>]>>),
-    Multiple(hash_set::IntoIter<Box<[ClassBase<'db>]>>),
+    Single(std::iter::Once<BasesList<'db>>),
+    Multiple(hash_set::IntoIter<BasesList<'db>>),
 }
 
 impl<'db> Iterator for BasesPossibilityIterator<'db> {
-    type Item = Box<[ClassBase<'db>]>;
+    type Item = BasesList<'db>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
@@ -493,13 +494,34 @@ impl<'db> From<&ClassBase<'db>> for Type<'db> {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
+pub(super) struct BasesList<'db>(Box<[ClassBase<'db>]>);
+
+impl<'db> Deref for BasesList<'db> {
+    type Target = [ClassBase<'db>];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'db> FromIterator<ClassBase<'db>> for BasesList<'db> {
+    fn from_iter<T: IntoIterator<Item = ClassBase<'db>>>(iter: T) -> Self {
+        Self(iter.into_iter().collect())
+    }
+}
+
 /// A single possible method resolution order of a given class.
 ///
 /// See [`ClassType::mro_possibilities`] for more details.
 #[derive(PartialEq, Eq, Default, Hash, Clone, Debug)]
-pub(super) struct Mro<'db>(Vec<ClassBase<'db>>);
+pub(super) struct Mro<'db>(Box<[ClassBase<'db>]>);
 
 impl<'db> Mro<'db> {
+    fn new(mro: Vec<ClassBase<'db>>) -> Self {
+        Self(mro.into_boxed_slice())
+    }
+
     fn from_error(db: &'db dyn Db, class: ClassBase<'db>) -> Self {
         Self::from([class, ClassBase::Unknown, ClassBase::builtins_object(db)])
     }
@@ -507,15 +529,11 @@ impl<'db> Mro<'db> {
     pub(super) fn iter(&self) -> std::slice::Iter<'_, ClassBase<'db>> {
         self.0.iter()
     }
-
-    fn push(&mut self, element: ClassBase<'db>) {
-        self.0.push(element);
-    }
 }
 
 impl<'db, const N: usize> From<[ClassBase<'db>; N]> for Mro<'db> {
     fn from(value: [ClassBase<'db>; N]) -> Self {
-        Self(Vec::from(value))
+        Self(Box::new(value))
     }
 }
 
@@ -546,13 +564,14 @@ impl<'a, 'db> IntoIterator for &'a Mro<'db> {
 /// [C3-merge algorithm]: https://docs.python.org/3/howto/mro.html#python-2-3-mro
 /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
 fn c3_merge(mut sequences: Vec<VecDeque<ClassBase>>) -> Option<Mro> {
-    let mut mro = Mro::default();
+    // Most MROs aren't that long...
+    let mut mro = Vec::with_capacity(8);
 
     loop {
         sequences.retain(|sequence| !sequence.is_empty());
 
         if sequences.is_empty() {
-            return Some(mro);
+            return Some(Mro::new(mro));
         }
 
         // Iterator over all potential candidates to be the next MRO entry:
