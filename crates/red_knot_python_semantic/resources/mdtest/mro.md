@@ -325,3 +325,48 @@ class AA(Z):
 
 reveal_type(AA.__mro__)  # revealed: tuple[Literal[AA], Literal[Z], Unknown, Literal[object]]
 ```
+
+## `__bases__` lists that cause errors... now with `Union`s
+
+```py
+def returns_bool() -> bool:
+    return True
+
+class O:
+    pass
+
+class X(O):
+    pass
+
+class Y(O):
+    pass
+
+if bool():
+    foo = Y
+else:
+    foo = object
+
+class PossibleError(foo, X):
+    pass
+
+reveal_type(PossibleError.__mro__)  # revealed: tuple[Literal[PossibleError], Literal[Y], Literal[X], Literal[O], Literal[object]] | tuple[Literal[PossibleError], Unknown, Literal[object]]
+
+class A(X, Y):
+    pass
+
+reveal_type(A.__mro__)  # revealed: tuple[Literal[A], Literal[X], Literal[Y], Literal[O], Literal[object]]
+
+if returns_bool():
+    class B(X, Y):
+        pass
+else:
+    class B(Y, X):
+        pass
+
+reveal_type(B.__mro__)  # revealed: tuple[Literal[B], Literal[X], Literal[Y], Literal[O], Literal[object]] | tuple[Literal[B], Literal[Y], Literal[X], Literal[O], Literal[object]]
+
+class Z(A, B):
+    pass
+
+reveal_type(Z.__mro__)  # revealed: tuple[Literal[Z], Literal[A], Literal[B], Literal[X], Literal[Y], Literal[O], Literal[object]] | tuple[Literal[Z], Unknown, Literal[object]]
+```
