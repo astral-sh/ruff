@@ -3478,48 +3478,6 @@ mod tests {
     }
 
     #[test]
-    fn string_type() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            r#"
-            w = "Hello"
-            x = 'world'
-            y = "Guten " + 'tag'
-            z = 'bon ' + "jour"
-            "#,
-        )?;
-
-        assert_public_ty(&db, "src/a.py", "w", r#"Literal["Hello"]"#);
-        assert_public_ty(&db, "src/a.py", "x", r#"Literal["world"]"#);
-        assert_public_ty(&db, "src/a.py", "y", r#"Literal["Guten tag"]"#);
-        assert_public_ty(&db, "src/a.py", "z", r#"Literal["bon jour"]"#);
-
-        Ok(())
-    }
-
-    #[test]
-    fn string_type_with_nested_quotes() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            r#"
-            x = 'I say "hello" to you'
-            y = "You say \"hey\" back"
-            z = 'No "closure here'
-            "#,
-        )?;
-
-        assert_public_ty(&db, "src/a.py", "x", r#"Literal["I say \"hello\" to you"]"#);
-        assert_public_ty(&db, "src/a.py", "y", r#"Literal["You say \"hey\" back"]"#);
-        assert_public_ty(&db, "src/a.py", "z", r#"Literal["No \"closure here"]"#);
-
-        Ok(())
-    }
-
-    #[test]
     fn multiplied_string() -> anyhow::Result<()> {
         let mut db = setup_db();
 
@@ -3670,71 +3628,6 @@ mod tests {
         let function = global_symbol_ty(&db, mod_file, "example").expect_function();
         let returns = function.return_type(&db);
         assert_eq!(returns.display(&db).to_string(), "int");
-
-        Ok(())
-    }
-
-    #[test]
-    fn fstring_expression() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            x = 0
-            y = str()
-            z = False
-
-            a = f'hello'
-            b = f'h {x}'
-            c = 'one ' f'single ' f'literal'
-            d = 'first ' f'second({b})' f' third'
-            e = f'-{y}-'
-            f = f'-{y}-' f'--' '--'
-            g = f'{z} == {False} is {True}'
-            ",
-        )?;
-
-        assert_public_ty(&db, "src/a.py", "a", "Literal[\"hello\"]");
-        assert_public_ty(&db, "src/a.py", "b", "Literal[\"h 0\"]");
-        assert_public_ty(&db, "src/a.py", "c", "Literal[\"one single literal\"]");
-        assert_public_ty(&db, "src/a.py", "d", "Literal[\"first second(h 0) third\"]");
-        assert_public_ty(&db, "src/a.py", "e", "str");
-        assert_public_ty(&db, "src/a.py", "f", "str");
-        assert_public_ty(&db, "src/a.py", "g", "Literal[\"False == False is True\"]");
-
-        Ok(())
-    }
-
-    #[test]
-    fn fstring_expression_with_conversion_flags() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            string = 'hello'
-            a = f'{string!r}'
-            ",
-        )?;
-
-        assert_public_ty(&db, "src/a.py", "a", "str"); // Should be `Literal["'hello'"]`
-
-        Ok(())
-    }
-
-    #[test]
-    fn fstring_expression_with_format_specifier() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            a = f'{1:02}'
-            ",
-        )?;
-
-        assert_public_ty(&db, "src/a.py", "a", "str"); // Should be `Literal["01"]`
 
         Ok(())
     }
@@ -6516,43 +6409,6 @@ mod tests {
     }
 
     #[test]
-    fn subscript_literal_string() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "/src/a.py",
-            "
-            s = 'abcde'
-
-            a = s[0]
-            b = s[1]
-            c = s[-1]
-            d = s[-2]
-            e = s[8]
-            f = s[-8]
-            ",
-        )?;
-
-        assert_public_ty(&db, "/src/a.py", "a", "Literal[\"a\"]");
-        assert_public_ty(&db, "/src/a.py", "b", "Literal[\"b\"]");
-        assert_public_ty(&db, "/src/a.py", "c", "Literal[\"e\"]");
-        assert_public_ty(&db, "/src/a.py", "d", "Literal[\"d\"]");
-        assert_public_ty(&db, "/src/a.py", "e", "Unknown");
-        assert_public_ty(&db, "/src/a.py", "f", "Unknown");
-
-        assert_file_diagnostics(
-            &db,
-            "src/a.py",
-            &[
-                "Index 8 is out of bounds for string `Literal[\"abcde\"]` with length 5",
-                "Index -8 is out of bounds for string `Literal[\"abcde\"]` with length 5",
-            ],
-        );
-
-        Ok(())
-    }
-
-    #[test]
     fn subscript_getitem_unbound() -> anyhow::Result<()> {
         let mut db = setup_db();
 
@@ -6620,26 +6476,6 @@ mod tests {
             "/src/a.py",
             &["Method `__getitem__` of type `None` is not callable on object of type `NotSubscriptable`"],
         );
-
-        Ok(())
-    }
-
-    #[test]
-    fn subscript_str_literal() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "/src/a.py",
-            "
-                def add(x: int, y: int) -> int:
-                    return x + y
-
-                a = 'abcde'[add(0, 1)]
-            ",
-        )?;
-
-        // TODO overloads...
-        assert_public_ty(&db, "/src/a.py", "a", "@Todo");
 
         Ok(())
     }
