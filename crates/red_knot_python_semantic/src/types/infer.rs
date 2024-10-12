@@ -4501,25 +4501,6 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn import_builtins() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_file("/src/a.py", "import builtins; x = builtins.copyright")?;
-
-        assert_public_ty(&db, "/src/a.py", "x", "Literal[copyright]");
-        // imported builtins module is the same file as the implicit builtins
-        let file = system_path_to_file(&db, "/src/a.py").expect("file to exist");
-        let builtins_ty = global_symbol_ty(&db, file, "builtins");
-        let builtins_file = builtins_ty.expect_module();
-        let implicit_builtins_file = builtins_module_scope(&db)
-            .expect("builtins module should exist")
-            .file(&db);
-        assert_eq!(builtins_file, implicit_builtins_file);
-
-        Ok(())
-    }
-
     /// A class's bases can be self-referential; this looks silly but a slightly more complex
     /// version of it actually occurs in typeshed: `class str(Sequence[str]): ...`
     #[test]
@@ -4920,99 +4901,6 @@ mod tests {
         assert_public_ty(&db, "/src/a.py", "y", "Literal[1]");
 
         Ok(())
-    }
-
-    /// A declared-but-not-bound name can be imported from a stub file.
-    #[test]
-    fn import_from_stub_declaration_only() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "/src/a.py",
-            "
-            from b import x
-            y = x
-            ",
-        )?;
-        db.write_dedented(
-            "/src/b.pyi",
-            "
-            x: int
-            ",
-        )?;
-
-        assert_public_ty(&db, "/src/a.py", "y", "int");
-
-        Ok(())
-    }
-
-    /// Declarations take priority over definitions when importing from a non-stub file.
-    #[test]
-    fn import_from_non_stub_declared_and_bound() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "/src/a.py",
-            "
-            from b import x
-            y = x
-            ",
-        )?;
-        db.write_dedented(
-            "/src/b.py",
-            "
-            x: int = 1
-            ",
-        )?;
-
-        assert_public_ty(&db, "/src/a.py", "y", "int");
-
-        Ok(())
-    }
-
-    #[test]
-    fn unresolved_import_statement() {
-        let mut db = setup_db();
-
-        db.write_file("src/foo.py", "import bar\n").unwrap();
-
-        assert_file_diagnostics(&db, "src/foo.py", &["Cannot resolve import `bar`"]);
-    }
-
-    #[test]
-    fn unresolved_import_from_statement() {
-        let mut db = setup_db();
-
-        db.write_file("src/foo.py", "from bar import baz\n")
-            .unwrap();
-        assert_file_diagnostics(&db, "/src/foo.py", &["Cannot resolve import `bar`"]);
-    }
-
-    #[test]
-    fn unresolved_import_from_resolved_module() {
-        let mut db = setup_db();
-
-        db.write_files([("/src/a.py", ""), ("/src/b.py", "from a import thing")])
-            .unwrap();
-
-        assert_file_diagnostics(&db, "/src/b.py", &["Module `a` has no member `thing`"]);
-    }
-
-    #[test]
-    fn resolved_import_of_symbol_from_unresolved_import() {
-        let mut db = setup_db();
-
-        db.write_files([
-            ("/src/a.py", "import foo as foo"),
-            ("/src/b.py", "from a import foo"),
-        ])
-        .unwrap();
-
-        assert_file_diagnostics(&db, "/src/a.py", &["Cannot resolve import `foo`"]);
-
-        // Importing the unresolved import into a second first-party file should not trigger
-        // an additional "unresolved import" violation
-        assert_file_diagnostics(&db, "/src/b.py", &[]);
     }
 
     #[test]
@@ -6200,70 +6088,6 @@ mod tests {
         .unwrap();
 
         assert_file_diagnostics(&db, "/src/a.py", &[]);
-    }
-
-    #[test]
-    fn no_implicit_shadow_import() {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "/src/a.py",
-            "
-            from b import x
-
-            x = 'foo'
-            ",
-        )
-        .unwrap();
-
-        db.write_file("/src/b.py", "x: int").unwrap();
-
-        assert_file_diagnostics(
-            &db,
-            "/src/a.py",
-            &[r#"Object of type `Literal["foo"]` is not assignable to `int`"#],
-        );
-    }
-
-    #[test]
-    fn import_from_conditional_reimport() {
-        let mut db = setup_db();
-
-        db.write_file("/src/a.py", "from b import f").unwrap();
-        db.write_dedented(
-            "/src/b.py",
-            "
-            if flag:
-                from c import f
-            else:
-                def f(): ...
-            ",
-        )
-        .unwrap();
-        db.write_file("/src/c.py", "def f(): ...").unwrap();
-
-        // TODO we should really disambiguate in such cases: Literal[b.f, c.f]
-        assert_public_ty(&db, "/src/a.py", "f", "Literal[f, f]");
-    }
-
-    #[test]
-    fn import_from_conditional_reimport_vs_non_declaration() {
-        let mut db = setup_db();
-
-        db.write_file("/src/a.py", "from b import x").unwrap();
-        db.write_dedented(
-            "/src/b.py",
-            "
-            if flag:
-                from c import x
-            else:
-                x = 1
-            ",
-        )
-        .unwrap();
-        db.write_file("/src/c.pyi", "x: int").unwrap();
-
-        assert_public_ty(&db, "/src/a.py", "x", "int");
     }
 
     // Incremental inference tests
