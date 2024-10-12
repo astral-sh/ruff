@@ -297,9 +297,11 @@ impl<'a> TodoDirective<'a> {
             let offset = subset.text_len() - trimmed.text_len();
             relative_offset += offset;
 
+            let first_word = trimmed.split(|c: char| !c.is_alphanumeric()).nth(0);
+
             // If we detect a TodoDirectiveKind variant substring in the comment, construct and
             // return the appropriate TodoDirective
-            if let Ok(directive_kind) = trimmed.parse::<TodoDirectiveKind>() {
+            if let Ok(directive_kind) = first_word?.parse::<TodoDirectiveKind>() {
                 let len = directive_kind.len();
 
                 return Some(Self {
@@ -334,40 +336,13 @@ impl FromStr for TodoDirectiveKind {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        // The lengths of the respective variant strings: TODO, FIXME, HACK, XXX
-
-        for length in [3, 4, 5] {
-            let Some(substr) = s.get(..length) else {
-                break;
-            };
-
-            if s.len() > length {
-                if let Some(c) = s.chars().nth(length) {
-                    if c.is_alphanumeric() {
-                        // The word is longer, so ignore it
-                        continue;
-                    }
-                }
-            }
-
-            match substr.to_lowercase().as_str() {
-                "fixme" => {
-                    return Ok(TodoDirectiveKind::Fixme);
-                }
-                "hack" => {
-                    return Ok(TodoDirectiveKind::Hack);
-                }
-                "todo" => {
-                    return Ok(TodoDirectiveKind::Todo);
-                }
-                "xxx" => {
-                    return Ok(TodoDirectiveKind::Xxx);
-                }
-                _ => continue,
-            }
+        match s.to_lowercase().as_str() {
+            "fixme" => Ok(TodoDirectiveKind::Fixme),
+            "hack" => Ok(TodoDirectiveKind::Hack),
+            "todo" => Ok(TodoDirectiveKind::Todo),
+            "xxx" => Ok(TodoDirectiveKind::Xxx),
+            _ => Err(()),
         }
-
-        Err(())
     }
 }
 
