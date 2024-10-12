@@ -263,9 +263,12 @@ fn mro_of_class_slow_path<'db>(
 /// resolve the list into a "union of bases lists", where each list in the union
 /// is guaranteed not to hold any bases that are a [`Type::Union`].
 fn fork_bases<'db>(db: &'db dyn Db, bases: &[Type<'db>]) -> BasesPossibilities<'db> {
+    // Fast path for the common case, where none of the bases is a [`Type::Union`]:
     if !bases.iter().any(Type::is_union) {
         return BasesPossibilities::Single(bases.iter().map(ClassBase::from).collect());
     }
+
+    // Slow path: one or more of the bases is a [`Type::Union`]
     let mut possibilities = FxHashSet::from_iter([Box::default()]);
     for base in bases {
         possibilities = add_next_base(db, &possibilities, *base);
@@ -563,17 +566,23 @@ fn c3_merge(mut sequences: Vec<VecDeque<ClassBase>>) -> Option<Mro> {
             return Some(mro);
         }
 
-        let mro_entry = sequences
-            .iter()
-            .map(|sequence| sequence[0])
-            .find(|candidate| {
-                sequences
-                    .iter()
-                    .all(|sequence| sequence.iter().skip(1).all(|base| base != candidate))
-            })?;
+        // Iterator over all potential candidates to be the next MRO entry:
+        let mut mro_entry_candidate_iter = sequences.iter().map(|sequence| sequence[0]);
+
+        // If the candidate exists "deeper down" in the inheritance hierarchy,
+        // we should refrain from adding it to the MRO for now. Add the first candidate
+        // for which this does not hold true. If this holds true for all candidates,
+        // return `None`; it will be impossible to find a consistent MRO for the class
+        // with the given bases.
+        let mro_entry = mro_entry_candidate_iter.find(|candidate| {
+            sequences
+                .iter()
+                .all(|sequence| sequence.iter().skip(1).all(|base| base != candidate))
+        })?;
 
         mro.push(mro_entry);
 
+        // Make sure we don't try to add the candidate to the MRO twice:
         for sequence in &mut sequences {
             if sequence[0] == mro_entry {
                 sequence.pop_front();
