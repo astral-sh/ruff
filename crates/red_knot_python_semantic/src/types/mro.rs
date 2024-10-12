@@ -13,10 +13,10 @@ use std::iter::FusedIterator;
 pub(super) enum MroPossibilities<'db> {
     /// It can be statically determined that there is only exactly 1
     /// possible `__mro__` for this class; here it is:
-    Known(Mro<'db>),
+    Single(Mro<'db>),
 
     /// There are multiple possible `__mro__`s for this class:
-    Ambiguous(FxHashSet<Option<Mro<'db>>>),
+    Multiple(FxHashSet<Option<Mro<'db>>>),
 }
 
 impl<'db> MroPossibilities<'db> {
@@ -38,15 +38,28 @@ impl<'db> MroPossibilities<'db> {
 
     pub(super) fn iter<'s>(&'s self) -> MroPossibilityIterator<'s, 'db> {
         match self {
-            Self::Known(single_mro) => MroPossibilityIterator::Single(std::iter::once(single_mro)),
-            Self::Ambiguous(multiple_mros) => {
-                MroPossibilityIterator::Multiple(multiple_mros.iter())
-            }
+            Self::Single(single_mro) => MroPossibilityIterator::Single(std::iter::once(single_mro)),
+            Self::Multiple(multiple_mros) => MroPossibilityIterator::Multiple(multiple_mros.iter()),
         }
     }
 
-    fn known(mro: impl Into<Mro<'db>>) -> Self {
-        Self::Known(mro.into())
+    fn single(mro: impl Into<Mro<'db>>) -> Self {
+        Self::Single(mro.into())
+    }
+
+    fn possibly_many(mut possibilities: FxHashSet<Option<Mro<'db>>>) -> Self {
+        debug_assert_ne!(
+            possibilities.len(),
+            0,
+            "There should always be at least one possible mro"
+        );
+        if possibilities.len() == 1 {
+            if possibilities.iter().next().unwrap().is_some() {
+                return Self::Single(possibilities.into_iter().next().unwrap().unwrap());
+            }
+        }
+        possibilities.shrink_to_fit();
+        Self::Multiple(possibilities)
     }
 }
 
@@ -76,7 +89,7 @@ fn mro_of_class_fast_path<'db>(
                 KnownClass::Object.to_class(db),
                 "Only `object` should have 0 bases in Python"
             );
-            Some(MroPossibilities::known([class]))
+            Some(MroPossibilities::single([class]))
         }
 
         // The class has a single base.
@@ -86,7 +99,7 @@ fn mro_of_class_fast_path<'db>(
         [single_base] => {
             let object = KnownClass::Object.to_class(db);
             let mro = if single_base == &object {
-                MroPossibilities::known([class, object.expect_class()])
+                MroPossibilities::single([class, object.expect_class()])
             } else {
                 let mut possibilities = FxHashSet::default();
                 for possibility in &*ClassBase::from(single_base).mro_possibilities(db) {
@@ -100,7 +113,7 @@ fn mro_of_class_fast_path<'db>(
                             .collect(),
                     ));
                 }
-                MroPossibilities::Ambiguous(possibilities)
+                MroPossibilities::possibly_many(possibilities)
             };
             Some(mro)
         }
@@ -193,8 +206,7 @@ fn mro_of_class_slow_path<'db>(
         }
     }
 
-    debug_assert_ne!(mro_possibilities.len(), 0);
-    MroPossibilities::Ambiguous(mro_possibilities)
+    MroPossibilities::possibly_many(mro_possibilities)
 }
 
 /// Given a list of types representing the bases of a class,
@@ -357,7 +369,7 @@ impl<'db> ClassBase<'db> {
             ClassBase::Class(class) => Cow::Borrowed(class.mro_possibilities(db)),
             ClassBase::Any | ClassBase::Todo | ClassBase::Unknown => {
                 let object = ClassBase::Class(KnownClass::Object.to_class(db).expect_class());
-                Cow::Owned(MroPossibilities::known([self, object]))
+                Cow::Owned(MroPossibilities::single([self, object]))
             }
         }
     }
