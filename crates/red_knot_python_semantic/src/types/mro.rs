@@ -243,7 +243,7 @@ fn mro_of_class_slow_path<'db>(
                     let linearized = c3_merge(
                         std::iter::once(VecDeque::from([ClassBase::Class(class)]))
                             .chain(possible_mros_of_bases)
-                            .chain(std::iter::once(bases.iter().copied().copied().collect()))
+                            .chain(std::iter::once(bases.iter().map(|base|**base).collect()))
                             .collect(),
                     );
                     match linearized {
@@ -504,7 +504,7 @@ impl<'db> From<&ClassBase<'db>> for Type<'db> {
 ///
 /// See [`ClassType::mro_possibilities`] for more details.
 #[derive(PartialEq, Eq, Default, Hash, Clone, Debug)]
-pub(super) struct Mro<'db>(VecDeque<ClassBase<'db>>);
+pub(super) struct Mro<'db>(Vec<ClassBase<'db>>);
 
 impl<'db> Mro<'db> {
     fn from_error(db: &'db dyn Db, class: ClassType<'db>) -> Self {
@@ -515,18 +515,18 @@ impl<'db> Mro<'db> {
         ])
     }
 
-    pub(super) fn iter(&self) -> std::collections::vec_deque::Iter<'_, ClassBase<'db>> {
+    pub(super) fn iter(&self) -> std::slice::Iter<'_, ClassBase<'db>> {
         self.0.iter()
     }
 
     fn push(&mut self, element: ClassBase<'db>) {
-        self.0.push_back(element);
+        self.0.push(element);
     }
 }
 
 impl<'db, const N: usize> From<[ClassBase<'db>; N]> for Mro<'db> {
     fn from(value: [ClassBase<'db>; N]) -> Self {
-        Self(VecDeque::from(value))
+        Self(Vec::from(value))
     }
 }
 
@@ -543,7 +543,7 @@ impl<'db> FromIterator<ClassBase<'db>> for Mro<'db> {
 }
 
 impl<'a, 'db> IntoIterator for &'a Mro<'db> {
-    type IntoIter = std::collections::vec_deque::Iter<'a, ClassBase<'db>>;
+    type IntoIter = std::slice::Iter<'a, ClassBase<'db>>;
     type Item = &'a ClassBase<'db>;
 
     fn into_iter(self) -> Self::IntoIter {
