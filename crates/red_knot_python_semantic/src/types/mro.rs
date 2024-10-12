@@ -78,6 +78,15 @@ impl<'db> MroPossibilities<'db> {
         }
     }
 
+    /// Return a `HashSet` representing various possible ways in which
+    /// construction of the class might have raised `TypeError` at runtime.
+    /// Return `None` if construction of the class always succeeds at runtime.
+    ///
+    /// Each element in the returned `HashSet` is a [`BasesList`] representing
+    /// one possible value of the class's `__bases__` at runtime. The set is
+    /// only made up of [`BasesList`]s that would cause the class creation to
+    /// fail due to it being impossible to construct a consistent MRO from said
+    /// list of bases.
     pub(super) fn possible_errors(&self) -> Option<&FxHashSet<BasesList<'db>>> {
         match self {
             Self::CertainFailure(failure_cases) | Self::PossibleSuccess { failure_cases, .. } => {
@@ -87,10 +96,16 @@ impl<'db> MroPossibilities<'db> {
         }
     }
 
+    /// Create an [`MroPossibilities`] instance that reflects the fact
+    /// that the given class can have only one possible MRO at runtime.
     fn single(mro: impl Into<Mro<'db>>) -> Self {
         Self::SingleSuccess(mro.into())
     }
 
+    /// Create an [`MroPossibilities`] instance that reflects the fact
+    /// that the given class could potentially have multiple possible MROs at
+    /// runtime (and/or that the class creation could possibly fail
+    /// altogether).
     fn possibly_many(
         mut possibilities: FxHashSet<Mro<'db>>,
         mut errors: FxHashSet<BasesList<'db>>,
@@ -122,7 +137,10 @@ impl<'db> MroPossibilities<'db> {
     }
 }
 
-/// Fast path that is only valid if we know that none of the bases is a union type
+/// Fast path for calculating a class's MRO.
+///
+/// This fast path is only valid if we know that none of the bases is a
+/// [`Type::Union`]
 fn mro_of_class_fast_path<'db>(
     db: &'db dyn Db,
     class: ClassType<'db>,
@@ -175,7 +193,9 @@ fn mro_of_class_fast_path<'db>(
     }
 }
 
-/// Slow path: this is only taken if the class has multiple bases
+/// Slow path for calculating the MRO of a class.
+///
+/// We fall back to this path if the class has multiple bases
 /// (of which any might be a union type),
 /// or it has a single base, and the base is a union type.
 fn mro_of_class_slow_path<'db>(
@@ -341,6 +361,7 @@ impl<'db> IntoIterator for BasesPossibilities<'db> {
     }
 }
 
+/// Iterates over the various possible [`BasesList`]s for a given class
 enum BasesPossibilityIterator<'db> {
     Single(std::iter::Once<BasesList<'db>>),
     Multiple(hash_set::IntoIter<BasesList<'db>>),
@@ -359,6 +380,7 @@ impl<'db> Iterator for BasesPossibilityIterator<'db> {
 
 impl FusedIterator for BasesPossibilityIterator<'_> {}
 
+/// Iterates over the various possible [`Mro`]s for a given class.
 #[derive(Clone)]
 pub(super) enum MroPossibilityIterator<'a, 'db> {
     SingleSuccess(Once<&'a Mro<'db>>),
@@ -405,10 +427,16 @@ pub(super) enum ClassBase<'db> {
 }
 
 impl<'db> ClassBase<'db> {
+    /// Return a `ClassBase` representing the `builtins.object` class.
     fn builtins_object(db: &'db dyn Db) -> Self {
         Self::Class(KnownClass::Object.to_class(db).expect_class())
     }
 
+    /// Access an attribute on this `ClassBase` ignoring the possibility of any
+    /// superclasses.
+    ///
+    /// (For a `ClassBase::Class` variant, this is equivalent to looking up the
+    /// attribute directly in the class's dictionary at runtime.)
     pub(super) fn own_class_member(self, db: &'db dyn Db, member: &str) -> Type<'db> {
         match self {
             Self::Any => Type::Any,
@@ -427,6 +455,7 @@ impl<'db> ClassBase<'db> {
         }
     }
 
+    /// Return the various [`MroPossibilities`] for this base.
     fn mro_possibilities(self, db: &'db dyn Db) -> Cow<MroPossibilities<'db>> {
         match self {
             ClassBase::Class(class) => Cow::Borrowed(class.mro_possibilities(db)),
@@ -494,6 +523,10 @@ impl<'db> From<&ClassBase<'db>> for Type<'db> {
     }
 }
 
+/// Represents a class's bases list.
+///
+/// At runtime, this list of classes can be found
+/// in the `__bases__` attribute on a class.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
 pub(super) struct BasesList<'db>(Box<[ClassBase<'db>]>);
 
@@ -522,6 +555,14 @@ impl<'db> Mro<'db> {
         Self(mro.into_boxed_slice())
     }
 
+    /// In the event that a possible list of bases would (or could) lead to a
+    /// `TypeError` being raised at runtime due to an unresolvable MRO, we
+    /// infer one of the "possible MROs" of the class as being
+    /// `[<the class in question>, Unknown, object]`. This seems most likely
+    /// to reduce the possibility of cascading errors elsewhere.
+    ///
+    /// (We emit a diagnostic warning about the runtime `TypeError` in
+    /// [`super::infer::TypeInferenceBuilder::infer_region_scope`].)
     fn from_error(db: &'db dyn Db, class: ClassBase<'db>) -> Self {
         Self::from([class, ClassBase::Unknown, ClassBase::builtins_object(db)])
     }

@@ -8,6 +8,11 @@ extremely important for *us* to know the precise possible values of
 a class's Method Resolution Order, or we won't be able to infer the
 correct type of attributes accessed from instances.
 
+For documentation on method resolution orders, see:
+
+- <https://docs.python.org/3/glossary.html#term-method-resolution-order>
+- <https://docs.python.org/3/howto/mro.html#python-2-3-mro>
+
 ## No bases
 
 ```py
