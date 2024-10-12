@@ -1431,7 +1431,7 @@ impl<'db> ClassType<'db> {
         if name == "__mro__" {
             let mro_possibilities = self.mro_possibilities(db);
             let mut union_builder = UnionBuilder::new(db);
-            for mro in mro_possibilities.iter(db) {
+            for mro in mro_possibilities.iter(db, mro::ClassBase::Class(self)) {
                 let elements = mro.iter().map(Type::from).collect();
                 union_builder = union_builder.add(Type::Tuple(TupleType::new(db, elements)));
             }
@@ -1455,7 +1455,7 @@ impl<'db> ClassType<'db> {
     pub fn inherited_class_member(self, db: &'db dyn Db, name: &str) -> Type<'db> {
         let mro_possibilities = self.mro_possibilities(db);
         let mut union_builder = UnionBuilder::new(db);
-        'outer: for mro in mro_possibilities.iter(db) {
+        'outer: for mro in mro_possibilities.iter(db, mro::ClassBase::Class(self)) {
             for base in &*mro {
                 let member = base.own_class_member(db, name);
                 if !member.is_unbound() {

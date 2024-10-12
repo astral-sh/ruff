@@ -24,16 +24,12 @@ pub(super) enum MroPossibilities<'db> {
     /// It can be statically determined that the `__mro__` possibilities for this class
     /// (possibly one, possibly many) always fail. Here are the various possible
     /// bases that all lead to class creation failing:
-    CertainFailure {
-        problematic_class: ClassType<'db>,
-        failure_cases: FxHashSet<Box<[ClassBase<'db>]>>,
-    },
+    CertainFailure(FxHashSet<Box<[ClassBase<'db>]>>),
 
     /// There are multiple possible `__mro__`s for this class. Some of these
     /// possibilities result in the class being successfully created; some of them
     /// result in class creation failure.
     PossibleSuccess {
-        class: ClassType<'db>,
         possible_mros: FxHashSet<Mro<'db>>,
         failure_cases: FxHashSet<Box<[ClassBase<'db>]>>,
     },
@@ -56,14 +52,15 @@ impl<'db> MroPossibilities<'db> {
         mro_of_class_slow_path(db, class, &bases)
     }
 
-    pub(super) fn iter<'s>(&'s self, db: &'db dyn Db) -> MroPossibilityIterator<'s, 'db> {
+    pub(super) fn iter<'s>(
+        &'s self,
+        db: &'db dyn Db,
+        class: ClassBase<'db>,
+    ) -> MroPossibilityIterator<'s, 'db> {
         match self {
-            Self::CertainFailure {
-                problematic_class, ..
-            } => MroPossibilityIterator::SingleFailure(std::iter::once(Mro::from_error(
-                db,
-                *problematic_class,
-            ))),
+            Self::CertainFailure { .. } => {
+                MroPossibilityIterator::SingleFailure(std::iter::once(Mro::from_error(db, class)))
+            }
             Self::SingleSuccess(single_mro) => {
                 MroPossibilityIterator::SingleSuccess(std::iter::once(single_mro))
             }
@@ -71,20 +68,20 @@ impl<'db> MroPossibilities<'db> {
                 MroPossibilityIterator::MultipleSuccesses(multiple_mros.iter())
             }
             Self::PossibleSuccess {
-                class,
                 possible_mros,
                 failure_cases: _,
             } => MroPossibilityIterator::SuccessesAndFailures {
                 successes: possible_mros.iter(),
-                failures: std::iter::once(Mro::from_error(db, *class)),
+                failures: std::iter::once(Mro::from_error(db, class)),
             },
         }
     }
 
     pub(super) fn possible_errors(&self) -> Option<&FxHashSet<Box<[ClassBase<'db>]>>> {
         match self {
-            Self::CertainFailure { failure_cases, .. }
-            | Self::PossibleSuccess { failure_cases, .. } => Some(failure_cases),
+            Self::CertainFailure(failure_cases) | Self::PossibleSuccess { failure_cases, .. } => {
+                Some(failure_cases)
+            }
             Self::SingleSuccess(_) | Self::MultipleSuccesses(_) => None,
         }
     }
@@ -94,7 +91,6 @@ impl<'db> MroPossibilities<'db> {
     }
 
     fn possibly_many(
-        class: ClassType<'db>,
         mut possibilities: FxHashSet<Mro<'db>>,
         mut errors: FxHashSet<Box<[ClassBase<'db>]>>,
     ) -> Self {
@@ -111,16 +107,12 @@ impl<'db> MroPossibilities<'db> {
             }
             (0, _) => {
                 errors.shrink_to_fit();
-                Self::CertainFailure {
-                    problematic_class: class,
-                    failure_cases: errors,
-                }
+                Self::CertainFailure(errors)
             }
             _ => {
                 possibilities.shrink_to_fit();
                 errors.shrink_to_fit();
                 Self::PossibleSuccess {
-                    class,
                     possible_mros: possibilities,
                     failure_cases: errors,
                 }
@@ -159,14 +151,15 @@ fn mro_of_class_fast_path<'db>(
                 MroPossibilities::single([class, object.expect_class()])
             } else {
                 let mut possibilities = FxHashSet::default();
-                for possibility in ClassBase::from(single_base).mro_possibilities(db).iter(db) {
+                let base = ClassBase::from(single_base);
+                for possibility in base.mro_possibilities(db).iter(db, base) {
                     possibilities.insert(
                         std::iter::once(ClassBase::Class(class))
                             .chain(possibility.iter().copied())
                             .collect(),
                     );
                 }
-                MroPossibilities::possibly_many(class, possibilities, FxHashSet::default())
+                MroPossibilities::possibly_many(possibilities, FxHashSet::default())
             };
             Some(mro)
         }
@@ -204,7 +197,7 @@ fn mro_of_class_slow_path<'db>(
                 if *single_base == object {
                     mro_possibilities.insert(Mro::from([ClassBase::Class(class), object]));
                 } else {
-                    for possibility in single_base.mro_possibilities(db).iter(db) {
+                    for possibility in single_base.mro_possibilities(db).iter(db, *single_base) {
                         mro_possibilities.insert(
                             std::iter::once(ClassBase::Class(class))
                                 .chain(possibility.iter().copied())
@@ -222,14 +215,14 @@ fn mro_of_class_slow_path<'db>(
             _ => {
                 let bases = VecDeque::from_iter(bases_possibility);
 
-                let possible_mros_per_base: Vec<_> = bases
+                let possible_mros_per_base: Vec<(ClassBase, Cow<MroPossibilities>)> = bases
                     .iter()
-                    .map(|base| base.mro_possibilities(db))
+                    .map(|base| (**base, base.mro_possibilities(db)))
                     .collect();
 
                 let mro_cartesian_product = possible_mros_per_base
                     .iter()
-                    .map(|mro_set| mro_set.iter(db))
+                    .map(|(base, mro_possibilities)| mro_possibilities.iter(db, *base))
                     .multi_cartesian_product();
 
                 // Each `possible_mros_of_bases` is a concrete possibility of the list of mros of all of the bases:
@@ -255,7 +248,7 @@ fn mro_of_class_slow_path<'db>(
         }
     }
 
-    MroPossibilities::possibly_many(class, mro_possibilities, mro_errors)
+    MroPossibilities::possibly_many(mro_possibilities, mro_errors)
 }
 
 /// Given a list of types representing the bases of a class,
@@ -507,12 +500,8 @@ impl<'db> From<&ClassBase<'db>> for Type<'db> {
 pub(super) struct Mro<'db>(Vec<ClassBase<'db>>);
 
 impl<'db> Mro<'db> {
-    fn from_error(db: &'db dyn Db, class: ClassType<'db>) -> Self {
-        Self::from([
-            ClassBase::Class(class),
-            ClassBase::Unknown,
-            ClassBase::builtins_object(db),
-        ])
+    fn from_error(db: &'db dyn Db, class: ClassBase<'db>) -> Self {
+        Self::from([class, ClassBase::Unknown, ClassBase::builtins_object(db)])
     }
 
     pub(super) fn iter(&self) -> std::slice::Iter<'_, ClassBase<'db>> {
