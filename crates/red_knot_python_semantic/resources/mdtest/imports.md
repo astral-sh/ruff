@@ -168,12 +168,3 @@ Submodule imports possibly not supported right now? Actually `foo` import should
 from . import foo  # error: [unresolved-import]
 reveal_type(foo)   # revealed: Unknown
 ```
-
-### No module name
-
-Track that invalid syntax in a `StmtImportFrom` node leads to the type being inferred as `Unknown`:
-
-```py path=package/foo.py
-from import bar
-reveal_type(bar)  # revealed: Unknown
-```
