@@ -3,20 +3,40 @@ use crate::Db;
 use itertools::Itertools;
 use rustc_hash::FxHashSet;
 use std::borrow::Cow;
-use std::collections::VecDeque;
-use std::iter::FusedIterator;
+use std::collections::{hash_set, VecDeque};
+use std::iter::{FusedIterator, Once};
 
 /// The resolved possible [method resolution order]s for a single class.
 ///
 /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) enum MroPossibilities<'db> {
-    /// It can be statically determined that there is only exactly 1
-    /// possible `__mro__` for this class; here it is:
-    Single(Mro<'db>),
+    /// It can be statically determined that there is only 1 possible `__mro__`
+    /// outcome for this class and the outcome is that class creation always succeeds
+    /// with the same MRO. Here is the successful MRO:
+    SingleSuccess(Mro<'db>),
 
-    /// There are multiple possible `__mro__`s for this class:
-    Multiple(FxHashSet<Option<Mro<'db>>>),
+    /// There are multiple possible `__mro__` values for this class, but they would
+    /// all lead to the class being successfully created. Here are the different
+    /// possibilities:
+    MultipleSuccesses(FxHashSet<Mro<'db>>),
+
+    /// It can be statically determined that the `__mro__` possibilities for this class
+    /// (possibly one, possibly many) always fail. Here are the various possible
+    /// bases that all lead to class creation failing:
+    CertainFailure {
+        problematic_class: ClassType<'db>,
+        failure_cases: FxHashSet<Box<[ClassBase<'db>]>>,
+    },
+
+    /// There are multiple possible `__mro__`s for this class. Some of these
+    /// possibilities result in the class being successfully created; some of them
+    /// result in class creation failure.
+    PossibleSuccess {
+        class: ClassType<'db>,
+        possible_mros: FxHashSet<Mro<'db>>,
+        failure_cases: FxHashSet<Box<[ClassBase<'db>]>>,
+    },
 }
 
 impl<'db> MroPossibilities<'db> {
@@ -36,39 +56,76 @@ impl<'db> MroPossibilities<'db> {
         mro_of_class_slow_path(db, class, &bases)
     }
 
-    pub(super) fn iter<'s>(&'s self) -> MroPossibilityIterator<'s, 'db> {
+    pub(super) fn iter<'s>(&'s self, db: &'db dyn Db) -> MroPossibilityIterator<'s, 'db> {
         match self {
-            Self::Single(single_mro) => MroPossibilityIterator::Single(std::iter::once(single_mro)),
-            Self::Multiple(multiple_mros) => MroPossibilityIterator::Multiple(multiple_mros.iter()),
+            Self::CertainFailure {
+                problematic_class, ..
+            } => MroPossibilityIterator::SingleFailure(std::iter::once(Mro::from_error(
+                db,
+                *problematic_class,
+            ))),
+            Self::SingleSuccess(single_mro) => {
+                MroPossibilityIterator::SingleSuccess(std::iter::once(single_mro))
+            }
+            Self::MultipleSuccesses(multiple_mros) => {
+                MroPossibilityIterator::MultipleSuccesses(multiple_mros.iter())
+            }
+            Self::PossibleSuccess {
+                class,
+                possible_mros,
+                failure_cases: _,
+            } => MroPossibilityIterator::SuccessesAndFailures {
+                successes: possible_mros.iter(),
+                failures: std::iter::once(Mro::from_error(db, *class)),
+            },
+        }
+    }
+
+    pub(super) fn possible_errors(&self) -> Option<&FxHashSet<Box<[ClassBase<'db>]>>> {
+        match self {
+            Self::CertainFailure { failure_cases, .. }
+            | Self::PossibleSuccess { failure_cases, .. } => Some(failure_cases),
+            Self::SingleSuccess(_) | Self::MultipleSuccesses(_) => None,
         }
     }
 
     fn single(mro: impl Into<Mro<'db>>) -> Self {
-        Self::Single(mro.into())
+        Self::SingleSuccess(mro.into())
     }
 
-    fn possibly_many(mut possibilities: FxHashSet<Option<Mro<'db>>>) -> Self {
+    fn possibly_many(
+        class: ClassType<'db>,
+        mut possibilities: FxHashSet<Mro<'db>>,
+        mut errors: FxHashSet<Box<[ClassBase<'db>]>>,
+    ) -> Self {
         debug_assert_ne!(
-            possibilities.len(),
+            possibilities.len().saturating_add(errors.len()),
             0,
-            "There should always be at least one possible mro"
+            "There should always be at least one possible mro outcome"
         );
-        if possibilities.len() == 1 {
-            if possibilities.iter().next().unwrap().is_some() {
-                return Self::Single(possibilities.into_iter().next().unwrap().unwrap());
+        match (possibilities.len(), errors.len()) {
+            (1, 0) => Self::SingleSuccess(possibilities.into_iter().next().unwrap()),
+            (_, 0) => {
+                possibilities.shrink_to_fit();
+                Self::MultipleSuccesses(possibilities)
+            }
+            (0, _) => {
+                errors.shrink_to_fit();
+                Self::CertainFailure {
+                    problematic_class: class,
+                    failure_cases: errors,
+                }
+            }
+            _ => {
+                possibilities.shrink_to_fit();
+                errors.shrink_to_fit();
+                Self::PossibleSuccess {
+                    class,
+                    possible_mros: possibilities,
+                    failure_cases: errors,
+                }
             }
         }
-        possibilities.shrink_to_fit();
-        Self::Multiple(possibilities)
-    }
-}
-
-impl<'s, 'db> IntoIterator for &'s MroPossibilities<'db> {
-    type IntoIter = MroPossibilityIterator<'s, 'db>;
-    type Item = Option<&'s Mro<'db>>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter()
     }
 }
 
@@ -102,18 +159,14 @@ fn mro_of_class_fast_path<'db>(
                 MroPossibilities::single([class, object.expect_class()])
             } else {
                 let mut possibilities = FxHashSet::default();
-                for possibility in &*ClassBase::from(single_base).mro_possibilities(db) {
-                    let Some(possibility) = possibility else {
-                        possibilities.insert(None);
-                        continue;
-                    };
-                    possibilities.insert(Some(
+                for possibility in ClassBase::from(single_base).mro_possibilities(db).iter(db) {
+                    possibilities.insert(
                         std::iter::once(ClassBase::Class(class))
                             .chain(possibility.iter().copied())
                             .collect(),
-                    ));
+                    );
                 }
-                MroPossibilities::possibly_many(possibilities)
+                MroPossibilities::possibly_many(class, possibilities, FxHashSet::default())
             };
             Some(mro)
         }
@@ -139,6 +192,7 @@ fn mro_of_class_slow_path<'db>(
     let bases_possibilities = fork_bases(db, bases);
     debug_assert_ne!(bases_possibilities.len(), 0);
     let mut mro_possibilities = FxHashSet::default();
+    let mut mro_errors = FxHashSet::default();
 
     for bases_possibility in &bases_possibilities {
         match bases_possibility {
@@ -146,20 +200,16 @@ fn mro_of_class_slow_path<'db>(
 
             // fast path for a common case: only inherits from a single base
             [single_base] => {
-                let object = ClassBase::Class(KnownClass::Object.to_class(db).expect_class());
+                let object = ClassBase::builtins_object(db);
                 if *single_base == object {
-                    mro_possibilities.insert(Some(Mro::from([ClassBase::Class(class), object])));
+                    mro_possibilities.insert(Mro::from([ClassBase::Class(class), object]));
                 } else {
-                    for possibility in &*single_base.mro_possibilities(db) {
-                        let Some(possibility) = possibility else {
-                            mro_possibilities.insert(None);
-                            continue;
-                        };
-                        mro_possibilities.insert(Some(
+                    for possibility in single_base.mro_possibilities(db).iter(db) {
+                        mro_possibilities.insert(
                             std::iter::once(ClassBase::Class(class))
                                 .chain(possibility.iter().copied())
                                 .collect(),
-                        ));
+                        );
                     }
                 }
             }
@@ -179,34 +229,33 @@ fn mro_of_class_slow_path<'db>(
 
                 let mro_cartesian_product = possible_mros_per_base
                     .iter()
-                    .map(|mro_set| mro_set.iter())
+                    .map(|mro_set| mro_set.iter(db))
                     .multi_cartesian_product();
 
                 // Each `possible_mros_of_bases` is a concrete possibility of the list of mros of all of the bases:
                 // where the bases are `[B1, B2, B..N]`, `possible_mros_of_bases` represents one possibility of
                 // `[mro_of_B1, mro_of_B2, mro_of_B..N]`
                 for possible_mros_of_bases in mro_cartesian_product {
-                    let Some(possible_mros_of_bases) = possible_mros_of_bases
+                    let possible_mros_of_bases: Vec<VecDeque<ClassBase>> = possible_mros_of_bases
                         .into_iter()
-                        .map(|maybe_mro| maybe_mro.map(|mro|mro.iter().copied().collect()))
-                        .collect::<Option<Vec<_>>>()
-                    else {
-                        mro_possibilities.insert(None);
-                        continue;
-                    };
+                        .map(|mro|mro.iter().copied().collect())
+                        .collect();
                     let linearized = c3_merge(
                         std::iter::once(VecDeque::from([ClassBase::Class(class)]))
                             .chain(possible_mros_of_bases)
                             .chain(std::iter::once(bases.iter().copied().copied().collect()))
                             .collect(),
                     );
-                    mro_possibilities.insert(linearized);
+                    match linearized {
+                        Some(mro) => mro_possibilities.insert(mro),
+                        None => mro_errors.insert(bases_possibility.iter().copied().collect()),
+                    };
                 }
             }
         }
     }
 
-    MroPossibilities::possibly_many(mro_possibilities)
+    MroPossibilities::possibly_many(class, mro_possibilities, mro_errors)
 }
 
 /// Given a list of types representing the bases of a class,
@@ -315,22 +364,35 @@ impl FusedIterator for BasesPossibilityIterator<'_, '_> {}
 
 #[derive(Clone)]
 pub(super) enum MroPossibilityIterator<'a, 'db> {
-    Single(std::iter::Once<&'a Mro<'db>>),
-    Multiple(std::collections::hash_set::Iter<'a, Option<Mro<'db>>>),
+    SingleSuccess(Once<&'a Mro<'db>>),
+    SingleFailure(Once<Mro<'db>>),
+    MultipleSuccesses(hash_set::Iter<'a, Mro<'db>>),
+    SuccessesAndFailures {
+        successes: hash_set::Iter<'a, Mro<'db>>,
+        failures: Once<Mro<'db>>,
+    },
 }
 
 impl<'a, 'db> Iterator for MroPossibilityIterator<'a, 'db> {
-    type Item = Option<&'a Mro<'db>>;
+    type Item = Cow<'a, Mro<'db>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            Self::Single(iter) => iter.next().map(Some),
-            Self::Multiple(iter) => iter.next().map(Option::as_ref),
+            Self::SingleSuccess(iter) => iter.next().map(Cow::Borrowed),
+            Self::SingleFailure(iter) => iter.next().map(Cow::Owned),
+            Self::MultipleSuccesses(iter) => iter.next().map(Cow::Borrowed),
+            Self::SuccessesAndFailures {
+                successes,
+                failures,
+            } => successes
+                .next()
+                .map(Cow::Borrowed)
+                .or_else(|| failures.next().map(Cow::Owned)),
         }
     }
 }
 
-impl FusedIterator for MroPossibilityIterator<'_, '_> {}
+impl<'a, 'db> FusedIterator for MroPossibilityIterator<'a, 'db> {}
 
 /// Enumeration of the possible kinds of types we allow in class bases.
 ///
@@ -346,6 +408,10 @@ pub(super) enum ClassBase<'db> {
 }
 
 impl<'db> ClassBase<'db> {
+    fn builtins_object(db: &'db dyn Db) -> Self {
+        Self::Class(KnownClass::Object.to_class(db).expect_class())
+    }
+
     pub(super) fn own_class_member(self, db: &'db dyn Db, member: &str) -> Type<'db> {
         match self {
             Self::Any => Type::Any,
@@ -368,7 +434,7 @@ impl<'db> ClassBase<'db> {
         match self {
             ClassBase::Class(class) => Cow::Borrowed(class.mro_possibilities(db)),
             ClassBase::Any | ClassBase::Todo | ClassBase::Unknown => {
-                let object = ClassBase::Class(KnownClass::Object.to_class(db).expect_class());
+                let object = ClassBase::builtins_object(db);
                 Cow::Owned(MroPossibilities::single([self, object]))
             }
         }
@@ -438,6 +504,14 @@ impl<'db> From<&ClassBase<'db>> for Type<'db> {
 pub(super) struct Mro<'db>(VecDeque<ClassBase<'db>>);
 
 impl<'db> Mro<'db> {
+    fn from_error(db: &'db dyn Db, class: ClassType<'db>) -> Self {
+        Self::from([
+            ClassBase::Class(class),
+            ClassBase::Unknown,
+            ClassBase::builtins_object(db),
+        ])
+    }
+
     pub(super) fn iter(&self) -> std::collections::vec_deque::Iter<'_, ClassBase<'db>> {
         self.0.iter()
     }

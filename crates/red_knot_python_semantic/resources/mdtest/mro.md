@@ -276,3 +276,52 @@ class Foo(x, y):
 
 reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Literal[A], Literal[D], Literal[object]] | tuple[Literal[Foo], Literal[B], Literal[D], Literal[object]] | tuple[Literal[Foo], Literal[A], Literal[C], Literal[object]] | tuple[Literal[Foo], Literal[B], Literal[C], Literal[object]]
 ```
+
+## `__bases__` lists that cause errors at runtime
+
+If the class's `__bases__` cause an exception to be raised at runtime
+and therefore the class creation to fail, we infer the class's `__mro__`
+as being `[<class>, Unknown, object]`:
+
+```py
+class Foo(object, int):
+    pass
+
+reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Unknown, Literal[object]]
+
+class Bar(Foo):
+    pass
+
+reveal_type(Bar.__mro__)  # revealed: tuple[Literal[Bar], Literal[Foo], Unknown, Literal[object]]
+
+# This is the `TypeError` at the bottom of "ex_2"
+# in the examples at <https://docs.python.org/3/howto/mro.html#the-end>
+
+class O:
+    pass
+
+class X(O):
+    pass
+
+class Y(O):
+    pass
+
+class A(X, Y):
+    pass
+
+class B(Y, X):
+    pass
+
+reveal_type(A.__mro__)  # revealed: tuple[Literal[A], Literal[X], Literal[Y], Literal[O], Literal[object]]
+reveal_type(B.__mro__)  # revealed: tuple[Literal[B], Literal[Y], Literal[X], Literal[O], Literal[object]]
+
+class Z(A, B):
+    pass
+
+reveal_type(Z.__mro__)  # revealed: tuple[Literal[Z], Unknown, Literal[object]]
+
+class AA(Z):
+    pass
+
+reveal_type(AA.__mro__)  # revealed: tuple[Literal[AA], Literal[Z], Unknown, Literal[object]]
+```

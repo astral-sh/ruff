@@ -1412,7 +1412,7 @@ impl<'db> ClassType<'db> {
         } else if base_nodes.is_empty() {
             // All Python classes that have an empty bases list in their AST
             // implicitly inherit from `object`:
-            Box::new([KnownClass::Object.to_class(db)])
+            Box::new([object])
         } else {
             base_nodes
                 .iter()
@@ -1428,10 +1428,7 @@ impl<'db> ClassType<'db> {
         if name == "__mro__" {
             let mro_possibilities = self.mro_possibilities(db);
             let mut union_builder = UnionBuilder::new(db);
-            for mro in mro_possibilities {
-                let Some(mro) = mro else {
-                    continue; // TODO
-                };
+            for mro in mro_possibilities.iter(db) {
                 let elements = mro.iter().map(Type::from).collect();
                 union_builder = union_builder.add(Type::Tuple(TupleType::new(db, elements)));
             }
@@ -1455,11 +1452,8 @@ impl<'db> ClassType<'db> {
     pub fn inherited_class_member(self, db: &'db dyn Db, name: &str) -> Type<'db> {
         let mro_possibilities = self.mro_possibilities(db);
         let mut union_builder = UnionBuilder::new(db);
-        'outer: for mro in mro_possibilities {
-            let Some(mro) = mro else {
-                continue; // TODO
-            };
-            for base in mro {
+        'outer: for mro in mro_possibilities.iter(db) {
+            for base in &*mro {
                 let member = base.own_class_member(db, name);
                 if !member.is_unbound() {
                     union_builder = union_builder.add(member);
