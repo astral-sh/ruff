@@ -2134,6 +2134,7 @@ name = "red_knot_test"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "colored",
  "once_cell",
  "red_knot_python_semantic",
  "red_knot_vendored",

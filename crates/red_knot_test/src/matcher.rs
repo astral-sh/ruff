@@ -3,6 +3,7 @@
 use crate::assertion::{Assertion, ErrorAssertion, InlineFileAssertions};
 use crate::db::Db;
 use crate::diagnostic::SortedDiagnostics;
+use colored::{ColoredString, Colorize};
 use red_knot_python_semantic::types::TypeCheckDiagnostic;
 use ruff_db::files::File;
 use ruff_db::source::{line_index, source_text, SourceText};
@@ -14,12 +15,12 @@ use std::sync::Arc;
 
 #[derive(Debug, Default)]
 pub(super) struct FailuresByLine {
-    failures: Vec<String>,
+    failures: Vec<ColoredString>,
     lines: Vec<LineFailures>,
 }
 
 impl FailuresByLine {
-    pub(super) fn iter(&self) -> impl Iterator<Item = (OneIndexed, &[String])> {
+    pub(super) fn iter(&self) -> impl Iterator<Item = (OneIndexed, &[ColoredString])> {
         self.lines.iter().map(|line_failures| {
             (
                 line_failures.line_number,
@@ -28,7 +29,7 @@ impl FailuresByLine {
         })
     }
 
-    fn push(&mut self, line_number: OneIndexed, messages: Vec<String>) {
+    fn push(&mut self, line_number: OneIndexed, messages: Vec<ColoredString>) {
         let start = self.failures.len();
         self.failures.extend(messages);
         self.lines.push(LineFailures {
@@ -142,34 +143,35 @@ impl Diagnostic for Arc<TypeCheckDiagnostic> {
 }
 
 trait Unmatched {
-    fn unmatched(&self) -> String;
+    fn unmatched(&self) -> ColoredString;
 }
 
-fn unmatched<'a, T: Unmatched + 'a>(unmatched: &'a [T]) -> Vec<String> {
+fn unmatched<'a, T: Unmatched + 'a>(unmatched: &'a [T]) -> Vec<ColoredString> {
     unmatched.iter().map(Unmatched::unmatched).collect()
 }
 
 trait UnmatchedWithColumn {
-    fn unmatched_with_column(&self, column: OneIndexed) -> String;
+    fn unmatched_with_column(&self, column: OneIndexed) -> ColoredString;
 }
 
 impl Unmatched for Assertion<'_> {
-    fn unmatched(&self) -> String {
-        format!("unmatched assertion: {self}")
+    fn unmatched(&self) -> colored::ColoredString {
+        format!("unmatched assertion: {self}").color("red")
     }
 }
 
 fn maybe_add_undefined_reveal_clarification<T: Diagnostic>(
     diagnostic: &T,
     original: std::fmt::Arguments,
-) -> String {
+) -> ColoredString {
     if diagnostic.rule() == "undefined-reveal" {
         format!(
             "used built-in `reveal_type`: add a `# revealed` assertion on this line \
             (original diagnostic: {original})"
         )
+        .color("yellow")
     } else {
-        format!("unexpected error: {original}")
+        format!("unexpected error: {original}").color("red")
     }
 }
 
@@ -177,7 +179,7 @@ impl<T> Unmatched for T
 where
     T: Diagnostic,
 {
-    fn unmatched(&self) -> String {
+    fn unmatched(&self) -> ColoredString {
         maybe_add_undefined_reveal_clarification(
             self,
             format_args!(r#"[{}] "{}""#, self.rule(), self.message()),
@@ -189,7 +191,7 @@ impl<T> UnmatchedWithColumn for T
 where
     T: Diagnostic,
 {
-    fn unmatched_with_column(&self, column: OneIndexed) -> String {
+    fn unmatched_with_column(&self, column: OneIndexed) -> ColoredString {
         maybe_add_undefined_reveal_clarification(
             self,
             format_args!(r#"{column} [{}] "{}""#, self.rule(), self.message()),
@@ -217,7 +219,7 @@ impl Matcher {
         &self,
         diagnostics: &'a [T],
         assertions: &'a [Assertion<'b>],
-    ) -> Result<(), Vec<String>>
+    ) -> Result<(), Vec<ColoredString>>
     where
         'b: 'a,
     {
@@ -232,7 +234,7 @@ impl Matcher {
                     ..
                 })
             ) {
-                failures.push("invalid assertion: no rule or message text".to_string());
+                failures.push("invalid assertion: no rule or message text".color("red"));
                 continue;
             }
             if !self.matches(assertion, &mut unmatched) {
@@ -319,6 +321,7 @@ impl Matcher {
 #[cfg(test)]
 mod tests {
     use super::FailuresByLine;
+    use colored::ColoredString;
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
     use ruff_python_trivia::textwrap::dedent;
@@ -383,7 +386,7 @@ mod tests {
             .collect();
         let failures: Vec<(OneIndexed, Vec<String>)> = failures
             .iter()
-            .map(|(idx, msgs)| (idx, msgs.to_vec()))
+            .map(|(idx, msgs)| (idx, msgs.iter().map(ColoredString::to_string).collect()))
             .collect();
 
         assert_eq!(failures, expected);
