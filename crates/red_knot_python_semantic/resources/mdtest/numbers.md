@@ -25,6 +25,19 @@ We only track integer literals within the range of an i64:
 reveal_type(9223372036854775808)  # revealed: int
 ```
 
+### Negated
+
+We can track that a negated integer literal resolves to the corresponding integer literal:
+
+```py path=a.py
+x = -1
+y = -1234567890987654321
+z = --987
+reveal_type(x)  # revealed: Literal[-1]
+reveal_type(y)  # revealed: Literal[-1234567890987654321]
+reveal_type(z)  # revealed: Literal[987]
+```
+
 ## Floats
 
 There aren't literal float types, but we infer the general float type:

@@ -1,11 +1,12 @@
 # Follow imports
 
-## Classes
+## Structures
+
+### Class
 
 We can follow import to class:
 
-````markdown
-```py path=a.py
+```py
 from b import C as D; E = D
 reveal_type(E) # revealed: Literal[C]
 ```
@@ -13,121 +14,166 @@ reveal_type(E) # revealed: Literal[C]
 ```py path=b.py
 class C: pass
 ```
-````
+
+### Module member
+
+```py
+import b; D = b.C
+reveal_type(D) # revealed: Literal[C]
+```
+
+```py path=b.py
+class C: pass
+```
 
 ## Relative
 
+### Non-existent
+
 Track that non-existent relative imports resolve to `Unknown`:
-````markdown
-```py path=package1/__init__.py
+
+```py path=package/__init__.py
 ```
 
-```py path=package1/bar.py
+```py path=package/bar.py
 from .foo import X # error: [unresolved-import]
 reveal_type(X)  # revealed: Unknown
 ```
-````
 
-Follow relative imports:
+### Simple
 
-````markdown
-```py path=package2/__init__.py
+We can follow relative imports:
+
+```py path=package/__init__.py
 ```
 
-```py path=package2/foo.py
+```py path=package/foo.py
 X = 42
 ```
 
-```py path=package2/bar.py
+```py path=package/bar.py
 from .foo import X
 reveal_type(X)  # revealed: Literal[42]
 ```
-````
+
+### Dotted
 
 We can also follow dotted relative imports:
 
-````markdown
-```py path=package3/__init__.py
+```py path=package/__init__.py
 ```
 
-```py path=package3/foo/bar/baz.py
+```py path=package/foo/bar/baz.py
 X = 42
 ```
 
-```py path=package3/bar.py
+```py path=package/bar.py
 from .foo.bar.baz import X
 reveal_type(X)  # revealed: Literal[42]
 ```
-````
 
-Follow relative import bare to package:
+### Bare to package
 
-````markdown
-```py path=package4/__init__.py
+We can follow relative import bare to package:
+
+```py path=package/__init__.py
 X = 42
 ```
 
-```py path=package4/bar.py
+```py path=package/bar.py
 from . import X
 reveal_type(X)  # revealed: Literal[42]
 ```
-````
 
-Follow non-existent relative import bare to package:
+### Non-existent + bare to package
 
-```py path=package5/bar.py
+```py path=package/bar.py
 from . import X # error: [unresolved-import]
 reveal_type(X)  # revealed: Unknown
 ```
 
-Follow relative import from dunder init:
+### Dunder init
 
-````markdown
-```py path=package6/__init__.py
+```py path=package/__init__.py
 from .foo import X
 reveal_type(X)  # revealed: Literal[42]
 ```
 
-```py path=package6/foo.py
+```py path=package/foo.py
 X = 42
 ```
-````
 
-Follow non-existent relative import from dunder init:
+### Non-existent + dunder init
 
-```py path=package7/__init__.py
+```py path=package/__init__.py
 from .foo import X # error: [unresolved-import]
 reveal_type(X)     # revealed: Unknown
 ```
 
-Follow very relative import:
+### Long relative import
 
-````markdown
-```py path=package8/__init__.py
+```py path=package/__init__.py
 ```
 
-```py path=package8/foo.py
+```py path=package/foo.py
 X = 42
 ```
 
-```py path=package8/subpackage/subsubpackage/bar.py
+```py path=package/subpackage/subsubpackage/bar.py
 from ...foo import X
 reveal_type(X)  # revealed: Literal[42]
 ```
-````
 
-Imported unbound symbol is `Unknown`:
+### Unbound symbol
 
-````markdown
-```py path=package9/__init__.py
+We can track that imported unbound symbol is `Unknown`:
+
+```py path=package/__init__.py
 ```
 
-```py path=package9/foo.py
+```py path=package/foo.py
 x
 ```
 
-```py path=package9/bar.py
+```py path=package/bar.py
 from .foo import x # error: [unresolved-import]
 reveal_type(x)     # revealed: Unknown
 ```
-````
+
+### TODO: Bare to module
+
+Submodule imports possibly not supported right now? Actually, `y` type should be `Literal[42]`.
+
+```py path=package/__init__.py
+```
+
+```py path=package/foo.py
+X = 42
+```
+
+```py path=package/bar.py
+from . import foo  # error: [unresolved-import]
+y = foo.X
+reveal_type(y)     # revealed: Unknown
+```
+
+### TODO: Non-existent + bare to module
+
+Submodule imports possibly not supported right now? Actually `foo` import should be resolved correctly.
+
+```py path=package/__init__.py
+```
+
+```py path=package/bar.py
+from . import foo  # error: [unresolved-import]
+reveal_type(foo)   # revealed: Unknown
+```
+
+### No module name
+
+Track that invalid syntax in a `StmtImportFrom` node leads to the type being inferred as `Unknown`:
+
+```py path=package/foo.py
+from import bar
+reveal_type(bar)  # revealed: Unknown
+```
