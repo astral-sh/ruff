@@ -36,9 +36,10 @@ pub fn run(path: &PathBuf, title: &str) {
 
             for (path, by_line) in failures {
                 println!("{}", format!("  {path}").bold());
-                for (line, failures) in by_line.iter() {
+                for (line_number, failures) in by_line.iter() {
                     for failure in failures {
-                        println!("    line {line}: {failure}");
+                        let line_info = format!("line {line_number}:").cyan();
+                        println!("    {line_info} {failure}");
                     }
                 }
                 println!();
