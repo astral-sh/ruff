@@ -35,7 +35,7 @@ pub fn run(path: &PathBuf, title: &str) {
             println!("\n{}\n", test.name().bold().underline());
 
             for (path, by_line) in failures {
-                println!("{}", format!("  {path}").bold());
+                println!("{}", path.as_str().bold());
                 for (line_number, failures) in by_line.iter() {
                     for failure in failures {
                         let line_info = format!("line {line_number}:").cyan();
