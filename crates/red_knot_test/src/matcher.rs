@@ -3,6 +3,7 @@
 use crate::assertion::{Assertion, ErrorAssertion, InlineFileAssertions};
 use crate::db::Db;
 use crate::diagnostic::SortedDiagnostics;
+use colored::Colorize;
 use red_knot_python_semantic::types::TypeCheckDiagnostic;
 use ruff_db::files::File;
 use ruff_db::source::{line_index, source_text, SourceText};
@@ -155,7 +156,7 @@ trait UnmatchedWithColumn {
 
 impl Unmatched for Assertion<'_> {
     fn unmatched(&self) -> String {
-        format!("unmatched assertion: {self}")
+        format!("{} {self}", "unmatched assertion:".red())
     }
 }
 
@@ -165,11 +166,11 @@ fn maybe_add_undefined_reveal_clarification<T: Diagnostic>(
 ) -> String {
     if diagnostic.rule() == "undefined-reveal" {
         format!(
-            "used built-in `reveal_type`: add a `# revealed` assertion on this line \
-            (original diagnostic: {original})"
+            "{} add a `# revealed` assertion on this line (original diagnostic: {original})",
+            "used built-in `reveal_type`:".yellow()
         )
     } else {
-        format!("unexpected error: {original}")
+        format!("{} {original}", "unexpected error:".red())
     }
 }
 
@@ -232,7 +233,10 @@ impl Matcher {
                     ..
                 })
             ) {
-                failures.push("invalid assertion: no rule or message text".to_string());
+                failures.push(format!(
+                    "{} no rule or message text",
+                    "invalid assertion:".red()
+                ));
                 continue;
             }
             if !self.matches(assertion, &mut unmatched) {
@@ -360,6 +364,8 @@ mod tests {
     }
 
     fn get_result(source: &str, diagnostics: Vec<TestDiagnostic>) -> Result<(), FailuresByLine> {
+        colored::control::set_override(false);
+
         let mut db = crate::db::Db::setup(SystemPathBuf::from("/src"));
         db.write_file("/src/test.py", source).unwrap();
         let file = system_path_to_file(&db, "/src/test.py").unwrap();
