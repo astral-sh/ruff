@@ -3652,69 +3652,6 @@ mod tests {
     }
 
     #[test]
-    fn literal_int_arithmetic() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/a.py",
-            "
-            a = 2 + 1
-            b = a - 4
-            c = a * b
-            d = c // 3
-            e = c / 3
-            f = 5 % 3
-            ",
-        )?;
-
-        assert_public_ty(&db, "src/a.py", "a", "Literal[3]");
-        assert_public_ty(&db, "src/a.py", "b", "Literal[-1]");
-        assert_public_ty(&db, "src/a.py", "c", "Literal[-3]");
-        assert_public_ty(&db, "src/a.py", "d", "Literal[-1]");
-        assert_public_ty(&db, "src/a.py", "e", "float");
-        assert_public_ty(&db, "src/a.py", "f", "Literal[2]");
-
-        Ok(())
-    }
-
-    #[test]
-    fn division_by_zero() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "/src/a.py",
-            "
-            a = 1 / 0
-            b = 2 // 0
-            c = 3 % 0
-            d = int() / 0
-            e = 1.0 / 0
-            ",
-        )?;
-
-        assert_public_ty(&db, "/src/a.py", "a", "float");
-        assert_public_ty(&db, "/src/a.py", "b", "int");
-        assert_public_ty(&db, "/src/a.py", "c", "int");
-        // TODO: These should be `int` and `float` respectively once we support inference
-        assert_public_ty(&db, "/src/a.py", "d", "@Todo");
-        assert_public_ty(&db, "/src/a.py", "e", "@Todo");
-
-        assert_file_diagnostics(
-            &db,
-            "src/a.py",
-            &[
-                "Cannot divide object of type `Literal[1]` by zero",
-                "Cannot floor divide object of type `Literal[2]` by zero",
-                "Cannot reduce object of type `Literal[3]` modulo zero",
-                "Cannot divide object of type `int` by zero",
-                "Cannot divide object of type `float` by zero",
-            ],
-        );
-
-        Ok(())
-    }
-
-    #[test]
     fn walrus() -> anyhow::Result<()> {
         let mut db = setup_db();
 
@@ -4116,22 +4053,6 @@ mod tests {
             ",
         )?;
         assert_public_ty(&db, "/src/source_with_future.py", "foo", "Foo");
-
-        Ok(())
-    }
-
-    #[test]
-    fn big_int() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "/src/a.py",
-            "
-            x = 10_000_000_000_000_000_000
-            ",
-        )?;
-
-        assert_public_ty(&db, "/src/a.py", "x", "int");
 
         Ok(())
     }
@@ -5257,63 +5178,6 @@ mod tests {
             &["Index 4 is out of bounds for tuple of type `tuple[Literal[1], Literal[\"a\"], Literal[\"b\"]]` with length 3", "Index -4 is out of bounds for tuple of type `tuple[Literal[1], Literal[\"a\"], Literal[\"b\"]]` with length 3"],
         );
 
-        Ok(())
-    }
-
-    #[test]
-    fn unary_add() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "/src/a.py",
-            "
-            a = +0
-            b = +1
-            c = +True
-            ",
-        )?;
-
-        assert_public_ty(&db, "/src/a.py", "a", "Literal[0]");
-        assert_public_ty(&db, "/src/a.py", "b", "Literal[1]");
-        assert_public_ty(&db, "/src/a.py", "c", "Literal[1]");
-        Ok(())
-    }
-
-    #[test]
-    fn unary_sub() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "/src/a.py",
-            "
-            a = -0
-            b = -1
-            c = -True
-            ",
-        )?;
-
-        assert_public_ty(&db, "/src/a.py", "a", "Literal[0]");
-        assert_public_ty(&db, "/src/a.py", "b", "Literal[-1]");
-        assert_public_ty(&db, "/src/a.py", "c", "Literal[-1]");
-        Ok(())
-    }
-
-    #[test]
-    fn unary_invert() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "/src/a.py",
-            "
-            a = ~0
-            b = ~1
-            c = ~True
-            ",
-        )?;
-
-        assert_public_ty(&db, "/src/a.py", "a", "Literal[-1]");
-        assert_public_ty(&db, "/src/a.py", "b", "Literal[-2]");
-        assert_public_ty(&db, "/src/a.py", "c", "Literal[-2]");
         Ok(())
     }
 }
