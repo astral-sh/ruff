@@ -46,7 +46,10 @@ pub(crate) fn iteration_over_set(checker: &mut Checker, expr: &Expr) {
         return;
     };
 
-    if set.iter().any(Expr::is_starred_expr) {
+    // Only suggest a fix if all elements are literals.
+    // This is because we can't determine if the set is used to de-dupe
+    // the output values of a call, operation, etc.
+    if !set.iter().all(Expr::is_literal_expr) {
         return;
     }
 

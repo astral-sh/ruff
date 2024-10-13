@@ -50,3 +50,9 @@ for number in {i for i in range(10)}:  # set comprehensions are fine
 
 for item in {*numbers_set, 4, 5, 6}:  # set unpacking is fine
     print(f"I like {item}.")
+
+for item in {1, 2, 3, 4, 5, 6, 2 // 1}:  # operations in set literals are fine
+    print(f"I like {item}.")
+
+for item in {1, 2, 3, 4, 5, 6, int("7")}:  # calls in set literals are fine
+    print(f"I like {item}.")
