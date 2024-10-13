@@ -3282,7 +3282,6 @@ mod tests {
     use crate::semantic_index::definition::Definition;
     use crate::semantic_index::symbol::FileScopeId;
     use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
-    use crate::stdlib::builtins_module_scope;
     use crate::types::{
         check_types, global_symbol_ty, infer_definition_types, symbol_ty, TypeCheckDiagnostics,
     };
