@@ -109,7 +109,7 @@ struct WatcherInner {
 impl Watcher {
     /// Sets up file watching for `path`.
     pub fn watch(&mut self, path: &SystemPath) -> notify::Result<()> {
-        tracing::debug!("Watching path: '{path}'.");
+        tracing::debug!("Watching path: `{path}`");
 
         self.inner_mut()
             .watcher
@@ -118,7 +118,7 @@ impl Watcher {
 
     /// Stops file watching for `path`.
     pub fn unwatch(&mut self, path: &SystemPath) -> notify::Result<()> {
-        tracing::debug!("Unwatching path: '{path}'.");
+        tracing::debug!("Unwatching path: `{path}`");
 
         self.inner_mut().watcher.unwatch(path.as_std_path())
     }
@@ -157,11 +157,11 @@ impl Watcher {
     }
 
     fn inner(&self) -> &WatcherInner {
-        self.inner.as_ref().expect("Watcher to be running.")
+        self.inner.as_ref().expect("Watcher to be running")
     }
 
     fn inner_mut(&mut self) -> &mut WatcherInner {
-        self.inner.as_mut().expect("Watcher to be running.")
+        self.inner.as_mut().expect("Watcher to be running")
     }
 }
 
@@ -179,7 +179,7 @@ struct Debouncer {
 
 impl Debouncer {
     fn add_result(&mut self, result: notify::Result<notify::Event>) {
-        tracing::trace!("Handling file watcher event: {result:?}.");
+        tracing::trace!("Handling file watcher event: {result:?}");
         match result {
             Ok(event) => self.add_event(event),
             Err(error) => self.add_error(error),
@@ -192,7 +192,7 @@ impl Debouncer {
         // are IO errors. All other errors should really only happen when adding or removing a watched folders.
         // It's not clear what an upstream handler should do in the case of an IOError (other than logging it).
         // That's what we do for now as well.
-        tracing::warn!("File watcher error: {error:?}.");
+        tracing::warn!("File watcher error: {error:?}");
     }
 
     fn add_event(&mut self, event: notify::Event) {
@@ -214,7 +214,7 @@ impl Debouncer {
             Ok(path) => path,
             Err(path) => {
                 tracing::debug!(
-                    "Ignore change to non-UTF8 path '{path}': {kind:?}",
+                    "Ignore change to non-UTF8 path `{path}`: {kind:?}",
                     path = path.display()
                 );
 
@@ -351,7 +351,7 @@ impl Debouncer {
             }
 
             EventKind::Any => {
-                tracing::debug!("Skipping any FS event for '{path}'.");
+                tracing::debug!("Skipping any FS event for `{path}`");
                 return;
             }
         };

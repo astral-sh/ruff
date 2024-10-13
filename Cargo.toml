@@ -34,11 +34,12 @@ ruff_python_trivia = { path = "crates/ruff_python_trivia" }
 ruff_server = { path = "crates/ruff_server" }
 ruff_source_file = { path = "crates/ruff_source_file" }
 ruff_text_size = { path = "crates/ruff_text_size" }
-ruff_vendored = { path = "crates/ruff_vendored" }
+red_knot_vendored = { path = "crates/red_knot_vendored" }
 ruff_workspace = { path = "crates/ruff_workspace" }
 
 red_knot_python_semantic = { path = "crates/red_knot_python_semantic" }
 red_knot_server = { path = "crates/red_knot_server" }
+red_knot_test = { path = "crates/red_knot_test" }
 red_knot_workspace = { path = "crates/red_knot_workspace", default-features = false }
 
 aho-corasick = { version = "1.1.3" }
@@ -72,7 +73,10 @@ filetime = { version = "0.2.23" }
 glob = { version = "0.3.1" }
 globset = { version = "0.4.14" }
 globwalk = { version = "0.9.1" }
-hashbrown = "0.14.3"
+hashbrown = { version = "0.15.0", default-features = false, features = [
+    "raw-entry",
+    "inline-more",
+] }
 ignore = { version = "0.4.22" }
 imara-diff = { version = "0.1.5" }
 imperative = { version = "1.0.4" }
@@ -90,7 +94,7 @@ libcst = { version = "1.1.0", default-features = false }
 log = { version = "0.4.17" }
 lsp-server = { version = "0.7.6" }
 lsp-types = { git = "https://github.com/astral-sh/lsp-types.git", rev = "3512a9f", features = [
-  "proposed",
+    "proposed",
 ] }
 matchit = { version = "0.8.1" }
 memchr = { version = "2.7.1" }
@@ -111,6 +115,7 @@ quote = { version = "1.0.23" }
 rand = { version = "0.8.5" }
 rayon = { version = "1.10.0" }
 regex = { version = "1.10.2" }
+rstest = { version = "0.22.0", default-features = false }
 rustc-hash = { version = "2.0.0" }
 salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "4a7c955255e707e64e43f3ce5eabb771ae067768" }
 schemars = { version = "0.8.16" }
@@ -120,7 +125,7 @@ serde-wasm-bindgen = { version = "0.6.4" }
 serde_json = { version = "1.0.113" }
 serde_test = { version = "1.0.152" }
 serde_with = { version = "3.6.0", default-features = false, features = [
-  "macros",
+    "macros",
 ] }
 shellexpand = { version = "3.0.0" }
 similar = { version = "2.4.0", features = ["inline"] }
@@ -137,7 +142,10 @@ toml = { version = "0.8.11" }
 tracing = { version = "0.1.40" }
 tracing-flame = { version = "0.2.0" }
 tracing-indicatif = { version = "0.3.6" }
-tracing-subscriber = { version = "0.3.18", default-features = false, features = ["env-filter", "fmt"] }
+tracing-subscriber = { version = "0.3.18", default-features = false, features = [
+    "env-filter",
+    "fmt",
+] }
 tracing-tree = { version = "0.4.0" }
 typed-arena = { version = "2.0.2" }
 unic-ucd-category = { version = "0.9" }
@@ -148,10 +156,10 @@ unicode-normalization = { version = "0.1.23" }
 ureq = { version = "2.9.6" }
 url = { version = "2.5.0" }
 uuid = { version = "1.6.1", features = [
-  "v4",
-  "fast-rng",
-  "macro-diagnostics",
-  "js",
+    "v4",
+    "fast-rng",
+    "macro-diagnostics",
+    "js",
 ] }
 walkdir = { version = "2.3.2" }
 wasm-bindgen = { version = "0.2.92" }
@@ -162,7 +170,10 @@ zip = { version = "0.6.6", default-features = false }
 [workspace.lints.rust]
 unsafe_code = "warn"
 unreachable_pub = "warn"
-unexpected_cfgs = { level = "warn", check-cfg = ["cfg(fuzzing)", "cfg(codspeed)"] }
+unexpected_cfgs = { level = "warn", check-cfg = [
+    "cfg(fuzzing)",
+    "cfg(codspeed)",
+] }
 
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -2 }
@@ -245,23 +256,23 @@ windows-archive = ".zip"
 unix-archive = ".tar.gz"
 # Target platforms to build apps for (Rust target-triple syntax)
 targets = [
-  "aarch64-apple-darwin",
-  "aarch64-pc-windows-msvc",
-  "aarch64-unknown-linux-gnu",
-  "aarch64-unknown-linux-musl",
-  "arm-unknown-linux-musleabihf",
-  "armv7-unknown-linux-gnueabihf",
-  "armv7-unknown-linux-musleabihf",
-  "i686-pc-windows-msvc",
-  "i686-unknown-linux-gnu",
-  "i686-unknown-linux-musl",
-  "powerpc64-unknown-linux-gnu",
-  "powerpc64le-unknown-linux-gnu",
-  "s390x-unknown-linux-gnu",
-  "x86_64-apple-darwin",
-  "x86_64-pc-windows-msvc",
-  "x86_64-unknown-linux-gnu",
-  "x86_64-unknown-linux-musl",
+    "aarch64-apple-darwin",
+    "aarch64-pc-windows-msvc",
+    "aarch64-unknown-linux-gnu",
+    "aarch64-unknown-linux-musl",
+    "arm-unknown-linux-musleabihf",
+    "armv7-unknown-linux-gnueabihf",
+    "armv7-unknown-linux-musleabihf",
+    "i686-pc-windows-msvc",
+    "i686-unknown-linux-gnu",
+    "i686-unknown-linux-musl",
+    "powerpc64-unknown-linux-gnu",
+    "powerpc64le-unknown-linux-gnu",
+    "s390x-unknown-linux-gnu",
+    "x86_64-apple-darwin",
+    "x86_64-pc-windows-msvc",
+    "x86_64-unknown-linux-gnu",
+    "x86_64-unknown-linux-musl",
 ]
 # Whether to auto-include files like READMEs, LICENSEs, and CHANGELOGs (default true)
 auto-includes = false
@@ -280,7 +291,11 @@ local-artifacts-jobs = ["./build-binaries", "./build-docker"]
 # Publish jobs to run in CI
 publish-jobs = ["./publish-pypi", "./publish-wasm"]
 # Post-announce jobs to run in CI
-post-announce-jobs = ["./notify-dependents", "./publish-docs", "./publish-playground"]
+post-announce-jobs = [
+    "./notify-dependents",
+    "./publish-docs",
+    "./publish-playground",
+]
 # Custom permissions for GitHub Jobs
 github-custom-job-permissions = { "build-docker" = { packages = "write", contents = "read" }, "publish-wasm" = { contents = "read", id-token = "write", packages = "write" } }
 # Whether to install an updater program

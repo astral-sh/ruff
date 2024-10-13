@@ -11,7 +11,10 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{leading_comments, trailing_comments};
 use crate::expression::parentheses::in_parentheses_only_soft_line_break_or_space;
+use crate::other::f_string::FormatFString;
+use crate::other::string_literal::StringLiteralKind;
 use crate::prelude::*;
+use crate::string::any::AnyStringPart;
 use crate::QuoteStyle;
 
 mod any;
@@ -46,12 +49,28 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedString<'_> {
 
         let mut joiner = f.join_with(in_parentheses_only_soft_line_break_or_space());
 
-        for part in self.string.parts(quoting) {
+        for part in self.string.parts() {
             let part_comments = comments.leading_dangling_trailing(&part);
+
+            let format_part = format_with(|f: &mut PyFormatter| match part {
+                AnyStringPart::String(part) => {
+                    let kind = if self.string.is_fstring() {
+                        #[allow(deprecated)]
+                        StringLiteralKind::InImplicitlyConcatenatedFString(quoting)
+                    } else {
+                        StringLiteralKind::String
+                    };
+
+                    part.format().with_options(kind).fmt(f)
+                }
+                AnyStringPart::Bytes(bytes_literal) => bytes_literal.format().fmt(f),
+                AnyStringPart::FString(part) => FormatFString::new(part, quoting).fmt(f),
+            });
+
             joiner.entry(&format_args![
                 line_suffix_boundary(),
                 leading_comments(part_comments.leading),
-                part,
+                format_part,
                 trailing_comments(part_comments.trailing)
             ]);
         }

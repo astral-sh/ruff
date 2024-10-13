@@ -50,7 +50,7 @@ file_resolver.exclude = [
 	"venv",
 ]
 file_resolver.extend_exclude = [
-	"crates/ruff_vendored/vendor/",
+	"crates/red_knot_vendored/vendor/",
 	"crates/ruff/resources/",
 	"crates/ruff_linter/resources/",
 	"crates/ruff_python_formatter/resources/",
@@ -359,6 +359,7 @@ linter.pycodestyle.max_line_length = 88
 linter.pycodestyle.max_doc_length = none
 linter.pycodestyle.ignore_overlong_task_comments = false
 linter.pyflakes.extend_generics = []
+linter.pyflakes.allowed_unused_imports = []
 linter.pylint.allow_magic_value_types = [
 	str,
 	bytes,

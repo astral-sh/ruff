@@ -11,7 +11,7 @@ use ruff_python_stdlib::typing::{
 };
 use ruff_text_size::Ranged;
 
-use crate::analyze::type_inference::{PythonType, ResolvedPythonType};
+use crate::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use crate::model::SemanticModel;
 use crate::{Binding, BindingKind, Modules};
 
@@ -576,7 +576,7 @@ trait BuiltinTypeChecker {
     /// Builtin type name.
     const BUILTIN_TYPE_NAME: &'static str;
     /// Type name as found in the `Typing` module.
-    const TYPING_NAME: &'static str;
+    const TYPING_NAME: Option<&'static str>;
     /// [`PythonType`] associated with the intended type.
     const EXPR_TYPE: PythonType;
 
@@ -584,7 +584,7 @@ trait BuiltinTypeChecker {
     fn match_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
         let value = map_subscript(annotation);
         semantic.match_builtin_expr(value, Self::BUILTIN_TYPE_NAME)
-            || semantic.match_typing_expr(value, Self::TYPING_NAME)
+            || Self::TYPING_NAME.is_some_and(|name| semantic.match_typing_expr(value, name))
     }
 
     /// Check initializer expression to match the intended type.
@@ -624,7 +624,7 @@ struct ListChecker;
 
 impl BuiltinTypeChecker for ListChecker {
     const BUILTIN_TYPE_NAME: &'static str = "list";
-    const TYPING_NAME: &'static str = "List";
+    const TYPING_NAME: Option<&'static str> = Some("List");
     const EXPR_TYPE: PythonType = PythonType::List;
 }
 
@@ -632,7 +632,7 @@ struct DictChecker;
 
 impl BuiltinTypeChecker for DictChecker {
     const BUILTIN_TYPE_NAME: &'static str = "dict";
-    const TYPING_NAME: &'static str = "Dict";
+    const TYPING_NAME: Option<&'static str> = Some("Dict");
     const EXPR_TYPE: PythonType = PythonType::Dict;
 }
 
@@ -640,7 +640,7 @@ struct SetChecker;
 
 impl BuiltinTypeChecker for SetChecker {
     const BUILTIN_TYPE_NAME: &'static str = "set";
-    const TYPING_NAME: &'static str = "Set";
+    const TYPING_NAME: Option<&'static str> = Some("Set");
     const EXPR_TYPE: PythonType = PythonType::Set;
 }
 
@@ -648,8 +648,16 @@ struct TupleChecker;
 
 impl BuiltinTypeChecker for TupleChecker {
     const BUILTIN_TYPE_NAME: &'static str = "tuple";
-    const TYPING_NAME: &'static str = "Tuple";
+    const TYPING_NAME: Option<&'static str> = Some("Tuple");
     const EXPR_TYPE: PythonType = PythonType::Tuple;
+}
+
+struct IntChecker;
+
+impl BuiltinTypeChecker for IntChecker {
+    const BUILTIN_TYPE_NAME: &'static str = "int";
+    const TYPING_NAME: Option<&'static str> = None;
+    const EXPR_TYPE: PythonType = PythonType::Number(NumberLike::Integer);
 }
 
 pub struct IoBaseChecker;
@@ -759,6 +767,11 @@ pub fn is_dict(binding: &Binding, semantic: &SemanticModel) -> bool {
     }
 
     check_type::<DictChecker>(binding, semantic)
+}
+
+/// Test whether the given binding can be considered an integer.
+pub fn is_int(binding: &Binding, semantic: &SemanticModel) -> bool {
+    check_type::<IntChecker>(binding, semantic)
 }
 
 /// Test whether the given binding can be considered a set.

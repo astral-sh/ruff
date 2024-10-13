@@ -36,9 +36,8 @@ impl Display for DisplayType<'_> {
                 | Type::BytesLiteral(_)
                 | Type::Class(_)
                 | Type::Function(_)
-                | Type::RevealTypeFunction(_)
         ) {
-            write!(f, "Literal[{representation}]",)
+            write!(f, "Literal[{representation}]")
         } else {
             representation.fmt(f)
         }
@@ -67,15 +66,16 @@ impl Display for DisplayRepresentation<'_> {
             Type::Unknown => f.write_str("Unknown"),
             Type::Unbound => f.write_str("Unbound"),
             Type::None => f.write_str("None"),
+            // `[Type::Todo]`'s display should be explicit that is not a valid display of
+            // any other type
+            Type::Todo => f.write_str("@Todo"),
             Type::Module(file) => {
                 write!(f, "<module '{:?}'>", file.path(self.db))
             }
             // TODO functions and classes should display using a fully qualified name
             Type::Class(class) => f.write_str(class.name(self.db)),
             Type::Instance(class) => f.write_str(class.name(self.db)),
-            Type::Function(function) | Type::RevealTypeFunction(function) => {
-                f.write_str(function.name(self.db))
-            }
+            Type::Function(function) => f.write_str(function.name(self.db)),
             Type::Union(union) => union.display(self.db).fmt(f),
             Type::Intersection(intersection) => intersection.display(self.db).fmt(f),
             Type::IntLiteral(n) => n.fmt(f),
@@ -194,7 +194,7 @@ impl TryFrom<Type<'_>> for LiteralTypeKind {
     fn try_from(value: Type<'_>) -> Result<Self, Self::Error> {
         match value {
             Type::Class(_) => Ok(Self::Class),
-            Type::Function(_) | Type::RevealTypeFunction(_) => Ok(Self::Function),
+            Type::Function(_) => Ok(Self::Function),
             Type::IntLiteral(_) => Ok(Self::IntLiteral),
             Type::StringLiteral(_) => Ok(Self::StringLiteral),
             Type::BytesLiteral(_) => Ok(Self::BytesLiteral),
@@ -335,7 +335,7 @@ mod tests {
             class B: ...
             ",
         )?;
-        let mod_file = system_path_to_file(&db, "src/main.py").expect("Expected file to exist.");
+        let mod_file = system_path_to_file(&db, "src/main.py").expect("file to exist");
 
         let union_elements = &[
             Type::Unknown,

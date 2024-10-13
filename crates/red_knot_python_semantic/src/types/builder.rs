@@ -25,9 +25,11 @@
 //!   * No type in an intersection can be a supertype of any other type in the intersection (just
 //!     eliminate the supertype from the intersection).
 //!   * An intersection containing two non-overlapping types should simplify to [`Type::Never`].
-use crate::types::{builtins_symbol_ty, IntersectionType, Type, UnionType};
+use crate::types::{IntersectionType, Type, UnionType};
 use crate::{Db, FxOrderSet};
 use smallvec::SmallVec;
+
+use super::KnownClass;
 
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<Type<'db>>,
@@ -64,7 +66,7 @@ impl<'db> UnionBuilder<'db> {
                 let mut to_remove = SmallVec::<[usize; 2]>::new();
                 for (index, element) in self.elements.iter().enumerate() {
                     if Some(*element) == bool_pair {
-                        to_add = builtins_symbol_ty(self.db, "bool");
+                        to_add = KnownClass::Bool.to_instance(self.db);
                         to_remove.push(index);
                         // The type we are adding is a BooleanLiteral, which doesn't have any
                         // subtypes. And we just found that the union already contained our
@@ -215,6 +217,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
     /// Adds a positive type to this intersection.
     fn add_positive(&mut self, db: &'db dyn Db, ty: Type<'db>) {
+        // TODO `Any`/`Unknown`/`Todo` actually should not self-cancel
         match ty {
             Type::Intersection(inter) => {
                 let pos = inter.positive(db);
@@ -234,7 +237,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
     /// Adds a negative type to this intersection.
     fn add_negative(&mut self, db: &'db dyn Db, ty: Type<'db>) {
-        // TODO Any/Unknown actually should not self-cancel
+        // TODO `Any`/`Unknown`/`Todo` actually should not self-cancel
         match ty {
             Type::Intersection(intersection) => {
                 let pos = intersection.negative(db);
@@ -299,7 +302,7 @@ mod tests {
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
-    use crate::types::{builtins_symbol_ty, UnionBuilder};
+    use crate::types::{KnownClass, UnionBuilder};
     use crate::ProgramSettings;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
@@ -359,7 +362,7 @@ mod tests {
     #[test]
     fn build_union_bool() {
         let db = setup_db();
-        let bool_ty = builtins_symbol_ty(&db, "bool");
+        let bool_instance_ty = KnownClass::Bool.to_instance(&db);
 
         let t0 = Type::BooleanLiteral(true);
         let t1 = Type::BooleanLiteral(true);
@@ -370,7 +373,7 @@ mod tests {
         assert_eq!(union.elements(&db), &[t0, t3]);
 
         let union = UnionType::from_elements(&db, [t0, t1, t2, t3]).expect_union();
-        assert_eq!(union.elements(&db), &[bool_ty, t3]);
+        assert_eq!(union.elements(&db), &[bool_instance_ty, t3]);
     }
 
     #[test]
@@ -388,7 +391,7 @@ mod tests {
     #[test]
     fn build_union_simplify_subtype() {
         let db = setup_db();
-        let t0 = builtins_symbol_ty(&db, "str").to_instance(&db);
+        let t0 = KnownClass::Str.to_instance(&db);
         let t1 = Type::LiteralString;
         let u0 = UnionType::from_elements(&db, [t0, t1]);
         let u1 = UnionType::from_elements(&db, [t1, t0]);
@@ -400,7 +403,7 @@ mod tests {
     #[test]
     fn build_union_no_simplify_unknown() {
         let db = setup_db();
-        let t0 = builtins_symbol_ty(&db, "str").to_instance(&db);
+        let t0 = KnownClass::Str.to_instance(&db);
         let t1 = Type::Unknown;
         let u0 = UnionType::from_elements(&db, [t0, t1]);
         let u1 = UnionType::from_elements(&db, [t1, t0]);
@@ -412,9 +415,9 @@ mod tests {
     #[test]
     fn build_union_subsume_multiple() {
         let db = setup_db();
-        let str_ty = builtins_symbol_ty(&db, "str").to_instance(&db);
-        let int_ty = builtins_symbol_ty(&db, "int").to_instance(&db);
-        let object_ty = builtins_symbol_ty(&db, "object").to_instance(&db);
+        let str_ty = KnownClass::Str.to_instance(&db);
+        let int_ty = KnownClass::Int.to_instance(&db);
+        let object_ty = KnownClass::Object.to_instance(&db);
         let unknown_ty = Type::Unknown;
 
         let u0 = UnionType::from_elements(&db, [str_ty, unknown_ty, int_ty, object_ty]);

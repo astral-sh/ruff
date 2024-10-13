@@ -17,14 +17,14 @@ use crate::checkers::ast::Checker;
 use crate::importer::{ImportRequest, Importer};
 
 /// ## What it does
-/// Checks for lambda expressions and function definitions that can be replaced
-/// with a function from the `operator` module.
+/// Checks for lambda expressions and function definitions that can be replaced with a function from
+/// the `operator` module.
 ///
 /// ## Why is this bad?
-/// The `operator` module provides functions that implement the same functionality
-/// as the corresponding operators. For example, `operator.add` is equivalent to
-/// `lambda x, y: x + y`. Using the functions from the `operator` module is more
-/// concise and communicates the intent of the code more clearly.
+/// The `operator` module provides functions that implement the same functionality as the
+/// corresponding operators. For example, `operator.add` is equivalent to `lambda x, y: x + y`.
+/// Using the functions from the `operator` module is more concise and communicates the intent of
+/// the code more clearly.
 ///
 /// ## Example
 /// ```python
@@ -42,6 +42,12 @@ use crate::importer::{ImportRequest, Importer};
 /// nums = [1, 2, 3]
 /// total = functools.reduce(operator.add, nums)
 /// ```
+///
+/// ## Fix safety
+/// This fix is usually safe, but if the lambda is called with keyword arguments, e.g.,
+/// `add = lambda x, y: x + y; add(x=1, y=2)`, replacing the lambda with an operator function, e.g.,
+/// `operator.add`, will cause the call to raise a `TypeError`, as functions in `operator` do not allow
+/// keyword arguments.
 #[violation]
 pub struct ReimplementedOperator {
     operator: Operator,
@@ -177,7 +183,7 @@ impl FunctionLike<'_> {
                 } else {
                     format!("{binding}({})", operator.args.join(", "))
                 };
-                Ok(Some(Fix::safe_edits(
+                Ok(Some(Fix::unsafe_edits(
                     Edit::range_replacement(content, self.range()),
                     [edit],
                 )))

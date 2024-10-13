@@ -42,14 +42,14 @@ impl TestCase {
 
     fn stop_watch(&mut self) -> Vec<watch::ChangeEvent> {
         self.try_stop_watch(Duration::from_secs(10))
-            .expect("Expected watch changes but observed none.")
+            .expect("Expected watch changes but observed none")
     }
 
     fn try_stop_watch(&mut self, timeout: Duration) -> Option<Vec<watch::ChangeEvent>> {
         let watcher = self
             .watcher
             .take()
-            .expect("Cannot call `stop_watch` more than once.");
+            .expect("Cannot call `stop_watch` more than once");
 
         let mut all_events = self
             .changes_receiver
@@ -72,7 +72,7 @@ impl TestCase {
     #[cfg(unix)]
     fn take_watch_changes(&self) -> Vec<watch::ChangeEvent> {
         self.try_take_watch_changes(Duration::from_secs(10))
-            .expect("Expected watch changes but observed none.")
+            .expect("Expected watch changes but observed none")
     }
 
     fn try_take_watch_changes(&self, timeout: Duration) -> Option<Vec<watch::ChangeEvent>> {
@@ -150,14 +150,14 @@ where
             let absolute_path = workspace_path.join(relative_path);
             if let Some(parent) = absolute_path.parent() {
                 std::fs::create_dir_all(parent).with_context(|| {
-                    format!("Failed to create parent directory for file '{relative_path}'.",)
+                    format!("Failed to create parent directory for file `{relative_path}`")
                 })?;
             }
 
             let mut file = std::fs::File::create(absolute_path.as_std_path())
-                .with_context(|| format!("Failed to open file '{relative_path}'"))?;
+                .with_context(|| format!("Failed to open file `{relative_path}`"))?;
             file.write_all(content.as_bytes())
-                .with_context(|| format!("Failed to write to file '{relative_path}'"))?;
+                .with_context(|| format!("Failed to write to file `{relative_path}`"))?;
             file.sync_data()?;
         }
 
@@ -194,7 +194,7 @@ where
 
     let root_path = SystemPath::from_std_path(temp_dir.path()).ok_or_else(|| {
         anyhow!(
-            "Temp directory '{}' is not a valid UTF-8 path.",
+            "Temporary directory `{}` is not a valid UTF-8 path.",
             temp_dir.path().display()
         )
     })?;
@@ -209,7 +209,7 @@ where
     let workspace_path = root_path.join("workspace");
 
     std::fs::create_dir_all(workspace_path.as_std_path())
-        .with_context(|| format!("Failed to create workspace directory '{workspace_path}'",))?;
+        .with_context(|| format!("Failed to create workspace directory `{workspace_path}`"))?;
 
     setup_files
         .setup(&root_path, &workspace_path)
@@ -233,7 +233,7 @@ where
         }))
     {
         std::fs::create_dir_all(path.as_std_path())
-            .with_context(|| format!("Failed to create search path '{path}'"))?;
+            .with_context(|| format!("Failed to create search path `{path}`"))?;
     }
 
     let configuration = Configuration {
@@ -665,7 +665,7 @@ fn directory_deleted() -> anyhow::Result<()> {
 
     let bar = case.system_file(case.workspace_path("bar.py")).unwrap();
 
-    assert!(resolve_module(case.db().upcast(), ModuleName::new_static("sub.a").unwrap()).is_some(),);
+    assert!(resolve_module(case.db().upcast(), ModuleName::new_static("sub.a").unwrap()).is_some());
 
     let sub_path = case.workspace_path("sub");
 

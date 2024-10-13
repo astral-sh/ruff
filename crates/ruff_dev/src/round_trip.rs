@@ -6,8 +6,8 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 
+use ruff_python_ast::PySourceType;
 use ruff_python_codegen::round_trip;
-use ruff_python_stdlib::path::is_jupyter_notebook;
 
 #[derive(clap::Args)]
 pub(crate) struct Args {
@@ -18,7 +18,7 @@ pub(crate) struct Args {
 
 pub(crate) fn main(args: &Args) -> Result<()> {
     let path = args.file.as_path();
-    if is_jupyter_notebook(path) {
+    if PySourceType::from(path).is_ipynb() {
         println!("{}", ruff_notebook::round_trip(path)?);
     } else {
         let contents = fs::read_to_string(&args.file)?;

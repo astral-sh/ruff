@@ -36,6 +36,11 @@ async def func():
             ...
 
 
+async def main():
+    async with asyncio.timeout(7):
+        print({i async for i in long_running_range()})
+
+
 async def func():
     with anyio.move_on_after(delay=0.2):
         ...

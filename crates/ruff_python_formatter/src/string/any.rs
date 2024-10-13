@@ -10,9 +10,6 @@ use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::expression::expr_f_string::f_string_quoting;
-use crate::other::f_string::FormatFString;
-use crate::other::string_literal::{FormatStringLiteral, StringLiteralKind};
-use crate::prelude::*;
 use crate::string::Quoting;
 
 /// Represents any kind of string expression. This could be either a string,
@@ -46,6 +43,10 @@ impl<'a> AnyString<'a> {
         }
     }
 
+    pub(crate) const fn is_fstring(self) -> bool {
+        matches!(self, Self::FString(_))
+    }
+
     /// Returns the quoting to be used for this string.
     pub(super) fn quoting(self, locator: &Locator<'_>) -> Quoting {
         match self {
@@ -54,23 +55,21 @@ impl<'a> AnyString<'a> {
         }
     }
 
-    /// Returns a vector of all the [`AnyStringPart`] of this string.
-    pub(super) fn parts(self, quoting: Quoting) -> AnyStringPartsIter<'a> {
+    /// Returns an iterator over the [`AnyStringPart`]s of this string.
+    pub(super) fn parts(self) -> AnyStringPartsIter<'a> {
         match self {
             Self::String(ExprStringLiteral { value, .. }) => {
                 AnyStringPartsIter::String(value.iter())
             }
             Self::Bytes(ExprBytesLiteral { value, .. }) => AnyStringPartsIter::Bytes(value.iter()),
-            Self::FString(ExprFString { value, .. }) => {
-                AnyStringPartsIter::FString(value.iter(), quoting)
-            }
+            Self::FString(ExprFString { value, .. }) => AnyStringPartsIter::FString(value.iter()),
         }
     }
 
     pub(crate) fn is_multiline(self, source: &str) -> bool {
         match self {
             AnyString::String(_) | AnyString::Bytes(_) => {
-                self.parts(Quoting::default())
+                self.parts()
                     .next()
                     .is_some_and(|part| part.flags().is_triple_quoted())
                     && memchr2(b'\n', b'\r', source[self.range()].as_bytes()).is_some()
@@ -139,7 +138,7 @@ impl<'a> From<&'a ExprFString> for AnyString<'a> {
 pub(super) enum AnyStringPartsIter<'a> {
     String(std::slice::Iter<'a, StringLiteral>),
     Bytes(std::slice::Iter<'a, ast::BytesLiteral>),
-    FString(std::slice::Iter<'a, ast::FStringPart>, Quoting),
+    FString(std::slice::Iter<'a, ast::FStringPart>),
 }
 
 impl<'a> Iterator for AnyStringPartsIter<'a> {
@@ -147,27 +146,12 @@ impl<'a> Iterator for AnyStringPartsIter<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let part = match self {
-            Self::String(inner) => {
-                let part = inner.next()?;
-                AnyStringPart::String {
-                    part,
-                    layout: StringLiteralKind::String,
-                }
-            }
+            Self::String(inner) => AnyStringPart::String(inner.next()?),
             Self::Bytes(inner) => AnyStringPart::Bytes(inner.next()?),
-            Self::FString(inner, quoting) => {
-                let part = inner.next()?;
-                match part {
-                    ast::FStringPart::Literal(string_literal) => AnyStringPart::String {
-                        part: string_literal,
-                        layout: StringLiteralKind::InImplicitlyConcatenatedFString(*quoting),
-                    },
-                    ast::FStringPart::FString(f_string) => AnyStringPart::FString {
-                        part: f_string,
-                        quoting: *quoting,
-                    },
-                }
-            }
+            Self::FString(inner) => match inner.next()? {
+                ast::FStringPart::Literal(string_literal) => AnyStringPart::String(string_literal),
+                ast::FStringPart::FString(f_string) => AnyStringPart::FString(f_string),
+            },
         };
 
         Some(part)
@@ -182,23 +166,17 @@ impl FusedIterator for AnyStringPartsIter<'_> {}
 /// This is constructed from the [`AnyString::parts`] method on [`AnyString`].
 #[derive(Clone, Debug)]
 pub(super) enum AnyStringPart<'a> {
-    String {
-        part: &'a ast::StringLiteral,
-        layout: StringLiteralKind,
-    },
+    String(&'a ast::StringLiteral),
     Bytes(&'a ast::BytesLiteral),
-    FString {
-        part: &'a ast::FString,
-        quoting: Quoting,
-    },
+    FString(&'a ast::FString),
 }
 
 impl AnyStringPart<'_> {
     fn flags(&self) -> AnyStringFlags {
         match self {
-            Self::String { part, .. } => part.flags.into(),
+            Self::String(part) => part.flags.into(),
             Self::Bytes(bytes_literal) => bytes_literal.flags.into(),
-            Self::FString { part, .. } => part.flags.into(),
+            Self::FString(part) => part.flags.into(),
         }
     }
 }
@@ -206,9 +184,9 @@ impl AnyStringPart<'_> {
 impl<'a> From<&AnyStringPart<'a>> for AnyNodeRef<'a> {
     fn from(value: &AnyStringPart<'a>) -> Self {
         match value {
-            AnyStringPart::String { part, .. } => AnyNodeRef::StringLiteral(part),
+            AnyStringPart::String(part) => AnyNodeRef::StringLiteral(part),
             AnyStringPart::Bytes(part) => AnyNodeRef::BytesLiteral(part),
-            AnyStringPart::FString { part, .. } => AnyNodeRef::FString(part),
+            AnyStringPart::FString(part) => AnyNodeRef::FString(part),
         }
     }
 }
@@ -216,21 +194,9 @@ impl<'a> From<&AnyStringPart<'a>> for AnyNodeRef<'a> {
 impl Ranged for AnyStringPart<'_> {
     fn range(&self) -> TextRange {
         match self {
-            Self::String { part, .. } => part.range(),
+            Self::String(part) => part.range(),
             Self::Bytes(part) => part.range(),
-            Self::FString { part, .. } => part.range(),
-        }
-    }
-}
-
-impl Format<PyFormatContext<'_>> for AnyStringPart<'_> {
-    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        match self {
-            AnyStringPart::String { part, layout } => {
-                FormatStringLiteral::new(part, *layout).fmt(f)
-            }
-            AnyStringPart::Bytes(bytes_literal) => bytes_literal.format().fmt(f),
-            AnyStringPart::FString { part, quoting } => FormatFString::new(part, *quoting).fmt(f),
+            Self::FString(part) => part.range(),
         }
     }
 }
