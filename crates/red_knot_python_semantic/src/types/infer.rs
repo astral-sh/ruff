@@ -1154,13 +1154,23 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = assignment;
 
         for target in targets {
-            if let ast::Expr::Name(name) = target {
-                self.infer_definition(name);
-            } else {
-                // TODO infer definitions in unpacking assignment. When we do, this duplication of
-                // the "get `Expression`, call `infer_expression_types` on it, `self.extend`" dance
-                // will be removed; it'll all happen in `infer_assignment_definition` instead.
-                let expression = self.index.expression(value.as_ref());
+            self.infer_assignment_target(target, value);
+        }
+    }
+
+    // TODO: Remove the `value` argument once we handle all possible assignment targets.
+    fn infer_assignment_target(&mut self, target: &ast::Expr, value: &ast::Expr) {
+        match target {
+            ast::Expr::Name(name) => self.infer_definition(name),
+            ast::Expr::List(ast::ExprList { elts, .. })
+            | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                for element in elts {
+                    self.infer_assignment_target(element, value);
+                }
+            }
+            _ => {
+                // TODO: Remove this once we handle all possible assignment targets.
+                let expression = self.index.expression(value);
                 self.extend(infer_expression_types(self.db, expression));
                 self.infer_expression(target);
             }
