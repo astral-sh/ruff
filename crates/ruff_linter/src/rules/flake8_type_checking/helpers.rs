@@ -1,5 +1,4 @@
 use anyhow::Result;
-use ast::str::Quote;
 use ast::visitor::source_order;
 use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
 use std::cmp::Reverse;
@@ -318,6 +317,14 @@ impl<'a> QuoteAnnotation<'a> {
             annotation: String::new(),
         }
     }
+
+    fn get_state(&self, name: &str) -> State {
+        match name {
+            "Literal" => State::Literal,
+            "Annotated" => State::AnnotatedFirst,
+            _ => State::Other,
+        }
+    }
 }
 
 impl<'a> source_order::SourceOrderVisitor<'a> for QuoteAnnotation<'a> {
@@ -325,21 +332,28 @@ impl<'a> source_order::SourceOrderVisitor<'a> for QuoteAnnotation<'a> {
         let generator = Generator::from(self.stylist);
         match expr {
             Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
-                if let Some(name) = value.as_name_expr() {
-                    let value = generator.expr(value);
-                    self.annotation.push_str(&value);
-                    self.annotation.push('[');
-                    match name.id.as_str() {
-                        "Literal" => self.state.push(State::Literal),
-                        "Annotated" => self.state.push(State::AnnotatedFirst),
-                        _ => self.state.push(State::Other),
+                let value_expr = generator.expr(value);
+                self.annotation.push_str(&value_expr);
+                self.annotation.push('[');
+                match value.as_ref() {
+                    Expr::Name(ast::ExprName { id, .. }) => {
+                        self.state.push(self.get_state(id.as_str()));
                     }
-
-                    self.visit_expr(slice);
-                    self.state.pop();
-                    self.annotation.push(']');
+                    Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
+                        if let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() {
+                            if id.as_str() == "typing" {
+                                self.state.push(self.get_state(attr.id.as_str()));
+                            }
+                        }
+                    }
+                    _ => {}
                 }
+
+                self.visit_expr(slice);
+                self.state.pop();
+                self.annotation.push(']');
             }
+
             Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                 let Some(first_elm) = elts.first() else {
                     return;
