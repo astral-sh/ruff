@@ -13,7 +13,7 @@ use crate::semantic_index::{
 use crate::stdlib::{
     builtins_symbol_ty, types_symbol_ty, typeshed_symbol_ty, typing_extensions_symbol_ty,
 };
-use crate::types::mro::MroPossibilities;
+use crate::types::mro::ClassMroSet;
 use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet, Module};
 
@@ -1360,8 +1360,8 @@ impl<'db> ClassType<'db> {
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
     #[salsa::tracked(return_ref)]
-    fn mro_possibilities(self, db: &'db dyn Db) -> MroPossibilities<'db> {
-        MroPossibilities::of_class(db, self)
+    fn mro_possibilities(self, db: &'db dyn Db) -> ClassMroSet<'db> {
+        ClassMroSet::of_class(db, self)
     }
 }
 
@@ -1456,7 +1456,7 @@ impl<'db> ClassType<'db> {
         let mro_possibilities = self.mro_possibilities(db);
         let mut union_builder = UnionBuilder::new(db);
         'outer: for mro in mro_possibilities.iter(db, mro::ClassBase::Class(self)) {
-            for base in &*mro {
+            for base in &**mro {
                 let member = base.own_class_member(db, name);
                 if !member.is_unbound() {
                     union_builder = union_builder.add(member);

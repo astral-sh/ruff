@@ -395,12 +395,17 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .extend(deferred_expression_types.iter());
         }
 
-        let class_definitions: Vec<ClassType<'db>> = self
-            .types
-            .declarations
-            .values()
-            .filter_map(|ty| ty.into_class_type())
-            .collect();
+        self.check_class_mros();
+    }
+
+    /// Iterate over all class definitions to check that Python will be able to create
+    /// a consistent "[method resolution order]" for each class at runtime. If not,
+    /// issue a diagnostic.
+    ///
+    /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
+    fn check_class_mros(&mut self) {
+        let declarations = std::mem::take(&mut self.types.declarations);
+        let class_definitions = declarations.values().filter_map(|ty| ty.into_class_type());
 
         for class in class_definitions {
             if let Some(mro_errors) = class.mro_possibilities(self.db).possible_errors() {
@@ -417,6 +422,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
         }
+
+        self.types.declarations = declarations;
     }
 
     fn infer_region_definition(&mut self, definition: Definition<'db>) {

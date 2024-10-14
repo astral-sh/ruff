@@ -4,14 +4,36 @@ use itertools::Itertools;
 use rustc_hash::FxHashSet;
 use std::borrow::Cow;
 use std::collections::{hash_set, VecDeque};
-use std::iter::{FusedIterator, Once};
 use std::ops::Deref;
+
+/// Represents a class's bases list.
+///
+/// At runtime, this list of classes can be found in the `__bases__` attribute on a class.
+/// Note that this includes *implicit* bases as well as *explicit* bases.
+/// For example, the following class does not explicitly inherit from anything,
+/// but Python inserts `object` into its `__bases__` as a result, as all Python classes
+/// must be subclasses of `object`:
+///
+/// ```pycon
+/// >>> class Foo: pass
+/// ...
+/// >>> Foo.__bases__
+/// (<class 'object'>,)
+/// ```
+///
+/// The only class in Python that has an empty `__bases__` list is `object` itself:
+///
+/// ```pycon
+/// >>> object.__bases__
+/// ()
+/// ```
+type BasesList<'db> = Box<[ClassBase<'db>]>;
 
 /// The resolved possible [method resolution order]s for a single class.
 ///
 /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) enum MroPossibilities<'db> {
+pub(super) enum ClassMroSet<'db> {
     /// It can be statically determined that there is only 1 possible `__mro__`
     /// outcome for this class and the outcome is that class creation always succeeds
     /// with the same MRO. Here is the successful MRO:
@@ -36,7 +58,7 @@ pub(super) enum MroPossibilities<'db> {
     },
 }
 
-impl<'db> MroPossibilities<'db> {
+impl<'db> ClassMroSet<'db> {
     /// Return the possible Method Resolution Orders ("MRO"s) for this class.
     ///
     /// See [`ClassType::mro_possibilities`] for more details.
@@ -60,10 +82,10 @@ impl<'db> MroPossibilities<'db> {
     ) -> MroPossibilityIterator<'s, 'db> {
         match self {
             Self::CertainFailure { .. } => {
-                MroPossibilityIterator::SingleFailure(std::iter::once(Mro::from_error(db, class)))
+                MroPossibilityIterator::SingleFailure(Some(Mro::from_error(db, class)))
             }
             Self::SingleSuccess(single_mro) => {
-                MroPossibilityIterator::SingleSuccess(std::iter::once(single_mro))
+                MroPossibilityIterator::SingleSuccess(Some(single_mro))
             }
             Self::MultipleSuccesses(multiple_mros) => {
                 MroPossibilityIterator::MultipleSuccesses(multiple_mros.iter())
@@ -73,7 +95,7 @@ impl<'db> MroPossibilities<'db> {
                 failure_cases: _,
             } => MroPossibilityIterator::SuccessesAndFailures {
                 successes: possible_mros.iter(),
-                failures: std::iter::once(Mro::from_error(db, class)),
+                failures: Some(Mro::from_error(db, class)),
             },
         }
     }
@@ -139,13 +161,12 @@ impl<'db> MroPossibilities<'db> {
 
 /// Fast path for calculating a class's MRO.
 ///
-/// This fast path is only valid if we know that none of the bases is a
-/// [`Type::Union`]
+/// This fast path is only valid if we know that none of the bases is a [`Type::Union`]
 fn mro_of_class_fast_path<'db>(
     db: &'db dyn Db,
     class: ClassType<'db>,
     bases: &[Type<'db>],
-) -> Option<MroPossibilities<'db>> {
+) -> Option<ClassMroSet<'db>> {
     match bases {
         // 0 bases means that it must be `object` itself.
         //
@@ -157,7 +178,7 @@ fn mro_of_class_fast_path<'db>(
                 KnownClass::Object.to_class(db),
                 "Only `object` should have 0 bases in Python"
             );
-            Some(MroPossibilities::single([class]))
+            Some(ClassMroSet::single([class]))
         }
 
         // The class has a single base.
@@ -165,20 +186,22 @@ fn mro_of_class_fast_path<'db>(
         // That could be an explicit base (`class A(B): pass`),
         // or an implicit base (which is always `object`: `class A: pass`).
         [single_base] => {
-            let object = KnownClass::Object.to_class(db);
-            let mro = if single_base == &object {
-                MroPossibilities::single([class, object.expect_class()])
-            } else {
-                let mut possibilities = FxHashSet::default();
-                let base = ClassBase::from(single_base);
-                for possibility in base.mro_possibilities(db).iter(db, base) {
-                    possibilities.insert(
-                        std::iter::once(ClassBase::Class(class))
-                            .chain(possibility.iter().copied())
-                            .collect(),
-                    );
+            let mro = match single_base.into_class_type() {
+                Some(class_base) if class_base.is_known(db, KnownClass::Object) => {
+                    ClassMroSet::single([class, class_base])
                 }
-                MroPossibilities::possibly_many(possibilities, FxHashSet::default())
+                _ => {
+                    let mut possibilities = FxHashSet::default();
+                    let base = ClassBase::from(single_base);
+                    for possibility in base.mro_possibilities(db).iter(db, base) {
+                        possibilities.insert(
+                            std::iter::once(ClassBase::Class(class))
+                                .chain(possibility.iter().copied())
+                                .collect(),
+                        );
+                    }
+                    ClassMroSet::possibly_many(possibilities, FxHashSet::default())
+                }
             };
             Some(mro)
         }
@@ -202,7 +225,7 @@ fn mro_of_class_slow_path<'db>(
     db: &'db dyn Db,
     class: ClassType<'db>,
     bases: &[Type<'db>],
-) -> MroPossibilities<'db> {
+) -> ClassMroSet<'db> {
     let bases_possibilities = fork_bases(db, bases);
     debug_assert_ne!(bases_possibilities.len(), 0);
     let mut mro_possibilities = FxHashSet::default();
@@ -234,7 +257,7 @@ fn mro_of_class_slow_path<'db>(
             // For a Python-3 translation of the algorithm described in that document,
             // see https://gist.github.com/AlexWaygood/674db1fce6856a90f251f63e73853639
             _ => {
-                let possible_mros_per_base: Vec<(ClassBase, Cow<MroPossibilities>)> = bases_possibility
+                let possible_mros_per_base: Vec<(ClassBase, Cow<ClassMroSet>)> = bases_possibility
                     .iter()
                     .map(|base| (*base, base.mro_possibilities(db)))
                     .collect();
@@ -273,7 +296,7 @@ fn mro_of_class_slow_path<'db>(
         }
     }
 
-    MroPossibilities::possibly_many(mro_possibilities, mro_errors)
+    ClassMroSet::possibly_many(mro_possibilities, mro_errors)
 }
 
 /// Given a list of types representing the bases of a class,
@@ -336,7 +359,9 @@ enum BasesPossibilities<'db> {
     /// There is only one possible value for the class's `__bases__`; here it is
     Single(BasesList<'db>),
 
-    /// There are multiple possible values for the class's `__bases__` tuple
+    /// There are multiple possible values for the class's `__bases__` tuple.
+    /// This can only happen if one of the objects in the class's explicit bases
+    /// is inferred as being a [`Type::Union`].
     Multiple(FxHashSet<BasesList<'db>>),
 }
 
@@ -355,7 +380,7 @@ impl<'db> IntoIterator for BasesPossibilities<'db> {
 
     fn into_iter(self) -> Self::IntoIter {
         match self {
-            Self::Single(bases) => BasesPossibilityIterator::Single(std::iter::once(bases)),
+            Self::Single(bases) => BasesPossibilityIterator::Single(Some(bases)),
             Self::Multiple(bases) => BasesPossibilityIterator::Multiple(bases.into_iter()),
         }
     }
@@ -363,7 +388,7 @@ impl<'db> IntoIterator for BasesPossibilities<'db> {
 
 /// Iterates over the various possible [`BasesList`]s for a given class
 enum BasesPossibilityIterator<'db> {
-    Single(std::iter::Once<BasesList<'db>>),
+    Single(Option<BasesList<'db>>),
     Multiple(hash_set::IntoIter<BasesList<'db>>),
 }
 
@@ -372,23 +397,23 @@ impl<'db> Iterator for BasesPossibilityIterator<'db> {
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            Self::Single(iter) => iter.next(),
+            Self::Single(iter) => iter.take(),
             Self::Multiple(iter) => iter.next(),
         }
     }
 }
 
-impl FusedIterator for BasesPossibilityIterator<'_> {}
+impl std::iter::FusedIterator for BasesPossibilityIterator<'_> {}
 
 /// Iterates over the various possible [`Mro`]s for a given class.
 #[derive(Clone)]
 pub(super) enum MroPossibilityIterator<'a, 'db> {
-    SingleSuccess(Once<&'a Mro<'db>>),
-    SingleFailure(Once<Mro<'db>>),
+    SingleSuccess(Option<&'a Mro<'db>>),
+    SingleFailure(Option<Mro<'db>>),
     MultipleSuccesses(hash_set::Iter<'a, Mro<'db>>),
     SuccessesAndFailures {
         successes: hash_set::Iter<'a, Mro<'db>>,
-        failures: Once<Mro<'db>>,
+        failures: Option<Mro<'db>>,
     },
 }
 
@@ -397,8 +422,8 @@ impl<'a, 'db> Iterator for MroPossibilityIterator<'a, 'db> {
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            Self::SingleSuccess(iter) => iter.next().map(Cow::Borrowed),
-            Self::SingleFailure(iter) => iter.next().map(Cow::Owned),
+            Self::SingleSuccess(iter) => iter.take().map(Cow::Borrowed),
+            Self::SingleFailure(iter) => iter.take().map(Cow::Owned),
             Self::MultipleSuccesses(iter) => iter.next().map(Cow::Borrowed),
             Self::SuccessesAndFailures {
                 successes,
@@ -406,12 +431,12 @@ impl<'a, 'db> Iterator for MroPossibilityIterator<'a, 'db> {
             } => successes
                 .next()
                 .map(Cow::Borrowed)
-                .or_else(|| failures.next().map(Cow::Owned)),
+                .or_else(|| failures.take().map(Cow::Owned)),
         }
     }
 }
 
-impl<'a, 'db> FusedIterator for MroPossibilityIterator<'a, 'db> {}
+impl<'a, 'db> std::iter::FusedIterator for MroPossibilityIterator<'a, 'db> {}
 
 /// Enumeration of the possible kinds of types we allow in class bases.
 ///
@@ -446,22 +471,33 @@ impl<'db> ClassBase<'db> {
         }
     }
 
-    pub(super) fn display(self, db: &'db dyn Db) -> Cow<'static, str> {
-        match self {
-            Self::Any => Cow::Borrowed("Any"),
-            Self::Todo => Cow::Borrowed("Todo"),
-            Self::Unknown => Cow::Borrowed("Unknown"),
-            Self::Class(class) => Cow::Owned(format!("<class '{}'>", class.name(db))),
+    pub(super) fn display(self, db: &'db dyn Db) -> impl std::fmt::Display + 'db {
+        struct Display<'db> {
+            base: ClassBase<'db>,
+            db: &'db dyn Db,
         }
+
+        impl std::fmt::Display for Display<'_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self.base {
+                    ClassBase::Any => f.write_str("Any"),
+                    ClassBase::Todo => f.write_str("Todo"),
+                    ClassBase::Unknown => f.write_str("Unknown"),
+                    ClassBase::Class(class) => write!(f, "<class '{}'>", class.name(self.db)),
+                }
+            }
+        }
+
+        Display { base: self, db }
     }
 
     /// Return the various [`MroPossibilities`] for this base.
-    fn mro_possibilities(self, db: &'db dyn Db) -> Cow<MroPossibilities<'db>> {
+    fn mro_possibilities(self, db: &'db dyn Db) -> Cow<ClassMroSet<'db>> {
         match self {
             ClassBase::Class(class) => Cow::Borrowed(class.mro_possibilities(db)),
             ClassBase::Any | ClassBase::Todo | ClassBase::Unknown => {
                 let object = ClassBase::builtins_object(db);
-                Cow::Owned(MroPossibilities::single([self, object]))
+                Cow::Owned(ClassMroSet::single([self, object]))
             }
         }
     }
@@ -523,27 +559,6 @@ impl<'db> From<&ClassBase<'db>> for Type<'db> {
     }
 }
 
-/// Represents a class's bases list.
-///
-/// At runtime, this list of classes can be found
-/// in the `__bases__` attribute on a class.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
-pub(super) struct BasesList<'db>(Box<[ClassBase<'db>]>);
-
-impl<'db> Deref for BasesList<'db> {
-    type Target = [ClassBase<'db>];
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<'db> FromIterator<ClassBase<'db>> for BasesList<'db> {
-    fn from_iter<T: IntoIterator<Item = ClassBase<'db>>>(iter: T) -> Self {
-        Self(iter.into_iter().collect())
-    }
-}
-
 /// A single possible method resolution order of a given class.
 ///
 /// See [`ClassType::mro_possibilities`] for more details.
@@ -551,10 +566,6 @@ impl<'db> FromIterator<ClassBase<'db>> for BasesList<'db> {
 pub(super) struct Mro<'db>(Box<[ClassBase<'db>]>);
 
 impl<'db> Mro<'db> {
-    fn new(mro: Vec<ClassBase<'db>>) -> Self {
-        Self(mro.into_boxed_slice())
-    }
-
     /// In the event that a possible list of bases would (or could) lead to a
     /// `TypeError` being raised at runtime due to an unresolvable MRO, we
     /// infer one of the "possible MROs" of the class as being
@@ -566,16 +577,6 @@ impl<'db> Mro<'db> {
     fn from_error(db: &'db dyn Db, class: ClassBase<'db>) -> Self {
         Self::from([class, ClassBase::Unknown, ClassBase::builtins_object(db)])
     }
-
-    pub(super) fn iter(&self) -> std::slice::Iter<'_, ClassBase<'db>> {
-        self.0.iter()
-    }
-}
-
-impl<'db, const N: usize> From<[ClassBase<'db>; N]> for Mro<'db> {
-    fn from(value: [ClassBase<'db>; N]) -> Self {
-        Self(Box::new(value))
-    }
 }
 
 impl<'db, const N: usize> From<[ClassType<'db>; N]> for Mro<'db> {
@@ -584,18 +585,29 @@ impl<'db, const N: usize> From<[ClassType<'db>; N]> for Mro<'db> {
     }
 }
 
-impl<'db> FromIterator<ClassBase<'db>> for Mro<'db> {
-    fn from_iter<T: IntoIterator<Item = ClassBase<'db>>>(iter: T) -> Self {
-        Self(iter.into_iter().collect())
+impl<'db, const N: usize> From<[ClassBase<'db>; N]> for Mro<'db> {
+    fn from(value: [ClassBase<'db>; N]) -> Self {
+        value.into_iter().map(ClassBase::from).collect()
     }
 }
 
-impl<'a, 'db> IntoIterator for &'a Mro<'db> {
-    type IntoIter = std::slice::Iter<'a, ClassBase<'db>>;
-    type Item = &'a ClassBase<'db>;
+impl<'db> From<Vec<ClassBase<'db>>> for Mro<'db> {
+    fn from(value: Vec<ClassBase<'db>>) -> Self {
+        Self(value.into_boxed_slice())
+    }
+}
 
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter()
+impl<'db> Deref for Mro<'db> {
+    type Target = [ClassBase<'db>];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'db> FromIterator<ClassBase<'db>> for Mro<'db> {
+    fn from_iter<T: IntoIterator<Item = ClassBase<'db>>>(iter: T) -> Self {
+        Self(iter.into_iter().collect())
     }
 }
 
@@ -612,21 +624,22 @@ fn c3_merge(mut sequences: Vec<VecDeque<ClassBase>>) -> Option<Mro> {
         sequences.retain(|sequence| !sequence.is_empty());
 
         if sequences.is_empty() {
-            return Some(Mro::new(mro));
+            return Some(Mro::from(mro));
         }
-
-        // Iterator over all potential candidates to be the next MRO entry:
-        let mut mro_entry_candidate_iter = sequences.iter().map(|sequence| sequence[0]);
 
         // If the candidate exists "deeper down" in the inheritance hierarchy,
         // we should refrain from adding it to the MRO for now. Add the first candidate
         // for which this does not hold true. If this holds true for all candidates,
         // return `None`; it will be impossible to find a consistent MRO for the class
         // with the given bases.
-        let mro_entry = mro_entry_candidate_iter.find(|candidate| {
-            sequences
+        let mro_entry = sequences.iter().find_map(|outer_sequence| {
+            let candidate = outer_sequence[0];
+
+            let not_head = sequences
                 .iter()
-                .all(|sequence| sequence.iter().skip(1).all(|base| base != candidate))
+                .all(|sequence| sequence.iter().skip(1).all(|base| base != &candidate));
+
+            not_head.then_some(candidate)
         })?;
 
         mro.push(mro_entry);
