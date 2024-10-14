@@ -1150,13 +1150,18 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ast::StmtAssign {
             range: _,
             targets,
-            value: _,
+            value,
         } = assignment;
 
         for target in targets {
             if let ast::Expr::Name(name) = target {
                 self.infer_definition(name);
             } else {
+                // TODO infer definitions in unpacking assignment. When we do, this duplication of
+                // the "get `Expression`, call `infer_expression_types` on it, `self.extend`" dance
+                // will be removed; it'll all happen in `infer_assignment_definition` instead.
+                let expression = self.index.expression(value.as_ref());
+                self.extend(infer_expression_types(self.db, expression));
                 self.infer_expression(target);
             }
         }
