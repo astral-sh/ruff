@@ -1,6 +1,3 @@
-from typing import Literal
-
-
 def f():
     from pandas import DataFrame
 
@@ -15,8 +12,7 @@ def f():
         ...
 
 
-# Causes fixes to not converge
-# def f():
+# def f(): # Causes fixes to not converge
 #     from pandas import DataFrame
 #
 #     def baz() -> DataFrame["int"]:
