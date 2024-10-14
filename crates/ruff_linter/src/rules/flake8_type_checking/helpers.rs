@@ -308,17 +308,14 @@ pub(crate) struct QuoteAnnotation<'a> {
     state: Vec<State>,
     stylist: &'a Stylist<'a>,
     annotation: String,
-    final_quote_type: Quote,
 }
 
 impl<'a> QuoteAnnotation<'a> {
     pub(crate) fn new(stylist: &'a Stylist<'a>) -> Self {
-        let final_quote_type = stylist.quote();
         Self {
             state: vec![],
             stylist,
             annotation: String::new(),
-            final_quote_type,
         }
     }
 }
@@ -360,6 +357,7 @@ impl<'a> source_order::SourceOrderVisitor<'a> for QuoteAnnotation<'a> {
             Expr::BinOp(ast::ExprBinOp {
                 left, op, right, ..
             }) => {
+                debug_assert!(*op == ast::Operator::BitOr);
                 self.visit_expr(left);
                 self.annotation.push(' ');
                 self.annotation.push_str(op.as_str());
@@ -380,15 +378,15 @@ impl<'a> source_order::SourceOrderVisitor<'a> for QuoteAnnotation<'a> {
                     Some(State::Literal | State::AnnotatedRest) => {
                         let mut source = generator.expr(expr);
                         source = source.replace(
-                            self.final_quote_type.as_char(),
-                            &self.final_quote_type.opposite().as_char().to_string(),
+                            self.stylist.quote().as_char(),
+                            &self.stylist.quote().opposite().as_char().to_string(),
                         );
                         source
                     }
                     None | Some(State::AnnotatedFirst | State::Other) => {
                         let mut source = generator.expr(expr);
-                        source = source.replace(self.final_quote_type.as_char(), "");
-                        source = source.replace(self.final_quote_type.opposite().as_char(), "");
+                        source = source.replace(self.stylist.quote().as_char(), "");
+                        source = source.replace(self.stylist.quote().opposite().as_char(), "");
                         source
                     }
                 };
