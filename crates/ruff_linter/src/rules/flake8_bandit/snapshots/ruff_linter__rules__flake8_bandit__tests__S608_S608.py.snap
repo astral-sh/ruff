@@ -1,4 +1,366 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
+S608.py:4:10: S608 Possible SQL injection vector through string-based query construction
+  |
+3 | var, table, val, var2, x = "", "", "", "", ""
+4 | query1 = "SELECT %s FROM table" % (var,) # bad
+  |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+5 | query2 = "SELECT var FROM " + table
+6 | query3 = "SELECT " + val + " FROM " + table
+  |
 
+S608.py:5:10: S608 Possible SQL injection vector through string-based query construction
+  |
+3 | var, table, val, var2, x = "", "", "", "", ""
+4 | query1 = "SELECT %s FROM table" % (var,) # bad
+5 | query2 = "SELECT var FROM " + table
+  |          ^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+6 | query3 = "SELECT " + val + " FROM " + table
+7 | query4 = "SELECT {} FROM table;".format(var)
+  |
+
+S608.py:6:10: S608 Possible SQL injection vector through string-based query construction
+  |
+4 | query1 = "SELECT %s FROM table" % (var,) # bad
+5 | query2 = "SELECT var FROM " + table
+6 | query3 = "SELECT " + val + " FROM " + table
+  |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+7 | query4 = "SELECT {} FROM table;".format(var)
+8 | query5 = f"SELECT * FROM table WHERE var = {var}"
+  |
+
+S608.py:7:10: S608 Possible SQL injection vector through string-based query construction
+  |
+5 | query2 = "SELECT var FROM " + table
+6 | query3 = "SELECT " + val + " FROM " + table
+7 | query4 = "SELECT {} FROM table;".format(var)
+  |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+8 | query5 = f"SELECT * FROM table WHERE var = {var}"
+  |
+
+S608.py:10:10: S608 Possible SQL injection vector through string-based query construction
+   |
+ 8 | query5 = f"SELECT * FROM table WHERE var = {var}"
+ 9 | 
+10 | query6 = "DELETE FROM table WHERE var = %s" % (var,)
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+11 | query7 = "DELETE FROM table WHERE VAR = " + var
+12 | query8 = "DELETE FROM " + table + "WHERE var = " + var
+   |
+
+S608.py:11:10: S608 Possible SQL injection vector through string-based query construction
+   |
+10 | query6 = "DELETE FROM table WHERE var = %s" % (var,)
+11 | query7 = "DELETE FROM table WHERE VAR = " + var
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+12 | query8 = "DELETE FROM " + table + "WHERE var = " + var
+13 | query9 = "DELETE FROM table WHERE var = {}".format(var)
+   |
+
+S608.py:12:10: S608 Possible SQL injection vector through string-based query construction
+   |
+10 | query6 = "DELETE FROM table WHERE var = %s" % (var,)
+11 | query7 = "DELETE FROM table WHERE VAR = " + var
+12 | query8 = "DELETE FROM " + table + "WHERE var = " + var
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+13 | query9 = "DELETE FROM table WHERE var = {}".format(var)
+14 | query10 = f"DELETE FROM table WHERE var = {var}"
+   |
+
+S608.py:13:10: S608 Possible SQL injection vector through string-based query construction
+   |
+11 | query7 = "DELETE FROM table WHERE VAR = " + var
+12 | query8 = "DELETE FROM " + table + "WHERE var = " + var
+13 | query9 = "DELETE FROM table WHERE var = {}".format(var)
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+14 | query10 = f"DELETE FROM table WHERE var = {var}"
+   |
+
+S608.py:16:11: S608 Possible SQL injection vector through string-based query construction
+   |
+14 | query10 = f"DELETE FROM table WHERE var = {var}"
+15 | 
+16 | query11 = "INSERT INTO table VALUES (%s)" % (var,)
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+17 | query12 = "INSERT INTO TABLE VALUES (" + var + ")"
+18 | query13 = "INSERT INTO {} VALUES ({})".format(table, var)
+   |
+
+S608.py:17:11: S608 Possible SQL injection vector through string-based query construction
+   |
+16 | query11 = "INSERT INTO table VALUES (%s)" % (var,)
+17 | query12 = "INSERT INTO TABLE VALUES (" + var + ")"
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+18 | query13 = "INSERT INTO {} VALUES ({})".format(table, var)
+19 | query14 = f"INSERT INTO {table} VALUES var = {var}"
+   |
+
+S608.py:18:11: S608 Possible SQL injection vector through string-based query construction
+   |
+16 | query11 = "INSERT INTO table VALUES (%s)" % (var,)
+17 | query12 = "INSERT INTO TABLE VALUES (" + var + ")"
+18 | query13 = "INSERT INTO {} VALUES ({})".format(table, var)
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+19 | query14 = f"INSERT INTO {table} VALUES var = {var}"
+   |
+
+S608.py:21:11: S608 Possible SQL injection vector through string-based query construction
+   |
+19 | query14 = f"INSERT INTO {table} VALUES var = {var}"
+20 | 
+21 | query15 = "UPDATE %s SET var = %s" % (table, var)
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+22 | query16 = "UPDATE " + table + " SET var = " + var
+23 | query17 = "UPDATE {} SET var = {}".format(table, var)
+   |
+
+S608.py:22:11: S608 Possible SQL injection vector through string-based query construction
+   |
+21 | query15 = "UPDATE %s SET var = %s" % (table, var)
+22 | query16 = "UPDATE " + table + " SET var = " + var
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+23 | query17 = "UPDATE {} SET var = {}".format(table, var)
+24 | query18 = f"UPDATE {table} SET var = {var}"
+   |
+
+S608.py:23:11: S608 Possible SQL injection vector through string-based query construction
+   |
+21 | query15 = "UPDATE %s SET var = %s" % (table, var)
+22 | query16 = "UPDATE " + table + " SET var = " + var
+23 | query17 = "UPDATE {} SET var = {}".format(table, var)
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+24 | query18 = f"UPDATE {table} SET var = {var}"
+   |
+
+S608.py:26:11: S608 Possible SQL injection vector through string-based query construction
+   |
+24 | query18 = f"UPDATE {table} SET var = {var}"
+25 | 
+26 | query19 = "select %s from table" % (var,)
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+27 | query20 = "select var from " + table
+28 | query21 = "select " + val + " from " + table
+   |
+
+S608.py:27:11: S608 Possible SQL injection vector through string-based query construction
+   |
+26 | query19 = "select %s from table" % (var,)
+27 | query20 = "select var from " + table
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+28 | query21 = "select " + val + " from " + table
+29 | query22 = "select {} from table;".format(var)
+   |
+
+S608.py:28:11: S608 Possible SQL injection vector through string-based query construction
+   |
+26 | query19 = "select %s from table" % (var,)
+27 | query20 = "select var from " + table
+28 | query21 = "select " + val + " from " + table
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+29 | query22 = "select {} from table;".format(var)
+30 | query23 = f"select * from table where var = {var}"
+   |
+
+S608.py:29:11: S608 Possible SQL injection vector through string-based query construction
+   |
+27 | query20 = "select var from " + table
+28 | query21 = "select " + val + " from " + table
+29 | query22 = "select {} from table;".format(var)
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+30 | query23 = f"select * from table where var = {var}"
+   |
+
+S608.py:32:11: S608 Possible SQL injection vector through string-based query construction
+   |
+30 | query23 = f"select * from table where var = {var}"
+31 | 
+32 | query24 = "delete from table where var = %s" % (var,)
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+33 | query25 = "delete from table where var = " + var
+34 | query26 = "delete from " + table + "where var = " + var
+   |
+
+S608.py:33:11: S608 Possible SQL injection vector through string-based query construction
+   |
+32 | query24 = "delete from table where var = %s" % (var,)
+33 | query25 = "delete from table where var = " + var
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+34 | query26 = "delete from " + table + "where var = " + var
+35 | query27 = "delete from table where var = {}".format(var)
+   |
+
+S608.py:34:11: S608 Possible SQL injection vector through string-based query construction
+   |
+32 | query24 = "delete from table where var = %s" % (var,)
+33 | query25 = "delete from table where var = " + var
+34 | query26 = "delete from " + table + "where var = " + var
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+35 | query27 = "delete from table where var = {}".format(var)
+36 | query28 = f"delete from table where var = {var}"
+   |
+
+S608.py:35:11: S608 Possible SQL injection vector through string-based query construction
+   |
+33 | query25 = "delete from table where var = " + var
+34 | query26 = "delete from " + table + "where var = " + var
+35 | query27 = "delete from table where var = {}".format(var)
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+36 | query28 = f"delete from table where var = {var}"
+   |
+
+S608.py:38:11: S608 Possible SQL injection vector through string-based query construction
+   |
+36 | query28 = f"delete from table where var = {var}"
+37 | 
+38 | query29 = "insert into table values (%s)" % (var,)
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+39 | query30 = "insert into table values (" + var + ")"
+40 | query31 = "insert into {} values ({})".format(table, var)
+   |
+
+S608.py:39:11: S608 Possible SQL injection vector through string-based query construction
+   |
+38 | query29 = "insert into table values (%s)" % (var,)
+39 | query30 = "insert into table values (" + var + ")"
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+40 | query31 = "insert into {} values ({})".format(table, var)
+41 | query32 = f"insert into {table} values var = {var}"
+   |
+
+S608.py:40:11: S608 Possible SQL injection vector through string-based query construction
+   |
+38 | query29 = "insert into table values (%s)" % (var,)
+39 | query30 = "insert into table values (" + var + ")"
+40 | query31 = "insert into {} values ({})".format(table, var)
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+41 | query32 = f"insert into {table} values var = {var}"
+   |
+
+S608.py:43:11: S608 Possible SQL injection vector through string-based query construction
+   |
+41 | query32 = f"insert into {table} values var = {var}"
+42 | 
+43 | query33 = "update %s set var = %s" % (table, var)
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+44 | query34 = "update " + table + " set var = " + var
+45 | query35 = "update {} set var = {}".format(table, var)
+   |
+
+S608.py:44:11: S608 Possible SQL injection vector through string-based query construction
+   |
+43 | query33 = "update %s set var = %s" % (table, var)
+44 | query34 = "update " + table + " set var = " + var
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+45 | query35 = "update {} set var = {}".format(table, var)
+46 | query36 = f"update {table} set var = {var}"
+   |
+
+S608.py:45:11: S608 Possible SQL injection vector through string-based query construction
+   |
+43 | query33 = "update %s set var = %s" % (table, var)
+44 | query34 = "update " + table + " set var = " + var
+45 | query35 = "update {} set var = {}".format(table, var)
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+46 | query36 = f"update {table} set var = {var}"
+   |
+
+S608.py:50:12: S608 Possible SQL injection vector through string-based query construction
+   |
+48 |   # multi-line failures
+49 |   def query37():
+50 |       return """
+   |  ____________^
+51 | |     SELECT *
+52 | |     FROM table
+53 | |     WHERE var = %s
+54 | |     """ % var
+   | |_____________^ S608
+55 |   
+56 |   def query38():
+   |
+
+S608.py:57:12: S608 Possible SQL injection vector through string-based query construction
+   |
+56 |   def query38():
+57 |       return """
+   |  ____________^
+58 | |     SELECT *
+59 | |     FROM TABLE
+60 | |     WHERE var =
+61 | |     """ + var
+   | |_____________^ S608
+62 |   
+63 |   def query39():
+   |
+
+S608.py:64:12: S608 Possible SQL injection vector through string-based query construction
+   |
+63 |   def query39():
+64 |       return """
+   |  ____________^
+65 | |     SELECT *
+66 | |     FROM table
+67 | |     WHERE var = {}
+68 | |     """.format(var)
+   | |___________________^ S608
+69 |   
+70 |   def query40():
+   |
+
+S608.py:86:26: S608 Possible SQL injection vector through string-based query construction
+   |
+84 | cursor = None
+85 | # # cursor-wrapped failures
+86 | query42 = cursor.execute("SELECT * FROM table WHERE var = %s" % var)
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+87 | query43 = cursor.execute(f"SELECT * FROM table WHERE var = {var}")
+88 | query44 = cursor.execute("SELECT * FROM table WHERE var = {}".format(var))
+   |
+
+S608.py:88:26: S608 Possible SQL injection vector through string-based query construction
+   |
+86 | query42 = cursor.execute("SELECT * FROM table WHERE var = %s" % var)
+87 | query43 = cursor.execute(f"SELECT * FROM table WHERE var = {var}")
+88 | query44 = cursor.execute("SELECT * FROM table WHERE var = {}".format(var))
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+89 | query45 = cursor.executemany("SELECT * FROM table WHERE var = %s" % var, [])
+   |
+
+S608.py:89:30: S608 Possible SQL injection vector through string-based query construction
+   |
+87 | query43 = cursor.execute(f"SELECT * FROM table WHERE var = {var}")
+88 | query44 = cursor.execute("SELECT * FROM table WHERE var = {}".format(var))
+89 | query45 = cursor.executemany("SELECT * FROM table WHERE var = %s" % var, [])
+   |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+90 | 
+91 | # # pass
+   |
+
+S608.py:107:11: S608 Possible SQL injection vector through string-based query construction
+    |
+105 | query48 = "REPLACE table VALUES (%s)" % (var,)
+106 | 
+107 | query49 = "Deselect something that is not SQL even though it has a ' from ' somewhere in %s." % "there"
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+108 | 
+109 | # # pass
+    |
+
+S608.py:114:1: S608 Possible SQL injection vector through string-based query construction
+    |
+113 | # # errors
+114 | "SELECT * FROM " + ("table1" if x > 0 else "table2") # query50
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+115 | "SELECT * FROM " + ("table1" if x > 0 else ["table2"]) # query51
+    |
+
+S608.py:115:1: S608 Possible SQL injection vector through string-based query construction
+    |
+113 | # # errors
+114 | "SELECT * FROM " + ("table1" if x > 0 else "table2") # query50
+115 | "SELECT * FROM " + ("table1" if x > 0 else ["table2"]) # query51
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+116 | 
+117 | # test cases from #12044
+    |
