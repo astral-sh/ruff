@@ -1271,8 +1271,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                             Cow::Borrowed(tuple_ty.elements(builder.db).as_ref())
                         };
 
-                        for (element, element_ty) in elts.iter().zip(element_types.iter()) {
-                            if let Some(ty) = inner(builder, element, *element_ty, variable) {
+                        for (index, element) in elts.iter().enumerate() {
+                            if let Some(ty) = inner(
+                                builder,
+                                element,
+                                element_types.get(index).copied().unwrap_or(Type::Unknown),
+                                variable,
+                            ) {
                                 return Some(ty);
                             }
                         }
