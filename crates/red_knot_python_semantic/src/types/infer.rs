@@ -27,8 +27,8 @@
 //! associated with a particular definition. Scope-level inference infers deferred types for all
 //! definitions once the rest of the types in the scope have been inferred.
 use itertools::Itertools;
+use std::borrow::Cow;
 use std::num::NonZeroU32;
-use std::slice::Iter;
 
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
@@ -1216,15 +1216,48 @@ impl<'db> TypeInferenceBuilder<'db> {
                 ast::Expr::List(ast::ExprList { elts, .. })
                 | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => match value_ty {
                     Type::Tuple(tuple_ty) => {
-                        let mut unpack_types_iter =
-                            UnpackTypesIter::new(elts, tuple_ty.elements(builder.db));
-                        for element in elts {
-                            if let Some(ty) = inner(
-                                builder,
-                                element,
-                                unpack_types_iter.next().unwrap_or(Type::Unknown),
-                                variable,
-                            ) {
+                        let starred_index = elts.iter().position(ast::Expr::is_starred_expr);
+
+                        let element_types = if let Some(starred_index) = starred_index {
+                            if tuple_ty.len(builder.db) >= elts.len() {
+                                let mut element_types = Vec::with_capacity(elts.len());
+                                element_types.extend_from_slice(
+                                    // SAFETY: Safe because of the length check above.
+                                    tuple_ty.elements(builder.db).get(..starred_index).unwrap(),
+                                );
+
+                                // E.g., in `(a, *b, c, d) = ...`, the index of starred element `b`
+                                // is 1 and the remaining elements after that are 2.
+                                let remaining = elts.len() - 2;
+                                let end_index =
+                                    tuple_ty.len(builder.db) - starred_index - remaining;
+                                // SAFETY: Safe because of the length check above.
+                                let _starred_element_types = tuple_ty
+                                    .elements(builder.db)
+                                    .get(starred_index..=end_index)
+                                    .unwrap();
+                                // TODO: Combine the types into a list type.
+                                // combine_types(starred_element_types);
+                                element_types.push(Type::Todo);
+
+                                element_types.extend_from_slice(
+                                    // SAFETY: Safe because of the length check above.
+                                    tuple_ty.elements(builder.db).get(end_index + 1..).unwrap(),
+                                );
+                                Cow::Owned(element_types)
+                            } else if tuple_ty.len(builder.db) == elts.len() - 1 {
+                                let mut element_types = tuple_ty.elements(builder.db).to_vec();
+                                element_types.insert(starred_index, Type::Todo);
+                                Cow::Owned(element_types)
+                            } else {
+                                Cow::Borrowed(tuple_ty.elements(builder.db).as_ref())
+                            }
+                        } else {
+                            Cow::Borrowed(tuple_ty.elements(builder.db).as_ref())
+                        };
+
+                        for (element, element_ty) in elts.iter().zip(element_types.iter()) {
+                            if let Some(ty) = inner(builder, element, *element_ty, variable) {
                                 return Some(ty);
                             }
                         }
@@ -3349,78 +3382,6 @@ fn perform_rich_comparison<'db>(
 
     // TODO: reflected dunder -- (==, ==), (!=, !=), (<, >), (>, <), (<=, >=), (>=, <=)
     None
-}
-
-#[derive(Debug, PartialEq)]
-enum StarredExprKind {
-    Any,
-    Combine,
-    Other,
-}
-
-struct UnpackTypesIter<'db, 'a> {
-    types: Iter<'a, Type<'db>>,
-    current_index: usize,
-    targets_len: usize,
-    starred_index: Option<usize>,
-    starred_expr_kind: StarredExprKind,
-}
-
-impl<'db, 'a> UnpackTypesIter<'db, 'a> {
-    fn new(elements: &'a [ast::Expr], types: &'a [Type<'db>]) -> Self {
-        let starred_index = elements.iter().position(ast::Expr::is_starred_expr);
-
-        let starred_expr_kind = if starred_index.is_some() {
-            if types.len() >= elements.len() {
-                StarredExprKind::Combine
-            } else if types.len() == elements.len() - 1 {
-                StarredExprKind::Any
-            } else {
-                StarredExprKind::Other
-            }
-        } else {
-            StarredExprKind::Other
-        };
-
-        Self {
-            types: types.iter(),
-            current_index: 0,
-            targets_len: elements.len(),
-            starred_index,
-            starred_expr_kind,
-        }
-    }
-}
-
-impl<'db, 'a> Iterator for UnpackTypesIter<'db, 'a> {
-    type Item = Type<'db>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let at_starred = self.starred_index == Some(self.current_index);
-        self.current_index += 1;
-        if at_starred && self.starred_expr_kind == StarredExprKind::Any {
-            return Some(Type::Any);
-        }
-
-        let next_ty = self.types.next().copied()?;
-
-        if at_starred && self.starred_expr_kind == StarredExprKind::Combine {
-            let mut types = vec![next_ty];
-            let remaining = self.targets_len - self.current_index;
-            while self.types.len() != remaining {
-                let Some(next_ty) = self.types.next().copied() else {
-                    break;
-                };
-                types.push(next_ty);
-            }
-
-            // TODO: combine_types(types)
-
-            Some(Type::Todo)
-        } else {
-            Some(next_ty)
-        }
-    }
 }
 
 #[cfg(test)]

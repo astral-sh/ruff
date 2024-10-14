@@ -569,12 +569,8 @@ where
                 for target in &node.targets {
                     let kind = match target {
                         ast::Expr::List(_) | ast::Expr::Tuple(_) => AssignmentKind::Sequence,
-                        ast::Expr::Name(_)
-                        | ast::Expr::Starred(_)
-                        | ast::Expr::Attribute(_)
-                        | ast::Expr::Subscript(_) => AssignmentKind::Other,
-                        // TODO: is this a good default for an error recovery case like `1 = 2`?
-                        _ => continue,
+                        // TODO: Should we continue for an error recovery case like `1 = 2`?
+                        _ => AssignmentKind::Other,
                     };
                     self.current_assignment = Some(CurrentAssignment::Assign {
                         target,
