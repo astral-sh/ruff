@@ -2661,8 +2661,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             (Type::BytesLiteral(salsa_b1), Type::BytesLiteral(salsa_b2)) => {
-                let b1 = salsa_b1.value(self.db).as_ref();
-                let b2 = salsa_b2.value(self.db).as_ref();
+                let b1 = &**salsa_b1.value(self.db);
+                let b2 = &**salsa_b2.value(self.db);
                 match op {
                     ast::CmpOp::Eq => Some(Type::BooleanLiteral(b1 == b2)),
                     ast::CmpOp::NotEq => Some(Type::BooleanLiteral(b1 != b2)),
