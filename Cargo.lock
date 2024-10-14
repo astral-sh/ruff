@@ -2083,6 +2083,7 @@ dependencies = [
  "hashbrown 0.15.0",
  "insta",
  "itertools 0.13.0",
+ "memchr",
  "ordermap",
  "red_knot_test",
  "red_knot_vendored",

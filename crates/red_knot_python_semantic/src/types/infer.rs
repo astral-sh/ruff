@@ -2661,18 +2661,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             (Type::BytesLiteral(salsa_b1), Type::BytesLiteral(salsa_b2)) => {
-                let contains_subsequence = |needle: &[u8], haystack: &[u8]| {
-                    if needle.is_empty() {
-                        true
-                    } else {
-                        haystack
-                            .windows(needle.len())
-                            .any(|window| window == needle)
-                    }
-                };
-
-                let b1 = salsa_b1.value(self.db).as_ref();
-                let b2 = salsa_b2.value(self.db).as_ref();
+                let b1 = &**salsa_b1.value(self.db);
+                let b2 = &**salsa_b2.value(self.db);
                 match op {
                     ast::CmpOp::Eq => Some(Type::BooleanLiteral(b1 == b2)),
                     ast::CmpOp::NotEq => Some(Type::BooleanLiteral(b1 != b2)),
@@ -2680,8 +2670,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                     ast::CmpOp::LtE => Some(Type::BooleanLiteral(b1 <= b2)),
                     ast::CmpOp::Gt => Some(Type::BooleanLiteral(b1 > b2)),
                     ast::CmpOp::GtE => Some(Type::BooleanLiteral(b1 >= b2)),
-                    ast::CmpOp::In => Some(Type::BooleanLiteral(contains_subsequence(b1, b2))),
-                    ast::CmpOp::NotIn => Some(Type::BooleanLiteral(!contains_subsequence(b1, b2))),
+                    ast::CmpOp::In => {
+                        Some(Type::BooleanLiteral(memchr::memmem::find(b2, b1).is_some()))
+                    }
+                    ast::CmpOp::NotIn => {
+                        Some(Type::BooleanLiteral(memchr::memmem::find(b2, b1).is_none()))
+                    }
                     ast::CmpOp::Is => {
                         if b1 == b2 {
                             Some(KnownClass::Bool.to_instance(self.db))
