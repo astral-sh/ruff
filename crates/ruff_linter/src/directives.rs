@@ -287,21 +287,23 @@ impl<'a> TodoDirective<'a> {
     pub(crate) fn from_comment(comment: &'a str, comment_range: TextRange) -> Option<Self> {
         // The directive's offset from the start of the comment.
         let mut relative_offset = TextSize::new(0);
-        let mut subset_opt = Some(comment);
+        let mut subset = comment;
 
         // Loop over `#`-delimited sections of the comment to check for directives. This will
         // correctly handle cases like `# foo # TODO`.
-        while let Some(subset) = subset_opt {
+        loop {
             let trimmed = subset.trim_start_matches('#').trim_start();
 
             let offset = subset.text_len() - trimmed.text_len();
             relative_offset += offset;
 
-            let first_word = trimmed.split(|c: char| !c.is_alphanumeric()).nth(0);
+            // Find the first word. Don't use split by whitespace because that would include the `:` character
+            // in `TODO:`
+            let first_word = trimmed.split(|c: char| !c.is_alphanumeric()).next()?;
 
             // If we detect a TodoDirectiveKind variant substring in the comment, construct and
             // return the appropriate TodoDirective
-            if let Ok(directive_kind) = first_word?.parse::<TodoDirectiveKind>() {
+            if let Ok(directive_kind) = first_word.parse::<TodoDirectiveKind>() {
                 let len = directive_kind.len();
 
                 return Some(Self {
@@ -312,11 +314,11 @@ impl<'a> TodoDirective<'a> {
             }
 
             // Shrink the subset to check for the next phrase starting with "#".
-            subset_opt = if let Some(new_offset) = trimmed.find('#') {
+            if let Some(new_offset) = trimmed.find('#') {
                 relative_offset += TextSize::try_from(new_offset).unwrap();
-                subset.get(relative_offset.to_usize()..)
+                subset = &subset[relative_offset.to_usize()..]
             } else {
-                None
+                break;
             };
         }
 
