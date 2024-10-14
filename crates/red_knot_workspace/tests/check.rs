@@ -9,7 +9,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use ruff_python_ast::visitor::source_order;
 use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
-use ruff_python_ast::{Alias, Expr, Parameter, ParameterWithDefault, Stmt};
+use ruff_python_ast::{self as ast, Alias, Expr, Parameter, ParameterWithDefault, Stmt};
 
 fn setup_db(workspace_root: &SystemPath) -> anyhow::Result<RootDatabase> {
     let system = OsSystem::new(workspace_root);
@@ -65,6 +65,17 @@ impl<'db> PullTypesVisitor<'db> {
             model: SemanticModel::new(db, file),
         }
     }
+
+    fn visit_assign_target(&mut self, target: &Expr) {
+        match target {
+            Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                for element in elts {
+                    self.visit_assign_target(element);
+                }
+            }
+            _ => self.visit_expr(target),
+        }
+    }
 }
 
 impl SourceOrderVisitor<'_> for PullTypesVisitor<'_> {
@@ -76,10 +87,15 @@ impl SourceOrderVisitor<'_> for PullTypesVisitor<'_> {
             Stmt::ClassDef(class) => {
                 let _ty = class.ty(&self.model);
             }
+            Stmt::Assign(assign) => {
+                for target in &assign.targets {
+                    self.visit_assign_target(target);
+                }
+                return;
+            }
             Stmt::AnnAssign(_)
             | Stmt::Return(_)
             | Stmt::Delete(_)
-            | Stmt::Assign(_)
             | Stmt::AugAssign(_)
             | Stmt::TypeAlias(_)
             | Stmt::For(_)

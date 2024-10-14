@@ -132,7 +132,7 @@ reveal_type(b)  # revealed: Unknown
 ### Simple unpacking
 
 ```py
-a, b = 'abc'
+a, b = 'ab'
 reveal_type(a)  # revealed: LiteralString
 reveal_type(b)  # revealed: LiteralString
 ```
