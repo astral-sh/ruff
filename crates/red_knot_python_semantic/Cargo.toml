@@ -34,6 +34,7 @@ hashbrown = { workspace = true }
 smallvec = { workspace = true }
 static_assertions = { workspace = true }
 test-case = { workspace = true }
+memchr = { workspace = true }
 
 [dev-dependencies]
 ruff_db = { workspace = true, features = ["os", "testing"] }
