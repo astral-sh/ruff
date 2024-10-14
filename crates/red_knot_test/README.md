@@ -34,8 +34,7 @@ syntax, it's just how this README embeds an example mdtest Markdown document.)
 See actual example mdtest suites in
 [`crates/red_knot_python_semantic/resources/mdtest`](https://github.com/astral-sh/ruff/tree/main/crates/red_knot_python_semantic/resources/mdtest).
 
-> [!NOTE]
-> If you use `rstest` to generate a separate test for all Markdown files in a certain directory,
+> ℹ️ Note: If you use `rstest` to generate a separate test for all Markdown files in a certain directory,
 > as with the example in `crates/red_knot_python_semantic/tests/mdtest.rs`,
 > you will likely want to also make sure that the crate the tests are in is rebuilt every time a
 > Markdown file is added or removed from the directory. See
