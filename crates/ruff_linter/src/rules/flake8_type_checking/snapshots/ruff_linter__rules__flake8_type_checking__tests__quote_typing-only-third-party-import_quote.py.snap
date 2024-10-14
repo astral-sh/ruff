@@ -59,44 +59,13 @@ quote.py:12:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a typ
 16 18 | 
 17 19 | 
 
-quote.py:19:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+quote.py:27:22: TCH002 [*] Move third-party import `pandas` into a type-checking block
    |
-18 | def f():
-19 |     from pandas import DataFrame
-   |                        ^^^^^^^^^ TCH002
-20 | 
-21 |     def baz() -> DataFrame["int"]:
-   |
-   = help: Move into type-checking block
-
-ℹ Unsafe fix
-1     |-from typing import Literal
-   1  |+from typing import Literal, TYPE_CHECKING
-   2  |+
-   3  |+if TYPE_CHECKING:
-   4  |+    from pandas import DataFrame
-2  5  | 
-3  6  | 
-4  7  | def f():
---------------------------------------------------------------------------------
-16 19 | 
-17 20 | 
-18 21 | def f():
-19    |-    from pandas import DataFrame
-20 22 | 
-21    |-    def baz() -> DataFrame["int"]:
-   23 |+    def baz() -> "DataFrame[int]":
-22 24 |         ...
-23 25 | 
-24 26 | 
-
-quote.py:26:22: TCH002 [*] Move third-party import `pandas` into a type-checking block
-   |
-25 | def f():
-26 |     import pandas as pd
+26 | def f():
+27 |     import pandas as pd
    |                      ^^ TCH002
-27 | 
-28 |     def baz() -> pd.DataFrame:
+28 | 
+29 |     def baz() -> pd.DataFrame:
    |
    = help: Move into type-checking block
 
@@ -110,24 +79,24 @@ quote.py:26:22: TCH002 [*] Move third-party import `pandas` into a type-checking
 3  6  | 
 4  7  | def f():
 --------------------------------------------------------------------------------
-23 26 | 
 24 27 | 
-25 28 | def f():
-26    |-    import pandas as pd
-27 29 | 
-28    |-    def baz() -> pd.DataFrame:
-   30 |+    def baz() -> "pd.DataFrame":
-29 31 |         ...
-30 32 | 
+25 28 | 
+26 29 | def f():
+27    |-    import pandas as pd
+28 30 | 
+29    |-    def baz() -> pd.DataFrame:
+   31 |+    def baz() -> "pd.DataFrame":
+30 32 |         ...
 31 33 | 
+32 34 | 
 
-quote.py:33:22: TCH002 [*] Move third-party import `pandas` into a type-checking block
+quote.py:34:22: TCH002 [*] Move third-party import `pandas` into a type-checking block
    |
-32 | def f():
-33 |     import pandas as pd
+33 | def f():
+34 |     import pandas as pd
    |                      ^^ TCH002
-34 | 
-35 |     def baz() -> pd.DataFrame.Extra:
+35 | 
+36 |     def baz() -> pd.DataFrame.Extra:
    |
    = help: Move into type-checking block
 
@@ -141,24 +110,24 @@ quote.py:33:22: TCH002 [*] Move third-party import `pandas` into a type-checking
 3  6  | 
 4  7  | def f():
 --------------------------------------------------------------------------------
-30 33 | 
 31 34 | 
-32 35 | def f():
-33    |-    import pandas as pd
-34 36 | 
-35    |-    def baz() -> pd.DataFrame.Extra:
-   37 |+    def baz() -> "pd.DataFrame.Extra":
-36 38 |         ...
-37 39 | 
+32 35 | 
+33 36 | def f():
+34    |-    import pandas as pd
+35 37 | 
+36    |-    def baz() -> pd.DataFrame.Extra:
+   38 |+    def baz() -> "pd.DataFrame.Extra":
+37 39 |         ...
 38 40 | 
+39 41 | 
 
-quote.py:40:22: TCH002 [*] Move third-party import `pandas` into a type-checking block
+quote.py:41:22: TCH002 [*] Move third-party import `pandas` into a type-checking block
    |
-39 | def f():
-40 |     import pandas as pd
+40 | def f():
+41 |     import pandas as pd
    |                      ^^ TCH002
-41 | 
-42 |     def baz() -> pd.DataFrame | int:
+42 | 
+43 |     def baz() -> pd.DataFrame | int:
    |
    = help: Move into type-checking block
 
@@ -172,24 +141,24 @@ quote.py:40:22: TCH002 [*] Move third-party import `pandas` into a type-checking
 3  6  | 
 4  7  | def f():
 --------------------------------------------------------------------------------
-37 40 | 
 38 41 | 
-39 42 | def f():
-40    |-    import pandas as pd
-41 43 | 
-42    |-    def baz() -> pd.DataFrame | int:
-   44 |+    def baz() -> "pd.DataFrame | int":
-43 45 |         ...
-44 46 | 
+39 42 | 
+40 43 | def f():
+41    |-    import pandas as pd
+42 44 | 
+43    |-    def baz() -> pd.DataFrame | int:
+   45 |+    def baz() -> "pd.DataFrame | int":
+44 46 |         ...
 45 47 | 
+46 48 | 
 
-quote.py:48:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+quote.py:49:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
    |
-47 | def f():
-48 |     from pandas import DataFrame
+48 | def f():
+49 |     from pandas import DataFrame
    |                        ^^^^^^^^^ TCH002
-49 | 
-50 |     def baz() -> DataFrame():
+50 | 
+51 |     def baz() -> DataFrame():
    |
    = help: Move into type-checking block
 
@@ -203,25 +172,25 @@ quote.py:48:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a typ
 3  6  | 
 4  7  | def f():
 --------------------------------------------------------------------------------
-45 48 | 
 46 49 | 
-47 50 | def f():
-48    |-    from pandas import DataFrame
-49 51 | 
-50    |-    def baz() -> DataFrame():
-   52 |+    def baz() -> "DataFrame()":
-51 53 |         ...
-52 54 | 
+47 50 | 
+48 51 | def f():
+49    |-    from pandas import DataFrame
+50 52 | 
+51    |-    def baz() -> DataFrame():
+   53 |+    def baz() -> "DataFrame()":
+52 54 |         ...
 53 55 | 
+54 56 | 
 
-quote.py:57:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+quote.py:58:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
    |
-55 |     from typing import Literal
-56 | 
-57 |     from pandas import DataFrame
+56 |     from typing import Literal
+57 | 
+58 |     from pandas import DataFrame
    |                        ^^^^^^^^^ TCH002
-58 | 
-59 |     def baz() -> DataFrame[Literal["int"]]:
+59 | 
+60 |     def baz() -> DataFrame[Literal["int"]]:
    |
    = help: Move into type-checking block
 
@@ -235,24 +204,24 @@ quote.py:57:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a typ
 3  6  | 
 4  7  | def f():
 --------------------------------------------------------------------------------
-54 57 | def f():
-55 58 |     from typing import Literal
-56 59 | 
-57    |-    from pandas import DataFrame
-58 60 | 
-59    |-    def baz() -> DataFrame[Literal["int"]]:
-   61 |+    def baz() -> "DataFrame[Literal['int']]":
-60 62 |         ...
-61 63 | 
+55 58 | def f():
+56 59 |     from typing import Literal
+57 60 | 
+58    |-    from pandas import DataFrame
+59 61 | 
+60    |-    def baz() -> DataFrame[Literal["int"]]:
+   62 |+    def baz() -> "DataFrame[Literal['int']]":
+61 63 |         ...
 62 64 | 
+63 65 | 
 
-quote.py:74:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+quote.py:75:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
    |
-73 | def f():
-74 |     from pandas import DataFrame, Series
+74 | def f():
+75 |     from pandas import DataFrame, Series
    |                        ^^^^^^^^^ TCH002
-75 | 
-76 |     def baz() -> DataFrame | Series:
+76 | 
+77 |     def baz() -> DataFrame | Series:
    |
    = help: Move into type-checking block
 
@@ -266,24 +235,24 @@ quote.py:74:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a typ
 3  6  | 
 4  7  | def f():
 --------------------------------------------------------------------------------
-71 74 | 
 72 75 | 
-73 76 | def f():
-74    |-    from pandas import DataFrame, Series
-75 77 | 
-76    |-    def baz() -> DataFrame | Series:
-   78 |+    def baz() -> "DataFrame | Series":
-77 79 |         ...
-78 80 | 
+73 76 | 
+74 77 | def f():
+75    |-    from pandas import DataFrame, Series
+76 78 | 
+77    |-    def baz() -> DataFrame | Series:
+   79 |+    def baz() -> "DataFrame | Series":
+78 80 |         ...
 79 81 | 
+80 82 | 
 
-quote.py:74:35: TCH002 [*] Move third-party import `pandas.Series` into a type-checking block
+quote.py:75:35: TCH002 [*] Move third-party import `pandas.Series` into a type-checking block
    |
-73 | def f():
-74 |     from pandas import DataFrame, Series
+74 | def f():
+75 |     from pandas import DataFrame, Series
    |                                   ^^^^^^ TCH002
-75 | 
-76 |     def baz() -> DataFrame | Series:
+76 | 
+77 |     def baz() -> DataFrame | Series:
    |
    = help: Move into type-checking block
 
@@ -297,24 +266,24 @@ quote.py:74:35: TCH002 [*] Move third-party import `pandas.Series` into a type-c
 3  6  | 
 4  7  | def f():
 --------------------------------------------------------------------------------
-71 74 | 
 72 75 | 
-73 76 | def f():
-74    |-    from pandas import DataFrame, Series
-75 77 | 
-76    |-    def baz() -> DataFrame | Series:
-   78 |+    def baz() -> "DataFrame | Series":
-77 79 |         ...
-78 80 | 
+73 76 | 
+74 77 | def f():
+75    |-    from pandas import DataFrame, Series
+76 78 | 
+77    |-    def baz() -> DataFrame | Series:
+   79 |+    def baz() -> "DataFrame | Series":
+78 80 |         ...
 79 81 | 
+80 82 | 
 
-quote.py:81:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+quote.py:82:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
    |
-80 | def f():
-81 |     from pandas import DataFrame, Series
+81 | def f():
+82 |     from pandas import DataFrame, Series
    |                        ^^^^^^^^^ TCH002
-82 | 
-83 |     def baz() -> (
+83 | 
+84 |     def baz() -> (
    |
    = help: Move into type-checking block
 
@@ -328,37 +297,37 @@ quote.py:81:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a typ
 3  6  | 
 4  7  | def f():
 --------------------------------------------------------------------------------
-78 81 | 
 79 82 | 
-80 83 | def f():
-81    |-    from pandas import DataFrame, Series
-82 84 | 
-83 85 |     def baz() -> (
-84    |-        DataFrame |
-85    |-        Series
-   86 |+        "DataFrame | Series"
-86 87 |     ):
-87 88 |         ...
-88 89 | 
-89 90 |     class C:
-90    |-        x: DataFrame[
-91    |-            int
-92    |-        ] = 1
-   91 |+        x: "DataFrame[int]" = 1
-93 92 | 
-94    |-    def func() -> DataFrame[[DataFrame[_P, _R]], DataFrame[_P, _R]]:
-   93 |+    def func() -> "DataFrame[[DataFrame[_P, _R]], DataFrame[_P, _R]]":
-95 94 |         ...
-96 95 | 
+80 83 | 
+81 84 | def f():
+82    |-    from pandas import DataFrame, Series
+83 85 | 
+84 86 |     def baz() -> (
+85    |-        DataFrame |
+86    |-        Series
+   87 |+        "DataFrame | Series"
+87 88 |     ):
+88 89 |         ...
+89 90 | 
+90 91 |     class C:
+91    |-        x: DataFrame[
+92    |-            int
+93    |-        ] = 1
+   92 |+        x: "DataFrame[int]" = 1
+94 93 | 
+95    |-    def func() -> DataFrame[[DataFrame[_P, _R]], DataFrame[_P, _R]]:
+   94 |+    def func() -> "DataFrame[[DataFrame[_P, _R]], DataFrame[_P, _R]]":
+96 95 |         ...
 97 96 | 
+98 97 | 
 
-quote.py:81:35: TCH002 [*] Move third-party import `pandas.Series` into a type-checking block
+quote.py:82:35: TCH002 [*] Move third-party import `pandas.Series` into a type-checking block
    |
-80 | def f():
-81 |     from pandas import DataFrame, Series
+81 | def f():
+82 |     from pandas import DataFrame, Series
    |                                   ^^^^^^ TCH002
-82 | 
-83 |     def baz() -> (
+83 | 
+84 |     def baz() -> (
    |
    = help: Move into type-checking block
 
@@ -372,37 +341,37 @@ quote.py:81:35: TCH002 [*] Move third-party import `pandas.Series` into a type-c
 3  6  | 
 4  7  | def f():
 --------------------------------------------------------------------------------
-78 81 | 
 79 82 | 
-80 83 | def f():
-81    |-    from pandas import DataFrame, Series
-82 84 | 
-83 85 |     def baz() -> (
-84    |-        DataFrame |
-85    |-        Series
-   86 |+        "DataFrame | Series"
-86 87 |     ):
-87 88 |         ...
-88 89 | 
-89 90 |     class C:
-90    |-        x: DataFrame[
-91    |-            int
-92    |-        ] = 1
-   91 |+        x: "DataFrame[int]" = 1
-93 92 | 
-94    |-    def func() -> DataFrame[[DataFrame[_P, _R]], DataFrame[_P, _R]]:
-   93 |+    def func() -> "DataFrame[[DataFrame[_P, _R]], DataFrame[_P, _R]]":
-95 94 |         ...
-96 95 | 
+80 83 | 
+81 84 | def f():
+82    |-    from pandas import DataFrame, Series
+83 85 | 
+84 86 |     def baz() -> (
+85    |-        DataFrame |
+86    |-        Series
+   87 |+        "DataFrame | Series"
+87 88 |     ):
+88 89 |         ...
+89 90 | 
+90 91 |     class C:
+91    |-        x: DataFrame[
+92    |-            int
+93    |-        ] = 1
+   92 |+        x: "DataFrame[int]" = 1
+94 93 | 
+95    |-    def func() -> DataFrame[[DataFrame[_P, _R]], DataFrame[_P, _R]]:
+   94 |+    def func() -> "DataFrame[[DataFrame[_P, _R]], DataFrame[_P, _R]]":
+96 95 |         ...
 97 96 | 
+98 97 | 
 
-quote.py:99:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+quote.py:100:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
     |
- 98 | def f():
- 99 |     from pandas import DataFrame, Series
+ 99 | def f():
+100 |     from pandas import DataFrame, Series
     |                        ^^^^^^^^^ TCH002
-100 | 
-101 |     def func(self) -> DataFrame | list[Series]:
+101 | 
+102 |     def func(self) -> DataFrame | list[Series]:
     |
     = help: Move into type-checking block
 
@@ -416,24 +385,22 @@ quote.py:99:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a typ
 3   6   | 
 4   7   | def f():
 --------------------------------------------------------------------------------
-96  99  | 
 97  100 | 
-98  101 | def f():
-99      |-    from pandas import DataFrame, Series
-100 102 | 
-101     |-    def func(self) -> DataFrame | list[Series]:
-    103 |+    def func(self) -> "DataFrame | list[Series]":
-102 104 |         pass
-103 105 | 
-104 106 | def f():
+98  101 | 
+99  102 | def f():
+100     |-    from pandas import DataFrame, Series
+101 103 | 
+102     |-    def func(self) -> DataFrame | list[Series]:
+    104 |+    def func(self) -> "DataFrame | list[Series]":
+103 105 |         pass
 
-quote.py:99:35: TCH002 [*] Move third-party import `pandas.Series` into a type-checking block
+quote.py:100:35: TCH002 [*] Move third-party import `pandas.Series` into a type-checking block
     |
- 98 | def f():
- 99 |     from pandas import DataFrame, Series
+ 99 | def f():
+100 |     from pandas import DataFrame, Series
     |                                   ^^^^^^ TCH002
-100 | 
-101 |     def func(self) -> DataFrame | list[Series]:
+101 | 
+102 |     def func(self) -> DataFrame | list[Series]:
     |
     = help: Move into type-checking block
 
@@ -447,75 +414,11 @@ quote.py:99:35: TCH002 [*] Move third-party import `pandas.Series` into a type-c
 3   6   | 
 4   7   | def f():
 --------------------------------------------------------------------------------
-96  99  | 
 97  100 | 
-98  101 | def f():
-99      |-    from pandas import DataFrame, Series
-100 102 | 
-101     |-    def func(self) -> DataFrame | list[Series]:
-    103 |+    def func(self) -> "DataFrame | list[Series]":
-102 104 |         pass
-103 105 | 
-104 106 | def f():
-
-quote.py:105:44: TCH002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
-    |
-104 | def f():
-105 |     from django.contrib.auth.models import AbstractBaseUser
-    |                                            ^^^^^^^^^^^^^^^^ TCH002
-106 |     from typing import Annotated
-    |
-    = help: Move into type-checking block
-
-ℹ Unsafe fix
-1       |-from typing import Literal
-    1   |+from typing import Literal, TYPE_CHECKING
-    2   |+
-    3   |+if TYPE_CHECKING:
-    4   |+    from django.contrib.auth.models import AbstractBaseUser
-2   5   | 
-3   6   | 
-4   7   | def f():
---------------------------------------------------------------------------------
-102 105 |         pass
-103 106 | 
-104 107 | def f():
-105     |-    from django.contrib.auth.models import AbstractBaseUser
-106 108 |     from typing import Annotated
-107 109 | 
-108     |-    def test_remove_inner_quotes_double(self, user: AbstractBaseUser["int"], view: "type[CondorBaseViewSet]"):
-    110 |+    def test_remove_inner_quotes_double(self, user: "AbstractBaseUser[int]", view: "type[CondorBaseViewSet]"):
-109 111 |         pass
-110 112 | 
-111     |-    def test_remove_inner_quotes_single(self, user: AbstractBaseUser['int']):
-    113 |+    def test_remove_inner_quotes_single(self, user: "AbstractBaseUser[int]"):
-112 114 |         pass
-113 115 | 
-114     |-    def test_remove_inner_quotes_mixed(self, user: AbstractBaseUser['int', "str"]):
-    116 |+    def test_remove_inner_quotes_mixed(self, user: "AbstractBaseUser[int, str]"):
-115 117 |         pass
-116 118 | 
-117     |-    def test_literal_annotation_args_contain_quotes(self, type1: AbstractBaseUser[Literal["user", "admin"], Annotated["int", "1", 2]]):
-    119 |+    def test_literal_annotation_args_contain_quotes(self, type1: "AbstractBaseUser[Literal['user', 'admin'], Annotated[int, '1', 2]]"):
-118 120 |         pass
-119 121 | 
-120     |-    def test_union_contain_inner_quotes(self, type1: AbstractBaseUser["int" | Literal["int"]]):
-    122 |+    def test_union_contain_inner_quotes(self, type1: "AbstractBaseUser[int | Literal['int']]"):
-121 123 |         pass
-122 124 | 
-123     |-    def test_literal_cannot_remove(user: AbstractBaseUser[Literal['user', "admin"]]):
-    125 |+    def test_literal_cannot_remove(user: "AbstractBaseUser[Literal['user', 'admin']]"):
-124 126 |         pass
-125 127 | 
-126     |-    def test_literal_cannot_remove2(user: AbstractBaseUser[Literal['int'], str]):
-    128 |+    def test_literal_cannot_remove2(user: "AbstractBaseUser[Literal['int'], str]"):
-127 129 |         pass
-128 130 | 
-129 131 |     def test_type_literal_mixed_quotes(view: type["CondorBaseViewSet"], role: Literal["admin", 'user']):
-130 132 |         pass
-131 133 | 
-132     |-    def test_mixed_quotes_literal(user: AbstractBaseUser[Literal['user'], "int"]):
-    134 |+    def test_mixed_quotes_literal(user: "AbstractBaseUser[Literal['user'], int]"):
-133 135 |         pass
-134 136 | 
-135 137 |     def test_annotated_literal_mixed_quotes(user: Annotated[str, "max_length=20", Literal['user', "admin"]]):
+98  101 | 
+99  102 | def f():
+100     |-    from pandas import DataFrame, Series
+101 103 | 
+102     |-    def func(self) -> DataFrame | list[Series]:
+    104 |+    def func(self) -> "DataFrame | list[Series]":
+103 105 |         pass
