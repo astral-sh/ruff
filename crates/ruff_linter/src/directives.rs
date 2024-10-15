@@ -316,7 +316,7 @@ impl<'a> TodoDirective<'a> {
             // Shrink the subset to check for the next phrase starting with "#".
             if let Some(new_offset) = trimmed.find('#') {
                 relative_offset += TextSize::try_from(new_offset).unwrap();
-                subset = &subset[relative_offset.to_usize()..];
+                subset = &comment[relative_offset.to_usize()..];
             } else {
                 break;
             };
