@@ -496,11 +496,9 @@ impl<'db> Type<'db> {
                 tuple.elements(db).is_empty()
             }
             Type::Union(..) => {
-                // There are some rare edge cases where a union type might be a singleton type.
-                // For example, a union with just one element (which itself is a singleton). Or
-                // a union with an empty type (e.g. Never | None). Here, we assume that such
-                // types would have been simplified to a different representation earlier and
-                // simply return false.
+                // A single-element union, where the sole element was a singleton, would itself
+                // be a singleton type. However, unions with length < 2 should never appear in
+                // our model due to [`UnionBuilder::build`].
                 false
             }
             Type::Intersection(..) => {
