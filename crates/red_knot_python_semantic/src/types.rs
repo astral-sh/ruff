@@ -474,7 +474,6 @@ impl<'db> Type<'db> {
             | Type::Unknown
             | Type::Todo
             | Type::Unbound
-            | Type::Instance(..) // TODO some instance types can be singleton types (EllipsisType, NotImplementedType)
             | Type::IntLiteral(..)
             | Type::StringLiteral(..)
             | Type::BytesLiteral(..)
@@ -484,7 +483,12 @@ impl<'db> Type<'db> {
                 // are both of type Literal[345], for example.
                 false
             }
-            Type::None | Type::BooleanLiteral(_) | Type::Function(..) | Type::Class(..) | Type::Module(..) => true,
+            Type::None
+            | Type::BooleanLiteral(_)
+            | Type::Function(..)
+            | Type::Class(..)
+            | Type::Module(..) => true,
+            Type::Instance(class) => class.is_known(db, KnownClass::EllipsisType),
             Type::Tuple(tuple) => {
                 // We deliberately deviate from the language specification [1] here and claim
                 // that the empty tuple type is a singleton type. The reasoning is that `()`
@@ -891,6 +895,7 @@ pub enum KnownClass {
     GenericAlias,
     ModuleType,
     FunctionType,
+    EllipsisType,
     // Typeshed
     NoneType, // Part of `types` for Python >= 3.10
 }
@@ -901,17 +906,18 @@ impl<'db> KnownClass {
             Self::Bool => "bool",
             Self::Object => "object",
             Self::Bytes => "bytes",
-            Self::Tuple => "tuple",
+            Self::Type => "type",
             Self::Int => "int",
             Self::Float => "float",
             Self::Str => "str",
+            Self::List => "list",
+            Self::Tuple => "tuple",
             Self::Set => "set",
             Self::Dict => "dict",
-            Self::List => "list",
-            Self::Type => "type",
             Self::GenericAlias => "GenericAlias",
             Self::ModuleType => "ModuleType",
             Self::FunctionType => "FunctionType",
+            Self::EllipsisType => "EllipsisType",
             Self::NoneType => "NoneType",
         }
     }
@@ -933,7 +939,7 @@ impl<'db> KnownClass {
             | Self::Tuple
             | Self::Set
             | Self::Dict => builtins_symbol_ty(db, self.as_str()),
-            Self::GenericAlias | Self::ModuleType | Self::FunctionType => {
+            Self::GenericAlias | Self::ModuleType | Self::FunctionType | Self::EllipsisType => {
                 types_symbol_ty(db, self.as_str())
             }
             Self::NoneType => typeshed_symbol_ty(db, self.as_str()),
@@ -969,6 +975,7 @@ impl<'db> KnownClass {
             "NoneType" => Some(Self::NoneType),
             "ModuleType" => Some(Self::ModuleType),
             "FunctionType" => Some(Self::FunctionType),
+            "EllipsisType" => Some(Self::EllipsisType),
             _ => None,
         }
     }
@@ -990,7 +997,9 @@ impl<'db> KnownClass {
             | Self::Tuple
             | Self::Set
             | Self::Dict => module.name() == "builtins",
-            Self::GenericAlias | Self::ModuleType | Self::FunctionType => module.name() == "types",
+            Self::GenericAlias | Self::ModuleType | Self::FunctionType | Self::EllipsisType => {
+                module.name() == "types"
+            }
             Self::NoneType => matches!(module.name().as_str(), "_typeshed" | "types"),
         }
     }
@@ -1529,8 +1538,8 @@ pub struct TupleType<'db> {
 #[cfg(test)]
 mod tests {
     use super::{
-        builtins_symbol_ty, BytesLiteralType, StringLiteralType, Truthiness, TupleType, Type,
-        UnionType,
+        builtins_symbol_ty, types_symbol_ty, BytesLiteralType, StringLiteralType, Truthiness,
+        TupleType, Type, UnionType,
     };
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
@@ -1573,6 +1582,7 @@ mod tests {
         LiteralString,
         BytesLiteral(&'static str),
         BuiltinInstance(&'static str),
+        TypesModuleInstance(&'static str),
         Union(Vec<Ty>),
         Tuple(Vec<Ty>),
     }
@@ -1594,6 +1604,7 @@ mod tests {
                     Type::BytesLiteral(BytesLiteralType::new(db, s.as_bytes().into()))
                 }
                 Ty::BuiltinInstance(s) => builtins_symbol_ty(db, s).to_instance(db),
+                Ty::TypesModuleInstance(s) => types_symbol_ty(db, s).to_instance(db),
                 Ty::Union(tys) => {
                     UnionType::from_elements(db, tys.into_iter().map(|ty| ty.into_type(db)))
                 }
@@ -1675,6 +1686,7 @@ mod tests {
     #[test_case(Ty::BoolLiteral(true))]
     #[test_case(Ty::BoolLiteral(false))]
     #[test_case(Ty::Tuple(vec![]))]
+    #[test_case(Ty::TypesModuleInstance("EllipsisType"))]
     fn is_singleton(from: Ty) {
         let db = setup_db();
 
