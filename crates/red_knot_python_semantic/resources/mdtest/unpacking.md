@@ -84,9 +84,9 @@ reveal_type(b)  # revealed: Literal[2]
 # TODO: Remove 'not-iterable' diagnostic
 [a, *b, c, d] = (1, 2)  # error: "Object of type `None` is not iterable"
 reveal_type(a)  # revealed: Literal[1]
-# TODO: Should be List[int] / List[Literal[2]] once support for assigning to starred expression is added
+# TODO: Should be List[Any] once support for assigning to starred expression is added
 reveal_type(b)  # revealed: @Todo
-reveal_type(c)  # revealed: Unknown
+reveal_type(c)  # revealed: Literal[2]
 reveal_type(d)  # revealed: Unknown
 ```
 
@@ -148,6 +148,44 @@ reveal_type(a)  # revealed: Unknown
 reveal_type(b)  # revealed: Unknown
 ```
 
+### Custom iterator unpacking
+
+```py
+class Iterator:
+    def __next__(self) -> int:
+        return 42
+
+
+class Iterable:
+    def __iter__(self) -> Iterator:
+        return Iterator()
+
+
+(a, b) = Iterable()
+reveal_type(a)  # revealed: int
+reveal_type(b)  # revealed: int
+```
+
+### Custom iterator unpacking nested
+
+```py
+class Iterator:
+    def __next__(self) -> int:
+        return 42
+
+
+class Iterable:
+    def __iter__(self) -> Iterator:
+        return Iterator()
+
+
+(a, (b, c), d) = (1, Iterable(), 2)
+reveal_type(a)  # revealed: Literal[1]
+reveal_type(b)  # revealed: int
+reveal_type(c)  # revealed: int
+reveal_type(d)  # revealed: Literal[2]
+```
+
 ## String
 
 ### Simple unpacking
@@ -186,7 +224,7 @@ reveal_type(b)  # revealed: LiteralString
 reveal_type(a)  # revealed: LiteralString
 # TODO: Should be List[LiteralString] once support for assigning to starred expression is added
 reveal_type(b)  # revealed: @Todo
-reveal_type(c)  # revealed: Unknown
+reveal_type(c)  # revealed: LiteralString
 reveal_type(d)  # revealed: Unknown
 ```
 

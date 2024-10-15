@@ -1192,13 +1192,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         let value_ty = self.expression_ty(value);
 
         let target_ty = match (value_ty, kind) {
-            (
-                Type::Tuple(_) | Type::StringLiteral(_) | Type::LiteralString,
-                AssignmentKind::Sequence,
-            ) => self.infer_sequence_unpacking(target, value_ty, variable),
-            (_, AssignmentKind::Sequence) => value_ty
-                .iterate(self.db)
-                .unwrap_with_diagnostic(value.into(), self),
+            (_, AssignmentKind::Sequence) => {
+                self.infer_sequence_unpacking(target, value_ty, variable)
+            }
             _ => value_ty,
         };
 
@@ -1227,8 +1223,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     return Some(value_ty);
                 }
                 ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
-                    // TODO: Wrap the `value_ty` in a list type.
-                    return inner(builder, value, Type::Todo, variable);
+                    return inner(builder, value, value_ty, variable);
                 }
                 ast::Expr::List(ast::ExprList { elts, .. })
                 | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => match value_ty {
@@ -1240,7 +1235,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 let mut element_types = Vec::with_capacity(elts.len());
                                 element_types.extend_from_slice(
                                     // SAFETY: Safe because of the length check above.
-                                    tuple_ty.elements(builder.db).get(..starred_index).unwrap(),
+                                    &tuple_ty.elements(builder.db)[..starred_index],
                                 );
 
                                 // E.g., in `(a, *b, c, d) = ...`, the index of starred element `b`
@@ -1250,10 +1245,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 // to the starred expression, in an exclusive manner.
                                 let starred_end_index = tuple_ty.len(builder.db) - remaining;
                                 // SAFETY: Safe because of the length check above.
-                                let _starred_element_types = tuple_ty
-                                    .elements(builder.db)
-                                    .get(starred_index..starred_end_index)
-                                    .unwrap();
+                                let _starred_element_types = &tuple_ty.elements(builder.db)
+                                    [starred_index..starred_end_index];
                                 // TODO: Combine the types into a list type. If the
                                 // starred_element_types is empty, then it should be `List[Any]`.
                                 // combine_types(starred_element_types);
@@ -1261,14 +1254,13 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                                 element_types.extend_from_slice(
                                     // SAFETY: Safe because of the length check above.
-                                    tuple_ty
-                                        .elements(builder.db)
-                                        .get(starred_end_index..)
-                                        .unwrap(),
+                                    &tuple_ty.elements(builder.db)[starred_end_index..],
                                 );
                                 Cow::Owned(element_types)
                             } else {
-                                Cow::Borrowed(tuple_ty.elements(builder.db).as_ref())
+                                let mut element_types = tuple_ty.elements(builder.db).to_vec();
+                                element_types.insert(starred_index, Type::Todo);
+                                Cow::Owned(element_types)
                             }
                         } else {
                             Cow::Borrowed(tuple_ty.elements(builder.db).as_ref())
@@ -1297,15 +1289,20 @@ impl<'db> TypeInferenceBuilder<'db> {
                             return Some(ty);
                         }
                     }
-                    Type::LiteralString => {
+                    _ => {
+                        let value_ty = if matches!(value_ty, Type::LiteralString) {
+                            Type::LiteralString
+                        } else {
+                            value_ty
+                                .iterate(builder.db)
+                                .unwrap_with_diagnostic(AnyNodeRef::from(target), builder)
+                        };
                         for element in elts {
-                            if let Some(ty) = inner(builder, element, Type::LiteralString, variable)
-                            {
+                            if let Some(ty) = inner(builder, element, value_ty, variable) {
                                 return Some(ty);
                             }
                         }
                     }
-                    _ => {}
                 },
                 _ => {}
             }
