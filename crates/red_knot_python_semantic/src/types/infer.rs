@@ -1191,9 +1191,9 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let value_ty = self.expression_ty(value);
 
-        let target_ty = match (value_ty, kind) {
-            (_, AssignmentKind::Sequence) => self.infer_sequence_unpacking(target, value_ty, name),
-            _ => value_ty,
+        let target_ty = match kind {
+            AssignmentKind::Sequence => self.infer_sequence_unpacking(target, value_ty, name),
+            AssignmentKind::Name => value_ty,
         };
 
         self.add_binding(name.into(), definition, target_ty);
