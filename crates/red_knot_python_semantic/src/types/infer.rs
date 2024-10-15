@@ -725,7 +725,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             decorator_list,
         } = function;
 
-        let decorator_tys = decorator_list
+        let decorator_tys: Box<[Type]> = decorator_list
             .iter()
             .map(|decorator| self.infer_decorator(decorator))
             .collect();
@@ -1415,7 +1415,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = alias;
 
         let module_ty = if let Some(module_name) = ModuleName::new(name) {
-            if let Some(module) = self.module_ty_from_name(module_name) {
+            if let Some(module) = self.module_ty_from_name(&module_name) {
                 module
             } else {
                 self.unresolved_module_diagnostic(alias, 0, Some(name));
@@ -1501,7 +1501,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         if module.kind().is_package() {
             level -= 1;
         }
-        let mut module_name = module.name().to_owned();
+        let mut module_name = module.name().clone();
         for _ in 0..level {
             module_name = module_name
                 .parent()
@@ -1553,7 +1553,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let module_ty = match module_name {
             Ok(name) => {
-                if let Some(ty) = self.module_ty_from_name(name) {
+                if let Some(ty) = self.module_ty_from_name(&name) {
                     ty
                 } else {
                     self.unresolved_module_diagnostic(import_from, *level, module);
@@ -1626,7 +1626,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    fn module_ty_from_name(&self, module_name: ModuleName) -> Option<Type<'db>> {
+    fn module_ty_from_name(&self, module_name: &ModuleName) -> Option<Type<'db>> {
         resolve_module(self.db, module_name).map(|module| Type::Module(module.file()))
     }
 
@@ -1740,10 +1740,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_string_literal_expression(&mut self, literal: &ast::ExprStringLiteral) -> Type<'db> {
         if literal.value.len() <= Self::MAX_STRING_LITERAL_SIZE {
-            Type::StringLiteral(StringLiteralType::new(
-                self.db,
-                literal.value.to_str().into(),
-            ))
+            Type::StringLiteral(StringLiteralType::new(self.db, literal.value.to_str()))
         } else {
             Type::LiteralString
         }
@@ -1753,7 +1750,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         // TODO: ignoring r/R prefixes for now, should normalize bytes values
         Type::BytesLiteral(BytesLiteralType::new(
             self.db,
-            literal.value.bytes().collect(),
+            literal.value.bytes().collect::<Box<[u8]>>(),
         ))
     }
 
@@ -2402,7 +2399,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let rhs_value = rhs.value(self.db).as_ref();
                 if lhs_value.len() + rhs_value.len() <= Self::MAX_STRING_LITERAL_SIZE {
                     Type::StringLiteral(StringLiteralType::new(self.db, {
-                        (lhs_value + rhs_value).into()
+                        (lhs_value + rhs_value).into_boxed_str()
                     }))
                 } else {
                     Type::LiteralString
@@ -2418,13 +2415,16 @@ impl<'db> TypeInferenceBuilder<'db> {
             (Type::StringLiteral(s), Type::IntLiteral(n), ast::Operator::Mult)
             | (Type::IntLiteral(n), Type::StringLiteral(s), ast::Operator::Mult) => {
                 if n < 1 {
-                    Type::StringLiteral(StringLiteralType::new(self.db, Box::default()))
+                    Type::StringLiteral(StringLiteralType::new(self.db, ""))
                 } else if let Ok(n) = usize::try_from(n) {
                     if n.checked_mul(s.value(self.db).len())
                         .is_some_and(|new_length| new_length <= Self::MAX_STRING_LITERAL_SIZE)
                     {
                         let new_literal = s.value(self.db).repeat(n);
-                        Type::StringLiteral(StringLiteralType::new(self.db, new_literal.into()))
+                        Type::StringLiteral(StringLiteralType::new(
+                            self.db,
+                            new_literal.into_boxed_str(),
+                        ))
                     } else {
                         Type::LiteralString
                     }
@@ -2436,7 +2436,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             (Type::LiteralString, Type::IntLiteral(n), ast::Operator::Mult)
             | (Type::IntLiteral(n), Type::LiteralString, ast::Operator::Mult) => {
                 if n < 1 {
-                    Type::StringLiteral(StringLiteralType::new(self.db, Box::default()))
+                    Type::StringLiteral(StringLiteralType::new(self.db, ""))
                 } else {
                     Type::LiteralString
                 }

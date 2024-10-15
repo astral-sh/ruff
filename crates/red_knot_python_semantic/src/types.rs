@@ -791,14 +791,10 @@ impl<'db> Type<'db> {
             Type::IntLiteral(number) => Type::StringLiteral(StringLiteralType::new(db, {
                 number.to_string().into_boxed_str()
             })),
-            Type::BooleanLiteral(true) => {
-                Type::StringLiteral(StringLiteralType::new(db, "True".into()))
-            }
-            Type::BooleanLiteral(false) => {
-                Type::StringLiteral(StringLiteralType::new(db, "False".into()))
-            }
+            Type::BooleanLiteral(true) => Type::StringLiteral(StringLiteralType::new(db, "True")),
+            Type::BooleanLiteral(false) => Type::StringLiteral(StringLiteralType::new(db, "False")),
             Type::StringLiteral(literal) => Type::StringLiteral(StringLiteralType::new(db, {
-                format!("'{}'", literal.value(db).escape_default()).into()
+                format!("'{}'", literal.value(db).escape_default()).into_boxed_str()
             })),
             Type::LiteralString => Type::LiteralString,
             // TODO: handle more complex types
@@ -1532,20 +1528,16 @@ mod tests {
                 Ty::Unknown => Type::Unknown,
                 Ty::Any => Type::Any,
                 Ty::IntLiteral(n) => Type::IntLiteral(n),
-                Ty::StringLiteral(s) => {
-                    Type::StringLiteral(StringLiteralType::new(db, (*s).into()))
-                }
+                Ty::StringLiteral(s) => Type::StringLiteral(StringLiteralType::new(db, s)),
                 Ty::BoolLiteral(b) => Type::BooleanLiteral(b),
                 Ty::LiteralString => Type::LiteralString,
-                Ty::BytesLiteral(s) => {
-                    Type::BytesLiteral(BytesLiteralType::new(db, s.as_bytes().into()))
-                }
+                Ty::BytesLiteral(s) => Type::BytesLiteral(BytesLiteralType::new(db, s.as_bytes())),
                 Ty::BuiltinInstance(s) => builtins_symbol_ty(db, s).to_instance(db),
                 Ty::Union(tys) => {
                     UnionType::from_elements(db, tys.into_iter().map(|ty| ty.into_type(db)))
                 }
                 Ty::Tuple(tys) => {
-                    let elements = tys.into_iter().map(|ty| ty.into_type(db)).collect();
+                    let elements: Box<_> = tys.into_iter().map(|ty| ty.into_type(db)).collect();
                     Type::Tuple(TupleType::new(db, elements))
                 }
             }
