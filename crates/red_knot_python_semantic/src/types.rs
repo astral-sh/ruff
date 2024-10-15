@@ -245,6 +245,13 @@ pub enum Type<'db> {
     Unbound,
     /// The None object -- TODO remove this in favor of Instance(types.NoneType)
     None,
+    /// Type for narrowing a type to the subset of that type that is truthy (bool(x) == True).
+    /// Mainly used in intersections: `X & Truthy`. Example: for `list` it's all lists of `len > 0`
+    Truthy,
+    /// Type for narrowing a type to the subset of that type that is falsy (bool(x) == False).
+    /// Mainly used in intersections: `X & Falsy`. Example: for `int` it's the singleton
+    /// `IntLiteral[0]`.
+    Falsy,
     /// Temporary type for symbols that can't be inferred yet because of missing implementations.
     /// Behaves equivalently to `Any`.
     ///
@@ -393,6 +400,72 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Return the `Truthy` subset of this type (intersection with Truthy).
+    #[must_use]
+    pub fn truthy(&self, db: &'db dyn Db) -> Type<'db> {
+        IntersectionBuilder::build_truthy(db, *self)
+    }
+
+    /// Return the `Falsy` subset of this type (intersection with Falsy).
+    #[must_use]
+    pub fn falsy(&self, db: &'db dyn Db) -> Type<'db> {
+        self.falsy_set(db)
+            .unwrap_or_else(|| IntersectionBuilder::build_falsy(db, *self))
+    }
+
+    /// Returns, if it can be expressed, the set of values that are falsy in this type. This is
+    /// defined for some builtin types (e.g. int, str, ...)
+    #[must_use]
+    pub fn falsy_set(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        match self {
+            Self::Instance(class) => match class.known(db) {
+                // For the following types, we know the logic for falsiness and can represent
+                // specific instances of that type, so we can give back a precise subset.
+                Some(KnownClass::Bool) => Some(Self::BooleanLiteral(false)),
+                Some(KnownClass::Int) => Some(Self::IntLiteral(0)),
+                Some(KnownClass::Bytes) => Some(Self::BytesLiteral(BytesLiteralType::empty(db))),
+                Some(KnownClass::Str) => Some(Self::StringLiteral(StringLiteralType::empty(db))),
+                Some(KnownClass::Tuple) => Some(Self::Tuple(TupleType::empty(db))),
+                _ => match self.bool(db) {
+                    // When a `__bool__` signature is `AlwaysFalse`, it means that the falsy set is
+                    // the whole type (that we had as input), and the truthy set is empty.
+                    Truthiness::AlwaysFalse => Some(*self),
+                    Truthiness::AlwaysTrue => Some(Type::Never),
+                    Truthiness::Ambiguous => None,
+                },
+            },
+            Type::LiteralString => Some(Self::StringLiteral(StringLiteralType::empty(db))),
+            _ => match self.bool(db) {
+                Truthiness::AlwaysFalse => Some(*self),
+                Truthiness::AlwaysTrue => Some(Type::Never),
+                Truthiness::Ambiguous => None,
+            },
+        }
+    }
+
+    /// Returns, if it can be expressed, the set of values that are truthy in this type. This is
+    /// rarely defined, with the exception of the `builtins.bool` type.
+    #[must_use]
+    pub fn truthy_set(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        match self {
+            Type::Instance(class) => match class.known(db) {
+                Some(KnownClass::Bool) => Some(Type::BooleanLiteral(true)),
+                _ => match self.bool(db) {
+                    // When a `__bool__` signature is `AlwaysTrue`, it means that the truthy set is
+                    // the whole type (that we had as input), and the falsy set is empty.
+                    Truthiness::AlwaysTrue => Some(*self),
+                    Truthiness::AlwaysFalse => Some(Type::Never),
+                    Truthiness::Ambiguous => None,
+                },
+            },
+            _ => match self.bool(db) {
+                Truthiness::AlwaysFalse => Some(*self),
+                Truthiness::AlwaysTrue => Some(Type::Never),
+                Truthiness::Ambiguous => None,
+            },
+        }
+    }
+
     /// Return true if the type is a class or a union of classes.
     pub fn is_class(&self, db: &'db dyn Db) -> bool {
         match self {
@@ -486,6 +559,8 @@ impl<'db> Type<'db> {
             }
             Type::Unknown => Type::Unknown,
             Type::Unbound => Type::Unbound,
+            Type::Truthy => Type::Unknown,
+            Type::Falsy => Type::Unknown,
             Type::None => {
                 // TODO: attribute lookup on None type
                 Type::Todo
@@ -542,13 +617,16 @@ impl<'db> Type<'db> {
             Type::Any | Type::Todo | Type::Never | Type::Unknown | Type::Unbound => {
                 Truthiness::Ambiguous
             }
-            Type::None => Truthiness::AlwaysFalse,
-            Type::Function(_) => Truthiness::AlwaysTrue,
-            Type::Module(_) => Truthiness::AlwaysTrue,
+            Type::None | Type::Falsy => Truthiness::AlwaysFalse,
+            Type::Function(_) | Type::Module(_) | Type::Truthy => Truthiness::AlwaysTrue,
             Type::Class(_) => {
                 // TODO: lookup `__bool__` and `__len__` methods on the class's metaclass
                 // More info in https://docs.python.org/3/library/stdtypes.html#truth-value-testing
                 Truthiness::Ambiguous
+            }
+            // Temporary special case for `FunctionType` until we handle generic instances
+            Type::Instance(class) if class.is_known(db, KnownClass::FunctionType) => {
+                Truthiness::AlwaysTrue
             }
             Type::Instance(_) => {
                 // TODO: lookup `__bool__` and `__len__` methods on the instance's class
@@ -570,9 +648,23 @@ impl<'db> Type<'db> {
                 }
                 first_element_truthiness
             }
-            Type::Intersection(_) => {
-                // TODO
-                Truthiness::Ambiguous
+            Type::Intersection(intersection) => {
+                // The truthiness of the intersection is the intersection of the truthiness of its
+                // elements:
+                // - `Ambiguous` & `Truthy` == `Truthy`
+                // - `Ambiguous` & `Falsy` == `Falsy`
+                // - `Truthy` & `Falsy` == `Never`  -- this should be impossible to build
+                intersection
+                    // Negative elements (what this intersection should not be) do not have an
+                    // influence on the truthiness of the intersection.
+                    // Or if they should, this should be simplified at build time.
+                    .positive(db)
+                    .iter()
+                    .map(|ty| ty.bool(db))
+                    // Stop at the first `Truthy`or `Falsy` since an intersection containing both
+                    // should simplify to the empty intersection at build time.
+                    .find(|truthiness| !truthiness.is_ambiguous())
+                    .unwrap_or(Truthiness::Ambiguous)
             }
             Type::IntLiteral(num) => Truthiness::from(*num != 0),
             Type::BooleanLiteral(bool) => Truthiness::from(*bool),
@@ -718,10 +810,12 @@ impl<'db> Type<'db> {
             Type::Todo => Type::Todo,
             Type::Unknown => Type::Unknown,
             Type::Unbound => Type::Unknown,
+            Type::Truthy | Type::Falsy => Type::Unknown,
             Type::Never => Type::Never,
             Type::Class(class) => Type::Instance(*class),
             Type::Union(union) => union.map(db, |element| element.to_instance(db)),
             // TODO: we can probably do better here: --Alex
+            // TODO: case of `type[X] & Truthy` or `type[X] & Falsy` should be straightforward
             Type::Intersection(_) => Type::Todo,
             // TODO: calling `.to_instance()` on any of these should result in a diagnostic,
             // since they already indicate that the object is an instance of some kind:
@@ -745,6 +839,7 @@ impl<'db> Type<'db> {
         match self {
             Type::Unbound => Type::Unbound,
             Type::Never => Type::Never,
+            Type::Truthy | Type::Falsy => Type::Unknown,
             Type::Instance(class) => Type::Class(*class),
             Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
             Type::BooleanLiteral(_) => KnownClass::Bool.to_class(db),
@@ -1457,10 +1552,62 @@ pub struct IntersectionType<'db> {
     negative: FxOrderSet<Type<'db>>,
 }
 
+impl<'db> IntersectionType<'db> {
+    /// If this is an intersection of `X & Truthy` (generalized to `(X & Y) & Truthy`), returns the
+    /// left side of the intersection (the type that intersects with `Truthy`).
+    fn truthy_of(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        if self.positive(db).contains(&Type::Truthy) {
+            let builder = self
+                .positive(db)
+                .iter()
+                .filter(|ty| *ty != &Type::Truthy)
+                .fold(IntersectionBuilder::new(db), |builder, ty| {
+                    builder.add_positive(*ty)
+                });
+            Some(
+                self.negative(db)
+                    .iter()
+                    .fold(builder, |builder, ty| builder.add_negative(*ty))
+                    .build(),
+            )
+        } else {
+            None
+        }
+    }
+
+    /// If this is an intersection of `X & Falsy` (generalized to `(X & Y) & Falsy`), returns the
+    /// left side of the intersection (the type that intersects with `Falsy`).
+    fn falsy_of(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        if self.positive(db).contains(&Type::Falsy) {
+            let builder = self
+                .positive(db)
+                .iter()
+                .filter(|ty| *ty != &Type::Falsy)
+                .fold(IntersectionBuilder::new(db), |builder, ty| {
+                    builder.add_positive(*ty)
+                });
+            Some(
+                self.negative(db)
+                    .iter()
+                    .fold(builder, |builder, ty| builder.add_negative(*ty))
+                    .build(),
+            )
+        } else {
+            None
+        }
+    }
+}
+
 #[salsa::interned]
 pub struct StringLiteralType<'db> {
     #[return_ref]
     value: Box<str>,
+}
+
+impl<'db> StringLiteralType<'db> {
+    pub fn empty(db: &'db dyn Db) -> Self {
+        Self::new(db, Box::default())
+    }
 }
 
 #[salsa::interned]
@@ -1469,10 +1616,22 @@ pub struct BytesLiteralType<'db> {
     value: Box<[u8]>,
 }
 
+impl<'db> BytesLiteralType<'db> {
+    pub fn empty(db: &'db dyn Db) -> Self {
+        Self::new(db, Box::default())
+    }
+}
+
 #[salsa::interned]
 pub struct TupleType<'db> {
     #[return_ref]
     elements: Box<[Type<'db>]>,
+}
+
+impl<'db> TupleType<'db> {
+    pub fn empty(db: &'db dyn Db) -> Self {
+        Self::new(db, Box::default())
+    }
 }
 
 #[cfg(test)]
