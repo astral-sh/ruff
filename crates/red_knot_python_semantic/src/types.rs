@@ -1510,6 +1510,12 @@ pub struct StringLiteralType<'db> {
     value: Box<str>,
 }
 
+impl<'db> StringLiteralType<'db> {
+    pub fn len(&self, db: &'db dyn Db) -> usize {
+        self.value(db).len()
+    }
+}
+
 #[salsa::interned]
 pub struct BytesLiteralType<'db> {
     #[return_ref]
@@ -1520,6 +1526,16 @@ pub struct BytesLiteralType<'db> {
 pub struct TupleType<'db> {
     #[return_ref]
     elements: Box<[Type<'db>]>,
+}
+
+impl<'db> TupleType<'db> {
+    pub fn get(&self, db: &'db dyn Db, index: usize) -> Option<Type<'db>> {
+        self.elements(db).get(index).copied()
+    }
+
+    pub fn len(&self, db: &'db dyn Db) -> usize {
+        self.elements(db).len()
+    }
 }
 
 #[cfg(test)]

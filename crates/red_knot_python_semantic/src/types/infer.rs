@@ -27,6 +27,7 @@
 //! associated with a particular definition. Scope-level inference infers deferred types for all
 //! definitions once the rest of the types in the scope have been inferred.
 use itertools::Itertools;
+use std::borrow::Cow;
 use std::num::NonZeroU32;
 
 use ruff_db::files::File;
@@ -41,7 +42,7 @@ use crate::module_name::ModuleName;
 use crate::module_resolver::{file_to_module, resolve_module};
 use crate::semantic_index::ast_ids::{HasScopedAstId, HasScopedUseId, ScopedExpressionId};
 use crate::semantic_index::definition::{
-    Definition, DefinitionKind, DefinitionNodeKey, ExceptHandlerDefinitionKind,
+    AssignmentKind, Definition, DefinitionKind, DefinitionNodeKey, ExceptHandlerDefinitionKind,
 };
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::semantic_index;
@@ -415,7 +416,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             DefinitionKind::Assignment(assignment) => {
                 self.infer_assignment_definition(
                     assignment.target(),
-                    assignment.assignment(),
+                    assignment.value(),
+                    assignment.name(),
+                    assignment.kind(),
                     definition,
                 );
             }
@@ -1151,13 +1154,23 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = assignment;
 
         for target in targets {
-            if let ast::Expr::Name(name) = target {
-                self.infer_definition(name);
-            } else {
-                // TODO infer definitions in unpacking assignment. When we do, this duplication of
-                // the "get `Expression`, call `infer_expression_types` on it, `self.extend`" dance
-                // will be removed; it'll all happen in `infer_assignment_definition` instead.
-                let expression = self.index.expression(value.as_ref());
+            self.infer_assignment_target(target, value);
+        }
+    }
+
+    // TODO: Remove the `value` argument once we handle all possible assignment targets.
+    fn infer_assignment_target(&mut self, target: &ast::Expr, value: &ast::Expr) {
+        match target {
+            ast::Expr::Name(name) => self.infer_definition(name),
+            ast::Expr::List(ast::ExprList { elts, .. })
+            | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                for element in elts {
+                    self.infer_assignment_target(element, value);
+                }
+            }
+            _ => {
+                // TODO: Remove this once we handle all possible assignment targets.
+                let expression = self.index.expression(value);
                 self.extend(infer_expression_types(self.db, expression));
                 self.infer_expression(target);
             }
@@ -1166,18 +1179,138 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_assignment_definition(
         &mut self,
-        target: &ast::ExprName,
-        assignment: &ast::StmtAssign,
+        target: &ast::Expr,
+        value: &ast::Expr,
+        name: &ast::ExprName,
+        kind: AssignmentKind,
         definition: Definition<'db>,
     ) {
-        let expression = self.index.expression(assignment.value.as_ref());
+        let expression = self.index.expression(value);
         let result = infer_expression_types(self.db, expression);
         self.extend(result);
-        let value_ty = self.expression_ty(&assignment.value);
-        self.add_binding(assignment.into(), definition, value_ty);
+
+        let value_ty = self.expression_ty(value);
+
+        let target_ty = match kind {
+            AssignmentKind::Sequence => self.infer_sequence_unpacking(target, value_ty, name),
+            AssignmentKind::Name => value_ty,
+        };
+
+        self.add_binding(name.into(), definition, target_ty);
         self.types
             .expressions
-            .insert(target.scoped_ast_id(self.db, self.scope), value_ty);
+            .insert(name.scoped_ast_id(self.db, self.scope), target_ty);
+    }
+
+    fn infer_sequence_unpacking(
+        &mut self,
+        target: &ast::Expr,
+        value_ty: Type<'db>,
+        name: &ast::ExprName,
+    ) -> Type<'db> {
+        // The inner function is recursive and only differs in the return type which is an `Option`
+        // where if the variable is found, the corresponding type is returned otherwise `None`.
+        fn inner<'db>(
+            builder: &mut TypeInferenceBuilder<'db>,
+            target: &ast::Expr,
+            value_ty: Type<'db>,
+            name: &ast::ExprName,
+        ) -> Option<Type<'db>> {
+            match target {
+                ast::Expr::Name(target_name) if target_name == name => {
+                    return Some(value_ty);
+                }
+                ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
+                    return inner(builder, value, value_ty, name);
+                }
+                ast::Expr::List(ast::ExprList { elts, .. })
+                | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => match value_ty {
+                    Type::Tuple(tuple_ty) => {
+                        let starred_index = elts.iter().position(ast::Expr::is_starred_expr);
+
+                        let element_types = if let Some(starred_index) = starred_index {
+                            if tuple_ty.len(builder.db) >= elts.len() - 1 {
+                                let mut element_types = Vec::with_capacity(elts.len());
+                                element_types.extend_from_slice(
+                                    // SAFETY: Safe because of the length check above.
+                                    &tuple_ty.elements(builder.db)[..starred_index],
+                                );
+
+                                // E.g., in `(a, *b, c, d) = ...`, the index of starred element `b`
+                                // is 1 and the remaining elements after that are 2.
+                                let remaining = elts.len() - (starred_index + 1);
+                                // This index represents the type of the last element that belongs
+                                // to the starred expression, in an exclusive manner.
+                                let starred_end_index = tuple_ty.len(builder.db) - remaining;
+                                // SAFETY: Safe because of the length check above.
+                                let _starred_element_types = &tuple_ty.elements(builder.db)
+                                    [starred_index..starred_end_index];
+                                // TODO: Combine the types into a list type. If the
+                                // starred_element_types is empty, then it should be `List[Any]`.
+                                // combine_types(starred_element_types);
+                                element_types.push(Type::Todo);
+
+                                element_types.extend_from_slice(
+                                    // SAFETY: Safe because of the length check above.
+                                    &tuple_ty.elements(builder.db)[starred_end_index..],
+                                );
+                                Cow::Owned(element_types)
+                            } else {
+                                let mut element_types = tuple_ty.elements(builder.db).to_vec();
+                                element_types.insert(starred_index, Type::Todo);
+                                Cow::Owned(element_types)
+                            }
+                        } else {
+                            Cow::Borrowed(tuple_ty.elements(builder.db).as_ref())
+                        };
+
+                        for (index, element) in elts.iter().enumerate() {
+                            if let Some(ty) = inner(
+                                builder,
+                                element,
+                                element_types.get(index).copied().unwrap_or(Type::Unknown),
+                                name,
+                            ) {
+                                return Some(ty);
+                            }
+                        }
+                    }
+                    Type::StringLiteral(string_literal_ty) => {
+                        // Deconstruct the string literal to delegate the inference back to the
+                        // tuple type for correct handling of starred expressions. We could go
+                        // further and deconstruct to an array of `StringLiteral` with each
+                        // individual character, instead of just an array of `LiteralString`, but
+                        // there would be a cost and it's not clear that it's worth it.
+                        let value_ty = Type::Tuple(TupleType::new(
+                            builder.db,
+                            vec![Type::LiteralString; string_literal_ty.len(builder.db)]
+                                .into_boxed_slice(),
+                        ));
+                        if let Some(ty) = inner(builder, target, value_ty, name) {
+                            return Some(ty);
+                        }
+                    }
+                    _ => {
+                        let value_ty = if matches!(value_ty, Type::LiteralString) {
+                            Type::LiteralString
+                        } else {
+                            value_ty
+                                .iterate(builder.db)
+                                .unwrap_with_diagnostic(AnyNodeRef::from(target), builder)
+                        };
+                        for element in elts {
+                            if let Some(ty) = inner(builder, element, value_ty, name) {
+                                return Some(ty);
+                            }
+                        }
+                    }
+                },
+                _ => {}
+            }
+            None
+        }
+
+        inner(self, target, value_ty, name).unwrap_or(Type::Unknown)
     }
 
     fn infer_annotated_assignment_statement(&mut self, assignment: &ast::StmtAnnAssign) {
