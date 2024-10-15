@@ -155,13 +155,24 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             let inference = infer_expression_types(self.db, expression);
             for (op, comparator) in std::iter::zip(&**ops, &**comparators) {
                 let comp_ty = inference.expression_ty(comparator.scoped_ast_id(self.db, scope));
-                if matches!(op, ast::CmpOp::IsNot) {
-                    let ty = IntersectionBuilder::new(self.db)
-                        .add_negative(comp_ty)
-                        .build();
-                    self.constraints.insert(symbol, ty);
-                };
-                // TODO other comparison types
+                match op {
+                    ast::CmpOp::IsNot => {
+                        if comp_ty.is_singleton(self.db) {
+                            let ty = IntersectionBuilder::new(self.db)
+                                .add_negative(comp_ty)
+                                .build();
+                            self.constraints.insert(symbol, ty);
+                        } else {
+                            // Non-singletons cannot be safely narrowed using `is not`
+                        }
+                    }
+                    ast::CmpOp::Is => {
+                        self.constraints.insert(symbol, comp_ty);
+                    }
+                    _ => {
+                        // TODO other comparison types
+                    }
+                }
             }
         }
     }
