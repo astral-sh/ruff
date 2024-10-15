@@ -26,7 +26,9 @@ if x is not False:
 
 ## `is not` for non-singleton types
 
-Non-singleton types should *not* narrow the type:
+Non-singleton types should *not* narrow the type: two instances of a
+non-singleton class may occupy different addresses in memory even if
+they compare equal.
 
 ```py
 x = [1]
