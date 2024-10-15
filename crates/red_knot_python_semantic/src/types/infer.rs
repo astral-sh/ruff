@@ -417,7 +417,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_assignment_definition(
                     assignment.target(),
                     assignment.value(),
-                    assignment.variable(),
+                    assignment.name(),
                     assignment.kind(),
                     definition,
                 );
@@ -1181,7 +1181,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         target: &ast::Expr,
         value: &ast::Expr,
-        variable: &ast::ExprName,
+        name: &ast::ExprName,
         kind: AssignmentKind,
         definition: Definition<'db>,
     ) {
@@ -1192,23 +1192,21 @@ impl<'db> TypeInferenceBuilder<'db> {
         let value_ty = self.expression_ty(value);
 
         let target_ty = match (value_ty, kind) {
-            (_, AssignmentKind::Sequence) => {
-                self.infer_sequence_unpacking(target, value_ty, variable)
-            }
+            (_, AssignmentKind::Sequence) => self.infer_sequence_unpacking(target, value_ty, name),
             _ => value_ty,
         };
 
-        self.add_binding(variable.into(), definition, target_ty);
+        self.add_binding(name.into(), definition, target_ty);
         self.types
             .expressions
-            .insert(variable.scoped_ast_id(self.db, self.scope), target_ty);
+            .insert(name.scoped_ast_id(self.db, self.scope), target_ty);
     }
 
     fn infer_sequence_unpacking(
         &mut self,
         target: &ast::Expr,
         value_ty: Type<'db>,
-        variable: &ast::ExprName,
+        name: &ast::ExprName,
     ) -> Type<'db> {
         // The inner function is recursive and only differs in the return type which is an `Option`
         // where if the variable is found, the corresponding type is returned otherwise `None`.
@@ -1216,14 +1214,14 @@ impl<'db> TypeInferenceBuilder<'db> {
             builder: &mut TypeInferenceBuilder<'db>,
             target: &ast::Expr,
             value_ty: Type<'db>,
-            variable: &ast::ExprName,
+            name: &ast::ExprName,
         ) -> Option<Type<'db>> {
             match target {
-                ast::Expr::Name(name) if name == variable => {
+                ast::Expr::Name(target_name) if target_name == name => {
                     return Some(value_ty);
                 }
                 ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
-                    return inner(builder, value, value_ty, variable);
+                    return inner(builder, value, value_ty, name);
                 }
                 ast::Expr::List(ast::ExprList { elts, .. })
                 | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => match value_ty {
@@ -1271,7 +1269,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 builder,
                                 element,
                                 element_types.get(index).copied().unwrap_or(Type::Unknown),
-                                variable,
+                                name,
                             ) {
                                 return Some(ty);
                             }
@@ -1285,7 +1283,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             vec![Type::LiteralString; string_literal_ty.len(builder.db)]
                                 .into_boxed_slice(),
                         ));
-                        if let Some(ty) = inner(builder, target, value_ty, variable) {
+                        if let Some(ty) = inner(builder, target, value_ty, name) {
                             return Some(ty);
                         }
                     }
@@ -1298,7 +1296,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 .unwrap_with_diagnostic(AnyNodeRef::from(target), builder)
                         };
                         for element in elts {
-                            if let Some(ty) = inner(builder, element, value_ty, variable) {
+                            if let Some(ty) = inner(builder, element, value_ty, name) {
                                 return Some(ty);
                             }
                         }
@@ -1309,7 +1307,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             None
         }
 
-        inner(self, target, value_ty, variable).unwrap_or(Type::Unknown)
+        inner(self, target, value_ty, name).unwrap_or(Type::Unknown)
     }
 
     fn infer_annotated_assignment_statement(&mut self, assignment: &ast::StmtAnnAssign) {

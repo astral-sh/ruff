@@ -566,7 +566,7 @@ where
                 debug_assert!(self.current_assignment.is_none());
                 self.visit_expr(&node.value);
                 self.add_standalone_expression(&node.value);
-                for target in &node.targets {
+                for (target_index, target) in node.targets.iter().enumerate() {
                     let kind = match target {
                         ast::Expr::List(_) | ast::Expr::Tuple(_) => Some(AssignmentKind::Sequence),
                         ast::Expr::Name(_) => Some(AssignmentKind::Name),
@@ -574,8 +574,8 @@ where
                     };
                     if let Some(kind) = kind {
                         self.current_assignment = Some(CurrentAssignment::Assign {
-                            target,
-                            value: &node.value,
+                            assignment: node,
+                            target_index,
                             kind,
                         });
                     }
@@ -827,16 +827,16 @@ where
                 if is_definition {
                     match self.current_assignment {
                         Some(CurrentAssignment::Assign {
-                            target,
-                            value,
+                            assignment,
+                            target_index,
                             kind,
                         }) => {
                             self.add_definition(
                                 symbol,
                                 AssignmentDefinitionNodeRef {
-                                    target,
-                                    value,
-                                    variable: name_node,
+                                    assignment,
+                                    target_index,
+                                    name: name_node,
                                     kind,
                                 },
                             );
@@ -1063,8 +1063,8 @@ where
 #[derive(Copy, Clone, Debug)]
 enum CurrentAssignment<'a> {
     Assign {
-        target: &'a ast::Expr,
-        value: &'a ast::Expr,
+        assignment: &'a ast::StmtAssign,
+        target_index: usize,
         kind: AssignmentKind,
     },
     AnnAssign(&'a ast::StmtAnnAssign),

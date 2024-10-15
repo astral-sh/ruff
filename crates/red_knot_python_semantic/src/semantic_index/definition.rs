@@ -160,9 +160,9 @@ pub(crate) struct ImportFromDefinitionNodeRef<'a> {
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct AssignmentDefinitionNodeRef<'a> {
-    pub(crate) target: &'a ast::Expr,
-    pub(crate) value: &'a ast::Expr,
-    pub(crate) variable: &'a ast::ExprName,
+    pub(crate) assignment: &'a ast::StmtAssign,
+    pub(crate) target_index: usize,
+    pub(crate) name: &'a ast::ExprName,
     pub(crate) kind: AssignmentKind,
 }
 
@@ -227,14 +227,14 @@ impl DefinitionNodeRef<'_> {
                 DefinitionKind::NamedExpression(AstNodeRef::new(parsed, named))
             }
             DefinitionNodeRef::Assignment(AssignmentDefinitionNodeRef {
-                value,
-                target,
-                variable,
+                assignment,
+                target_index,
+                name,
                 kind,
             }) => DefinitionKind::Assignment(AssignmentDefinitionKind {
-                value: AstNodeRef::new(parsed.clone(), value),
-                target: AstNodeRef::new(parsed.clone(), target),
-                variable: AstNodeRef::new(parsed, variable),
+                assignment: AstNodeRef::new(parsed.clone(), assignment),
+                target_index,
+                name: AstNodeRef::new(parsed, name),
                 kind,
             }),
             DefinitionNodeRef::AnnotatedAssignment(assign) => {
@@ -306,11 +306,11 @@ impl DefinitionNodeRef<'_> {
             Self::Class(node) => node.into(),
             Self::NamedExpression(node) => node.into(),
             Self::Assignment(AssignmentDefinitionNodeRef {
-                value: _,
-                target: _,
-                variable,
+                assignment: _,
+                target_index: _,
+                name,
                 kind: _,
-            }) => variable.into(),
+            }) => name.into(),
             Self::AnnotatedAssignment(node) => node.into(),
             Self::AugmentedAssignment(node) => node.into(),
             Self::For(ForStmtDefinitionNodeRef {
@@ -493,23 +493,23 @@ impl ImportFromDefinitionKind {
 
 #[derive(Clone, Debug)]
 pub struct AssignmentDefinitionKind {
-    target: AstNodeRef<ast::Expr>,
-    value: AstNodeRef<ast::Expr>,
-    variable: AstNodeRef<ast::ExprName>,
+    assignment: AstNodeRef<ast::StmtAssign>,
+    target_index: usize,
+    name: AstNodeRef<ast::ExprName>,
     kind: AssignmentKind,
 }
 
 impl AssignmentDefinitionKind {
     pub(crate) fn value(&self) -> &ast::Expr {
-        self.value.node()
+        &self.assignment.node().value
     }
 
     pub(crate) fn target(&self) -> &ast::Expr {
-        self.target.node()
+        &self.assignment.node().targets[self.target_index]
     }
 
-    pub(crate) fn variable(&self) -> &ast::ExprName {
-        self.variable.node()
+    pub(crate) fn name(&self) -> &ast::ExprName {
+        self.name.node()
     }
 
     pub(crate) fn kind(&self) -> AssignmentKind {
