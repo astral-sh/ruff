@@ -2,7 +2,9 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::str::raw_contents;
 use ruff_python_ast::{self as ast, Expr, Operator};
+use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -10,7 +12,7 @@ use crate::checkers::ast::Checker;
 // Implementation of regex from bandit
 static SQL_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
-        r"(?ixs)
+        r"(?ix)
         (
             select\s+.*from\s |
             delete\s+from\s  |
@@ -94,7 +96,7 @@ pub(crate) fn hardcoded_sql_expression(checker: &mut Checker, expr: &Expr) {
             };
             string.value.to_str().escape_default().to_string()
         }
-        // Expr::FString(f_string) => concatenated_f_string(f_string, checker.locator()),
+        Expr::FString(f_string) => concatenated_f_string(f_string, checker.locator()),
         _ => return,
     };
 
@@ -115,13 +117,12 @@ pub(crate) fn hardcoded_sql_expression(checker: &mut Checker, expr: &Expr) {
 /// ```
 ///
 /// becomes `foobar {x}baz`.
-// fn concatenated_f_string(expr: &ast::ExprFString, locator: &Locator) -> String {
-//     expr.value
-//         .iter()
-//         .filter_map(|part| raw_contents(locator.slice(part)))
-//         .map(|s| s.escape_default().to_string())
-//         .collect()
-// }
+fn concatenated_f_string(expr: &ast::ExprFString, locator: &Locator) -> String {
+    expr.value
+        .iter()
+        .filter_map(|part| raw_contents(locator.slice(part)))
+        .collect()
+}
 
 /// Returns `Some(true)` if an expression appears to be an explicit string concatenation,
 /// `Some(false)` if it's _not_ an explicit concatenation, and `None` if it's ambiguous.
