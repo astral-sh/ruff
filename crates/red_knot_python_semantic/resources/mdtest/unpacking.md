@@ -84,7 +84,7 @@ reveal_type(b)  # revealed: Literal[2]
 # TODO: Remove 'not-iterable' diagnostic
 [a, *b, c, d] = (1, 2)  # error: "Object of type `None` is not iterable"
 reveal_type(a)  # revealed: Literal[1]
-# TODO: Should be List[Any] once support for assigning to starred expression is added
+# TODO: Should be list[Any] once support for assigning to starred expression is added
 reveal_type(b)  # revealed: @Todo
 reveal_type(c)  # revealed: Literal[2]
 reveal_type(d)  # revealed: Unknown
@@ -95,7 +95,7 @@ reveal_type(d)  # revealed: Unknown
 ```py
 [a, *b, c] = (1, 2)  # error: "Object of type `None` is not iterable"
 reveal_type(a)  # revealed: Literal[1]
-# TODO: Should be List[Any] once support for assigning to starred expression is added
+# TODO: Should be list[Any] once support for assigning to starred expression is added
 reveal_type(b)  # revealed: @Todo
 reveal_type(c)  # revealed: Literal[2]
 ```
@@ -106,7 +106,7 @@ reveal_type(c)  # revealed: Literal[2]
 # TODO: Remove 'not-iterable' diagnostic
 [a, *b, c] = (1, 2, 3)  # error: "Object of type `None` is not iterable"
 reveal_type(a)  # revealed: Literal[1]
-# TODO: Should be List[int] once support for assigning to starred expression is added
+# TODO: Should be list[int] once support for assigning to starred expression is added
 reveal_type(b)  # revealed: @Todo
 reveal_type(c)  # revealed: Literal[3]
 ```
@@ -117,7 +117,7 @@ reveal_type(c)  # revealed: Literal[3]
 # TODO: Remove 'not-iterable' diagnostic
 [a, *b, c, d] = (1, 2, 3, 4, 5, 6)  # error: "Object of type `None` is not iterable"
 reveal_type(a)  # revealed: Literal[1]
-# TODO: Should be List[int] once support for assigning to starred expression is added
+# TODO: Should be list[int] once support for assigning to starred expression is added
 reveal_type(b)  # revealed: @Todo
 reveal_type(c)  # revealed: Literal[5]
 reveal_type(d)  # revealed: Literal[6]
@@ -130,7 +130,7 @@ reveal_type(d)  # revealed: Literal[6]
 [a, b, *c] = (1, 2, 3, 4)  # error: "Object of type `None` is not iterable"
 reveal_type(a)  # revealed: Literal[1]
 reveal_type(b)  # revealed: Literal[2]
-# TODO: Should be List[int] once support for assigning to starred expression is added
+# TODO: Should be list[int] once support for assigning to starred expression is added
 reveal_type(c)  # revealed: @Todo
 ```
 
@@ -222,7 +222,7 @@ reveal_type(b)  # revealed: LiteralString
 # TODO: Remove 'not-iterable' diagnostic
 (a, *b, c, d) = "ab"  # error: "Object of type `None` is not iterable"
 reveal_type(a)  # revealed: LiteralString
-# TODO: Should be List[LiteralString] once support for assigning to starred expression is added
+# TODO: Should be list[LiteralString] once support for assigning to starred expression is added
 reveal_type(b)  # revealed: @Todo
 reveal_type(c)  # revealed: LiteralString
 reveal_type(d)  # revealed: Unknown
@@ -233,7 +233,7 @@ reveal_type(d)  # revealed: Unknown
 ```py
 (a, *b, c) = "ab"  # error: "Object of type `None` is not iterable"
 reveal_type(a)  # revealed: LiteralString
-# TODO: Should be List[Any] once support for assigning to starred expression is added
+# TODO: Should be list[Any] once support for assigning to starred expression is added
 reveal_type(b)  # revealed: @Todo
 reveal_type(c)  # revealed: LiteralString
 ```
@@ -244,7 +244,7 @@ reveal_type(c)  # revealed: LiteralString
 # TODO: Remove 'not-iterable' diagnostic
 (a, *b, c) = "abc"  # error: "Object of type `None` is not iterable"
 reveal_type(a)  # revealed: LiteralString
-# TODO: Should be List[LiteralString] once support for assigning to starred expression is added
+# TODO: Should be list[LiteralString] once support for assigning to starred expression is added
 reveal_type(b)  # revealed: @Todo
 reveal_type(c)  # revealed: LiteralString
 ```
@@ -255,7 +255,7 @@ reveal_type(c)  # revealed: LiteralString
 # TODO: Remove 'not-iterable' diagnostic
 (a, *b, c, d) = "abcdef"  # error: "Object of type `None` is not iterable"
 reveal_type(a)  # revealed: LiteralString
-# TODO: Should be List[LiteralString] once support for assigning to starred expression is added
+# TODO: Should be list[LiteralString] once support for assigning to starred expression is added
 reveal_type(b)  # revealed: @Todo
 reveal_type(c)  # revealed: LiteralString
 reveal_type(d)  # revealed: LiteralString
@@ -268,6 +268,6 @@ reveal_type(d)  # revealed: LiteralString
 (a, b, *c) = "abcd"  # error: "Object of type `None` is not iterable"
 reveal_type(a)  # revealed: LiteralString
 reveal_type(b)  # revealed: LiteralString
-# TODO: Should be List[int] once support for assigning to starred expression is added
+# TODO: Should be list[int] once support for assigning to starred expression is added
 reveal_type(c)  # revealed: @Todo
 ```

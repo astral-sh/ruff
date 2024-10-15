@@ -580,8 +580,8 @@ where
                         });
                     }
                     self.visit_expr(target);
+                    self.current_assignment = None;
                 }
-                self.current_assignment = None;
             }
             ast::Stmt::AnnAssign(node) => {
                 debug_assert!(self.current_assignment.is_none());
