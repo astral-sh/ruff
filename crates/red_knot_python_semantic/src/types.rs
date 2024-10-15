@@ -486,10 +486,7 @@ impl<'db> Type<'db> {
                 false
             }
             Type::None | Type::BooleanLiteral(_) | Type::Function(..) | Type::Class(..) => true,
-            Type::Tuple(tuple) => {
-                !tuple.elements(db).is_empty()
-                    && tuple.elements(db).iter().all(|ty| ty.is_singleton(db))
-            }
+            Type::Tuple(tuple) => tuple.elements(db).iter().all(|ty| ty.is_singleton(db)),
             Type::Union(..) => {
                 // There are some rare edge cases where a union type might be a singleton type.
                 // For example, a union with just one element (which itself is a singleton). Or
@@ -1672,6 +1669,7 @@ mod tests {
     #[test_case(Ty::None)]
     #[test_case(Ty::BoolLiteral(true))]
     #[test_case(Ty::BoolLiteral(false))]
+    #[test_case(Ty::Tuple(vec![]))]
     #[test_case(Ty::Tuple(vec![Ty::None]))]
     #[test_case(Ty::Tuple(vec![Ty::None, Ty::BoolLiteral(true)]))]
     fn is_singleton(from: Ty) {
@@ -1684,7 +1682,6 @@ mod tests {
     #[test_case(Ty::IntLiteral(345))]
     #[test_case(Ty::BuiltinInstance("str"))]
     #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]))]
-    #[test_case(Ty::Tuple(vec![]))]
     fn is_not_singleton(from: Ty) {
         let db = setup_db();
 
