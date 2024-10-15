@@ -27,5 +27,6 @@ def add(x: int, y: int) -> int:
     return x + y
 
 a = 'abcde'[add(0, 1)]
-reveal_type(a)  # revealed: str
+# TODO: Support overloads... Should be `str`
+reveal_type(a)  # revealed: @Todo
 ```
