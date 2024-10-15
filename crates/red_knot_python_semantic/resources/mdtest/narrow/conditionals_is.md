@@ -15,12 +15,15 @@ reveal_type(x)  # revealed: None | Literal[1]
 ## `is` for other types
 
 ```py
-x = 345
+class A:
+    ...
+
+x = A()
 y = x if flag else None
 
 if y is x:
-    # TODO the following should be simplified to 'Literal[345]'
-    reveal_type(y)  # revealed: Literal[345] | None & Literal[345]
+    # TODO the following should be simplified to 'A'
+    reveal_type(y)  # revealed: A | None & A
 
-reveal_type(y)  # revealed: Literal[345] | None
+reveal_type(y)  # revealed: A | None
 ```
