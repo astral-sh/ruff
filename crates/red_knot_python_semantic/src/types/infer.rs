@@ -7339,7 +7339,8 @@ mod tests {
             ",
         )?;
 
-        assert_public_ty(&db, "/src/a.py", "a", "str");
+        // TODO overloads...
+        assert_public_ty(&db, "/src/a.py", "a", "@Todo");
 
         Ok(())
     }

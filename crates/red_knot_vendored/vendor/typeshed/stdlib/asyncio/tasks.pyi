@@ -1,16 +1,20 @@
 import concurrent.futures
 import sys
+from _asyncio import (
+    Task as Task,
+    _enter_task as _enter_task,
+    _leave_task as _leave_task,
+    _register_task as _register_task,
+    _unregister_task as _unregister_task,
+)
 from collections.abc import Awaitable, Coroutine, Generator, Iterable, Iterator
-from types import FrameType
-from typing import Any, Literal, Protocol, TextIO, TypeVar, overload
+from typing import Any, Literal, Protocol, TypeVar, overload
 from typing_extensions import TypeAlias
 
 from . import _CoroutineLike
 from .events import AbstractEventLoop
 from .futures import Future
 
-if sys.version_info >= (3, 9):
-    from types import GenericAlias
 if sys.version_info >= (3, 11):
     from contextvars import Context
 
@@ -400,58 +404,6 @@ elif sys.version_info >= (3, 9):
 else:
     _TaskCompatibleCoro: TypeAlias = Generator[_TaskYieldType, None, _T_co] | Awaitable[_T_co]
 
-# mypy and pyright complain that a subclass of an invariant class shouldn't be covariant.
-# While this is true in general, here it's sort-of okay to have a covariant subclass,
-# since the only reason why `asyncio.Future` is invariant is the `set_result()` method,
-# and `asyncio.Task.set_result()` always raises.
-class Task(Future[_T_co]):  # type: ignore[type-var]  # pyright: ignore[reportInvalidTypeArguments]
-    if sys.version_info >= (3, 12):
-        def __init__(
-            self,
-            coro: _TaskCompatibleCoro[_T_co],
-            *,
-            loop: AbstractEventLoop = ...,
-            name: str | None = ...,
-            context: Context | None = None,
-            eager_start: bool = False,
-        ) -> None: ...
-    elif sys.version_info >= (3, 11):
-        def __init__(
-            self,
-            coro: _TaskCompatibleCoro[_T_co],
-            *,
-            loop: AbstractEventLoop = ...,
-            name: str | None = ...,
-            context: Context | None = None,
-        ) -> None: ...
-    else:
-        def __init__(
-            self, coro: _TaskCompatibleCoro[_T_co], *, loop: AbstractEventLoop = ..., name: str | None = ...
-        ) -> None: ...
-
-    if sys.version_info >= (3, 12):
-        def get_coro(self) -> _TaskCompatibleCoro[_T_co] | None: ...
-    else:
-        def get_coro(self) -> _TaskCompatibleCoro[_T_co]: ...
-
-    def get_name(self) -> str: ...
-    def set_name(self, value: object, /) -> None: ...
-    if sys.version_info >= (3, 12):
-        def get_context(self) -> Context: ...
-
-    def get_stack(self, *, limit: int | None = None) -> list[FrameType]: ...
-    def print_stack(self, *, limit: int | None = None, file: TextIO | None = None) -> None: ...
-    if sys.version_info >= (3, 11):
-        def cancelling(self) -> int: ...
-        def uncancel(self) -> int: ...
-    if sys.version_info < (3, 9):
-        @classmethod
-        def current_task(cls, loop: AbstractEventLoop | None = None) -> Task[Any] | None: ...
-        @classmethod
-        def all_tasks(cls, loop: AbstractEventLoop | None = None) -> set[Task[Any]]: ...
-    if sys.version_info >= (3, 9):
-        def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
-
 def all_tasks(loop: AbstractEventLoop | None = None) -> set[Task[Any]]: ...
 
 if sys.version_info >= (3, 11):
@@ -460,9 +412,10 @@ if sys.version_info >= (3, 11):
 else:
     def create_task(coro: _CoroutineLike[_T], *, name: str | None = None) -> Task[_T]: ...
 
-def current_task(loop: AbstractEventLoop | None = None) -> Task[Any] | None: ...
-def _enter_task(loop: AbstractEventLoop, task: Task[Any]) -> None: ...
-def _leave_task(loop: AbstractEventLoop, task: Task[Any]) -> None: ...
+if sys.version_info >= (3, 12):
+    from _asyncio import current_task as current_task
+else:
+    def current_task(loop: AbstractEventLoop | None = None) -> Task[Any] | None: ...
 
 if sys.version_info >= (3, 12):
     _TaskT_co = TypeVar("_TaskT_co", bound=Task[Any], covariant=True)
@@ -499,6 +452,3 @@ if sys.version_info >= (3, 12):
         name: str | None = None,
         context: Context | None = None,
     ) -> Task[_T_co]: ...
-
-def _register_task(task: Task[Any]) -> None: ...
-def _unregister_task(task: Task[Any]) -> None: ...

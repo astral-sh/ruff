@@ -1,5 +1,5 @@
 from _curses import *
-from _curses import _CursesWindow as _CursesWindow
+from _curses import window as window
 from collections.abc import Callable
 from typing import TypeVar
 from typing_extensions import Concatenate, ParamSpec
@@ -19,4 +19,9 @@ COLS: int
 COLORS: int
 COLOR_PAIRS: int
 
-def wrapper(func: Callable[Concatenate[_CursesWindow, _P], _T], /, *arg: _P.args, **kwds: _P.kwargs) -> _T: ...
+def wrapper(func: Callable[Concatenate[window, _P], _T], /, *arg: _P.args, **kwds: _P.kwargs) -> _T: ...
+
+# typeshed used the name _CursesWindow for the underlying C class before
+# it was mapped to the name 'window' in 3.8.
+# Kept here as a legacy alias in case any third-party code is relying on it.
+_CursesWindow = window

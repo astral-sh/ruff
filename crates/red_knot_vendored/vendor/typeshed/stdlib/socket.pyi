@@ -109,8 +109,6 @@ from _socket import (
     _RetAddress as _RetAddress,
     close as close,
     dup as dup,
-    error as error,
-    gaierror as gaierror,
     getdefaulttimeout as getdefaulttimeout,
     gethostbyaddr as gethostbyaddr,
     gethostbyname as gethostbyname,
@@ -121,7 +119,6 @@ from _socket import (
     getservbyname as getservbyname,
     getservbyport as getservbyport,
     has_ipv6 as has_ipv6,
-    herror as herror,
     htonl as htonl,
     htons as htons,
     if_indextoname as if_indextoname,
@@ -134,7 +131,6 @@ from _socket import (
     ntohl as ntohl,
     ntohs as ntohs,
     setdefaulttimeout as setdefaulttimeout,
-    timeout as timeout,
 )
 from _typeshed import ReadableBuffer, Unused, WriteableBuffer
 from collections.abc import Iterable
@@ -485,6 +481,18 @@ if sys.version_info >= (3, 12):
 EBADF: int
 EAGAIN: int
 EWOULDBLOCK: int
+
+# These errors are implemented in _socket at runtime
+# but they consider themselves to live in socket so we'll put them here.
+error = OSError
+
+class herror(error): ...
+class gaierror(error): ...
+
+if sys.version_info >= (3, 10):
+    timeout = TimeoutError
+else:
+    class timeout(error): ...
 
 class AddressFamily(IntEnum):
     AF_INET = 2
