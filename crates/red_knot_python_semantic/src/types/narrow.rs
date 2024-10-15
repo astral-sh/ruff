@@ -155,7 +155,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             let inference = infer_expression_types(self.db, expression);
             for (op, comparator) in std::iter::zip(&**ops, &**comparators) {
                 let comp_ty = inference.expression_ty(comparator.scoped_ast_id(self.db, scope));
-                if matches!(op, ast::CmpOp::IsNot) {
+                if matches!(op, ast::CmpOp::IsNot | ast::CmpOp::NotEq) {
                     let ty = IntersectionBuilder::new(self.db)
                         .add_negative(comp_ty)
                         .build();
