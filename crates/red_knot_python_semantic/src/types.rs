@@ -472,6 +472,7 @@ impl<'db> Type<'db> {
             Type::Any
             | Type::Never
             | Type::Unknown
+            | Type::Todo
             | Type::Unbound
             | Type::Module(..)
             | Type::Instance(..)
@@ -508,7 +509,6 @@ impl<'db> Type<'db> {
                 //
                 false
             }
-            Type::Todo => todo!(),
         }
     }
 
