@@ -1740,10 +1740,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_string_literal_expression(&mut self, literal: &ast::ExprStringLiteral) -> Type<'db> {
         if literal.value.len() <= Self::MAX_STRING_LITERAL_SIZE {
-            Type::StringLiteral(StringLiteralType::new(
-                self.db,
-                Box::<str>::from(literal.value.to_str()),
-            ))
+            Type::StringLiteral(StringLiteralType::new(self.db, literal.value.to_str()))
         } else {
             Type::LiteralString
         }
@@ -2402,7 +2399,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let rhs_value = rhs.value(self.db).as_ref();
                 if lhs_value.len() + rhs_value.len() <= Self::MAX_STRING_LITERAL_SIZE {
                     Type::StringLiteral(StringLiteralType::new(self.db, {
-                        Box::<str>::from(lhs_value + rhs_value)
+                        (lhs_value + rhs_value).into_boxed_str()
                     }))
                 } else {
                     Type::LiteralString
@@ -2418,7 +2415,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             (Type::StringLiteral(s), Type::IntLiteral(n), ast::Operator::Mult)
             | (Type::IntLiteral(n), Type::StringLiteral(s), ast::Operator::Mult) => {
                 if n < 1 {
-                    Type::StringLiteral(StringLiteralType::new(self.db, Box::default()))
+                    Type::StringLiteral(StringLiteralType::new(self.db, ""))
                 } else if let Ok(n) = usize::try_from(n) {
                     if n.checked_mul(s.value(self.db).len())
                         .is_some_and(|new_length| new_length <= Self::MAX_STRING_LITERAL_SIZE)
@@ -2439,7 +2436,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             (Type::LiteralString, Type::IntLiteral(n), ast::Operator::Mult)
             | (Type::IntLiteral(n), Type::LiteralString, ast::Operator::Mult) => {
                 if n < 1 {
-                    Type::StringLiteral(StringLiteralType::new(self.db, Box::default()))
+                    Type::StringLiteral(StringLiteralType::new(self.db, ""))
                 } else {
                     Type::LiteralString
                 }

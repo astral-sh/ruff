@@ -791,12 +791,8 @@ impl<'db> Type<'db> {
             Type::IntLiteral(number) => Type::StringLiteral(StringLiteralType::new(db, {
                 number.to_string().into_boxed_str()
             })),
-            Type::BooleanLiteral(true) => {
-                Type::StringLiteral(StringLiteralType::new(db, Box::<str>::from("True")))
-            }
-            Type::BooleanLiteral(false) => {
-                Type::StringLiteral(StringLiteralType::new(db, Box::<str>::from("False")))
-            }
+            Type::BooleanLiteral(true) => Type::StringLiteral(StringLiteralType::new(db, "True")),
+            Type::BooleanLiteral(false) => Type::StringLiteral(StringLiteralType::new(db, "False")),
             Type::StringLiteral(literal) => Type::StringLiteral(StringLiteralType::new(db, {
                 format!("'{}'", literal.value(db).escape_default()).into_boxed_str()
             })),
@@ -1532,14 +1528,10 @@ mod tests {
                 Ty::Unknown => Type::Unknown,
                 Ty::Any => Type::Any,
                 Ty::IntLiteral(n) => Type::IntLiteral(n),
-                Ty::StringLiteral(s) => {
-                    Type::StringLiteral(StringLiteralType::new(db, Box::<str>::from(s)))
-                }
+                Ty::StringLiteral(s) => Type::StringLiteral(StringLiteralType::new(db, s)),
                 Ty::BoolLiteral(b) => Type::BooleanLiteral(b),
                 Ty::LiteralString => Type::LiteralString,
-                Ty::BytesLiteral(s) => {
-                    Type::BytesLiteral(BytesLiteralType::new(db, Box::<[u8]>::from(s.as_bytes())))
-                }
+                Ty::BytesLiteral(s) => Type::BytesLiteral(BytesLiteralType::new(db, s.as_bytes())),
                 Ty::BuiltinInstance(s) => builtins_symbol_ty(db, s).to_instance(db),
                 Ty::Union(tys) => {
                     UnionType::from_elements(db, tys.into_iter().map(|ty| ty.into_type(db)))
