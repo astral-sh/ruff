@@ -2719,18 +2719,35 @@ impl<'db> TypeInferenceBuilder<'db> {
                         self.infer_lexicographic_type_comparison(lhs_elements, op, rhs_elements)
                     }
                     ast::CmpOp::In | ast::CmpOp::NotIn => {
-                        // - `[ast::CmpOp::In]`: returns `true` if the element is definitely in the tuple, otherwise `bool`
-                        // - `[ast::CmpOp::NotIn]`: returns `false` if the element is definitely in the tuple, otherwise `bool`
-                        if rhs_elements.iter().any(|ty| {
-                            let eq_result_ty = self.infer_binary_type_comparison(
+                        let mut eq_cnt = 0usize;
+                        let mut not_eq_cnt = 0usize;
+
+                        for ty in rhs_elements {
+                            let eq_result = self.infer_binary_type_comparison(
                                 Type::Tuple(lhs),
                                 ast::CmpOp::Eq,
                                 *ty,
                             );
+                            // In Python, if `__eq__` is not defined, it implicitly uses object's `__eq__`. Adding `debug_assert!` as a precaution.
+                            debug_assert!(
+                                eq_result.is_some(),
+                                "Type inference for `==` comparison returned `None`."
+                            );
 
-                            matches!(eq_result_ty, Some(Type::BooleanLiteral(true)))
-                        }) {
+                            match eq_result {
+                                Some(Type::Todo) | None => return eq_result,
+                                Some(ty) => match ty.bool(self.db) {
+                                    Truthiness::AlwaysTrue => eq_cnt += 1,
+                                    Truthiness::AlwaysFalse => not_eq_cnt += 1,
+                                    Truthiness::Ambiguous => (),
+                                },
+                            }
+                        }
+
+                        if eq_cnt >= 1 {
                             Some(Type::BooleanLiteral(op.is_in()))
+                        } else if not_eq_cnt == rhs_elements.len() {
+                            Some(Type::BooleanLiteral(op.is_not_in()))
                         } else {
                             Some(KnownClass::Bool.to_instance(self.db))
                         }
@@ -2738,16 +2755,25 @@ impl<'db> TypeInferenceBuilder<'db> {
                     ast::CmpOp::Is | ast::CmpOp::IsNot => {
                         // - `[ast::CmpOp::Is]`: returns `false` if the elements are definitely unequal, otherwise `bool`
                         // - `[ast::CmpOp::IsNot]`: returns `true` if the elements are definitely unequal, otherwise `bool`
-                        let eq_result_ty = self.infer_lexicographic_type_comparison(
+                        let eq_result = self.infer_lexicographic_type_comparison(
                             lhs_elements,
                             ast::CmpOp::Eq,
                             rhs_elements,
                         );
+                        // In Python, if `__eq__` is not defined, it implicitly uses object's `__eq__`. Adding `debug_assert!` as a precaution.
+                        debug_assert!(
+                            eq_result.is_some(),
+                            "Type inference for `==` comparison returned `None`."
+                        );
 
-                        if let Some(Type::BooleanLiteral(false)) = eq_result_ty {
-                            Some(Type::BooleanLiteral(!op.is_is()))
-                        } else {
-                            Some(KnownClass::Bool.to_instance(self.db))
+                        match eq_result {
+                            Some(Type::Todo) | None => eq_result,
+                            Some(ty) => match ty.bool(self.db) {
+                                Truthiness::AlwaysFalse => {
+                                    Some(Type::BooleanLiteral(op.is_is_not()))
+                                }
+                                _ => Some(KnownClass::Bool.to_instance(self.db)),
+                            },
                         }
                     }
                 }
@@ -2770,7 +2796,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// This comparison supports only equality and ordering operators: `==`, `!=`, `<`, `<=`, `>`, `>=`.
     /// For lexicographic comparison, elements from both slices are compared pairwise using
     /// `infer_binary_type_comparison`. If a conclusive result cannot be determined as a `BoolLiteral`,
-    /// it returns `bool`. If the comparison is undefined between types, it returns `None`.
+    /// it returns `bool`.
     fn infer_lexicographic_type_comparison(
         &mut self,
         left: &[Type<'db>],
@@ -2786,33 +2812,36 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | ast::CmpOp::Gt
                 | ast::CmpOp::GtE
         ) {
+            debug_assert!(
+                false,
+                "Unsupported comparison operator for lexicographic type comparison."
+            );
             return None;
         }
 
         // Compare paired elements from left and right slices
         for (l_ty, r_ty) in left.iter().zip(right.iter()) {
-            let eq_result_ty = self.infer_binary_type_comparison(*l_ty, ast::CmpOp::Eq, *r_ty);
+            let eq_result = self.infer_binary_type_comparison(*l_ty, ast::CmpOp::Eq, *r_ty);
+            // In Python, if `__eq__` is not defined, it implicitly uses object's `__eq__`. Adding `debug_assert!` as a precaution.
+            debug_assert!(
+                eq_result.is_some(),
+                "Type inference for `==` comparison returned `None`."
+            );
 
-            match eq_result_ty {
-                // Types are equal, continue to the next pair
-                Some(Type::BooleanLiteral(true)) => continue,
-
-                // Types are not equal, perform the specified comparison and return the result
-                Some(Type::BooleanLiteral(false)) => {
-                    return self.infer_binary_type_comparison(*l_ty, op, *r_ty)
-                }
-
-                // If the intermediate result is a bool instance, we cannot determine the final result using BoolLiteral.
-                // In this case, we simply return a bool instance.
-                Some(Type::Instance(class_ty)) if class_ty.is_known(self.db, KnownClass::Bool) => {
-                    return Some(KnownClass::Bool.to_instance(self.db));
-                }
-
-                // TODO: Todo propagation; it should be removed later.
-                Some(Type::Todo) => return Some(Type::Todo),
-
-                // If comparison is undefined, return None
-                _ => return None,
+            match eq_result {
+                // If propagation is required, return the result as is
+                Some(Type::Todo) | None => return eq_result,
+                Some(ty) => match ty.bool(self.db) {
+                    // Types are equal, continue to the next pair
+                    Truthiness::AlwaysTrue => continue,
+                    // Types are not equal, perform the specified comparison and return the result
+                    Truthiness::AlwaysFalse => {
+                        return self.infer_binary_type_comparison(*l_ty, op, *r_ty)
+                    }
+                    // If the intermediate result is abiguous, we cannot determine the final result as BoolLiteral.
+                    // In this case, we simply return a bool instance.
+                    Truthiness::Ambiguous => return Some(KnownClass::Bool.to_instance(self.db)),
+                },
             }
         }
 
