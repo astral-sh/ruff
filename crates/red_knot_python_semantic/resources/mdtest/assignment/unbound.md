@@ -34,7 +34,7 @@ reveal_type(y)  # revealed: int
 
 ## Unbound
 
-```py path=unbound/
+```py
 x = foo; foo = 1
 reveal_type(x)  # revealed: Unbound
 ```
