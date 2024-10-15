@@ -35,5 +35,6 @@ x = [1]
 y = [1]
 
 if x is not y:
+    # TODO: should include type parameter: list[int]
     reveal_type(x)  # revealed: list
 ```
