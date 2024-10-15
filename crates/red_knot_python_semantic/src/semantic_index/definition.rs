@@ -521,7 +521,7 @@ impl AssignmentDefinitionKind {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AssignmentKind {
     Sequence,
-    Other,
+    Name,
 }
 
 #[derive(Clone, Debug)]

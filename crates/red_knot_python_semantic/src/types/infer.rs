@@ -1223,10 +1223,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             variable: &ast::ExprName,
         ) -> Option<Type<'db>> {
             match target {
-                // TODO: Handle other possible target expression like attribute, subscript,
-                // and starred.
                 ast::Expr::Name(name) if name == variable => {
                     return Some(value_ty);
+                }
+                ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
+                    // TODO: Wrap the `value_ty` in a list type.
+                    return inner(builder, value, Type::Todo, variable);
                 }
                 ast::Expr::List(ast::ExprList { elts, .. })
                 | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => match value_ty {
@@ -1234,7 +1236,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         let starred_index = elts.iter().position(ast::Expr::is_starred_expr);
 
                         let element_types = if let Some(starred_index) = starred_index {
-                            if tuple_ty.len(builder.db) >= elts.len() {
+                            if tuple_ty.len(builder.db) >= elts.len() - 1 {
                                 let mut element_types = Vec::with_capacity(elts.len());
                                 element_types.extend_from_slice(
                                     // SAFETY: Safe because of the length check above.
@@ -1243,26 +1245,27 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                                 // E.g., in `(a, *b, c, d) = ...`, the index of starred element `b`
                                 // is 1 and the remaining elements after that are 2.
-                                let remaining = elts.len() - 2;
-                                let end_index =
-                                    tuple_ty.len(builder.db) - starred_index - remaining;
+                                let remaining = elts.len() - (starred_index + 1);
+                                // This index represents the type of the last element that belongs
+                                // to the starred expression, in an exclusive manner.
+                                let starred_end_index = tuple_ty.len(builder.db) - remaining;
                                 // SAFETY: Safe because of the length check above.
                                 let _starred_element_types = tuple_ty
                                     .elements(builder.db)
-                                    .get(starred_index..=end_index)
+                                    .get(starred_index..starred_end_index)
                                     .unwrap();
-                                // TODO: Combine the types into a list type.
+                                // TODO: Combine the types into a list type. If the
+                                // starred_element_types is empty, then it should be `List[Any]`.
                                 // combine_types(starred_element_types);
                                 element_types.push(Type::Todo);
 
                                 element_types.extend_from_slice(
                                     // SAFETY: Safe because of the length check above.
-                                    tuple_ty.elements(builder.db).get(end_index + 1..).unwrap(),
+                                    tuple_ty
+                                        .elements(builder.db)
+                                        .get(starred_end_index..)
+                                        .unwrap(),
                                 );
-                                Cow::Owned(element_types)
-                            } else if tuple_ty.len(builder.db) == elts.len() - 1 {
-                                let mut element_types = tuple_ty.elements(builder.db).to_vec();
-                                element_types.insert(starred_index, Type::Todo);
                                 Cow::Owned(element_types)
                             } else {
                                 Cow::Borrowed(tuple_ty.elements(builder.db).as_ref())
@@ -1283,16 +1286,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
                     }
                     Type::StringLiteral(string_literal_ty) => {
-                        for (index, element) in elts.iter().enumerate() {
-                            let string_length = string_literal_ty.len(builder.db);
-                            let element_ty = if index < string_length {
-                                Type::LiteralString
-                            } else {
-                                Type::Unknown
-                            };
-                            if let Some(ty) = inner(builder, element, element_ty, variable) {
-                                return Some(ty);
-                            }
+                        // Deconstruct the string literal to delegate the inference back to the
+                        // tuple type for correct handling of starred expressions.
+                        let value_ty = Type::Tuple(TupleType::new(
+                            builder.db,
+                            vec![Type::LiteralString; string_literal_ty.len(builder.db)]
+                                .into_boxed_slice(),
+                        ));
+                        if let Some(ty) = inner(builder, target, value_ty, variable) {
+                            return Some(ty);
                         }
                     }
                     Type::LiteralString => {

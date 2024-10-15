@@ -568,15 +568,17 @@ where
                 self.add_standalone_expression(&node.value);
                 for target in &node.targets {
                     let kind = match target {
-                        ast::Expr::List(_) | ast::Expr::Tuple(_) => AssignmentKind::Sequence,
-                        // TODO: Should we continue for an error recovery case like `1 = 2`?
-                        _ => AssignmentKind::Other,
+                        ast::Expr::List(_) | ast::Expr::Tuple(_) => Some(AssignmentKind::Sequence),
+                        ast::Expr::Name(_) => Some(AssignmentKind::Name),
+                        _ => None,
                     };
-                    self.current_assignment = Some(CurrentAssignment::Assign {
-                        target,
-                        value: &node.value,
-                        kind,
-                    });
+                    if let Some(kind) = kind {
+                        self.current_assignment = Some(CurrentAssignment::Assign {
+                            target,
+                            value: &node.value,
+                            kind,
+                        });
+                    }
                     self.visit_expr(target);
                 }
                 self.current_assignment = None;

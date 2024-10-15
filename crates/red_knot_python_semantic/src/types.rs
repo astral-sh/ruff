@@ -292,13 +292,6 @@ impl<'db> Type<'db> {
         matches!(self, Type::Never)
     }
 
-    pub const fn as_tuple_type(&self) -> Option<&TupleType<'db>> {
-        match self {
-            Type::Tuple(tuple_type) => Some(tuple_type),
-            _ => None,
-        }
-    }
-
     pub const fn into_class_type(self) -> Option<ClassType<'db>> {
         match self {
             Type::Class(class_type) => Some(class_type),

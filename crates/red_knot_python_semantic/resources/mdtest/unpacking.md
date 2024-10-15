@@ -61,6 +61,7 @@ reveal_type(c)  # revealed: Literal[4]
 ### Uneven unpacking (1)
 
 ```py
+# TODO: Add diagnostic (there aren't enough values to unpack)
 (a, b, c) = (1, 2)
 reveal_type(a)  # revealed: Literal[1]
 reveal_type(b)  # revealed: Literal[2]
@@ -70,6 +71,7 @@ reveal_type(c)  # revealed: Unknown
 ### Uneven unpacking (2)
 
 ```py
+# TODO: Add diagnostic (too many values to unpack)
 (a, b) = (1, 2, 3)
 reveal_type(a)  # revealed: Literal[1]
 reveal_type(b)  # revealed: Literal[2]
@@ -77,40 +79,59 @@ reveal_type(b)  # revealed: Literal[2]
 
 ### Starred expression (1)
 
-TODO: The error message here is because `infer_starred_expression` isn't complete
-
 ```py
+# TODO: Add diagnostic (need more values to unpack)
+# TODO: Remove 'not-iterable' diagnostic
 [a, *b, c, d] = (1, 2)  # error: "Object of type `None` is not iterable"
 reveal_type(a)  # revealed: Literal[1]
-# TODO: Should be List[int]
-reveal_type(b)  # revealed: Unknown
+# TODO: Should be List[int] / List[Literal[2]] once support for assigning to starred expression is added
+reveal_type(b)  # revealed: @Todo
 reveal_type(c)  # revealed: Unknown
 reveal_type(d)  # revealed: Unknown
 ```
 
 ### Starred expression (2)
 
-TODO: The error message here is because `infer_starred_expression` isn't complete
-
 ```py
-[a, *b, c] = (1, 2, 3)  # error: "Object of type `None` is not iterable"
+[a, *b, c] = (1, 2)  # error: "Object of type `None` is not iterable"
 reveal_type(a)  # revealed: Literal[1]
-# TODO: Should be List[int]
-reveal_type(b)  # revealed: Unknown
-reveal_type(c)  # revealed: Literal[3]
+# TODO: Should be List[Any] once support for assigning to starred expression is added
+reveal_type(b)  # revealed: @Todo
+reveal_type(c)  # revealed: Literal[2]
 ```
 
 ### Starred expression (3)
 
-TODO: The error message here is because `infer_starred_expression` isn't complete
+```py
+# TODO: Remove 'not-iterable' diagnostic
+[a, *b, c] = (1, 2, 3)  # error: "Object of type `None` is not iterable"
+reveal_type(a)  # revealed: Literal[1]
+# TODO: Should be List[int] once support for assigning to starred expression is added
+reveal_type(b)  # revealed: @Todo
+reveal_type(c)  # revealed: Literal[3]
+```
+
+### Starred expression (4)
 
 ```py
+# TODO: Remove 'not-iterable' diagnostic
 [a, *b, c, d] = (1, 2, 3, 4, 5, 6)  # error: "Object of type `None` is not iterable"
 reveal_type(a)  # revealed: Literal[1]
-# TODO: Should be List[int]
-reveal_type(b)  # revealed: Unknown
+# TODO: Should be List[int] once support for assigning to starred expression is added
+reveal_type(b)  # revealed: @Todo
 reveal_type(c)  # revealed: Literal[5]
 reveal_type(d)  # revealed: Literal[6]
+```
+
+### Starred expression (5)
+
+```py
+# TODO: Remove 'not-iterable' diagnostic
+[a, b, *c] = (1, 2, 3, 4)  # error: "Object of type `None` is not iterable"
+reveal_type(a)  # revealed: Literal[1]
+reveal_type(b)  # revealed: Literal[2]
+# TODO: Should be List[int] once support for assigning to starred expression is added
+reveal_type(c)  # revealed: @Todo
 ```
 
 ### Non-iterable unpacking
@@ -137,13 +158,78 @@ reveal_type(a)  # revealed: LiteralString
 reveal_type(b)  # revealed: LiteralString
 ```
 
-### Starred expression
-
-TODO: The error message here is because `infer_starred_expression` isn't complete
+### Uneven unpacking (1)
 
 ```py
-a, *b = 'abc'  # error: "Object of type `None` is not iterable"
+# TODO: Add diagnostic (there aren't enough values to unpack)
+a, b, c = 'ab'
 reveal_type(a)  # revealed: LiteralString
-# TODO: Should be List[str]
-reveal_type(b)  # revealed: Unknown
+reveal_type(b)  # revealed: LiteralString
+reveal_type(c)  # revealed: Unknown
+```
+
+### Uneven unpacking (2)
+
+```py
+# TODO: Add diagnostic (too many values to unpack)
+a, b = 'abc'
+reveal_type(a)  # revealed: LiteralString
+reveal_type(b)  # revealed: LiteralString
+```
+
+### Starred expression (1)
+
+```py
+# TODO: Add diagnostic (need more values to unpack)
+# TODO: Remove 'not-iterable' diagnostic
+(a, *b, c, d) = "ab"  # error: "Object of type `None` is not iterable"
+reveal_type(a)  # revealed: LiteralString
+# TODO: Should be List[LiteralString] once support for assigning to starred expression is added
+reveal_type(b)  # revealed: @Todo
+reveal_type(c)  # revealed: Unknown
+reveal_type(d)  # revealed: Unknown
+```
+
+### Starred expression (2)
+
+```py
+(a, *b, c) = "ab"  # error: "Object of type `None` is not iterable"
+reveal_type(a)  # revealed: LiteralString
+# TODO: Should be List[Any] once support for assigning to starred expression is added
+reveal_type(b)  # revealed: @Todo
+reveal_type(c)  # revealed: LiteralString
+```
+
+### Starred expression (3)
+
+```py
+# TODO: Remove 'not-iterable' diagnostic
+(a, *b, c) = "abc"  # error: "Object of type `None` is not iterable"
+reveal_type(a)  # revealed: LiteralString
+# TODO: Should be List[LiteralString] once support for assigning to starred expression is added
+reveal_type(b)  # revealed: @Todo
+reveal_type(c)  # revealed: LiteralString
+```
+
+### Starred expression (4)
+
+```py
+# TODO: Remove 'not-iterable' diagnostic
+(a, *b, c, d) = "abcdef"  # error: "Object of type `None` is not iterable"
+reveal_type(a)  # revealed: LiteralString
+# TODO: Should be List[LiteralString] once support for assigning to starred expression is added
+reveal_type(b)  # revealed: @Todo
+reveal_type(c)  # revealed: LiteralString
+reveal_type(d)  # revealed: LiteralString
+```
+
+### Starred expression (5)
+
+```py
+# TODO: Remove 'not-iterable' diagnostic
+(a, b, *c) = "abcd"  # error: "Object of type `None` is not iterable"
+reveal_type(a)  # revealed: LiteralString
+reveal_type(b)  # revealed: LiteralString
+# TODO: Should be List[int] once support for assigning to starred expression is added
+reveal_type(c)  # revealed: @Todo
 ```
