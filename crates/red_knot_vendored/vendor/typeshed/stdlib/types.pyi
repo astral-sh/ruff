@@ -424,6 +424,8 @@ class MethodType:
     @property
     def __closure__(self) -> tuple[CellType, ...] | None: ...  # inherited from the added function
     @property
+    def __code__(self) -> CodeType: ...  # inherited from the added function
+    @property
     def __defaults__(self) -> tuple[Any, ...] | None: ...  # inherited from the added function
     @property
     def __func__(self) -> Callable[..., Any]: ...

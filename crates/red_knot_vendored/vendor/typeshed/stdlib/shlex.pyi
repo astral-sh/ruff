@@ -27,7 +27,7 @@ def join(split_command: Iterable[str]) -> str: ...
 def quote(s: str) -> str: ...
 
 # TODO: Make generic over infile once PEP 696 is implemented.
-class shlex(Iterable[str]):
+class shlex:
     commenters: str
     wordchars: str
     whitespace: str

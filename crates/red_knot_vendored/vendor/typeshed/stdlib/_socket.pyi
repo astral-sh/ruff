@@ -1,6 +1,7 @@
 import sys
 from _typeshed import ReadableBuffer, WriteableBuffer
 from collections.abc import Iterable
+from socket import error as error, gaierror as gaierror, herror as herror, timeout as timeout
 from typing import Any, SupportsIndex, overload
 from typing_extensions import TypeAlias
 
@@ -666,18 +667,6 @@ if sys.platform != "win32":
 if sys.platform != "win32" and sys.platform != "darwin":
     IPX_TYPE: int
 
-# ===== Exceptions =====
-
-error = OSError
-
-class herror(error): ...
-class gaierror(error): ...
-
-if sys.version_info >= (3, 10):
-    timeout = TimeoutError
-else:
-    class timeout(error): ...
-
 # ===== Classes =====
 
 class socket:
@@ -687,8 +676,9 @@ class socket:
     def type(self) -> int: ...
     @property
     def proto(self) -> int: ...
+    # F811: "Redefinition of unused `timeout`"
     @property
-    def timeout(self) -> float | None: ...
+    def timeout(self) -> float | None: ...  # noqa: F811
     if sys.platform == "win32":
         def __init__(
             self, family: int = ..., type: int = ..., proto: int = ..., fileno: SupportsIndex | bytes | None = ...
@@ -788,7 +778,9 @@ def inet_ntoa(packed_ip: ReadableBuffer, /) -> str: ...
 def inet_pton(address_family: int, ip_string: str, /) -> bytes: ...
 def inet_ntop(address_family: int, packed_ip: ReadableBuffer, /) -> str: ...
 def getdefaulttimeout() -> float | None: ...
-def setdefaulttimeout(timeout: float | None, /) -> None: ...
+
+# F811: "Redefinition of unused `timeout`"
+def setdefaulttimeout(timeout: float | None, /) -> None: ...  # noqa: F811
 
 if sys.platform != "win32":
     def sethostname(name: str, /) -> None: ...

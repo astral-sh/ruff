@@ -5,7 +5,7 @@ from typing_extensions import TypeAlias
 
 _TestType: TypeAlias = unittest.case.TestCase | TestSuite
 
-class BaseTestSuite(Iterable[_TestType]):
+class BaseTestSuite:
     _tests: list[unittest.case.TestCase]
     _removed_tests: int
     def __init__(self, tests: Iterable[_TestType] = ()) -> None: ...

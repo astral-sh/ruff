@@ -20,6 +20,8 @@ _QuotingType: TypeAlias = int
 
 class Error(Exception): ...
 
+_DialectLike: TypeAlias = str | Dialect | type[Dialect]
+
 class Dialect:
     delimiter: str
     quotechar: str | None
@@ -29,9 +31,18 @@ class Dialect:
     lineterminator: str
     quoting: _QuotingType
     strict: bool
-    def __init__(self) -> None: ...
-
-_DialectLike: TypeAlias = str | Dialect | type[Dialect]
+    def __init__(
+        self,
+        dialect: _DialectLike | None = ...,
+        delimiter: str = ",",
+        doublequote: bool = True,
+        escapechar: str | None = None,
+        lineterminator: str = "\r\n",
+        quotechar: str | None = '"',
+        quoting: _QuotingType = 0,
+        skipinitialspace: bool = False,
+        strict: bool = False,
+    ) -> None: ...
 
 class _reader(Iterator[list[str]]):
     @property
