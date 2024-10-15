@@ -111,7 +111,10 @@ impl<'db> UnionBuilder<'db> {
         match self.elements.len() {
             0 => Type::Never,
             1 => self.elements[0],
-            _ => Type::Union(UnionType::new(self.db, self.elements.into())),
+            _ => Type::Union(UnionType::new(
+                self.db,
+                Box::<[Type<'_>]>::from(self.elements),
+            )),
         }
     }
 }
