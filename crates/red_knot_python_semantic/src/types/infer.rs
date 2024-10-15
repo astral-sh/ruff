@@ -1740,7 +1740,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let member_ty = module_ty.member(self.db, &ast::name::Name::new(&name.id));
 
-        if member_ty.is_unbound() {
+        if member_ty.is_unbound() || member_ty.is_never() {
             self.add_diagnostic(
                 AnyNodeRef::Alias(alias),
                 "unresolved-import",
@@ -3680,7 +3680,8 @@ mod tests {
         // the type as seen from external modules (`Unknown`)
         // is different from the type inside the module itself (`Never`):
         assert_public_ty(&db, "src/package/foo.py", "x", "Never");
-        assert_public_ty(&db, "src/package/bar.py", "x", "Unknown");
+        assert_file_diagnostics(&db, "src/package/bar.py", &["Module `package.foo` has no member `x`"]);
+        assert_public_ty(&db, "src/package/bar.py", "x", "Never");
 
         Ok(())
     }
