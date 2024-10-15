@@ -475,7 +475,7 @@ impl<'db> Type<'db> {
             | Type::Todo
             | Type::Unbound
             | Type::Module(..)
-            | Type::Instance(..)
+            | Type::Instance(..) // TODO some instance types can be singleton types (EllipsisType, NotImplementedType)
             | Type::IntLiteral(..)
             | Type::StringLiteral(..)
             | Type::BytesLiteral(..)
