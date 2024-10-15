@@ -1,4 +1,4 @@
-# Union return from calls
+# Unions in calls
 
 ## Union of return types
 
@@ -29,7 +29,7 @@ reveal_type(x)  # revealed: Unknown | int
 
 ## Non-callable elements in a union
 
-If a variable in a union isn't callable, it should raise an error when called.
+Calling a union with a non-callable element should emit a diagnostic.
 
 ```py
 if flag:
@@ -44,7 +44,7 @@ reveal_type(x)  # revealed: Unknown | int
 
 ## Multiple non-callable elements in a union
 
-When more than one element of a union is not callable, the system should flag both.
+Calling a union with multiple non-callable elements should mention all of them in the diagnostic.
 
 ```py
 if flag:
@@ -61,7 +61,7 @@ reveal_type(x)  # revealed: Unknown | int
 
 ## All non-callable union elements
 
-If none of the elements in a union are callable, the type system should raise an error.
+Calling a union with no callable elements can emit a simpler diagnostic.
 
 ```py
 if flag:

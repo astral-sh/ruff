@@ -16,7 +16,7 @@ Walking through examples:
     1. `True` and `bool` and `bool` - evaluate truthiness
     1. `bool | A` - union of "true" types
 
-- `c = 10 < 0 < A() < B() < C()` short-cicuit to False
+- `c = 10 < 0 < A() < B() < C()` short-circuit to False
 
 ```py
 from __future__ import annotations

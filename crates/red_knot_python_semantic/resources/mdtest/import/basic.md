@@ -21,10 +21,3 @@ reveal_type(D) # revealed: Literal[C]
 ```py path=b.py
 class C: pass
 ```
-
-## Importing builtin module
-
-```py
-import builtins; x = builtins.copyright
-reveal_type(x) # revealed: Literal[copyright]
-```

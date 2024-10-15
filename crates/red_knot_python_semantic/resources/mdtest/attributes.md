@@ -1,4 +1,4 @@
-# Class attributes assignment
+# Class attributes
 
 ## Union of attributes
 

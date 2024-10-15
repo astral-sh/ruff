@@ -112,7 +112,7 @@ X = 42
 ```
 
 ```py path=package/bar.py
-# TODO: submodule imports possibly not supported right now?
+# TODO: support submodule imports
 from . import foo  # error: [unresolved-import]
 y = foo.X
 

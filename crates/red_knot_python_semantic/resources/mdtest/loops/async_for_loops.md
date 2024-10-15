@@ -1,6 +1,6 @@
 # Async
 
-This tests that we understand that `async` for loops do not work according to the synchronous iteration protocol.
+Async `for` loops do not work according to the synchronous iteration protocol.
 
 ## Invalid async for loop
 

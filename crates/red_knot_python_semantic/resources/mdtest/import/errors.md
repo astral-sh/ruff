@@ -27,8 +27,11 @@ from a import thing # error: "Module `a` has no member `thing`"
 import foo as foo # error: "Cannot resolve import `foo`"
 ```
 
+Importing the unresolved import into a second file should not trigger an additional "unresolved
+import" violation:
+
 ```py
-from a import foo # NOTE: Importing the unresolved import into a second first-party file should not trigger an additional "unresolved import" violation
+from a import foo
 ```
 
 ## No implicit shadowing error
