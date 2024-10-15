@@ -474,7 +474,6 @@ impl<'db> Type<'db> {
             | Type::Unknown
             | Type::Todo
             | Type::Unbound
-            | Type::Module(..)
             | Type::Instance(..) // TODO some instance types can be singleton types (EllipsisType, NotImplementedType)
             | Type::IntLiteral(..)
             | Type::StringLiteral(..)
@@ -485,7 +484,7 @@ impl<'db> Type<'db> {
                 // are both of type Literal[345], for example.
                 false
             }
-            Type::None | Type::BooleanLiteral(_) | Type::Function(..) | Type::Class(..) => true,
+            Type::None | Type::BooleanLiteral(_) | Type::Function(..) | Type::Class(..) | Type::Module(..) => true,
             Type::Tuple(tuple) => {
                 // We deliberately deviate from the language specification [1] here and claim
                 // that the empty tuple type is a singleton type. The reasoning is that `()`
