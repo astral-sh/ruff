@@ -1277,7 +1277,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                     Type::StringLiteral(string_literal_ty) => {
                         // Deconstruct the string literal to delegate the inference back to the
-                        // tuple type for correct handling of starred expressions.
+                        // tuple type for correct handling of starred expressions. We could go
+                        // further and deconstruct to an array of `StringLiteral` with each
+                        // individual character, instead of just an array of `LiteralString`, but
+                        // there would be a cost and it's not clear that it's worth it.
                         let value_ty = Type::Tuple(TupleType::new(
                             builder.db,
                             vec![Type::LiteralString; string_literal_ty.len(builder.db)]
