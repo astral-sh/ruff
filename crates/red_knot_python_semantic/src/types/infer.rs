@@ -817,8 +817,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = parameter_with_default;
 
         self.infer_optional_expression(parameter.annotation.as_deref());
-
-        self.infer_definition(parameter_with_default);
     }
 
     fn infer_parameter(&mut self, parameter: &ast::Parameter) {
@@ -829,8 +827,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = parameter;
 
         self.infer_optional_expression(annotation.as_deref());
-
-        self.infer_definition(parameter);
     }
 
     fn infer_parameter_with_default_definition(
