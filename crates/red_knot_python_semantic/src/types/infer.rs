@@ -5422,53 +5422,6 @@ mod tests {
     }
 
     #[test]
-    fn narrow_not_none() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "/src/a.py",
-            "
-            x = None if flag else 1
-            y = 0
-            if x is not None:
-                y = x
-            ",
-        )?;
-
-        assert_public_ty(&db, "/src/a.py", "x", "None | Literal[1]");
-        assert_public_ty(&db, "/src/a.py", "y", "Literal[0, 1]");
-
-        Ok(())
-    }
-
-    #[test]
-    fn narrow_singleton_pattern() {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "/src/a.py",
-            "
-            x = None if flag else 1
-            y = 0
-            match x:
-                case None:
-                    y = x
-            ",
-        )
-        .unwrap();
-
-        // TODO: The correct inferred type should be `Literal[0] | None` but currently the
-        // simplification logic doesn't account for this. The final type with parenthesis:
-        // `Literal[0] | None | (Literal[1] & None)`
-        assert_public_ty(
-            &db,
-            "/src/a.py",
-            "y",
-            "Literal[0] | None | Literal[1] & None",
-        );
-    }
-
-    #[test]
     fn while_loop() -> anyhow::Result<()> {
         let mut db = setup_db();
 

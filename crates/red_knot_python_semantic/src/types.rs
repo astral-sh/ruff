@@ -463,6 +463,55 @@ impl<'db> Type<'db> {
         self == other
     }
 
+    /// Return true if there is just a single inhabitant for this type.
+    ///
+    /// Note: This function aims to have no false positives, but might return `false`
+    /// for more complicated types that are actually singletons.
+    pub(crate) fn is_singleton(self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::Any
+            | Type::Never
+            | Type::Unknown
+            | Type::Unbound
+            | Type::Module(..)
+            | Type::Instance(..)
+            | Type::IntLiteral(..)
+            | Type::StringLiteral(..)
+            | Type::BytesLiteral(..)
+            | Type::LiteralString => {
+                // Note: The literal types included in this pattern are not true singletons.
+                // There can be multiple Python objects (at different memory locations) that
+                // are both of type Literal[345], for example.
+                false
+            }
+            Type::None | Type::BooleanLiteral(_) | Type::Function(..) | Type::Class(..) => true,
+            Type::Tuple(tuple) => {
+                !tuple.elements(db).is_empty()
+                    && tuple.elements(db).iter().all(|ty| ty.is_singleton(db))
+            }
+            Type::Union(..) => {
+                // There are some rare edge cases where a union type might be a singleton type.
+                // For example, a union with just one element (which itself is a singleton). Or
+                // a union with an empty type (e.g. Never | None). Here, we assume that such
+                // types would have been simplified to a different representation earlier and
+                // simply return false.
+                false
+            }
+            Type::Intersection(..) => {
+                // Intersection types are hard to analyze. The following types are technically
+                // all singleton types, but it is not straightforward to compute this. Again,
+                // we simply return false.
+                //
+                //   bool & ~Literal[False]`
+                //   None & (None | int)
+                //   (A | B) & (B | C)          with A, B, C disjunct and B a singleton
+                //
+                false
+            }
+            Type::Todo => todo!(),
+        }
+    }
+
     /// Resolve a member access of a type.
     ///
     /// For example, if `foo` is `Type::Instance(<Bar>)`,
@@ -1514,6 +1563,7 @@ mod tests {
     enum Ty {
         Never,
         Unknown,
+        None,
         Any,
         IntLiteral(i64),
         BoolLiteral(bool),
@@ -1530,6 +1580,7 @@ mod tests {
             match self {
                 Ty::Never => Type::Never,
                 Ty::Unknown => Type::Unknown,
+                Ty::None => Type::None,
                 Ty::Any => Type::Any,
                 Ty::IntLiteral(n) => Type::IntLiteral(n),
                 Ty::StringLiteral(s) => {
@@ -1616,6 +1667,28 @@ mod tests {
         let db = setup_db();
 
         assert!(from.into_type(&db).is_equivalent_to(&db, to.into_type(&db)));
+    }
+
+    #[test_case(Ty::None)]
+    #[test_case(Ty::BoolLiteral(true))]
+    #[test_case(Ty::BoolLiteral(false))]
+    #[test_case(Ty::Tuple(vec![Ty::None]))]
+    #[test_case(Ty::Tuple(vec![Ty::None, Ty::BoolLiteral(true)]))]
+    fn is_singleton(from: Ty) {
+        let db = setup_db();
+
+        assert!(from.into_type(&db).is_singleton(&db));
+    }
+
+    #[test_case(Ty::Never)]
+    #[test_case(Ty::IntLiteral(345))]
+    #[test_case(Ty::BuiltinInstance("str"))]
+    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]))]
+    #[test_case(Ty::Tuple(vec![]))]
+    fn is_not_singleton(from: Ty) {
+        let db = setup_db();
+
+        assert!(!from.into_type(&db).is_singleton(&db));
     }
 
     #[test_case(Ty::IntLiteral(1); "is_int_literal_truthy")]
