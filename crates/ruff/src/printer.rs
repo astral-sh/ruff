@@ -421,7 +421,7 @@ impl Printer {
                 if any_fixable {
                     writeln!(
                         writer,
-                        "[*] indicates that a violation is fixable with the `--fix` option."
+                        "[*] fixable with `ruff check --fix`
                     )?;
                 }
                 return Ok(());
