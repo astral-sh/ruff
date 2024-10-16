@@ -419,10 +419,7 @@ impl Printer {
                 }
 
                 if any_fixable {
-                    writeln!(
-                        writer,
-                        "[*] fixable with `ruff check --fix`
-                    )?;
+                    writeln!(writer, "[*] fixable with `ruff check --fix`",)?;
                 }
                 return Ok(());
             }
