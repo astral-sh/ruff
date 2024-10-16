@@ -1740,22 +1740,13 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let member_ty = module_ty.member(self.db, &ast::name::Name::new(&name.id));
 
+        // TODO: What if it's a union where one of the elements is `Unbound`?
         if member_ty.is_unbound() || member_ty.is_never() {
             self.add_diagnostic(
                 AnyNodeRef::Alias(alias),
                 "unresolved-import",
                 format_args!(
                     "Module `{}{}` has no member `{name}`",
-                    ".".repeat(*level as usize),
-                    module.unwrap_or_default()
-                ),
-            );
-        } else if member_ty.contains_unbound(self.db) {
-            self.add_diagnostic(
-                AnyNodeRef::Alias(alias),
-                "possibly-unresolved-import",
-                format_args!(
-                    "Module `{}{}` may not have member `{name}`",
                     ".".repeat(*level as usize),
                     module.unwrap_or_default()
                 ),

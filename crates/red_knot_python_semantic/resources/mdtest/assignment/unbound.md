@@ -11,7 +11,7 @@ reveal_type(y)  # revealed: Unbound | Literal[3]
 ```
 
 ```py path=package/public.py
-from .maybe_unbound import x, y # error: [possibly-unresolved-import]
+from .maybe_unbound import x, y 
 reveal_type(x)  # revealed: Literal[3]
 reveal_type(y)  # revealed: Literal[3]
 ```
@@ -27,7 +27,7 @@ reveal_type(y)  # revealed: Unbound | int
 ```
 
 ```py path=package/public.py
-from .maybe_unbound_annotated import x, y # error: [possibly-unresolved-import]
+from .maybe_unbound_annotated import x, y
 reveal_type(x)  # revealed: Literal[3]
 reveal_type(y)  # revealed: int
 ```
