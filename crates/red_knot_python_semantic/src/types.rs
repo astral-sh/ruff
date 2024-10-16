@@ -483,6 +483,11 @@ impl<'db> Type<'db> {
             (Type::Unbound, _) | (_, Type::Unbound) => false,
             (Type::Todo, _) | (_, Type::Todo) => false,
 
+            (ty @ (Type::Function(..) | Type::Module(..) | Type::Class(..)), other)
+            | (other, ty @ (Type::Function(..) | Type::Module(..) | Type::Class(..))) => {
+                ty != other
+            }
+
             (Type::Union(union), other) | (other, Type::Union(union)) => union
                 .elements(db)
                 .iter()
@@ -510,7 +515,7 @@ impl<'db> Type<'db> {
                             .elements(db)
                             .iter()
                             .zip(other_tuple.elements(db).iter())
-                            .all(|(e1, e2)| e1.is_disjoint_from(db, *e2))
+                            .any(|(e1, e2)| e1.is_disjoint_from(db, *e2))
                     } else {
                         true
                     }
@@ -526,6 +531,9 @@ impl<'db> Type<'db> {
                 | Type::Unknown
                 | Type::Unbound
                 | Type::Todo
+                | Type::Function(..)
+                | Type::Module(..)
+                | Type::Class(..)
                 | Type::Union(..)
                 | Type::Intersection(..)
                 | Type::Tuple(..) => {
@@ -535,10 +543,7 @@ impl<'db> Type<'db> {
                 | Type::BooleanLiteral(_)
                 | Type::StringLiteral(..)
                 | Type::LiteralString
-                | Type::BytesLiteral(..)
-                | Type::Function(..)
-                | Type::Module(..)
-                | Type::Class(..) => true,
+                | Type::BytesLiteral(..) => true,
                 Type::None => false,
                 Type::Instance(class_type) => {
                     !class_type.is_known(db, KnownClass::NoneType) // TODO: is this enough since NoneType is final?
@@ -552,6 +557,9 @@ impl<'db> Type<'db> {
                     | Type::Unknown
                     | Type::Unbound
                     | Type::Todo
+                    | Type::Function(..)
+                    | Type::Module(..)
+                    | Type::Class(..)
                     | Type::Union(..)
                     | Type::Intersection(..)
                     | Type::Tuple(..)
@@ -561,10 +569,7 @@ impl<'db> Type<'db> {
                     Type::IntLiteral(_)
                     | Type::StringLiteral(..)
                     | Type::LiteralString
-                    | Type::BytesLiteral(..)
-                    | Type::Function(..)
-                    | Type::Module(..)
-                    | Type::Class(..) => true,
+                    | Type::BytesLiteral(..) => true,
                     Type::BooleanLiteral(bool_other) => bool != bool_other,
                     Type::Instance(class_type) => {
                         !class_type.is_known(db, KnownClass::Bool) // TODO: is this enough since bool is final?
@@ -577,6 +582,9 @@ impl<'db> Type<'db> {
                 | Type::Any
                 | Type::Unknown
                 | Type::Unbound
+                | Type::Function(..)
+                | Type::Module(..)
+                | Type::Class(..)
                 | Type::Todo
                 | Type::Union(..)
                 | Type::Intersection(..)
@@ -585,12 +593,7 @@ impl<'db> Type<'db> {
                 | Type::BooleanLiteral(..) => {
                     unreachable!("handled above")
                 }
-                Type::StringLiteral(..)
-                | Type::LiteralString
-                | Type::BytesLiteral(..)
-                | Type::Function(..)
-                | Type::Module(..)
-                | Type::Class(..) => true,
+                Type::StringLiteral(..) | Type::LiteralString | Type::BytesLiteral(..) => true,
                 Type::IntLiteral(int_other) => int != int_other,
                 Type::Instance(class_type) => {
                     !class_type.is_known(db, KnownClass::Int) // TODO: this is probably wrong since there could be subclasses of int?
@@ -1842,6 +1845,7 @@ mod tests {
     #[test_case(Ty::Tuple(vec![Ty::BuiltinInstance("int")]), Ty::BuiltinInstance("int"))]
     #[test_case(Ty::Tuple(vec![Ty::IntLiteral(1)]), Ty::Tuple(vec![Ty::IntLiteral(2)]))]
     #[test_case(Ty::Tuple(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Tuple(vec![Ty::IntLiteral(1)]))]
+    #[test_case(Ty::Tuple(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Tuple(vec![Ty::IntLiteral(1), Ty::IntLiteral(3)]))]
     fn is_disjoint_from(a: Ty, b: Ty) {
         let db = setup_db();
         let a = a.into_type(&db);
