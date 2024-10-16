@@ -157,7 +157,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                 let comp_ty = inference.expression_ty(comparator.scoped_ast_id(self.db, scope));
                 match op {
                     ast::CmpOp::IsNot => {
-                        if comp_ty.is_singleton(self.db) {
+                        if comp_ty.is_singleton() {
                             let ty = IntersectionBuilder::new(self.db)
                                 .add_negative(comp_ty)
                                 .build();
