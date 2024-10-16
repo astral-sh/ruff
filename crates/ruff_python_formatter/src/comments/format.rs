@@ -482,6 +482,13 @@ fn normalize_comment<'a>(
         return Ok(Cow::Borrowed(trimmed));
     }
 
+    // Parameters for sbatch job scripts start with `#SBATCH`.
+    // Putting a space between `#` and `SBATCH` causes sbatch to no longer recognize the
+    // comment as a parameter directive.
+    if comment.line_position().is_own_line() && content.starts_with("SBATCH") {
+        return Ok(Cow::Borrowed(trimmed));
+    }
+
     // Otherwise, we need to normalize the comment by adding a space after the `#`.
     if content.starts_with('\u{A0}') {
         let trimmed = content.trim_start_matches('\u{A0}');
