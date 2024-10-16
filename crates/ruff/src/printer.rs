@@ -417,6 +417,13 @@ impl Printer {
                         statistic.name,
                     )?;
                 }
+
+                if any_fixable {
+                    writeln!(
+                        writer,
+                        "[*] indicates that a violation is fixable with the `--fix` option."
+                    )?;
+                }
                 return Ok(());
             }
             OutputFormat::Json => {

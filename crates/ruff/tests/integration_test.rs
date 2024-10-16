@@ -979,6 +979,7 @@ fn show_statistics() {
     exit_code: 1
     ----- stdout -----
     1	F401	[*] unused-import
+    [*] indicates that a violation is fixable with the `--fix` option.
 
     ----- stderr -----
     "###);
