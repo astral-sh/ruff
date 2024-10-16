@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use except_handlers::{TryNodeContextStack, TryNodeContextStackManager};
+use except_handlers::TryNodeContextStackManager;
 use rustc_hash::FxHashMap;
 
 use ruff_db::files::File;
@@ -101,11 +101,6 @@ impl<'db> SemanticIndexBuilder<'db> {
             .scope_stack
             .last()
             .expect("Always to have a root scope")
-    }
-
-    fn try_node_context_stack(&mut self) -> &mut TryNodeContextStack {
-        self.try_node_context_stack_manager
-            .current_try_context_stack()
     }
 
     fn push_scope(&mut self, node: NodeWithScopeRef) {
@@ -241,9 +236,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         }
 
         let mut try_node_stack_manager = std::mem::take(&mut self.try_node_context_stack_manager);
-        try_node_stack_manager
-            .current_try_context_stack()
-            .record_definition(self);
+        try_node_stack_manager.record_definition(self);
         self.try_node_context_stack_manager = try_node_stack_manager;
 
         definition
@@ -791,7 +784,7 @@ where
                 // states during the `try` block before visiting those suites.
                 let pre_try_block_state = self.flow_snapshot();
 
-                self.try_node_context_stack().push_context();
+                self.try_node_context_stack_manager.push_context();
 
                 // Visit the `try` block!
                 self.visit_body(body);
@@ -800,7 +793,7 @@ where
 
                 // Take a record also of all the intermediate states we encountered
                 // while visiting the `try` block
-                let try_block_snapshots = self.try_node_context_stack().pop_context();
+                let try_block_snapshots = self.try_node_context_stack_manager.pop_context();
 
                 if !handlers.is_empty() {
                     // Save the state immediately *after* visiting the `try` block

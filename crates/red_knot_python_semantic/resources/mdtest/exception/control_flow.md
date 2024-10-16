@@ -19,9 +19,9 @@ exception to be raised.
 ## A single bare `except`
 
 If there are different types for a single variable `x` in the two branches, we
-can't determine which branch might have been taken, so the inferred type after
-the `try`/`except` block is the union of type at the end of the `try` block
-(`str`) and the type at the end of the `except` block (`Literal[2]`):
+can't determine which branch might have been taken. The inferred type after
+the `try`/`except` block is therefore the union of type at the end of the `try`
+suite (`str`) and the type at the end of the `except` suite (`Literal[2]`):
 
 ```py path=union_type_inferred.py
 def could_raise_returns_str() -> str:
@@ -63,8 +63,8 @@ reveal_type(x)  # revealed: str
 For simple `try`/`except` blocks, `except TypeError:` has the same control flow
 as `except:`. There might have been an unhandled exception, but (as described
 in [the document on exception-handling semantics](https://astral-sh.notion.site/Exception-handler-control-flow-11348797e1ca80bb8ce1e9aedbbe439d))
-that would lead to termination of the scope -- it's irrelevant to consider this
-possibility.
+that would lead to termination of the scope. It's therefore irrelevant to
+consider this possibility when it comes to control-flow analysis.
 
 ```py
 def could_raise_returns_str() -> str:
@@ -88,8 +88,9 @@ reveal_type(x)  # revealed: str | Literal[2]
 
 If the scope reaches the final `reveal_type` call in this example,
 either the `try`-block suite of statements was executed in its entirety,
-or exactly one `except` was executed in its entirety. The inferred type of `x`
-should be the union of the types at the end of the three suites:
+or exactly one `except` suite was executed in its entirety.
+The inferred type of `x` should be the union of the types at the end of the
+three suites:
 
 - At the end of `try`, `type(x) == str`
 - At the end of `except TypeError`, `x == 2`
@@ -119,7 +120,7 @@ reveal_type(x)  # revealed: str | Literal[2, 3]
 
 ## Exception handlers with `else` branches (but no `finally`)
 
-If we reach the `reveal_type` call at the end of the scope,
+If we reach the `reveal_type` call at the end of this scope,
 either the `try` and `else` suites were both executed in their entireties,
 or the `except` suite was executed in its entirety. The type of `x` will be the
 union of the type at the end of the `else` suite and the type at the end of the
@@ -184,10 +185,10 @@ reveal_type(x)  # revealed: Literal[2, 3, 4]
 
 ## Exception handlers with `finally` branches (but no `except` branches)
 
-A `finally` suite is *always* executed, so if we reach the `reveal_type` call
-at the end of this example, we know that `x` *must* have been reassigned to `2`
-during the `finally` suite; therefore the type of `x` at the end of the example
-is `Literal[2]`:
+A `finally` suite is *always* executed. As such, if we reach the `reveal_type`
+call at the end of this example, we know that `x` *must* have been reassigned
+to `2` during the `finally` suite. The type of `x` at the end of the example is
+therefore `Literal[2]`:
 
 ```py path=redef_in_finally.py
 def could_raise_returns_str() -> str:
@@ -242,7 +243,7 @@ following possibilities inside `finally` suites:
 - The `try` suite could have run to completion
 - Or we could have jumped from halfway through the `try` suite to an `except`
     suite, and the `except` suite ran to completion
-- Or we could have jumped from halfway through the `try`suite straight to the
+- Or we could have jumped from halfway through the `try` suite straight to the
     `finally` suite
 - Or we could have jumped from halfway through the `try` suite to an
     `except` suite, only for an exception raised in the `except` suite to cause
@@ -279,12 +280,12 @@ finally:
 reveal_type(x)  # revealed: Literal[2]
 ```
 
-Example without a redefinition in the `finally` suite. As before, there
-*should* be fewer possibilities after completion of the `finally` suite than
-there were during the `finally` suite itself (since in some control-flow
-possibilities, some exceptions were merely *suspended* during the `finally`
-suite, and lead to the scope's termination following conclusion of the
-`finally` suite).
+Now for an example without a redefinition in the `finally` suite.
+As before, there *should* be fewer possibilities after completion of the
+`finally` suite than there were during the `finally` suite itself.
+(In some control-flow possibilities, some exceptions were merely *suspended*
+during the `finally` suite, and lead to the scope's termination following the
+conclusion of the `finally` suite.)
 
 ```py path=no_redef_in_finally.py
 def could_raise_returns_str() -> str:
