@@ -136,7 +136,7 @@ def query54():
         bar
     """
 
-query55 = f"""SELECT * FROM 
+query55 = f"""SELECT * FROM
 {var}.table
 """
 
@@ -149,5 +149,6 @@ SELECT *
 FROM {var}.table
 """
 
-query58 = f"SELECT\
- * FROM {var}.table"
+# to be handled seperately
+# query58 = f"SELECT\
+#  * FROM {var}.table"

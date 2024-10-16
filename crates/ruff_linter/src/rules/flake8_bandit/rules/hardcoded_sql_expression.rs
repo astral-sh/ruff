@@ -9,17 +9,8 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
-// Implementation of regex from bandit
 static SQL_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(
-        r"(?ix)
-        (
-            select\s+.*from\s |
-            delete\s+from\s  |
-            insert\s+into\s.*values\s |
-            update\s+.*set\s
-        )",
-    )
+    Regex::new(r"(?i)(select\s+.*\s+from\s|delete\s+from\s|(insert|replace)\s+.*\s+values\s|update\s+.*\s+set\s)")
     .unwrap()
 });
 
