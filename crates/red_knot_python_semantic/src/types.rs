@@ -374,6 +374,7 @@ impl<'db> Type<'db> {
         }
     }
 
+    #[must_use]
     fn replace_unbound_with(&self, db: &'db dyn Db, replacement: Type<'db>) -> Type<'db> {
         match self {
             Type::Unbound => replacement,
