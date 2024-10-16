@@ -205,8 +205,9 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
                 quote_selection.flags,
                 // TODO: Remove the `b'{'` in `choose_quotes` when promoting the
                 // `format_fstring` preview style
-                is_f_string_formatting_enabled(self.context),
                 false,
+                false,
+                is_f_string_formatting_enabled(self.context),
             )
         } else {
             Cow::Borrowed(raw_content)
@@ -599,8 +600,9 @@ pub(crate) fn normalize_string(
     input: &str,
     start_offset: usize,
     new_flags: AnyStringFlags,
-    format_f_string: bool,
     escape_braces: bool,
+    flip_nested_fstring_quotes: bool,
+    format_f_string: bool,
 ) -> Cow<str> {
     // The normalized string if `input` is not yet normalized.
     // `output` must remain empty if `input` is already normalized.
@@ -706,6 +708,14 @@ pub(crate) fn normalize_string(
                 output.push_str(&input[last_index..index]);
                 output.push('\\');
                 output.push(c);
+                last_index = index + preferred_quote.len_utf8();
+            } else if c == preferred_quote
+                && flip_nested_fstring_quotes
+                && formatted_value_nesting > 0
+            {
+                // Flip the quotes
+                output.push_str(&input[last_index..index]);
+                output.push(opposite_quote);
                 last_index = index + preferred_quote.len_utf8();
             }
         }
@@ -996,6 +1006,7 @@ mod tests {
         str_prefix::{AnyStringPrefix, ByteStringPrefix},
         AnyStringFlags,
     };
+    use ruff_python_ast::str_prefix::FStringPrefix;
 
     use crate::string::normalize_string;
 
@@ -1023,10 +1034,35 @@ mod tests {
                 Quote::Double,
                 false,
             ),
+            false,
+            false,
+            true,
+        );
+
+        assert_eq!(r"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a", &normalized);
+    }
+
+    #[test]
+    fn normalize_nested_fstring() {
+        let input =
+            r#"With single quote: '  {my_dict['foo']} With double quote: "  {my_dict["bar"]}"#;
+
+        let normalized = normalize_string(
+            input,
+            0,
+            AnyStringFlags::new(
+                AnyStringPrefix::Format(FStringPrefix::Regular),
+                Quote::Double,
+                false,
+            ),
+            false,
             true,
             false,
         );
 
-        assert_eq!(r"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a", &normalized);
+        assert_eq!(
+            "With single quote: '  {my_dict['foo']} With double quote: \\\"  {my_dict['bar']}",
+            &normalized
+        );
     }
 }

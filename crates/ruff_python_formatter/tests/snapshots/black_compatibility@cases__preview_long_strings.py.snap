@@ -667,21 +667,21 @@ log.info(f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share
      "Arg #2",
      "Arg #3",
      "Arg #4",
-@@ -315,80 +232,72 @@
- 
+@@ -316,79 +233,75 @@
  triple_quote_string = """This is a really really really long triple quote string assignment and it should not be touched."""
  
--assert some_type_of_boolean_expression, (
+ assert some_type_of_boolean_expression, (
 -    "Followed by a really really really long string that is used to provide context to"
 -    " the AssertionError exception."
--)
-+assert some_type_of_boolean_expression, "Followed by a really really really long string that is used to provide context to the AssertionError exception."
++    "Followed by a really really really long string that is used to provide context to the AssertionError exception."
+ )
  
--assert some_type_of_boolean_expression, (
+ assert some_type_of_boolean_expression, (
 -    "Followed by a really really really long string that is used to provide context to"
 -    " the AssertionError exception, which uses dynamic string {}.".format("formatting")
-+assert some_type_of_boolean_expression, "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic string {}.".format(
-+    "formatting"
++    "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic string {}.".format(
++        "formatting"
++    )
  )
  
  assert some_type_of_boolean_expression, (
@@ -772,7 +772,7 @@ log.info(f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share
      x,
      y,
      z,
-@@ -397,7 +306,7 @@
+@@ -397,7 +310,7 @@
  func_with_bad_parens(
      x,
      y,
@@ -781,7 +781,7 @@ log.info(f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share
      z,
  )
  
-@@ -408,50 +317,27 @@
+@@ -408,50 +321,27 @@
      + CONCATENATED
      + "using the '+' operator."
  )
@@ -840,7 +840,7 @@ log.info(f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share
  
  long_unmergable_string_with_pragma = (
      "This is a really long string that can't be merged because it has a likely pragma at the end"  # type: ignore
-@@ -468,51 +354,24 @@
+@@ -468,51 +358,24 @@
      " of it."
  )
  
@@ -901,7 +901,7 @@ log.info(f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share
  )
  
  dict_with_lambda_values = {
-@@ -524,65 +383,58 @@
+@@ -524,65 +387,58 @@
  
  # Complex string concatenations with a method call in the middle.
  code = (
@@ -985,7 +985,7 @@ log.info(f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share
  )
  
  log.info(
-@@ -590,5 +442,5 @@
+@@ -590,5 +446,5 @@
  )
  
  log.info(
@@ -1231,10 +1231,14 @@ pragma_comment_string2 = "Lines which end with an inline pragma comment of the f
 
 triple_quote_string = """This is a really really really long triple quote string assignment and it should not be touched."""
 
-assert some_type_of_boolean_expression, "Followed by a really really really long string that is used to provide context to the AssertionError exception."
+assert some_type_of_boolean_expression, (
+    "Followed by a really really really long string that is used to provide context to the AssertionError exception."
+)
 
-assert some_type_of_boolean_expression, "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic string {}.".format(
-    "formatting"
+assert some_type_of_boolean_expression, (
+    "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic string {}.".format(
+        "formatting"
+    )
 )
 
 assert some_type_of_boolean_expression, (
