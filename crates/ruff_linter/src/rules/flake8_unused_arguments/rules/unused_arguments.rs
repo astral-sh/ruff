@@ -335,25 +335,20 @@ fn is_not_implemented_stub_with_variable(function_def: &StmtFunctionDef) -> bool
         _ => &function_def.body,
     };
 
-    let [first_stmt, second_stmt] = statements else {
-        return false;
-    };
-
-    let Stmt::Assign(ast::StmtAssign { value, .. }) = first_stmt else {
-        return false;
-    };
-
-    if !matches!(**value, ast::Expr::StringLiteral(_) | ast::Expr::FString(_)) {
-        return false;
-    }
-
-    let Stmt::Raise(StmtRaise {
+    let [Stmt::Assign(ast::StmtAssign { value, .. }), Stmt::Raise(StmtRaise {
         exc: Some(exception),
         ..
-    }) = second_stmt
+    })] = statements
     else {
         return false;
     };
+
+    if !matches!(
+        value.as_ref(),
+        ast::Expr::StringLiteral(_) | ast::Expr::FString(_)
+    ) {
+        return false;
+    }
 
     let ast::Expr::Call(ast::ExprCall {
         func, arguments, ..
