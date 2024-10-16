@@ -218,39 +218,31 @@ impl<'db> InnerIntersectionBuilder<'db> {
     /// Adds a positive type to this intersection.
     fn add_positive(&mut self, db: &'db dyn Db, ty: Type<'db>) {
         // TODO `Any`/`Unknown`/`Todo` actually should not self-cancel
-        match ty {
-            Type::Intersection(inter) => {
-                for pos in inter.positive(db) {
-                    self.add_positive(db, *pos);
-                }
-                for neg in inter.negative(db) {
-                    self.add_negative(db, *neg);
+        if let Type::Intersection(other) = ty {
+            for pos in other.positive(db) {
+                self.add_positive(db, *pos);
+            }
+            for neg in other.negative(db) {
+                self.add_negative(db, *neg);
+            }
+        } else {
+            for pos in &self.positive {
+                if ty.is_disjoint_from(db, *pos) {
+                    self.negative.clear();
+                    self.positive.clear();
+                    return;
                 }
 
-                // self.positive.extend(pos.difference(&self.negative));
-                // self.negative.extend(neg.difference(&self.positive));
-                // self.positive.retain(|elem| !neg.contains(elem));
-                // self.negative.retain(|elem| !pos.contains(elem));
+                // TODO add simplification for ty & pos != Never
             }
-            _ => {
-                for pos in &self.positive {
-                    if ty.is_disjoint_from(db, *pos) {
-                        self.negative.clear();
-                        self.positive.clear();
-                        return;
-                    }
+            for neg in &self.negative {
+                if ty.is_subtype_of(db, *neg) {
+                    self.negative.clear();
+                    self.positive.clear();
+                    return;
                 }
-                for neg in &self.negative {
-                    if ty.is_subtype_of(db, *neg) {
-                        self.negative.clear();
-                        self.positive.clear();
-                        return;
-                    }
-                }
-                self.positive.insert(ty);
-                // if !self.negative.remove(&ty) {
-                // };
             }
+            self.positive.insert(ty);
         }
     }
 
@@ -259,13 +251,6 @@ impl<'db> InnerIntersectionBuilder<'db> {
         // TODO `Any`/`Unknown`/`Todo` actually should not self-cancel
         match ty {
             Type::Intersection(inter) => {
-                // let pos = intersection.negative(db);
-                // let neg = intersection.positive(db);
-                // self.positive.extend(pos.difference(&self.negative));
-                // self.negative.extend(neg.difference(&self.positive));
-                // self.positive.retain(|elem| !neg.contains(elem));
-                // self.negative.retain(|elem| !pos.contains(elem));
-
                 for pos in inter.positive(db) {
                     self.add_negative(db, *pos);
                 }
