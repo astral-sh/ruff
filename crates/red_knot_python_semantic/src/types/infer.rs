@@ -2783,7 +2783,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     ///
     /// For lexicographic comparison, elements from both slices are compared pairwise using
     /// `infer_binary_type_comparison`. If a conclusive result cannot be determined as a `BoolLiteral`,
-    /// it returns `bool`.
+    /// it returns `bool`. Returns `None` if the comparison is not supported.
     fn infer_lexicographic_type_comparison(
         &mut self,
         left: &[Type<'db>],
@@ -2806,14 +2806,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Truthiness::AlwaysFalse => {
                         return self.infer_binary_type_comparison(l_ty, op.into(), r_ty)
                     }
-                    // If the intermediate result is abiguous, we cannot determine the final result as BoolLiteral.
+                    // If the intermediate result is ambiguous, we cannot determine the final result as BooleanLiteral.
                     // In this case, we simply return a bool instance.
                     Truthiness::Ambiguous => return Some(KnownClass::Bool.to_instance(self.db)),
                 },
             }
         }
 
-        // At this point, the lengths of the two slices are different, but the prefix of
+        // At this point, the lengths of the two slices may be different, but the prefix of
         // left and right slices is entirely identical.
         // We return a comparison of the slice lengths based on the operator.
         let (left_len, right_len) = (left.len(), right.len());
