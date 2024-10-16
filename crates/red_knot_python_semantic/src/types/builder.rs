@@ -268,14 +268,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         return;
                     }
                 }
-                // TODO: what is the mirror-rule here?
-                // for neg in &self.negative {
-                //     if ty.is_disjoint_from(db, neg) {
-                //         self.negative.clear();
-                //         self.positive.clear();
-                //         return;
-                //     }
-                // }
+                // TODO: what is the analog for the negative part here?
                 self.negative.insert(ty);
             }
         }
