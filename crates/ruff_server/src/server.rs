@@ -551,6 +551,7 @@ impl Workspace {
     }
 
     /// Set the client settings for this workspace.
+    #[must_use]
     pub fn with_settings(mut self, settings: ClientSettings) -> Self {
         self.settings = Some(settings);
         self

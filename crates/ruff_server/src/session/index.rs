@@ -286,6 +286,7 @@ impl Index {
             settings.ruff_settings = ruff_settings::RuffSettingsIndex::new(
                 root,
                 settings.client_settings.editor_settings(),
+                false,
             );
         }
     }
@@ -422,8 +423,10 @@ impl WorkspaceSettingsIndex {
         let workspace_settings_index = ruff_settings::RuffSettingsIndex::new(
             &workspace_path,
             client_settings.editor_settings(),
+            workspace.is_default(),
         );
 
+        tracing::info!("Registering workspace: {}", workspace_path.display());
         self.insert(
             workspace_path,
             WorkspaceSettings {

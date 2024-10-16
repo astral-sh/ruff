@@ -100,13 +100,19 @@ impl RuffSettings {
 }
 
 impl RuffSettingsIndex {
-    pub(super) fn new(root: &Path, editor_settings: &ResolvedEditorSettings) -> Self {
+    pub(super) fn new(
+        root: &Path,
+        editor_settings: &ResolvedEditorSettings,
+        is_default_workspace: bool,
+    ) -> Self {
         let mut has_error = false;
         let mut index = BTreeMap::default();
         let mut respect_gitignore = None;
+        let should_skip_workspace = usize::from(!is_default_workspace);
 
-        // Add any settings from above the workspace root, excluding the workspace root itself.
-        for directory in root.ancestors().skip(1) {
+        // Add any settings from above the workspace root. The ones from the workspace root will be
+        // added only if it's not the default workspace.
+        for directory in root.ancestors().skip(should_skip_workspace) {
             match settings_toml(directory) {
                 Ok(Some(pyproject)) => {
                     match ruff_workspace::resolver::resolve_root_settings(
@@ -155,6 +161,18 @@ impl RuffSettingsIndex {
         }
 
         let fallback = Arc::new(RuffSettings::fallback(editor_settings, root));
+
+        if is_default_workspace {
+            if has_error {
+                let root = root.display();
+                show_err_msg!(
+                    "Error while resolving settings from workspace {root}. \
+                    Please refer to the logs for more details.",
+                );
+            }
+
+            return RuffSettingsIndex { index, fallback };
+        }
 
         // Add any settings within the workspace itself
         let mut builder = WalkBuilder::new(root);
@@ -266,7 +284,7 @@ impl RuffSettingsIndex {
             );
         }
 
-        Self {
+        RuffSettingsIndex {
             index: index.into_inner().unwrap(),
             fallback,
         }
