@@ -48,7 +48,6 @@ fn symbol_ty_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymb
     let _span = tracing::trace_span!("symbol_ty_by_id", ?symbol).entered();
 
     let use_def = use_def_map(db, scope);
-    let unbound_ty = || use_def.public_may_be_unbound(symbol).then_some(Type::Never);
 
     // If the symbol is declared, the public type is based on declarations; otherwise, it's based
     // on inference from bindings.
@@ -56,11 +55,7 @@ fn symbol_ty_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymb
         let declarations = use_def.public_declarations(symbol);
         // If the symbol is undeclared in some paths, include the inferred type in the public type.
         let undeclared_ty = if declarations.may_be_undeclared() {
-            Some(bindings_ty(
-                db,
-                use_def.public_bindings(symbol),
-                unbound_ty(),
-            ))
+            Some(bindings_ty(db, use_def.public_bindings(symbol), None))
         } else {
             None
         };
@@ -68,7 +63,13 @@ fn symbol_ty_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymb
         // problem of the module we are importing from.
         declarations_ty(db, declarations, undeclared_ty).unwrap_or_else(|(ty, _)| ty)
     } else {
-        bindings_ty(db, use_def.public_bindings(symbol), unbound_ty())
+        bindings_ty(
+            db,
+            use_def.public_bindings(symbol),
+            use_def
+                .public_may_be_unbound(symbol)
+                .then_some(Type::Unbound),
+        )
     }
 }
 
@@ -367,7 +368,7 @@ impl<'db> Type<'db> {
 
     pub fn may_be_unbound(&self, db: &'db dyn Db) -> bool {
         match self {
-            Type::Unbound => true,
+            Type::Unbound | Type::Never => true,
             Type::Union(union) => union.elements(db).contains(&Type::Unbound),
             // Unbound can't appear in an intersection, because an intersection with Unbound
             // simplifies to just Unbound.
