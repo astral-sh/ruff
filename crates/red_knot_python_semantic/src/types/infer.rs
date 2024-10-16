@@ -4023,7 +4023,7 @@ mod tests {
         let y_ty = symbol_ty(&db, function_scope, "y");
         let x_ty = symbol_ty(&db, function_scope, "x");
 
-        assert_eq!(x_ty.display(&db).to_string(), "Never");
+        assert_eq!(x_ty.display(&db).to_string(), "Unbound");
         assert_eq!(y_ty.display(&db).to_string(), "Literal[1]");
 
         Ok(())
@@ -4045,6 +4045,7 @@ mod tests {
                 "
                 if flag:
                     copyright{annotation} = 1
+
                 def f():
                     y = copyright
             ",
@@ -4579,7 +4580,7 @@ mod tests {
             ",
         )?;
 
-        assert_scope_ty(&db, "src/a.py", &["foo", "<listcomp>"], "z", "Never");
+        assert_scope_ty(&db, "src/a.py", &["foo", "<listcomp>"], "z", "Unbound");
 
         // (There is a diagnostic for invalid syntax that's emitted, but it's not listed by `assert_file_diagnostics`)
         assert_file_diagnostics(&db, "src/a.py", &[]);
