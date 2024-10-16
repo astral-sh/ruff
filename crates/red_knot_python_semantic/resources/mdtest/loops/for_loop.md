@@ -18,7 +18,7 @@ reveal_type(x)  # revealed: Unbound | int
 ```
 
 ```py path=package/public.py
-from .basic_for_loop import x # error: [unresolved-import]
+from .basic_for_loop import x
 
 reveal_type(x)  # revealed: int
 ```
@@ -95,7 +95,7 @@ reveal_type(x)  # revealed: Unbound | int
 ```
 
 ```py path=package/public.py
-from .without_oldstyle_iteration_protocol import x # error: [unresolved-import]
+from .without_oldstyle_iteration_protocol import x
 
 reveal_type(x)  # revealed: int
 ```
@@ -110,14 +110,14 @@ reveal_type(x)  # revealed: Unbound | Literal[1] | Literal["a"] | Literal[b"foo"
 ```
 
 ```py path=package/public.py
-from .with_heterogeneous_tuple import x # error: [unresolved-import]
+from .with_heterogeneous_tuple import x
 
 reveal_type(x)  # revealed: Literal[1] | Literal["a"] | Literal[b"foo"]
 ```
 
 ## With non-callable iterator
 
-```py path=with_noncallable_iterator/with_noncallable_iterator.py
+```py path=package/with_noncallable_iterator.py
 class NotIterable:
     if flag:
         __iter__ = 1
@@ -130,10 +130,10 @@ for x in NotIterable(): # error: "Object of type `NotIterable` is not iterable"
 reveal_type(x)  # revealed: Unbound | Unknown
 ```
 
-```py path=with_noncallable_iterator/with_noncallable_iterator.py
+```py path=package/public.py
 from .with_noncallable_iterator import x
 
-reveal_type(x)  # revealed: Unknown | int
+reveal_type(x)  # revealed: Unknown
 ```
 
 ## Invalid iterable

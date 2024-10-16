@@ -55,7 +55,13 @@ fn symbol_ty_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymb
         let declarations = use_def.public_declarations(symbol);
         // If the symbol is undeclared in some paths, include the inferred type in the public type.
         let undeclared_ty = if declarations.may_be_undeclared() {
-            Some(bindings_ty(db, use_def.public_bindings(symbol), None))
+            Some(bindings_ty(
+                db,
+                use_def.public_bindings(symbol),
+                use_def
+                    .public_may_be_unbound(symbol)
+                    .then_some(Type::Unbound),
+            ))
         } else {
             None
         };
@@ -368,14 +374,18 @@ impl<'db> Type<'db> {
         }
     }
 
-    #[must_use]
-    pub fn replace_unbound_with(&self, db: &'db dyn Db, replacement: Type<'db>) -> Type<'db> {
+    fn replace_type_with(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        replacement: Type<'db>,
+    ) -> Type<'db> {
         match self {
-            Type::Unbound => replacement,
-            Type::Union(union) => {
-                union.map(db, |element| element.replace_unbound_with(db, replacement))
-            }
-            ty => *ty,
+            Type::Union(union) => union.map(db, |element| {
+                element.replace_type_with(db, source, replacement)
+            }),
+            _ if *self == source => replacement,
+            _ => *self,
         }
     }
 

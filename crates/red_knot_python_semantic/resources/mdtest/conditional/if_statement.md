@@ -35,7 +35,7 @@ reveal_type(s)  # revealed: Unbound | Literal[5]
 ```
 
 ```py path=package/public.py
-from .simple_if_elif_else import r, s # error: [unresolved-import]
+from .simple_if_elif_else import r, s
 
 reveal_type(r)  # revealed: Literal[2]
 reveal_type(s)  # revealed: Literal[5]

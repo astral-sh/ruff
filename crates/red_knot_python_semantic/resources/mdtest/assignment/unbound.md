@@ -23,7 +23,7 @@ if flag:
     y: int = 3
 x = y
 reveal_type(x)  # revealed: Unbound | Literal[3]
-reveal_type(y)  # revealed: Unbound | int
+reveal_type(y)  # revealed: Unbound | Literal[3]
 ```
 
 ```py path=package/public.py

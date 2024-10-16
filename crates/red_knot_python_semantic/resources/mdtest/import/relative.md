@@ -117,7 +117,7 @@ from . import foo  # error: [unresolved-import]
 y = foo.X
 
 # TODO: should be `Literal[42]`
-reveal_type(y)     # revealed: Unknown
+reveal_type(y)     # revealed: @Todo
 ```
 
 ## Non-existent + bare to module

@@ -25,7 +25,7 @@ reveal_type(y)  # revealed: Unbound | Literal[2, 3]
 ```
 
 ```py path=package/public.py
-from .without_wildcard import y # error: [unresolved-import]
+from .without_wildcard import y
 
 reveal_type(y)  # revealed: Literal[2, 3]
 ```

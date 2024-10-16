@@ -1741,7 +1741,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let member_ty = module_ty.member(self.db, &ast::name::Name::new(&name.id));
 
         // TODO: What if it's a union where one of the elements is `Unbound`?
-        if member_ty.is_unbound() || member_ty.is_never() {
+        if member_ty.is_unbound() {
             self.add_diagnostic(
                 AnyNodeRef::Alias(alias),
                 "unresolved-import",
@@ -1758,7 +1758,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         // the runtime error will occur immediately (rather than when the symbol is *used*,
         // as would be the case for a symbol with type `Unbound`), so it's appropriate to
         // think of the type of the imported symbol as `Never` rather than `Unbound`
-        let ty = member_ty.replace_unbound_with(self.db, Type::Never);
+        let ty = member_ty.replace_type_with(self.db, Type::Unbound, Type::Never);
 
         self.add_declaration_with_binding(alias.into(), definition, ty, ty);
     }
@@ -2389,7 +2389,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     );
                     builtin_ty = typing_extensions_symbol_ty(self.db, name);
                 }
-                ty.replace_unbound_with(self.db, builtin_ty)
+                ty.replace_type_with(self.db, Type::Unbound, builtin_ty)
             } else {
                 ty
             }
