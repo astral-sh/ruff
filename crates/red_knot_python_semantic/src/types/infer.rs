@@ -1699,10 +1699,30 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .ok_or(ModuleNameResolutionError::InvalidSyntax)
         };
 
-        let module_ty = match module_name {
-            Ok(name) => {
-                if let Some(ty) = self.module_ty_from_name(&name) {
-                    ty
+        let ty = match module_name {
+            Ok(module_name) => {
+                if let Some(module_ty) = self.module_ty_from_name(&module_name) {
+                    let ast::Alias {
+                        range: _,
+                        name,
+                        asname: _,
+                    } = alias;
+
+                    let member_ty = module_ty.member(self.db, &ast::name::Name::new(&name.id));
+
+                    if member_ty.is_unbound() {
+                        self.add_diagnostic(
+                            AnyNodeRef::Alias(alias),
+                            "unresolved-import",
+                            format_args!("Module `{module_name}` has no member `{name}`",),
+                        );
+
+                        Type::Unknown
+                    } else {
+                        // For possibly-unbound names, just eliminate Unbound from the type; we
+                        // must be in a bound path. TODO diagnostic for maybe-unbound import?
+                        member_ty.replace_unbound_with(self.db, Type::Never)
+                    }
                 } else {
                     self.unresolved_module_diagnostic(import_from, *level, module);
                     Type::Unknown
@@ -1731,34 +1751,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::Unknown
             }
         };
-
-        let ast::Alias {
-            range: _,
-            name,
-            asname: _,
-        } = alias;
-
-        let member_ty = module_ty.member(self.db, &ast::name::Name::new(&name.id));
-
-        // TODO: What if it's a union where one of the elements is `Unbound`?
-        if member_ty.is_unbound() {
-            self.add_diagnostic(
-                AnyNodeRef::Alias(alias),
-                "unresolved-import",
-                format_args!(
-                    "Module `{}{}` has no member `{name}`",
-                    ".".repeat(*level as usize),
-                    module.unwrap_or_default()
-                ),
-            );
-        }
-
-        // If a symbol is unbound in the module the symbol was originally defined in,
-        // when we're trying to import the symbol from that module into "our" module,
-        // the runtime error will occur immediately (rather than when the symbol is *used*,
-        // as would be the case for a symbol with type `Unbound`), so it's appropriate to
-        // think of the type of the imported symbol as `Never` rather than `Unbound`
-        let ty = member_ty.replace_type_with(self.db, Type::Unbound, Type::Never);
 
         self.add_declaration_with_binding(alias.into(), definition, ty, ty);
     }
@@ -2389,7 +2381,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     );
                     builtin_ty = typing_extensions_symbol_ty(self.db, name);
                 }
-                ty.replace_type_with(self.db, Type::Unbound, builtin_ty)
+                ty.replace_unbound_with(self.db, builtin_ty)
             } else {
                 ty
             }

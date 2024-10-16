@@ -374,17 +374,12 @@ impl<'db> Type<'db> {
         }
     }
 
-    fn replace_type_with(
-        &self,
-        db: &'db dyn Db,
-        source: Type<'db>,
-        replacement: Type<'db>,
-    ) -> Type<'db> {
+    fn replace_unbound_with(&self, db: &'db dyn Db, replacement: Type<'db>) -> Type<'db> {
         match self {
-            Type::Union(union) => union.map(db, |element| {
-                element.replace_type_with(db, source, replacement)
-            }),
-            _ if *self == source => replacement,
+            Type::Unbound => replacement,
+            Type::Union(union) => {
+                union.map(db, |element| element.replace_unbound_with(db, replacement))
+            }
             _ => *self,
         }
     }
