@@ -2831,7 +2831,68 @@ impl<'db> TypeInferenceBuilder<'db> {
             (_, Type::BytesLiteral(_)) => {
                 self.infer_binary_type_comparison(left, op, KnownClass::Bytes.to_instance(self.db))
             }
+            (Type::Tuple(lhs), Type::Tuple(rhs)) => {
+                // Note: This only works on heterogeneous tuple types.
+                let lhs_elements = lhs.elements(self.db).as_ref();
+                let rhs_elements = rhs.elements(self.db).as_ref();
 
+                let mut lexicographic_type_comparison =
+                    |op| self.infer_lexicographic_type_comparison(lhs_elements, op, rhs_elements);
+
+                match op {
+                    ast::CmpOp::Eq => lexicographic_type_comparison(RichCompareOperator::Eq),
+                    ast::CmpOp::NotEq => lexicographic_type_comparison(RichCompareOperator::Ne),
+                    ast::CmpOp::Lt => lexicographic_type_comparison(RichCompareOperator::Lt),
+                    ast::CmpOp::LtE => lexicographic_type_comparison(RichCompareOperator::Le),
+                    ast::CmpOp::Gt => lexicographic_type_comparison(RichCompareOperator::Gt),
+                    ast::CmpOp::GtE => lexicographic_type_comparison(RichCompareOperator::Ge),
+                    ast::CmpOp::In | ast::CmpOp::NotIn => {
+                        let mut eq_count = 0usize;
+                        let mut not_eq_count = 0usize;
+
+                        for ty in rhs_elements {
+                            let eq_result = self.infer_binary_type_comparison(
+                                Type::Tuple(lhs),
+                                ast::CmpOp::Eq,
+                                *ty,
+                            ).expect("infer_binary_type_comparison should never return None for `CmpOp::Eq`");
+
+                            match eq_result {
+                                Type::Todo => return Some(Type::Todo),
+                                ty => match ty.bool(self.db) {
+                                    Truthiness::AlwaysTrue => eq_count += 1,
+                                    Truthiness::AlwaysFalse => not_eq_count += 1,
+                                    Truthiness::Ambiguous => (),
+                                },
+                            }
+                        }
+
+                        if eq_count >= 1 {
+                            Some(Type::BooleanLiteral(op.is_in()))
+                        } else if not_eq_count == rhs_elements.len() {
+                            Some(Type::BooleanLiteral(op.is_not_in()))
+                        } else {
+                            Some(KnownClass::Bool.to_instance(self.db))
+                        }
+                    }
+                    ast::CmpOp::Is | ast::CmpOp::IsNot => {
+                        // - `[ast::CmpOp::Is]`: returns `false` if the elements are definitely unequal, otherwise `bool`
+                        // - `[ast::CmpOp::IsNot]`: returns `true` if the elements are definitely unequal, otherwise `bool`
+                        let eq_result = lexicographic_type_comparison(RichCompareOperator::Eq)
+                            .expect(
+                            "infer_binary_type_comparison should never return None for `CmpOp::Eq`",
+                        );
+
+                        Some(match eq_result {
+                            Type::Todo => Type::Todo,
+                            ty => match ty.bool(self.db) {
+                                Truthiness::AlwaysFalse => Type::BooleanLiteral(op.is_is_not()),
+                                _ => KnownClass::Bool.to_instance(self.db),
+                            },
+                        })
+                    }
+                }
+            }
             // Lookup the rich comparison `__dunder__` methods on instances
             (Type::Instance(left_class_ty), Type::Instance(right_class_ty)) => match op {
                 ast::CmpOp::Lt => {
@@ -2843,6 +2904,55 @@ impl<'db> TypeInferenceBuilder<'db> {
             // TODO: handle more types
             _ => Some(Type::Todo),
         }
+    }
+
+    /// Performs lexicographic comparison between two slices of types.
+    ///
+    /// For lexicographic comparison, elements from both slices are compared pairwise using
+    /// `infer_binary_type_comparison`. If a conclusive result cannot be determined as a `BoolLiteral`,
+    /// it returns `bool`. Returns `None` if the comparison is not supported.
+    fn infer_lexicographic_type_comparison(
+        &mut self,
+        left: &[Type<'db>],
+        op: RichCompareOperator,
+        right: &[Type<'db>],
+    ) -> Option<Type<'db>> {
+        // Compare paired elements from left and right slices
+        for (l_ty, r_ty) in left.iter().copied().zip(right.iter().copied()) {
+            let eq_result = self
+                .infer_binary_type_comparison(l_ty, ast::CmpOp::Eq, r_ty)
+                .expect("infer_binary_type_comparison should never return None for `CmpOp::Eq`");
+
+            match eq_result {
+                // If propagation is required, return the result as is
+                Type::Todo => return Some(Type::Todo),
+                ty => match ty.bool(self.db) {
+                    // Types are equal, continue to the next pair
+                    Truthiness::AlwaysTrue => continue,
+                    // Types are not equal, perform the specified comparison and return the result
+                    Truthiness::AlwaysFalse => {
+                        return self.infer_binary_type_comparison(l_ty, op.into(), r_ty)
+                    }
+                    // If the intermediate result is ambiguous, we cannot determine the final result as BooleanLiteral.
+                    // In this case, we simply return a bool instance.
+                    Truthiness::Ambiguous => return Some(KnownClass::Bool.to_instance(self.db)),
+                },
+            }
+        }
+
+        // At this point, the lengths of the two slices may be different, but the prefix of
+        // left and right slices is entirely identical.
+        // We return a comparison of the slice lengths based on the operator.
+        let (left_len, right_len) = (left.len(), right.len());
+
+        Some(Type::BooleanLiteral(match op {
+            RichCompareOperator::Eq => left_len == right_len,
+            RichCompareOperator::Ne => left_len != right_len,
+            RichCompareOperator::Lt => left_len < right_len,
+            RichCompareOperator::Le => left_len <= right_len,
+            RichCompareOperator::Gt => left_len > right_len,
+            RichCompareOperator::Ge => left_len >= right_len,
+        }))
     }
 
     fn infer_subscript_expression(&mut self, subscript: &ast::ExprSubscript) -> Type<'db> {
@@ -3283,6 +3393,29 @@ impl<'db> TypeInferenceBuilder<'db> {
         assert!(previous.is_none());
 
         ty
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RichCompareOperator {
+    Eq,
+    Ne,
+    Gt,
+    Ge,
+    Lt,
+    Le,
+}
+
+impl From<RichCompareOperator> for ast::CmpOp {
+    fn from(value: RichCompareOperator) -> Self {
+        match value {
+            RichCompareOperator::Eq => ast::CmpOp::Eq,
+            RichCompareOperator::Ne => ast::CmpOp::NotEq,
+            RichCompareOperator::Lt => ast::CmpOp::Lt,
+            RichCompareOperator::Le => ast::CmpOp::LtE,
+            RichCompareOperator::Gt => ast::CmpOp::Gt,
+            RichCompareOperator::Ge => ast::CmpOp::GtE,
+        }
     }
 }
 
