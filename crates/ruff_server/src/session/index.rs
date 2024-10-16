@@ -10,6 +10,7 @@ use rustc_hash::FxHashMap;
 pub(crate) use ruff_settings::RuffSettings;
 
 use crate::edit::LanguageId;
+use crate::server::{Workspace, Workspaces};
 use crate::{
     edit::{DocumentKey, DocumentVersion, NotebookDocument},
     PositionEncoding, TextDocument,
@@ -67,12 +68,12 @@ pub enum DocumentQuery {
 
 impl Index {
     pub(super) fn new(
-        workspace_folders: Vec<(Url, ClientSettings)>,
+        workspaces: &Workspaces,
         global_settings: &ClientSettings,
     ) -> crate::Result<Self> {
         let mut settings = WorkspaceSettingsIndex::default();
-        for (url, workspace_settings) in workspace_folders {
-            settings.register_workspace(&url, Some(workspace_settings), global_settings)?;
+        for workspace in &**workspaces {
+            settings.register_workspace(workspace, global_settings)?;
         }
 
         Ok(Self {
@@ -167,11 +168,12 @@ impl Index {
 
     pub(super) fn open_workspace_folder(
         &mut self,
-        url: &Url,
+        url: Url,
         global_settings: &ClientSettings,
     ) -> crate::Result<()> {
         // TODO(jane): Find a way for workspace client settings to be added or changed dynamically.
-        self.settings.register_workspace(url, None, global_settings)
+        self.settings
+            .register_workspace(&Workspace::new(url), global_settings)
     }
 
     pub(super) fn num_documents(&self) -> usize {
@@ -398,10 +400,10 @@ impl WorkspaceSettingsIndex {
     /// workspace. Otherwise, the global settings are used exclusively.
     fn register_workspace(
         &mut self,
-        workspace_url: &Url,
-        workspace_settings: Option<ClientSettings>,
+        workspace: &Workspace,
         global_settings: &ClientSettings,
     ) -> crate::Result<()> {
+        let workspace_url = workspace.url();
         if workspace_url.scheme() != "file" {
             tracing::info!("Ignoring non-file workspace URL: {workspace_url}");
             show_warn_msg!("Ruff does not support non-file workspaces; Ignoring {workspace_url}");
@@ -411,8 +413,8 @@ impl WorkspaceSettingsIndex {
             anyhow!("Failed to convert workspace URL to file path: {workspace_url}")
         })?;
 
-        let client_settings = if let Some(workspace_settings) = workspace_settings {
-            ResolvedClientSettings::with_workspace(&workspace_settings, global_settings)
+        let client_settings = if let Some(workspace_settings) = workspace.settings() {
+            ResolvedClientSettings::with_workspace(workspace_settings, global_settings)
         } else {
             ResolvedClientSettings::global(global_settings)
         };
