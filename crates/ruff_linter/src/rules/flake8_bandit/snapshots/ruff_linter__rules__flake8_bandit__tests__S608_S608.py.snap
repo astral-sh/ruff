@@ -586,5 +586,5 @@ S608.py:147:11: S608 Possible SQL injection vector through string-based query co
 150 | | """
     | |___^ S608
 151 |   
-152 |   # query58 = f"SELECT\
+152 |   # to be handled seperately
     |
