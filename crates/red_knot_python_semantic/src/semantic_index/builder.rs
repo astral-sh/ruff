@@ -38,8 +38,9 @@ pub(super) struct SemanticIndexBuilder<'db> {
     file: File,
     module: &'db ParsedModule,
     scope_stack: Vec<FileScopeId>,
-    /// The assignment we're currently visiting.
-    current_assignment: Option<CurrentAssignment<'db>>,
+    /// The assignments we're currently visiting, with
+    /// the most recent visit at the end of the Vec
+    current_assignments: Vec<CurrentAssignment<'db>>,
     /// The match case we're currently visiting.
     current_match_case: Option<CurrentMatchCase<'db>>,
     /// Flow states at each `break` in the current loop.
@@ -67,7 +68,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             file,
             module: parsed,
             scope_stack: Vec::new(),
-            current_assignment: None,
+            current_assignments: vec![],
             current_match_case: None,
             loop_break_states: vec![],
 
@@ -238,6 +239,19 @@ impl<'db> SemanticIndexBuilder<'db> {
         expression
     }
 
+    fn push_assignment(&mut self, assignment: CurrentAssignment<'db>) {
+        self.current_assignments.push(assignment);
+    }
+
+    fn pop_assignment(&mut self) {
+        let popped_assignment = self.current_assignments.pop();
+        debug_assert!(popped_assignment.is_some());
+    }
+
+    fn current_assignment(&self) -> Option<&CurrentAssignment<'db>> {
+        self.current_assignments.last()
+    }
+
     fn add_pattern_constraint(
         &mut self,
         subject: &ast::Expr,
@@ -359,12 +373,12 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.visit_expr(&generator.iter);
         self.push_scope(scope);
 
-        self.current_assignment = Some(CurrentAssignment::Comprehension {
+        self.push_assignment(CurrentAssignment::Comprehension {
             node: generator,
             first: true,
         });
         self.visit_expr(&generator.target);
-        self.current_assignment = None;
+        self.pop_assignment();
 
         for expr in &generator.ifs {
             self.visit_expr(expr);
@@ -374,12 +388,12 @@ impl<'db> SemanticIndexBuilder<'db> {
             self.add_standalone_expression(&generator.iter);
             self.visit_expr(&generator.iter);
 
-            self.current_assignment = Some(CurrentAssignment::Comprehension {
+            self.push_assignment(CurrentAssignment::Comprehension {
                 node: generator,
                 first: false,
             });
             self.visit_expr(&generator.target);
-            self.current_assignment = None;
+            self.pop_assignment();
 
             for expr in &generator.ifs {
                 self.visit_expr(expr);
@@ -415,7 +429,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.pop_scope();
         assert!(self.scope_stack.is_empty());
 
-        assert!(self.current_assignment.is_none());
+        assert_eq!(&self.current_assignments, &[]);
 
         let mut symbol_tables: IndexVec<_, _> = self
             .symbol_tables
@@ -563,7 +577,7 @@ where
                 }
             }
             ast::Stmt::Assign(node) => {
-                debug_assert!(self.current_assignment.is_none());
+                debug_assert_eq!(&self.current_assignments, &[]);
                 self.visit_expr(&node.value);
                 self.add_standalone_expression(&node.value);
                 for (target_index, target) in node.targets.iter().enumerate() {
@@ -573,25 +587,28 @@ where
                         _ => None,
                     };
                     if let Some(kind) = kind {
-                        self.current_assignment = Some(CurrentAssignment::Assign {
+                        self.push_assignment(CurrentAssignment::Assign {
                             assignment: node,
                             target_index,
                             kind,
                         });
                     }
                     self.visit_expr(target);
-                    self.current_assignment = None;
+                    if kind.is_some() {
+                        // only need to pop in the case where we pushed something
+                        self.pop_assignment();
+                    }
                 }
             }
             ast::Stmt::AnnAssign(node) => {
-                debug_assert!(self.current_assignment.is_none());
+                debug_assert_eq!(&self.current_assignments, &[]);
                 self.visit_expr(&node.annotation);
                 if let Some(value) = &node.value {
                     self.visit_expr(value);
                 }
-                self.current_assignment = Some(node.into());
+                self.push_assignment(node.into());
                 self.visit_expr(&node.target);
-                self.current_assignment = None;
+                self.pop_assignment();
             }
             ast::Stmt::AugAssign(
                 aug_assign @ ast::StmtAugAssign {
@@ -601,11 +618,11 @@ where
                     value,
                 },
             ) => {
-                debug_assert!(self.current_assignment.is_none());
+                debug_assert_eq!(&self.current_assignments, &[]);
                 self.visit_expr(value);
-                self.current_assignment = Some(aug_assign.into());
+                self.push_assignment(aug_assign.into());
                 self.visit_expr(target);
-                self.current_assignment = None;
+                self.pop_assignment();
             }
             ast::Stmt::If(node) => {
                 self.visit_expr(&node.test);
@@ -673,9 +690,9 @@ where
                     self.visit_expr(&item.context_expr);
                     if let Some(optional_vars) = item.optional_vars.as_deref() {
                         self.add_standalone_expression(&item.context_expr);
-                        self.current_assignment = Some(item.into());
+                        self.push_assignment(item.into());
                         self.visit_expr(optional_vars);
-                        self.current_assignment = None;
+                        self.pop_assignment();
                     }
                 }
                 self.visit_body(body);
@@ -700,10 +717,10 @@ where
                 let pre_loop = self.flow_snapshot();
                 let saved_break_states = std::mem::take(&mut self.loop_break_states);
 
-                debug_assert!(self.current_assignment.is_none());
-                self.current_assignment = Some(for_stmt.into());
+                debug_assert_eq!(&self.current_assignments, &[]);
+                self.push_assignment(for_stmt.into());
                 self.visit_expr(target);
-                self.current_assignment = None;
+                self.pop_assignment();
 
                 // TODO: Definitions created by loop variables
                 // (and definitions created inside the body)
@@ -813,7 +830,7 @@ where
 
         match expr {
             ast::Expr::Name(name_node @ ast::ExprName { id, ctx, .. }) => {
-                let (is_use, is_definition) = match (ctx, self.current_assignment) {
+                let (is_use, is_definition) = match (ctx, self.current_assignment()) {
                     (ast::ExprContext::Store, Some(CurrentAssignment::AugAssign(_))) => {
                         // For augmented assignment, the target expression is also used.
                         (true, true)
@@ -824,8 +841,9 @@ where
                     (ast::ExprContext::Invalid, _) => (false, false),
                 };
                 let symbol = self.add_symbol(id.clone());
+
                 if is_definition {
-                    match self.current_assignment {
+                    match self.current_assignment().copied() {
                         Some(CurrentAssignment::Assign {
                             assignment,
                             target_index,
@@ -896,12 +914,11 @@ where
                 walk_expr(self, expr);
             }
             ast::Expr::Named(node) => {
-                debug_assert!(self.current_assignment.is_none());
                 // TODO walrus in comprehensions is implicitly nonlocal
                 self.visit_expr(&node.value);
-                self.current_assignment = Some(node.into());
+                self.push_assignment(node.into());
                 self.visit_expr(&node.target);
-                self.current_assignment = None;
+                self.pop_assignment();
             }
             ast::Expr::Lambda(lambda) => {
                 if let Some(parameters) = &lambda.parameters {
@@ -1060,7 +1077,7 @@ where
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 enum CurrentAssignment<'a> {
     Assign {
         assignment: &'a ast::StmtAssign,
