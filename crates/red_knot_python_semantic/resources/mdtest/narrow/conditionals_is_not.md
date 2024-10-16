@@ -31,10 +31,9 @@ non-singleton class may occupy different addresses in memory even if
 they compare equal.
 
 ```py
-x = [1]
-y = [1]
+x = 345
+y = 345
 
 if x is not y:
-    # TODO: should include type parameter: list[int]
-    reveal_type(x)  # revealed: list
+    reveal_type(x)  # revealed: Literal[345]
 ```

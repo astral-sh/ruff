@@ -485,14 +485,10 @@ impl<'db> Type<'db> {
                 false
             }
             Type::None | Type::BooleanLiteral(_) | Type::Function(..) | Type::Class(..) | Type::Module(..) => true,
-            Type::Tuple(tuple) => {
-                // We deliberately deviate from the language specification [1] here and claim
-                // that the empty tuple type is a singleton type. The reasoning is that `()`
-                // is often used as a sentinel value in user code. Declaring the empty tuple to
-                // be of singleton type allows us to narrow types in `is not ()` conditionals.
-                //
-                // [1] https://docs.python.org/3/reference/expressions.html#parenthesized-forms
-                tuple.elements(db).is_empty()
+            Type::Tuple(..) => {
+                // Not even empty tuples are proper singleton types, see:
+                // https://docs.python.org/3/reference/expressions.html#parenthesized-forms
+                false
             }
             Type::Union(..) => {
                 // A single-element union, where the sole element was a singleton, would itself
@@ -501,13 +497,12 @@ impl<'db> Type<'db> {
                 false
             }
             Type::Intersection(..) => {
-                // Intersection types are hard to analyze. The following types are technically
-                // all singleton types, but it is not straightforward to compute this. Again,
-                // we simply return false.
+                // Here, we assume that all intersection types that are singletons would have
+                // been reduced to a different form via [`IntersectionBuilder::build`] by now.
+                // For example:
                 //
-                //   bool & ~Literal[False]`
-                //   None & (None | int)
-                //   (A | B) & (B | C)          with A, B, C disjunct and B a singleton
+                //   bool & ~Literal[False]   = Literal[True]
+                //   None & (None | int)      = None | None & int = None
                 //
                 false
             }
@@ -1682,7 +1677,6 @@ mod tests {
     #[test_case(Ty::None)]
     #[test_case(Ty::BoolLiteral(true))]
     #[test_case(Ty::BoolLiteral(false))]
-    #[test_case(Ty::Tuple(vec![]))]
     fn is_singleton(from: Ty) {
         let db = setup_db();
 
@@ -1693,6 +1687,7 @@ mod tests {
     #[test_case(Ty::IntLiteral(345))]
     #[test_case(Ty::BuiltinInstance("str"))]
     #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]))]
+    #[test_case(Ty::Tuple(vec![]))]
     #[test_case(Ty::Tuple(vec![Ty::None]))]
     #[test_case(Ty::Tuple(vec![Ty::None, Ty::BoolLiteral(true)]))]
     fn is_not_singleton(from: Ty) {
