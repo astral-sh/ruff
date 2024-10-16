@@ -3659,29 +3659,6 @@ mod tests {
     }
 
     #[test]
-    fn imported_unbound_symbol_is_unknown() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_files([
-            ("src/package/__init__.py", ""),
-            ("src/package/foo.py", "x"),
-            ("src/package/bar.py", "from package.foo import x"),
-        ])?;
-
-        // the type as seen from external modules (`Unknown`)
-        // is different from the type inside the module itself (`Never`):
-        assert_public_ty(&db, "src/package/foo.py", "x", "Unbound");
-        assert_file_diagnostics(
-            &db,
-            "src/package/bar.py",
-            &["Module `package.foo` has no member `x`"],
-        );
-        assert_public_ty(&db, "src/package/bar.py", "x", "Never");
-
-        Ok(())
-    }
-
-    #[test]
     fn from_import_with_no_module_name() -> anyhow::Result<()> {
         // This test checks that invalid syntax in a `StmtImportFrom` node
         // leads to the type being inferred as `Unknown`
@@ -4021,8 +3998,6 @@ mod tests {
     }
 
     #[test_case("", "Literal[1]"; "unannotated")]
-    // Tests that we only use the definition of a symbol instead of its declaration when we are
-    // checking module globals without a nonlocal binding.
     #[test_case(": int", "int"; "annotated")]
     fn conditionally_global_or_builtin(
         annotation: &'static str,

@@ -99,7 +99,7 @@ x
 
 ```py path=package/bar.py
 from .foo import x # error: [unresolved-import]
-reveal_type(x)     # revealed: Never
+reveal_type(x)     # revealed: Unknown
 ```
 
 ## Bare to module
@@ -117,7 +117,7 @@ from . import foo  # error: [unresolved-import]
 y = foo.X
 
 # TODO: should be `Literal[42]`
-reveal_type(y)     # revealed: @Todo
+reveal_type(y)     # revealed: Unknown
 ```
 
 ## Non-existent + bare to module
@@ -126,8 +126,8 @@ reveal_type(y)     # revealed: @Todo
 ```
 
 ```py path=package/bar.py
-# TODO: submodule imports possibly not supported right now?
+# TODO: support submodule imports
 from . import foo  # error: [unresolved-import]
 
-reveal_type(foo)   # revealed: Never
+reveal_type(foo)   # revealed: Unknown
 ```

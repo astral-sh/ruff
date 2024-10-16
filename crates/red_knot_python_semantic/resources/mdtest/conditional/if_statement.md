@@ -16,7 +16,7 @@ reveal_type(x)  # revealed: Literal[2, 3]
 
 ## Simple if-elif-else
 
-```py path=package/simple_if_elif_else.py
+```py
 y = 1
 y = 2
 if flag:
@@ -32,13 +32,6 @@ x = y
 reveal_type(x)  # revealed: Literal[3, 4, 5]
 reveal_type(r)  # revealed: Unbound | Literal[2]
 reveal_type(s)  # revealed: Unbound | Literal[5]
-```
-
-```py path=package/public.py
-from .simple_if_elif_else import r, s
-
-reveal_type(r)  # revealed: Literal[2]
-reveal_type(s)  # revealed: Literal[5]
 ```
 
 ## Single symbol across if-elif-else

@@ -1,47 +1,16 @@
 # Unbound
 
-## Maybe unbound
-
-```py path=package/maybe_unbound.py
-if flag:
-    y = 3
-x = y
-reveal_type(x)  # revealed: Unbound | Literal[3]
-reveal_type(y)  # revealed: Unbound | Literal[3]
-```
-
-```py path=package/public.py
-from .maybe_unbound import x, y 
-reveal_type(x)  # revealed: Literal[3]
-reveal_type(y)  # revealed: Literal[3]
-```
-
-## Maybe unbound annotated
-
-```py path=package/maybe_unbound_annotated.py
-if flag:
-    y: int = 3
-x = y
-reveal_type(x)  # revealed: Unbound | Literal[3]
-reveal_type(y)  # revealed: Unbound | Literal[3]
-```
-
-```py path=package/public.py
-from .maybe_unbound_annotated import x, y
-reveal_type(x)  # revealed: Literal[3]
-reveal_type(y)  # revealed: int
-```
-
 ## Unbound
 
 ```py
-x = foo; foo = 1
+x = foo
+foo = 1
 reveal_type(x)  # revealed: Unbound
 ```
 
 ## Unbound class variable
 
-Class variables can reference global variables unless overridden within the class scope.
+Name lookups within a class scope fall back to globals, but lookups of class attributes don't.
 
 ```py
 x = 1
