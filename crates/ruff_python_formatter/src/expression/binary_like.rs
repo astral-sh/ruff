@@ -5,7 +5,7 @@ use smallvec::SmallVec;
 
 use ruff_formatter::write;
 use ruff_python_ast::{
-    Expr, ExprAttribute, ExprBinOp, ExprBoolOp, ExprCompare, ExprUnaryOp, UnaryOp,
+    Expr, ExprAttribute, ExprBinOp, ExprBoolOp, ExprCompare, ExprUnaryOp, StringLike, UnaryOp,
 };
 use ruff_python_trivia::CommentRanges;
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
@@ -20,7 +20,7 @@ use crate::expression::parentheses::{
 };
 use crate::expression::OperatorPrecedence;
 use crate::prelude::*;
-use crate::string::{AnyString, FormatImplicitConcatenatedString};
+use crate::string::FormatImplicitConcatenatedString;
 
 #[derive(Copy, Clone, Debug)]
 pub(super) enum BinaryLike<'a> {
@@ -293,7 +293,8 @@ impl Format<PyFormatContext<'_>> for BinaryLike<'_> {
         let mut string_operands = flat_binary
             .operands()
             .filter_map(|(index, operand)| {
-                AnyString::from_expression(operand.expression())
+                StringLike::try_from(operand.expression())
+                    .ok()
                     .filter(|string| {
                         string.is_implicit_concatenated()
                             && !is_expression_parenthesized(

@@ -2,7 +2,10 @@ use std::iter::FusedIterator;
 
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::{self as ast, AnyNodeRef, AnyStringFlags, Expr};
+use crate::{
+    self as ast, AnyNodeRef, AnyStringFlags, Expr, ExprBytesLiteral, ExprFString,
+    ExprStringLiteral, StringFlags,
+};
 
 /// Unowned pendant to [`ast::Expr`] that stores a reference instead of a owned value.
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -405,12 +408,25 @@ pub enum StringLike<'a> {
 }
 
 impl<'a> StringLike<'a> {
+    pub const fn is_fstring(self) -> bool {
+        matches!(self, Self::FString(_))
+    }
+
     /// Returns an iterator over the [`StringLikePart`] contained in this string-like expression.
     pub fn parts(&self) -> StringLikePartIter<'_> {
         match self {
             StringLike::String(expr) => StringLikePartIter::String(expr.value.iter()),
             StringLike::Bytes(expr) => StringLikePartIter::Bytes(expr.value.iter()),
             StringLike::FString(expr) => StringLikePartIter::FString(expr.value.iter()),
+        }
+    }
+
+    /// Returns `true` if the string is implicitly concatenated.
+    pub fn is_implicit_concatenated(self) -> bool {
+        match self {
+            Self::String(ExprStringLiteral { value, .. }) => value.is_implicit_concatenated(),
+            Self::Bytes(ExprBytesLiteral { value, .. }) => value.is_implicit_concatenated(),
+            Self::FString(ExprFString { value, .. }) => value.is_implicit_concatenated(),
         }
     }
 }
@@ -430,6 +446,45 @@ impl<'a> From<&'a ast::ExprBytesLiteral> for StringLike<'a> {
 impl<'a> From<&'a ast::ExprFString> for StringLike<'a> {
     fn from(value: &'a ast::ExprFString) -> Self {
         StringLike::FString(value)
+    }
+}
+
+impl<'a> From<&StringLike<'a>> for ExpressionRef<'a> {
+    fn from(value: &StringLike<'a>) -> Self {
+        match value {
+            StringLike::String(expr) => ExpressionRef::StringLiteral(expr),
+            StringLike::Bytes(expr) => ExpressionRef::BytesLiteral(expr),
+            StringLike::FString(expr) => ExpressionRef::FString(expr),
+        }
+    }
+}
+
+impl<'a> From<StringLike<'a>> for AnyNodeRef<'a> {
+    fn from(value: StringLike<'a>) -> Self {
+        AnyNodeRef::from(&value)
+    }
+}
+
+impl<'a> From<&StringLike<'a>> for AnyNodeRef<'a> {
+    fn from(value: &StringLike<'a>) -> Self {
+        match value {
+            StringLike::String(expr) => AnyNodeRef::ExprStringLiteral(expr),
+            StringLike::Bytes(expr) => AnyNodeRef::ExprBytesLiteral(expr),
+            StringLike::FString(expr) => AnyNodeRef::ExprFString(expr),
+        }
+    }
+}
+
+impl<'a> TryFrom<&'a Expr> for StringLike<'a> {
+    type Error = ();
+
+    fn try_from(value: &'a Expr) -> Result<Self, Self::Error> {
+        match value {
+            Expr::StringLiteral(value) => Ok(Self::String(value)),
+            Expr::BytesLiteral(value) => Ok(Self::Bytes(value)),
+            Expr::FString(value) => Ok(Self::FString(value)),
+            _ => Err(()),
+        }
     }
 }
 
@@ -460,6 +515,15 @@ impl StringLikePart<'_> {
             StringLikePart::FString(f_string) => AnyStringFlags::from(f_string.flags),
         }
     }
+
+    /// Returns the range of the string's content in the source (minus prefix and quotes).
+    pub fn content_range(self) -> TextRange {
+        let kind = self.flags();
+        TextRange::new(
+            self.start() + kind.opener_len(),
+            self.end() - kind.closer_len(),
+        )
+    }
 }
 
 impl<'a> From<&'a ast::StringLiteral> for StringLikePart<'a> {
@@ -477,6 +541,16 @@ impl<'a> From<&'a ast::BytesLiteral> for StringLikePart<'a> {
 impl<'a> From<&'a ast::FString> for StringLikePart<'a> {
     fn from(value: &'a ast::FString) -> Self {
         StringLikePart::FString(value)
+    }
+}
+
+impl<'a> From<&StringLikePart<'a>> for AnyNodeRef<'a> {
+    fn from(value: &StringLikePart<'a>) -> Self {
+        match value {
+            StringLikePart::String(part) => AnyNodeRef::StringLiteral(part),
+            StringLikePart::Bytes(part) => AnyNodeRef::BytesLiteral(part),
+            StringLikePart::FString(part) => AnyNodeRef::FString(part),
+        }
     }
 }
 
