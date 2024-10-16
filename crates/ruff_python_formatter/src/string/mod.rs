@@ -174,6 +174,7 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedString<'_> {
                 write!(f, [flags.prefix(), quotes])?;
 
                 // TODO: strings in expression statements aren't joined correctly because they aren't wrap in a group :(
+                // TODO: FStrings when the f-string preview style is enabled???
 
                 for part in self.string.parts() {
                     let content = f.context().locator().slice(part.content_range());
@@ -181,8 +182,9 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedString<'_> {
                         content,
                         0,
                         flags,
-                        is_f_string_formatting_enabled(f.context()),
                         flags.is_f_string() && !part.flags().is_f_string(),
+                        true,
+                        false,
                     );
                     match normalized {
                         Cow::Borrowed(_) => source_text_slice(part.content_range()).fmt(f)?,
