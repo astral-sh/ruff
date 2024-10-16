@@ -19,6 +19,6 @@ class C:
     if flag:
         x = 2
 
-reveal_type(C.x) # revealed: Unbound | Literal[2]
+reveal_type(C.x) # revealed: Literal[2]
 reveal_type(C.y) # revealed: Literal[1]
 ```

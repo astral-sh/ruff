@@ -1430,7 +1430,8 @@ impl<'db> ClassType<'db> {
     pub fn class_member(self, db: &'db dyn Db, name: &str) -> Type<'db> {
         let member = self.own_class_member(db, name);
         if !member.is_unbound() {
-            return member;
+            // TODO diagnostic if maybe unbound?
+            return member.replace_unbound_with(db, Type::Never);
         }
 
         self.inherited_class_member(db, name)
