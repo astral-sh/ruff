@@ -263,7 +263,21 @@ impl<'db> InnerIntersectionBuilder<'db> {
             }
             Type::Never => {}
             Type::Unbound => {}
+
             _ => {
+                if let Type::BooleanLiteral(bool) = new_negative {
+                    if self
+                        .positive
+                        .iter()
+                        .any(|pos| *pos == KnownClass::Bool.to_instance(db))
+                    {
+                        self.positive.clear();
+                        self.negative.clear();
+                        self.positive.insert(Type::BooleanLiteral(!bool));
+                        return;
+                    }
+                }
+
                 for pos in &self.positive {
                     if pos.is_subtype_of(db, new_negative) {
                         self.negative.clear();
@@ -656,5 +670,23 @@ mod tests {
             .build();
 
         assert_eq!(ty, t_p);
+    }
+
+    #[test]
+    fn build_intersection_simplify_split_bool() {
+        let db = setup_db();
+
+        let t_p = KnownClass::Bool.to_instance(&db);
+
+        for bool in [true, false] {
+            let t_n = Type::BooleanLiteral(bool);
+
+            let ty = IntersectionBuilder::new(&db)
+                .add_positive(t_p)
+                .add_negative(t_n)
+                .build();
+
+            assert_eq!(ty, Type::BooleanLiteral(!bool));
+        }
     }
 }
