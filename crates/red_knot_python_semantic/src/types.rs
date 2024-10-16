@@ -472,29 +472,53 @@ impl<'db> Type<'db> {
     }
 
     /// Return true if this type and `other` have no common elements.
-    pub(crate) fn is_disjoint_from(self, _db: &'db dyn Db, other: Type<'db>) -> bool {
+    pub(crate) fn is_disjoint_from(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         match (self, other) {
-            (Type::Never, _) => true,
-            (_, Type::Never) => true,
-            (
-                Type::None,
-                Type::BooleanLiteral(..)
-                | Type::BytesLiteral(..)
-                | Type::IntLiteral(..)
+            (Type::Never, _) | (_, Type::Never) => true,
+            (Type::Union(union), other) | (other, Type::Union(union)) => todo!(),
+            (Type::Intersection(intersection), other)
+            | (other, Type::Intersection(intersection)) => todo!(),
+
+            // In all branches below, Never, Union, and Intersection are unreachable
+            // on both sides
+            (Type::None, other) | (other, Type::None) => match other {
+                Type::Never | Type::Union(..) | Type::Intersection(..) => unreachable!(),
+                Type::IntLiteral(_)
+                | Type::BooleanLiteral(_)
+                | Type::StringLiteral(..)
                 | Type::LiteralString
-                | Type::StringLiteral(..),
-            ) => true,
-            (
-                Type::BooleanLiteral(..)
                 | Type::BytesLiteral(..)
-                | Type::IntLiteral(..)
+                | Type::Function(..)
+                | Type::Module(..)
+                | Type::Class(..)
+                | Type::Tuple(..) => true,
+                Type::None => false,
+                Type::Instance(class_type) => {
+                    !class_type.is_known(db, KnownClass::NoneType) // TODO: is this enough?
+                }
+                Type::Any | Type::Unknown | Type::Unbound | Type::Todo => todo!(),
+            },
+
+            // In all branches below, None is unreachable in addition
+            (Type::BooleanLiteral(b), other) | (other, Type::BooleanLiteral(b)) => match other {
+                Type::Never | Type::Union(..) | Type::Intersection(..) | Type::None => {
+                    unreachable!()
+                }
+                Type::IntLiteral(_)
+                | Type::StringLiteral(..)
                 | Type::LiteralString
-                | Type::StringLiteral(..),
-                Type::None,
-            ) => true,
-            (Type::None, Type::Instance(i)) | (Type::Instance(i), Type::None) => {
-                true // TODO not correct if i is an instance of NoneType
-            }
+                | Type::BytesLiteral(..)
+                | Type::Function(..)
+                | Type::Module(..)
+                | Type::Class(..)
+                | Type::Tuple(..) => true,
+                Type::BooleanLiteral(other_b) => b != other_b,
+                Type::Instance(class_type) => {
+                    !class_type.is_known(db, KnownClass::Bool) // TODO: is this enough?
+                }
+                Type::Any | Type::Unknown | Type::Unbound | Type::Todo => todo!(),
+            },
+
             _ => false,
         }
     }
@@ -1713,6 +1737,37 @@ mod tests {
         let db = setup_db();
 
         assert!(from.into_type(&db).is_equivalent_to(&db, to.into_type(&db)));
+    }
+
+    #[test_case(Ty::Never, Ty::Never)]
+    #[test_case(Ty::Never, Ty::None)]
+    #[test_case(Ty::Never, Ty::BuiltinInstance("int"))]
+    #[test_case(Ty::None, Ty::StringLiteral("test"))]
+    #[test_case(Ty::None, Ty::BuiltinInstance("int"))]
+    #[test_case(Ty::BoolLiteral(true), Ty::BuiltinInstance("int"))]
+    #[test_case(Ty::BoolLiteral(true), Ty::BoolLiteral(false))]
+    fn is_disjoint_from(a: Ty, b: Ty) {
+        let db = setup_db();
+        let a = a.into_type(&db);
+        let b = b.into_type(&db);
+
+        assert!(a.is_disjoint_from(&db, b));
+        assert!(b.is_disjoint_from(&db, a));
+    }
+
+    #[test_case(Ty::None, Ty::None)]
+    #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinInstance("int"))]
+    #[test_case(Ty::BuiltinInstance("str"), Ty::LiteralString)]
+    #[test_case(Ty::BoolLiteral(true), Ty::BoolLiteral(true))]
+    #[test_case(Ty::BoolLiteral(false), Ty::BoolLiteral(false))]
+    #[test_case(Ty::BoolLiteral(true), Ty::BuiltinInstance("bool"))]
+    fn is_not_disjoint_from(a: Ty, b: Ty) {
+        let db = setup_db();
+        let a = a.into_type(&db);
+        let b = b.into_type(&db);
+
+        assert!(!a.is_disjoint_from(&db, b));
+        assert!(!b.is_disjoint_from(&db, a));
     }
 
     #[test_case(Ty::None)]
