@@ -111,6 +111,11 @@ class C:
         msg = "..."
         raise NotImplementedError(msg)
 
+    def f(self, x, y):
+        """Docstring."""
+        msg = f"{x}..."
+        raise NotImplementedError(msg)
+
     ###
     # Unused functions attached to abstract methods (OK).
     ###
