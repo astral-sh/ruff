@@ -2717,6 +2717,21 @@ impl<'db> TypeInferenceBuilder<'db> {
         // - `[ast::CompOp::Is]`: return `false` if unequal, `bool` if equal
         // - `[ast::CompOp::IsNot]`: return `true` if unequal, `bool` if equal
         match (left, right) {
+            (Type::Union(union), other) => Some(UnionType::from_elements(
+                self.db,
+                union
+                    .elements(self.db)
+                    .iter()
+                    .filter_map(|element| self.infer_binary_type_comparison(*element, op, other)),
+            )),
+            (other, Type::Union(union)) => Some(UnionType::from_elements(
+                self.db,
+                union
+                    .elements(self.db)
+                    .iter()
+                    .filter_map(|element| self.infer_binary_type_comparison(other, op, *element)),
+            )),
+
             (Type::IntLiteral(n), Type::IntLiteral(m)) => match op {
                 ast::CmpOp::Eq => Some(Type::BooleanLiteral(n == m)),
                 ast::CmpOp::NotEq => Some(Type::BooleanLiteral(n != m)),
@@ -2908,6 +2923,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 }
             }
+
             // Lookup the rich comparison `__dunder__` methods on instances
             (Type::Instance(left_class_ty), Type::Instance(right_class_ty)) => match op {
                 ast::CmpOp::Lt => {
@@ -2917,7 +2933,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 _ => Some(Type::Todo),
             },
             // TODO: handle more types
-            _ => Some(Type::Todo),
+            _ => match op {
+                ast::CmpOp::Is | ast::CmpOp::IsNot => Some(KnownClass::Bool.to_instance(self.db)),
+                _ => Some(Type::Todo),
+            },
         }
     }
 
