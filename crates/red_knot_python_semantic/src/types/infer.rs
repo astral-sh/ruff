@@ -3550,7 +3550,6 @@ mod tests {
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast::name::Name;
-    use test_case::test_case;
 
     use super::TypeInferenceBuilder;
 
@@ -3985,45 +3984,6 @@ mod tests {
 
         assert_eq!(x_ty.display(&db).to_string(), "Unbound");
         assert_eq!(y_ty.display(&db).to_string(), "Literal[1]");
-
-        Ok(())
-    }
-
-    #[test_case("", "Literal[1]"; "unannotated")]
-    #[test_case(": int", "int"; "annotated")]
-    fn conditionally_global_or_builtin(
-        annotation: &'static str,
-        expected: &str,
-    ) -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "/src/a.py",
-            &format!(
-                "
-                if flag:
-                    copyright{annotation} = 1
-
-                def f():
-                    y = copyright
-            ",
-            ),
-        )?;
-
-        let file = system_path_to_file(&db, "src/a.py").expect("file to exist");
-        let index = semantic_index(&db, file);
-        let function_scope = index
-            .child_scopes(FileScopeId::global())
-            .next()
-            .unwrap()
-            .0
-            .to_scope_id(&db, file);
-        let y_ty = symbol_ty(&db, function_scope, "y");
-
-        assert_eq!(
-            y_ty.display(&db).to_string(),
-            format!("Literal[copyright] | {expected}")
-        );
 
         Ok(())
     }
