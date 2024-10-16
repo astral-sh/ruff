@@ -103,7 +103,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             .expect("Always to have a root scope")
     }
 
-    fn try_node_context_stack(&mut self) -> &mut TryNodeContextStack {
+    fn try_node_context_stack(&self) -> &TryNodeContextStack {
         self.try_node_context_stack_manager
             .current_try_context_stack()
     }
@@ -239,8 +239,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             DefinitionCategory::Declaration => use_def.record_declaration(symbol, definition),
             DefinitionCategory::Binding => use_def.record_binding(symbol, definition),
         }
-        let snapshot = self.flow_snapshot();
-        self.try_node_context_stack().record_definition(&snapshot);
+        self.try_node_context_stack().record_definition(self);
 
         definition
     }
