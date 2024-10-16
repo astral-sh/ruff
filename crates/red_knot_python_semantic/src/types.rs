@@ -366,7 +366,7 @@ impl<'db> Type<'db> {
 
     pub fn may_be_unbound(&self, db: &'db dyn Db) -> bool {
         match self {
-            Type::Unbound | Type::Never => true,
+            Type::Unbound => true,
             Type::Union(union) => union.elements(db).contains(&Type::Unbound),
             // Unbound can't appear in an intersection, because an intersection with Unbound
             // simplifies to just Unbound.
