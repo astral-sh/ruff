@@ -28,6 +28,7 @@ else:
     y = 5
     s = y
 x = y
+
 reveal_type(x)  # revealed: Literal[3, 4, 5]
 reveal_type(r)  # revealed: Unbound | Literal[2]
 reveal_type(s)  # revealed: Unbound | Literal[5]

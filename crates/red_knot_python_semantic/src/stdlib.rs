@@ -37,6 +37,13 @@ fn core_module_symbol_ty<'db>(
 ) -> Type<'db> {
     resolve_module(db, &core_module.name())
         .map(|module| global_symbol_ty(db, module.file(), symbol))
+        .map(|ty| {
+            if ty.is_unbound() {
+                ty
+            } else {
+                ty.replace_unbound_with(db, Type::Never)
+            }
+        })
         .unwrap_or(Type::Unbound)
 }
 

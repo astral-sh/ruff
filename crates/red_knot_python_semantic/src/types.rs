@@ -60,7 +60,7 @@ fn symbol_ty_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymb
                 use_def.public_bindings(symbol),
                 use_def
                     .public_may_be_unbound(symbol)
-                    .then_some(Type::Unknown),
+                    .then_some(Type::Unbound),
             ))
         } else {
             None
@@ -79,7 +79,7 @@ fn symbol_ty_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymb
     }
 }
 
-/// Shorthand for `symbol_ty` that takes a symbol name instead of an ID.
+/// Shorthand for `symbol_ty_by_id` that takes a symbol name instead of an ID.
 fn symbol_ty<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Type<'db> {
     let table = symbol_table(db, scope);
     table
@@ -381,7 +381,7 @@ impl<'db> Type<'db> {
             Type::Union(union) => {
                 union.map(db, |element| element.replace_unbound_with(db, replacement))
             }
-            ty => *ty,
+            _ => *self,
         }
     }
 
@@ -444,6 +444,9 @@ impl<'db> Type<'db> {
     ///
     /// [assignable to]: https://typing.readthedocs.io/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
     pub(crate) fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
+        if self.is_equivalent_to(db, target) {
+            return true;
+        }
         match (self, target) {
             (Type::Unknown | Type::Any | Type::Todo, _) => true,
             (_, Type::Unknown | Type::Any | Type::Todo) => true,
@@ -1426,7 +1429,8 @@ impl<'db> ClassType<'db> {
     pub fn class_member(self, db: &'db dyn Db, name: &str) -> Type<'db> {
         let member = self.own_class_member(db, name);
         if !member.is_unbound() {
-            return member;
+            // TODO diagnostic if maybe unbound?
+            return member.replace_unbound_with(db, Type::Never);
         }
 
         self.inherited_class_member(db, name)
@@ -1625,6 +1629,7 @@ mod tests {
     #[test_case(Ty::BytesLiteral("foo"), Ty::BuiltinInstance("bytes"))]
     #[test_case(Ty::IntLiteral(1), Ty::Union(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")]))]
     #[test_case(Ty::IntLiteral(1), Ty::Union(vec![Ty::Unknown, Ty::BuiltinInstance("str")]))]
+    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]))]
     fn is_assignable_to(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_assignable_to(&db, to.into_type(&db)));
