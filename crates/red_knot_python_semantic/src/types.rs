@@ -478,6 +478,7 @@ impl<'db> Type<'db> {
     pub(crate) fn is_disjoint_from(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         match (self, other) {
             (Type::Never, _) | (_, Type::Never) => true,
+
             (Type::Any, _) | (_, Type::Any) => false,
             (Type::Unknown, _) | (_, Type::Unknown) => false,
             (Type::Unbound, _) | (_, Type::Unbound) => false,
@@ -520,7 +521,6 @@ impl<'db> Type<'db> {
                         true
                     }
                 } else {
-                    // TODO: is this wrong because tuple can be subclassed?
                     true
                 }
             }

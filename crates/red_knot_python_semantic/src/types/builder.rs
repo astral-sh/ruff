@@ -216,9 +216,9 @@ impl<'db> InnerIntersectionBuilder<'db> {
     }
 
     /// Adds a positive type to this intersection.
-    fn add_positive(&mut self, db: &'db dyn Db, ty: Type<'db>) {
+    fn add_positive(&mut self, db: &'db dyn Db, new_positive: Type<'db>) {
         // TODO `Any`/`Unknown`/`Todo` actually should not self-cancel
-        if let Type::Intersection(other) = ty {
+        if let Type::Intersection(other) = new_positive {
             for pos in other.positive(db) {
                 self.add_positive(db, *pos);
             }
@@ -227,29 +227,32 @@ impl<'db> InnerIntersectionBuilder<'db> {
             }
         } else {
             for pos in &self.positive {
-                if ty.is_disjoint_from(db, *pos) {
+                if new_positive.is_disjoint_from(db, *pos) {
                     self.negative.clear();
                     self.positive.clear();
                     return;
                 }
 
-                // TODO add simplification for ty & pos != Never
+                // TODO if ty <: pos or pos <: ty, we can only
+                // keep the smaller of the two (the subtype).
             }
+
             for neg in &self.negative {
-                if ty.is_subtype_of(db, *neg) {
+                if new_positive.is_subtype_of(db, *neg) {
                     self.negative.clear();
                     self.positive.clear();
                     return;
                 }
             }
-            self.positive.insert(ty);
+
+            self.positive.insert(new_positive);
         }
     }
 
     /// Adds a negative type to this intersection.
-    fn add_negative(&mut self, db: &'db dyn Db, ty: Type<'db>) {
+    fn add_negative(&mut self, db: &'db dyn Db, new_negative: Type<'db>) {
         // TODO `Any`/`Unknown`/`Todo` actually should not self-cancel
-        match ty {
+        match new_negative {
             Type::Intersection(inter) => {
                 for pos in inter.positive(db) {
                     self.add_negative(db, *pos);
@@ -262,14 +265,14 @@ impl<'db> InnerIntersectionBuilder<'db> {
             Type::Unbound => {}
             _ => {
                 for pos in &self.positive {
-                    if pos.is_subtype_of(db, ty) {
+                    if pos.is_subtype_of(db, new_negative) {
                         self.negative.clear();
                         self.positive.clear();
                         return;
                     }
                 }
-                // TODO: what is the analog for the negative part here?
-                self.negative.insert(ty);
+
+                self.negative.insert(new_negative);
             }
         }
     }
@@ -600,7 +603,7 @@ mod tests {
     }
 
     #[test]
-    fn build_intersection_simplify_positive_subtype() {
+    fn build_intersection_simplify_negative_type_and_positive_subtype() {
         let db = setup_db();
 
         let t = KnownClass::Str.to_instance(&db);
@@ -615,7 +618,7 @@ mod tests {
     }
 
     #[test]
-    fn build_intersection_simplify_positive_disjoint() {
+    fn build_intersection_simplify_disjoint_positive_types() {
         let db = setup_db();
 
         let t1 = Type::IntLiteral(1);
