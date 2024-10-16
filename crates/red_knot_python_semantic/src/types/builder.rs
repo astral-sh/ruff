@@ -220,17 +220,36 @@ impl<'db> InnerIntersectionBuilder<'db> {
         // TODO `Any`/`Unknown`/`Todo` actually should not self-cancel
         match ty {
             Type::Intersection(inter) => {
-                let pos = inter.positive(db);
-                let neg = inter.negative(db);
-                self.positive.extend(pos.difference(&self.negative));
-                self.negative.extend(neg.difference(&self.positive));
-                self.positive.retain(|elem| !neg.contains(elem));
-                self.negative.retain(|elem| !pos.contains(elem));
+                for pos in inter.positive(db) {
+                    self.add_positive(db, *pos);
+                }
+                for neg in inter.negative(db) {
+                    self.add_negative(db, *neg);
+                }
+
+                // self.positive.extend(pos.difference(&self.negative));
+                // self.negative.extend(neg.difference(&self.positive));
+                // self.positive.retain(|elem| !neg.contains(elem));
+                // self.negative.retain(|elem| !pos.contains(elem));
             }
             _ => {
-                if !self.negative.remove(&ty) {
-                    self.positive.insert(ty);
-                };
+                for pos in &self.positive {
+                    if ty.is_disjoint_from(db, *pos) {
+                        self.negative.clear();
+                        self.positive.clear();
+                        return;
+                    }
+                }
+                for neg in &self.negative {
+                    if ty.is_subtype_of(db, *neg) {
+                        self.negative.clear();
+                        self.positive.clear();
+                        return;
+                    }
+                }
+                self.positive.insert(ty);
+                // if !self.negative.remove(&ty) {
+                // };
             }
         }
     }
@@ -239,20 +258,40 @@ impl<'db> InnerIntersectionBuilder<'db> {
     fn add_negative(&mut self, db: &'db dyn Db, ty: Type<'db>) {
         // TODO `Any`/`Unknown`/`Todo` actually should not self-cancel
         match ty {
-            Type::Intersection(intersection) => {
-                let pos = intersection.negative(db);
-                let neg = intersection.positive(db);
-                self.positive.extend(pos.difference(&self.negative));
-                self.negative.extend(neg.difference(&self.positive));
-                self.positive.retain(|elem| !neg.contains(elem));
-                self.negative.retain(|elem| !pos.contains(elem));
+            Type::Intersection(inter) => {
+                // let pos = intersection.negative(db);
+                // let neg = intersection.positive(db);
+                // self.positive.extend(pos.difference(&self.negative));
+                // self.negative.extend(neg.difference(&self.positive));
+                // self.positive.retain(|elem| !neg.contains(elem));
+                // self.negative.retain(|elem| !pos.contains(elem));
+
+                for pos in inter.positive(db) {
+                    self.add_negative(db, *pos);
+                }
+                for neg in inter.negative(db) {
+                    self.add_positive(db, *neg);
+                }
             }
             Type::Never => {}
             Type::Unbound => {}
             _ => {
-                if !self.positive.remove(&ty) {
-                    self.negative.insert(ty);
-                };
+                for pos in &self.positive {
+                    if pos.is_subtype_of(db, ty) {
+                        self.negative.clear();
+                        self.positive.clear();
+                        return;
+                    }
+                }
+                for neg in &self.negative {
+                    // TODO: what is the mirror-rule here?
+                    // if ty.is_disjoint_from(db, neg) {
+                    //     self.negative.clear();
+                    //     self.positive.clear();
+                    //     return;
+                    // }
+                }
+                self.negative.insert(ty);
             }
         }
     }
@@ -580,5 +619,35 @@ mod tests {
             .build();
 
         assert_eq!(ty, Type::IntLiteral(1));
+    }
+
+    #[test]
+    fn build_intersection_simplify_positive_subtype() {
+        let db = setup_db();
+
+        let t = KnownClass::Str.to_instance(&db);
+        let s = Type::LiteralString;
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_negative(t)
+            .add_positive(s)
+            .build();
+
+        assert_eq!(ty, Type::Never);
+    }
+
+    #[test]
+    fn build_intersection_simplify_positive_disjoint() {
+        let db = setup_db();
+
+        let t1 = Type::IntLiteral(1);
+        let t2 = Type::None;
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(t1)
+            .add_positive(t2)
+            .build();
+
+        assert_eq!(ty, Type::Never);
     }
 }

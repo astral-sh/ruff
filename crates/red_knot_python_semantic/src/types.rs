@@ -471,6 +471,34 @@ impl<'db> Type<'db> {
         self == other
     }
 
+    /// Return true if this type and `other` have no common elements.
+    pub(crate) fn is_disjoint_from(self, _db: &'db dyn Db, other: Type<'db>) -> bool {
+        match (self, other) {
+            (Type::Never, _) => true,
+            (_, Type::Never) => true,
+            (
+                Type::None,
+                Type::BooleanLiteral(..)
+                | Type::BytesLiteral(..)
+                | Type::IntLiteral(..)
+                | Type::LiteralString
+                | Type::StringLiteral(..),
+            ) => true,
+            (
+                Type::BooleanLiteral(..)
+                | Type::BytesLiteral(..)
+                | Type::IntLiteral(..)
+                | Type::LiteralString
+                | Type::StringLiteral(..),
+                Type::None,
+            ) => true,
+            (Type::None, Type::Instance(i)) | (Type::Instance(i), Type::None) => {
+                true // TODO not correct if i is an instance of NoneType
+            }
+            _ => false,
+        }
+    }
+
     /// Return true if there is just a single inhabitant for this type.
     ///
     /// Note: This function aims to have no false positives, but might return `false`
