@@ -1,11 +1,11 @@
 # Control flow for exception handlers
 
-Tests that assert we understand the possible "definition states" (which symbols
-might or might not be defined) in various branches of a
+These tests assert that we understand the possible "definition states" (which
+symbols might or might not be defined) in the various branches of a
 `try`/`except`/`else`/`finally` block.
 
 For a full writeup on the semantics of exception handlers,
-see [this document](https://astral-sh.notion.site/Exception-handler-control-flow-11348797e1ca80bb8ce1e9aedbbe439d).
+see [this document][1].
 
 The tests throughout this Markdown document use functions with names starting
 with `could_raise_*` to mark definitions that might or might not succeed
@@ -18,10 +18,23 @@ exception to be raised.
 
 ## A single bare `except`
 
-If there are different types for a single variable `x` in the two branches, we
-can't determine which branch might have been taken. The inferred type after
-the `try`/`except` block is therefore the union of the type at the end of the `try`
-suite (`str`) and the type at the end of the `except` suite (`Literal[2]`):
+Consider the following `try`/`except` block, with a single bare `except:`.
+There are different types for the variable `x` in the two branches of this
+block, and we can't determine which branch might have been taken from the
+perspective of code following this block. The inferred type after the block's
+conclusion is therefore the union of the type at the end of the `try` suite
+(`str`) and the type at the end of the `except` suite (`Literal[2]`).
+
+*Within* the `except` suite, we must infer a union of all possible "definition
+states" we could have been in at any point during the `try` suite. This is
+because control flow could have jumped to the `except` suite without any of the
+`try`-suite definitions successfully completing, with only *some* of the
+`try`-suite definitions successfully completing, or indeed with *all* of them
+successfully completing. The type of `x` at the beginning of the `except` suite
+in this example is therefore `Literal[1] | str`, taking into account that we
+might have jumped to the `except` suite before the
+`x = could_raise_returns_str()` redefinition, but we *also* could have jumped
+to the `except` suite *after* that redefinition.
 
 ```py path=union_type_inferred.py
 def could_raise_returns_str() -> str:
@@ -41,8 +54,9 @@ except:
 reveal_type(x)  # revealed: str | Literal[2]
 ```
 
-If `x` has the same type at the end of both branches, the branches unify and
-`x` is not inferred as having a union type following the `try`/`except` block:
+If `x` has the same type at the end of both branches, however, the branches
+unify and `x` is not inferred as having a union type following the
+`try`/`except` block:
 
 ```py path=branches_unify_to_non_union_type.py
 def could_raise_returns_str() -> str:
@@ -60,11 +74,13 @@ reveal_type(x)  # revealed: str
 
 ## A non-bare `except`
 
-For simple `try`/`except` blocks, `except TypeError:` has the same control flow
-as `except:`. There might have been an unhandled exception, but (as described
-in [the document on exception-handling semantics](https://astral-sh.notion.site/Exception-handler-control-flow-11348797e1ca80bb8ce1e9aedbbe439d))
-that would lead to termination of the scope. It's therefore irrelevant to
-consider this possibility when it comes to control-flow analysis.
+For simple `try`/`except` blocks, an `except TypeError:` handler has the same
+control flow semantics as an `except:` handler. An `except TypeError:` handler
+will not catch *all* exceptions: if this is the only handler, it opens up the
+possibility that an exception might occur that would not be handled. However,
+as described in [the document on exception-handling semantics][1], that would
+lead to termination of the scope. It's therefore irrelevant to consider this
+possibility when it comes to control-flow analysis.
 
 ```py
 def could_raise_returns_str() -> str:
@@ -89,8 +105,8 @@ reveal_type(x)  # revealed: str | Literal[2]
 If the scope reaches the final `reveal_type` call in this example,
 either the `try`-block suite of statements was executed in its entirety,
 or exactly one `except` suite was executed in its entirety.
-The inferred type of `x` should be the union of the types at the end of the
-three suites:
+The inferred type of `x` at this point is the union of the types at the end of
+the three suites:
 
 - At the end of `try`, `type(x) == str`
 - At the end of `except TypeError`, `x == 2`
@@ -122,9 +138,9 @@ reveal_type(x)  # revealed: str | Literal[2, 3]
 
 If we reach the `reveal_type` call at the end of this scope,
 either the `try` and `else` suites were both executed in their entireties,
-or the `except` suite was executed in its entirety. The type of `x` will be the
-union of the type at the end of the `else` suite and the type at the end of the
-`except` suite:
+or the `except` suite was executed in its entirety. The type of `x` at this
+point is the union of the type at the end of the `else` suite and the type at
+the end of the `except` suite:
 
 - At the end of `else`, `x == 3`
 - At the end of `except`, `x == 2`
@@ -244,7 +260,7 @@ following possibilities inside `finally` suites:
 - Or we could have jumped from halfway through the `try` suite to an `except`
     suite, and the `except` suite ran to completion
 - Or we could have jumped from halfway through the `try` suite straight to the
-    `finally` suite
+    `finally` suite due to an unhandled exception
 - Or we could have jumped from halfway through the `try` suite to an
     `except` suite, only for an exception raised in the `except` suite to cause
     us to jump to the `finally` suite before the `except` suite ran to completion
@@ -284,7 +300,7 @@ Now for an example without a redefinition in the `finally` suite.
 As before, there *should* be fewer possibilities after completion of the
 `finally` suite than there were during the `finally` suite itself.
 (In some control-flow possibilities, some exceptions were merely *suspended*
-during the `finally` suite, and lead to the scope's termination following the
+during the `finally` suite; these lead to the scope's termination following the
 conclusion of the `finally` suite.)
 
 ```py path=no_redef_in_finally.py
@@ -621,3 +637,5 @@ finally:
 
 reveal_type(x)  # revealed: Literal[foo] | Literal[Bar]
 ```
+
+[1]: https://astral-sh.notion.site/Exception-handler-control-flow-11348797e1ca80bb8ce1e9aedbbe439d
