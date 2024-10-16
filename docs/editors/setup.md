@@ -330,7 +330,7 @@ Ruff can be installed as an [External Tool](https://www.jetbrains.com/help/pycha
 in PyCharm. Open the Preferences pane, then navigate to "Tools", then "External Tools". From there,
 add a new tool with the following configuration:
 
-![Install Ruff as an External Tool](https://user-images.githubusercontent.com/1309177/193155720-336e43f0-1a8d-46b4-bc12-e60f9ae01f7e.png)
+![Install Ruff as an External Tool](https://github.com/user-attachments/assets/2b7af3e4-8196-4c64-a721-5bc3d7564a72)
 
 Ruff should then appear as a runnable action:
 
