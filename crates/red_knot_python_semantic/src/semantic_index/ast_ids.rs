@@ -34,7 +34,13 @@ pub(crate) struct AstIds {
 
 impl AstIds {
     fn expression_id(&self, key: impl Into<ExpressionNodeKey>) -> ScopedExpressionId {
-        self.expressions_map[&key.into()]
+        let key = &key.into();
+        match self.expressions_map.get(key) {
+            Some(result) => *result,
+            None => {
+                panic!("Could not find expression ID for {key:?}");
+            }
+        }
     }
 
     fn use_id(&self, key: impl Into<ExpressionNodeKey>) -> ScopedUseId {

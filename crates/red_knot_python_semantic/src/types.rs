@@ -1,11 +1,11 @@
-use infer::TypeInferenceBuilder;
+use infer::{TypeInference, TypeInferenceBuilder};
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::ast_ids::HasScopedAstId;
 use crate::semantic_index::definition::{Definition, DefinitionKind};
-use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId};
+use crate::semantic_index::symbol::{NodeWithScopeRef, ScopeId, ScopedSymbolId};
 use crate::semantic_index::{
     global_scope, semantic_index, symbol_table, use_def_map, BindingWithConstraints,
     BindingWithConstraintsIterator, DeclarationsIterator,
@@ -1416,10 +1416,31 @@ impl<'db> ClassType<'db> {
         let DefinitionKind::Class(class_stmt_node) = definition.kind(db) else {
             panic!("Class type definition must have DefinitionKind::Class");
         };
-        class_stmt_node
-            .bases()
-            .iter()
-            .map(move |base_expr| definition_expression_ty(db, definition, base_expr))
+
+        let has_type_params = class_stmt_node.type_params.is_some();
+
+        let type_scope_info: Option<(ScopeId<'db>, &TypeInference<'db>)> = if has_type_params {
+            let file = definition.file(db);
+            let index = semantic_index(db, file);
+            // we need to use the type param'd scope
+            let type_param_scope = index
+                .node_scope(NodeWithScopeRef::ClassTypeParameters(class_stmt_node))
+                .to_scope_id(db, file);
+            Some((type_param_scope, infer_scope_types(db, type_param_scope)))
+        } else {
+            None
+        };
+
+        let mapper = move |base_expr: &ast::Expr| {
+            if has_type_params {
+                // Safety: we calculated the inference if has_type_params
+                let (type_param_scope, inferences) = type_scope_info.unwrap();
+                inferences.expression_ty(base_expr.scoped_ast_id(db, type_param_scope))
+            } else {
+                definition_expression_ty(db, definition, base_expr)
+            }
+        };
+        class_stmt_node.bases().iter().map(mapper)
     }
 
     /// Returns the class member of this class named `name`.
