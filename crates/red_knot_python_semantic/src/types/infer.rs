@@ -26,6 +26,8 @@
 //! stringified annotations. We have a fourth Salsa query for inferring the deferred types
 //! associated with a particular definition. Scope-level inference infers deferred types for all
 //! definitions once the rest of the types in the scope have been inferred.
+//!
+//! No-op change to test CI.
 use itertools::Itertools;
 use std::borrow::Cow;
 use std::num::NonZeroU32;
