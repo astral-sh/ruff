@@ -467,7 +467,7 @@ impl<'db> Type<'db> {
     ///
     /// Note: This function aims to have no false positives, but might return `false`
     /// for more complicated types that are actually singletons.
-    pub(crate) fn is_singleton(self, db: &'db dyn Db) -> bool {
+    pub(crate) fn is_singleton(self) -> bool {
         match self {
             Type::Any
             | Type::Never
@@ -486,7 +486,10 @@ impl<'db> Type<'db> {
             }
             Type::None | Type::BooleanLiteral(_) | Type::Function(..) | Type::Class(..) | Type::Module(..) => true,
             Type::Tuple(..) => {
-                // Not even empty tuples are proper singleton types, see:
+                // The empty tuple is a singleton on CPython and PyPy, but not on other Python
+                // implementations such as GraalPy. Its *use* as a singleton is discouraged and
+                // should not be relied on for type narrowing, so we do not treat it as one.
+                // See:
                 // https://docs.python.org/3/reference/expressions.html#parenthesized-forms
                 false
             }
@@ -1680,7 +1683,7 @@ mod tests {
     fn is_singleton(from: Ty) {
         let db = setup_db();
 
-        assert!(from.into_type(&db).is_singleton(&db));
+        assert!(from.into_type(&db).is_singleton());
     }
 
     #[test_case(Ty::Never)]
@@ -1693,7 +1696,7 @@ mod tests {
     fn is_not_singleton(from: Ty) {
         let db = setup_db();
 
-        assert!(!from.into_type(&db).is_singleton(&db));
+        assert!(!from.into_type(&db).is_singleton());
     }
 
     #[test_case(Ty::IntLiteral(1); "is_int_literal_truthy")]
