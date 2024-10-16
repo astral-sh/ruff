@@ -20,6 +20,7 @@ use crate::expression::{
     maybe_parenthesize_expression,
 };
 use crate::other::string_literal::StringLiteralKind;
+use crate::preview::is_join_implicit_concatenated_string_enabled;
 use crate::statement::trailing_semicolon;
 use crate::string::StringLikeExtensions;
 use crate::{has_skip_comment, prelude::*};
@@ -286,10 +287,12 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
         match self {
             FormatStatementsLastExpression::LeftToRight { value, statement } => {
                 let can_inline_comment = should_inline_comments(value, *statement, f.context());
-                let is_implicit_concatenated = StringLike::try_from(*value).is_ok_and(|string| {
-                    string.is_implicit_concatenated()
-                        && !string.is_implicit_and_cant_join(f.context())
-                });
+                let is_implicit_concatenated =
+                    is_join_implicit_concatenated_string_enabled(f.context())
+                        && StringLike::try_from(*value).is_ok_and(|string| {
+                            string.is_implicit_concatenated()
+                                && !string.is_implicit_and_cant_join(f.context())
+                        });
 
                 if !can_inline_comment && !is_implicit_concatenated {
                     return maybe_parenthesize_expression(
