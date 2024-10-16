@@ -272,7 +272,18 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     }
                 }
 
-                self.negative.insert(new_negative);
+                // This condition disregards irrelevant negative contributions. For example,
+                // we have A & ~B = A, if B is disjoint from A. So we only add negative
+                // elements if they overlap with any of the given positive contributions.
+                // Unless there are none yet.
+                if self.positive.is_empty()
+                    || self
+                        .positive
+                        .iter()
+                        .any(|pos| !new_negative.is_disjoint_from(db, *pos))
+                {
+                    self.negative.insert(new_negative);
+                }
             }
         }
     }
@@ -630,5 +641,20 @@ mod tests {
             .build();
 
         assert_eq!(ty, Type::Never);
+    }
+
+    #[test]
+    fn build_intersection_simplify_disregard_irrelevant_negative() {
+        let db = setup_db();
+
+        let t_p = KnownClass::Bool.to_instance(&db);
+        let t_n = Type::IntLiteral(1);
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(t_p)
+            .add_negative(t_n)
+            .build();
+
+        assert_eq!(ty, t_p);
     }
 }
