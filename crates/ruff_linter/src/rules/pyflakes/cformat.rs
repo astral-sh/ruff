@@ -73,8 +73,7 @@ mod tests {
         let literal = "%(foo)s %s %d %(bar)x";
 
         let expected_positional = 2;
-        let expected_keywords: FxHashSet<_> =
-            ["foo", "bar"].into_iter().map(String::from).collect();
+        let expected_keywords = ["foo", "bar"].into_iter().map(String::from).collect();
 
         let format_summary = CFormatSummary::try_from(literal).unwrap();
         assert!(!format_summary.starred);
