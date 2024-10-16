@@ -282,11 +282,11 @@ impl<'db> Type<'db> {
     }
 
     fn contains_unbound(&self, db: &'db dyn Db) -> bool {
-        return self.is_equivalent_to(db, Type::Unbound)
-            || match self {
-                Type::Union(union) => union.elements(db).iter().any(|ty| ty.contains_unbound(db)),
-                _ => false,
-            };
+        match self {
+            Type::Unbound => true,
+            Type::Union(union) => union.elements(db).iter().any(|ty| ty.contains_unbound(db)),
+            _ => false,
+        }
     }
 
     pub const fn is_never(&self) -> bool {
