@@ -328,7 +328,7 @@ fn is_not_implemented_stub_with_variable(function_def: &StmtFunctionDef) -> bool
     // Ignore doc-strings.
     let statements = match function_def.body.as_slice() {
         [Stmt::Expr(StmtExpr { value, .. }), rest @ ..]
-            if matches!(value.as_ref(), ast::Expr::StringLiteral(_)) =>
+            if matches!(**value, ast::Expr::StringLiteral(_)) =>
         {
             rest
         }
@@ -343,10 +343,7 @@ fn is_not_implemented_stub_with_variable(function_def: &StmtFunctionDef) -> bool
         return false;
     };
 
-    if !matches!(
-        value.as_ref(),
-        ast::Expr::StringLiteral(_) | ast::Expr::FString(_)
-    ) {
+    if !matches!(**value, ast::Expr::StringLiteral(_) | ast::Expr::FString(_)) {
         return false;
     }
 
@@ -360,12 +357,12 @@ fn is_not_implemented_stub_with_variable(function_def: &StmtFunctionDef) -> bool
 
     let ast::Expr::Call(ast::ExprCall {
         func, arguments, ..
-    }) = exception.as_ref()
+    }) = &**exception
     else {
         return false;
     };
 
-    if !matches!(func.as_ref(), ast::Expr::Name(name) if name.id == "NotImplementedError") {
+    if !matches!(&**func, ast::Expr::Name(name) if name.id == "NotImplementedError") {
         return false;
     }
 
