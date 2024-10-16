@@ -164,20 +164,29 @@ impl FusedIterator for AnyStringPartsIter<'_> {}
 /// string. This could be either a string, bytes or f-string.
 ///
 /// This is constructed from the [`AnyString::parts`] method on [`AnyString`].
-#[derive(Clone, Debug)]
-pub(super) enum AnyStringPart<'a> {
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum AnyStringPart<'a> {
     String(&'a ast::StringLiteral),
     Bytes(&'a ast::BytesLiteral),
     FString(&'a ast::FString),
 }
 
 impl AnyStringPart<'_> {
-    fn flags(&self) -> AnyStringFlags {
+    pub(super) fn flags(self) -> AnyStringFlags {
         match self {
             Self::String(part) => part.flags.into(),
             Self::Bytes(bytes_literal) => bytes_literal.flags.into(),
             Self::FString(part) => part.flags.into(),
         }
+    }
+
+    /// Returns the range of the string's content in the source (minus prefix and quotes).
+    pub(super) fn content_range(self) -> TextRange {
+        let kind = self.flags();
+        TextRange::new(
+            self.start() + kind.opener_len(),
+            self.end() - kind.closer_len(),
+        )
     }
 }
 
@@ -188,6 +197,24 @@ impl<'a> From<&AnyStringPart<'a>> for AnyNodeRef<'a> {
             AnyStringPart::Bytes(part) => AnyNodeRef::BytesLiteral(part),
             AnyStringPart::FString(part) => AnyNodeRef::FString(part),
         }
+    }
+}
+
+impl<'a> From<&'a ast::StringLiteral> for AnyStringPart<'a> {
+    fn from(value: &'a ast::StringLiteral) -> Self {
+        Self::String(value)
+    }
+}
+
+impl<'a> From<&'a ast::BytesLiteral> for AnyStringPart<'a> {
+    fn from(value: &'a ast::BytesLiteral) -> Self {
+        Self::Bytes(value)
+    }
+}
+
+impl<'a> From<&'a ast::FString> for AnyStringPart<'a> {
+    fn from(value: &'a ast::FString) -> Self {
+        Self::FString(value)
     }
 }
 

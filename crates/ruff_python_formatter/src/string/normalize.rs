@@ -9,7 +9,8 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::context::FStringState;
 use crate::prelude::*;
 use crate::preview::is_f_string_formatting_enabled;
-use crate::string::{Quoting, StringPart, StringQuotes};
+use crate::string::any::AnyStringPart;
+use crate::string::{Quoting, StringQuotes};
 use crate::QuoteStyle;
 
 pub(crate) struct StringNormalizer<'a, 'src> {
@@ -37,7 +38,7 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
         self
     }
 
-    fn quoting(&self, string: StringPart) -> Quoting {
+    fn quoting(&self, string: AnyStringPart) -> Quoting {
         if let FStringState::InsideExpressionElement(context) = self.context.f_string_state() {
             // If we're inside an f-string, we need to make sure to preserve the
             // existing quotes unless we're inside a triple-quoted f-string and
@@ -66,7 +67,7 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
     }
 
     /// Computes the strings preferred quotes.
-    pub(crate) fn choose_quotes(&self, string: StringPart) -> QuoteSelection {
+    pub(crate) fn choose_quotes(&self, string: AnyStringPart) -> QuoteSelection {
         let raw_content = self.context.locator().slice(string.content_range());
         let first_quote_or_normalized_char_offset = raw_content
             .bytes()
@@ -168,7 +169,7 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
     }
 
     /// Computes the strings preferred quotes and normalizes its content.
-    pub(crate) fn normalize(&self, string: StringPart) -> NormalizedString<'src> {
+    pub(crate) fn normalize(&self, string: AnyStringPart) -> NormalizedString<'src> {
         let raw_content = self.context.locator().slice(string.content_range());
         let quote_selection = self.choose_quotes(string);
 

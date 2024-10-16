@@ -3,11 +3,9 @@ pub(crate) use normalize::{normalize_string, NormalizedString, StringNormalizer}
 use ruff_formatter::format_args;
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::{
-    self as ast,
     str_prefix::{AnyStringPrefix, StringLiteralPrefix},
     AnyStringFlags, StringFlags,
 };
-use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{leading_comments, trailing_comments};
 use crate::expression::parentheses::in_parentheses_only_soft_line_break_or_space;
@@ -137,61 +135,6 @@ impl From<Quote> for QuoteStyle {
         match value {
             Quote::Single => QuoteStyle::Single,
             Quote::Double => QuoteStyle::Double,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct StringPart {
-    flags: AnyStringFlags,
-    range: TextRange,
-}
-
-impl Ranged for StringPart {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-
-impl StringPart {
-    /// Use the `kind()` method to retrieve information about the
-    fn flags(self) -> AnyStringFlags {
-        self.flags
-    }
-
-    /// Returns the range of the string's content in the source (minus prefix and quotes).
-    fn content_range(self) -> TextRange {
-        let kind = self.flags();
-        TextRange::new(
-            self.start() + kind.opener_len(),
-            self.end() - kind.closer_len(),
-        )
-    }
-}
-
-impl From<&ast::StringLiteral> for StringPart {
-    fn from(value: &ast::StringLiteral) -> Self {
-        Self {
-            range: value.range,
-            flags: value.flags.into(),
-        }
-    }
-}
-
-impl From<&ast::BytesLiteral> for StringPart {
-    fn from(value: &ast::BytesLiteral) -> Self {
-        Self {
-            range: value.range,
-            flags: value.flags.into(),
-        }
-    }
-}
-
-impl From<&ast::FString> for StringPart {
-    fn from(value: &ast::FString) -> Self {
-        Self {
-            range: value.range,
-            flags: value.flags.into(),
         }
     }
 }
