@@ -472,17 +472,65 @@ impl<'db> Type<'db> {
     }
 
     /// Return true if this type and `other` have no common elements.
+    ///
+    /// Note: This function aims to have no false positives, but might return
+    /// wrong `false` answers in some cases.
     pub(crate) fn is_disjoint_from(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         match (self, other) {
             (Type::Never, _) | (_, Type::Never) => true,
-            (Type::Union(union), other) | (other, Type::Union(union)) => todo!(),
-            (Type::Intersection(intersection), other)
-            | (other, Type::Intersection(intersection)) => todo!(),
+            (Type::Any, _) | (_, Type::Any) => false,
+            (Type::Unknown, _) | (_, Type::Unknown) => false,
+            (Type::Unbound, _) | (_, Type::Unbound) => false,
+            (Type::Todo, _) | (_, Type::Todo) => false,
 
-            // In all branches below, Never, Union, and Intersection are unreachable
-            // on both sides
+            (Type::Union(union), other) | (other, Type::Union(union)) => union
+                .elements(db)
+                .iter()
+                .all(|e| e.is_disjoint_from(db, other)),
+
+            (Type::Intersection(intersection), other)
+            | (other, Type::Intersection(intersection)) => {
+                if intersection
+                    .positive(db)
+                    .iter()
+                    .any(|p| p.is_disjoint_from(db, other))
+                {
+                    true
+                } else {
+                    // TODO we can do better here. For example:
+                    // X & ~Literal[1] is disjoint from Literal[1]
+                    false
+                }
+            }
+
+            (Type::Tuple(tuple), other) | (other, Type::Tuple(tuple)) => {
+                if let Type::Tuple(other_tuple) = other {
+                    if tuple.len(db) == other_tuple.len(db) {
+                        tuple
+                            .elements(db)
+                            .iter()
+                            .zip(other_tuple.elements(db).iter())
+                            .all(|(e1, e2)| e1.is_disjoint_from(db, *e2))
+                    } else {
+                        true
+                    }
+                } else {
+                    // TODO: is this wrong because tuple can be subclassed?
+                    true
+                }
+            }
+
             (Type::None, other) | (other, Type::None) => match other {
-                Type::Never | Type::Union(..) | Type::Intersection(..) => unreachable!(),
+                Type::Never
+                | Type::Any
+                | Type::Unknown
+                | Type::Unbound
+                | Type::Todo
+                | Type::Union(..)
+                | Type::Intersection(..)
+                | Type::Tuple(..) => {
+                    unreachable!("handled above")
+                }
                 Type::IntLiteral(_)
                 | Type::BooleanLiteral(_)
                 | Type::StringLiteral(..)
@@ -490,35 +538,66 @@ impl<'db> Type<'db> {
                 | Type::BytesLiteral(..)
                 | Type::Function(..)
                 | Type::Module(..)
-                | Type::Class(..)
-                | Type::Tuple(..) => true,
+                | Type::Class(..) => true,
                 Type::None => false,
                 Type::Instance(class_type) => {
-                    !class_type.is_known(db, KnownClass::NoneType) // TODO: is this enough?
+                    !class_type.is_known(db, KnownClass::NoneType) // TODO: is this enough since NoneType is final?
                 }
-                Type::Any | Type::Unknown | Type::Unbound | Type::Todo => todo!(),
             },
 
-            // In all branches below, None is unreachable in addition
-            (Type::BooleanLiteral(b), other) | (other, Type::BooleanLiteral(b)) => match other {
-                Type::Never | Type::Union(..) | Type::Intersection(..) | Type::None => {
-                    unreachable!()
+            (Type::BooleanLiteral(bool), other) | (other, Type::BooleanLiteral(bool)) => {
+                match other {
+                    Type::Never
+                    | Type::Any
+                    | Type::Unknown
+                    | Type::Unbound
+                    | Type::Todo
+                    | Type::Union(..)
+                    | Type::Intersection(..)
+                    | Type::Tuple(..)
+                    | Type::None => {
+                        unreachable!("handled above")
+                    }
+                    Type::IntLiteral(_)
+                    | Type::StringLiteral(..)
+                    | Type::LiteralString
+                    | Type::BytesLiteral(..)
+                    | Type::Function(..)
+                    | Type::Module(..)
+                    | Type::Class(..) => true,
+                    Type::BooleanLiteral(bool_other) => bool != bool_other,
+                    Type::Instance(class_type) => {
+                        !class_type.is_known(db, KnownClass::Bool) // TODO: is this enough since bool is final?
+                    }
                 }
-                Type::IntLiteral(_)
-                | Type::StringLiteral(..)
+            }
+
+            (Type::IntLiteral(int), other) | (other, Type::IntLiteral(int)) => match other {
+                Type::Never
+                | Type::Any
+                | Type::Unknown
+                | Type::Unbound
+                | Type::Todo
+                | Type::Union(..)
+                | Type::Intersection(..)
+                | Type::Tuple(..)
+                | Type::None
+                | Type::BooleanLiteral(..) => {
+                    unreachable!("handled above")
+                }
+                Type::StringLiteral(..)
                 | Type::LiteralString
                 | Type::BytesLiteral(..)
                 | Type::Function(..)
                 | Type::Module(..)
-                | Type::Class(..)
-                | Type::Tuple(..) => true,
-                Type::BooleanLiteral(other_b) => b != other_b,
+                | Type::Class(..) => true,
+                Type::IntLiteral(int_other) => int != int_other,
                 Type::Instance(class_type) => {
-                    !class_type.is_known(db, KnownClass::Bool) // TODO: is this enough?
+                    !class_type.is_known(db, KnownClass::Int) // TODO: this is probably wrong since there could be subclasses of int?
                 }
-                Type::Any | Type::Unknown | Type::Unbound | Type::Todo => todo!(),
             },
 
+            // TODO: Handle, StringLiteral, LiteralString, BytesLiteral, Tuple
             _ => false,
         }
     }
@@ -1600,8 +1679,8 @@ impl<'db> TupleType<'db> {
 #[cfg(test)]
 mod tests {
     use super::{
-        builtins_symbol_ty, BytesLiteralType, StringLiteralType, Truthiness, TupleType, Type,
-        UnionType,
+        builtins_symbol_ty, BytesLiteralType, IntersectionBuilder, StringLiteralType, Truthiness,
+        TupleType, Type, UnionType,
     };
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
@@ -1645,6 +1724,7 @@ mod tests {
         BytesLiteral(&'static str),
         BuiltinInstance(&'static str),
         Union(Vec<Ty>),
+        Intersection(Vec<Ty>, Vec<Ty>),
         Tuple(Vec<Ty>),
     }
 
@@ -1663,6 +1743,16 @@ mod tests {
                 Ty::BuiltinInstance(s) => builtins_symbol_ty(db, s).to_instance(db),
                 Ty::Union(tys) => {
                     UnionType::from_elements(db, tys.into_iter().map(|ty| ty.into_type(db)))
+                }
+                Ty::Intersection(pos, neg) => {
+                    let mut builder = IntersectionBuilder::new(db);
+                    for p in pos {
+                        builder = builder.add_positive(p.into_type(db));
+                    }
+                    for n in neg {
+                        builder = builder.add_negative(n.into_type(db));
+                    }
+                    builder.build()
                 }
                 Ty::Tuple(tys) => {
                     let elements: Box<_> = tys.into_iter().map(|ty| ty.into_type(db)).collect();
@@ -1746,6 +1836,12 @@ mod tests {
     #[test_case(Ty::None, Ty::BuiltinInstance("int"))]
     #[test_case(Ty::BoolLiteral(true), Ty::BuiltinInstance("int"))]
     #[test_case(Ty::BoolLiteral(true), Ty::BoolLiteral(false))]
+    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::IntLiteral(3))]
+    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(3), Ty::IntLiteral(4)]))]
+    #[test_case(Ty::Intersection(vec![Ty::BuiltinInstance("int"), Ty::IntLiteral(1)], vec![]), Ty::IntLiteral(2))]
+    #[test_case(Ty::Tuple(vec![Ty::BuiltinInstance("int")]), Ty::BuiltinInstance("int"))]
+    #[test_case(Ty::Tuple(vec![Ty::IntLiteral(1)]), Ty::Tuple(vec![Ty::IntLiteral(2)]))]
+    #[test_case(Ty::Tuple(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Tuple(vec![Ty::IntLiteral(1)]))]
     fn is_disjoint_from(a: Ty, b: Ty) {
         let db = setup_db();
         let a = a.into_type(&db);
@@ -1755,12 +1851,17 @@ mod tests {
         assert!(b.is_disjoint_from(&db, a));
     }
 
+    #[test_case(Ty::Any, Ty::BuiltinInstance("int"))]
     #[test_case(Ty::None, Ty::None)]
     #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinInstance("int"))]
     #[test_case(Ty::BuiltinInstance("str"), Ty::LiteralString)]
     #[test_case(Ty::BoolLiteral(true), Ty::BoolLiteral(true))]
     #[test_case(Ty::BoolLiteral(false), Ty::BoolLiteral(false))]
     #[test_case(Ty::BoolLiteral(true), Ty::BuiltinInstance("bool"))]
+    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::IntLiteral(2))]
+    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(2), Ty::IntLiteral(3)]))]
+    #[test_case(Ty::Intersection(vec![Ty::BuiltinInstance("int"), Ty::IntLiteral(2)], vec![]), Ty::IntLiteral(2))]
+    #[test_case(Ty::Tuple(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Tuple(vec![Ty::IntLiteral(1), Ty::BuiltinInstance("int")]))]
     fn is_not_disjoint_from(a: Ty, b: Ty) {
         let db = setup_db();
         let a = a.into_type(&db);

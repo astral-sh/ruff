@@ -268,14 +268,14 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         return;
                     }
                 }
-                for neg in &self.negative {
-                    // TODO: what is the mirror-rule here?
-                    // if ty.is_disjoint_from(db, neg) {
-                    //     self.negative.clear();
-                    //     self.positive.clear();
-                    //     return;
-                    // }
-                }
+                // TODO: what is the mirror-rule here?
+                // for neg in &self.negative {
+                //     if ty.is_disjoint_from(db, neg) {
+                //         self.negative.clear();
+                //         self.positive.clear();
+                //         return;
+                //     }
+                // }
                 self.negative.insert(ty);
             }
         }
@@ -505,7 +505,7 @@ mod tests {
         let db = setup_db();
         let ta = Type::Any;
         let t1 = Type::IntLiteral(1);
-        let t2 = Type::IntLiteral(2);
+        let t2 = KnownClass::Int.to_instance(&db);
         let i0 = IntersectionBuilder::new(&db)
             .add_positive(ta)
             .add_negative(t1)
