@@ -600,7 +600,7 @@ impl<'db> Type<'db> {
                 }
             },
 
-            // TODO: Handle, StringLiteral, LiteralString, BytesLiteral, Tuple
+            // TODO: Handle, StringLiteral, LiteralString, BytesLiteral
             _ => false,
         }
     }
