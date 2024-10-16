@@ -20,7 +20,7 @@ exception to be raised.
 
 If there are different types for a single variable `x` in the two branches, we
 can't determine which branch might have been taken. The inferred type after
-the `try`/`except` block is therefore the union of type at the end of the `try`
+the `try`/`except` block is therefore the union of the type at the end of the `try`
 suite (`str`) and the type at the end of the `except` suite (`Literal[2]`):
 
 ```py path=union_type_inferred.py

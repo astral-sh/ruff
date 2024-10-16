@@ -870,7 +870,7 @@ where
                 // ran to completion or exactly one `except` branch ran to completion, and then again under
                 // the assumption that potentially none of the branches ran to completion and we in fact
                 // jumped from a `try`, `else` or `except` branch straight into the `finally` branch.
-                // This requires some rethinking of some fundamental assumptions the `use-def` map makes.
+                // This requires rethinking some fundamental assumptions semantic indexing makes.
                 // For more details, see:
                 // - https://astral-sh.notion.site/Exception-handler-control-flow-11348797e1ca80bb8ce1e9aedbbe439d
                 // - https://github.com/astral-sh/ruff/pull/13633#discussion_r1788626702
