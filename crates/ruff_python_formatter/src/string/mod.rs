@@ -20,9 +20,7 @@ use crate::expression::parentheses::in_parentheses_only_soft_line_break_or_space
 use crate::other::f_string::FormatFString;
 use crate::other::string_literal::StringLiteralKind;
 use crate::prelude::*;
-use crate::preview::{
-    is_f_string_formatting_enabled, is_join_implicit_concatenated_string_enabled,
-};
+use crate::preview::is_join_implicit_concatenated_string_enabled;
 use crate::string::normalize::QuoteMetadata;
 use crate::QuoteStyle;
 
