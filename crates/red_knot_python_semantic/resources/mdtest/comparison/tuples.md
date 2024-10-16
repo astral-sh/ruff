@@ -6,7 +6,7 @@ For tuples like `tuple[int, str, Literal[1]]`
 
 ### Value Comparisons
 
-`Value Comparisons` refers to the operators: `==`, `!=`, `<`, `<=`, `>`, `>=`
+"Value Comparisons" refers to the operators: `==`, `!=`, `<`, `<=`, `>`, `>=`
 
 #### Results without Ambiguity
 
@@ -95,7 +95,7 @@ reveal_type(a == b)  # revealed: @Todo
 # TODO: should be Literal[True]
 reveal_type(a != b)  # revealed: @Todo
 
-# TODO: should be Unknown and add more infomative diagnosis
+# TODO: should be Unknown and add more infomative diagnostics
 reveal_type(a < b)   # revealed: @Todo
 reveal_type(a <= b)  # revealed: @Todo
 reveal_type(a > b)   # revealed: @Todo
@@ -156,7 +156,7 @@ reveal_type(a >= a)  # revealed: @Todo
 
 ### Membership Test Comparisons
 
-`Membership Test Comparisons` refers to the operators `in` and `not in`.
+"Membership Test Comparisons" refers to the operators `in` and `not in`.
 
 ```py
 def int_instance() -> int: ...
@@ -179,7 +179,7 @@ reveal_type(a not in d)  # revealed: @Todo
 
 ### Identity Comparisons
 
-`Identity Comparisons` refers to `is` and `is not`.
+"Identity Comparisons" refers to `is` and `is not`.
 
 ```py
 a = (1, 2)
