@@ -17,6 +17,11 @@ pub struct FormatExprFString {
 
 #[derive(Default)]
 pub struct ExprFStringLayout {
+    /// ID of the group wrapping the implicit concatenated string. If `None`, the implicit
+    /// is wrapped in an [`in_parentheses_only_group`].
+    ///
+    /// This is used when formatting implicit concatenated strings in assignment value positions
+    /// where the positioning of comments depends on whether the string can be joined or not.
     pub implicit_group_id: Option<GroupId>,
 }
 
