@@ -1,11 +1,11 @@
-use infer::TypeInferenceBuilder;
+use infer::{TypeInference, TypeInferenceBuilder};
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::ast_ids::HasScopedAstId;
 use crate::semantic_index::definition::{Definition, DefinitionKind};
-use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId};
+use crate::semantic_index::symbol::{NodeWithScopeRef, ScopeId, ScopedSymbolId};
 use crate::semantic_index::{
     global_scope, semantic_index, symbol_table, use_def_map, BindingWithConstraints,
     BindingWithConstraintsIterator, DeclarationsIterator,
