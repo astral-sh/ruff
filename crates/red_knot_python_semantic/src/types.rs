@@ -282,14 +282,6 @@ impl<'db> Type<'db> {
         matches!(self, Type::Unbound)
     }
 
-    fn contains_unbound(&self, db: &'db dyn Db) -> bool {
-        match self {
-            Type::Unbound => true,
-            Type::Union(union) => union.elements(db).iter().any(|ty| ty.contains_unbound(db)),
-            _ => false,
-        }
-    }
-
     pub const fn is_never(&self) -> bool {
         matches!(self, Type::Never)
     }
