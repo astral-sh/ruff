@@ -1,21 +1,24 @@
-pub(crate) use any::AnyString;
+use memchr::memchr2;
+
 pub(crate) use normalize::{normalize_string, NormalizedString, StringNormalizer};
 use ruff_formatter::format_args;
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::{
+    self as ast,
     str_prefix::{AnyStringPrefix, StringLiteralPrefix},
-    AnyStringFlags, StringFlags,
+    AnyStringFlags, StringFlags, StringLike, StringLikePart,
 };
+use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
 use crate::comments::{leading_comments, trailing_comments};
+use crate::expression::expr_f_string::f_string_quoting;
 use crate::expression::parentheses::in_parentheses_only_soft_line_break_or_space;
 use crate::other::f_string::FormatFString;
 use crate::other::string_literal::StringLiteralKind;
 use crate::prelude::*;
-use crate::string::any::AnyStringPart;
 use crate::QuoteStyle;
 
-mod any;
 pub(crate) mod docstring;
 mod normalize;
 
@@ -29,11 +32,11 @@ pub(crate) enum Quoting {
 /// Formats any implicitly concatenated string. This could be any valid combination
 /// of string, bytes or f-string literals.
 pub(crate) struct FormatImplicitConcatenatedString<'a> {
-    string: AnyString<'a>,
+    string: StringLike<'a>,
 }
 
 impl<'a> FormatImplicitConcatenatedString<'a> {
-    pub(crate) fn new(string: impl Into<AnyString<'a>>) -> Self {
+    pub(crate) fn new(string: impl Into<StringLike<'a>>) -> Self {
         Self {
             string: string.into(),
         }
@@ -51,7 +54,7 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedString<'_> {
             let part_comments = comments.leading_dangling_trailing(&part);
 
             let format_part = format_with(|f: &mut PyFormatter| match part {
-                AnyStringPart::String(part) => {
+                StringLikePart::String(part) => {
                     let kind = if self.string.is_fstring() {
                         #[allow(deprecated)]
                         StringLiteralKind::InImplicitlyConcatenatedFString(quoting)
@@ -61,8 +64,8 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedString<'_> {
 
                     part.format().with_options(kind).fmt(f)
                 }
-                AnyStringPart::Bytes(bytes_literal) => bytes_literal.format().fmt(f),
-                AnyStringPart::FString(part) => FormatFString::new(part, quoting).fmt(f),
+                StringLikePart::Bytes(bytes_literal) => bytes_literal.format().fmt(f),
+                StringLikePart::FString(part) => FormatFString::new(part, quoting).fmt(f),
             });
 
             joiner.entry(&format_args![
@@ -135,6 +138,36 @@ impl From<Quote> for QuoteStyle {
         match value {
             Quote::Single => QuoteStyle::Single,
             Quote::Double => QuoteStyle::Double,
+        }
+    }
+}
+
+// Extension trait that adds formatter specific helper methods to `StringLike`.
+pub(crate) trait StringLikeExtensions {
+    fn quoting(&self, locator: &Locator<'_>) -> Quoting;
+
+    fn is_multiline(&self, source: &str) -> bool;
+}
+
+impl StringLikeExtensions for ast::StringLike<'_> {
+    fn quoting(&self, locator: &Locator<'_>) -> Quoting {
+        match self {
+            Self::String(_) | Self::Bytes(_) => Quoting::CanChange,
+            Self::FString(f_string) => f_string_quoting(f_string, locator),
+        }
+    }
+
+    fn is_multiline(&self, source: &str) -> bool {
+        match self {
+            Self::String(_) | Self::Bytes(_) => {
+                self.parts()
+                    .next()
+                    .is_some_and(|part| part.flags().is_triple_quoted())
+                    && memchr2(b'\n', b'\r', source[self.range()].as_bytes()).is_some()
+            }
+            Self::FString(fstring) => {
+                memchr2(b'\n', b'\r', source[fstring.range].as_bytes()).is_some()
+            }
         }
     }
 }
