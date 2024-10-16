@@ -48,8 +48,7 @@ else:
 ```
 
 ```py
-# TODO we should not emit this error
-from b import f # error: [invalid-assignment] "Object of type `Literal[f, f]` is not assignable to `Literal[f, f]`"
+from b import f
 # TODO: We should disambiguate in such cases, showing `Literal[b.f, c.f]`.
 reveal_type(f)  # revealed: Literal[f, f]
 ```
