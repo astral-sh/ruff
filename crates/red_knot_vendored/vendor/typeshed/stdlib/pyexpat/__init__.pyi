@@ -3,16 +3,12 @@ from collections.abc import Callable
 from pyexpat import errors as errors, model as model
 from typing import Any, Final, final
 from typing_extensions import TypeAlias
+from xml.parsers.expat import ExpatError as ExpatError
 
 EXPAT_VERSION: Final[str]  # undocumented
 version_info: tuple[int, int, int]  # undocumented
 native_encoding: str  # undocumented
 features: list[tuple[str, int]]  # undocumented
-
-class ExpatError(Exception):
-    code: int
-    lineno: int
-    offset: int
 
 error = ExpatError
 XML_PARAM_ENTITY_PARSING_NEVER: Final = 0

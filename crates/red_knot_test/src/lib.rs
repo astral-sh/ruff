@@ -1,3 +1,4 @@
+use colored::Colorize;
 use parser as test_parser;
 use red_knot_python_semantic::types::check_types;
 use ruff_db::files::system_path_to_file;
@@ -31,19 +32,22 @@ pub fn run(path: &PathBuf, title: &str) {
     for test in suite.tests() {
         if let Err(failures) = run_test(&test) {
             any_failures = true;
-            println!("{}", test.name());
+            println!("\n{}\n", test.name().bold().underline());
 
             for (path, by_line) in failures {
-                println!("  {path}");
-                for (line, failures) in by_line.iter() {
+                println!("{}", path.as_str().bold());
+                for (line_number, failures) in by_line.iter() {
                     for failure in failures {
-                        println!("    line {line}: {failure}");
+                        let line_info = format!("line {line_number}:").cyan();
+                        println!("    {line_info} {failure}");
                     }
                 }
                 println!();
             }
         }
     }
+
+    println!("{}\n", "-".repeat(50));
 
     assert!(!any_failures, "Some tests failed.");
 }
