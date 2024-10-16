@@ -95,7 +95,7 @@ reveal_type(a == b)  # revealed: @Todo
 # TODO: should be Literal[True]
 reveal_type(a != b)  # revealed: @Todo
 
-# TODO: should be Unknown and add more infomative diagnostics
+# TODO: should be Unknown and add more informative diagnostics
 reveal_type(a < b)   # revealed: @Todo
 reveal_type(a <= b)  # revealed: @Todo
 reveal_type(a > b)   # revealed: @Todo
