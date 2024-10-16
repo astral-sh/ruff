@@ -194,7 +194,7 @@ impl CommentRanges {
     }
 
     /// Returns `true` if a comment is an own-line comment (as opposed to an end-of-line comment).
-    fn is_own_line(offset: TextSize, locator: &Locator) -> bool {
+    pub fn is_own_line(offset: TextSize, locator: &Locator) -> bool {
         let range = TextRange::new(locator.line_start(offset), offset);
         locator.slice(range).chars().all(is_python_whitespace)
     }

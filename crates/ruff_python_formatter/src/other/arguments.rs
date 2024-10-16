@@ -1,5 +1,5 @@
 use ruff_formatter::{write, FormatContext};
-use ruff_python_ast::{ArgOrKeyword, Arguments, Expr};
+use ruff_python_ast::{ArgOrKeyword, Arguments, Expr, StringLike};
 use ruff_python_trivia::{PythonWhitespace, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -8,7 +8,7 @@ use crate::expression::is_expression_huggable;
 use crate::expression::parentheses::{empty_parenthesized, parenthesized, Parentheses};
 use crate::other::commas;
 use crate::prelude::*;
-use crate::string::AnyString;
+use crate::string::StringLikeExtensions;
 
 #[derive(Default)]
 pub struct FormatArguments;
@@ -179,8 +179,8 @@ fn is_arguments_huggable(arguments: &Arguments, context: &PyFormatContext) -> bo
 
     // If the expression itself isn't huggable, then we can't hug it.
     if !(is_expression_huggable(arg, context)
-        || AnyString::from_expression(arg)
-            .is_some_and(|string| is_huggable_string_argument(string, arguments, context)))
+        || StringLike::try_from(arg)
+            .is_ok_and(|string| is_huggable_string_argument(string, arguments, context)))
     {
         return false;
     }
@@ -219,7 +219,7 @@ fn is_arguments_huggable(arguments: &Arguments, context: &PyFormatContext) -> bo
 /// )
 /// ```
 fn is_huggable_string_argument(
-    string: AnyString,
+    string: StringLike,
     arguments: &Arguments,
     context: &PyFormatContext,
 ) -> bool {

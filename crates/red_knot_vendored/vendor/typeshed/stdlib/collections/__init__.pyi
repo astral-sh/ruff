@@ -17,7 +17,6 @@ if sys.version_info >= (3, 10):
         Mapping,
         MutableMapping,
         MutableSequence,
-        Reversible,
         Sequence,
         ValuesView,
     )
@@ -331,13 +330,13 @@ class Counter(dict[_T, int], Generic[_T]):
 
 # The pure-Python implementations of the "views" classes
 # These are exposed at runtime in `collections/__init__.py`
-class _OrderedDictKeysView(KeysView[_KT_co], Reversible[_KT_co]):
+class _OrderedDictKeysView(KeysView[_KT_co]):
     def __reversed__(self) -> Iterator[_KT_co]: ...
 
-class _OrderedDictItemsView(ItemsView[_KT_co, _VT_co], Reversible[tuple[_KT_co, _VT_co]]):
+class _OrderedDictItemsView(ItemsView[_KT_co, _VT_co]):
     def __reversed__(self) -> Iterator[tuple[_KT_co, _VT_co]]: ...
 
-class _OrderedDictValuesView(ValuesView[_VT_co], Reversible[_VT_co]):
+class _OrderedDictValuesView(ValuesView[_VT_co]):
     def __reversed__(self) -> Iterator[_VT_co]: ...
 
 # The C implementations of the "views" classes
@@ -345,18 +344,18 @@ class _OrderedDictValuesView(ValuesView[_VT_co], Reversible[_VT_co]):
 # but they are not exposed anywhere)
 # pyright doesn't have a specific error code for subclassing error!
 @final
-class _odict_keys(dict_keys[_KT_co, _VT_co], Reversible[_KT_co]):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]
+class _odict_keys(dict_keys[_KT_co, _VT_co]):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]
     def __reversed__(self) -> Iterator[_KT_co]: ...
 
 @final
-class _odict_items(dict_items[_KT_co, _VT_co], Reversible[tuple[_KT_co, _VT_co]]):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]
+class _odict_items(dict_items[_KT_co, _VT_co]):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]
     def __reversed__(self) -> Iterator[tuple[_KT_co, _VT_co]]: ...
 
 @final
-class _odict_values(dict_values[_KT_co, _VT_co], Reversible[_VT_co], Generic[_KT_co, _VT_co]):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]
+class _odict_values(dict_values[_KT_co, _VT_co]):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]
     def __reversed__(self) -> Iterator[_VT_co]: ...
 
-class OrderedDict(dict[_KT, _VT], Reversible[_KT], Generic[_KT, _VT]):
+class OrderedDict(dict[_KT, _VT]):
     def popitem(self, last: bool = True) -> tuple[_KT, _VT]: ...
     def move_to_end(self, key: _KT, last: bool = True) -> None: ...
     def copy(self) -> Self: ...

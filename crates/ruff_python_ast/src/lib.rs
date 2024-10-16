@@ -68,7 +68,7 @@ pub enum TomlSourceType {
     Unrecognized,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, is_macro::Is)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PySourceType {
     /// The source is a Python file (`.py`).
@@ -99,13 +99,33 @@ impl PySourceType {
 
         Some(ty)
     }
+
+    pub fn try_from_path(path: impl AsRef<Path>) -> Option<Self> {
+        path.as_ref()
+            .extension()
+            .and_then(OsStr::to_str)
+            .and_then(Self::try_from_extension)
+    }
+
+    pub const fn is_py_file(self) -> bool {
+        matches!(self, Self::Python)
+    }
+
+    pub const fn is_stub(self) -> bool {
+        matches!(self, Self::Stub)
+    }
+
+    pub const fn is_py_file_or_stub(self) -> bool {
+        matches!(self, Self::Python | Self::Stub)
+    }
+
+    pub const fn is_ipynb(self) -> bool {
+        matches!(self, Self::Ipynb)
+    }
 }
 
 impl<P: AsRef<Path>> From<P> for PySourceType {
     fn from(path: P) -> Self {
-        path.as_ref()
-            .extension()
-            .and_then(OsStr::to_str)
-            .map_or(Self::Python, Self::from_extension)
+        Self::try_from_path(path).unwrap_or_default()
     }
 }

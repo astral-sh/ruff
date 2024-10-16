@@ -1,6 +1,6 @@
 import sys
 from collections.abc import Iterable, Iterator
-from typing import Any, Final, Generic, Literal, SupportsInt, TypeVar, overload
+from typing import Any, Final, Generic, Literal, TypeVar, overload
 from typing_extensions import Self, TypeAlias
 
 # Undocumented length constants
@@ -31,7 +31,7 @@ class _IPAddressBase:
     @property
     def version(self) -> int: ...
 
-class _BaseAddress(_IPAddressBase, SupportsInt):
+class _BaseAddress(_IPAddressBase):
     def __init__(self, address: object) -> None: ...
     def __add__(self, other: int) -> Self: ...
     def __hash__(self) -> int: ...

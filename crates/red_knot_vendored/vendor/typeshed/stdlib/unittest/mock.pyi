@@ -363,7 +363,7 @@ class _patcher:
 
 patch: _patcher
 
-class MagicMixin:
+class MagicMixin(Base):
     def __init__(self, *args: Any, **kw: Any) -> None: ...
 
 class NonCallableMagicMock(MagicMixin, NonCallableMock): ...
@@ -393,7 +393,7 @@ class AsyncMock(AsyncMockMixin, AsyncMagicMixin, Mock):
     # But, `NonCallableMock` super-class has the better version.
     def reset_mock(self, visited: Any = None, *, return_value: bool = False, side_effect: bool = False) -> None: ...
 
-class MagicProxy:
+class MagicProxy(Base):
     name: str
     parent: Any
     def __init__(self, name: str, parent: Any) -> None: ...

@@ -316,12 +316,23 @@ else:
         __rand__ = __and__
         __rxor__ = __xor__
 
-# subclassing IntFlag so it picks up all implemented base functions, best modeling behavior of enum.auto()
-class auto(IntFlag):
+class auto:
     _value_: Any
     @_magic_enum_attr
     def value(self) -> Any: ...
     def __new__(cls) -> Self: ...
+
+    # These don't exist, but auto is basically immediately replaced with
+    # either an int or a str depending on the type of the enum. StrEnum's auto
+    # shouldn't have these, but they're needed for int versions of auto (mostly the __or__).
+    # Ideally type checkers would special case auto enough to handle this,
+    # but until then this is a slightly inaccurate helping hand.
+    def __or__(self, other: int | Self) -> Self: ...
+    def __and__(self, other: int | Self) -> Self: ...
+    def __xor__(self, other: int | Self) -> Self: ...
+    __ror__ = __or__
+    __rand__ = __and__
+    __rxor__ = __xor__
 
 if sys.version_info >= (3, 11):
     def pickle_by_global_name(self: Enum, proto: int) -> str: ...

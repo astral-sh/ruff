@@ -2935,6 +2935,42 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::TypeParamParamSpec {
     }
 }
 
+impl FormatRule<ast::StringLiteral, PyFormatContext<'_>>
+    for crate::other::string_literal::FormatStringLiteral
+{
+    #[inline]
+    fn fmt(&self, node: &ast::StringLiteral, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::StringLiteral>::fmt(self, node, f)
+    }
+}
+impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StringLiteral {
+    type Format<'a> = FormatRefWithRule<
+        'a,
+        ast::StringLiteral,
+        crate::other::string_literal::FormatStringLiteral,
+        PyFormatContext<'ast>,
+    >;
+    fn format(&self) -> Self::Format<'_> {
+        FormatRefWithRule::new(
+            self,
+            crate::other::string_literal::FormatStringLiteral::default(),
+        )
+    }
+}
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StringLiteral {
+    type Format = FormatOwnedWithRule<
+        ast::StringLiteral,
+        crate::other::string_literal::FormatStringLiteral,
+        PyFormatContext<'ast>,
+    >;
+    fn into_format(self) -> Self::Format {
+        FormatOwnedWithRule::new(
+            self,
+            crate::other::string_literal::FormatStringLiteral::default(),
+        )
+    }
+}
+
 impl FormatRule<ast::BytesLiteral, PyFormatContext<'_>>
     for crate::other::bytes_literal::FormatBytesLiteral
 {

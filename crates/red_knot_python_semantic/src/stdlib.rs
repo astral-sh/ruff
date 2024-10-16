@@ -35,7 +35,7 @@ fn core_module_symbol_ty<'db>(
     core_module: CoreStdlibModule,
     symbol: &str,
 ) -> Type<'db> {
-    resolve_module(db, core_module.name())
+    resolve_module(db, &core_module.name())
         .map(|module| global_symbol_ty(db, module.file(), symbol))
         .unwrap_or(Type::Unbound)
 }
@@ -76,7 +76,7 @@ pub(crate) fn typing_extensions_symbol_ty<'db>(db: &'db dyn Db, symbol: &str) ->
 ///
 /// Can return `None` if a custom typeshed is used that is missing the core module in question.
 fn core_module_scope(db: &dyn Db, core_module: CoreStdlibModule) -> Option<ScopeId<'_>> {
-    resolve_module(db, core_module.name()).map(|module| global_scope(db, module.file()))
+    resolve_module(db, &core_module.name()).map(|module| global_scope(db, module.file()))
 }
 
 /// Get the `builtins` module scope.

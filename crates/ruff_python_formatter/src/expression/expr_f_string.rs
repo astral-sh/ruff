@@ -1,4 +1,4 @@
-use ruff_python_ast::{AnyNodeRef, ExprFString};
+use ruff_python_ast::{AnyNodeRef, ExprFString, StringLike};
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
@@ -7,7 +7,7 @@ use crate::expression::parentheses::{
 };
 use crate::other::f_string_part::FormatFStringPart;
 use crate::prelude::*;
-use crate::string::{AnyString, FormatImplicitConcatenatedString, Quoting};
+use crate::string::{FormatImplicitConcatenatedString, Quoting, StringLikeExtensions};
 
 #[derive(Default)]
 pub struct FormatExprFString;
@@ -53,7 +53,7 @@ impl NeedsParentheses for ExprFString {
         //   ```
         // This isn't decided yet, refer to the relevant discussion:
         // https://github.com/astral-sh/ruff/discussions/9785
-        } else if AnyString::FString(self).is_multiline(context.source()) {
+        } else if StringLike::FString(self).is_multiline(context.source()) {
             OptionalParentheses::Never
         } else {
             OptionalParentheses::BestFit

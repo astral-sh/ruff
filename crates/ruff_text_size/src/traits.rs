@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use {crate::TextRange, crate::TextSize, std::convert::TryInto};
 
 use priv_in_pub::Sealed;
@@ -59,6 +60,15 @@ impl Ranged for TextRange {
 }
 
 impl<T> Ranged for &T
+where
+    T: Ranged,
+{
+    fn range(&self) -> TextRange {
+        T::range(self)
+    }
+}
+
+impl<T> Ranged for Arc<T>
 where
     T: Ranged,
 {

@@ -470,6 +470,112 @@ struct Line {
     tokens_end: u32,
 }
 
+/// Keeps track of whether we are currently visiting a class or function definition in a
+/// [`LogicalLine`]. If we are visiting a class or function, the enum also keeps track
+/// of the [type parameters] of the class/function.
+///
+/// Call [`DefinitionState::visit_token_kind`] on the [`TokenKind`] of each
+/// successive [`LogicalLineToken`] to ensure the state remains up to date.
+///
+/// [type parameters]: https://docs.python.org/3/reference/compound_stmts.html#type-params
+#[derive(Debug, Clone, Copy)]
+enum DefinitionState {
+    InClass(TypeParamsState),
+    InFunction(TypeParamsState),
+    NotInClassOrFunction,
+}
+
+impl DefinitionState {
+    fn from_tokens<'a>(tokens: impl IntoIterator<Item = &'a LogicalLineToken>) -> Self {
+        let mut token_kinds = tokens.into_iter().map(LogicalLineToken::kind);
+        while let Some(token_kind) = token_kinds.next() {
+            let state = match token_kind {
+                TokenKind::Indent | TokenKind::Dedent => continue,
+                TokenKind::Class => Self::InClass(TypeParamsState::default()),
+                TokenKind::Def => Self::InFunction(TypeParamsState::default()),
+                TokenKind::Async if matches!(token_kinds.next(), Some(TokenKind::Def)) => {
+                    Self::InFunction(TypeParamsState::default())
+                }
+                _ => Self::NotInClassOrFunction,
+            };
+            return state;
+        }
+        Self::NotInClassOrFunction
+    }
+
+    const fn in_function_definition(self) -> bool {
+        matches!(self, Self::InFunction(_))
+    }
+
+    const fn type_params_state(self) -> Option<TypeParamsState> {
+        match self {
+            Self::InClass(state) | Self::InFunction(state) => Some(state),
+            Self::NotInClassOrFunction => None,
+        }
+    }
+
+    fn in_type_params(self) -> bool {
+        matches!(
+            self.type_params_state(),
+            Some(TypeParamsState::InTypeParams { .. })
+        )
+    }
+
+    fn visit_token_kind(&mut self, token_kind: TokenKind) {
+        let type_params_state_mut = match self {
+            Self::InClass(type_params_state) | Self::InFunction(type_params_state) => {
+                type_params_state
+            }
+            Self::NotInClassOrFunction => return,
+        };
+        match token_kind {
+            TokenKind::Lpar if type_params_state_mut.before_type_params() => {
+                *type_params_state_mut = TypeParamsState::TypeParamsEnded;
+            }
+            TokenKind::Lsqb => match type_params_state_mut {
+                TypeParamsState::TypeParamsEnded => {}
+                TypeParamsState::BeforeTypeParams => {
+                    *type_params_state_mut = TypeParamsState::InTypeParams {
+                        inner_square_brackets: 0,
+                    };
+                }
+                TypeParamsState::InTypeParams {
+                    inner_square_brackets,
+                } => *inner_square_brackets += 1,
+            },
+            TokenKind::Rsqb => {
+                if let TypeParamsState::InTypeParams {
+                    inner_square_brackets,
+                } = type_params_state_mut
+                {
+                    if *inner_square_brackets == 0 {
+                        *type_params_state_mut = TypeParamsState::TypeParamsEnded;
+                    } else {
+                        *inner_square_brackets -= 1;
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+enum TypeParamsState {
+    #[default]
+    BeforeTypeParams,
+    InTypeParams {
+        inner_square_brackets: u32,
+    },
+    TypeParamsEnded,
+}
+
+impl TypeParamsState {
+    const fn before_type_params(self) -> bool {
+        matches!(self, Self::BeforeTypeParams)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use ruff_python_parser::parse_module;

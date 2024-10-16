@@ -19,8 +19,9 @@ _global_shutdown: bool
 
 class _ThreadWakeup:
     _closed: bool
-    _reader: Connection
-    _writer: Connection
+    # Any: Unused send and recv methods
+    _reader: Connection[Any, Any]
+    _writer: Connection[Any, Any]
     def close(self) -> None: ...
     def wakeup(self) -> None: ...
     def clear(self) -> None: ...

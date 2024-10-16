@@ -307,3 +307,11 @@ hello {
           ]
       } --------
 """
+
+
+# Implicit concatenated f-string containing quotes
+_ = (
+    'This string should change its quotes to double quotes'
+    f'This string uses double quotes in an expression {"woah"}'
+    f'This f-string does not use any quotes.'
+)

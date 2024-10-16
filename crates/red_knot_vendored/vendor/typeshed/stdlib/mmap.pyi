@@ -1,6 +1,6 @@
 import sys
 from _typeshed import ReadableBuffer, Unused
-from collections.abc import Iterable, Iterator, Sized
+from collections.abc import Iterator
 from typing import Final, Literal, NoReturn, overload
 from typing_extensions import Self
 
@@ -30,7 +30,7 @@ if sys.platform != "win32":
 
 PAGESIZE: int
 
-class mmap(Iterable[int], Sized):
+class mmap:
     if sys.platform == "win32":
         def __init__(self, fileno: int, length: int, tagname: str | None = ..., access: int = ..., offset: int = ...) -> None: ...
     else:

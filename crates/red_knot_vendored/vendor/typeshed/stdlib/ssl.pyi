@@ -1,18 +1,51 @@
 import enum
 import socket
 import sys
+from _ssl import (
+    _DEFAULT_CIPHERS as _DEFAULT_CIPHERS,
+    _OPENSSL_API_VERSION as _OPENSSL_API_VERSION,
+    HAS_ALPN as HAS_ALPN,
+    HAS_ECDH as HAS_ECDH,
+    HAS_NPN as HAS_NPN,
+    HAS_SNI as HAS_SNI,
+    OPENSSL_VERSION as OPENSSL_VERSION,
+    OPENSSL_VERSION_INFO as OPENSSL_VERSION_INFO,
+    OPENSSL_VERSION_NUMBER as OPENSSL_VERSION_NUMBER,
+    HAS_SSLv2 as HAS_SSLv2,
+    HAS_SSLv3 as HAS_SSLv3,
+    HAS_TLSv1 as HAS_TLSv1,
+    HAS_TLSv1_1 as HAS_TLSv1_1,
+    HAS_TLSv1_2 as HAS_TLSv1_2,
+    HAS_TLSv1_3 as HAS_TLSv1_3,
+    MemoryBIO as MemoryBIO,
+    RAND_add as RAND_add,
+    RAND_bytes as RAND_bytes,
+    RAND_status as RAND_status,
+    SSLSession as SSLSession,
+    _PasswordType as _PasswordType,  # typeshed only, but re-export for other type stubs to use
+    _SSLContext,
+)
 from _typeshed import ReadableBuffer, StrOrBytesPath, WriteableBuffer
 from collections.abc import Callable, Iterable
-from typing import Any, Literal, NamedTuple, TypedDict, final, overload
+from typing import Any, Literal, NamedTuple, TypedDict, overload
 from typing_extensions import Never, Self, TypeAlias
+
+if sys.version_info >= (3, 13):
+    from _ssl import HAS_PSK as HAS_PSK
+
+if sys.version_info < (3, 12):
+    from _ssl import RAND_pseudo_bytes as RAND_pseudo_bytes
+
+if sys.version_info < (3, 10):
+    from _ssl import RAND_egd as RAND_egd
+
+if sys.platform == "win32":
+    from _ssl import enum_certificates as enum_certificates, enum_crls as enum_crls
 
 _PCTRTT: TypeAlias = tuple[tuple[str, str], ...]
 _PCTRTTT: TypeAlias = tuple[_PCTRTT, ...]
 _PeerCertRetDictType: TypeAlias = dict[str, str | _PCTRTTT | _PCTRTT]
 _PeerCertRetType: TypeAlias = _PeerCertRetDictType | bytes | None
-_EnumRetType: TypeAlias = list[tuple[bytes, str, set[str] | bool]]
-_PasswordType: TypeAlias = Callable[[], str | bytes | bytearray] | str | bytes | bytearray
-
 _SrvnmeCbType: TypeAlias = Callable[[SSLSocket | SSLObject, str | None, SSLSocket], int | None]
 
 socket_error = OSError
@@ -98,15 +131,6 @@ else:
 
 _create_default_https_context: Callable[..., SSLContext]
 
-def RAND_bytes(n: int, /) -> bytes: ...
-
-if sys.version_info < (3, 12):
-    def RAND_pseudo_bytes(n: int, /) -> tuple[bytes, bool]: ...
-
-def RAND_status() -> bool: ...
-def RAND_egd(path: str) -> None: ...
-def RAND_add(string: str | ReadableBuffer, entropy: float, /) -> None: ...
-
 if sys.version_info < (3, 12):
     def match_hostname(cert: _PeerCertRetDictType, hostname: str) -> None: ...
 
@@ -132,10 +156,6 @@ class DefaultVerifyPaths(NamedTuple):
     openssl_capath: str
 
 def get_default_verify_paths() -> DefaultVerifyPaths: ...
-
-if sys.platform == "win32":
-    def enum_certificates(store_name: str) -> _EnumRetType: ...
-    def enum_crls(store_name: str) -> _EnumRetType: ...
 
 class VerifyMode(enum.IntEnum):
     CERT_NONE = 0
@@ -229,21 +249,8 @@ if sys.version_info >= (3, 11) or sys.platform == "linux":
     OP_IGNORE_UNEXPECTED_EOF: Options
 
 HAS_NEVER_CHECK_COMMON_NAME: bool
-HAS_SSLv2: bool
-HAS_SSLv3: bool
-HAS_TLSv1: bool
-HAS_TLSv1_1: bool
-HAS_TLSv1_2: bool
-HAS_TLSv1_3: bool
-HAS_ALPN: bool
-HAS_ECDH: bool
-HAS_SNI: bool
-HAS_NPN: bool
-CHANNEL_BINDING_TYPES: list[str]
 
-OPENSSL_VERSION: str
-OPENSSL_VERSION_INFO: tuple[int, int, int, int, int]
-OPENSSL_VERSION_NUMBER: int
+CHANNEL_BINDING_TYPES: list[str]
 
 class AlertDescription(enum.IntEnum):
     ALERT_DESCRIPTION_ACCESS_DENIED = 49
@@ -379,17 +386,15 @@ class TLSVersion(enum.IntEnum):
     TLSv1_2 = 771
     TLSv1_3 = 772
 
-class SSLContext:
-    check_hostname: bool
+class SSLContext(_SSLContext):
     options: Options
     verify_flags: VerifyFlags
     verify_mode: VerifyMode
     @property
-    def protocol(self) -> _SSLMethod: ...
+    def protocol(self) -> _SSLMethod: ...  # type: ignore[override]
     hostname_checks_common_name: bool
     maximum_version: TLSVersion
     minimum_version: TLSVersion
-    sni_callback: Callable[[SSLObject, str, SSLContext], None | int] | None
     # The following two attributes have class-level defaults.
     # However, the docs explicitly state that it's OK to override these attributes on instances,
     # so making these ClassVars wouldn't be appropriate
@@ -406,10 +411,6 @@ class SSLContext:
     else:
         def __new__(cls, protocol: int = ..., *args: Any, **kwargs: Any) -> Self: ...
 
-    def cert_store_stats(self) -> dict[str, int]: ...
-    def load_cert_chain(
-        self, certfile: StrOrBytesPath, keyfile: StrOrBytesPath | None = None, password: _PasswordType | None = None
-    ) -> None: ...
     def load_default_certs(self, purpose: Purpose = ...) -> None: ...
     def load_verify_locations(
         self,
@@ -448,7 +449,6 @@ class SSLContext:
         server_hostname: str | bytes | None = None,
         session: SSLSession | None = None,
     ) -> SSLObject: ...
-    def session_stats(self) -> dict[str, int]: ...
 
 class SSLObject:
     context: SSLContext
@@ -482,28 +482,6 @@ class SSLObject:
     if sys.version_info >= (3, 13):
         def get_verified_chain(self) -> list[bytes]: ...
         def get_unverified_chain(self) -> list[bytes]: ...
-
-@final
-class MemoryBIO:
-    pending: int
-    eof: bool
-    def read(self, size: int = -1, /) -> bytes: ...
-    def write(self, b: ReadableBuffer, /) -> int: ...
-    def write_eof(self) -> None: ...
-
-@final
-class SSLSession:
-    @property
-    def has_ticket(self) -> bool: ...
-    @property
-    def id(self) -> bytes: ...
-    @property
-    def ticket_lifetime_hint(self) -> int: ...
-    @property
-    def time(self) -> int: ...
-    @property
-    def timeout(self) -> int: ...
-    def __eq__(self, value: object, /) -> bool: ...
 
 class SSLErrorNumber(enum.IntEnum):
     SSL_ERROR_EOF = 8

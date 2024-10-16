@@ -20,6 +20,7 @@
 __future__: 3.0-
 __main__: 3.0-
 _ast: 3.0-
+_asyncio: 3.0-
 _bisect: 3.0-
 _bootlocale: 3.4-3.9
 _codecs: 3.0-
@@ -37,6 +38,7 @@ _imp: 3.0-
 _interpchannels: 3.13-
 _interpqueues: 3.13-
 _interpreters: 3.13-
+_io: 3.0-
 _json: 3.0-
 _locale: 3.0-
 _lsprof: 3.0-
@@ -50,6 +52,8 @@ _pydecimal: 3.5-
 _random: 3.0-
 _sitebuiltins: 3.4-
 _socket: 3.0-  # present in 3.0 at runtime, but not in typeshed
+_sqlite3: 3.0-
+_ssl: 3.0-
 _stat: 3.4-
 _thread: 3.0-
 _threading_local: 3.0-

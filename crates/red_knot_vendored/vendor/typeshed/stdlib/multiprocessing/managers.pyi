@@ -1,7 +1,7 @@
 import queue
 import sys
 import threading
-from _typeshed import SupportsKeysAndGetItem, SupportsRichComparison, SupportsRichComparisonT
+from _typeshed import Incomplete, SupportsKeysAndGetItem, SupportsRichComparison, SupportsRichComparisonT
 from collections.abc import Callable, Iterable, Iterator, Mapping, MutableMapping, MutableSequence, Sequence
 from types import TracebackType
 from typing import Any, AnyStr, ClassVar, Generic, SupportsIndex, TypeVar, overload
@@ -129,7 +129,9 @@ class Server:
         self, registry: dict[str, tuple[Callable[..., Any], Any, Any, Any]], address: Any, authkey: bytes, serializer: str
     ) -> None: ...
     def serve_forever(self) -> None: ...
-    def accept_connection(self, c: Connection, name: str) -> None: ...
+    def accept_connection(
+        self, c: Connection[tuple[str, str | None], tuple[str, str, Iterable[Incomplete], Mapping[str, Incomplete]]], name: str
+    ) -> None: ...
 
 class BaseManager:
     if sys.version_info >= (3, 11):

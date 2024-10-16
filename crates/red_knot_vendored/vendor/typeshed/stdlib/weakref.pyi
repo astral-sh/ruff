@@ -1,18 +1,13 @@
 import sys
 from _typeshed import SupportsKeysAndGetItem
-from _weakref import (
-    CallableProxyType as CallableProxyType,
-    ProxyType as ProxyType,
-    ReferenceType as ReferenceType,
-    getweakrefcount as getweakrefcount,
-    getweakrefs as getweakrefs,
-    proxy as proxy,
-    ref as ref,
-)
+from _weakref import getweakrefcount as getweakrefcount, getweakrefs as getweakrefs, proxy as proxy
 from _weakrefset import WeakSet as WeakSet
 from collections.abc import Callable, Iterable, Iterator, Mapping, MutableMapping
-from typing import Any, Generic, TypeVar, overload
+from typing import Any, Generic, TypeVar, final, overload
 from typing_extensions import ParamSpec, Self
+
+if sys.version_info >= (3, 9):
+    from types import GenericAlias
 
 __all__ = [
     "ref",
@@ -40,11 +35,39 @@ _P = ParamSpec("_P")
 
 ProxyTypes: tuple[type[Any], ...]
 
+# These classes are implemented in C and imported from _weakref at runtime. However,
+# they consider themselves to live in the weakref module for sys.version_info >= (3, 11),
+# so defining their stubs here means we match their __module__ value.
+# Prior to 3.11 they did not declare a module for themselves and ended up looking like they
+# came from the builtin module at runtime, which was just wrong, and we won't attempt to
+# duplicate that.
+
+@final
+class CallableProxyType(Generic[_CallableT]):  # "weakcallableproxy"
+    def __eq__(self, value: object, /) -> bool: ...
+    def __getattr__(self, attr: str) -> Any: ...
+    __call__: _CallableT
+
+@final
+class ProxyType(Generic[_T]):  # "weakproxy"
+    def __eq__(self, value: object, /) -> bool: ...
+    def __getattr__(self, attr: str) -> Any: ...
+
+class ReferenceType(Generic[_T]):  # "weakref"
+    __callback__: Callable[[Self], Any]
+    def __new__(cls, o: _T, callback: Callable[[Self], Any] | None = ..., /) -> Self: ...
+    def __call__(self) -> _T | None: ...
+    def __eq__(self, value: object, /) -> bool: ...
+    def __hash__(self) -> int: ...
+    if sys.version_info >= (3, 9):
+        def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
+
+ref = ReferenceType
+
+# everything below here is implemented in weakref.py
+
 class WeakMethod(ref[_CallableT]):
-    # `ref` is implemented in `C` so positional-only arguments are enforced, but not in `WeakMethod`.
-    def __new__(  # pyright: ignore[reportInconsistentConstructor]
-        cls, meth: _CallableT, callback: Callable[[Self], Any] | None = None
-    ) -> Self: ...
+    def __new__(cls, meth: _CallableT, callback: Callable[[Self], Any] | None = None) -> Self: ...
     def __call__(self) -> _CallableT | None: ...
     def __eq__(self, other: object) -> bool: ...
     def __ne__(self, other: object) -> bool: ...
@@ -103,8 +126,8 @@ class WeakValueDictionary(MutableMapping[_KT, _VT]):
 
 class KeyedRef(ref[_T], Generic[_KT, _T]):
     key: _KT
-    def __new__(type, ob: _T, callback: Callable[[_T], Any], key: _KT) -> Self: ...
-    def __init__(self, ob: _T, callback: Callable[[_T], Any], key: _KT) -> None: ...
+    def __new__(type, ob: _T, callback: Callable[[Self], Any], key: _KT) -> Self: ...
+    def __init__(self, ob: _T, callback: Callable[[Self], Any], key: _KT) -> None: ...
 
 class WeakKeyDictionary(MutableMapping[_KT, _VT]):
     @overload

@@ -238,9 +238,19 @@ impl Cell {
             //
             // This is to avoid false positives when these variables are referenced
             // elsewhere in the notebook.
+            //
+            // Refer https://github.com/astral-sh/ruff/issues/13718 for `ipytest`.
             !matches!(
                 command,
-                "capture" | "debug" | "prun" | "pypy" | "python" | "python3" | "time" | "timeit"
+                "capture"
+                    | "debug"
+                    | "ipytest"
+                    | "prun"
+                    | "pypy"
+                    | "python"
+                    | "python3"
+                    | "time"
+                    | "timeit"
             )
         })
     }

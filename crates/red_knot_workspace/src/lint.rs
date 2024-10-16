@@ -136,7 +136,7 @@ fn lint_bad_override(context: &SemanticLintContext, class: &ast::StmtClassDef) {
     // TODO we should have a special marker on the real typing module (from typeshed) so if you
     //   have your own "typing" module in your project, we don't consider it THE typing module (and
     //   same for other stdlib modules that our lint rules care about)
-    let Some(typing) = semantic.resolve_module(ModuleName::new("typing").unwrap()) else {
+    let Some(typing) = semantic.resolve_module(&ModuleName::new("typing").unwrap()) else {
         return;
     };
 

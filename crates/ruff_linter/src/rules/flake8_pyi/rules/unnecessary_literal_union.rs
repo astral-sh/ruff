@@ -80,6 +80,8 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &mut Checker, expr: &'a Exp
                 } else {
                     literal_exprs.push(slice);
                 }
+            } else {
+                other_exprs.push(expr);
             }
         } else {
             other_exprs.push(expr);

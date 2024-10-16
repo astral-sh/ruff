@@ -35,7 +35,7 @@ use crate::rules::fastapi::rules::is_fastapi_route_call;
 /// 5. The string references variables that are not in scope, or it doesn't capture variables at all.
 /// 6. Any format specifiers in the potential f-string are invalid.
 /// 7. The string is part of a function call that is known to expect a template string rather than an
-///    evaluated f-string: for example, a [`logging`] call, a [`gettext`] call, or a [`fastAPI` path].
+///    evaluated f-string: for example, a [`logging`] call, a [`gettext`] call, or a [fastAPI path].
 ///
 /// ## Example
 ///
@@ -52,9 +52,9 @@ use crate::rules::fastapi::rules::is_fastapi_route_call;
 /// print(f"Hello {name}! It is {day_of_week} today!")
 /// ```
 ///
-/// [`logging`]: https://docs.python.org/3/howto/logging-cookbook.html#using-particular-formatting-styles-throughout-your-application
-/// [`gettext`]: https://docs.python.org/3/library/gettext.html
-/// [`fastAPI` path]: https://fastapi.tiangolo.com/tutorial/path-params/
+/// [logging]: https://docs.python.org/3/howto/logging-cookbook.html#using-particular-formatting-styles-throughout-your-application
+/// [gettext]: https://docs.python.org/3/library/gettext.html
+/// [fastAPI path]: https://fastapi.tiangolo.com/tutorial/path-params/
 #[violation]
 pub struct MissingFStringSyntax;
 

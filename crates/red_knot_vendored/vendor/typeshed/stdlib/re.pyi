@@ -4,7 +4,6 @@ import sre_constants
 import sys
 from _typeshed import ReadableBuffer
 from collections.abc import Callable, Iterator, Mapping
-from sre_constants import error as error
 from typing import Any, AnyStr, Generic, Literal, TypeVar, final, overload
 from typing_extensions import TypeAlias
 
@@ -53,6 +52,16 @@ if sys.version_info >= (3, 13):
     PatternError = sre_constants.error
 
 _T = TypeVar("_T")
+
+# The implementation defines this in re._constants (version_info >= 3, 11) or
+# sre_constants. Typeshed has it here because its __module__ attribute is set to "re".
+class error(Exception):
+    msg: str
+    pattern: str | bytes | None
+    pos: int | None
+    lineno: int
+    colno: int
+    def __init__(self, msg: str, pattern: str | bytes | None = None, pos: int | None = None) -> None: ...
 
 @final
 class Match(Generic[AnyStr]):
