@@ -3679,8 +3679,12 @@ mod tests {
 
         // the type as seen from external modules (`Unknown`)
         // is different from the type inside the module itself (`Never`):
-        assert_public_ty(&db, "src/package/foo.py", "x", "Never");
-        assert_file_diagnostics(&db, "src/package/bar.py", &["Module `package.foo` has no member `x`"]);
+        assert_public_ty(&db, "src/package/foo.py", "x", "Unbound");
+        assert_file_diagnostics(
+            &db,
+            "src/package/bar.py",
+            &["Module `package.foo` has no member `x`"],
+        );
         assert_public_ty(&db, "src/package/bar.py", "x", "Never");
 
         Ok(())
