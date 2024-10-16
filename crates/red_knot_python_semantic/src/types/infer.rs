@@ -2709,44 +2709,40 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let lhs_elements = lhs.elements(self.db).as_ref();
                 let rhs_elements = rhs.elements(self.db).as_ref();
 
+                let mut lexicographic_type_comparison =
+                    |op| self.infer_lexicographic_type_comparison(lhs_elements, op, rhs_elements);
+
                 match op {
-                    ast::CmpOp::Eq
-                    | ast::CmpOp::NotEq
-                    | ast::CmpOp::Lt
-                    | ast::CmpOp::LtE
-                    | ast::CmpOp::Gt
-                    | ast::CmpOp::GtE => {
-                        self.infer_lexicographic_type_comparison(lhs_elements, op, rhs_elements)
-                    }
+                    ast::CmpOp::Eq => lexicographic_type_comparison(RichCompareOperator::Eq),
+                    ast::CmpOp::NotEq => lexicographic_type_comparison(RichCompareOperator::Ne),
+                    ast::CmpOp::Lt => lexicographic_type_comparison(RichCompareOperator::Lt),
+                    ast::CmpOp::LtE => lexicographic_type_comparison(RichCompareOperator::Le),
+                    ast::CmpOp::Gt => lexicographic_type_comparison(RichCompareOperator::Gt),
+                    ast::CmpOp::GtE => lexicographic_type_comparison(RichCompareOperator::Ge),
                     ast::CmpOp::In | ast::CmpOp::NotIn => {
-                        let mut eq_cnt = 0usize;
-                        let mut not_eq_cnt = 0usize;
+                        let mut eq_count = 0usize;
+                        let mut not_eq_count = 0usize;
 
                         for ty in rhs_elements {
                             let eq_result = self.infer_binary_type_comparison(
                                 Type::Tuple(lhs),
                                 ast::CmpOp::Eq,
                                 *ty,
-                            );
-                            // In Python, if `__eq__` is not defined, it implicitly uses object's `__eq__`. Adding `debug_assert!` as a precaution.
-                            debug_assert!(
-                                eq_result.is_some(),
-                                "Type inference for `==` comparison returned `None`."
-                            );
+                            ).expect("infer_binary_type_comparison should never return None for `CmpOp::Eq`");
 
                             match eq_result {
-                                Some(Type::Todo) | None => return eq_result,
-                                Some(ty) => match ty.bool(self.db) {
-                                    Truthiness::AlwaysTrue => eq_cnt += 1,
-                                    Truthiness::AlwaysFalse => not_eq_cnt += 1,
+                                Type::Todo => return Some(Type::Todo),
+                                ty => match ty.bool(self.db) {
+                                    Truthiness::AlwaysTrue => eq_count += 1,
+                                    Truthiness::AlwaysFalse => not_eq_count += 1,
                                     Truthiness::Ambiguous => (),
                                 },
                             }
                         }
 
-                        if eq_cnt >= 1 {
+                        if eq_count >= 1 {
                             Some(Type::BooleanLiteral(op.is_in()))
-                        } else if not_eq_cnt == rhs_elements.len() {
+                        } else if not_eq_count == rhs_elements.len() {
                             Some(Type::BooleanLiteral(op.is_not_in()))
                         } else {
                             Some(KnownClass::Bool.to_instance(self.db))
@@ -2755,26 +2751,18 @@ impl<'db> TypeInferenceBuilder<'db> {
                     ast::CmpOp::Is | ast::CmpOp::IsNot => {
                         // - `[ast::CmpOp::Is]`: returns `false` if the elements are definitely unequal, otherwise `bool`
                         // - `[ast::CmpOp::IsNot]`: returns `true` if the elements are definitely unequal, otherwise `bool`
-                        let eq_result = self.infer_lexicographic_type_comparison(
-                            lhs_elements,
-                            ast::CmpOp::Eq,
-                            rhs_elements,
-                        );
-                        // In Python, if `__eq__` is not defined, it implicitly uses object's `__eq__`. Adding `debug_assert!` as a precaution.
-                        debug_assert!(
-                            eq_result.is_some(),
-                            "Type inference for `==` comparison returned `None`."
+                        let eq_result = lexicographic_type_comparison(RichCompareOperator::Eq)
+                            .expect(
+                            "infer_binary_type_comparison should never return None for `CmpOp::Eq`",
                         );
 
-                        match eq_result {
-                            Some(Type::Todo) | None => eq_result,
-                            Some(ty) => match ty.bool(self.db) {
-                                Truthiness::AlwaysFalse => {
-                                    Some(Type::BooleanLiteral(op.is_is_not()))
-                                }
-                                _ => Some(KnownClass::Bool.to_instance(self.db)),
+                        Some(match eq_result {
+                            Type::Todo => Type::Todo,
+                            ty => match ty.bool(self.db) {
+                                Truthiness::AlwaysFalse => Type::BooleanLiteral(op.is_is_not()),
+                                _ => KnownClass::Bool.to_instance(self.db),
                             },
-                        }
+                        })
                     }
                 }
             }
@@ -2793,50 +2781,30 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     /// Performs lexicographic comparison between two slices of types.
     ///
-    /// This comparison supports only equality and ordering operators: `==`, `!=`, `<`, `<=`, `>`, `>=`.
     /// For lexicographic comparison, elements from both slices are compared pairwise using
     /// `infer_binary_type_comparison`. If a conclusive result cannot be determined as a `BoolLiteral`,
     /// it returns `bool`.
     fn infer_lexicographic_type_comparison(
         &mut self,
         left: &[Type<'db>],
-        op: ast::CmpOp,
+        op: RichCompareOperator,
         right: &[Type<'db>],
     ) -> Option<Type<'db>> {
-        if !matches!(
-            op,
-            ast::CmpOp::Eq
-                | ast::CmpOp::NotEq
-                | ast::CmpOp::Lt
-                | ast::CmpOp::LtE
-                | ast::CmpOp::Gt
-                | ast::CmpOp::GtE
-        ) {
-            debug_assert!(
-                false,
-                "Unsupported comparison operator for lexicographic type comparison."
-            );
-            return None;
-        }
-
         // Compare paired elements from left and right slices
-        for (l_ty, r_ty) in left.iter().zip(right.iter()) {
-            let eq_result = self.infer_binary_type_comparison(*l_ty, ast::CmpOp::Eq, *r_ty);
-            // In Python, if `__eq__` is not defined, it implicitly uses object's `__eq__`. Adding `debug_assert!` as a precaution.
-            debug_assert!(
-                eq_result.is_some(),
-                "Type inference for `==` comparison returned `None`."
-            );
+        for (l_ty, r_ty) in left.iter().copied().zip(right.iter().copied()) {
+            let eq_result = self
+                .infer_binary_type_comparison(l_ty, ast::CmpOp::Eq, r_ty)
+                .expect("infer_binary_type_comparison should never return None for `CmpOp::Eq`");
 
             match eq_result {
                 // If propagation is required, return the result as is
-                Some(Type::Todo) | None => return eq_result,
-                Some(ty) => match ty.bool(self.db) {
+                Type::Todo => return Some(Type::Todo),
+                ty => match ty.bool(self.db) {
                     // Types are equal, continue to the next pair
                     Truthiness::AlwaysTrue => continue,
                     // Types are not equal, perform the specified comparison and return the result
                     Truthiness::AlwaysFalse => {
-                        return self.infer_binary_type_comparison(*l_ty, op, *r_ty)
+                        return self.infer_binary_type_comparison(l_ty, op.into(), r_ty)
                     }
                     // If the intermediate result is abiguous, we cannot determine the final result as BoolLiteral.
                     // In this case, we simply return a bool instance.
@@ -2848,16 +2816,15 @@ impl<'db> TypeInferenceBuilder<'db> {
         // At this point, the lengths of the two slices are different, but the prefix of
         // left and right slices is entirely identical.
         // We return a comparison of the slice lengths based on the operator.
-        let (l_len, r_len) = (left.len(), right.len());
+        let (left_len, right_len) = (left.len(), right.len());
 
         Some(Type::BooleanLiteral(match op {
-            ast::CmpOp::Eq => l_len == r_len,
-            ast::CmpOp::NotEq => l_len != r_len,
-            ast::CmpOp::Lt => l_len < r_len,
-            ast::CmpOp::LtE => l_len <= r_len,
-            ast::CmpOp::Gt => l_len > r_len,
-            ast::CmpOp::GtE => l_len >= r_len,
-            _ => return None,
+            RichCompareOperator::Eq => left_len == right_len,
+            RichCompareOperator::Ne => left_len != right_len,
+            RichCompareOperator::Lt => left_len < right_len,
+            RichCompareOperator::Le => left_len <= right_len,
+            RichCompareOperator::Gt => left_len > right_len,
+            RichCompareOperator::Ge => left_len >= right_len,
         }))
     }
 
@@ -3315,6 +3282,29 @@ impl<'db> TypeInferenceBuilder<'db> {
         assert!(previous.is_none());
 
         ty
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RichCompareOperator {
+    Eq,
+    Ne,
+    Gt,
+    Ge,
+    Lt,
+    Le,
+}
+
+impl From<RichCompareOperator> for ast::CmpOp {
+    fn from(value: RichCompareOperator) -> Self {
+        match value {
+            RichCompareOperator::Eq => ast::CmpOp::Eq,
+            RichCompareOperator::Ne => ast::CmpOp::NotEq,
+            RichCompareOperator::Lt => ast::CmpOp::Lt,
+            RichCompareOperator::Le => ast::CmpOp::LtE,
+            RichCompareOperator::Gt => ast::CmpOp::Gt,
+            RichCompareOperator::Ge => ast::CmpOp::GtE,
+        }
     }
 }
 
