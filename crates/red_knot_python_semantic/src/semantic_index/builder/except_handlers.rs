@@ -1,5 +1,3 @@
-use std::cell::RefCell;
-
 use crate::semantic_index::use_def::FlowSnapshot;
 
 use super::SemanticIndexBuilder;
@@ -17,9 +15,9 @@ impl TryNodeContextStackManager {
     }
 
     /// Retrieve the [`TryNodeContextStack`] that is relevant for the current scope.
-    pub(super) fn current_try_context_stack(&self) -> &TryNodeContextStack {
+    pub(super) fn current_try_context_stack(&mut self) -> &mut TryNodeContextStack {
         self.0
-            .last()
+            .last_mut()
             .expect("There should always be at least one `TryBlockContexts` on the stack")
     }
 
@@ -38,30 +36,29 @@ impl TryNodeContextStackManager {
 
 /// The contexts of nested `try`/`except` blocks for a single scope
 #[derive(Debug, Default)]
-pub(super) struct TryNodeContextStack(RefCell<Vec<TryNodeContext>>);
+pub(super) struct TryNodeContextStack(Vec<TryNodeContext>);
 
 impl TryNodeContextStack {
     /// Push a new [`TryNodeContext`] for recording intermediate states
     /// while visiting a [`ruff_python_ast::StmtTry`] node that has a `finally` branch.
-    pub(super) fn push_context(&self) {
-        self.0.borrow_mut().push(TryNodeContext::default());
+    pub(super) fn push_context(&mut self) {
+        self.0.push(TryNodeContext::default());
     }
 
     /// Pop a [`TryNodeContext`] off the stack.
-    pub(super) fn pop_context(&self) -> Vec<FlowSnapshot> {
+    pub(super) fn pop_context(&mut self) -> Vec<FlowSnapshot> {
         let TryNodeContext {
             try_suite_snapshots,
         } = self
             .0
-            .borrow_mut()
             .pop()
             .expect("Cannot pop a `try` block off an empty `TryBlockContexts` stack");
         try_suite_snapshots
     }
 
     /// For each `try` block on the stack, push the snapshot onto the `try` block
-    pub(super) fn record_definition(&self, builder: &SemanticIndexBuilder) {
-        for context in self.0.borrow_mut().iter_mut() {
+    pub(super) fn record_definition(&mut self, builder: &SemanticIndexBuilder) {
+        for context in &mut self.0 {
             context.record_definition(builder.flow_snapshot());
         }
     }

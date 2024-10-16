@@ -103,7 +103,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             .expect("Always to have a root scope")
     }
 
-    fn try_node_context_stack(&self) -> &TryNodeContextStack {
+    fn try_node_context_stack(&mut self) -> &mut TryNodeContextStack {
         self.try_node_context_stack_manager
             .current_try_context_stack()
     }
@@ -239,7 +239,12 @@ impl<'db> SemanticIndexBuilder<'db> {
             DefinitionCategory::Declaration => use_def.record_declaration(symbol, definition),
             DefinitionCategory::Binding => use_def.record_binding(symbol, definition),
         }
-        self.try_node_context_stack().record_definition(self);
+
+        let mut try_node_stack_manager = std::mem::take(&mut self.try_node_context_stack_manager);
+        try_node_stack_manager
+            .current_try_context_stack()
+            .record_definition(self);
+        self.try_node_context_stack_manager = try_node_stack_manager;
 
         definition
     }
