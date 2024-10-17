@@ -1,4 +1,4 @@
-use infer::{TypeInference, TypeInferenceBuilder};
+use infer::TypeInferenceBuilder;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 
@@ -14,7 +14,7 @@ use crate::stdlib::{
     builtins_symbol_ty, types_symbol_ty, typeshed_symbol_ty, typing_extensions_symbol_ty,
 };
 use crate::types::narrow::narrowing_constraint;
-use crate::{Db, FxOrderSet, Module};
+use crate::{Db, FxOrderSet, HasTy, Module, SemanticModel};
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
 pub use self::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
@@ -1388,10 +1388,6 @@ pub struct ClassType<'db> {
 
     body_scope: ScopeId<'db>,
 
-    // a specialized scope that covers the bases and keywords of the class
-    // (introduced when there are type parameters on the class)
-    bases_specialized_scope: Option<ScopeId<'db>>,
-
     known: Option<KnownClass>,
 }
 
@@ -1420,22 +1416,20 @@ impl<'db> ClassType<'db> {
         let DefinitionKind::Class(class_stmt_node) = definition.kind(db) else {
             panic!("Class type definition must have DefinitionKind::Class");
         };
-
-        // if there's a type params scope
-        let bases_scope_info: Option<(ScopeId<'db>, &TypeInference<'db>)> = self
-            .bases_specialized_scope(db)
-            .map(|bases_scope| (bases_scope, infer_scope_types(db, bases_scope)));
-
-        class_stmt_node.bases().iter().map(move |base_expr: &ast::Expr| {
-            if let Some((bases_scope, inferences)) = bases_scope_info {
-                // when we have a specialized scope, we'll look up the inference
-                // within that scope
-                inferences.expression_ty(base_expr.scoped_ast_id(db, bases_scope))
-            } else {
-                // Otherwise, we can do the lookup based on the definition scope
-                definition_expression_ty(db, definition, base_expr)
-            }
-        })
+        let model: SemanticModel<'db> = SemanticModel::new(db, definition.file(db));
+        class_stmt_node
+            .bases()
+            .iter()
+            .map(move |base_expr: &ast::Expr| {
+                if class_stmt_node.type_params.is_some() {
+                    // when we have a specialized scope, we'll look up the inference
+                    // within that scope
+                    base_expr.ty(&model)
+                } else {
+                    // Otherwise, we can do the lookup based on the definition scope
+                    definition_expression_ty(db, definition, base_expr)
+                }
+            })
     }
 
     /// Returns the class member of this class named `name`.

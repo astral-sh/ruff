@@ -872,19 +872,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             .as_ref()
             .and_then(|module| KnownClass::maybe_from_module(module, name.as_str()));
 
-        // when type_params.is_some(), there's a specialized scope for the bases + keywords
-        let bases_specialized_scope = type_params.as_ref().map(|_| {
-            self.index
-                .node_scope(NodeWithScopeRef::ClassTypeParameters(class))
-                .to_scope_id(self.db, self.file)
-        });
-
         let class_ty = Type::Class(ClassType::new(
             self.db,
             name.id.clone(),
             definition,
             body_scope,
-            bases_specialized_scope,
             maybe_known_class,
         ));
 
