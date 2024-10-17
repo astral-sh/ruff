@@ -545,9 +545,7 @@ impl<'db> Type<'db> {
                 | Type::LiteralString
                 | Type::BytesLiteral(..) => true,
                 Type::None => false,
-                Type::Instance(class_type) => {
-                    !class_type.is_known(db, KnownClass::NoneType) // TODO: is this enough since NoneType is final?
-                }
+                Type::Instance(class_type) => !class_type.is_known(db, KnownClass::NoneType),
             },
 
             (Type::BooleanLiteral(bool), other) | (other, Type::BooleanLiteral(bool)) => {
@@ -571,9 +569,7 @@ impl<'db> Type<'db> {
                     | Type::LiteralString
                     | Type::BytesLiteral(..) => true,
                     Type::BooleanLiteral(bool_other) => bool != bool_other,
-                    Type::Instance(class_type) => {
-                        !class_type.is_known(db, KnownClass::Bool) // TODO: is this enough since bool is final?
-                    }
+                    Type::Instance(class_type) => !class_type.is_known(db, KnownClass::Bool),
                 }
             }
 
