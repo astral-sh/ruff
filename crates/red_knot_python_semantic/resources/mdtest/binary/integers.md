@@ -37,6 +37,7 @@ b = 2 // 0  # error: "Cannot floor divide object of type `Literal[2]` by zero"
 c = 3 % 0  # error: "Cannot reduce object of type `Literal[3]` modulo zero"
 d = int() / 0  # error: "Cannot divide object of type `int` by zero"
 e = 1.0 / 0  # error: "Cannot divide object of type `float` by zero"
+f = 1 / False  # error: "Cannot divide object of type `Literal[1]` by zero"
 
 reveal_type(a)  # revealed: float
 reveal_type(b)  # revealed: int
@@ -51,4 +52,5 @@ class MyInt(int): pass
 # No error for a subclass of int
 # TODO should be float
 reveal_type(MyInt(3) / 0)  # revealed: @Todo
+reveal_type(f)  # revealed: float
 ```

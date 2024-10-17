@@ -543,6 +543,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             Type::Instance(cls)
                 if cls.is_known(self.db, KnownClass::Float)
                     || cls.is_known(self.db, KnownClass::Int) => {}
+            Type::BooleanLiteral(_) => {}
             _ => return,
         };
 
@@ -2459,7 +2460,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             operand,
         } = unary;
 
-        match (op, self.infer_expression(operand)) {
+        let operand_type = self.infer_expression(operand);
+
+        match (op, operand_type) {
             (UnaryOp::UAdd, Type::IntLiteral(value)) => Type::IntLiteral(value),
             (UnaryOp::USub, Type::IntLiteral(value)) => Type::IntLiteral(-value),
             (UnaryOp::Invert, Type::IntLiteral(value)) => Type::IntLiteral(!value),
@@ -2469,7 +2472,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             (UnaryOp::Invert, Type::BooleanLiteral(bool)) => Type::IntLiteral(!i64::from(bool)),
 
             (UnaryOp::Not, ty) => ty.bool(self.db).negate().into_type(self.db),
-
+            (_, Type::Any) => Type::Any,
+            (_, Type::Unknown) => Type::Unknown,
+            (op, Type::Instance(class)) => {
+                let class_member = class.class_member(self.db, op.dunder());
+                let call = class_member.call(self.db, &[operand_type]);
+                call.return_ty(self.db).unwrap_or(Type::Unknown)
+            }
             _ => Type::Todo, // TODO other unary op types
         }
     }
@@ -2491,7 +2500,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             (op, right_ty),
             (
                 ast::Operator::Div | ast::Operator::FloorDiv | ast::Operator::Mod,
-                Type::IntLiteral(0),
+                Type::IntLiteral(0) | Type::BooleanLiteral(false)
             )
         ) {
             self.check_division_by_zero(binary, left_ty);
@@ -2518,9 +2527,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .map(Type::IntLiteral)
                 .unwrap_or_else(|| KnownClass::Int.to_instance(self.db)),
 
-            (Type::IntLiteral(_), Type::IntLiteral(_), ast::Operator::Div) => {
-                KnownClass::Float.to_instance(self.db)
-            }
+            (
+                Type::IntLiteral(_),
+                Type::IntLiteral(_) | Type::BooleanLiteral(_),
+                ast::Operator::Div,
+            ) => KnownClass::Float.to_instance(self.db),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::FloorDiv) => n
                 .checked_div(m)
@@ -2589,6 +2600,21 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
 
+            (Type::BooleanLiteral(_), Type::BooleanLiteral(_), op) => match op {
+                ruff_python_ast::Operator::Add
+                | ruff_python_ast::Operator::Sub
+                | ruff_python_ast::Operator::Mult
+                | ruff_python_ast::Operator::Mod
+                | ruff_python_ast::Operator::Pow
+                | ruff_python_ast::Operator::LShift
+                | ruff_python_ast::Operator::RShift
+                | ruff_python_ast::Operator::BitXor
+                | ruff_python_ast::Operator::BitAnd
+                | ruff_python_ast::Operator::FloorDiv
+                | ruff_python_ast::Operator::MatMult => KnownClass::Int.to_instance(self.db),
+                ruff_python_ast::Operator::BitOr => KnownClass::Bool.to_instance(self.db),
+                ruff_python_ast::Operator::Div => KnownClass::Float.to_instance(self.db),
+            },
             _ => Type::Todo, // TODO
         }
     }
