@@ -595,13 +595,109 @@ impl<'db> Type<'db> {
                 }
                 Type::StringLiteral(..) | Type::LiteralString | Type::BytesLiteral(..) => true,
                 Type::IntLiteral(int_other) => int != int_other,
-                Type::Instance(class_type) => {
-                    !class_type.is_known(db, KnownClass::Int) // TODO: this is probably wrong since there could be subclasses of int?
-                }
+                Type::Instance(..) => false,
             },
 
-            // TODO: Handle, StringLiteral, LiteralString, BytesLiteral
-            _ => false,
+            (Type::StringLiteral(string), other) | (other, Type::StringLiteral(string)) => {
+                match other {
+                    Type::Never
+                    | Type::Any
+                    | Type::Unknown
+                    | Type::Unbound
+                    | Type::Function(..)
+                    | Type::Module(..)
+                    | Type::Class(..)
+                    | Type::Todo
+                    | Type::Union(..)
+                    | Type::Intersection(..)
+                    | Type::Tuple(..)
+                    | Type::None
+                    | Type::BooleanLiteral(..)
+                    | Type::IntLiteral(..) => {
+                        unreachable!("handled above")
+                    }
+                    Type::StringLiteral(string_other) => string != string_other,
+                    Type::LiteralString => false,
+                    Type::BytesLiteral(..) => true,
+                    Type::Instance(..) => false,
+                }
+            }
+
+            (Type::LiteralString, other) | (other, Type::LiteralString) => match other {
+                Type::Never
+                | Type::Any
+                | Type::Unknown
+                | Type::Unbound
+                | Type::Function(..)
+                | Type::Module(..)
+                | Type::Class(..)
+                | Type::Todo
+                | Type::Union(..)
+                | Type::Intersection(..)
+                | Type::Tuple(..)
+                | Type::None
+                | Type::BooleanLiteral(..)
+                | Type::IntLiteral(..)
+                | Type::StringLiteral(..) => {
+                    unreachable!("handled above")
+                }
+                Type::LiteralString => false,
+                Type::BytesLiteral(..) => true,
+                Type::Instance(..) => false,
+            },
+
+            (Type::BytesLiteral(bytes), other) | (other, Type::BytesLiteral(bytes)) => {
+                match other {
+                    Type::Never
+                    | Type::Any
+                    | Type::Unknown
+                    | Type::Unbound
+                    | Type::Function(..)
+                    | Type::Module(..)
+                    | Type::Class(..)
+                    | Type::Todo
+                    | Type::Union(..)
+                    | Type::Intersection(..)
+                    | Type::Tuple(..)
+                    | Type::None
+                    | Type::BooleanLiteral(..)
+                    | Type::IntLiteral(..)
+                    | Type::StringLiteral(..)
+                    | Type::LiteralString => {
+                        unreachable!("handled above")
+                    }
+                    Type::BytesLiteral(bytes_other) => bytes != bytes_other,
+                    Type::Instance(..) => false,
+                }
+            }
+
+            (Type::Instance(..), other) => {
+                match other {
+                    Type::Never
+                    | Type::Any
+                    | Type::Unknown
+                    | Type::Unbound
+                    | Type::Function(..)
+                    | Type::Module(..)
+                    | Type::Class(..)
+                    | Type::Todo
+                    | Type::Union(..)
+                    | Type::Intersection(..)
+                    | Type::Tuple(..)
+                    | Type::None
+                    | Type::BooleanLiteral(..)
+                    | Type::IntLiteral(..)
+                    | Type::StringLiteral(..)
+                    | Type::LiteralString
+                    | Type::BytesLiteral(..) => {
+                        unreachable!("handled above")
+                    }
+                    Type::Instance(..) => {
+                        // TODO
+                        false
+                    }
+                }
+            }
         }
     }
 
@@ -1839,6 +1935,7 @@ mod tests {
     #[test_case(Ty::None, Ty::BuiltinInstance("int"))]
     #[test_case(Ty::BoolLiteral(true), Ty::BuiltinInstance("int"))]
     #[test_case(Ty::BoolLiteral(true), Ty::BoolLiteral(false))]
+    #[test_case(Ty::IntLiteral(1), Ty::IntLiteral(2))]
     #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::IntLiteral(3))]
     #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(3), Ty::IntLiteral(4)]))]
     #[test_case(Ty::Intersection(vec![Ty::BuiltinInstance("int"), Ty::IntLiteral(1)], vec![]), Ty::IntLiteral(2))]

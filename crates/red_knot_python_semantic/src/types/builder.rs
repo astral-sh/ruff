@@ -227,8 +227,8 @@ impl<'db> InnerIntersectionBuilder<'db> {
             }
         } else {
             // ~Literal[True] & bool = Literal[False]
-            if let Type::Instance(instance) = new_positive {
-                if instance.is_known(db, KnownClass::Bool) {
+            if let Type::Instance(class_type) = new_positive {
+                if class_type.is_known(db, KnownClass::Bool) {
                     let mut found_bool_literal = None;
                     for neg in &self.negative {
                         if let Type::BooleanLiteral(bool) = neg {
@@ -734,14 +734,19 @@ mod tests {
     fn build_intersection_simplify_disregard_irrelevant_negative() {
         let db = setup_db();
 
-        let t_p = KnownClass::Bool.to_instance(&db);
-        let t_n = Type::IntLiteral(1);
+        let t_p = KnownClass::Int.to_instance(&db);
+        let t_n = Type::BooleanLiteral(false);
 
         let ty = IntersectionBuilder::new(&db)
             .add_positive(t_p)
             .add_negative(t_n)
             .build();
+        assert_eq!(ty, t_p);
 
+        let ty = IntersectionBuilder::new(&db)
+            .add_negative(t_n)
+            .add_positive(t_p)
+            .build();
         assert_eq!(ty, t_p);
     }
 
