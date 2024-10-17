@@ -867,7 +867,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ast::StmtClassDef {
             range: _,
             name,
-            type_params: _,
+            type_params,
             decorator_list,
             arguments: _,
             body: _,
@@ -885,6 +885,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let maybe_known_class = file_to_module(self.db, body_scope.file(self.db))
             .as_ref()
             .and_then(|module| KnownClass::maybe_from_module(module, name.as_str()));
+
         let class_ty = Type::Class(ClassType::new(
             self.db,
             name.id.clone(),
@@ -895,17 +896,21 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         self.add_declaration_with_binding(class.into(), definition, class_ty, class_ty);
 
-        for keyword in class.keywords() {
-            self.infer_expression(&keyword.value);
-        }
+        // if there are type parameters, then the keywords and bases are within that scope
+        // and we don't need to run inference here
+        if type_params.is_none() {
+            for keyword in class.keywords() {
+                self.infer_expression(&keyword.value);
+            }
 
-        // Inference of bases deferred in stubs
-        // TODO also defer stringified generic type parameters
-        if self.are_all_types_deferred() {
-            self.types.has_deferred = true;
-        } else {
-            for base in class.bases() {
-                self.infer_expression(base);
+            // Inference of bases deferred in stubs
+            // TODO also defer stringified generic type parameters
+            if self.are_all_types_deferred() {
+                self.types.has_deferred = true;
+            } else {
+                for base in class.bases() {
+                    self.infer_expression(base);
+                }
             }
         }
     }

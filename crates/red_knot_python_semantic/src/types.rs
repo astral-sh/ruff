@@ -14,7 +14,7 @@ use crate::stdlib::{
     builtins_symbol_ty, types_symbol_ty, typeshed_symbol_ty, typing_extensions_symbol_ty,
 };
 use crate::types::narrow::narrowing_constraint;
-use crate::{Db, FxOrderSet, Module};
+use crate::{Db, FxOrderSet, HasTy, Module, SemanticModel};
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
 pub use self::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
@@ -1425,7 +1425,17 @@ impl<'db> ClassType<'db> {
         class_stmt_node
             .bases()
             .iter()
-            .map(move |base_expr| definition_expression_ty(db, definition, base_expr))
+            .map(move |base_expr: &ast::Expr| {
+                if class_stmt_node.type_params.is_some() {
+                    // when we have a specialized scope, we'll look up the inference
+                    // within that scope
+                    let model: SemanticModel<'db> = SemanticModel::new(db, definition.file(db));
+                    base_expr.ty(&model)
+                } else {
+                    // Otherwise, we can do the lookup based on the definition scope
+                    definition_expression_ty(db, definition, base_expr)
+                }
+            })
     }
 
     /// Returns the class member of this class named `name`.
