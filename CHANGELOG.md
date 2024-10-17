@@ -33,13 +33,8 @@ Check out the [blog post](https://astral.sh/blog/ruff-v0.7.0) for a migration gu
 - \[`flake8-bugbear`\] Do not suggest setting parameter `strict=` to `False` in `B905` diagnostic message ([#13656](https://github.com/astral-sh/ruff/pull/13656))
 - \[`flake8-todos`\] Only flag the word "TODO", not words starting with "todo" (`TD006`) ([#13640](https://github.com/astral-sh/ruff/pull/13640))
 - \[`pycodestyle`\] Fix whitespace-related false positives and false negatives inside type-parameter lists (`E231`, `E251`) ([#13704](https://github.com/astral-sh/ruff/pull/13704))
-- \[`flake8-simplify`\] [`open-file-with-context-handler`](https://docs.astral.sh/ruff/rules/open-file-with-context-handler/)
-    (`SIM115`), a rule which looks for files opened without the use of context managers, now has more
-    expansive behavior ([#12959](https://github.com/astral-sh/ruff/pull/12959)).
-    Whereas before it would only look for files opened using the builtin `open()`
-    function or `pathlib.Path(...).open()`, it can now detect files being opened using a wide range
-    of other standard-library functions and classes. This improved capability has been available to
-    users of preview mode for several months, but has now been promoted to stable.
+- \[`flake8-simplify`\] Stabilize preview behavior for `SIM115` so that the rule can detect files
+    being opened from a wider range of standard-library functions ([#12959](https://github.com/astral-sh/ruff/pull/12959)).
 
 ### CLI
 
