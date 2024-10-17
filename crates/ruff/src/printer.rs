@@ -417,6 +417,10 @@ impl Printer {
                         statistic.name,
                     )?;
                 }
+
+                if any_fixable {
+                    writeln!(writer, "[*] fixable with `ruff check --fix`",)?;
+                }
                 return Ok(());
             }
             OutputFormat::Json => {

@@ -979,6 +979,7 @@ fn show_statistics() {
     exit_code: 1
     ----- stdout -----
     1	F401	[*] unused-import
+    [*] fixable with `ruff check --fix`
 
     ----- stderr -----
     "###);
