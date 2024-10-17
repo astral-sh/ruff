@@ -2489,6 +2489,15 @@ impl<'db> TypeInferenceBuilder<'db> {
             self.check_division_by_zero(binary, left_ty);
         }
 
+        self.infer_binary_expression_type(left_ty, right_ty, *op)
+    }
+
+    fn infer_binary_expression_type(
+        &mut self,
+        left_ty: Type<'db>,
+        right_ty: Type<'db>,
+        op: ast::Operator,
+    ) -> Type<'db> {
         match (left_ty, right_ty, op) {
             // When interacting with Todo, Any and Unknown should propagate (as if we fix this
             // `Todo` in the future, the result would then become Any or Unknown, respectively.)
@@ -2580,6 +2589,62 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Type::LiteralString
                 }
             }
+
+            (Type::Instance(_), Type::IntLiteral(_), op) => {
+                self.infer_binary_expression_type(left_ty, KnownClass::Int.to_instance(self.db), op)
+            }
+
+            (Type::IntLiteral(_), Type::Instance(_), op) => self.infer_binary_expression_type(
+                KnownClass::Int.to_instance(self.db),
+                right_ty,
+                op,
+            ),
+
+            (Type::Instance(_), Type::Tuple(_), op) => self.infer_binary_expression_type(
+                left_ty,
+                KnownClass::Tuple.to_instance(self.db),
+                op,
+            ),
+
+            (Type::Tuple(_), Type::Instance(_), op) => self.infer_binary_expression_type(
+                KnownClass::Tuple.to_instance(self.db),
+                right_ty,
+                op,
+            ),
+
+            (Type::Instance(_), Type::StringLiteral(_), op) => {
+                self.infer_binary_expression_type(left_ty, KnownClass::Str.to_instance(self.db), op)
+            }
+
+            (Type::StringLiteral(_), Type::Instance(_), op) => self.infer_binary_expression_type(
+                KnownClass::Str.to_instance(self.db),
+                right_ty,
+                op,
+            ),
+
+            (Type::Instance(_), Type::BytesLiteral(_), op) => self.infer_binary_expression_type(
+                left_ty,
+                KnownClass::Bytes.to_instance(self.db),
+                op,
+            ),
+
+            (Type::BytesLiteral(_), Type::Instance(_), op) => self.infer_binary_expression_type(
+                KnownClass::Bytes.to_instance(self.db),
+                right_ty,
+                op,
+            ),
+
+            (Type::Instance(left_class), Type::Instance(right_class), op) => left_class
+                .class_member(self.db, op.dunder())
+                .call(self.db, &[left_ty, right_ty])
+                .return_ty(self.db)
+                .unwrap_or_else(|| {
+                    right_class
+                        .class_member(self.db, op.reflected_dunder())
+                        .call(self.db, &[right_ty, left_ty])
+                        .return_ty(self.db)
+                        .unwrap_or(Type::Unknown)
+                }),
 
             _ => Type::Todo, // TODO
         }
