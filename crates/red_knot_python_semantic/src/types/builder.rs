@@ -226,6 +226,24 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 self.add_negative(db, *neg);
             }
         } else {
+            // ~Literal[True] & bool = Literal[False]
+            if let Type::Instance(instance) = new_positive {
+                if instance.is_known(db, KnownClass::Bool) {
+                    let mut found_bool_literal = None;
+                    for neg in &self.negative {
+                        if let Type::BooleanLiteral(bool) = neg {
+                            found_bool_literal = Some(*bool);
+                        }
+                    }
+
+                    if let Some(bool) = found_bool_literal {
+                        *self = Self::new();
+                        self.positive.insert(Type::BooleanLiteral(!bool));
+                        return;
+                    }
+                }
+            }
+
             let mut to_remove = None;
             for (index, existing_positive) in self.positive.iter().enumerate() {
                 // S & T = S    if S <: T
@@ -278,23 +296,18 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     self.add_positive(db, *neg);
                 }
             }
-            Type::Never => {}
             Type::Unbound => {}
-
+            // ~Literal[True] & bool = Literal[False]
+            Type::BooleanLiteral(bool)
+                if self
+                    .positive
+                    .iter()
+                    .any(|pos| *pos == KnownClass::Bool.to_instance(db)) =>
+            {
+                *self = Self::new();
+                self.positive.insert(Type::BooleanLiteral(!bool));
+            }
             _ => {
-                // TODO: do we need the mirror-version of this above
-                if let Type::BooleanLiteral(bool) = new_negative {
-                    if self
-                        .positive
-                        .iter()
-                        .any(|pos| *pos == KnownClass::Bool.to_instance(db))
-                    {
-                        *self = Self::new();
-                        self.positive.insert(Type::BooleanLiteral(!bool));
-                        return;
-                    }
-                }
-
                 let mut to_remove = None;
                 for (index, existing_negative) in self.negative.iter().enumerate() {
                     // ~S & ~T = ~T    if S <: T
@@ -745,7 +758,12 @@ mod tests {
                 .add_positive(t_p)
                 .add_negative(t_n)
                 .build();
+            assert_eq!(ty, Type::BooleanLiteral(!bool));
 
+            let ty = IntersectionBuilder::new(&db)
+                .add_negative(t_n)
+                .add_positive(t_p)
+                .build();
             assert_eq!(ty, Type::BooleanLiteral(!bool));
         }
     }
