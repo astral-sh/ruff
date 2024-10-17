@@ -13,6 +13,7 @@ use crate::semantic_index::{
 use crate::stdlib::{
     builtins_symbol_ty, types_symbol_ty, typeshed_symbol_ty, typing_extensions_symbol_ty,
 };
+use crate::types::mro::ClassMroSet;
 use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet, Module};
 
@@ -27,6 +28,7 @@ mod builder;
 mod diagnostic;
 mod display;
 mod infer;
+mod mro;
 mod narrow;
 
 pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
@@ -290,6 +292,10 @@ impl<'db> Type<'db> {
 
     pub const fn is_never(&self) -> bool {
         matches!(self, Type::Never)
+    }
+
+    pub const fn is_union(&self) -> bool {
+        matches!(self, Type::Union(_))
     }
 
     pub const fn into_class_type(self) -> Option<ClassType<'db>> {
@@ -1397,6 +1403,21 @@ pub struct ClassType<'db> {
     known: Option<KnownClass>,
 }
 
+#[salsa::tracked]
+impl<'db> ClassType<'db> {
+    /// Return the possible [method resolution order]s ("MRO"s) for this class.
+    ///
+    /// The MRO is the tuple of classes that can be retrieved as the `__mro__`
+    /// attribute on a class at runtime. Because the inferred type of a class base
+    /// could be a union, any class could have multiple possible MROs.
+    ///
+    /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
+    #[salsa::tracked(return_ref)]
+    fn mro_possibilities(self, db: &'db dyn Db) -> ClassMroSet<'db> {
+        ClassMroSet::of_class(db, self)
+    }
+}
+
 impl<'db> ClassType<'db> {
     pub fn is_known(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
         match self.known(db) {
@@ -1413,25 +1434,63 @@ impl<'db> ClassType<'db> {
             })
     }
 
-    /// Return an iterator over the types of this class's bases.
-    ///
-    /// # Panics:
-    /// If `definition` is not a `DefinitionKind::Class`.
-    pub fn bases(&self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
-        let definition = self.definition(db);
-        let DefinitionKind::Class(class_stmt_node) = definition.kind(db) else {
+    pub(crate) fn node(&self, db: &'db dyn Db) -> &ast::StmtClassDef {
+        let DefinitionKind::Class(class_stmt_node) = self.definition(db).kind(db) else {
             panic!("Class type definition must have DefinitionKind::Class");
         };
         class_stmt_node
-            .bases()
-            .iter()
-            .map(move |base_expr| definition_expression_ty(db, definition, base_expr))
+    }
+
+    /// Return an array of the types of this class's bases.
+    ///
+    /// The returned array should exactly match the result of `t.__bases__`
+    /// at runtime in Python, where `t` is the runtime Python class
+    /// represented by `self` in this method. Note that this means that
+    /// it will not necessarily match the arguments passed as bases in the
+    /// class definition: `class C: pass` creates a class `C` where
+    /// `C.__bases__ == (object,)`, even though there were no bases passed
+    /// in the class definition.
+    ///
+    /// # Panics:
+    /// If `definition` is not a `DefinitionKind::Class`.
+    pub fn bases(&self, db: &'db dyn Db) -> Box<[Type<'db>]> {
+        let base_nodes = self.node(db).bases();
+        let object = KnownClass::Object.to_class(db);
+
+        if Type::Class(*self) == object {
+            // Uniquely among Python classes, `object` has no bases:
+            //
+            // ```pycon
+            // >>> object.__bases__
+            // ()
+            // ```
+            Box::default()
+        } else if base_nodes.is_empty() {
+            // All Python classes that have an empty bases list in their AST
+            // implicitly inherit from `object`:
+            Box::new([object])
+        } else {
+            base_nodes
+                .iter()
+                .map(move |base_expr| definition_expression_ty(db, self.definition(db), base_expr))
+                .collect()
+        }
     }
 
     /// Returns the class member of this class named `name`.
     ///
     /// The member resolves to a member of the class itself or any of its bases.
     pub fn class_member(self, db: &'db dyn Db, name: &str) -> Type<'db> {
+        if name == "__mro__" {
+            let mro_possibilities = self.mro_possibilities(db);
+            let mut union_builder = UnionBuilder::new(db);
+            for mro in mro_possibilities.iter(db, mro::ClassBase::Class(self)) {
+                let elements = mro.iter().map(Type::from).collect();
+                union_builder = union_builder.add(Type::Tuple(TupleType::new(db, elements)));
+            }
+            return union_builder.build();
+        }
+
         let member = self.own_class_member(db, name);
         if !member.is_unbound() {
             // TODO diagnostic if maybe unbound?
@@ -1448,14 +1507,19 @@ impl<'db> ClassType<'db> {
     }
 
     pub fn inherited_class_member(self, db: &'db dyn Db, name: &str) -> Type<'db> {
-        for base in self.bases(db) {
-            let member = base.member(db, name);
-            if !member.is_unbound() {
-                return member;
+        let mro_possibilities = self.mro_possibilities(db);
+        let mut union_builder = UnionBuilder::new(db);
+        'outer: for mro in mro_possibilities.iter(db, mro::ClassBase::Class(self)) {
+            for base in &**mro {
+                let member = base.own_class_member(db, name);
+                if !member.is_unbound() {
+                    union_builder = union_builder.add(member);
+                    continue 'outer;
+                }
             }
+            union_builder = union_builder.add(Type::Unbound);
         }
-
-        Type::Unbound
+        union_builder.build()
     }
 }
 

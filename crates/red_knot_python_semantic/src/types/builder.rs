@@ -45,6 +45,7 @@ impl<'db> UnionBuilder<'db> {
     }
 
     /// Adds a type to this union.
+    #[must_use]
     pub(crate) fn add(mut self, ty: Type<'db>) -> Self {
         match ty {
             Type::Union(union) => {

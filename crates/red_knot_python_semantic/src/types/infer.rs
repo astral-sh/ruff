@@ -413,6 +413,36 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .expressions
                 .extend(deferred_expression_types.iter());
         }
+
+        self.check_class_mros();
+    }
+
+    /// Iterate over all class definitions to check that Python will be able to create
+    /// a consistent "[method resolution order]" for each class at runtime. If not,
+    /// issue a diagnostic.
+    ///
+    /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
+    fn check_class_mros(&mut self) {
+        let declarations = std::mem::take(&mut self.types.declarations);
+        let class_definitions = declarations.values().filter_map(|ty| ty.into_class_type());
+
+        for class in class_definitions {
+            if let Some(mro_errors) = class.mro_possibilities(self.db).possible_errors() {
+                for error in mro_errors {
+                    self.add_diagnostic(
+                        class.node(self.db).into(),
+                        "inconsistent-mro",
+                        format_args!(
+                            "Cannot create a consistent method resolution order (MRO) for class `{}` with possible bases list `[{}]`",
+                            class.name(self.db),
+                            error.iter().map(|base|base.display(self.db)).join(", ")
+                        )
+                    );
+                }
+            }
+        }
+
+        self.types.declarations = declarations;
     }
 
     fn infer_region_definition(&mut self, definition: Definition<'db>) {
@@ -3700,6 +3730,7 @@ mod tests {
 
         let base_names: Vec<_> = class
             .bases(&db)
+            .iter()
             .map(|base_ty| format!("{}", base_ty.display(&db)))
             .collect();
 
@@ -3932,12 +3963,12 @@ mod tests {
         let a = system_path_to_file(&db, "src/a.py").expect("file to exist");
         let c_ty = global_symbol_ty(&db, a, "C");
         let c_class = c_ty.expect_class();
-        let mut c_bases = c_class.bases(&db);
-        let b_ty = c_bases.next().unwrap();
+        let c_bases = c_class.bases(&db);
+        let b_ty = c_bases[0];
         let b_class = b_ty.expect_class();
         assert_eq!(b_class.name(&db), "B");
-        let mut b_bases = b_class.bases(&db);
-        let a_ty = b_bases.next().unwrap();
+        let b_bases = b_class.bases(&db);
+        let a_ty = b_bases[0];
         let a_class = a_ty.expect_class();
         assert_eq!(a_class.name(&db), "A");
 
@@ -4086,15 +4117,8 @@ mod tests {
         db.write_file("/src/a.pyi", "class C(object): pass")?;
         let file = system_path_to_file(&db, "/src/a.pyi").unwrap();
         let ty = global_symbol_ty(&db, file, "C");
-
-        let base = ty
-            .expect_class()
-            .bases(&db)
-            .next()
-            .expect("there should be at least one base");
-
+        let base = ty.expect_class().bases(&db)[0];
         assert_eq!(base.display(&db).to_string(), "Literal[object]");
-
         Ok(())
     }
 
