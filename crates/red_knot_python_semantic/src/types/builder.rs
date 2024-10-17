@@ -374,6 +374,12 @@ mod tests {
 
         let union = UnionType::from_elements(&db, [t0, t1, t2, t3]).expect_union();
         assert_eq!(union.elements(&db), &[bool_instance_ty, t3]);
+
+        let result_ty = UnionType::from_elements(&db, [bool_instance_ty, t0]);
+        assert_eq!(result_ty, bool_instance_ty);
+
+        let result_ty = UnionType::from_elements(&db, [t0, bool_instance_ty]);
+        assert_eq!(result_ty, bool_instance_ty);
     }
 
     #[test]

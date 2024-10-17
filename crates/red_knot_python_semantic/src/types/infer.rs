@@ -57,7 +57,7 @@ use crate::types::{
 };
 use crate::Db;
 
-use super::KnownClass;
+use super::{KnownClass, UnionBuilder};
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -2711,6 +2711,21 @@ impl<'db> TypeInferenceBuilder<'db> {
         // - `[ast::CompOp::Is]`: return `false` if unequal, `bool` if equal
         // - `[ast::CompOp::IsNot]`: return `true` if unequal, `bool` if equal
         match (left, right) {
+            (Type::Union(union), other) => {
+                let mut builder = UnionBuilder::new(self.db);
+                for element in union.elements(self.db) {
+                    builder = builder.add(self.infer_binary_type_comparison(*element, op, other)?);
+                }
+                Some(builder.build())
+            }
+            (other, Type::Union(union)) => {
+                let mut builder = UnionBuilder::new(self.db);
+                for element in union.elements(self.db) {
+                    builder = builder.add(self.infer_binary_type_comparison(other, op, *element)?);
+                }
+                Some(builder.build())
+            }
+
             (Type::IntLiteral(n), Type::IntLiteral(m)) => match op {
                 ast::CmpOp::Eq => Some(Type::BooleanLiteral(n == m)),
                 ast::CmpOp::NotEq => Some(Type::BooleanLiteral(n != m)),
@@ -2902,6 +2917,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 }
             }
+
             // Lookup the rich comparison `__dunder__` methods on instances
             (Type::Instance(left_class_ty), Type::Instance(right_class_ty)) => match op {
                 ast::CmpOp::Lt => {
@@ -2911,7 +2927,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 _ => Some(Type::Todo),
             },
             // TODO: handle more types
-            _ => Some(Type::Todo),
+            _ => match op {
+                ast::CmpOp::Is | ast::CmpOp::IsNot => Some(KnownClass::Bool.to_instance(self.db)),
+                _ => Some(Type::Todo),
+            },
         }
     }
 
