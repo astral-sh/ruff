@@ -87,6 +87,8 @@ pub(crate) fn hardcoded_sql_expression(checker: &mut Checker, expr: &Expr) {
             };
             string.value.to_str().escape_default().to_string()
         }
+
+        // f"select * from table where val = {val}"
         Expr::FString(f_string) => concatenated_f_string(f_string, checker.locator()),
         _ => return,
     };
