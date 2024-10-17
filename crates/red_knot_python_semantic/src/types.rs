@@ -1416,7 +1416,6 @@ impl<'db> ClassType<'db> {
         let DefinitionKind::Class(class_stmt_node) = definition.kind(db) else {
             panic!("Class type definition must have DefinitionKind::Class");
         };
-        let model: SemanticModel<'db> = SemanticModel::new(db, definition.file(db));
         class_stmt_node
             .bases()
             .iter()
@@ -1424,6 +1423,7 @@ impl<'db> ClassType<'db> {
                 if class_stmt_node.type_params.is_some() {
                     // when we have a specialized scope, we'll look up the inference
                     // within that scope
+                    let model: SemanticModel<'db> = SemanticModel::new(db, definition.file(db));
                     base_expr.ty(&model)
                 } else {
                     // Otherwise, we can do the lookup based on the definition scope
