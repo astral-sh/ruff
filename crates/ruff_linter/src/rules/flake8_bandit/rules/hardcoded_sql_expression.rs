@@ -10,7 +10,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 static SQL_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)(select\s+.*\s+from\s|delete\s+from\s|(insert|replace)\s+.*\s+values\s|update\s+.*\s+set\s)")
+    Regex::new(r"(?i)\b(select\s+.*\s+from\s|delete\s+from\s|(insert|replace)\s+.*\s+values\s|update\s+.*\s+set\s)")
     .unwrap()
 });
 

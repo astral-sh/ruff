@@ -146,6 +146,11 @@ SELECT *
 FROM {var}.table
 """
 
+query57 = f"""
+PRESELECT *
+FROM {var}.table
+"""
+
 # to be handled seperately
 # query58 = f"SELECT\
 #  * FROM {var}.table"

@@ -479,16 +479,6 @@ S608.py:102:11: S608 Possible SQL injection vector through string-based query co
 104 | query49 = "Deselect something that is not SQL even though it has a ' from ' somewhere in %s." % "there"
     |
 
-S608.py:104:11: S608 Possible SQL injection vector through string-based query construction
-    |
-102 | query48 = "REPLACE table VALUES (%s)" % (var,)
-103 | 
-104 | query49 = "Deselect something that is not SQL even though it has a ' from ' somewhere in %s." % "there"
-    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
-105 | 
-106 | # # pass
-    |
-
 S608.py:111:1: S608 Possible SQL injection vector through string-based query construction
     |
 110 | # # errors
@@ -585,5 +575,5 @@ S608.py:144:11: S608 Possible SQL injection vector through string-based query co
 147 | | """
     | |___^ S608
 148 |   
-149 |   # to be handled seperately
+149 |   query57 = f"""
     |
