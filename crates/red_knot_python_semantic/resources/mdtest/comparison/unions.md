@@ -62,3 +62,16 @@ reveal_type(small > large)   # revealed: Literal[False]
 reveal_type(small >= large)  # revealed: Literal[False] | bool
 reveal_type(small < large)   # revealed: Literal[True] | bool
 ```
+
+## Unsupported operations
+
+Make sure we emit a diagnostic if *any* of the possible comparisons is
+unsupported. For now, we fall back to `bool` for the result type instead of
+trying to infer something more precise from the other (supported) variants:
+
+```py
+x = [1, 2] if flag else 1
+
+result = 1 in x  # error: "Operator `in` is not supported"
+reveal_type(result)  # revealed: bool
+```
