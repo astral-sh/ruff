@@ -31,6 +31,12 @@ ____aaa = "aaaaaaaaaaaaaaaaaaa" "aaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbb
 # Again the same string as above but as a non-implicit concatenated string. It should result in the same formatting
 # (for consistency).
 ____aaa = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvv"  # c
+
+# It should collapse the parentheses if the joined string and the comment fit on the same line.
+# This is required for stability.
+____aaa = (
+    "aaaaaaaaaaaaaaaaaaaaa" "aaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvv"  # c
+)
 ```
 
 ## Outputs
@@ -85,4 +91,8 @@ ____aaa = (
 ____aaa = (
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvv"  # c
 )
+
+# It should collapse the parentheses if the joined string and the comment fit on the same line.
+# This is required for stability.
+____aaa = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvv"  # c
 ```
