@@ -66,7 +66,6 @@ class A:
     def __ror__(self, other) -> A: return self
 
 class B: pass
-    
 
 reveal_type(B() + A())  # revealed: A
 reveal_type(B() - A())  # revealed: A
@@ -92,11 +91,30 @@ class A:
     def __add__(self, other) -> int: return 1
     def __rsub__(self, other) -> int: return 1
 
-reveal_type(A() + "foo")  # revealed: int
-reveal_type("foo" - A())  # revealed: int
+class B:
+    pass
+
+reveal_type(A() + B())  # revealed: int
+reveal_type(B() - A())  # revealed: int
 ```
 
-## Reflected precedence
+## Non-reflected precedence in general
+
+In general, if the left-hand side defines `__add__` and the right-hand side
+defines `__radd__` and the right-hand side is not a subtype of the left-hand
+side, `lhs.__add__` will take precedence:
+
+```py
+class A:
+    def __add__(self, other: B) -> int: return 42
+
+class B:
+    def __radd__(self, other: A) -> str: return "foo"
+
+reveal_type(A() + B())  # revealed:  int
+```
+
+## Reflected precedence for subtypes (in some cases)
 
 If the right-hand operand is a subtype of the left-hand operand and has a
 different implementation of the reflected method, the reflected method on the
@@ -105,11 +123,14 @@ right-hand operand takes precedence.
 ```py
 class A:
     def __add__(self, other) -> str: return "foo"
+    def __radd__(self, other) -> str: return "foo"
+
+class MyString(str): pass
 
 class B(A):
-    def __radd__(self, other) -> int: return 42
+    def __radd__(self, other) -> MyString: return MyString()
 
-reveal_type(A() + B())  # revealed: int
+reveal_type(A() + B())  # revealed: MyString
 ```
 
 ## Reflected precedence 2
@@ -164,13 +185,16 @@ reveal_type(B() + B())  # revealed: int
 ## Integration test: numbers from typeshed
 
 ```py
-# TODO should be complex, need to check arg type and fall back
-reveal_type(3.14 + 3j)  # revealed: float
 reveal_type(3j + 3.14)  # revealed: complex
-# TODO should be float, need to check arg type and fall back
-reveal_type(42 + 4.2)  # revealed: int
 reveal_type(4.2 + 42)  # revealed: float
 reveal_type(3j + 3)  # revealed: complex
+
+# TODO should be complex, need to check arg type and fall back
+reveal_type(3.14 + 3j)  # revealed: float
+
+# TODO should be float, need to check arg type and fall back
+reveal_type(42 + 4.2)  # revealed: int
+
 # TODO should be complex, need to check arg type and fall back
 reveal_type(3 + 3j)  # revealed: int
 
@@ -180,12 +204,14 @@ def returns_int() -> int:
 def returns_bool() -> bool:
     return True
 
-x = returns_bool
+x = returns_bool()
+y = returns_int()
 
-reveal_type(returns_bool() + returns_int())  # revealed: int
+reveal_type(x + y)  # revealed: int
+reveal_type(4.2 + x)  # revealed: float
+
 # TODO should be float, need to check arg type and fall back
-reveal_type(returns_int() + 4.12)  # revealed: int
-reveal_type(4.2 + returns_bool())  # revealed: float
+reveal_type(y + 4.12)  # revealed: int
 ```
 
 ## With literal types
@@ -223,11 +249,9 @@ class A:
     def __init__(self):
         self.__add__ = add_impl
 
-a = A()
-
 # error: [operator]
 # revealed: Unknown
-reveal_type(a + 1)
+reveal_type(A() + A())
 ```
 
 ### Missing dunder
@@ -251,12 +275,15 @@ class A:
 class B:
     def __radd__(self, other) -> int: ...
 
+class C: pass
+
 # error: [operator]
 # revealed: Unknown
-reveal_type(1 + A())
+reveal_type(C() + A())
+
 # error: [operator]
 # revealed: Unknown
-reveal_type(B() + 1)
+reveal_type(B() + C())
 ```
 
 ### Wrong type
