@@ -543,6 +543,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             Type::Instance(cls)
                 if cls.is_known(self.db, KnownClass::Float)
                     || cls.is_known(self.db, KnownClass::Int) => {}
+            Type::BooleanLiteral(_) => {}
             _ => return,
         };
 
@@ -2493,7 +2494,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             (op, right_ty),
             (
                 ast::Operator::Div | ast::Operator::FloorDiv | ast::Operator::Mod,
-                Type::IntLiteral(0),
+                Type::IntLiteral(0) | Type::BooleanLiteral(false)
             )
         ) {
             self.check_division_by_zero(binary, left_ty);
@@ -2520,9 +2521,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .map(Type::IntLiteral)
                 .unwrap_or_else(|| KnownClass::Int.to_instance(self.db)),
 
-            (Type::IntLiteral(_), Type::IntLiteral(_), ast::Operator::Div) => {
-                KnownClass::Float.to_instance(self.db)
-            }
+            (
+                Type::IntLiteral(_),
+                Type::IntLiteral(_) | Type::BooleanLiteral(_),
+                ast::Operator::Div,
+            ) => KnownClass::Float.to_instance(self.db),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::FloorDiv) => n
                 .checked_div(m)
