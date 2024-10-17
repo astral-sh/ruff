@@ -21,10 +21,8 @@ reveal_type(f)  # revealed: Literal[2]
 ## Division by Zero
 
 This error is really outside the current Python type system, because e.g. `int.__truediv__` and
-friends are not annotated with any special overload for `Literal[0]` to indicate that it's an error,
-and we don't even have a facility to permit such an annotation (the closest would be to annotate the
-overload as returning `typing.NoReturn`, but this just clarifies that it's terminal, it doesn't
-permit any useful diagnostic). So arguably divide-by-zero should be a lint error rather than a type
+friends are not annotated to indicate that it's an error, and we don't even have a facility to
+permit such an annotation. So arguably divide-by-zero should be a lint error rather than a type
 checker error. But we choose to go ahead and error in the cases that are very likely to be an error:
 dividing something typed as `int` or `float` by something known to be `Literal[0]`.
 
