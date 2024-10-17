@@ -1,0 +1,38 @@
+---
+source: crates/ruff_linter/src/rules/pydoclint/mod.rs
+---
+DOC502_sphinx.py:16:1: DOC502 Raised exception is not explicitly raised: `FasterThanLightError`
+   |
+14 |       :return: Speed as distance divided by time.
+15 |       :rtype: float
+16 | /     :raises FasterThanLightError: If speed is greater than the speed of light.
+17 | |     """
+   | |____^ DOC502
+18 |       return distance / time
+   |
+   = help: Remove `FasterThanLightError` from the docstring
+
+DOC502_sphinx.py:32:1: DOC502 Raised exceptions are not explicitly raised: `FasterThanLightError`, `DivisionByZero`
+   |
+30 |       :return: Speed as distance divided by time.
+31 |       :rtype: float
+32 | /     :raises FasterThanLightError: If speed is greater than the speed of light.
+33 | |     :raises DivisionByZero: If attempting to divide by zero.
+34 | |     """
+   | |____^ DOC502
+35 |       return distance / time
+   |
+   = help: Remove `FasterThanLightError`, `DivisionByZero` from the docstring
+
+DOC502_sphinx.py:49:1: DOC502 Raised exception is not explicitly raised: `DivisionByZero`
+   |
+47 |       :return: Speed as distance divided by time.
+48 |       :rtype: float
+49 | /     :raises FasterThanLightError: If speed is greater than the speed of light.
+50 | |     :raises DivisionByZero: If attempting to divide by zero.
+51 | |     """
+   | |____^ DOC502
+52 |       try:
+53 |           return distance / time
+   |
+   = help: Remove `DivisionByZero` from the docstring
