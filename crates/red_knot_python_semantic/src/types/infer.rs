@@ -2594,6 +2594,21 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
 
+            (Type::BooleanLiteral(_), Type::BooleanLiteral(_), op) => match op {
+                ruff_python_ast::Operator::Add
+                | ruff_python_ast::Operator::Sub
+                | ruff_python_ast::Operator::Mult
+                | ruff_python_ast::Operator::Mod
+                | ruff_python_ast::Operator::Pow
+                | ruff_python_ast::Operator::LShift
+                | ruff_python_ast::Operator::RShift
+                | ruff_python_ast::Operator::BitXor
+                | ruff_python_ast::Operator::BitAnd
+                | ruff_python_ast::Operator::FloorDiv
+                | ruff_python_ast::Operator::MatMult => KnownClass::Int.to_instance(self.db),
+                ruff_python_ast::Operator::BitOr => KnownClass::Bool.to_instance(self.db),
+                ruff_python_ast::Operator::Div => KnownClass::Float.to_instance(self.db),
+            },
             _ => Type::Todo, // TODO
         }
     }
