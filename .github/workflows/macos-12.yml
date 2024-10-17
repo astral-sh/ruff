@@ -14,9 +14,9 @@ env:
 
 jobs:
   macos-x86_64:
-    runs-on: macos-13
-    env:
-      MACOSX_DEPLOYMENT_TARGET: 13.7
+    runs-on: macos-14
+#    env:
+#      MACOSX_DEPLOYMENT_TARGET: 13.7
     steps:
       - uses: actions/checkout@v4
         with:
