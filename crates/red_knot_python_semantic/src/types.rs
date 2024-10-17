@@ -415,6 +415,11 @@ impl<'db> Type<'db> {
             (_, Type::Unknown | Type::Any | Type::Todo) => false,
             (Type::Never, _) => true,
             (_, Type::Never) => false,
+            (Type::BooleanLiteral(_), Type::Instance(class))
+                if class.is_known(db, KnownClass::Bool) =>
+            {
+                true
+            }
             (Type::IntLiteral(_), Type::Instance(class)) if class.is_known(db, KnownClass::Int) => {
                 true
             }

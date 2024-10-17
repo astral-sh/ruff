@@ -56,11 +56,10 @@ small = 1 if flag_s else 2
 large = 2 if flag_l else 3
 
 reveal_type(small <= large)  # revealed: Literal[True]
-reveal_type(small > large)   # revealed: Literal[False]
+reveal_type(small >= large)  # revealed: bool
 
-# TODO both of the following should be simplified to `bool`
-reveal_type(small >= large)  # revealed: Literal[False] | bool
-reveal_type(small < large)   # revealed: Literal[True] | bool
+reveal_type(small < large)   # revealed: bool
+reveal_type(small > large)   # revealed: Literal[False]
 ```
 
 ## Unsupported operations
