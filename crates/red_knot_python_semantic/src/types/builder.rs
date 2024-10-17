@@ -226,21 +226,27 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 self.add_negative(db, *neg);
             }
         } else {
-            for pos in &self.positive {
-                if new_positive.is_disjoint_from(db, *pos) {
-                    self.negative.clear();
-                    self.positive.clear();
+            let mut to_remove = None;
+            for (index, existing_positive) in self.positive.iter().enumerate() {
+                if existing_positive.is_subtype_of(db, new_positive) {
                     return;
                 }
+                if new_positive.is_subtype_of(db, *existing_positive) {
+                    to_remove = Some(index);
+                }
 
-                // TODO if ty <: pos or pos <: ty, we can only
-                // keep the smaller of the two (the subtype).
+                if new_positive.is_disjoint_from(db, *existing_positive) {
+                    *self = Self::new();
+                    return;
+                }
+            }
+            if let Some(index) = to_remove {
+                self.positive.remove_index(index);
             }
 
-            for neg in &self.negative {
-                if new_positive.is_subtype_of(db, *neg) {
-                    self.negative.clear();
-                    self.positive.clear();
+            for existing_negative in &self.negative {
+                if new_positive.is_subtype_of(db, *existing_negative) {
+                    *self = Self::new();
                     return;
                 }
             }
@@ -265,31 +271,43 @@ impl<'db> InnerIntersectionBuilder<'db> {
             Type::Unbound => {}
 
             _ => {
+                // TODO: do we need the mirror-version of this above
                 if let Type::BooleanLiteral(bool) = new_negative {
                     if self
                         .positive
                         .iter()
                         .any(|pos| *pos == KnownClass::Bool.to_instance(db))
                     {
-                        self.positive.clear();
-                        self.negative.clear();
+                        *self = Self::new();
                         self.positive.insert(Type::BooleanLiteral(!bool));
                         return;
                     }
                 }
 
-                for pos in &self.positive {
-                    if pos.is_subtype_of(db, new_negative) {
-                        self.negative.clear();
-                        self.positive.clear();
+                let mut to_remove = None;
+                for (index, existing_negative) in self.negative.iter().enumerate() {
+                    if existing_negative.is_subtype_of(db, new_negative) {
+                        to_remove = Some(index);
+                    }
+                    if new_negative.is_subtype_of(db, *existing_negative) {
+                        return;
+                    }
+                }
+                if let Some(index) = to_remove {
+                    self.negative.remove_index(index);
+                }
+
+                for existing_positive in &self.positive {
+                    if existing_positive.is_subtype_of(db, new_negative) {
+                        *self = Self::new();
                         return;
                     }
                 }
 
                 // This condition disregards irrelevant negative contributions. For example,
-                // we have A & ~B = A, if B is disjoint from A. So we only add negative
-                // elements if they overlap with any of the given positive contributions.
-                // Unless there are none yet.
+                // A & ~B = A, if B is disjoint from A. So we only add negative elements if
+                // they overlap with any of the given positive contributions. Unless there
+                // are none yet.
                 if self.positive.is_empty()
                     || self
                         .positive
@@ -537,7 +555,7 @@ mod tests {
             .build()
             .expect_intersection();
 
-        assert_eq!(intersection.pos_vec(&db), &[t2, t1]);
+        assert_eq!(intersection.pos_vec(&db), &[t1]);
         assert_eq!(intersection.neg_vec(&db), &[ta]);
     }
 
@@ -628,6 +646,48 @@ mod tests {
     }
 
     #[test]
+    fn build_intersection_simplify_positive_type_and_positive_subtype() {
+        let db = setup_db();
+
+        let t = KnownClass::Str.to_instance(&db);
+        let s = Type::LiteralString;
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(t)
+            .add_positive(s)
+            .build();
+        assert_eq!(ty, s);
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(s)
+            .add_positive(t)
+            .build();
+        assert_eq!(ty, s);
+    }
+
+    #[test]
+    fn build_intersection_simplify_negative_type_and_negative_subtype() {
+        let db = setup_db();
+
+        let t = KnownClass::Str.to_instance(&db);
+        let s = Type::LiteralString;
+
+        let expected = IntersectionBuilder::new(&db).add_negative(t).build();
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_negative(t)
+            .add_negative(s)
+            .build();
+        assert_eq!(ty, expected);
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_negative(s)
+            .add_negative(t)
+            .build();
+        assert_eq!(ty, expected);
+    }
+
+    #[test]
     fn build_intersection_simplify_negative_type_and_positive_subtype() {
         let db = setup_db();
 
@@ -638,7 +698,12 @@ mod tests {
             .add_negative(t)
             .add_positive(s)
             .build();
+        assert_eq!(ty, Type::Never);
 
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(s)
+            .add_negative(t)
+            .build();
         assert_eq!(ty, Type::Never);
     }
 
