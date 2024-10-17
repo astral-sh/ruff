@@ -20,8 +20,7 @@ x = True if flag else False
 reveal_type(x)  # revealed: bool
 
 if x is not False:
-    # TODO the following should be `Literal[True]`
-    reveal_type(x)  # revealed: bool & ~Literal[False]
+    reveal_type(x)  # revealed: Literal[True]
 ```
 
 ## `is not` for non-singleton types
