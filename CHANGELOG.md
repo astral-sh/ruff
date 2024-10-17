@@ -23,7 +23,7 @@ Check out the [blog post](https://astral.sh/blog/ruff-v0.7.0) for a migration gu
 ### Preview linter features
 
 - \[`refurb`\] implement `hardcoded-string-charset` (FURB156) ([#13530](https://github.com/astral-sh/ruff/pull/13530))
-- \[refurb\] Count codepoints not bytes for `slice-to-remove-prefix-or-suffix (FURB188)` ([#13631](https://github.com/astral-sh/ruff/pull/13631))
+- \[`refurb`\] Count codepoints not bytes for `slice-to-remove-prefix-or-suffix (FURB188)` ([#13631](https://github.com/astral-sh/ruff/pull/13631))
 
 ### Rule changes
 
