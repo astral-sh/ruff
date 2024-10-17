@@ -244,11 +244,19 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 self.positive.remove_index(index);
             }
 
-            for existing_negative in &self.negative {
+            let mut to_remove = None;
+            for (index, existing_negative) in self.negative.iter().enumerate() {
                 if new_positive.is_subtype_of(db, *existing_negative) {
                     *self = Self::new();
                     return;
                 }
+
+                if existing_negative.is_disjoint_from(db, new_positive) {
+                    to_remove = Some(index);
+                }
+            }
+            if let Some(index) = to_remove {
+                self.negative.remove_index(index);
             }
 
             self.positive.insert(new_positive);
@@ -320,33 +328,15 @@ impl<'db> InnerIntersectionBuilder<'db> {
         }
     }
 
-    fn simplify(&mut self) {
-        // TODO this should be generalized based on subtyping, for now we just handle a few cases
-
-        // Never is a subtype of all types
-        if self.positive.contains(&Type::Never) {
-            self.positive.retain(Type::is_never);
-            self.negative.clear();
-        }
-
+    fn simplify_unbound(&mut self) {
         if self.positive.contains(&Type::Unbound) {
             self.positive.retain(Type::is_unbound);
             self.negative.clear();
         }
-
-        // None intersects only with object
-        for pos in &self.positive {
-            if let Type::Instance(_) = pos {
-                // could be `object` type
-            } else {
-                self.negative.remove(&Type::None);
-                break;
-            }
-        }
     }
 
     fn build(mut self, db: &'db dyn Db) -> Type<'db> {
-        self.simplify();
+        self.simplify_unbound();
         match (self.positive.len(), self.negative.len()) {
             (0, 0) => Type::Never,
             (1, 0) => self.positive[0],
@@ -637,11 +627,17 @@ mod tests {
     #[test]
     fn build_intersection_simplify_negative_none() {
         let db = setup_db();
+
         let ty = IntersectionBuilder::new(&db)
             .add_negative(Type::None)
             .add_positive(Type::IntLiteral(1))
             .build();
+        assert_eq!(ty, Type::IntLiteral(1));
 
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(Type::IntLiteral(1))
+            .add_negative(Type::None)
+            .build();
         assert_eq!(ty, Type::IntLiteral(1));
     }
 
