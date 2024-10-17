@@ -545,7 +545,10 @@ impl<'db> Type<'db> {
                 | Type::LiteralString
                 | Type::BytesLiteral(..) => true,
                 Type::None => false,
-                Type::Instance(class_type) => !class_type.is_known(db, KnownClass::NoneType),
+                Type::Instance(class_type) => {
+                    !class_type.is_known(db, KnownClass::NoneType)
+                        && !class_type.is_known(db, KnownClass::Object)
+                }
             },
 
             (Type::BooleanLiteral(bool), other) | (other, Type::BooleanLiteral(bool)) => {
@@ -569,7 +572,10 @@ impl<'db> Type<'db> {
                     | Type::LiteralString
                     | Type::BytesLiteral(..) => true,
                     Type::BooleanLiteral(bool_other) => bool != bool_other,
-                    Type::Instance(class_type) => !class_type.is_known(db, KnownClass::Bool),
+                    Type::Instance(class_type) => {
+                        !class_type.is_known(db, KnownClass::Bool)
+                            && !class_type.is_known(db, KnownClass::Object)
+                    }
                 }
             }
 
@@ -591,7 +597,10 @@ impl<'db> Type<'db> {
                 }
                 Type::StringLiteral(..) | Type::LiteralString | Type::BytesLiteral(..) => true,
                 Type::IntLiteral(int_other) => int != int_other,
-                Type::Instance(..) => false,
+                Type::Instance(class_type) => {
+                    !class_type.is_known(db, KnownClass::Int)
+                        && !class_type.is_known(db, KnownClass::Object)
+                }
             },
 
             (Type::StringLiteral(string), other) | (other, Type::StringLiteral(string)) => {
@@ -615,7 +624,10 @@ impl<'db> Type<'db> {
                     Type::StringLiteral(string_other) => string != string_other,
                     Type::LiteralString => false,
                     Type::BytesLiteral(..) => true,
-                    Type::Instance(..) => false,
+                    Type::Instance(class_type) => {
+                        !class_type.is_known(db, KnownClass::Str)
+                            && !class_type.is_known(db, KnownClass::Object)
+                    }
                 }
             }
 
@@ -1951,6 +1963,7 @@ mod tests {
 
     #[test_case(Ty::Any, Ty::BuiltinInstance("int"))]
     #[test_case(Ty::None, Ty::None)]
+    #[test_case(Ty::None, Ty::BuiltinInstance("object"))]
     #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinInstance("int"))]
     #[test_case(Ty::BuiltinInstance("str"), Ty::LiteralString)]
     #[test_case(Ty::BoolLiteral(true), Ty::BoolLiteral(true))]
