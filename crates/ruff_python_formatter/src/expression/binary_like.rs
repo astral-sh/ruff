@@ -20,7 +20,7 @@ use crate::expression::parentheses::{
 };
 use crate::expression::OperatorPrecedence;
 use crate::prelude::*;
-use crate::string::FormatImplicitConcatenatedString;
+use crate::string::implicit::FormatImplicitConcatenatedString;
 
 #[derive(Copy, Clone, Debug)]
 pub(super) enum BinaryLike<'a> {
