@@ -540,9 +540,6 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn check_division_by_zero(&mut self, expr: &ast::ExprBinOp, left: Type<'db>) {
         match left {
             Type::IntLiteral(_) => {}
-            Type::Instance(cls)
-                if cls.is_known(self.db, KnownClass::Float)
-                    || cls.is_known(self.db, KnownClass::Int) => {}
             _ => return,
         };
 
