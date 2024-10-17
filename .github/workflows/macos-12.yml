@@ -73,4 +73,4 @@ jobs:
       - name: "Extract"
         run: tar xzvf ruff-x86_64-apple-darwin.tar.gz
       - name: "Run Ruff"
-        run: ./ruff --help
+        run: ./ruff-x86_64-apple-darwin/ruff --help
