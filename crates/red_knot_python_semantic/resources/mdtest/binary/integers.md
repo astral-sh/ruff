@@ -42,6 +42,6 @@ e = 1.0 / 0
 reveal_type(a)  # revealed: float
 reveal_type(b)  # revealed: int
 reveal_type(c)  # revealed: int
-reveal_type(d)  # revealed: @Todo
-reveal_type(e)  # revealed: @Todo
+reveal_type(d)  # revealed: float
+reveal_type(e)  # revealed: float
 ```
