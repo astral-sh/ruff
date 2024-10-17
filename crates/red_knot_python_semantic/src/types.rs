@@ -545,10 +545,10 @@ impl<'db> Type<'db> {
                 | Type::LiteralString
                 | Type::BytesLiteral(..) => true,
                 Type::None => false,
-                Type::Instance(class_type) => {
-                    !class_type.is_known(db, KnownClass::NoneType)
-                        && !class_type.is_known(db, KnownClass::Object)
-                }
+                Type::Instance(class_type) => !matches!(
+                    class_type.known(db),
+                    Some(KnownClass::NoneType | KnownClass::Object)
+                ),
             },
 
             (Type::BooleanLiteral(bool), other) | (other, Type::BooleanLiteral(bool)) => {
@@ -572,10 +572,10 @@ impl<'db> Type<'db> {
                     | Type::LiteralString
                     | Type::BytesLiteral(..) => true,
                     Type::BooleanLiteral(bool_other) => bool != bool_other,
-                    Type::Instance(class_type) => {
-                        !class_type.is_known(db, KnownClass::Bool)
-                            && !class_type.is_known(db, KnownClass::Object)
-                    }
+                    Type::Instance(class_type) => !matches!(
+                        class_type.known(db),
+                        Some(KnownClass::Bool | KnownClass::Object)
+                    ),
                 }
             }
 
@@ -597,10 +597,10 @@ impl<'db> Type<'db> {
                 }
                 Type::StringLiteral(..) | Type::LiteralString | Type::BytesLiteral(..) => true,
                 Type::IntLiteral(int_other) => int != int_other,
-                Type::Instance(class_type) => {
-                    !class_type.is_known(db, KnownClass::Int)
-                        && !class_type.is_known(db, KnownClass::Object)
-                }
+                Type::Instance(class_type) => !matches!(
+                    class_type.known(db),
+                    Some(KnownClass::Int | KnownClass::Object)
+                ),
             },
 
             (Type::StringLiteral(string), other) | (other, Type::StringLiteral(string)) => {
@@ -624,10 +624,10 @@ impl<'db> Type<'db> {
                     Type::StringLiteral(string_other) => string != string_other,
                     Type::LiteralString => false,
                     Type::BytesLiteral(..) => true,
-                    Type::Instance(class_type) => {
-                        !class_type.is_known(db, KnownClass::Str)
-                            && !class_type.is_known(db, KnownClass::Object)
-                    }
+                    Type::Instance(class_type) => !matches!(
+                        class_type.known(db),
+                        Some(KnownClass::Str | KnownClass::Object)
+                    ),
                 }
             }
 
