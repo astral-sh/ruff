@@ -287,14 +287,12 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
         match self {
             FormatStatementsLastExpression::LeftToRight { value, statement } => {
                 let can_inline_comment = should_inline_comments(value, *statement, f.context());
-                let is_implicit_concatenated =
+                let is_joineable_implicit_concatenated_string =
                     is_join_implicit_concatenated_string_enabled(f.context())
-                        && StringLike::try_from(*value).is_ok_and(|string| {
-                            string.is_implicit_concatenated()
-                                && !string.is_implicit_and_cant_join(f.context())
-                        });
+                        && StringLike::try_from(*value)
+                            .is_ok_and(|string| string.is_implicit_and_can_join(f.context()));
 
-                if !can_inline_comment && !is_implicit_concatenated {
+                if !can_inline_comment && !is_joineable_implicit_concatenated_string {
                     return maybe_parenthesize_expression(
                         value,
                         *statement,
@@ -311,10 +309,45 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                     *statement,
                     &comments,
                 ) {
-                    if is_implicit_concatenated {
-                        let implicit_group_id = f.group_id("implicit_concatenated");
-                        optional_parentheses(&format_with(|f| {
+                    let group_id = f.group_id("optional_parentheses");
+                    let f = &mut WithNodeLevel::new(NodeLevel::Expression(Some(group_id)), f);
+
+                    // Special case for implicit concatenated strings in assigment value possitions.
+                    // The special handling is nessary to prevent an instability where an assignment has
+                    // a trailing own line comment and the implicit concatenated string fits on the line,
+                    // but only if the comment doesn't get inlined.
+                    //
+                    // ```python
+                    // ____aaa = (
+                    //     "aaaaaaaaaaaaaaaaaaaaa" "aaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvvvvvv"
+                    // )  # c
+                    // ```
+                    //
+                    // Without the special handling, this would get formatted to:
+                    // ```python
+                    // ____aaa = (
+                    //     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvvvvvv"
+                    // )  # c
+                    // ```
+                    //
+                    // However, this now gets reformatted again because Ruff now takes the `BestFit` layout for the string
+                    // because the value is no longer an implicit concatenated string.
+                    // ```python
+                    // ____aaa = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvvvvvv"  # c
+                    // ```
+                    //
+                    // The special handling here ensures that the implicit concatenated string only gets
+                    // joined **if** it fits with the trailing comment inlined. Otherwise, keep the multiline
+                    // formatting.
+                    if is_joineable_implicit_concatenated_string {
+                        inline_comments.mark_formatted();
+
+                        // FIXME: `optional_parentheses` doesn't work because it always expands
+                        //   when it contains a trailing comment (expand_parent)
+                        // TODO: We might be able to simplify this to just value.format().with_parentheses(Parentheses::NEver).
+                        let format_implicit = format_with(|f: &mut PyFormatter| {
                             inline_comments.mark_formatted();
+                            let implicit_group_id = f.group_id("implicit_concatenated_string");
 
                             match value {
                                 Expr::StringLiteral(literal) => {
@@ -326,7 +359,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                                             kind: StringLiteralKind::String,
                                             implicit_group_id: Some(implicit_group_id),
                                         })
-                                        .fmt(f)?;
+                                        .fmt(f)
                                 }
                                 Expr::BytesLiteral(literal) => {
                                     assert!(literal.value.is_implicit_concatenated());
@@ -336,7 +369,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                                         .with_options(ExprBytesLiteralLayout {
                                             implicit_group_id: Some(implicit_group_id),
                                         })
-                                        .fmt(f)?;
+                                        .fmt(f)
                                 }
 
                                 Expr::FString(literal) => {
@@ -347,7 +380,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                                         .with_options(ExprFStringLayout {
                                             implicit_group_id: Some(implicit_group_id),
                                         })
-                                        .fmt(f)?;
+                                        .fmt(f)
                                 }
 
                                 _ => {
@@ -356,28 +389,52 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                                     )
                                 }
                             }
+                        })
+                        .memoized();
 
-                            if !inline_comments.is_empty() {
-                                // If the implicit concatenated string fits in a single line,, format the comment in parentheses
-                                if_group_fits_on_line(&inline_comments)
-                                    .with_group_id(Some(implicit_group_id))
-                                    .fmt(f)?;
-                            }
+                        // Can we use a similar pattern to best_fits_parenthesize?
 
-                            Ok(())
-                        }))
+                        best_fitting![
+                            // Join the implicit concatenated string if it fits on a single line
+                            format_args![
+                                group(&format_implicit).with_group_id(Some(group_id)),
+                                inline_comments
+                            ],
+                            // I Think this **doesn't work** because you can't go from group expand back to flat :(.
+                            // We might have to expose `FormatImplicitConcatenatedFlat` :(. But maybe it's the best
+                            // where it returns an `Option` and the result has a `flat` and `expanded` method.
+
+                            // Parenthesize the string but join the implicit concatenated string and inline the comment.
+                            group(&format_args![
+                                token("("),
+                                soft_block_indent(&format_args![
+                                    group(&format_implicit),
+                                    inline_comments
+                                ]),
+                                token(")"),
+                            ])
+                            .with_group_id(Some(group_id))
+                            .should_expand(true),
+                            // Keep the implicit concatenated string multiline and don't inline the comment.
+                            group(&format_args![
+                                token("("),
+                                block_indent(&format_implicit),
+                                token(")"),
+                                inline_comments,
+                            ])
+                            .with_group_id(Some(group_id))
+                            .should_expand(true),
+                        ]
+                        .with_mode(BestFittingMode::AllLines)
                         .fmt(f)?;
-
-                        if !inline_comments.is_empty() {
-                            // If the implicit concatenated string expands, format the comments outside the parentheses
-                            if_group_breaks(&inline_comments)
-                                .with_group_id(Some(implicit_group_id))
-                                .fmt(f)?;
-                        }
+                        //
+                        // if !inline_comments.is_empty() {
+                        //     // Keep the trailing comment outside the parentheses if the implicit concatenated string expands.
+                        //     if_group_breaks(&inline_comments)
+                        //         .with_group_id(Some(implicit_group_id))
+                        //         .fmt(f)?;
+                        // }
                     } else {
-                        let group_id = f.group_id("optional_parentheses");
-                        let f = &mut WithNodeLevel::new(NodeLevel::Expression(Some(group_id)), f);
-
                         best_fit_parenthesize(&format_once(|f| {
                             inline_comments.mark_formatted();
 

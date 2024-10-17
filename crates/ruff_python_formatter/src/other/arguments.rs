@@ -223,8 +223,6 @@ fn is_huggable_string_argument(
     arguments: &Arguments,
     context: &PyFormatContext,
 ) -> bool {
-    // TODO: Implicit concatenated could become regular string. Although not if it is multiline. So that should be fine?
-    //   Double check
     if string.is_implicit_concatenated() || !string.is_multiline(context.source()) {
         return false;
     }

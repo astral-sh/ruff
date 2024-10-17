@@ -52,33 +52,16 @@ impl<'a> FormatImplicitConcatenatedString<'a> {
             return None;
         }
 
-        // Early exit if it's known that this string can't be joined because it
-        // * isn't supported (e.g. raw strings or triple quoted strings)
-        // * the implicit concatenated string can never be flat because of comments
-        if self.string.parts().any(|part| {
-            // Similar to Black, don't collapse triple quoted and raw strings.
-            // We could technically join strings that are raw-strings and use the same quotes but lets not do this for now.
-            // Joining triple quoted strings is more complicated because an
-            // implicit concatenated string could become a docstring (if it's the first string in a block).
-            // That means the joined string formatting would have to call into
-            // the docstring formatting or otherwise guarantee that the output
-            // won't change on a second run.
-            if part.flags().is_triple_quoted() || part.flags().is_raw_string() {
-                true
-            } else {
-                let comments = context.comments().leading_dangling_trailing(&part);
-
-                // For now, preserve comments documenting a specific part over possibly
-                // collapsing onto a single line. Collapsing could result in pragma comments
-                // now covering more code.
-                comments.has_leading() || comments.has_trailing()
-            }
-        }) {
+        // Early exit if it's known that this string can't be joined
+        if !self.string.is_implicit_and_can_join(context) {
             return None;
         }
 
         // Don't merge multiline strings because that's pointless, a multiline string can
         // never fit on a single line.
+        // TODO: The `is_multiline` implementation for f-string is an over-approximation and can
+        //   return `true` even if the f-string then gets formatted to a single line.
+        //   That's why we disregard the early exit here (it's just an optimisation).
         if !self.string.is_fstring() && self.string.is_multiline(context.source()) {
             return None;
         }
@@ -86,16 +69,18 @@ impl<'a> FormatImplicitConcatenatedString<'a> {
         // The string is either a regular string, f-string, or bytes string.
         let normalizer = StringNormalizer::from_context(context);
 
-        // TODO: Do we need to respect the quoting?
+        // TODO: Do we need to respect the quoting from an enclosing f-string?
         let mut merged_quotes: Option<QuoteMetadata> = None;
-        let mut prefix = match self.string {
+
+        // Only preserve the string type but disregard the `u` and `r` prefixes.
+        // * It's not necessary to preserve the `r` prefix because Ruff doesn't support joining raw strings (we shouldn't get here).
+        // * It's not necessary to preserve the `u` prefix because Ruff discards the `u` prefix (it's meaningless in Python 3+)
+        let prefix = match self.string {
             StringLike::String(_) => AnyStringPrefix::Regular(StringLiteralPrefix::Empty),
             StringLike::Bytes(_) => AnyStringPrefix::Bytes(ByteStringPrefix::Regular),
             StringLike::FString(_) => AnyStringPrefix::Format(FStringPrefix::Regular),
         };
 
-        // TODO unify quote styles.
-        // Possibly run directly on entire string?
         let first_part = self.string.parts().next()?;
 
         // Only determining the preferred quote for the first string is sufficient
@@ -107,15 +92,9 @@ impl<'a> FormatImplicitConcatenatedString<'a> {
         };
 
         for part in self.string.parts() {
-            // Again, this takes a StringPart and not a `AnyStringPart`.
             let part_quote_metadata = QuoteMetadata::from_part(part, preferred_quote, context);
 
-            if part.flags().is_f_string() {
-                prefix = AnyStringPrefix::Format(FStringPrefix::Regular);
-            }
-
             if let Some(merged) = merged_quotes.as_mut() {
-                // FIXME: this is not correct.
                 *merged = part_quote_metadata.merge(merged)?;
             } else {
                 merged_quotes = Some(part_quote_metadata);
@@ -135,6 +114,8 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedString<'_> {
         let comments = f.context().comments().clone();
         let quoting = self.string.quoting(&f.context().locator());
 
+        // Formats the string where each part is preserved as in the source.
+        // The parts are joined by soft line breaks.
         let format_expanded = format_with(|f| {
             let mut joiner = f.join_with(in_parentheses_only_soft_line_break_or_space());
             for part in self.string.parts() {
@@ -165,13 +146,16 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedString<'_> {
             joiner.finish()
         });
 
+        // If the string can be joined, try joining the implicit concatenated string into a single string
+        // if it fits on the line. Otherwise, parenthesize the string parts and format each part on its
+        // own line.
         if let Some(flags) = self.merged_flags(f.context()) {
+            // Merges all string parts into a single string.
             let format_flat = format_with(|f| {
                 let quotes = StringQuotes::from(flags);
 
                 write!(f, [flags.prefix(), quotes])?;
 
-                // TODO: strings in expression statements aren't joined correctly because they aren't wrap in a group :(
                 // TODO: FStrings when the f-string preview style is enabled???
 
                 for part in self.string.parts() {
@@ -196,6 +180,7 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedString<'_> {
             write!(
                 f,
                 [
+                    // TODO: strings in expression statements aren't joined correctly because they aren't wrap in a group :(
                     if_group_fits_on_line(&format_flat),
                     if_group_breaks(&format_expanded)
                 ]
@@ -274,7 +259,12 @@ pub(crate) trait StringLikeExtensions {
 
     fn is_multiline(&self, source: &str) -> bool;
 
-    fn is_implicit_and_cant_join(&self, context: &PyFormatContext) -> bool;
+    /// Tests if this is an implicitly concatenated string that can't be joined.
+    ///
+    /// * Returns `false` if this is not an implicitly concatenated string or the parts can't be joined
+    ///   because any part is a raw string, triple quoted string, or has leading or trailing comments.
+    /// * Returns `true` if it is an implicit concatenated string and Ruff tries to join it if it fits on the line.
+    fn is_implicit_and_can_join(&self, context: &PyFormatContext) -> bool;
 }
 
 impl StringLikeExtensions for ast::StringLike<'_> {
@@ -297,21 +287,31 @@ impl StringLikeExtensions for ast::StringLike<'_> {
         }
     }
 
-    fn is_implicit_and_cant_join(&self, context: &PyFormatContext) -> bool {
+    fn is_implicit_and_can_join(&self, context: &PyFormatContext) -> bool {
         if !self.is_implicit_concatenated() {
             return false;
         }
 
         for part in self.parts() {
+            // Similar to Black, don't collapse triple quoted and raw strings.
+            // We could technically join strings that are raw-strings and use the same quotes but lets not do this for now.
+            // Joining triple quoted strings is more complicated because an
+            // implicit concatenated string could become a docstring (if it's the first string in a block).
+            // That means the joined string formatting would have to call into
+            // the docstring formatting or otherwise guarantee that the output
+            // won't change on a second run.
             if part.flags().is_triple_quoted() || part.flags().is_raw_string() {
-                return true;
+                return false;
             }
 
+            // For now, preserve comments documenting a specific part over possibly
+            // collapsing onto a single line. Collapsing could result in pragma comments
+            // now covering more code.
             if context.comments().leading_trailing(&part).next().is_some() {
-                return true;
+                return false;
             }
         }
 
-        false
+        true
     }
 }
