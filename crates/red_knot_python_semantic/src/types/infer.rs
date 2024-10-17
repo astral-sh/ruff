@@ -892,7 +892,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             name.id.clone(),
             definition,
             body_scope,
-            bases_specialized_scope,
             maybe_known_class,
         ));
 

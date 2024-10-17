@@ -1,4 +1,4 @@
-use infer::{TypeInference, TypeInferenceBuilder};
+use infer::TypeInferenceBuilder;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 
@@ -1608,10 +1608,6 @@ pub struct ClassType<'db> {
     definition: Definition<'db>,
 
     body_scope: ScopeId<'db>,
-
-    // a specialized scope that covers the bases and keywords of the class
-    // (introduced when there are type parameters on the class)
-    bases_specialized_scope: Option<ScopeId<'db>>,
 
     known: Option<KnownClass>,
 }
