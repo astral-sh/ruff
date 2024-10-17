@@ -1,4 +1,4 @@
-### Comparison: Unions
+# Comparison: Unions
 
 ## Union on one side of the comparison
 
