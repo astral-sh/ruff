@@ -1,4 +1,3 @@
-use ruff_formatter::{FormatRuleWithOptions, GroupId};
 use ruff_python_ast::{AnyNodeRef, ExprFString, StringLike};
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
@@ -8,31 +7,10 @@ use crate::expression::parentheses::{
 };
 use crate::other::f_string_part::FormatFStringPart;
 use crate::prelude::*;
-use crate::string::{FormatImplicitConcatenatedString, Quoting, StringLikeExtensions};
+use crate::string::{implicit::FormatImplicitConcatenatedString, Quoting, StringLikeExtensions};
 
 #[derive(Default)]
-pub struct FormatExprFString {
-    layout: ExprFStringLayout,
-}
-
-#[derive(Default)]
-pub struct ExprFStringLayout {
-    /// ID of the group wrapping the implicit concatenated string. If `None`, the implicit
-    /// is wrapped in an [`in_parentheses_only_group`].
-    ///
-    /// This is used when formatting implicit concatenated strings in assignment value positions
-    /// where the positioning of comments depends on whether the string can be joined or not.
-    pub implicit_group_id: Option<GroupId>,
-}
-
-impl FormatRuleWithOptions<ExprFString, PyFormatContext<'_>> for FormatExprFString {
-    type Options = ExprFStringLayout;
-
-    fn with_options(mut self, options: Self::Options) -> Self {
-        self.layout = options;
-        self
-    }
-}
+pub struct FormatExprFString;
 
 impl FormatNodeRule<ExprFString> for FormatExprFString {
     fn fmt_fields(&self, item: &ExprFString, f: &mut PyFormatter) -> FormatResult<()> {
@@ -44,14 +22,7 @@ impl FormatNodeRule<ExprFString> for FormatExprFString {
                 f_string_quoting(item, &f.context().locator()),
             )
             .fmt(f),
-            _ => match self.layout.implicit_group_id {
-                Some(group_id) => group(&FormatImplicitConcatenatedString::new(item))
-                    .with_group_id(Some(group_id))
-                    .fmt(f),
-                None => {
-                    in_parentheses_only_group(&FormatImplicitConcatenatedString::new(item)).fmt(f)
-                }
-            },
+            _ => in_parentheses_only_group(&FormatImplicitConcatenatedString::new(item)).fmt(f),
         }
     }
 }

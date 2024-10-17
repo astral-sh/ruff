@@ -8,9 +8,6 @@ use crate::comments::{
     trailing_comments, Comments, LeadingDanglingTrailingComments, SourceComment,
 };
 use crate::context::{NodeLevel, WithNodeLevel};
-use crate::expression::expr_bytes_literal::ExprBytesLiteralLayout;
-use crate::expression::expr_f_string::ExprFStringLayout;
-use crate::expression::expr_string_literal::ExprStringLiteralLayout;
 use crate::expression::parentheses::{
     is_expression_parenthesized, optional_parentheses, NeedsParentheses, OptionalParentheses,
     Parentheses, Parenthesize,
@@ -19,10 +16,10 @@ use crate::expression::{
     can_omit_optional_parentheses, has_own_parentheses, has_parentheses,
     maybe_parenthesize_expression,
 };
-use crate::other::string_literal::StringLiteralKind;
-use crate::preview::is_join_implicit_concatenated_string_enabled;
 use crate::statement::trailing_semicolon;
-use crate::string::StringLikeExtensions;
+use crate::string::implicit::{
+    FormatImplicitConcatenatedStringExpanded, FormatImplicitConcatenatedStringFlat,
+};
 use crate::{has_skip_comment, prelude::*};
 
 #[derive(Default)]
@@ -287,12 +284,11 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
         match self {
             FormatStatementsLastExpression::LeftToRight { value, statement } => {
                 let can_inline_comment = should_inline_comments(value, *statement, f.context());
-                let is_joineable_implicit_concatenated_string =
-                    is_join_implicit_concatenated_string_enabled(f.context())
-                        && StringLike::try_from(*value)
-                            .is_ok_and(|string| string.is_implicit_and_can_join(f.context()));
+                let format_implicit_flat = StringLike::try_from(*value).ok().and_then(|string| {
+                    FormatImplicitConcatenatedStringFlat::new(string, f.context())
+                });
 
-                if !can_inline_comment && !is_joineable_implicit_concatenated_string {
+                if !can_inline_comment && format_implicit_flat.is_none() {
                     return maybe_parenthesize_expression(
                         value,
                         *statement,
@@ -339,101 +335,64 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                     // The special handling here ensures that the implicit concatenated string only gets
                     // joined **if** it fits with the trailing comment inlined. Otherwise, keep the multiline
                     // formatting.
-                    if is_joineable_implicit_concatenated_string {
+                    if let Some(flat) = format_implicit_flat {
                         inline_comments.mark_formatted();
 
-                        // FIXME: `optional_parentheses` doesn't work because it always expands
-                        //   when it contains a trailing comment (expand_parent)
-                        // TODO: We might be able to simplify this to just value.format().with_parentheses(Parentheses::NEver).
-                        let format_implicit = format_with(|f: &mut PyFormatter| {
-                            inline_comments.mark_formatted();
-                            let implicit_group_id = f.group_id("implicit_concatenated_string");
+                        let expanded = FormatImplicitConcatenatedStringExpanded::new(
+                            StringLike::try_from(*value).unwrap(),
+                        );
 
-                            match value {
-                                Expr::StringLiteral(literal) => {
-                                    assert!(literal.value.is_implicit_concatenated());
+                        // Join the implicit concatenated string if it fits on a single line
+                        // ```python
+                        // a = "testmorelong" # comment
+                        // ```
+                        let single_line = format_with(|f| write!(f, [flat, inline_comments]));
 
-                                    literal
-                                        .format()
-                                        .with_options(ExprStringLiteralLayout {
-                                            kind: StringLiteralKind::String,
-                                            implicit_group_id: Some(implicit_group_id),
-                                        })
-                                        .fmt(f)
-                                }
-                                Expr::BytesLiteral(literal) => {
-                                    assert!(literal.value.is_implicit_concatenated());
-
-                                    literal
-                                        .format()
-                                        .with_options(ExprBytesLiteralLayout {
-                                            implicit_group_id: Some(implicit_group_id),
-                                        })
-                                        .fmt(f)
-                                }
-
-                                Expr::FString(literal) => {
-                                    assert!(literal.value.is_implicit_concatenated());
-
-                                    literal
-                                        .format()
-                                        .with_options(ExprFStringLayout {
-                                            implicit_group_id: Some(implicit_group_id),
-                                        })
-                                        .fmt(f)
-                                }
-
-                                _ => {
-                                    unreachable!(
-                                        "Should only be called for implicit concatenated strings."
-                                    )
-                                }
-                            }
-                        })
-                        .memoized();
-
-                        // Can we use a similar pattern to best_fits_parenthesize?
-
-                        best_fitting![
-                            // Join the implicit concatenated string if it fits on a single line
-                            format_args![
-                                group(&format_implicit).with_group_id(Some(group_id)),
-                                inline_comments
-                            ],
-                            // I Think this **doesn't work** because you can't go from group expand back to flat :(.
-                            // We might have to expose `FormatImplicitConcatenatedFlat` :(. But maybe it's the best
-                            // where it returns an `Option` and the result has a `flat` and `expanded` method.
-
-                            // Parenthesize the string but join the implicit concatenated string and inline the comment.
+                        // Parenthesize the string but join the implicit concatenated string and inline the comment.
+                        // ```python
+                        // a = (
+                        //      "testmorelong" # comment
+                        // )
+                        // ```
+                        let joined_parenthesized = format_with(|f| {
                             group(&format_args![
                                 token("("),
-                                soft_block_indent(&format_args![
-                                    group(&format_implicit),
-                                    inline_comments
-                                ]),
+                                soft_block_indent(&format_args![flat, inline_comments]),
                                 token(")"),
                             ])
                             .with_group_id(Some(group_id))
-                            .should_expand(true),
-                            // Keep the implicit concatenated string multiline and don't inline the comment.
+                            .should_expand(true)
+                            .fmt(f)
+                        });
+
+                        // Keep the implicit concatenated string multiline and don't inline the comment.
+                        // ```python
+                        // a = (
+                        //      "test"
+                        //      "more"
+                        //      "long"
+                        // ) # comment
+                        // ```
+                        let implicit_expanded = format_with(|f| {
                             group(&format_args![
                                 token("("),
-                                block_indent(&format_implicit),
+                                block_indent(&expanded),
                                 token(")"),
                                 inline_comments,
                             ])
                             .with_group_id(Some(group_id))
-                            .should_expand(true),
-                        ]
-                        .with_mode(BestFittingMode::AllLines)
-                        .fmt(f)?;
-                        //
-                        // if !inline_comments.is_empty() {
-                        //     // Keep the trailing comment outside the parentheses if the implicit concatenated string expands.
-                        //     if_group_breaks(&inline_comments)
-                        //         .with_group_id(Some(implicit_group_id))
-                        //         .fmt(f)?;
-                        // }
+                            .should_expand(true)
+                            .fmt(f)
+                        });
+
+                        // We can't use `optional_parentheses` here because the `inline_comments` contains
+                        // a `expand_parent` which results in an instability because the next format
+                        // collapses the parentheses.
+                        // We can't use `parenthesize_if_expands` because it defaults to
+                        // the *flat* layout when the expanded layout doesn't fit.
+                        best_fitting![single_line, joined_parenthesized, implicit_expanded]
+                            .with_mode(BestFittingMode::AllLines)
+                            .fmt(f)?;
                     } else {
                         best_fit_parenthesize(&format_once(|f| {
                             inline_comments.mark_formatted();
