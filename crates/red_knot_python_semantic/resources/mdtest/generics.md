@@ -39,3 +39,19 @@ reveal_type(secure_box)  # revealed: MySecureBox
 # TODO reveal int
 reveal_type(secure_box.data)  # revealed: @Todo
 ```
+
+## Cyclical class definition
+
+In type stubs, classes can reference themselves in their base class definitions. For example, in `typeshed`, we have `class str(Sequence[str]): ...`.
+
+This should hold true even with generics at play.
+
+```py path=a.pyi
+class Seq[T]:
+  pass
+
+# TODO not error on the subscripting
+class S[T](Seq[S]):  # error: [non-subscriptable]
+  pass
+reveal_type(S)  # revealed: Literal[S]
+```
