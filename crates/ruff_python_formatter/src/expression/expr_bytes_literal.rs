@@ -5,7 +5,7 @@ use crate::expression::parentheses::{
     in_parentheses_only_group, NeedsParentheses, OptionalParentheses,
 };
 use crate::prelude::*;
-use crate::string::{FormatImplicitConcatenatedString, StringLikeExtensions};
+use crate::string::{implicit::FormatImplicitConcatenatedString, StringLikeExtensions};
 
 #[derive(Default)]
 pub struct FormatExprBytesLiteral;

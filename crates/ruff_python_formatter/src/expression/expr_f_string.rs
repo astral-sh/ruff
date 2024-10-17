@@ -7,7 +7,7 @@ use crate::expression::parentheses::{
 };
 use crate::other::f_string_part::FormatFStringPart;
 use crate::prelude::*;
-use crate::string::{FormatImplicitConcatenatedString, Quoting, StringLikeExtensions};
+use crate::string::{implicit::FormatImplicitConcatenatedString, Quoting, StringLikeExtensions};
 
 #[derive(Default)]
 pub struct FormatExprFString;
@@ -35,6 +35,7 @@ impl NeedsParentheses for ExprFString {
     ) -> OptionalParentheses {
         if self.value.is_implicit_concatenated() {
             OptionalParentheses::Multiline
+        }
         // TODO(dhruvmanila): Ideally what we want here is a new variant which
         // is something like:
         // - If the expression fits by just adding the parentheses, then add them and
@@ -53,7 +54,7 @@ impl NeedsParentheses for ExprFString {
         //   ```
         // This isn't decided yet, refer to the relevant discussion:
         // https://github.com/astral-sh/ruff/discussions/9785
-        } else if StringLike::FString(self).is_multiline(context.source()) {
+        else if StringLike::FString(self).is_multiline(context.source()) {
             OptionalParentheses::Never
         } else {
             OptionalParentheses::BestFit

@@ -285,6 +285,21 @@ b"Unicode Escape sequence don't apply to bytes: \N{0x} \u{ABCD} \U{ABCDEFGH}"
 ```
 
 
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -132,6 +132,6 @@
+ ]
+ 
+ # Parenthesized string continuation with messed up indentation
+-{"key": ([], b"a" b"b" b"c")}
++{"key": ([], b"abc")}
+ 
+ b"Unicode Escape sequence don't apply to bytes: \N{0x} \u{ABCD} \U{ABCDEFGH}"
+```
+
+
 ### Output 2
 ```
 indent-style               = space
@@ -441,4 +456,16 @@ b"Unicode Escape sequence don't apply to bytes: \N{0x} \u{ABCD} \U{ABCDEFGH}"
 ```
 
 
-
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -132,6 +132,6 @@
+ ]
+ 
+ # Parenthesized string continuation with messed up indentation
+-{'key': ([], b'a' b'b' b'c')}
++{'key': ([], b'abc')}
+ 
+ b"Unicode Escape sequence don't apply to bytes: \N{0x} \u{ABCD} \U{ABCDEFGH}"
+```

@@ -331,6 +331,22 @@ a = """\\\x1f"""
 ```
 
 
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -139,7 +139,7 @@
+ ]
+ 
+ # Parenthesized string continuation with messed up indentation
+-{"key": ([], "a" "b" "c")}
++{"key": ([], "abc")}
+ 
+ 
+ # Regression test for https://github.com/astral-sh/ruff/issues/5893
+```
+
+
 ### Output 2
 ```
 indent-style               = space
@@ -515,4 +531,17 @@ a = """\\\x1f"""
 ```
 
 
-
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -139,7 +139,7 @@
+ ]
+ 
+ # Parenthesized string continuation with messed up indentation
+-{'key': ([], 'a' 'b' 'c')}
++{'key': ([], 'abc')}
+ 
+ 
+ # Regression test for https://github.com/astral-sh/ruff/issues/5893
+```

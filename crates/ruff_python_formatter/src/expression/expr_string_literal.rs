@@ -6,7 +6,7 @@ use crate::expression::parentheses::{
 };
 use crate::other::string_literal::StringLiteralKind;
 use crate::prelude::*;
-use crate::string::{FormatImplicitConcatenatedString, StringLikeExtensions};
+use crate::string::{implicit::FormatImplicitConcatenatedString, StringLikeExtensions};
 
 #[derive(Default)]
 pub struct FormatExprStringLiteral {
