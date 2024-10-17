@@ -1426,7 +1426,7 @@ impl<'db> ClassType<'db> {
             .bases_specialized_scope(db)
             .map(|bases_scope| (bases_scope, infer_scope_types(db, bases_scope)));
 
-        let mapper = move |base_expr: &ast::Expr| {
+        class_stmt_node.bases().iter().map(move |base_expr: &ast::Expr| {
             if let Some((bases_scope, inferences)) = bases_scope_info {
                 // when we have a specialized scope, we'll look up the inference
                 // within that scope
@@ -1435,8 +1435,7 @@ impl<'db> ClassType<'db> {
                 // Otherwise, we can do the lookup based on the definition scope
                 definition_expression_ty(db, definition, base_expr)
             }
-        };
-        class_stmt_node.bases().iter().map(mapper)
+        })
     }
 
     /// Returns the class member of this class named `name`.
