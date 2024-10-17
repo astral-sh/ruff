@@ -9,6 +9,7 @@ Check out the [blog post](https://astral.sh/blog/ruff-v0.7.0) for a migration gu
 - The pytest rules `PT001` and `PT023` now default to omitting the decorator parentheses when there are no arguments
     ([#12838](https://github.com/astral-sh/ruff/pull/12838), [#13292](https://github.com/astral-sh/ruff/pull/13292)).
     This was a change that we attempted to make in Ruff v0.6.0, but only partially made due to an error on our part.
+    See the [blog post](https://astral.sh/blog/ruff-v0.7.0) for more details.
 - The `useless-try-except` rule (in our `tryceratops` category) has been recoded from `TRY302` to
     `TRY203` ([#13502](https://github.com/astral-sh/ruff/pull/13502)). This ensures Ruff's code is consistent with
     the same rule in the [`tryceratops`](https://github.com/guilatrova/tryceratops) linter.
