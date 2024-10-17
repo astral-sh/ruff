@@ -731,7 +731,7 @@ mod tests {
     }
 
     #[test]
-    fn build_intersection_simplify_disregard_irrelevant_negative() {
+    fn build_intersection_simplify_disjoint_positive_and_negative_types() {
         let db = setup_db();
 
         let t_p = KnownClass::Int.to_instance(&db);
