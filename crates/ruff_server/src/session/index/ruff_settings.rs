@@ -100,6 +100,16 @@ impl RuffSettings {
 }
 
 impl RuffSettingsIndex {
+    /// Create the settings index for the given workspace root.
+    ///
+    /// This will create the index in the following order:
+    /// 1. Resolve any settings from above the workspace root
+    /// 2. Resolve any settings from the workspace root itself
+    /// 3. Resolve any settings from within the workspace directory tree
+    ///
+    /// If this is the default workspace i.e., the client did not specify any workspace and so the
+    /// server will be running in a single file mode, then only (1) and (2) will be resolved,
+    /// skipping (3).
     pub(super) fn new(
         root: &Path,
         editor_settings: &ResolvedEditorSettings,
@@ -108,10 +118,14 @@ impl RuffSettingsIndex {
         let mut has_error = false;
         let mut index = BTreeMap::default();
         let mut respect_gitignore = None;
+
+        // If this is *not* the default workspace, then we should skip the workspace root itself
+        // because it will be resolved when walking the workspace directory tree. This is done by
+        // the `WalkBuilder` below.
         let should_skip_workspace = usize::from(!is_default_workspace);
 
-        // Add any settings from above the workspace root. The ones from the workspace root will be
-        // added only if it's not the default workspace.
+        // Add any settings from above the workspace root, skipping the workspace root itself if
+        // this is *not* the default workspace.
         for directory in root.ancestors().skip(should_skip_workspace) {
             match settings_toml(directory) {
                 Ok(Some(pyproject)) => {
@@ -162,6 +176,14 @@ impl RuffSettingsIndex {
 
         let fallback = Arc::new(RuffSettings::fallback(editor_settings, root));
 
+        // If this is the default workspace, the server is running in single-file mode. What this
+        // means is that the user opened a file directly (not the folder) in the editor and the
+        // server didn't receive a workspace folder during initialization. In this case, we default
+        // to the current working directory and skip walking the workspace directory tree for any
+        // settings.
+        //
+        // Refer to https://github.com/astral-sh/ruff/pull/13770 to understand what this behavior
+        // means for different editors.
         if is_default_workspace {
             if has_error {
                 let root = root.display();
