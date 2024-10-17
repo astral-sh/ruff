@@ -525,186 +525,96 @@ impl<'db> Type<'db> {
                 }
             }
 
-            (Type::None, other) | (other, Type::None) => match other {
-                Type::Never
-                | Type::Any
-                | Type::Unknown
-                | Type::Unbound
-                | Type::Todo
-                | Type::Function(..)
-                | Type::Module(..)
-                | Type::Class(..)
-                | Type::Union(..)
-                | Type::Intersection(..)
-                | Type::Tuple(..) => {
-                    unreachable!("handled above")
-                }
+            (
+                Type::None,
                 Type::IntLiteral(_)
                 | Type::BooleanLiteral(_)
                 | Type::StringLiteral(..)
                 | Type::LiteralString
-                | Type::BytesLiteral(..) => true,
-                Type::None => false,
-                Type::Instance(class_type) => !matches!(
+                | Type::BytesLiteral(..),
+            )
+            | (
+                Type::IntLiteral(_)
+                | Type::BooleanLiteral(_)
+                | Type::StringLiteral(..)
+                | Type::LiteralString
+                | Type::BytesLiteral(..),
+                Type::None,
+            ) => true,
+            (Type::None, Type::None) => false,
+            (Type::None, Type::Instance(class_type)) | (Type::Instance(class_type), Type::None) => {
+                !matches!(
                     class_type.known(db),
                     Some(KnownClass::NoneType | KnownClass::Object)
-                ),
-            },
-
-            (Type::BooleanLiteral(bool), other) | (other, Type::BooleanLiteral(bool)) => {
-                match other {
-                    Type::Never
-                    | Type::Any
-                    | Type::Unknown
-                    | Type::Unbound
-                    | Type::Todo
-                    | Type::Function(..)
-                    | Type::Module(..)
-                    | Type::Class(..)
-                    | Type::Union(..)
-                    | Type::Intersection(..)
-                    | Type::Tuple(..)
-                    | Type::None => {
-                        unreachable!("handled above")
-                    }
-                    Type::IntLiteral(_)
-                    | Type::StringLiteral(..)
-                    | Type::LiteralString
-                    | Type::BytesLiteral(..) => true,
-                    Type::BooleanLiteral(bool_other) => bool != bool_other,
-                    Type::Instance(class_type) => !matches!(
-                        class_type.known(db),
-                        Some(KnownClass::Bool | KnownClass::Object)
-                    ),
-                }
+                )
             }
 
-            (Type::IntLiteral(int), other) | (other, Type::IntLiteral(int)) => match other {
-                Type::Never
-                | Type::Any
-                | Type::Unknown
-                | Type::Unbound
-                | Type::Function(..)
-                | Type::Module(..)
-                | Type::Class(..)
-                | Type::Todo
-                | Type::Union(..)
-                | Type::Intersection(..)
-                | Type::Tuple(..)
-                | Type::None
-                | Type::BooleanLiteral(..) => {
-                    unreachable!("handled above")
-                }
-                Type::StringLiteral(..) | Type::LiteralString | Type::BytesLiteral(..) => true,
-                Type::IntLiteral(int_other) => int != int_other,
-                Type::Instance(class_type) => !matches!(
-                    class_type.known(db),
-                    Some(KnownClass::Int | KnownClass::Object)
-                ),
-            },
+            (
+                Type::BooleanLiteral(..),
+                Type::IntLiteral(_)
+                | Type::StringLiteral(..)
+                | Type::LiteralString
+                | Type::BytesLiteral(..),
+            )
+            | (
+                Type::IntLiteral(_)
+                | Type::StringLiteral(..)
+                | Type::LiteralString
+                | Type::BytesLiteral(..),
+                Type::BooleanLiteral(..),
+            ) => true,
+            (Type::BooleanLiteral(left), Type::BooleanLiteral(right)) => left != right,
+            (Type::BooleanLiteral(..), Type::Instance(class_type))
+            | (Type::Instance(class_type), Type::BooleanLiteral(..)) => !matches!(
+                class_type.known(db),
+                Some(KnownClass::Bool | KnownClass::Object)
+            ),
 
-            (Type::StringLiteral(string), other) | (other, Type::StringLiteral(string)) => {
-                match other {
-                    Type::Never
-                    | Type::Any
-                    | Type::Unknown
-                    | Type::Unbound
-                    | Type::Function(..)
-                    | Type::Module(..)
-                    | Type::Class(..)
-                    | Type::Todo
-                    | Type::Union(..)
-                    | Type::Intersection(..)
-                    | Type::Tuple(..)
-                    | Type::None
-                    | Type::BooleanLiteral(..)
-                    | Type::IntLiteral(..) => {
-                        unreachable!("handled above")
-                    }
-                    Type::StringLiteral(string_other) => string != string_other,
-                    Type::LiteralString => false,
-                    Type::BytesLiteral(..) => true,
-                    Type::Instance(class_type) => !matches!(
-                        class_type.known(db),
-                        Some(KnownClass::Str | KnownClass::Object)
-                    ),
-                }
-            }
+            (
+                Type::IntLiteral(..),
+                Type::StringLiteral(..) | Type::LiteralString | Type::BytesLiteral(..),
+            )
+            | (
+                Type::StringLiteral(..) | Type::LiteralString | Type::BytesLiteral(..),
+                Type::IntLiteral(..),
+            ) => true,
+            (Type::IntLiteral(left), Type::IntLiteral(right)) => left != right,
+            (Type::IntLiteral(..), Type::Instance(class_type))
+            | (Type::Instance(class_type), Type::IntLiteral(..)) => !matches!(
+                class_type.known(db),
+                Some(KnownClass::Int | KnownClass::Object)
+            ),
 
-            (Type::LiteralString, other) | (other, Type::LiteralString) => match other {
-                Type::Never
-                | Type::Any
-                | Type::Unknown
-                | Type::Unbound
-                | Type::Function(..)
-                | Type::Module(..)
-                | Type::Class(..)
-                | Type::Todo
-                | Type::Union(..)
-                | Type::Intersection(..)
-                | Type::Tuple(..)
-                | Type::None
-                | Type::BooleanLiteral(..)
-                | Type::IntLiteral(..)
-                | Type::StringLiteral(..) => {
-                    unreachable!("handled above")
-                }
-                Type::LiteralString => false,
-                Type::BytesLiteral(..) => true,
-                Type::Instance(..) => false,
-            },
+            (Type::StringLiteral(left), Type::StringLiteral(right)) => left != right,
+            (Type::StringLiteral(..), Type::LiteralString)
+            | (Type::LiteralString, Type::StringLiteral(..)) => false,
+            (Type::StringLiteral(..), Type::BytesLiteral(..))
+            | (Type::BytesLiteral(..), Type::StringLiteral(..)) => true,
+            (Type::StringLiteral(..), Type::Instance(class_type))
+            | (Type::Instance(class_type), Type::StringLiteral(..)) => !matches!(
+                class_type.known(db),
+                Some(KnownClass::Str | KnownClass::Object)
+            ),
 
-            (Type::BytesLiteral(bytes), other) | (other, Type::BytesLiteral(bytes)) => {
-                match other {
-                    Type::Never
-                    | Type::Any
-                    | Type::Unknown
-                    | Type::Unbound
-                    | Type::Function(..)
-                    | Type::Module(..)
-                    | Type::Class(..)
-                    | Type::Todo
-                    | Type::Union(..)
-                    | Type::Intersection(..)
-                    | Type::Tuple(..)
-                    | Type::None
-                    | Type::BooleanLiteral(..)
-                    | Type::IntLiteral(..)
-                    | Type::StringLiteral(..)
-                    | Type::LiteralString => {
-                        unreachable!("handled above")
-                    }
-                    Type::BytesLiteral(bytes_other) => bytes != bytes_other,
-                    Type::Instance(..) => false,
-                }
-            }
+            (Type::LiteralString, Type::LiteralString) => false,
+            (Type::LiteralString, Type::BytesLiteral(..))
+            | (Type::BytesLiteral(..), Type::LiteralString) => false,
+            (Type::LiteralString, Type::Instance(class_type))
+            | (Type::Instance(class_type), Type::LiteralString) => !matches!(
+                class_type.known(db),
+                Some(KnownClass::Str | KnownClass::Object)
+            ),
 
-            (Type::Instance(..), other) => {
-                match other {
-                    Type::Never
-                    | Type::Any
-                    | Type::Unknown
-                    | Type::Unbound
-                    | Type::Function(..)
-                    | Type::Module(..)
-                    | Type::Class(..)
-                    | Type::Todo
-                    | Type::Union(..)
-                    | Type::Intersection(..)
-                    | Type::Tuple(..)
-                    | Type::None
-                    | Type::BooleanLiteral(..)
-                    | Type::IntLiteral(..)
-                    | Type::StringLiteral(..)
-                    | Type::LiteralString
-                    | Type::BytesLiteral(..) => {
-                        unreachable!("handled above")
-                    }
-                    Type::Instance(..) => {
-                        // TODO
-                        false
-                    }
-                }
+            (Type::BytesLiteral(left), Type::BytesLiteral(right)) => left != right,
+            (Type::BytesLiteral(..), Type::Instance(class_type))
+            | (Type::Instance(class_type), Type::BytesLiteral(..)) => !matches!(
+                class_type.known(db),
+                Some(KnownClass::Bytes | KnownClass::Object)
+            ),
+
+            (Type::Instance(..), Type::Instance(..)) => {
+                // TODO
+                false
             }
         }
     }
@@ -1831,7 +1741,7 @@ mod tests {
         BytesLiteral(&'static str),
         BuiltinInstance(&'static str),
         Union(Vec<Ty>),
-        Intersection(Vec<Ty>, Vec<Ty>),
+        Intersection { pos: Vec<Ty>, neg: Vec<Ty> },
         Tuple(Vec<Ty>),
     }
 
@@ -1851,7 +1761,7 @@ mod tests {
                 Ty::Union(tys) => {
                     UnionType::from_elements(db, tys.into_iter().map(|ty| ty.into_type(db)))
                 }
-                Ty::Intersection(pos, neg) => {
+                Ty::Intersection { pos, neg } => {
                     let mut builder = IntersectionBuilder::new(db);
                     for p in pos {
                         builder = builder.add_positive(p.into_type(db));
@@ -1947,7 +1857,7 @@ mod tests {
     #[test_case(Ty::StringLiteral("a"), Ty::StringLiteral("b"))]
     #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::IntLiteral(3))]
     #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(3), Ty::IntLiteral(4)]))]
-    #[test_case(Ty::Intersection(vec![Ty::BuiltinInstance("int"), Ty::IntLiteral(1)], vec![]), Ty::IntLiteral(2))]
+    #[test_case(Ty::Intersection{pos: vec![Ty::BuiltinInstance("int"),  Ty::IntLiteral(1)], neg: vec![]}, Ty::IntLiteral(2))]
     #[test_case(Ty::Tuple(vec![Ty::BuiltinInstance("int")]), Ty::BuiltinInstance("int"))]
     #[test_case(Ty::Tuple(vec![Ty::IntLiteral(1)]), Ty::Tuple(vec![Ty::IntLiteral(2)]))]
     #[test_case(Ty::Tuple(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Tuple(vec![Ty::IntLiteral(1)]))]
@@ -1975,7 +1885,7 @@ mod tests {
     #[test_case(Ty::StringLiteral("a"), Ty::BuiltinInstance("str"))]
     #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::IntLiteral(2))]
     #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(2), Ty::IntLiteral(3)]))]
-    #[test_case(Ty::Intersection(vec![Ty::BuiltinInstance("int"), Ty::IntLiteral(2)], vec![]), Ty::IntLiteral(2))]
+    #[test_case(Ty::Intersection{pos: vec![Ty::BuiltinInstance("int"), Ty::IntLiteral(2)], neg: vec![]}, Ty::IntLiteral(2))]
     #[test_case(Ty::Tuple(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Tuple(vec![Ty::IntLiteral(1), Ty::BuiltinInstance("int")]))]
     fn is_not_disjoint_from(a: Ty, b: Ty) {
         let db = setup_db();
