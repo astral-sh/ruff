@@ -5,7 +5,7 @@ use ruff_python_ast as ast;
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::ast_ids::HasScopedAstId;
 use crate::semantic_index::definition::{Definition, DefinitionKind};
-use crate::semantic_index::symbol::{NodeWithScopeRef, ScopeId, ScopedSymbolId};
+use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId};
 use crate::semantic_index::{
     global_scope, semantic_index, symbol_table, use_def_map, BindingWithConstraints,
     BindingWithConstraintsIterator, DeclarationsIterator,
@@ -1388,6 +1388,10 @@ pub struct ClassType<'db> {
 
     body_scope: ScopeId<'db>,
 
+    // a specialized scope that covers the bases and keywords of the class
+    // (introduced when there are type parameters on the class)
+    bases_specialized_scope: Option<ScopeId<'db>>,
+
     known: Option<KnownClass>,
 }
 
@@ -1417,26 +1421,20 @@ impl<'db> ClassType<'db> {
             panic!("Class type definition must have DefinitionKind::Class");
         };
 
-        let has_type_params = class_stmt_node.type_params.is_some();
-
-        let type_scope_info: Option<(ScopeId<'db>, &TypeInference<'db>)> = if has_type_params {
-            let file = definition.file(db);
-            let index = semantic_index(db, file);
-            // we need to use the type param'd scope
-            let type_param_scope = index
-                .node_scope(NodeWithScopeRef::ClassTypeParameters(class_stmt_node))
-                .to_scope_id(db, file);
-            Some((type_param_scope, infer_scope_types(db, type_param_scope)))
-        } else {
-            None
-        };
+        // if there's a type params scope
+        let bases_scope_info: Option<(ScopeId<'db>, &TypeInference<'db>)> =
+            match self.bases_specialized_scope(db) {
+                None => None,
+                Some(bases_scope) => Some((bases_scope, infer_scope_types(db, bases_scope))),
+            };
 
         let mapper = move |base_expr: &ast::Expr| {
-            if has_type_params {
-                // Safety: we calculated the inference if has_type_params
-                let (type_param_scope, inferences) = type_scope_info.unwrap();
-                inferences.expression_ty(base_expr.scoped_ast_id(db, type_param_scope))
+            if let Some((bases_scope, inferences)) = bases_scope_info {
+                // when we have a specialized scope, we'll look up the inference
+                // within that scope
+                inferences.expression_ty(base_expr.scoped_ast_id(db, bases_scope))
             } else {
+                // Otherwise, we can do the lookup based on the definition scope
                 definition_expression_ty(db, definition, base_expr)
             }
         };
