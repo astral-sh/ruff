@@ -1422,11 +1422,9 @@ impl<'db> ClassType<'db> {
         };
 
         // if there's a type params scope
-        let bases_scope_info: Option<(ScopeId<'db>, &TypeInference<'db>)> =
-            match self.bases_specialized_scope(db) {
-                None => None,
-                Some(bases_scope) => Some((bases_scope, infer_scope_types(db, bases_scope))),
-            };
+        let bases_scope_info: Option<(ScopeId<'db>, &TypeInference<'db>)> = self
+            .bases_specialized_scope(db)
+            .map(|bases_scope| (bases_scope, infer_scope_types(db, bases_scope)));
 
         let mapper = move |base_expr: &ast::Expr| {
             if let Some((bases_scope, inferences)) = bases_scope_info {
