@@ -154,7 +154,9 @@ pub(crate) fn runtime_import_in_type_checking_block(
                 if checker.settings.flake8_type_checking.quote_annotations
                     && binding.references().all(|reference_id| {
                         let reference = checker.semantic().reference(reference_id);
-                        reference.in_typing_context() || reference.in_runtime_evaluated_annotation()
+                        reference.in_typing_context()
+                            || reference.in_runtime_evaluated_annotation()
+                            || reference.in_explicit_type_alias()
                     })
                 {
                     actions
