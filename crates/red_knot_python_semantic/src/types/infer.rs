@@ -2460,7 +2460,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             operand,
         } = unary;
 
-        match (op, self.infer_expression(operand)) {
+        let operand_type = self.infer_expression(operand);
+
+        match (op, operand_type) {
             (UnaryOp::UAdd, Type::IntLiteral(value)) => Type::IntLiteral(value),
             (UnaryOp::USub, Type::IntLiteral(value)) => Type::IntLiteral(-value),
             (UnaryOp::Invert, Type::IntLiteral(value)) => Type::IntLiteral(!value),
@@ -2472,7 +2474,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             (UnaryOp::Not, ty) => ty.bool(self.db).negate().into_type(self.db),
             (_, Type::Any) => Type::Any,
             (_, Type::Unknown) => Type::Unknown,
-
+            (op, Type::Instance(class)) => {
+                let class_member = class.class_member(self.db, op.dunder());
+                let call = class_member.call(self.db, &[operand_type]);
+                call.return_ty(self.db).unwrap_or(Type::Unknown)
+            }
             _ => Type::Todo, // TODO other unary op types
         }
     }
