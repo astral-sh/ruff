@@ -1,4 +1,4 @@
-## Binary operations on integers
+## Binary operations on booleans
 
 ## Basic Arithmetic
 
