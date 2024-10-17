@@ -2469,6 +2469,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             (UnaryOp::Invert, Type::BooleanLiteral(bool)) => Type::IntLiteral(!i64::from(bool)),
 
             (UnaryOp::Not, ty) => ty.bool(self.db).negate().into_type(self.db),
+            (_, Type::Any) => Type::Any,
+            (_, Type::Unknown) => Type::Unknown,
 
             _ => Type::Todo, // TODO other unary op types
         }
