@@ -1,5 +1,56 @@
 # Changelog
 
+## 0.7.0
+
+Check out the [blog post](https://astral.sh/blog/ruff-v0.7.0) for a migration guide and overview of the changes!
+
+### Breaking changes
+
+- The pytest rules `PT001` and `PT023` now default to omitting the decorator parentheses when there are no arguments
+    ([#12838](https://github.com/astral-sh/ruff/pull/12838), [#13292](https://github.com/astral-sh/ruff/pull/13292)).
+    This was a change that we attempted to make in Ruff v0.6.0, but only partially made due to an error on our part.
+- The `useless-try-except` rule (in our `tryceratops` category) has been recoded from `TRY302` to
+    `TRY203` ([#13502](https://github.com/astral-sh/ruff/pull/13502)). This ensures Ruff's code is consistent with
+    the same rule in the [`tryceratops`](https://github.com/guilatrova/tryceratops) linter.
+- The `lint.allow-unused-imports` setting has been removed ([#13677](https://github.com/astral-sh/ruff/pull/13677)). Use
+    [`lint.pyflakes.allow-unused-imports`](https://docs.astral.sh/ruff/settings/#lint_pyflakes_allowed-unused-imports)
+    instead.
+
+### Formatter preview style
+
+- Normalize implicit concatenated f-string quotes per part ([#13539](https://github.com/astral-sh/ruff/pull/13539))
+
+### Preview linter features
+
+- \[`refurb`\] implement `hardcoded-string-charset` (FURB156) ([#13530](https://github.com/astral-sh/ruff/pull/13530))
+- \[refurb\] Count codepoints not bytes for `slice-to-remove-prefix-or-suffix (FURB188)` ([#13631](https://github.com/astral-sh/ruff/pull/13631))
+
+### Rule changes
+
+- \[`pylint`\] Mark `PLE1141` fix as unsafe ([#13629](https://github.com/astral-sh/ruff/pull/13629))
+- \[`flake8-async`\] Consider async generators to be "checkpoints" for `cancel-scope-no-checkpoint` (`ASYNC100`) ([#13639](https://github.com/astral-sh/ruff/pull/13639))
+- \[`flake8-bugbear`\] Do not suggest setting parameter `strict=` to `False` in `B905` diagnostic message ([#13656](https://github.com/astral-sh/ruff/pull/13656))
+- \[`flake8-todos`\] Only flag the word "TODO", not words starting with "todo" (`TD006`) ([#13640](https://github.com/astral-sh/ruff/pull/13640))
+- \[`pycodestyle`\] Fix whitespace-related false positives and false negatives inside type-parameter lists (`E231`, `E251`) ([#13704](https://github.com/astral-sh/ruff/pull/13704))
+- \[`flake8-simplify`\] [`open-file-with-context-handler`](https://docs.astral.sh/ruff/rules/open-file-with-context-handler/)
+    (`SIM115`), a rule which looks for files opened without the use of context managers, now has more
+    expansive behavior ([#12959](https://github.com/astral-sh/ruff/pull/12959)).
+    Whereas before it would only look for files opened using the builtin `open()`
+    function or `pathlib.Path(...).open()`, it can now detect files being opened using a wide range
+    of other standard-library functions and classes. This improved capability has been available to
+    users of preview mode for several months, but has now been promoted to stable.
+
+### CLI
+
+- Add explanation of fixable in `--statistics` command ([#13774](https://github.com/astral-sh/ruff/pull/13774))
+
+### Bug fixes
+
+- \[`pyflakes`\] Allow `ipytest` cell magic (`F401`) ([#13745](https://github.com/astral-sh/ruff/pull/13745))
+- \[`flake8-use-pathlib`\] Fix `PTH123` false positive when `open` is passed a file descriptor ([#13616](https://github.com/astral-sh/ruff/pull/13616))
+- \[`flake8-bandit`\] Detect patterns from multi line SQL statements (`S608`) ([#13574](https://github.com/astral-sh/ruff/pull/13574))
+- \[`flake8-pyi`\] - Fix dropped expressions in `PYI030` autofix ([#13727](https://github.com/astral-sh/ruff/pull/13727))
+
 ## 0.6.9
 
 ### Preview features
