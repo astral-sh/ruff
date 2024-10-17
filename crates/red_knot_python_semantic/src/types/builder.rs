@@ -228,13 +228,15 @@ impl<'db> InnerIntersectionBuilder<'db> {
         } else {
             let mut to_remove = None;
             for (index, existing_positive) in self.positive.iter().enumerate() {
+                // S & T = S    if S <: T
                 if existing_positive.is_subtype_of(db, new_positive) {
                     return;
                 }
+                // same rule, reverse order
                 if new_positive.is_subtype_of(db, *existing_positive) {
                     to_remove = Some(index);
                 }
-
+                // A & B = Never    if A and B are disjoint
                 if new_positive.is_disjoint_from(db, *existing_positive) {
                     *self = Self::new();
                     return;
@@ -246,11 +248,12 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
             let mut to_remove = None;
             for (index, existing_negative) in self.negative.iter().enumerate() {
+                // S & ~T = Never    if S <: T
                 if new_positive.is_subtype_of(db, *existing_negative) {
                     *self = Self::new();
                     return;
                 }
-
+                // A & ~B = A    if A and B are disjoint
                 if existing_negative.is_disjoint_from(db, new_positive) {
                     to_remove = Some(index);
                 }
@@ -294,9 +297,11 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
                 let mut to_remove = None;
                 for (index, existing_negative) in self.negative.iter().enumerate() {
+                    // ~S & ~T = ~T    if S <: T
                     if existing_negative.is_subtype_of(db, new_negative) {
                         to_remove = Some(index);
                     }
+                    // same rule, reverse order
                     if new_negative.is_subtype_of(db, *existing_negative) {
                         return;
                     }
@@ -306,24 +311,18 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 }
 
                 for existing_positive in &self.positive {
+                    // S & ~T = Never    if S <: T
                     if existing_positive.is_subtype_of(db, new_negative) {
                         *self = Self::new();
                         return;
                     }
+                    // A & ~B = A    if A and B are disjoint
+                    if existing_positive.is_disjoint_from(db, new_negative) {
+                        return;
+                    }
                 }
 
-                // This condition disregards irrelevant negative contributions. For example,
-                // A & ~B = A, if B is disjoint from A. So we only add negative elements if
-                // they overlap with any of the given positive contributions. Unless there
-                // are none yet.
-                if self.positive.is_empty()
-                    || self
-                        .positive
-                        .iter()
-                        .any(|pos| !new_negative.is_disjoint_from(db, *pos))
-                {
-                    self.negative.insert(new_negative);
-                }
+                self.negative.insert(new_negative);
             }
         }
     }
@@ -526,7 +525,7 @@ mod tests {
             .expect_intersection();
 
         assert_eq!(intersection.pos_vec(&db), &[t2, ta]);
-        assert_eq!(intersection.neg_vec(&db), &[t1]);
+        assert_eq!(intersection.neg_vec(&db), &[]);
     }
 
     #[test]
