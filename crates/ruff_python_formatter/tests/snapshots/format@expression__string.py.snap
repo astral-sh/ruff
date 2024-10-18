@@ -335,6 +335,18 @@ a = """\\\x1f"""
 ```diff
 --- Stable
 +++ Preview
+@@ -70,9 +70,9 @@
+ 
+ # String continuation
+ 
+-"Let's" "start" "with" "a" "simple" "example"
++"Let'sstartwithasimpleexample"
+ 
+-"Let's" "start" "with" "a" "simple" "example" "now repeat after me:" "I am confident" "I am confident" "I am confident" "I am confident" "I am confident"
++"Let'sstartwithasimpleexamplenow repeat after me:I am confidentI am confidentI am confidentI am confidentI am confident"
+ 
+ (
+     "Let's"
 @@ -139,7 +139,7 @@
  ]
  
@@ -535,6 +547,18 @@ a = """\\\x1f"""
 ```diff
 --- Stable
 +++ Preview
+@@ -70,9 +70,9 @@
+ 
+ # String continuation
+ 
+-"Let's" 'start' 'with' 'a' 'simple' 'example'
++"Let'sstartwithasimpleexample"
+ 
+-"Let's" 'start' 'with' 'a' 'simple' 'example' 'now repeat after me:' 'I am confident' 'I am confident' 'I am confident' 'I am confident' 'I am confident'
++"Let'sstartwithasimpleexamplenow repeat after me:I am confidentI am confidentI am confidentI am confidentI am confident"
+ 
+ (
+     "Let's"
 @@ -139,7 +139,7 @@
  ]
  

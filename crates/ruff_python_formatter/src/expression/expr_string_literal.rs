@@ -6,6 +6,7 @@ use crate::expression::parentheses::{
 };
 use crate::other::string_literal::StringLiteralKind;
 use crate::prelude::*;
+use crate::string::implicit::FormatImplicitConcatenatedStringFlat;
 use crate::string::{implicit::FormatImplicitConcatenatedString, StringLikeExtensions};
 
 #[derive(Default)]
@@ -32,6 +33,15 @@ impl FormatNodeRule<ExprStringLiteral> for FormatExprStringLiteral {
                 // This is just a sanity check because [`DocstringStmt::try_from_statement`]
                 // ensures that the docstring is a *single* string literal.
                 assert!(!self.kind.is_docstring());
+
+                // Always join strings that aren't parenthesized and thus, always on a single line.
+                if !f.context().node_level().is_parenthesized() {
+                    if let Some(format_flat) =
+                        FormatImplicitConcatenatedStringFlat::new(item.into(), f.context())
+                    {
+                        return format_flat.fmt(f);
+                    }
+                }
 
                 in_parentheses_only_group(&FormatImplicitConcatenatedString::new(item))
             }

@@ -289,6 +289,18 @@ b"Unicode Escape sequence don't apply to bytes: \N{0x} \u{ABCD} \U{ABCDEFGH}"
 ```diff
 --- Stable
 +++ Preview
+@@ -63,9 +63,9 @@
+ 
+ # String continuation
+ 
+-b"Let's" b"start" b"with" b"a" b"simple" b"example"
++b"Let'sstartwithasimpleexample"
+ 
+-b"Let's" b"start" b"with" b"a" b"simple" b"example" b"now repeat after me:" b"I am confident" b"I am confident" b"I am confident" b"I am confident" b"I am confident"
++b"Let'sstartwithasimpleexamplenow repeat after me:I am confidentI am confidentI am confidentI am confidentI am confident"
+ 
+ (
+     b"Let's"
 @@ -132,6 +132,6 @@
  ]
  
@@ -460,6 +472,18 @@ b"Unicode Escape sequence don't apply to bytes: \N{0x} \u{ABCD} \U{ABCDEFGH}"
 ```diff
 --- Stable
 +++ Preview
+@@ -63,9 +63,9 @@
+ 
+ # String continuation
+ 
+-b"Let's" b'start' b'with' b'a' b'simple' b'example'
++b"Let'sstartwithasimpleexample"
+ 
+-b"Let's" b'start' b'with' b'a' b'simple' b'example' b'now repeat after me:' b'I am confident' b'I am confident' b'I am confident' b'I am confident' b'I am confident'
++b"Let'sstartwithasimpleexamplenow repeat after me:I am confidentI am confidentI am confidentI am confidentI am confident"
+ 
+ (
+     b"Let's"
 @@ -132,6 +132,6 @@
  ]
  
