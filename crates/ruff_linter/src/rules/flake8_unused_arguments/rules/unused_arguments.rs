@@ -1,6 +1,6 @@
 use regex::Regex;
 use ruff_python_ast as ast;
-use ruff_python_ast::{Parameter, Parameters};
+use ruff_python_ast::{Parameter, Parameters, Stmt, StmtExpr, StmtFunctionDef, StmtRaise};
 
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -311,6 +311,65 @@ fn call<'a>(
     }));
 }
 
+/// Returns `true` if a function appears to be a base class stub. In other
+/// words, if it matches the following syntax:
+///
+/// ```text
+/// variable = <string | f-string>
+/// raise NotImplementedError(variable)
+/// ```
+///
+/// See also [`is_stub`]. We're a bit more generous in what is considered a
+/// stub in this rule to avoid clashing with [`EM101`].
+///
+/// [`is_stub`]: function_type::is_stub
+/// [`EM101`]: https://docs.astral.sh/ruff/rules/raw-string-in-exception/
+fn is_not_implemented_stub_with_variable(function_def: &StmtFunctionDef) -> bool {
+    // Ignore doc-strings.
+    let statements = match function_def.body.as_slice() {
+        [Stmt::Expr(StmtExpr { value, .. }), rest @ ..] if value.is_string_literal_expr() => rest,
+        _ => &function_def.body,
+    };
+
+    let [Stmt::Assign(ast::StmtAssign { targets, value, .. }), Stmt::Raise(StmtRaise {
+        exc: Some(exception),
+        ..
+    })] = statements
+    else {
+        return false;
+    };
+
+    if !matches!(
+        value.as_ref(),
+        ast::Expr::StringLiteral(_) | ast::Expr::FString(_)
+    ) {
+        return false;
+    }
+
+    let ast::Expr::Call(ast::ExprCall {
+        func, arguments, ..
+    }) = &**exception
+    else {
+        return false;
+    };
+
+    if !matches!(&**func, ast::Expr::Name(name) if name.id == "NotImplementedError") {
+        return false;
+    }
+
+    if arguments.len() != 1 {
+        return false;
+    }
+
+    if let ast::Expr::Name(exception_arg_name) = &arguments.args[0] {
+        if let ast::Expr::Name(assign_var_name) = &targets[0] {
+            return assign_var_name.id == exception_arg_name.id;
+        }
+    }
+
+    true
+}
+
 /// ARG001, ARG002, ARG003, ARG004, ARG005
 pub(crate) fn unused_arguments(
     checker: &Checker,
@@ -345,6 +404,7 @@ pub(crate) fn unused_arguments(
                 function_type::FunctionType::Function => {
                     if checker.enabled(Argumentable::Function.rule_code())
                         && !function_type::is_stub(function_def, checker.semantic())
+                        && !is_not_implemented_stub_with_variable(function_def)
                         && !visibility::is_overload(decorator_list, checker.semantic())
                     {
                         function(
@@ -364,6 +424,7 @@ pub(crate) fn unused_arguments(
                 function_type::FunctionType::Method => {
                     if checker.enabled(Argumentable::Method.rule_code())
                         && !function_type::is_stub(function_def, checker.semantic())
+                        && !is_not_implemented_stub_with_variable(function_def)
                         && (!visibility::is_magic(name)
                             || visibility::is_init(name)
                             || visibility::is_new(name)
@@ -389,6 +450,7 @@ pub(crate) fn unused_arguments(
                 function_type::FunctionType::ClassMethod => {
                     if checker.enabled(Argumentable::ClassMethod.rule_code())
                         && !function_type::is_stub(function_def, checker.semantic())
+                        && !is_not_implemented_stub_with_variable(function_def)
                         && (!visibility::is_magic(name)
                             || visibility::is_init(name)
                             || visibility::is_new(name)
@@ -414,6 +476,7 @@ pub(crate) fn unused_arguments(
                 function_type::FunctionType::StaticMethod => {
                     if checker.enabled(Argumentable::StaticMethod.rule_code())
                         && !function_type::is_stub(function_def, checker.semantic())
+                        && !is_not_implemented_stub_with_variable(function_def)
                         && (!visibility::is_magic(name)
                             || visibility::is_init(name)
                             || visibility::is_new(name)

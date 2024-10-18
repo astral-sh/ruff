@@ -107,6 +107,19 @@ class C:
     def f(self, x):
         raise NotImplemented("...")
 
+    def f(self, x):
+        msg = "..."
+        raise NotImplementedError(msg)
+
+    def f(self, x):
+        msg = "..."
+        raise NotImplementedError("must use msg")
+
+    def f(self, x, y):
+        """Docstring."""
+        msg = f"{x}..."
+        raise NotImplementedError(msg)
+
     ###
     # Unused functions attached to abstract methods (OK).
     ###
