@@ -17,24 +17,23 @@ impl FormatNodeRule<ExprFString> for FormatExprFString {
     fn fmt_fields(&self, item: &ExprFString, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprFString { value, .. } = item;
 
-        match value.as_slice() {
-            [f_string_part] => FormatFStringPart::new(
+        if let [f_string_part] = value.as_slice() {
+            FormatFStringPart::new(
                 f_string_part,
                 f_string_quoting(item, &f.context().locator()),
             )
-            .fmt(f),
-            _ => {
-                // Always join fstrings that aren't parenthesized and thus, are always on a single line.
-                if !f.context().node_level().is_parenthesized() {
-                    if let Some(format_flat) =
-                        FormatImplicitConcatenatedStringFlat::new(item.into(), f.context())
-                    {
-                        return format_flat.fmt(f);
-                    }
+            .fmt(f)
+        } else {
+            // Always join fstrings that aren't parenthesized and thus, are always on a single line.
+            if !f.context().node_level().is_parenthesized() {
+                if let Some(format_flat) =
+                    FormatImplicitConcatenatedStringFlat::new(item.into(), f.context())
+                {
+                    return format_flat.fmt(f);
                 }
-
-                in_parentheses_only_group(&FormatImplicitConcatenatedString::new(item)).fmt(f)
             }
+
+            in_parentheses_only_group(&FormatImplicitConcatenatedString::new(item)).fmt(f)
         }
     }
 }
