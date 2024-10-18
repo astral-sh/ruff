@@ -111,7 +111,14 @@ class A:
 class B:
     def __radd__(self, other: A) -> str: return "foo"
 
+# C is a subtype of C, but if the two sides are of equal types,
+# the lhs *still* takes precedence
+class C:
+    def __add__(self, other: C) -> int: return 42
+    def __radd__(self, other: C) -> str: return "foo"
+
 reveal_type(A() + B())  # revealed:  int
+reveal_type(C() + C())  # revealed: int
 ```
 
 ## Reflected precedence for subtypes (in some cases)
@@ -125,12 +132,17 @@ class A:
     def __add__(self, other) -> str: return "foo"
     def __radd__(self, other) -> str: return "foo"
 
-class MyString(str): pass
+class MyString(str): ...
 
 class B(A):
     def __radd__(self, other) -> MyString: return MyString()
 
 reveal_type(A() + B())  # revealed: MyString
+
+# N.B. Still a subtype of `A`, even though `A` does not appear directly in the class's `__bases__`
+class C(B): ...
+
+reveal_type(A() + C())  # revealed: MyString
 ```
 
 ## Reflected precedence 2
