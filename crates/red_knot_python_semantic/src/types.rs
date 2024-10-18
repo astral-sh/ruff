@@ -509,31 +509,6 @@ impl<'db> Type<'db> {
                 }
             }
 
-            (Type::Tuple(tuple), other) | (other, Type::Tuple(tuple)) => {
-                if let Type::Tuple(other_tuple) = other {
-                    if tuple.len(db) == other_tuple.len(db) {
-                        tuple
-                            .elements(db)
-                            .iter()
-                            .zip(other_tuple.elements(db).iter())
-                            .any(|(e1, e2)| e1.is_disjoint_from(db, *e2))
-                    } else {
-                        true
-                    }
-                } else {
-                    // We can not be sure if the tuple is disjoint from 'other' because:
-                    //   - 'other' might be the homogeneous arbitrary-length tuple type
-                    //     tuple[T, ...] (which we don't have support for yet); if all
-                    //     of our element types are subtypes of T, this is not disjoint
-                    //   - 'other' might be a user subtype of tuple, which, if generic
-                    //     over the same or compatible *Ts, would overlap with tuple.
-                    //
-                    // TODO: add checks for the above cases once we support them
-
-                    false
-                }
-            }
-
             (
                 left @ (Type::None
                 | Type::BooleanLiteral(..)
@@ -547,11 +522,15 @@ impl<'db> Type<'db> {
                 | Type::BytesLiteral(..)),
             ) => left != right,
 
-            (Type::None, Type::Instance(class_type)) | (Type::Instance(class_type), Type::None) => {
-                !matches!(
-                    class_type.known(db),
-                    Some(KnownClass::NoneType | KnownClass::Object)
-                )
+            (Type::None, other) | (other, Type::None) => {
+                if let Type::Instance(class_type) = other {
+                    !matches!(
+                        class_type.known(db),
+                        Some(KnownClass::NoneType | KnownClass::Object)
+                    )
+                } else {
+                    true
+                }
             }
 
             (Type::BooleanLiteral(..), Type::Instance(class_type))
@@ -591,6 +570,31 @@ impl<'db> Type<'db> {
             (Type::Instance(..), Type::Instance(..)) => {
                 // TODO
                 false
+            }
+
+            (Type::Tuple(tuple), other) | (other, Type::Tuple(tuple)) => {
+                if let Type::Tuple(other_tuple) = other {
+                    if tuple.len(db) == other_tuple.len(db) {
+                        tuple
+                            .elements(db)
+                            .iter()
+                            .zip(other_tuple.elements(db).iter())
+                            .any(|(e1, e2)| e1.is_disjoint_from(db, *e2))
+                    } else {
+                        true
+                    }
+                } else {
+                    // We can not be sure if the tuple is disjoint from 'other' because:
+                    //   - 'other' might be the homogeneous arbitrary-length tuple type
+                    //     tuple[T, ...] (which we don't have support for yet); if all
+                    //     of our element types are subtypes of T, this is not disjoint
+                    //   - 'other' might be a user subtype of tuple, which, if generic
+                    //     over the same or compatible *Ts, would overlap with tuple.
+                    //
+                    // TODO: add checks for the above cases once we support them
+
+                    false
+                }
             }
         }
     }
@@ -1825,8 +1829,13 @@ mod tests {
     #[test_case(Ty::Never, Ty::Never)]
     #[test_case(Ty::Never, Ty::None)]
     #[test_case(Ty::Never, Ty::BuiltinInstance("int"))]
+    #[test_case(Ty::None, Ty::BoolLiteral(true))]
+    #[test_case(Ty::None, Ty::IntLiteral(1))]
     #[test_case(Ty::None, Ty::StringLiteral("test"))]
+    #[test_case(Ty::None, Ty::BytesLiteral("test"))]
+    #[test_case(Ty::None, Ty::LiteralString)]
     #[test_case(Ty::None, Ty::BuiltinInstance("int"))]
+    #[test_case(Ty::None, Ty::Tuple(vec![Ty::None]))]
     #[test_case(Ty::BoolLiteral(true), Ty::BuiltinInstance("int"))]
     #[test_case(Ty::BoolLiteral(true), Ty::BoolLiteral(false))]
     #[test_case(Ty::IntLiteral(1), Ty::IntLiteral(2))]
