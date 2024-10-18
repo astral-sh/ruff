@@ -1,4 +1,6 @@
 use anyhow::Result;
+use ast::visitor::source_order;
+use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
 use std::cmp::Reverse;
 
 use ruff_diagnostics::Edit;
@@ -9,7 +11,6 @@ use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_semantic::{
     analyze, Binding, BindingKind, Modules, NodeId, ResolvedReference, ScopeKind, SemanticModel,
 };
-use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 use crate::rules::flake8_type_checking::settings::Settings;
@@ -223,9 +224,7 @@ pub(crate) fn is_singledispatch_implementation(
 pub(crate) fn quote_annotation(
     node_id: NodeId,
     semantic: &SemanticModel,
-    locator: &Locator,
     stylist: &Stylist,
-    generator: Generator,
 ) -> Result<Edit> {
     let expr = semantic.expression(node_id).expect("Expression not found");
     if let Some(parent_id) = semantic.parent_expression_id(node_id) {
@@ -235,7 +234,7 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the value of a subscript, we need to quote the entire
                     // expression. For example, when quoting `DataFrame` in `DataFrame[int]`, we
                     // should generate `"DataFrame[int]"`.
-                    return quote_annotation(parent_id, semantic, locator, stylist, generator);
+                    return quote_annotation(parent_id, semantic, stylist);
                 }
             }
             Some(Expr::Attribute(parent)) => {
@@ -243,7 +242,7 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the value of an attribute, we need to quote the entire
                     // expression. For example, when quoting `DataFrame` in `pd.DataFrame`, we
                     // should generate `"pd.DataFrame"`.
-                    return quote_annotation(parent_id, semantic, locator, stylist, generator);
+                    return quote_annotation(parent_id, semantic, stylist);
                 }
             }
             Some(Expr::Call(parent)) => {
@@ -251,7 +250,7 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the function of a call, we need to quote the entire
                     // expression. For example, when quoting `DataFrame` in `DataFrame()`, we
                     // should generate `"DataFrame()"`.
-                    return quote_annotation(parent_id, semantic, locator, stylist, generator);
+                    return quote_annotation(parent_id, semantic, stylist);
                 }
             }
             Some(Expr::BinOp(parent)) => {
@@ -259,27 +258,18 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the left or right side of a binary operation, we need to
                     // quote the entire expression. For example, when quoting `DataFrame` in
                     // `DataFrame | Series`, we should generate `"DataFrame | Series"`.
-                    return quote_annotation(parent_id, semantic, locator, stylist, generator);
+                    return quote_annotation(parent_id, semantic, stylist);
                 }
             }
             _ => {}
         }
     }
 
-    // If the annotation already contains a quote, avoid attempting to re-quote it. For example:
-    // ```python
-    // from typing import Literal
-    //
-    // Set[Literal["Foo"]]
-    // ```
-    let text = locator.slice(expr);
-    if text.contains('\'') || text.contains('"') {
-        return Err(anyhow::anyhow!("Annotation already contains a quote"));
-    }
-
-    // Quote the entire expression.
     let quote = stylist.quote();
-    let annotation = generator.expr(expr);
+    let mut quote_annotation = QuoteAnnotation::new(stylist);
+    quote_annotation.visit_expr(expr);
+
+    let annotation = quote_annotation.annotation;
 
     Ok(Edit::range_replacement(
         format!("{quote}{annotation}{quote}"),
@@ -305,4 +295,119 @@ pub(crate) fn filter_contained(edits: Vec<Edit>) -> Vec<Edit> {
         }
     }
     filtered
+}
+
+#[derive(Copy, PartialEq, Clone)]
+enum State {
+    Literal,
+    AnnotatedFirst,
+    AnnotatedRest,
+    Other,
+}
+
+pub(crate) struct QuoteAnnotation<'a> {
+    state: Vec<State>,
+    stylist: &'a Stylist<'a>,
+    annotation: String,
+}
+
+impl<'a> QuoteAnnotation<'a> {
+    pub(crate) fn new(stylist: &'a Stylist<'a>) -> Self {
+        Self {
+            state: vec![],
+            stylist,
+            annotation: String::new(),
+        }
+    }
+
+    fn get_state(&self, name: &str) -> State {
+        match name {
+            "Literal" => State::Literal,
+            "Annotated" => State::AnnotatedFirst,
+            _ => State::Other,
+        }
+    }
+}
+
+impl<'a> source_order::SourceOrderVisitor<'a> for QuoteAnnotation<'a> {
+    fn visit_expr(&mut self, expr: &'a Expr) {
+        let generator = Generator::from(self.stylist);
+        match expr {
+            Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+                let value_expr = generator.expr(value);
+                self.annotation.push_str(&value_expr);
+                self.annotation.push('[');
+                match value.as_ref() {
+                    Expr::Name(ast::ExprName { id, .. }) => {
+                        self.state.push(self.get_state(id.as_str()));
+                    }
+                    Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
+                        if let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() {
+                            if id.as_str() == "typing" {
+                                self.state.push(self.get_state(attr.id.as_str()));
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+
+                self.visit_expr(slice);
+                self.state.pop();
+                self.annotation.push(']');
+            }
+
+            Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                let Some(first_elm) = elts.first() else {
+                    return;
+                };
+                self.visit_expr(first_elm);
+                if self.state.last().copied() == Some(State::AnnotatedFirst) {
+                    self.state.push(State::AnnotatedRest);
+                }
+                for elm in elts.iter().skip(1) {
+                    self.annotation.push_str(", ");
+                    self.visit_expr(elm);
+                }
+                self.state.pop();
+            }
+            Expr::BinOp(ast::ExprBinOp {
+                left, op, right, ..
+            }) => {
+                debug_assert!(*op == ast::Operator::BitOr);
+                self.visit_expr(left);
+                self.annotation.push(' ');
+                self.annotation.push_str(op.as_str());
+                self.annotation.push(' ');
+                self.visit_expr(right);
+            }
+            Expr::BoolOp(ast::ExprBoolOp { op, values, .. }) => {
+                for (i, value) in values.iter().enumerate() {
+                    if i > 0 {
+                        self.annotation.push(' ');
+                        self.annotation.push_str(op.as_str());
+                    }
+                    self.visit_expr(value);
+                }
+            }
+            _ => {
+                let source = match self.state.last().copied() {
+                    Some(State::Literal | State::AnnotatedRest) => {
+                        let mut source = generator.expr(expr);
+                        source = source.replace(
+                            self.stylist.quote().as_char(),
+                            &self.stylist.quote().opposite().as_char().to_string(),
+                        );
+                        source
+                    }
+                    None | Some(State::AnnotatedFirst | State::Other) => {
+                        let mut source = generator.expr(expr);
+                        source = source.replace(self.stylist.quote().as_char(), "");
+                        source = source.replace(self.stylist.quote().opposite().as_char(), "");
+                        source
+                    }
+                };
+                self.annotation.push_str(&source);
+            }
+        }
+    }
 }
