@@ -1446,7 +1446,9 @@ impl<'db> ClassType<'db> {
         (other == self)
             || self.bases(db).any(|base| match base {
                 Type::Class(base_class) => base_class == other,
-                Type::Any | Type::Unknown => true,
+                // `is_subclass_of` is checking the subtype relation, in which gradual types do not
+                // participate, so we should not return `True` if we find `Any/Unknown` in the
+                // bases.
                 _ => false,
             })
     }
