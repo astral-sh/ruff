@@ -217,7 +217,6 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
     /// Adds a positive type to this intersection.
     fn add_positive(&mut self, db: &'db dyn Db, new_positive: Type<'db>) {
-        // TODO `Any`/`Unknown`/`Todo` actually should not self-cancel
         if let Type::Intersection(other) = new_positive {
             for pos in other.positive(db) {
                 self.add_positive(db, *pos);
@@ -250,6 +249,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 // same rule, reverse order
                 if new_positive.is_subtype_of(db, *existing_positive) {
                     to_remove = Some(index);
+                    // no break here, we want to apply the other rules as well.
                 }
                 // A & B = Never    if A and B are disjoint
                 if new_positive.is_disjoint_from(db, *existing_positive) {
@@ -271,6 +271,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 // A & ~B = A    if A and B are disjoint
                 if existing_negative.is_disjoint_from(db, new_positive) {
                     to_remove = Some(index);
+                    break;
                 }
             }
             if let Some(index) = to_remove {
@@ -283,7 +284,6 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
     /// Adds a negative type to this intersection.
     fn add_negative(&mut self, db: &'db dyn Db, new_negative: Type<'db>) {
-        // TODO `Any`/`Unknown`/`Todo` actually should not self-cancel
         match new_negative {
             Type::Intersection(inter) => {
                 for pos in inter.positive(db) {
@@ -294,6 +294,12 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 }
             }
             Type::Unbound => {}
+            ty @ (Type::Any | Type::Unknown | Type::Todo) => {
+                // Adding any of these types to the negative side of an intersection
+                // is equivalent to adding it to the positive side. We do this to
+                // simplify the representation.
+                self.positive.insert(ty);
+            }
             // ~Literal[True] & bool = Literal[False]
             Type::BooleanLiteral(bool)
                 if self
@@ -555,8 +561,8 @@ mod tests {
             .build()
             .expect_intersection();
 
-        assert_eq!(intersection.pos_vec(&db), &[t1]);
-        assert_eq!(intersection.neg_vec(&db), &[ta]);
+        assert_eq!(intersection.pos_vec(&db), &[ta, t1]);
+        assert_eq!(intersection.neg_vec(&db), &[]);
     }
 
     #[test]
@@ -768,5 +774,24 @@ mod tests {
             .add_positive(t_p)
             .build();
         assert_eq!(ty, Type::BooleanLiteral(!bool_value));
+    }
+
+    #[test_case(Type::Any)]
+    #[test_case(Type::Unknown)]
+    #[test_case(Type::Todo)]
+    fn build_intersection_t_and_negative_t_does_not_simplify(ty: Type) {
+        let db = setup_db();
+
+        let result = IntersectionBuilder::new(&db)
+            .add_positive(ty)
+            .add_negative(ty)
+            .build();
+        assert_eq!(result, ty);
+
+        let result = IntersectionBuilder::new(&db)
+            .add_negative(ty)
+            .add_positive(ty)
+            .build();
+        assert_eq!(result, ty);
     }
 }
