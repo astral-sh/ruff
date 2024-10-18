@@ -229,16 +229,13 @@ impl<'db> InnerIntersectionBuilder<'db> {
             // ~Literal[True] & bool = Literal[False]
             if let Type::Instance(class_type) = new_positive {
                 if class_type.is_known(db, KnownClass::Bool) {
-                    let mut found_bool_literal = None;
-                    for neg in &self.negative {
-                        if let Type::BooleanLiteral(bool) = neg {
-                            found_bool_literal = Some(*bool);
-                        }
-                    }
-
-                    if let Some(bool) = found_bool_literal {
+                    if let Some(&Type::BooleanLiteral(value)) = self
+                        .negative
+                        .iter()
+                        .find(|element| matches!(element, Type::BooleanLiteral(..)))
+                    {
                         *self = Self::new();
-                        self.positive.insert(Type::BooleanLiteral(!bool));
+                        self.positive.insert(Type::BooleanLiteral(!value));
                         return;
                     }
                 }
