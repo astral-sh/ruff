@@ -75,11 +75,12 @@ pub(crate) fn derive_cache_key(item: &DeriveInput) -> syn::Result<TokenStream> {
                     }
                 }
 
-                let field_attr = if let Some(ident) = &field.ident {
-                    quote!(self.#ident)
-                } else {
-                    let index = syn::Index::from(i);
-                    quote!(self.#index)
+                let field_attr = match &field.ident {
+                    Some(ident) => quote!(self.#ident),
+                    None => {
+                        let index = syn::Index::from(i);
+                        quote!(self.#index)
+                    }
                 };
 
                 fields.push(quote!(#field_attr.cache_key(key);));

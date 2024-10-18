@@ -235,35 +235,38 @@ fn clean_params_dictionary(right: &Expr, locator: &Locator, stylist: &Stylist) -
         let mut seen: Vec<&str> = vec![];
         let mut indent = None;
         for ast::DictItem { key, value } in items {
-            if let Some(key) = key {
-                if let Expr::StringLiteral(ast::ExprStringLiteral {
-                    value: key_string, ..
-                }) = key
-                {
-                    // If the dictionary key is not a valid variable name, abort.
-                    if !is_identifier(key_string.to_str()) {
-                        return None;
-                    }
-                    // If there are multiple entries of the same key, abort.
-                    if seen.contains(&key_string.to_str()) {
-                        return None;
-                    }
-                    seen.push(key_string.to_str());
-                    if is_multi_line {
-                        if indent.is_none() {
-                            indent = indentation(locator, key);
+            match key {
+                Some(key) => {
+                    if let Expr::StringLiteral(ast::ExprStringLiteral {
+                        value: key_string, ..
+                    }) = key
+                    {
+                        // If the dictionary key is not a valid variable name, abort.
+                        if !is_identifier(key_string.to_str()) {
+                            return None;
                         }
-                    }
+                        // If there are multiple entries of the same key, abort.
+                        if seen.contains(&key_string.to_str()) {
+                            return None;
+                        }
+                        seen.push(key_string.to_str());
+                        if is_multi_line {
+                            if indent.is_none() {
+                                indent = indentation(locator, key);
+                            }
+                        }
 
-                    let value_string = locator.slice(value);
-                    arguments.push(format!("{key_string}={value_string}"));
-                } else {
-                    // If there are any non-string keys, abort.
-                    return None;
+                        let value_string = locator.slice(value);
+                        arguments.push(format!("{key_string}={value_string}"));
+                    } else {
+                        // If there are any non-string keys, abort.
+                        return None;
+                    }
                 }
-            } else {
-                let value_string = locator.slice(value);
-                arguments.push(format!("**{value_string}"));
+                None => {
+                    let value_string = locator.slice(value);
+                    arguments.push(format!("**{value_string}"));
+                }
             }
         }
         // If we couldn't parse out key values, abort.
