@@ -8,10 +8,11 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle::rules::logical_lines::{
-    extraneous_whitespace, indentation, missing_whitespace, missing_whitespace_after_keyword,
-    missing_whitespace_around_operator, redundant_backslash, space_after_comma,
-    space_around_operator, whitespace_around_keywords, whitespace_around_named_parameter_equals,
-    whitespace_before_comment, whitespace_before_parameters, LogicalLines, TokenFlags,
+    continued_indentation, extraneous_whitespace, indentation, missing_whitespace,
+    missing_whitespace_after_keyword, missing_whitespace_around_operator, redundant_backslash,
+    space_after_comma, space_around_operator, whitespace_around_keywords,
+    whitespace_around_named_parameter_equals, whitespace_before_comment,
+    whitespace_before_parameters, LogicalLines, TokenFlags,
 };
 use crate::settings::LinterSettings;
 
@@ -95,6 +96,19 @@ pub(crate) fn check_logical_lines(
         Rule::NoIndentedBlockComment,
         Rule::UnexpectedIndentationComment,
         Rule::OverIndented,
+    ]);
+    let enforce_continuation_indentation = settings.rules.any_enabled(&[
+        Rule::ContinuationUnderIndentedHanging,
+        Rule::ContinuationOverIndentedOrMissing,
+        Rule::ClosingBracketMismatched,
+        Rule::ClosingBracketMismatchedVisualIndent,
+        Rule::ContinuationMatchesNextLine,
+        Rule::ContinuationOverIndentedHanging,
+        Rule::ContinuationOverIndentedVisual,
+        Rule::ContinuationUnderIndentedVisual,
+        Rule::VisualIndentMatchesNextLine,
+        Rule::ContinuationUnalignedHanging,
+        Rule::ClosingBracketMissingIndentation,
     ]);
 
     for line in &LogicalLines::from_tokens(tokens, locator) {
@@ -180,6 +194,11 @@ pub(crate) fn check_logical_lines(
                     context.push_diagnostic(Diagnostic::new(kind, range));
                 }
             }
+        }
+
+        if line.flags().contains(TokenFlags::NON_TRIVIA) && enforce_continuation_indentation {
+            let hang_closing = false; // TODO setting
+            continued_indentation(&line, indent_level, indent_char, hang_closing, &mut context);
         }
 
         if !line.is_comment_only() {
