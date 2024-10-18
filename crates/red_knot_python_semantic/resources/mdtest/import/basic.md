@@ -10,8 +10,7 @@ reveal_type(E)  # revealed: Literal[C]
 ```
 
 ```py path=b.py
-class C:
-    pass
+class C: ...
 ```
 
 ## Module member resolution
@@ -24,6 +23,5 @@ reveal_type(D)  # revealed: Literal[C]
 ```
 
 ```py path=b.py
-class C:
-    pass
+class C: ...
 ```

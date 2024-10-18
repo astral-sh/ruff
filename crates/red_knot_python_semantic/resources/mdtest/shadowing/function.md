@@ -12,9 +12,7 @@ def f(x: str):
 ## Implicit error
 
 ```py path=a.py
-def f():
-    pass
-
+def f(): ...
 
 f = 1  # error: "Implicit shadowing of function `f`; annotate to make it explicit if this is intentional"
 ```
@@ -22,9 +20,7 @@ f = 1  # error: "Implicit shadowing of function `f`; annotate to make it explici
 ## Explicit shadowing
 
 ```py path=a.py
-def f():
-    pass
-
+def f(): ...
 
 f: int = 1
 ```
