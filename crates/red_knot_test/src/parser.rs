@@ -1,6 +1,7 @@
 use memchr::memchr2;
 use regex::{Captures, Match, Regex};
 use ruff_index::{newtype_index, IndexVec};
+use ruff_source_file::OneIndexed;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::LazyLock;
 
@@ -132,6 +133,7 @@ pub(crate) struct EmbeddedFile<'s> {
     pub(crate) path: &'s str,
     pub(crate) lang: &'s str,
     pub(crate) code: &'s str,
+    pub(crate) md_line_number: OneIndexed,
 }
 
 /// Matches a sequence of `#` characters, followed by a title heading, followed by a newline.
@@ -187,6 +189,9 @@ struct Parser<'s> {
     /// The unparsed remainder of the Markdown source.
     unparsed: &'s str,
 
+    /// Current line number of the parser
+    current_line_number: OneIndexed,
+
     /// Stack of ancestor sections.
     stack: SectionStack,
 
@@ -206,6 +211,7 @@ impl<'s> Parser<'s> {
             sections,
             files: IndexVec::default(),
             unparsed: source,
+            current_line_number: OneIndexed::new(1).unwrap(),
             stack: SectionStack::new(root_section_id),
             current_section_files: None,
         }
@@ -224,6 +230,12 @@ impl<'s> Parser<'s> {
             sections: self.sections,
             files: self.files,
         }
+    }
+
+    fn increment_line_count(&mut self, captures: &Captures<'s>) {
+        self.current_line_number = self
+            .current_line_number
+            .saturating_add(captures[0].lines().count());
     }
 
     fn parse_impl(&mut self) -> anyhow::Result<()> {
@@ -299,6 +311,8 @@ impl<'s> Parser<'s> {
 
         self.current_section_files = None;
 
+        self.increment_line_count(captures);
+
         Ok(())
     }
 
@@ -336,6 +350,7 @@ impl<'s> Parser<'s> {
                 .unwrap_or_default(),
             // CODE_RE can't match without matches for 'lang' and 'code'.
             code: captures.name("code").unwrap().into(),
+            md_line_number: self.current_line_number,
         });
 
         if let Some(current_files) = &mut self.current_section_files {
@@ -356,6 +371,8 @@ impl<'s> Parser<'s> {
         } else {
             self.current_section_files = Some(FxHashSet::from_iter([path]));
         }
+
+        self.increment_line_count(captures);
 
         Ok(())
     }

@@ -4,10 +4,11 @@ use red_knot_python_semantic::types::check_types;
 use ruff_db::files::{system_path_to_file, Files};
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+use ruff_source_file::OneIndexed;
 use std::collections::BTreeMap;
 use std::path::Path;
 
-type Failures = BTreeMap<SystemPathBuf, matcher::FailuresByLine>;
+type Failures = BTreeMap<AbsoluteLineNumberPath, matcher::FailuresByLine>;
 
 mod assertion;
 mod db;
@@ -40,12 +41,17 @@ pub fn run(path: &Path, title: &str) {
             any_failures = true;
             println!("\n{}\n", test.name().bold().underline());
 
-            for (path, by_line) in failures {
-                println!("{}", path.as_str().bold());
+            for (lined_path, by_line) in failures {
+                println!("{}", lined_path.path.as_str().bold());
                 for (line_number, failures) in by_line.iter() {
                     for failure in failures {
+                        let absolute_line_info = format!(
+                            "{}:{}",
+                            title,
+                            lined_path.line_number.saturating_add(line_number.get())
+                        );
                         let line_info = format!("line {line_number}:").cyan();
-                        println!("    {line_info} {failure}");
+                        println!("{absolute_line_info}    {line_info} {failure}");
                     }
                 }
                 println!();
@@ -58,10 +64,16 @@ pub fn run(path: &Path, title: &str) {
     assert!(!any_failures, "Some tests failed.");
 }
 
+#[derive(PartialEq, PartialOrd, Eq, Ord, Hash)]
+struct AbsoluteLineNumberPath {
+    path: SystemPathBuf,
+    line_number: OneIndexed,
+}
+
 fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures> {
     let workspace_root = db.workspace_root().to_path_buf();
 
-    let mut system_paths = vec![];
+    let mut paths: Vec<AbsoluteLineNumberPath> = Vec::with_capacity(test.files().count());
 
     for file in test.files() {
         assert!(
@@ -70,13 +82,16 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
         );
         let full_path = workspace_root.join(file.path);
         db.write_file(&full_path, file.code).unwrap();
-        system_paths.push(full_path);
+        paths.push(AbsoluteLineNumberPath {
+            path: full_path,
+            line_number: file.md_line_number,
+        });
     }
 
     let mut failures = BTreeMap::default();
 
-    for path in system_paths {
-        let file = system_path_to_file(db, path.clone()).unwrap();
+    for numbered_path in paths {
+        let file = system_path_to_file(db, numbered_path.path.clone()).unwrap();
         let parsed = parsed_module(db, file);
 
         // TODO allow testing against code with syntax errors
@@ -84,12 +99,12 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
             parsed.errors().is_empty(),
             "Python syntax errors in {}, {:?}: {:?}",
             test.name(),
-            path,
+            numbered_path.path,
             parsed.errors()
         );
 
         matcher::match_file(db, file, check_types(db, file)).unwrap_or_else(|line_failures| {
-            failures.insert(path, line_failures);
+            failures.insert(numbered_path, line_failures);
         });
     }
     if failures.is_empty() {
