@@ -362,7 +362,7 @@ fn is_not_implemented_stub_with_variable(function_def: &StmtFunctionDef) -> bool
         return false;
     };
 
-    argument.as_name_expr().map(|name| name.id()) == target.as_name_expr().map(|name| name.id())
+    argument.as_name_expr().map(ast::ExprName::id) == target.as_name_expr().map(ast::ExprName::id)
 }
 
 /// ARG001, ARG002, ARG003, ARG004, ARG005
