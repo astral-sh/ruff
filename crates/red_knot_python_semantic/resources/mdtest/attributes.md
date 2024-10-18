@@ -10,6 +10,5 @@ else:
     class C:
         x = 2
 
-y = C.x
-reveal_type(y)  # revealed: Literal[1, 2]
+reveal_type(C.x)  # revealed: Literal[1, 2]
 ```

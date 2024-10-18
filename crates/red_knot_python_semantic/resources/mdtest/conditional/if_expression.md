@@ -13,11 +13,9 @@ reveal_type(x)  # revealed: Literal[1, 2]
 y = 0
 z = 0
 x = (y := 1) if flag else (z := 2)
-a = y
-b = z
 reveal_type(x)  # revealed: Literal[1, 2]
-reveal_type(a)  # revealed: Literal[0, 1]
-reveal_type(b)  # revealed: Literal[0, 2]
+reveal_type(y)  # revealed: Literal[0, 1]
+reveal_type(z)  # revealed: Literal[0, 2]
 ```
 
 ## Nested if-expression

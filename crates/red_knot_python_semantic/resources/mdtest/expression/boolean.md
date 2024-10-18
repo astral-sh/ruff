@@ -6,23 +6,14 @@
 def foo() -> str:
     pass
 
-a = True or False
-b = 'x' or 'y' or 'z'
-c = '' or 'y' or 'z'
-d = False or 'z'
-e = False or True
-f = False or False
-g = foo() or False
-h = foo() or True
-
-reveal_type(a)  # revealed: Literal[True]
-reveal_type(b)  # revealed: Literal["x"]
-reveal_type(c)  # revealed: Literal["y"]
-reveal_type(d)  # revealed: Literal["z"]
-reveal_type(e)  # revealed: Literal[True]
-reveal_type(f)  # revealed: Literal[False]
-reveal_type(g)  # revealed: str | Literal[False]
-reveal_type(h)  # revealed: str | Literal[True]
+reveal_type(True or False)  # revealed: Literal[True]
+reveal_type('x' or 'y' or 'z')  # revealed: Literal["x"]
+reveal_type('' or 'y' or 'z')  # revealed: Literal["y"]
+reveal_type(False or 'z')  # revealed: Literal["z"]
+reveal_type(False or True)  # revealed: Literal[True]
+reveal_type(False or False)  # revealed: Literal[False]
+reveal_type(foo() or False)  # revealed: str | Literal[False]
+reveal_type(foo() or True)  # revealed: str | Literal[True]
 ```
 
 ## AND
@@ -31,21 +22,13 @@ reveal_type(h)  # revealed: str | Literal[True]
 def foo() -> str:
     pass
 
-a = True and False
-b = False and True
-c = foo() and False
-d = foo() and True
-e = 'x' and 'y' and 'z'
-f = 'x' and 'y' and ''
-g = '' and 'y'
-
-reveal_type(a)  # revealed: Literal[False]
-reveal_type(b)  # revealed: Literal[False]
-reveal_type(c)  # revealed: str | Literal[False]
-reveal_type(d)  # revealed: str | Literal[True]
-reveal_type(e)  # revealed: Literal["z"]
-reveal_type(f)  # revealed: Literal[""]
-reveal_type(g)  # revealed: Literal[""]
+reveal_type(True and False)  # revealed: Literal[False]
+reveal_type(False and True)  # revealed: Literal[False]
+reveal_type(foo() and False)  # revealed: str | Literal[False]
+reveal_type(foo() and True)  # revealed: str | Literal[True]
+reveal_type('x' and 'y' and 'z')  # revealed: Literal["z"]
+reveal_type('x' and 'y' and '')  # revealed: Literal[""]
+reveal_type('' and 'y')  # revealed: Literal[""]
 ```
 
 ## Simple function calls to bool
@@ -68,19 +51,12 @@ reveal_type(x)  # revealed: bool
 def foo() -> str:
     pass
 
-a = "x" and "y" or "z"
-b = "x" or "y" and "z"
-c = "" and "y" or "z"
-d = "" or "y" and "z"
-e = "x" and "y" or ""
-f = "x" or "y" and ""
-
-reveal_type(a)  # revealed: Literal["y"]
-reveal_type(b)  # revealed: Literal["x"]
-reveal_type(c)  # revealed: Literal["z"]
-reveal_type(d)  # revealed: Literal["z"]
-reveal_type(e)  # revealed: Literal["y"]
-reveal_type(f)  # revealed: Literal["x"]
+reveal_type("x" and "y" or "z")  # revealed: Literal["y"]
+reveal_type("x" or "y" and "z")  # revealed: Literal["x"]
+reveal_type("" and "y" or "z")  # revealed: Literal["z"]
+reveal_type("" or "y" and "z")  # revealed: Literal["z"]
+reveal_type("x" and "y" or "")  # revealed: Literal["y"]
+reveal_type("x" or "y" and "")  # revealed: Literal["x"]
 ```
 
 ## `bool()` function
@@ -95,57 +71,38 @@ def my_bool(x)-> bool: pass
 
 ```py
 from a import redefined_builtin_bool, my_bool
-a = redefined_builtin_bool(0)
-b = my_bool(0)
 
-reveal_type(a)  # revealed: Literal[False]
-reveal_type(b)  # revealed: bool
+reveal_type(redefined_builtin_bool(0))  # revealed: Literal[False]
+reveal_type(my_bool(0))  # revealed: bool
 ```
 
 ## Truthy values
 
 ```py
-a = bool(1)
-b = bool((0,))
-c = bool("NON EMPTY")
-d = bool(True)
+reveal_type(bool(1))  # revealed: Literal[True]
+reveal_type(bool((0,)))  # revealed: Literal[True]
+reveal_type(bool("NON EMPTY"))  # revealed: Literal[True]
+reveal_type(bool(True))  # revealed: Literal[True]
 
 def foo(): pass
-e = bool(foo)
-
-reveal_type(a)  # revealed: Literal[True]
-reveal_type(b)  # revealed: Literal[True]
-reveal_type(c)  # revealed: Literal[True]
-reveal_type(d)  # revealed: Literal[True]
-reveal_type(e)  # revealed: Literal[True]
+reveal_type(bool(foo))  # revealed: Literal[True]
 ```
 
 ## Falsy values
 
 ```py
-a = bool(0)
-b = bool(())
-c = bool(None)
-d = bool("")
-e = bool(False)
-f = bool()
-
-reveal_type(a)  # revealed: Literal[False]
-reveal_type(b)  # revealed: Literal[False]
-reveal_type(c)  # revealed: Literal[False]
-reveal_type(d)  # revealed: Literal[False]
-reveal_type(e)  # revealed: Literal[False]
-reveal_type(f)  # revealed: Literal[False]
+reveal_type(bool(0))  # revealed: Literal[False]
+reveal_type(bool(()))  # revealed: Literal[False]
+reveal_type(bool(None))  # revealed: Literal[False]
+reveal_type(bool(""))  # revealed: Literal[False]
+reveal_type(bool(False))  # revealed: Literal[False]
+reveal_type(bool())  # revealed: Literal[False]
 ```
 
 ## Ambiguous values
 
 ```py
-a = bool([])
-b = bool({})
-c = bool(set())
-
-reveal_type(a)  # revealed: bool
-reveal_type(b)  # revealed: bool
-reveal_type(c)  # revealed: bool
+reveal_type(bool([]))  # revealed: bool
+reveal_type(bool({}))  # revealed: bool
+reveal_type(bool(set()))  # revealed: bool
 ```

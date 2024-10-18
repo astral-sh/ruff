@@ -10,21 +10,19 @@ else:
     def f() -> str:
         return 'foo'
 
-x = f()
-reveal_type(x)  # revealed: int | str
+reveal_type(f())  # revealed: int | str
 ```
 
 ## Calling with an unknown union
 
 ```py
-from nonexistent import f # error: [unresolved-import] "Cannot resolve import `nonexistent`"
+from nonexistent import f  # error: [unresolved-import] "Cannot resolve import `nonexistent`"
 
 if flag:
     def f() -> int:
         return 1
 
-x = f()
-reveal_type(x)  # revealed: Unknown | int
+reveal_type(f())  # revealed: Unknown | int
 ```
 
 ## Non-callable elements in a union

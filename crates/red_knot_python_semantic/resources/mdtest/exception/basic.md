@@ -15,7 +15,7 @@ except re.error as f:
 ## Unknown type in except handler does not cause spurious diagnostic
 
 ```py
-from nonexistent_module import foo # error: [unresolved-import]
+from nonexistent_module import foo  # error: [unresolved-import]
 
 try:
     x
