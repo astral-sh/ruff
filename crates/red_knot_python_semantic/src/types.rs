@@ -60,7 +60,7 @@ fn symbol_ty_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymb
                 use_def.public_bindings(symbol),
                 use_def
                     .public_may_be_unbound(symbol)
-                    .then_some(Type::Unknown),
+                    .then_some(Type::Unbound),
             ))
         } else {
             None
@@ -79,7 +79,7 @@ fn symbol_ty_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymb
     }
 }
 
-/// Shorthand for `symbol_ty` that takes a symbol name instead of an ID.
+/// Shorthand for `symbol_ty_by_id` that takes a symbol name instead of an ID.
 fn symbol_ty<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Type<'db> {
     let table = symbol_table(db, scope);
     table
@@ -381,7 +381,7 @@ impl<'db> Type<'db> {
             Type::Union(union) => {
                 union.map(db, |element| element.replace_unbound_with(db, replacement))
             }
-            ty => *ty,
+            _ => *self,
         }
     }
 
@@ -415,6 +415,11 @@ impl<'db> Type<'db> {
             (_, Type::Unknown | Type::Any | Type::Todo) => false,
             (Type::Never, _) => true,
             (_, Type::Never) => false,
+            (Type::BooleanLiteral(_), Type::Instance(class))
+                if class.is_known(db, KnownClass::Bool) =>
+            {
+                true
+            }
             (Type::IntLiteral(_), Type::Instance(class)) if class.is_known(db, KnownClass::Int) => {
                 true
             }
@@ -444,6 +449,9 @@ impl<'db> Type<'db> {
     ///
     /// [assignable to]: https://typing.readthedocs.io/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
     pub(crate) fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
+        if self.is_equivalent_to(db, target) {
+            return true;
+        }
         match (self, target) {
             (Type::Unknown | Type::Any | Type::Todo, _) => true,
             (_, Type::Unknown | Type::Any | Type::Todo) => true,
@@ -461,6 +469,55 @@ impl<'db> Type<'db> {
         // TODO equivalent but not identical structural types, differently-ordered unions and
         // intersections, other cases?
         self == other
+    }
+
+    /// Return true if there is just a single inhabitant for this type.
+    ///
+    /// Note: This function aims to have no false positives, but might return `false`
+    /// for more complicated types that are actually singletons.
+    pub(crate) fn is_singleton(self) -> bool {
+        match self {
+            Type::Any
+            | Type::Never
+            | Type::Unknown
+            | Type::Todo
+            | Type::Unbound
+            | Type::Instance(..) // TODO some instance types can be singleton types (EllipsisType, NotImplementedType)
+            | Type::IntLiteral(..)
+            | Type::StringLiteral(..)
+            | Type::BytesLiteral(..)
+            | Type::LiteralString => {
+                // Note: The literal types included in this pattern are not true singletons.
+                // There can be multiple Python objects (at different memory locations) that
+                // are both of type Literal[345], for example.
+                false
+            }
+            Type::None | Type::BooleanLiteral(_) | Type::Function(..) | Type::Class(..) | Type::Module(..) => true,
+            Type::Tuple(..) => {
+                // The empty tuple is a singleton on CPython and PyPy, but not on other Python
+                // implementations such as GraalPy. Its *use* as a singleton is discouraged and
+                // should not be relied on for type narrowing, so we do not treat it as one.
+                // See:
+                // https://docs.python.org/3/reference/expressions.html#parenthesized-forms
+                false
+            }
+            Type::Union(..) => {
+                // A single-element union, where the sole element was a singleton, would itself
+                // be a singleton type. However, unions with length < 2 should never appear in
+                // our model due to [`UnionBuilder::build`].
+                false
+            }
+            Type::Intersection(..) => {
+                // Here, we assume that all intersection types that are singletons would have
+                // been reduced to a different form via [`IntersectionBuilder::build`] by now.
+                // For example:
+                //
+                //   bool & ~Literal[False]   = Literal[True]
+                //   None & (None | int)      = None | None & int = None
+                //
+                false
+            }
+        }
     }
 
     /// Resolve a member access of a type.
@@ -791,14 +848,10 @@ impl<'db> Type<'db> {
             Type::IntLiteral(number) => Type::StringLiteral(StringLiteralType::new(db, {
                 number.to_string().into_boxed_str()
             })),
-            Type::BooleanLiteral(true) => {
-                Type::StringLiteral(StringLiteralType::new(db, "True".into()))
-            }
-            Type::BooleanLiteral(false) => {
-                Type::StringLiteral(StringLiteralType::new(db, "False".into()))
-            }
+            Type::BooleanLiteral(true) => Type::StringLiteral(StringLiteralType::new(db, "True")),
+            Type::BooleanLiteral(false) => Type::StringLiteral(StringLiteralType::new(db, "False")),
             Type::StringLiteral(literal) => Type::StringLiteral(StringLiteralType::new(db, {
-                format!("'{}'", literal.value(db).escape_default()).into()
+                format!("'{}'", literal.value(db).escape_default()).into_boxed_str()
             })),
             Type::LiteralString => Type::LiteralString,
             // TODO: handle more complex types
@@ -1381,7 +1434,8 @@ impl<'db> ClassType<'db> {
     pub fn class_member(self, db: &'db dyn Db, name: &str) -> Type<'db> {
         let member = self.own_class_member(db, name);
         if !member.is_unbound() {
-            return member;
+            // TODO diagnostic if maybe unbound?
+            return member.replace_unbound_with(db, Type::Never);
         }
 
         self.inherited_class_member(db, name)
@@ -1463,6 +1517,12 @@ pub struct StringLiteralType<'db> {
     value: Box<str>,
 }
 
+impl<'db> StringLiteralType<'db> {
+    pub fn len(&self, db: &'db dyn Db) -> usize {
+        self.value(db).len()
+    }
+}
+
 #[salsa::interned]
 pub struct BytesLiteralType<'db> {
     #[return_ref]
@@ -1473,6 +1533,16 @@ pub struct BytesLiteralType<'db> {
 pub struct TupleType<'db> {
     #[return_ref]
     elements: Box<[Type<'db>]>,
+}
+
+impl<'db> TupleType<'db> {
+    pub fn get(&self, db: &'db dyn Db, index: usize) -> Option<Type<'db>> {
+        self.elements(db).get(index).copied()
+    }
+
+    pub fn len(&self, db: &'db dyn Db) -> usize {
+        self.elements(db).len()
+    }
 }
 
 #[cfg(test)]
@@ -1514,6 +1584,7 @@ mod tests {
     enum Ty {
         Never,
         Unknown,
+        None,
         Any,
         IntLiteral(i64),
         BoolLiteral(bool),
@@ -1530,22 +1601,19 @@ mod tests {
             match self {
                 Ty::Never => Type::Never,
                 Ty::Unknown => Type::Unknown,
+                Ty::None => Type::None,
                 Ty::Any => Type::Any,
                 Ty::IntLiteral(n) => Type::IntLiteral(n),
-                Ty::StringLiteral(s) => {
-                    Type::StringLiteral(StringLiteralType::new(db, (*s).into()))
-                }
+                Ty::StringLiteral(s) => Type::StringLiteral(StringLiteralType::new(db, s)),
                 Ty::BoolLiteral(b) => Type::BooleanLiteral(b),
                 Ty::LiteralString => Type::LiteralString,
-                Ty::BytesLiteral(s) => {
-                    Type::BytesLiteral(BytesLiteralType::new(db, s.as_bytes().into()))
-                }
+                Ty::BytesLiteral(s) => Type::BytesLiteral(BytesLiteralType::new(db, s.as_bytes())),
                 Ty::BuiltinInstance(s) => builtins_symbol_ty(db, s).to_instance(db),
                 Ty::Union(tys) => {
                     UnionType::from_elements(db, tys.into_iter().map(|ty| ty.into_type(db)))
                 }
                 Ty::Tuple(tys) => {
-                    let elements = tys.into_iter().map(|ty| ty.into_type(db)).collect();
+                    let elements: Box<_> = tys.into_iter().map(|ty| ty.into_type(db)).collect();
                     Type::Tuple(TupleType::new(db, elements))
                 }
             }
@@ -1566,6 +1634,7 @@ mod tests {
     #[test_case(Ty::BytesLiteral("foo"), Ty::BuiltinInstance("bytes"))]
     #[test_case(Ty::IntLiteral(1), Ty::Union(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")]))]
     #[test_case(Ty::IntLiteral(1), Ty::Union(vec![Ty::Unknown, Ty::BuiltinInstance("str")]))]
+    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]))]
     fn is_assignable_to(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_assignable_to(&db, to.into_type(&db)));
@@ -1616,6 +1685,28 @@ mod tests {
         let db = setup_db();
 
         assert!(from.into_type(&db).is_equivalent_to(&db, to.into_type(&db)));
+    }
+
+    #[test_case(Ty::None)]
+    #[test_case(Ty::BoolLiteral(true))]
+    #[test_case(Ty::BoolLiteral(false))]
+    fn is_singleton(from: Ty) {
+        let db = setup_db();
+
+        assert!(from.into_type(&db).is_singleton());
+    }
+
+    #[test_case(Ty::Never)]
+    #[test_case(Ty::IntLiteral(345))]
+    #[test_case(Ty::BuiltinInstance("str"))]
+    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]))]
+    #[test_case(Ty::Tuple(vec![]))]
+    #[test_case(Ty::Tuple(vec![Ty::None]))]
+    #[test_case(Ty::Tuple(vec![Ty::None, Ty::BoolLiteral(true)]))]
+    fn is_not_singleton(from: Ty) {
+        let db = setup_db();
+
+        assert!(!from.into_type(&db).is_singleton());
     }
 
     #[test_case(Ty::IntLiteral(1); "is_int_literal_truthy")]

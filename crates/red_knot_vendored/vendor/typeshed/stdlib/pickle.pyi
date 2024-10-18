@@ -157,10 +157,10 @@ class Pickler:
     def __init__(
         self,
         file: SupportsWrite[bytes],
-        protocol: int | None = ...,
+        protocol: int | None = None,
         *,
-        fix_imports: bool = ...,
-        buffer_callback: _BufferCallback = ...,
+        fix_imports: bool = True,
+        buffer_callback: _BufferCallback = None,
     ) -> None: ...
     def reducer_override(self, obj: Any) -> Any: ...
     def dump(self, obj: Any, /) -> None: ...
@@ -174,10 +174,10 @@ class Unpickler:
         self,
         file: _ReadableFileobj,
         *,
-        fix_imports: bool = ...,
-        encoding: str = ...,
-        errors: str = ...,
-        buffers: Iterable[Any] | None = ...,
+        fix_imports: bool = True,
+        encoding: str = "ASCII",
+        errors: str = "strict",
+        buffers: Iterable[Any] | None = (),
     ) -> None: ...
     def load(self) -> Any: ...
     def find_class(self, module_name: str, global_name: str, /) -> Any: ...

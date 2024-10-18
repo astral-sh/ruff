@@ -1,12 +1,12 @@
 use ruff_formatter::FormatRuleWithOptions;
-use ruff_python_ast::{AnyNodeRef, ExprStringLiteral};
+use ruff_python_ast::{AnyNodeRef, ExprStringLiteral, StringLike};
 
 use crate::expression::parentheses::{
     in_parentheses_only_group, NeedsParentheses, OptionalParentheses,
 };
 use crate::other::string_literal::StringLiteralKind;
 use crate::prelude::*;
-use crate::string::{AnyString, FormatImplicitConcatenatedString};
+use crate::string::{FormatImplicitConcatenatedString, StringLikeExtensions};
 
 #[derive(Default)]
 pub struct FormatExprStringLiteral {
@@ -48,7 +48,7 @@ impl NeedsParentheses for ExprStringLiteral {
     ) -> OptionalParentheses {
         if self.value.is_implicit_concatenated() {
             OptionalParentheses::Multiline
-        } else if AnyString::String(self).is_multiline(context.source()) {
+        } else if StringLike::String(self).is_multiline(context.source()) {
             OptionalParentheses::Never
         } else {
             OptionalParentheses::BestFit

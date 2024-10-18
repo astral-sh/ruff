@@ -141,7 +141,7 @@ static HEADER_RE: Lazy<Regex> =
 /// Matches a code block fenced by triple backticks, possibly with language and `key=val`
 /// configuration items following the opening backticks (in the "tag string" of the code block).
 static CODE_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^```(?<lang>\w+)(?<config>( +\S+)*)\s*\n(?<code>(.|\n)*?)\n```\s*\n").unwrap()
+    Regex::new(r"^```(?<lang>\w+)(?<config>( +\S+)*)\s*\n(?<code>(.|\n)*?)\n?```\s*\n").unwrap()
 });
 
 #[derive(Debug)]

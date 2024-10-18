@@ -200,7 +200,7 @@ def dumps(
     allow_none: bool = False,
 ) -> str: ...
 def loads(
-    data: str, use_datetime: bool = False, use_builtin_types: bool = False
+    data: str | ReadableBuffer, use_datetime: bool = False, use_builtin_types: bool = False
 ) -> tuple[tuple[_Marshallable, ...], str | None]: ...
 def gzip_encode(data: ReadableBuffer) -> bytes: ...  # undocumented
 def gzip_decode(data: ReadableBuffer, max_decode: int = 20971520) -> bytes: ...  # undocumented

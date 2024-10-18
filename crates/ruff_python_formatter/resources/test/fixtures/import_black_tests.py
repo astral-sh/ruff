@@ -39,7 +39,7 @@ def import_fixture(fixture: Path, fixture_set: str):
         extension = "py"
 
         if flags:
-            if "--preview" in flags:
+            if "--preview" in flags or "--unstable" in flags:
                 options["preview"] = "enabled"
 
             if "--pyi" in flags:

@@ -25,6 +25,27 @@ match the resulting diagnostics with the assertions in the test. Assertions are 
 Python comments. If all diagnostics and all assertions are matched, the test passes; otherwise, it
 fails.
 
+<!---
+(If you are reading this document in raw Markdown source rather than rendered Markdown, note that
+the quadruple-backtick-fenced "markdown" language code block above is NOT itself part of the mdtest
+syntax, it's just how this README embeds an example mdtest Markdown document.)
+--->
+
+See actual example mdtest suites in
+[`crates/red_knot_python_semantic/resources/mdtest`](https://github.com/astral-sh/ruff/tree/main/crates/red_knot_python_semantic/resources/mdtest).
+
+> ℹ️ Note: If you use `rstest` to generate a separate test for all Markdown files in a certain directory,
+> as with the example in `crates/red_knot_python_semantic/tests/mdtest.rs`,
+> you will likely want to also make sure that the crate the tests are in is rebuilt every time a
+> Markdown file is added or removed from the directory. See
+> [`crates/red_knot_python_semantic/build.rs`](https://github.com/astral-sh/ruff/tree/main/crates/red_knot_python_semantic/build.rs)
+> for an example of how to do this.
+>
+> This is because `rstest` generates its tests at build time rather than at runtime.
+> Without the `build.rs` file to force a rebuild when a Markdown file is added or removed,
+> a new Markdown test suite might not be run unless some other change in the crate caused a rebuild
+> following the addition of the new test file.
+
 ## Assertions
 
 Two kinds of assertions are supported: `# revealed:` (shown above) and `# error:`.
@@ -58,9 +79,8 @@ something about the behavior of importing it.)
 
 #### error
 
-A comment beginning with `# error:` is an assertion that a type checker diagnostic will
-be emitted, with text span starting on that line. If the comment is simply `# error:`, this will
-match any diagnostic. The matching can be narrowed in three ways:
+A comment beginning with `# error:` is an assertion that a type checker diagnostic will be emitted,
+with text span starting on that line. The matching can be narrowed in three ways:
 
 - `# error: [invalid-assignment]` requires that the matched diagnostic have the rule code
     `invalid-assignment`. (The square brackets are required.)
@@ -75,7 +95,8 @@ present; then contains-text, if present. For example, an assertion using all thr
 `# error: 8 [invalid-assignment] "Some text"`.
 
 Error assertions in tests intended to test type checker semantics should primarily use rule-code
-assertions, with occasional contains-text assertions where needed to disambiguate.
+assertions, with occasional contains-text assertions where needed to disambiguate or validate some
+details of the diagnostic message.
 
 ### Assertion locations
 
