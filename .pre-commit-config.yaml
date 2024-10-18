@@ -45,6 +45,15 @@ repos:
             | docs/\w+\.md
           )$
 
+  - repo: https://github.com/adamchainz/blacken-docs
+    rev: 1.19.0
+    hooks:
+      - id: blacken-docs
+        args: ["--line-length", "130"]
+        files: '^crates/.*/resources/mdtest/.*\.md'
+        additional_dependencies:
+          - black==24.10.0
+
   - repo: https://github.com/crate-ci/typos
     rev: v1.25.0
     hooks:
