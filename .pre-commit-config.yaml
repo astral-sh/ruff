@@ -1,4 +1,4 @@
-fail_fast: true
+fail_fast: false
 
 exclude: |
   (?x)^(
