@@ -12,6 +12,7 @@ pn = "pn"  # `import panel as pn` is a thing
 poit = "poit"
 BA = "BA" # acronym for "Bad Allowed", used in testing.
 jod = "jod" # e.g., `jod-thread`
+Numer = "Numer" # Library name 'NumerBlox' in "Who's Using Ruff?"
 
 [default]
 extend-ignore-re = [
