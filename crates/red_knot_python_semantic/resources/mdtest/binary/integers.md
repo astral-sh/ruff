@@ -26,16 +26,19 @@ subclass; we only emit the error if the LHS type is exactly `int` or `float`, no
 
 ```py
 a = 1 / 0  # error: "Cannot divide object of type `Literal[1]` by zero"
-b = 2 // 0  # error: "Cannot floor divide object of type `Literal[2]` by zero"
-c = 3 % 0  # error: "Cannot reduce object of type `Literal[3]` modulo zero"
-d = int() / 0  # error: "Cannot divide object of type `int` by zero"
-e = 1.0 / 0  # error: "Cannot divide object of type `float` by zero"
-
 reveal_type(a)  # revealed: float
+
+b = 2 // 0  # error: "Cannot floor divide object of type `Literal[2]` by zero"
 reveal_type(b)  # revealed: int
+
+c = 3 % 0  # error: "Cannot reduce object of type `Literal[3]` modulo zero"
 reveal_type(c)  # revealed: int
+
+d = int() / 0  # error: "Cannot divide object of type `int` by zero"
 # TODO should be int
 reveal_type(d)  # revealed: @Todo
+
+e = 1.0 / 0  # error: "Cannot divide object of type `float` by zero"
 # TODO should be float
 reveal_type(e)  # revealed: @Todo
 
