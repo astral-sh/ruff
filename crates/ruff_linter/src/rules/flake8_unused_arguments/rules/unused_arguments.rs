@@ -324,7 +324,10 @@ fn call<'a>(
 ///
 /// [`is_stub`]: function_type::is_stub
 /// [`EM101`]: https://docs.astral.sh/ruff/rules/raw-string-in-exception/
-fn is_not_implemented_stub_with_variable(function_def: &StmtFunctionDef) -> bool {
+fn is_not_implemented_stub_with_variable(
+    function_def: &StmtFunctionDef,
+    semantic: &SemanticModel,
+) -> bool {
     // Ignore doc-strings.
     let statements = match function_def.body.as_slice() {
         [Stmt::Expr(StmtExpr { value, .. }), rest @ ..] if value.is_string_literal_expr() => rest,
@@ -350,7 +353,7 @@ fn is_not_implemented_stub_with_variable(function_def: &StmtFunctionDef) -> bool
         return false;
     };
 
-    if !matches!(&**func, ast::Expr::Name(name) if name.id == "NotImplementedError") {
+    if !semantic.match_builtin_expr(func, "NotImplementedError") {
         return false;
     }
 
@@ -399,7 +402,7 @@ pub(crate) fn unused_arguments(
                 function_type::FunctionType::Function => {
                     if checker.enabled(Argumentable::Function.rule_code())
                         && !function_type::is_stub(function_def, checker.semantic())
-                        && !is_not_implemented_stub_with_variable(function_def)
+                        && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
                         && !visibility::is_overload(decorator_list, checker.semantic())
                     {
                         function(
@@ -419,7 +422,7 @@ pub(crate) fn unused_arguments(
                 function_type::FunctionType::Method => {
                     if checker.enabled(Argumentable::Method.rule_code())
                         && !function_type::is_stub(function_def, checker.semantic())
-                        && !is_not_implemented_stub_with_variable(function_def)
+                        && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
                         && (!visibility::is_magic(name)
                             || visibility::is_init(name)
                             || visibility::is_new(name)
@@ -445,7 +448,7 @@ pub(crate) fn unused_arguments(
                 function_type::FunctionType::ClassMethod => {
                     if checker.enabled(Argumentable::ClassMethod.rule_code())
                         && !function_type::is_stub(function_def, checker.semantic())
-                        && !is_not_implemented_stub_with_variable(function_def)
+                        && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
                         && (!visibility::is_magic(name)
                             || visibility::is_init(name)
                             || visibility::is_new(name)
@@ -471,7 +474,7 @@ pub(crate) fn unused_arguments(
                 function_type::FunctionType::StaticMethod => {
                     if checker.enabled(Argumentable::StaticMethod.rule_code())
                         && !function_type::is_stub(function_def, checker.semantic())
-                        && !is_not_implemented_stub_with_variable(function_def)
+                        && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
                         && (!visibility::is_magic(name)
                             || visibility::is_init(name)
                             || visibility::is_new(name)
