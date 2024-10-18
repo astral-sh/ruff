@@ -86,6 +86,8 @@ impl Violation for MissingTodoAuthor {
 /// # TODO(charlie): this comment has an issue link
 /// # https://github.com/astral-sh/ruff/issues/3870
 ///
+/// # TODO: https://github.com/astral-sh/ruff/issues/8061 This comment has an issue link
+///
 /// # TODO(charlie): this comment has a 3-digit issue code
 /// # 003
 ///
@@ -98,7 +100,7 @@ pub struct MissingTodoLink;
 impl Violation for MissingTodoLink {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing issue link on the line following this TODO")
+        format!("Missing issue link for this TODO")
     }
 }
 
@@ -222,11 +224,21 @@ impl Violation for MissingSpaceAfterTodoColon {
     }
 }
 
-static ISSUE_LINK_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
+// TD003 will trigger if neither the TODO itself nor the following line
+// matches any of the patterns.
+static ISSUE_IDENTIFIER_ON_OWN_LINE_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
     RegexSet::new([
-        r"^#\s*(http|https)://.*", // issue link
+        r"^#\s*(http|https)://.*", // issue link on its own line
         r"^#\s*\d+$",              // issue code - like "003"
         r"^#\s*[A-Z]{1,6}\-?\d+$", // issue code - like "TD003"
+    ])
+    .unwrap()
+});
+
+static ISSUE_IDENTIFIER_ON_TODO_LINE_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
+    RegexSet::new([
+        r"^#.*(http|https)://.+", // issue link
+        r"^#.*#\d+.*",            // issue code - like "#003"
     ])
     .unwrap()
 });
@@ -251,11 +263,17 @@ pub(crate) fn todos(
             continue;
         }
 
+        // If an issue link exists, we don't need to check the rest of the comment.
+        if ISSUE_IDENTIFIER_ON_TODO_LINE_REGEX_SET.is_match(content) {
+            continue;
+        }
+
         directive_errors(diagnostics, directive);
         static_errors(diagnostics, content, range, directive);
 
         let mut has_issue_link = false;
         let mut curr_range = range;
+
         for next_range in comment_ranges.iter().skip(range_index + 1).copied() {
             // Ensure that next_comment_range is in the same multiline comment "block" as
             // comment_range.
@@ -272,7 +290,7 @@ pub(crate) fn todos(
                 break;
             }
 
-            if ISSUE_LINK_REGEX_SET.is_match(next_comment) {
+            if ISSUE_IDENTIFIER_ON_OWN_LINE_REGEX_SET.is_match(next_comment) {
                 has_issue_link = true;
             }
 
