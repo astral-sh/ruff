@@ -9,9 +9,7 @@ y = 2
 if flag:
     y = 3
 
-x = y
-
-reveal_type(x)  # revealed: Literal[2, 3]
+reveal_type(y)  # revealed: Literal[2, 3]
 ```
 
 ## Simple if-elif-else
@@ -92,7 +90,6 @@ if flag:
     y = 3
 elif flag2:
     y = 4
-x = y
 
-reveal_type(x)  # revealed: Literal[2, 3, 4]
+reveal_type(y)  # revealed: Literal[2, 3, 4]
 ```

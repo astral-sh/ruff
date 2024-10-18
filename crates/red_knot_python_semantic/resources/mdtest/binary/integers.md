@@ -1,20 +1,24 @@
-## Binary operations on integers
+# Binary operations on integers
 
 ## Basic Arithmetic
 
 ```py
 a = 2 + 1
-b = a - 4
-c = a * b
-d = c // 3
-e = c / 3
-f = 5 % 3
-
 reveal_type(a)  # revealed: Literal[3]
+
+b = a - 4
 reveal_type(b)  # revealed: Literal[-1]
+
+c = a * b
 reveal_type(c)  # revealed: Literal[-3]
+
+d = c // 3
 reveal_type(d)  # revealed: Literal[-1]
+
+e = c / 3
 reveal_type(e)  # revealed: float
+
+f = 5 % 3
 reveal_type(f)  # revealed: Literal[2]
 ```
 

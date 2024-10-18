@@ -11,11 +11,10 @@ class Multiplier:
         return number * self.factor
 
 a = Multiplier(2.0)(3.0)
+reveal_type(a) # revealed: float
 
 class Unit: ...
 
 b = Unit()(3.0) # error: "Object of type `Unit` is not callable"
-
-reveal_type(a) # revealed: float
 reveal_type(b) # revealed: Unknown
 ```

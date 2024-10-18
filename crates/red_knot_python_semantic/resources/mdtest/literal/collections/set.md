@@ -3,6 +3,5 @@
 ## Basic set
 
 ```py
-x = {1, 2}
-reveal_type(x)  # revealed: set
+reveal_type({1, 2})  # revealed: set
 ```

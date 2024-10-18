@@ -1,4 +1,4 @@
-# Comparison - Tuples
+# Comparison: Tuples
 
 ## Heterogeneous
 

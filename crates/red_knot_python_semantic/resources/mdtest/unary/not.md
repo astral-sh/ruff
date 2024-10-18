@@ -3,10 +3,8 @@
 ## None
 
 ```py
-a = not None
-b = not not None
-reveal_type(a)  # revealed: Literal[True]
-reveal_type(b)  # revealed: Literal[False]
+reveal_type(not None)  # revealed: Literal[True]
+reveal_type(not not None)  # revealed: Literal[False]
 ```
 
 ## Function
@@ -17,12 +15,9 @@ from typing import reveal_type
 def f():
     return 1
 
-a = not f
-b = not reveal_type
-
-reveal_type(a)  # revealed: Literal[False]
+reveal_type(not f)  # revealed: Literal[False]
 # TODO Unknown should not be part of the type of typing.reveal_type
-# reveal_type(b)  revealed: Literal[False]
+# reveal_type(not reveal_type)  revealed: Literal[False]
 ```
 
 ## Module
@@ -30,11 +25,9 @@ reveal_type(a)  # revealed: Literal[False]
 ```py
 import b; import warnings
 
-x = not b
-z = not warnings
 
-reveal_type(x)  # revealed: Literal[False]
-reveal_type(z)  # revealed: Literal[False]
+reveal_type(not b)  # revealed: Literal[False]
+reveal_type(not warnings)  # revealed: Literal[False]
 ```
 
 ```py path=b.py
@@ -57,93 +50,63 @@ else:
     s = 0
     t = ""
 
-a = not p
-b = not q
-c = not r
-d = not s
-e = not t
-
-reveal_type(a)  # revealed: Literal[False]
-reveal_type(b)  # revealed: bool
-reveal_type(c)  # revealed: bool
-reveal_type(d)  # revealed: bool
-reveal_type(e)  # revealed: Literal[True]
+reveal_type(not p)  # revealed: Literal[False]
+reveal_type(not q)  # revealed: bool
+reveal_type(not r)  # revealed: bool
+reveal_type(not s)  # revealed: bool
+reveal_type(not t)  # revealed: Literal[True]
 ```
 
 ## Integer literal
 
 ```py
-a = not 1
-b = not 1234567890987654321
-e = not 0
-x = not -1
-y = not -1234567890987654321
-z = not --987
-
-reveal_type(a)  # revealed: Literal[False]
-reveal_type(b)  # revealed: Literal[False]
-reveal_type(e)  # revealed: Literal[True]
-reveal_type(x)  # revealed: Literal[False]
-reveal_type(y)  # revealed: Literal[False]
-reveal_type(z)  # revealed: Literal[False]
+reveal_type(not 1)  # revealed: Literal[False]
+reveal_type(not 1234567890987654321)  # revealed: Literal[False]
+reveal_type(not 0)  # revealed: Literal[True]
+reveal_type(not -1)  # revealed: Literal[False]
+reveal_type(not -1234567890987654321)  # revealed: Literal[False]
+reveal_type(not --987)  # revealed: Literal[False]
 ```
 
 ## Boolean literal
 
 ```py
 w = True
-x = False
-y = not w
-z = not x
-
 reveal_type(w)  # revealed: Literal[True]
+
+x = False
 reveal_type(x)  # revealed: Literal[False]
-reveal_type(y)  # revealed: Literal[False]
-reveal_type(z)  # revealed: Literal[True]
+
+reveal_type(not w)  # revealed: Literal[False]
+
+reveal_type(not x)  # revealed: Literal[True]
 ```
 
 ## String literal
 
 ```py
-a = not "hello"
-b = not ""
-c = not "0"
-d = not "hello" + "world"
-
-reveal_type(a)  # revealed: Literal[False]
-reveal_type(b)  # revealed: Literal[True]
-reveal_type(c)  # revealed: Literal[False]
-reveal_type(d)  # revealed: Literal[False]
+reveal_type(not "hello")  # revealed: Literal[False]
+reveal_type(not "")  # revealed: Literal[True]
+reveal_type(not "0")  # revealed: Literal[False]
+reveal_type(not "hello" + "world")  # revealed: Literal[False]
 ```
 
 ## Bytes literal
 
 ```py
-a = not b"hello"
-b = not b""
-c = not b"0"
-d = not b"hello" + b"world"
-
-reveal_type(a)  # revealed: Literal[False]
-reveal_type(b)  # revealed: Literal[True]
-reveal_type(c)  # revealed: Literal[False]
-reveal_type(d)  # revealed: Literal[False]
+reveal_type(not b"hello")  # revealed: Literal[False]
+reveal_type(not b"")  # revealed: Literal[True]
+reveal_type(not b"0")  # revealed: Literal[False]
+reveal_type(not b"hello" + b"world")  # revealed: Literal[False]
 ```
 
 ## Tuple
 
 ```py
-a = not (1,)
-b = not (1, 2)
-c = not (1, 2, 3)
-d = not ()
-e = not ("hello",)
-f = not (1, "hello")
-
-reveal_type(a)  # revealed: Literal[False]
-reveal_type(b)  # revealed: Literal[False]
-reveal_type(c)  # revealed: Literal[False]
-reveal_type(d)  # revealed: Literal[True]
-reveal_type(e)  # revealed: Literal[False]
-reveal_type(f)  # revealed: Literal[False]
+reveal_type(not (1,))  # revealed: Literal[False]
+reveal_type(not (1, 2))  # revealed: Literal[False]
+reveal_type(not (1, 2, 3))  # revealed: Literal[False]
+reveal_type(not ())  # revealed: Literal[True]
+reveal_type(not ("hello",))  # revealed: Literal[False]
+reveal_type(not (1, "hello"))  # revealed: Literal[False]
 ```

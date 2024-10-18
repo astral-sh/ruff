@@ -14,8 +14,7 @@ class Identity:
     def __class_getitem__(cls, item: int) -> str:
         return item
 
-a = Identity[0]  
-reveal_type(a) # revealed: str
+reveal_type(Identity[0])  # revealed: str
 ```
 
 ## Class getitem union
@@ -31,8 +30,7 @@ class Identity:
         def __class_getitem__(cls, item: int) -> int:
             return item
 
-a = Identity[0]  
-reveal_type(a) # revealed: str | int
+reveal_type(Identity[0])  # revealed: str | int
 ```
 
 ## Class getitem with class union
@@ -53,9 +51,8 @@ if flag:
 else:
     a = Identity2
 
-b = a[0]
-reveal_type(a) # revealed: Literal[Identity1, Identity2]
-reveal_type(b) # revealed: str | int
+reveal_type(a)  # revealed: Literal[Identity1, Identity2]
+reveal_type(a[0])  # revealed: str | int
 ```
 
 ## Class getitem with unbound method union
@@ -71,7 +68,7 @@ else:
     class Identity: pass
 
 a = Identity[42] # error: [call-non-callable] "Method `__class_getitem__` of type `Literal[__class_getitem__] | Unbound` is not callable on object of type `Literal[Identity, Identity]`" 
-reveal_type(a) # revealed: str | Unknown 
+reveal_type(a)  # revealed: str | Unknown 
 ```
 
 ## TODO: Class getitem non-class union
@@ -88,5 +85,5 @@ else:
 
 a = Identity[42] # error: "Cannot subscript object of type `Literal[Identity] | Literal[1]` with no `__getitem__` method"
 # TODO: should _probably_ emit `str | Unknown` 
-reveal_type(a) # revealed: Unknown 
+reveal_type(a)  # revealed: Unknown 
 ```
