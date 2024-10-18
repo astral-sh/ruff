@@ -5,10 +5,9 @@ use ruff_db::files::{system_path_to_file, Files};
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 use ruff_source_file::OneIndexed;
-use std::collections::BTreeMap;
 use std::path::Path;
 
-type Failures = BTreeMap<AbsoluteLineNumberPath, matcher::FailuresByLine>;
+type Failures = Vec<(AbsoluteLineNumberPath, matcher::FailuresByLine)>;
 
 mod assertion;
 mod db;
@@ -41,24 +40,16 @@ pub fn run(path: &Path, title: &str) {
             any_failures = true;
             println!("\n{}\n", test.name().bold().underline());
 
-            for (
-                AbsoluteLineNumberPath {
-                    path,
-                    line_number: absolute_line_number,
-                },
-                by_line,
-            ) in failures
-            {
-                println!("{}", path.as_str().bold());
+            for (contextual_path, by_line) in failures {
+                println!("{}", contextual_path.path.as_str().bold());
                 for (line_number, failures) in by_line.iter() {
                     for failure in failures {
-                        let absolute_line_info = format!(
-                            "{}:{}",
-                            title,
-                            absolute_line_number.saturating_add(line_number.get())
-                        );
-                        let line_info = format!("line {line_number}:").cyan();
-                        println!("{absolute_line_info}    {line_info} {failure}");
+                        let absolute_line_number = contextual_path
+                            .starting_line_number
+                            .saturating_add(line_number.try_into().unwrap());
+                        let line_info = format!("{title}:{absolute_line_number}").cyan();
+
+                        println!("    {line_info} {failure}");
                     }
                 }
                 println!();
@@ -71,10 +62,11 @@ pub fn run(path: &Path, title: &str) {
     assert!(!any_failures, "Some tests failed.");
 }
 
-#[derive(PartialEq, PartialOrd, Eq, Ord)]
 struct AbsoluteLineNumberPath {
     path: SystemPathBuf,
-    line_number: OneIndexed,
+
+    // Line number of the ``` that starts the code block
+    starting_line_number: OneIndexed,
 }
 
 fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures> {
@@ -91,15 +83,14 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
         db.write_file(&full_path, file.code).unwrap();
         paths.push(AbsoluteLineNumberPath {
             path: full_path,
-            line_number: file.md_line_number,
+            starting_line_number: file.starting_line_number,
         });
     }
 
-    let mut failures = BTreeMap::default();
+    let mut failures = vec![];
 
-    for numbered_path in paths {
-        let path = numbered_path.path.clone();
-        let file = system_path_to_file(db, path.clone()).unwrap();
+    for contextual_path in paths {
+        let file = system_path_to_file(db, contextual_path.path.clone()).unwrap();
         let parsed = parsed_module(db, file);
 
         // TODO allow testing against code with syntax errors
@@ -107,17 +98,18 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
             parsed.errors().is_empty(),
             "Python syntax errors in {}, {:?}: {:?}",
             test.name(),
-            path,
+            contextual_path.path,
             parsed.errors()
         );
 
         matcher::match_file(db, file, check_types(db, file)).unwrap_or_else(|line_failures| {
-            failures.insert(numbered_path, line_failures);
+            failures.push((contextual_path, line_failures));
         });
     }
     if failures.is_empty() {
         Ok(())
     } else {
+        failures.sort_by(|(a, _), (b, _)| a.path.cmp(&b.path));
         Err(failures)
     }
 }
