@@ -1,0 +1,734 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B907.py:8:10: B907 If value is a string containing character '\'', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+ 7 | # warnings
+ 8 | f"begin '{var}' end"
+   |          ^^^^^ B907
+ 9 | f"'{var}' end"
+10 | f"begin '{var}'"
+   |
+
+B907.py:9:4: B907 If value is a string containing character '\'', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+ 7 | # warnings
+ 8 | f"begin '{var}' end"
+ 9 | f"'{var}' end"
+   |    ^^^^^ B907
+10 | f"begin '{var}'"
+   |
+
+B907.py:10:10: B907 If value is a string containing character '\'', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+ 8 | f"begin '{var}' end"
+ 9 | f"'{var}' end"
+10 | f"begin '{var}'"
+   |          ^^^^^ B907
+11 | 
+12 | f'begin "{var}" end'
+   |
+
+B907.py:12:10: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+10 | f"begin '{var}'"
+11 | 
+12 | f'begin "{var}" end'
+   |          ^^^^^ B907
+13 | f'"{var}" end'
+14 | f'begin "{var}"'
+   |
+
+B907.py:13:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+12 | f'begin "{var}" end'
+13 | f'"{var}" end'
+   |    ^^^^^ B907
+14 | f'begin "{var}"'
+   |
+
+B907.py:14:10: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+12 | f'begin "{var}" end'
+13 | f'"{var}" end'
+14 | f'begin "{var}"'
+   |          ^^^^^ B907
+15 | 
+16 | f'a "{"hello"}" b'
+   |
+
+B907.py:16:6: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+14 | f'begin "{var}"'
+15 | 
+16 | f'a "{"hello"}" b'
+   |      ^^^^^^^^^ B907
+17 | f'a "{foo()}" b'
+   |
+
+B907.py:17:6: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+16 | f'a "{"hello"}" b'
+17 | f'a "{foo()}" b'
+   |      ^^^^^^^ B907
+18 | 
+19 | # fmt: off
+   |
+
+B907.py:21:8: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+19 | # fmt: off
+20 | k = (f'"'
+21 |      f'{var}'
+   |        ^^^^^ B907
+22 |      f'"'
+23 |      f'"')
+   |
+
+B907.py:26:8: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+25 | k = (f'"'
+26 |      f'{var}'
+   |        ^^^^^ B907
+27 |      '"'
+28 |      f'"')
+   |
+
+B907.py:31:8: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+30 | k = ('"'
+31 |      f'{var}'
+   |        ^^^^^ B907
+32 |      '"')
+   |
+
+B907.py:37:8: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+35 |      f'{var}' # no warning
+36 |      '"'
+37 |      f'{var2}' # warning
+   |        ^^^^^^ B907
+38 |      '"')
+   |
+
+B907.py:41:8: B907 If value is a string containing character '\'', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+40 | k = ('\''
+41 |      f'{var}'
+   |        ^^^^^ B907
+42 |      "'")
+   |
+
+B907.py:45:8: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+44 | k = ('"'
+45 |      f'{var}'
+   |        ^^^^^ B907
+46 |      "\"")
+   |
+
+B907.py:49:8: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+48 | k = (r'\"'
+49 |      f'{var}'
+   |        ^^^^^ B907
+50 |      r'"')
+51 | # fmt: on
+   |
+
+B907.py:53:13: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+51 | # fmt: on
+52 | 
+53 | f'{"hello"}"{var}"'  # warn for var and not hello
+   |             ^^^^^ B907
+54 | f'"{var}"{"hello"}'  # warn for var and not hello
+55 | f'"{var}" and {"hello"} and "{var2}"'  # warn for var and var2
+   |
+
+B907.py:54:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+53 | f'{"hello"}"{var}"'  # warn for var and not hello
+54 | f'"{var}"{"hello"}'  # warn for var and not hello
+   |    ^^^^^ B907
+55 | f'"{var}" and {"hello"} and "{var2}"'  # warn for var and var2
+56 | f'"{var}" and "{var2}"'  # warn for both
+   |
+
+B907.py:55:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+53 | f'{"hello"}"{var}"'  # warn for var and not hello
+54 | f'"{var}"{"hello"}'  # warn for var and not hello
+55 | f'"{var}" and {"hello"} and "{var2}"'  # warn for var and var2
+   |    ^^^^^ B907
+56 | f'"{var}" and "{var2}"'  # warn for both
+57 | f'"{var}""{var2}"'  # warn for both
+   |
+
+B907.py:55:30: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+53 | f'{"hello"}"{var}"'  # warn for var and not hello
+54 | f'"{var}"{"hello"}'  # warn for var and not hello
+55 | f'"{var}" and {"hello"} and "{var2}"'  # warn for var and var2
+   |                              ^^^^^^ B907
+56 | f'"{var}" and "{var2}"'  # warn for both
+57 | f'"{var}""{var2}"'  # warn for both
+   |
+
+B907.py:56:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+54 | f'"{var}"{"hello"}'  # warn for var and not hello
+55 | f'"{var}" and {"hello"} and "{var2}"'  # warn for var and var2
+56 | f'"{var}" and "{var2}"'  # warn for both
+   |    ^^^^^ B907
+57 | f'"{var}""{var2}"'  # warn for both
+   |
+
+B907.py:56:16: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+54 | f'"{var}"{"hello"}'  # warn for var and not hello
+55 | f'"{var}" and {"hello"} and "{var2}"'  # warn for var and var2
+56 | f'"{var}" and "{var2}"'  # warn for both
+   |                ^^^^^^ B907
+57 | f'"{var}""{var2}"'  # warn for both
+   |
+
+B907.py:57:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+55 | f'"{var}" and {"hello"} and "{var2}"'  # warn for var and var2
+56 | f'"{var}" and "{var2}"'  # warn for both
+57 | f'"{var}""{var2}"'  # warn for both
+   |    ^^^^^ B907
+58 | 
+59 | # check that pre-quote & variable is reset if no post-quote is found
+   |
+
+B907.py:57:11: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+55 | f'"{var}" and {"hello"} and "{var2}"'  # warn for var and var2
+56 | f'"{var}" and "{var2}"'  # warn for both
+57 | f'"{var}""{var2}"'  # warn for both
+   |           ^^^^^^ B907
+58 | 
+59 | # check that pre-quote & variable is reset if no post-quote is found
+   |
+
+B907.py:60:14: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+59 | # check that pre-quote & variable is reset if no post-quote is found
+60 | f'"{var}abc "{var2}"'  # warn on var2
+   |              ^^^^^^ B907
+61 | 
+62 | # check for escaped quotes
+   |
+
+B907.py:63:5: B907 If value is a string containing character '\'', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+62 | # check for escaped quotes
+63 | f'\'{var}\''
+   |     ^^^^^ B907
+64 | f'\"{var}\"'
+65 | f"\'{var}\'"
+   |
+
+B907.py:64:5: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+62 | # check for escaped quotes
+63 | f'\'{var}\''
+64 | f'\"{var}\"'
+   |     ^^^^^ B907
+65 | f"\'{var}\'"
+66 | f"\"{var}\""
+   |
+
+B907.py:65:5: B907 If value is a string containing character '\'', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+63 | f'\'{var}\''
+64 | f'\"{var}\"'
+65 | f"\'{var}\'"
+   |     ^^^^^ B907
+66 | f"\"{var}\""
+   |
+
+B907.py:66:5: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+64 | f'\"{var}\"'
+65 | f"\'{var}\'"
+66 | f"\"{var}\""
+   |     ^^^^^ B907
+67 | 
+68 | # check formatting on different contained types
+   |
+
+B907.py:69:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+68 | # check formatting on different contained types
+69 | f'"{var}"'
+   |    ^^^^^ B907
+70 | f'"{var.__str__}"'
+71 | f'"{var.__str__.__repr__}"'
+   |
+
+B907.py:70:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+68 | # check formatting on different contained types
+69 | f'"{var}"'
+70 | f'"{var.__str__}"'
+   |    ^^^^^^^^^^^^^ B907
+71 | f'"{var.__str__.__repr__}"'
+72 | f'"{3+5}"'
+   |
+
+B907.py:71:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+69 | f'"{var}"'
+70 | f'"{var.__str__}"'
+71 | f'"{var.__str__.__repr__}"'
+   |    ^^^^^^^^^^^^^^^^^^^^^^ B907
+72 | f'"{3+5}"'
+73 | f'"{foo()}"'
+   |
+
+B907.py:72:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+70 | f'"{var.__str__}"'
+71 | f'"{var.__str__.__repr__}"'
+72 | f'"{3+5}"'
+   |    ^^^^^ B907
+73 | f'"{foo()}"'
+74 | f'"{None}"'
+   |
+
+B907.py:73:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+71 | f'"{var.__str__.__repr__}"'
+72 | f'"{3+5}"'
+73 | f'"{foo()}"'
+   |    ^^^^^^^ B907
+74 | f'"{None}"'
+75 | f'"{...}"'  # although f'"{...!r}"' == 'Ellipsis'
+   |
+
+B907.py:74:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+72 | f'"{3+5}"'
+73 | f'"{foo()}"'
+74 | f'"{None}"'
+   |    ^^^^^^ B907
+75 | f'"{...}"'  # although f'"{...!r}"' == 'Ellipsis'
+76 | f'"{True}"'
+   |
+
+B907.py:75:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+73 | f'"{foo()}"'
+74 | f'"{None}"'
+75 | f'"{...}"'  # although f'"{...!r}"' == 'Ellipsis'
+   |    ^^^^^ B907
+76 | f'"{True}"'
+   |
+
+B907.py:76:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+74 | f'"{None}"'
+75 | f'"{...}"'  # although f'"{...!r}"' == 'Ellipsis'
+76 | f'"{True}"'
+   |    ^^^^^^ B907
+77 | 
+78 | # various format strings
+   |
+
+B907.py:80:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+   |
+78 | # various format strings
+79 | # with "add type hint" suggestion
+80 | f'"{var:}"'
+   |    ^^^^^^ B907
+81 | f'"{var:<}"'
+82 | f'"{var:>}"'
+   |
+
+B907.py:81:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a type hint at the end of the format spec
+   |
+79 | # with "add type hint" suggestion
+80 | f'"{var:}"'
+81 | f'"{var:<}"'
+   |    ^^^^^^^ B907
+82 | f'"{var:>}"'
+83 | f'"{var:^}"'
+   |
+
+B907.py:82:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a type hint at the end of the format spec
+   |
+80 | f'"{var:}"'
+81 | f'"{var:<}"'
+82 | f'"{var:>}"'
+   |    ^^^^^^^ B907
+83 | f'"{var:^}"'
+84 | f'"{var:h<}"'
+   |
+
+B907.py:83:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a type hint at the end of the format spec
+   |
+81 | f'"{var:<}"'
+82 | f'"{var:>}"'
+83 | f'"{var:^}"'
+   |    ^^^^^^^ B907
+84 | f'"{var:h<}"'
+85 | f'"{var:h>}"'
+   |
+
+B907.py:84:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a type hint at the end of the format spec
+   |
+82 | f'"{var:>}"'
+83 | f'"{var:^}"'
+84 | f'"{var:h<}"'
+   |    ^^^^^^^^ B907
+85 | f'"{var:h>}"'
+86 | f'"{var:h^}"'
+   |
+
+B907.py:85:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a type hint at the end of the format spec
+   |
+83 | f'"{var:^}"'
+84 | f'"{var:h<}"'
+85 | f'"{var:h>}"'
+   |    ^^^^^^^^ B907
+86 | f'"{var:h^}"'
+87 | f'"{var:s<}"'
+   |
+
+B907.py:86:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a type hint at the end of the format spec
+   |
+84 | f'"{var:h<}"'
+85 | f'"{var:h>}"'
+86 | f'"{var:h^}"'
+   |    ^^^^^^^^ B907
+87 | f'"{var:s<}"'
+88 | f'"{var:s>}"'
+   |
+
+B907.py:87:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a type hint at the end of the format spec
+   |
+85 | f'"{var:h>}"'
+86 | f'"{var:h^}"'
+87 | f'"{var:s<}"'
+   |    ^^^^^^^^ B907
+88 | f'"{var:s>}"'
+89 | f'"{var:s^}"'
+   |
+
+B907.py:88:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a type hint at the end of the format spec
+   |
+86 | f'"{var:h^}"'
+87 | f'"{var:s<}"'
+88 | f'"{var:s>}"'
+   |    ^^^^^^^^ B907
+89 | f'"{var:s^}"'
+90 | f'"{var:9}"'
+   |
+
+B907.py:89:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a type hint at the end of the format spec
+   |
+87 | f'"{var:s<}"'
+88 | f'"{var:s>}"'
+89 | f'"{var:s^}"'
+   |    ^^^^^^^^ B907
+90 | f'"{var:9}"'
+91 | f'"{var:<9}"'
+   |
+
+B907.py:90:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a type hint at the end of the format spec
+   |
+88 | f'"{var:s>}"'
+89 | f'"{var:s^}"'
+90 | f'"{var:9}"'
+   |    ^^^^^^^ B907
+91 | f'"{var:<9}"'
+92 | f'"{var:>9}"'
+   |
+
+B907.py:91:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a type hint at the end of the format spec
+   |
+89 | f'"{var:s^}"'
+90 | f'"{var:9}"'
+91 | f'"{var:<9}"'
+   |    ^^^^^^^^ B907
+92 | f'"{var:>9}"'
+93 | f'"{var:^9}"'
+   |
+
+B907.py:92:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a type hint at the end of the format spec
+   |
+90 | f'"{var:9}"'
+91 | f'"{var:<9}"'
+92 | f'"{var:>9}"'
+   |    ^^^^^^^^ B907
+93 | f'"{var:^9}"'
+94 | f'"{var:h<9}"'
+   |
+
+B907.py:93:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a type hint at the end of the format spec
+   |
+91 | f'"{var:<9}"'
+92 | f'"{var:>9}"'
+93 | f'"{var:^9}"'
+   |    ^^^^^^^^ B907
+94 | f'"{var:h<9}"'
+95 | f'"{var:19}"'
+   |
+
+B907.py:94:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a type hint at the end of the format spec
+   |
+92 | f'"{var:>9}"'
+93 | f'"{var:^9}"'
+94 | f'"{var:h<9}"'
+   |    ^^^^^^^^^ B907
+95 | f'"{var:19}"'
+96 | f'"{var:<19}"'
+   |
+
+B907.py:95:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a type hint at the end of the format spec
+   |
+93 | f'"{var:^9}"'
+94 | f'"{var:h<9}"'
+95 | f'"{var:19}"'
+   |    ^^^^^^^^ B907
+96 | f'"{var:<19}"'
+97 | f'"{var:>19}"'
+   |
+
+B907.py:96:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a type hint at the end of the format spec
+   |
+94 | f'"{var:h<9}"'
+95 | f'"{var:19}"'
+96 | f'"{var:<19}"'
+   |    ^^^^^^^^^ B907
+97 | f'"{var:>19}"'
+98 | f'"{var:^19}"'
+   |
+
+B907.py:97:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a type hint at the end of the format spec
+   |
+95 | f'"{var:19}"'
+96 | f'"{var:<19}"'
+97 | f'"{var:>19}"'
+   |    ^^^^^^^^^ B907
+98 | f'"{var:^19}"'
+99 | f'"{var:h<19}"'
+   |
+
+B907.py:98:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a type hint at the end of the format spec
+    |
+ 96 | f'"{var:<19}"'
+ 97 | f'"{var:>19}"'
+ 98 | f'"{var:^19}"'
+    |    ^^^^^^^^^ B907
+ 99 | f'"{var:h<19}"'
+100 | f'"{var:.}"'
+    |
+
+B907.py:99:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a type hint at the end of the format spec
+    |
+ 97 | f'"{var:>19}"'
+ 98 | f'"{var:^19}"'
+ 99 | f'"{var:h<19}"'
+    |    ^^^^^^^^^^ B907
+100 | f'"{var:.}"'
+101 | f'"{var:<.}"'
+    |
+
+B907.py:100:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a type hint at the end of the format spec
+    |
+ 98 | f'"{var:^19}"'
+ 99 | f'"{var:h<19}"'
+100 | f'"{var:.}"'
+    |    ^^^^^^^ B907
+101 | f'"{var:<.}"'
+102 | f'"{var:>.}"'
+    |
+
+B907.py:101:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a type hint at the end of the format spec
+    |
+ 99 | f'"{var:h<19}"'
+100 | f'"{var:.}"'
+101 | f'"{var:<.}"'
+    |    ^^^^^^^^ B907
+102 | f'"{var:>.}"'
+103 | f'"{var:^.}"'
+    |
+
+B907.py:102:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a type hint at the end of the format spec
+    |
+100 | f'"{var:.}"'
+101 | f'"{var:<.}"'
+102 | f'"{var:>.}"'
+    |    ^^^^^^^^ B907
+103 | f'"{var:^.}"'
+104 | f'"{var:h<.}"'
+    |
+
+B907.py:103:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a type hint at the end of the format spec
+    |
+101 | f'"{var:<.}"'
+102 | f'"{var:>.}"'
+103 | f'"{var:^.}"'
+    |    ^^^^^^^^ B907
+104 | f'"{var:h<.}"'
+105 | f'"{var:9.}"'
+    |
+
+B907.py:104:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a type hint at the end of the format spec
+    |
+102 | f'"{var:>.}"'
+103 | f'"{var:^.}"'
+104 | f'"{var:h<.}"'
+    |    ^^^^^^^^^ B907
+105 | f'"{var:9.}"'
+106 | f'"{var:19.}"'
+    |
+
+B907.py:105:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a type hint at the end of the format spec
+    |
+103 | f'"{var:^.}"'
+104 | f'"{var:h<.}"'
+105 | f'"{var:9.}"'
+    |    ^^^^^^^^ B907
+106 | f'"{var:19.}"'
+107 | f'"{var:.9}"'
+    |
+
+B907.py:106:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a type hint at the end of the format spec
+    |
+104 | f'"{var:h<.}"'
+105 | f'"{var:9.}"'
+106 | f'"{var:19.}"'
+    |    ^^^^^^^^^ B907
+107 | f'"{var:.9}"'
+108 | f'"{var:.19}"'
+    |
+
+B907.py:107:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a type hint at the end of the format spec
+    |
+105 | f'"{var:9.}"'
+106 | f'"{var:19.}"'
+107 | f'"{var:.9}"'
+    |    ^^^^^^^^ B907
+108 | f'"{var:.19}"'
+109 | # with "add !s" suggestion
+    |
+
+B907.py:108:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a type hint at the end of the format spec
+    |
+106 | f'"{var:19.}"'
+107 | f'"{var:.9}"'
+108 | f'"{var:.19}"'
+    |    ^^^^^^^^^ B907
+109 | # with "add !s" suggestion
+110 | f'"{var:s}"'
+    |
+
+B907.py:110:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add the `!s` conversion flag
+    |
+108 | f'"{var:.19}"'
+109 | # with "add !s" suggestion
+110 | f'"{var:s}"'
+    |    ^^^^^^^ B907
+111 | f'"{var:<s}"'
+112 | f'"{var:>s}"'
+    |
+
+B907.py:111:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add the `!s` conversion flag
+    |
+109 | # with "add !s" suggestion
+110 | f'"{var:s}"'
+111 | f'"{var:<s}"'
+    |    ^^^^^^^^ B907
+112 | f'"{var:>s}"'
+113 | f'"{var:^s}"'
+    |
+
+B907.py:112:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add the `!s` conversion flag
+    |
+110 | f'"{var:s}"'
+111 | f'"{var:<s}"'
+112 | f'"{var:>s}"'
+    |    ^^^^^^^^ B907
+113 | f'"{var:^s}"'
+114 | f'"{var:h<s}"'
+    |
+
+B907.py:113:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add the `!s` conversion flag
+    |
+111 | f'"{var:<s}"'
+112 | f'"{var:>s}"'
+113 | f'"{var:^s}"'
+    |    ^^^^^^^^ B907
+114 | f'"{var:h<s}"'
+115 | f'"{var:9s}"'
+    |
+
+B907.py:114:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add the `!s` conversion flag
+    |
+112 | f'"{var:>s}"'
+113 | f'"{var:^s}"'
+114 | f'"{var:h<s}"'
+    |    ^^^^^^^^^ B907
+115 | f'"{var:9s}"'
+116 | f'"{var:19s}"'
+    |
+
+B907.py:115:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add the `!s` conversion flag
+    |
+113 | f'"{var:^s}"'
+114 | f'"{var:h<s}"'
+115 | f'"{var:9s}"'
+    |    ^^^^^^^^ B907
+116 | f'"{var:19s}"'
+117 | f'"{var:.19s}"'
+    |
+
+B907.py:116:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add the `!s` conversion flag
+    |
+114 | f'"{var:h<s}"'
+115 | f'"{var:9s}"'
+116 | f'"{var:19s}"'
+    |    ^^^^^^^^^ B907
+117 | f'"{var:.19s}"'
+    |
+
+B907.py:117:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add the `!s` conversion flag
+    |
+115 | f'"{var:9s}"'
+116 | f'"{var:19s}"'
+117 | f'"{var:.19s}"'
+    |    ^^^^^^^^^^ B907
+118 | 
+119 | # These all currently give warnings, but could be considered false alarms
+    |
+
+B907.py:121:6: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+    |
+119 | # These all currently give warnings, but could be considered false alarms
+120 | # multiple quote marks
+121 | f'"""{var}"""'
+    |      ^^^^^ B907
+122 | # two variables fighting over the same quote mark
+123 | f'"{var}"{var2}"'  # currently gives warning on the first one
+    |
+
+B907.py:123:4: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+    |
+121 | f'"""{var}"""'
+122 | # two variables fighting over the same quote mark
+123 | f'"{var}"{var2}"'  # currently gives warning on the first one
+    |    ^^^^^ B907
+    |
+
+B907.py:123:10: B907 If value is a string containing character '\"', output may be confusing. Consider if this is an issue for this use-case. If this is intended behavior, add a format spec with a type hint
+    |
+121 | f'"""{var}"""'
+122 | # two variables fighting over the same quote mark
+123 | f'"{var}"{var2}"'  # currently gives warning on the first one
+    |          ^^^^^^ B907
+    |
