@@ -90,7 +90,9 @@ reveal_type(bool((0,)))  # revealed: Literal[True]
 reveal_type(bool("NON EMPTY"))  # revealed: Literal[True]
 reveal_type(bool(True))  # revealed: Literal[True]
 
+
 def foo(): ...
+
 
 reveal_type(bool(foo))  # revealed: Literal[True]
 ```

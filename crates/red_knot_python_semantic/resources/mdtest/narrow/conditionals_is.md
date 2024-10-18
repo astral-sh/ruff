@@ -16,6 +16,7 @@ reveal_type(x)  # revealed: None | Literal[1]
 ```py
 class A: ...
 
+
 x = A()
 y = x if flag else None
 
