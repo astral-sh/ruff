@@ -9,6 +9,7 @@
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 ) # too long to join
 
+
 "diffent '" 'quote "are fine"' # join
 
 
@@ -22,6 +23,22 @@ b"aaaaaaaaa" b"bbbbbbbbbbbbbbbbbbbb" # Join
 (
     b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" b"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 ) # too long to join
+
+
+# Skip joining if there is a trailing comment
+(
+    "fffffffffffff"
+    "bbbbbbbbbbbbb" # comment
+    "cccccccccccccc"
+)
+
+# Skip joining if there is a leading comment
+(
+    "fffffffffffff"
+    # comment
+    "bbbbbbbbbbbbb"
+    "cccccccccccccc"
+)
 
 ##############################################################################
 # F-strings
