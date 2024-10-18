@@ -13,7 +13,7 @@ reveal_type(y)  # revealed: Literal[1]
 ## Violates own annotation
 
 ```py
-x: int = 'foo' # error: [invalid-assignment] "Object of type `Literal["foo"]` is not assignable to `int`"
+x: int = 'foo'  # error: [invalid-assignment] "Object of type `Literal["foo"]` is not assignable to `int`"
 
 ```
 

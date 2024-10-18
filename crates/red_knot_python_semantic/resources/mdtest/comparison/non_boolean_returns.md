@@ -1,4 +1,4 @@
-# Non boolean returns
+# Comparison: Non boolean returns
 
 Walking through examples:
 
@@ -27,11 +27,12 @@ class B:
 class C:
     def __lt__(self, other) -> C: ...
 
-a = A() < B() < C()
-b = 0 < 1 < A() < 3
-c = 10 < 0 < A() < B() < C()
+x = A() < B() < C()
+reveal_type(x)  # revealed: A | B
 
-reveal_type(a)  # revealed: A | B
-reveal_type(b)  # revealed: bool | A
-reveal_type(c)  # revealed: Literal[False]
+y = 0 < 1 < A() < 3
+reveal_type(y)  # revealed: bool | A
+
+z = 10 < 0 < A() < B() < C()
+reveal_type(z)  # revealed: Literal[False]
 ```

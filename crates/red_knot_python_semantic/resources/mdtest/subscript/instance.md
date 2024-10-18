@@ -23,8 +23,7 @@ class Identity:
     def __getitem__(self, index: int) -> int:
         return index
 
-a = Identity()[0]  
-reveal_type(a) # revealed: int
+reveal_type(Identity()[0])  # revealed: int
 ```
 
 ## Getitem union
@@ -40,6 +39,5 @@ class Identity:
         def __getitem__(self, index: int) -> str:
             return str(index)
 
-a = Identity()[0]  
-reveal_type(a) # revealed: int | str
+reveal_type(Identity()[0])  # revealed: int | str
 ```

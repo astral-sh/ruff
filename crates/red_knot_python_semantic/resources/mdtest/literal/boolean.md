@@ -1,8 +1,6 @@
 # Boolean literals
 
 ```py
-x = True
-y = False
-reveal_type(x)  # revealed: Literal[True]
-reveal_type(y)  # revealed: Literal[False]
+reveal_type(True)  # revealed: Literal[True]
+reveal_type(False)  # revealed: Literal[False]
 ```

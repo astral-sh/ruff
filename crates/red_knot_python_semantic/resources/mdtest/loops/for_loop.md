@@ -106,7 +106,7 @@ class NotIterable:
     else:
         __iter__ = None
 
-for x in NotIterable(): # error: "Object of type `NotIterable` is not iterable"
+for x in NotIterable():  # error: "Object of type `NotIterable` is not iterable"
     pass
 
 reveal_type(x)  # revealed: Unbound | Unknown
@@ -116,7 +116,7 @@ reveal_type(x)  # revealed: Unbound | Unknown
 
 ```py
 nonsense = 123
-for x in nonsense: # error: "Object of type `Literal[123]` is not iterable"
+for x in nonsense:  # error: "Object of type `Literal[123]` is not iterable"
     pass
 ```
 
@@ -129,6 +129,6 @@ class NotIterable:
 
     __iter__ = None
 
-for x in NotIterable(): # error: "Object of type `NotIterable` is not iterable"
+for x in NotIterable():  # error: "Object of type `NotIterable` is not iterable"
     pass
 ```

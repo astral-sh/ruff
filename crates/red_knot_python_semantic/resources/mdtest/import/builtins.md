@@ -2,5 +2,5 @@
 
 ```py
 import builtins; x = builtins.copyright
-reveal_type(x) # revealed: Literal[copyright]
+reveal_type(x)  # revealed: Literal[copyright]
 ```

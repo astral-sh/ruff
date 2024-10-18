@@ -58,8 +58,8 @@ large = 2 if flag_l else 3
 reveal_type(small <= large)  # revealed: Literal[True]
 reveal_type(small >= large)  # revealed: bool
 
-reveal_type(small < large)   # revealed: bool
-reveal_type(small > large)   # revealed: Literal[False]
+reveal_type(small < large)  # revealed: bool
+reveal_type(small > large)  # revealed: Literal[False]
 ```
 
 ## Unsupported operations

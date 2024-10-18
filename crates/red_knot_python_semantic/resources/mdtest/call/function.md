@@ -6,8 +6,7 @@
 def get_int() -> int:
     return 42
 
-x = get_int()
-reveal_type(x)  # revealed: int
+reveal_type(get_int())  # revealed: int
 ```
 
 ## Async
@@ -16,10 +15,8 @@ reveal_type(x)  # revealed: int
 async def get_int_async() -> int:
     return 42
 
-x = get_int_async()
-
 # TODO: we don't yet support `types.CoroutineType`, should be generic `Coroutine[Any, Any, int]`
-reveal_type(x)  # revealed: @Todo
+reveal_type(get_int_async())  # revealed: @Todo
 ```
 
 ## Decorated
@@ -37,10 +34,8 @@ def decorator(func) -> Callable[[], int]:
 def bar() -> str:
     return 'bar'
 
-x = bar()
-
 # TODO: should reveal `int`, as the decorator replaces `bar` with `foo`
-reveal_type(x)  # revealed: @Todo
+reveal_type(bar())  # revealed: @Todo
 ```
 
 ## Invalid callable

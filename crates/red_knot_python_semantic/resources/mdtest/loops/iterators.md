@@ -14,5 +14,5 @@ class Iterable:
 
 def generator_function():
     yield from Iterable()
-    yield from NotIterable() # error: "Object of type `NotIterable` is not iterable"
+    yield from NotIterable()  # error: "Object of type `NotIterable` is not iterable"
 ```

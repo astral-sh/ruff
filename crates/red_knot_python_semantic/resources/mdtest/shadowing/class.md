@@ -4,7 +4,7 @@
 
 ```py
 class C: pass
-C = 1 # error: "Implicit shadowing of class `C`; annotate to make it explicit if this is intentional"
+C = 1  # error: "Implicit shadowing of class `C`; annotate to make it explicit if this is intentional"
 ```
 
 ## Explicit

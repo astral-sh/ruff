@@ -1,47 +1,50 @@
-## Binary operations on integers
+# Binary operations on integers
 
 ## Basic Arithmetic
 
 ```py
-a = 2 + 1
-b = a - 4
-c = a * b
-d = c // 3
-e = c / 3
-f = 5 % 3
-
-reveal_type(a)  # revealed: Literal[3]
-reveal_type(b)  # revealed: Literal[-1]
-reveal_type(c)  # revealed: Literal[-3]
-reveal_type(d)  # revealed: Literal[-1]
-reveal_type(e)  # revealed: float
-reveal_type(f)  # revealed: Literal[2]
+reveal_type(2 + 1)  # revealed: Literal[3]
+reveal_type(3 - 4)  # revealed: Literal[-1]
+reveal_type(3 * -1)  # revealed: Literal[-3]
+reveal_type(-3 // 3)  # revealed: Literal[-1]
+reveal_type(-3 / 3)  # revealed: float
+reveal_type(5 % 3)  # revealed: Literal[2]
 ```
 
 ## Division by Zero
 
+This error is really outside the current Python type system, because e.g. `int.__truediv__` and
+friends are not annotated to indicate that it's an error, and we don't even have a facility to
+permit such an annotation. So arguably divide-by-zero should be a lint error rather than a type
+checker error. But we choose to go ahead and error in the cases that are very likely to be an error:
+dividing something typed as `int` or `float` by something known to be `Literal[0]`.
+
+This isn't _definitely_ an error, because the object typed as `int` or `float` could be an instance
+of a custom subclass which overrides division behavior to handle zero without error. But if this
+unusual case occurs, the error can be avoided by explicitly typing the dividend as that safe custom
+subclass; we only emit the error if the LHS type is exactly `int` or `float`, not if its a subclass.
+
 ```py
-class MyInt(int):
-    def __truediv__(self, other):
-        return 100
-
-def returns_int() -> int:
-    return MyInt(3)
-
-# TODO: `a` should be `int` and `e` should be `float` once we support inference.
 a = 1 / 0  # error: "Cannot divide object of type `Literal[1]` by zero"
-b = 2 // 0  # error: "Cannot floor divide object of type `Literal[2]` by zero"
-c = 3 % 0  # error: "Cannot reduce object of type `Literal[3]` modulo zero"
-# even `int` type could be a subclass of `int` with custom behavior; no error
-d = returns_int() / 0
-# this could be flagged as an error, if we had an ExactFloat or ExactInstance
-# type, but given only a `float` type we can't issue an error for the same
-# reason: could be a custom float subclass
-e = 1.0 / 0
-
 reveal_type(a)  # revealed: float
+
+b = 2 // 0  # error: "Cannot floor divide object of type `Literal[2]` by zero"
 reveal_type(b)  # revealed: int
+
+c = 3 % 0  # error: "Cannot reduce object of type `Literal[3]` modulo zero"
 reveal_type(c)  # revealed: int
-reveal_type(d)  # revealed: float
-reveal_type(e)  # revealed: float
+
+# error: "Cannot divide object of type `int` by zero"
+# revealed: float
+reveal_type(int() / 0)
+
+# error: "Cannot divide object of type `float` by zero"
+# revealed: float
+reveal_type(1.0 / 0)
+
+class MyInt(int): pass
+
+# No error for a subclass of int
+# revealed: float
+reveal_type(MyInt(3) / 0)
 ```

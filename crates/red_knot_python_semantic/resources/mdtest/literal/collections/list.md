@@ -3,6 +3,5 @@
 ## Empty list
 
 ```py
-x = []
-reveal_type(x)  # revealed: list
+reveal_type([])  # revealed: list
 ```
