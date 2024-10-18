@@ -63,10 +63,9 @@ else:
         return 1
 
 
-x = (
-    f()
-)  # error: "Object of type `Literal[1] | Literal["foo"] | Literal[f]` is not callable (due to union elements Literal[1], Literal["foo"])"
-reveal_type(x)  # revealed: Unknown | int
+# error: "Object of type `Literal[1] | Literal["foo"] | Literal[f]` is not callable (due to union elements Literal[1], Literal["foo"])"
+# revealed: Unknown | int
+reveal_type(f())
 ```
 
 ## All non-callable union elements

@@ -12,7 +12,6 @@ class MyBox[T]:
     def __init__(self, data: T):
         self.data = data
 
-
 # TODO not error (should be subscriptable)
 box: MyBox[int] = MyBox(5)  # error: [non-subscriptable]
 # TODO error differently (str and int don't unify)
@@ -32,11 +31,8 @@ class MyBox[T]:
     def __init__(self, data: T):
         self.data = data
 
-
 # TODO not error on the subscripting
-class MySecureBox[T](MyBox[T]):  # error: [non-subscriptable]
-    pass
-
+class MySecureBox[T](MyBox[T]): ...  # error: [non-subscriptable]
 
 secure_box: MySecureBox[int] = MySecureBox(5)
 reveal_type(secure_box)  # revealed: MySecureBox
@@ -51,14 +47,10 @@ In type stubs, classes can reference themselves in their base class definitions.
 This should hold true even with generics at play.
 
 ```py path=a.pyi
-class Seq[T]:
-    pass
-
+class Seq[T]: ...
 
 # TODO not error on the subscripting
-class S[T](Seq[S]):  # error: [non-subscriptable]
-    pass
-
+class S[T](Seq[S]): ...  # error: [non-subscriptable]
 
 reveal_type(S)  # revealed: Literal[S]
 ```
