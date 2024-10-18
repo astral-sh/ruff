@@ -67,7 +67,7 @@ if flag:
 else:
     class Identity: pass
 
-a = Identity[42] # error: [call-non-callable] "Method `__class_getitem__` of type `Literal[__class_getitem__] | Unbound` is not callable on object of type `Literal[Identity, Identity]`" 
+a = Identity[42]  # error: [call-non-callable] "Method `__class_getitem__` of type `Literal[__class_getitem__] | Unbound` is not callable on object of type `Literal[Identity, Identity]`" 
 reveal_type(a)  # revealed: str | Unknown 
 ```
 
@@ -83,7 +83,7 @@ if flag:
 else:
     Identity = 1
 
-a = Identity[42] # error: "Cannot subscript object of type `Literal[Identity] | Literal[1]` with no `__getitem__` method"
+a = Identity[42]  # error: "Cannot subscript object of type `Literal[Identity] | Literal[1]` with no `__getitem__` method"
 # TODO: should _probably_ emit `str | Unknown` 
 reveal_type(a)  # revealed: Unknown 
 ```

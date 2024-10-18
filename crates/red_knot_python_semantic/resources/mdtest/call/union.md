@@ -16,7 +16,7 @@ reveal_type(f())  # revealed: int | str
 ## Calling with an unknown union
 
 ```py
-from nonexistent import f # error: [unresolved-import] "Cannot resolve import `nonexistent`"
+from nonexistent import f  # error: [unresolved-import] "Cannot resolve import `nonexistent`"
 
 if flag:
     def f() -> int:

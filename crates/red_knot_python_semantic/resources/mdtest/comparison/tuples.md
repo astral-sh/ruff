@@ -18,16 +18,16 @@ b = (1, "test", (3, 14), False)
 
 reveal_type(a == a)  # revealed: Literal[True]
 reveal_type(a != a)  # revealed: Literal[False]
-reveal_type(a < a)   # revealed: Literal[False]
+reveal_type(a < a)  # revealed: Literal[False]
 reveal_type(a <= a)  # revealed: Literal[True]
-reveal_type(a > a)   # revealed: Literal[False]
+reveal_type(a > a)  # revealed: Literal[False]
 reveal_type(a >= a)  # revealed: Literal[True]
 
 reveal_type(a == b)  # revealed: Literal[False]
 reveal_type(a != b)  # revealed: Literal[True]
-reveal_type(a < b)   # revealed: Literal[True]
+reveal_type(a < b)  # revealed: Literal[True]
 reveal_type(a <= b)  # revealed: Literal[True]
-reveal_type(a > b)   # revealed: Literal[False]
+reveal_type(a > b)  # revealed: Literal[False]
 reveal_type(a >= b)  # revealed: Literal[False]
 ```
 
@@ -39,9 +39,9 @@ b = (1, 2, 3, 4)
 
 reveal_type(a == b)  # revealed: Literal[False]
 reveal_type(a != b)  # revealed: Literal[True]
-reveal_type(a < b)   # revealed: Literal[True]
+reveal_type(a < b)  # revealed: Literal[True]
 reveal_type(a <= b)  # revealed: Literal[True]
-reveal_type(a > b)   # revealed: Literal[False]
+reveal_type(a > b)  # revealed: Literal[False]
 reveal_type(a >= b)  # revealed: Literal[False]
 
 c = ("a", "b", "c", "d")
@@ -49,9 +49,9 @@ d = ("a", "b", "c")
 
 reveal_type(c == d)  # revealed: Literal[False]
 reveal_type(c != d)  # revealed: Literal[True]
-reveal_type(c < d)   # revealed: Literal[False]
+reveal_type(c < d)  # revealed: Literal[False]
 reveal_type(c <= d)  # revealed: Literal[False]
-reveal_type(c > d)   # revealed: Literal[True]
+reveal_type(c > d)  # revealed: Literal[True]
 reveal_type(c >= d)  # revealed: Literal[True]
 ```
 
@@ -67,16 +67,16 @@ b = (int_instance(),)
 # TODO: All @Todo should be `bool`
 reveal_type(a == a)  # revealed: @Todo
 reveal_type(a != a)  # revealed: @Todo
-reveal_type(a < a)   # revealed: @Todo
+reveal_type(a < a)  # revealed: @Todo
 reveal_type(a <= a)  # revealed: @Todo
-reveal_type(a > a)   # revealed: @Todo
+reveal_type(a > a)  # revealed: @Todo
 reveal_type(a >= a)  # revealed: @Todo
 
 reveal_type(a == b)  # revealed: @Todo
 reveal_type(a != b)  # revealed: @Todo
-reveal_type(a < b)   # revealed: @Todo
+reveal_type(a < b)  # revealed: @Todo
 reveal_type(a <= b)  # revealed: @Todo
-reveal_type(a > b)   # revealed: @Todo
+reveal_type(a > b)  # revealed: @Todo
 reveal_type(a >= b)  # revealed: @Todo
 ```
 
@@ -96,9 +96,9 @@ reveal_type(a == b)  # revealed: @Todo
 reveal_type(a != b)  # revealed: @Todo
 
 # TODO: should be Unknown and add more informative diagnostics
-reveal_type(a < b)   # revealed: @Todo
+reveal_type(a < b)  # revealed: @Todo
 reveal_type(a <= b)  # revealed: @Todo
-reveal_type(a > b)   # revealed: @Todo
+reveal_type(a > b)  # revealed: @Todo
 reveal_type(a >= b)  # revealed: @Todo
 ```
 
@@ -111,9 +111,9 @@ b = (999999, "hello")
 
 reveal_type(a == b)  # revealed: Literal[False]
 reveal_type(a != b)  # revealed: Literal[True]
-reveal_type(a < b)   # revealed: Literal[True]
+reveal_type(a < b)  # revealed: Literal[True]
 reveal_type(a <= b)  # revealed: Literal[True]
-reveal_type(a > b)   # revealed: Literal[False]
+reveal_type(a > b)  # revealed: Literal[False]
 reveal_type(a >= b)  # revealed: Literal[False]
 ```
 
@@ -126,9 +126,9 @@ c = (b, b, b)
 
 reveal_type(c == c)  # revealed: Literal[True]
 reveal_type(c != c)  # revealed: Literal[False]
-reveal_type(c < c)   # revealed: Literal[False]
+reveal_type(c < c)  # revealed: Literal[False]
 reveal_type(c <= c)  # revealed: Literal[True]
-reveal_type(c > c)   # revealed: Literal[False]
+reveal_type(c > c)  # revealed: Literal[False]
 reveal_type(c >= c)  # revealed: Literal[True]
 ```
 
@@ -148,9 +148,9 @@ a = (A(), A())
 # TODO: All @Todo should be bool
 reveal_type(a == a)  # revealed: @Todo
 reveal_type(a != a)  # revealed: @Todo
-reveal_type(a < a)   # revealed: @Todo
+reveal_type(a < a)  # revealed: @Todo
 reveal_type(a <= a)  # revealed: @Todo
-reveal_type(a > a)   # revealed: @Todo
+reveal_type(a > a)  # revealed: @Todo
 reveal_type(a >= a)  # revealed: @Todo
 ```
 
