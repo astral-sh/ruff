@@ -1847,6 +1847,7 @@ mod tests {
     #[test_case(Ty::LiteralString, Ty::BytesLiteral("a"))]
     #[test_case(Ty::BytesLiteral("a"), Ty::BytesLiteral("b"))]
     #[test_case(Ty::BytesLiteral("a"), Ty::Tuple(vec![Ty::None]))]
+    #[test_case(Ty::BytesLiteral("a"), Ty::StringLiteral("a"))]
     #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::IntLiteral(3))]
     #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(3), Ty::IntLiteral(4)]))]
     #[test_case(Ty::Intersection{pos: vec![Ty::BuiltinInstance("int"),  Ty::IntLiteral(1)], neg: vec![]}, Ty::IntLiteral(2))]
