@@ -1,7 +1,8 @@
 //! Scheduling, I/O, and API endpoints.
 
 use std::num::NonZeroUsize;
-use std::panic::PanicHookInfo;
+#[allow(deprecated)]
+use std::panic::PanicInfo;
 
 use lsp_server::Message;
 use lsp_types::{
@@ -119,7 +120,8 @@ impl Server {
     }
 
     pub(crate) fn run(self) -> crate::Result<()> {
-        type PanicHook = Box<dyn Fn(&PanicHookInfo<'_>) + 'static + Sync + Send>;
+        #[allow(deprecated)]
+        type PanicHook = Box<dyn Fn(&PanicInfo<'_>) + 'static + Sync + Send>;
         struct RestorePanicHook {
             hook: Option<PanicHook>,
         }

@@ -6,7 +6,8 @@ use lsp_types::InitializeParams;
 use lsp_types::WorkspaceFolder;
 use std::num::NonZeroUsize;
 use std::ops::Deref;
-use std::panic::PanicHookInfo;
+#[allow(deprecated)]
+use std::panic::PanicInfo;
 use std::str::FromStr;
 use thiserror::Error;
 use types::ClientCapabilities;
@@ -125,7 +126,8 @@ impl Server {
     }
 
     pub fn run(self) -> crate::Result<()> {
-        type PanicHook = Box<dyn Fn(&PanicHookInfo<'_>) + 'static + Sync + Send>;
+        #[allow(deprecated)]
+        type PanicHook = Box<dyn Fn(&PanicInfo<'_>) + 'static + Sync + Send>;
         struct RestorePanicHook {
             hook: Option<PanicHook>,
         }
