@@ -775,19 +775,39 @@ mod tests {
     fn build_intersection_simplify_split_bool(bool_value: bool) {
         let db = setup_db();
 
-        let t_p = KnownClass::Bool.to_instance(&db);
+        let t_bool = KnownClass::Bool.to_instance(&db);
+        let t_bool_literal = Type::BooleanLiteral(bool_value);
 
-        let t_n = Type::BooleanLiteral(bool_value);
+        // We add t_object in various orders (in first or second position) in
+        // the tests below to ensure that the boolean simplification eliminates
+        // everything from the intersection, not just `bool`.
+        let t_object = KnownClass::Object.to_instance(&db);
 
         let ty = IntersectionBuilder::new(&db)
-            .add_positive(t_p)
-            .add_negative(t_n)
+            .add_positive(t_object)
+            .add_positive(t_bool)
+            .add_negative(t_bool_literal)
             .build();
         assert_eq!(ty, Type::BooleanLiteral(!bool_value));
 
         let ty = IntersectionBuilder::new(&db)
-            .add_negative(t_n)
-            .add_positive(t_p)
+            .add_positive(t_bool)
+            .add_positive(t_object)
+            .add_negative(t_bool_literal)
+            .build();
+        assert_eq!(ty, Type::BooleanLiteral(!bool_value));
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(t_object)
+            .add_negative(t_bool_literal)
+            .add_positive(t_bool)
+            .build();
+        assert_eq!(ty, Type::BooleanLiteral(!bool_value));
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_negative(t_bool_literal)
+            .add_positive(t_object)
+            .add_positive(t_bool)
             .build();
         assert_eq!(ty, Type::BooleanLiteral(!bool_value));
     }
