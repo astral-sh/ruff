@@ -265,7 +265,7 @@ class A:
     def __init__(self):
         self.__add__ = add_impl
 
-# error: [operator]
+# error: [unsupported-operator] "Operator `+` is unsupported between objects of type `A` and `A`"
 # revealed: Unknown
 reveal_type(A() + A())
 ```
@@ -275,7 +275,7 @@ reveal_type(A() + A())
 ```py
 class A: pass
 
-# error: [operator]
+# error: [unsupported-operator]
 # revealed: Unknown
 reveal_type(A() + A())
 ```
@@ -293,11 +293,11 @@ class B:
 
 class C: pass
 
-# error: [operator]
+# error: [unsupported-operator]
 # revealed: Unknown
 reveal_type(C() + A())
 
-# error: [operator]
+# error: [unsupported-operator]
 # revealed: Unknown
 reveal_type(B() + C())
 ```
