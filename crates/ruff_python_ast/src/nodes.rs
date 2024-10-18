@@ -2971,6 +2971,42 @@ impl Operator {
             Operator::FloorDiv => "//",
         }
     }
+
+    pub const fn dunder(self) -> &'static str {
+        match self {
+            Operator::Add => "__add__",
+            Operator::Sub => "__sub__",
+            Operator::Mult => "__mul__",
+            Operator::MatMult => "__matmul__",
+            Operator::Div => "__truediv__",
+            Operator::Mod => "__mod__",
+            Operator::Pow => "__pow__",
+            Operator::LShift => "__lshift__",
+            Operator::RShift => "__rshift__",
+            Operator::BitOr => "__or__",
+            Operator::BitXor => "__xor__",
+            Operator::BitAnd => "__and__",
+            Operator::FloorDiv => "__floordiv__",
+        }
+    }
+
+    pub const fn reflected_dunder(self) -> &'static str {
+        match self {
+            Operator::Add => "__radd__",
+            Operator::Sub => "__rsub__",
+            Operator::Mult => "__rmul__",
+            Operator::MatMult => "__rmatmul__",
+            Operator::Div => "__rtruediv__",
+            Operator::Mod => "__rmod__",
+            Operator::Pow => "__rpow__",
+            Operator::LShift => "__rlshift__",
+            Operator::RShift => "__rrshift__",
+            Operator::BitOr => "__ror__",
+            Operator::BitXor => "__rxor__",
+            Operator::BitAnd => "__rand__",
+            Operator::FloorDiv => "__rfloordiv__",
+        }
+    }
 }
 
 impl fmt::Display for Operator {
