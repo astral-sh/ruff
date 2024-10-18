@@ -126,45 +126,121 @@ where
     })
 }
 
+#[derive(Copy, Clone, Debug)]
+pub enum Maybe {
+    Yes,
+    Maybe,
+    No,
+}
+
+impl From<bool> for Maybe {
+    fn from(value: bool) -> Self {
+        if value {
+            Maybe::Yes
+        } else {
+            Maybe::No
+        }
+    }
+}
+
+impl Maybe {
+    pub const fn is_yes(self) -> bool {
+        matches!(self, Maybe::Yes)
+    }
+
+    pub const fn is_maybe(self) -> bool {
+        matches!(self, Maybe::Maybe)
+    }
+
+    pub const fn is_no(self) -> bool {
+        matches!(self, Maybe::No)
+    }
+
+    pub const fn to_bool(self) -> bool {
+        matches!(self, Maybe::Yes | Maybe::Maybe)
+    }
+
+    #[must_use]
+    pub fn merge(self, other: Self) -> Self {
+        match (self, other) {
+            (Maybe::Yes, _) | (_, Maybe::Yes) => Maybe::Yes,
+            (Maybe::Maybe, _) | (_, Maybe::Maybe) => Maybe::Maybe,
+            (Maybe::No, Maybe::No) => Maybe::No,
+        }
+    }
+}
+
+// Not ops implementation for Maybe
+impl std::ops::Not for Maybe {
+    type Output = bool;
+
+    fn not(self) -> Self::Output {
+        match self {
+            Maybe::Yes | Maybe::Maybe => false,
+            Maybe::No => true,
+        }
+    }
+}
+
 /// Call `func` over every `Expr` in `expr`, returning `true` if any expression
 /// returns `true`..
 pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
-    if func(expr) {
-        return true;
+    maybe_over_expr(expr, func).to_bool()
+}
+
+pub fn maybe_over_expr<T>(expr: &Expr, func: &dyn Fn(&Expr) -> T) -> Maybe
+where
+    T: Into<Maybe>,
+{
+    let func_result = func(expr).into();
+    if func_result.is_yes() {
+        return Maybe::Yes;
     }
-    match expr {
+    let expr_result = match expr {
         Expr::BoolOp(ast::ExprBoolOp { values, .. }) => {
-            values.iter().any(|expr| any_over_expr(expr, func))
+            values.iter().fold(Maybe::No, |acc, expr| {
+                acc.merge(maybe_over_expr(expr, func))
+            })
         }
-        Expr::FString(ast::ExprFString { value, .. }) => value
-            .elements()
-            .any(|expr| any_over_f_string_element(expr, func)),
+        Expr::FString(ast::ExprFString { value, .. }) => {
+            value.elements().fold(Maybe::No, |acc, expr| {
+                acc.merge(maybe_over_f_string_element(expr, func))
+            })
+        }
         Expr::Named(ast::ExprNamed {
             target,
             value,
             range: _,
-        }) => any_over_expr(target, func) || any_over_expr(value, func),
+        }) => maybe_over_expr(target, func).merge(maybe_over_expr(value, func)),
         Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
-            any_over_expr(left, func) || any_over_expr(right, func)
+            maybe_over_expr(left, func).merge(maybe_over_expr(right, func))
         }
-        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => any_over_expr(operand, func),
-        Expr::Lambda(ast::ExprLambda { body, .. }) => any_over_expr(body, func),
+        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => maybe_over_expr(operand, func),
+        Expr::Lambda(ast::ExprLambda { body, .. }) => maybe_over_expr(body, func),
         Expr::If(ast::ExprIf {
             test,
             body,
             orelse,
             range: _,
-        }) => any_over_expr(test, func) || any_over_expr(body, func) || any_over_expr(orelse, func),
+        }) => maybe_over_expr(test, func)
+            .merge(maybe_over_expr(body, func))
+            .merge(maybe_over_expr(orelse, func)),
         Expr::Dict(ast::ExprDict { items, range: _ }) => {
-            items.iter().any(|ast::DictItem { key, value }| {
-                any_over_expr(value, func)
-                    || key.as_ref().is_some_and(|key| any_over_expr(key, func))
-            })
+            items
+                .iter()
+                .fold(Maybe::No, |acc, ast::DictItem { key, value }| {
+                    acc.merge(maybe_over_expr(value, func)).merge(
+                        key.as_ref()
+                            .map_or(Maybe::No, |key| maybe_over_expr(key, func)),
+                    )
+                })
         }
         Expr::Set(ast::ExprSet { elts, range: _ })
         | Expr::List(ast::ExprList { elts, range: _, .. })
         | Expr::Tuple(ast::ExprTuple { elts, range: _, .. }) => {
-            elts.iter().any(|expr| any_over_expr(expr, func))
+            elts.iter().fold(Maybe::No, |acc, expr| {
+                acc.merge(maybe_over_expr(expr, func))
+            })
         }
         Expr::ListComp(ast::ExprListComp {
             elt,
@@ -182,27 +258,28 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
             range: _,
             parenthesized: _,
         }) => {
-            any_over_expr(elt, func)
-                || generators.iter().any(|generator| {
-                    any_over_expr(&generator.target, func)
-                        || any_over_expr(&generator.iter, func)
-                        || generator.ifs.iter().any(|expr| any_over_expr(expr, func))
-                })
+            maybe_over_expr(elt, func).merge(generators.iter().fold(Maybe::No, |acc, generator| {
+                acc.merge(maybe_over_expr(&generator.target, func))
+                    .merge(maybe_over_expr(&generator.iter, func))
+                    .merge(generator.ifs.iter().fold(Maybe::No, |acc, expr| {
+                        acc.merge(maybe_over_expr(expr, func))
+                    }))
+            }))
         }
         Expr::DictComp(ast::ExprDictComp {
             key,
             value,
             generators,
             range: _,
-        }) => {
-            any_over_expr(key, func)
-                || any_over_expr(value, func)
-                || generators.iter().any(|generator| {
-                    any_over_expr(&generator.target, func)
-                        || any_over_expr(&generator.iter, func)
-                        || generator.ifs.iter().any(|expr| any_over_expr(expr, func))
-                })
-        }
+        }) => maybe_over_expr(key, func)
+            .merge(maybe_over_expr(value, func))
+            .merge(generators.iter().fold(Maybe::No, |acc, generator| {
+                acc.merge(maybe_over_expr(&generator.target, func))
+                    .merge(maybe_over_expr(&generator.iter, func))
+                    .merge(generator.ifs.iter().fold(Maybe::No, |acc, expr| {
+                        acc.merge(maybe_over_expr(expr, func))
+                    }))
+            })),
         Expr::Await(ast::ExprAwait { value, range: _ })
         | Expr::YieldFrom(ast::ExprYieldFrom { value, range: _ })
         | Expr::Attribute(ast::ExprAttribute {
@@ -210,45 +287,50 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
         })
         | Expr::Starred(ast::ExprStarred {
             value, range: _, ..
-        }) => any_over_expr(value, func),
+        }) => maybe_over_expr(value, func),
         Expr::Yield(ast::ExprYield { value, range: _ }) => value
             .as_ref()
-            .is_some_and(|value| any_over_expr(value, func)),
+            .map_or(Maybe::No, |value| maybe_over_expr(value, func)),
         Expr::Compare(ast::ExprCompare {
             left, comparators, ..
-        }) => any_over_expr(left, func) || comparators.iter().any(|expr| any_over_expr(expr, func)),
+        }) => maybe_over_expr(left, func).merge(comparators.iter().fold(Maybe::No, |acc, expr| {
+            acc.merge(maybe_over_expr(expr, func))
+        })),
         Expr::Call(ast::ExprCall {
             func: call_func,
             arguments,
             range: _,
         }) => {
-            any_over_expr(call_func, func)
+            maybe_over_expr(call_func, func)
                 // Note that this is the evaluation order but not necessarily the declaration order
                 // (e.g. for `f(*args, a=2, *args2, **kwargs)` it's not)
-                || arguments.args.iter().any(|expr| any_over_expr(expr, func))
-                || arguments.keywords
-                    .iter()
-                    .any(|keyword| any_over_expr(&keyword.value, func))
+                .merge(arguments.args.iter().fold(Maybe::No, |acc, expr| {
+                    acc.merge(maybe_over_expr(expr, func))
+                }))
+                .merge(arguments.keywords.iter().fold(Maybe::No, |acc, keyword| {
+                    acc.merge(maybe_over_expr(&keyword.value, func))
+                }))
         }
         Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
-            any_over_expr(value, func) || any_over_expr(slice, func)
+            maybe_over_expr(value, func).merge(maybe_over_expr(slice, func))
         }
         Expr::Slice(ast::ExprSlice {
             lower,
             upper,
             step,
             range: _,
-        }) => {
-            lower
-                .as_ref()
-                .is_some_and(|value| any_over_expr(value, func))
-                || upper
+        }) => lower
+            .as_ref()
+            .map_or(Maybe::No, |value| maybe_over_expr(value, func))
+            .merge(
+                upper
                     .as_ref()
-                    .is_some_and(|value| any_over_expr(value, func))
-                || step
-                    .as_ref()
-                    .is_some_and(|value| any_over_expr(value, func))
-        }
+                    .map_or(Maybe::No, |value| maybe_over_expr(value, func)),
+            )
+            .merge(
+                step.as_ref()
+                    .map_or(Maybe::No, |value| maybe_over_expr(value, func)),
+            ),
         Expr::Name(_)
         | Expr::StringLiteral(_)
         | Expr::BytesLiteral(_)
@@ -256,62 +338,79 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
         | Expr::BooleanLiteral(_)
         | Expr::NoneLiteral(_)
         | Expr::EllipsisLiteral(_)
-        | Expr::IpyEscapeCommand(_) => false,
-    }
+        | Expr::IpyEscapeCommand(_) => Maybe::No,
+    };
+    func_result.merge(expr_result)
 }
 
 pub fn any_over_type_param(type_param: &TypeParam, func: &dyn Fn(&Expr) -> bool) -> bool {
+    maybe_over_type_param(type_param, func).to_bool()
+}
+
+pub fn maybe_over_type_param<T>(type_param: &TypeParam, func: &dyn Fn(&Expr) -> T) -> Maybe
+where
+    T: Into<Maybe>,
+{
     match type_param {
-        TypeParam::TypeVar(ast::TypeParamTypeVar { bound, default, .. }) => {
-            bound
-                .as_ref()
-                .is_some_and(|value| any_over_expr(value, func))
-                || default
+        TypeParam::TypeVar(ast::TypeParamTypeVar { bound, default, .. }) => bound
+            .as_ref()
+            .map_or(Maybe::No, |value| maybe_over_expr(value, func))
+            .merge(
+                default
                     .as_ref()
-                    .is_some_and(|value| any_over_expr(value, func))
-        }
+                    .map_or(Maybe::No, |value| maybe_over_expr(value, func)),
+            ),
         TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { default, .. }) => default
             .as_ref()
-            .is_some_and(|value| any_over_expr(value, func)),
+            .map_or(Maybe::No, |value| maybe_over_expr(value, func)),
         TypeParam::ParamSpec(ast::TypeParamParamSpec { default, .. }) => default
             .as_ref()
-            .is_some_and(|value| any_over_expr(value, func)),
+            .map_or(Maybe::No, |value| maybe_over_expr(value, func)),
     }
 }
 
 pub fn any_over_pattern(pattern: &Pattern, func: &dyn Fn(&Expr) -> bool) -> bool {
+    maybe_over_pattern(pattern, func).to_bool()
+}
+
+pub fn maybe_over_pattern<T>(pattern: &Pattern, func: &dyn Fn(&Expr) -> T) -> Maybe
+where
+    T: Into<Maybe>,
+{
     match pattern {
         Pattern::MatchValue(ast::PatternMatchValue { value, range: _ }) => {
-            any_over_expr(value, func)
+            maybe_over_expr(value, func)
         }
-        Pattern::MatchSingleton(_) => false,
-        Pattern::MatchSequence(ast::PatternMatchSequence { patterns, range: _ }) => patterns
+        Pattern::MatchSingleton(_) => Maybe::No,
+        Pattern::MatchSequence(ast::PatternMatchSequence { patterns, range: _ }) => {
+            patterns.iter().fold(Maybe::No, |acc, pattern| {
+                acc.merge(maybe_over_pattern(pattern, func))
+            })
+        }
+        Pattern::MatchMapping(ast::PatternMatchMapping { keys, patterns, .. }) => keys
             .iter()
-            .any(|pattern| any_over_pattern(pattern, func)),
-        Pattern::MatchMapping(ast::PatternMatchMapping { keys, patterns, .. }) => {
-            keys.iter().any(|key| any_over_expr(key, func))
-                || patterns
-                    .iter()
-                    .any(|pattern| any_over_pattern(pattern, func))
-        }
+            .fold(Maybe::No, |acc, key| acc.merge(maybe_over_expr(key, func)))
+            .merge(patterns.iter().fold(Maybe::No, |acc, pattern| {
+                acc.merge(maybe_over_pattern(pattern, func))
+            })),
         Pattern::MatchClass(ast::PatternMatchClass { cls, arguments, .. }) => {
-            any_over_expr(cls, func)
-                || arguments
-                    .patterns
-                    .iter()
-                    .any(|pattern| any_over_pattern(pattern, func))
-                || arguments
-                    .keywords
-                    .iter()
-                    .any(|keyword| any_over_pattern(&keyword.pattern, func))
+            maybe_over_expr(cls, func)
+                .merge(arguments.patterns.iter().fold(Maybe::No, |acc, pattern| {
+                    acc.merge(maybe_over_pattern(pattern, func))
+                }))
+                .merge(arguments.keywords.iter().fold(Maybe::No, |acc, keyword| {
+                    acc.merge(maybe_over_pattern(&keyword.pattern, func))
+                }))
         }
-        Pattern::MatchStar(_) => false,
+        Pattern::MatchStar(_) => Maybe::No,
         Pattern::MatchAs(ast::PatternMatchAs { pattern, .. }) => pattern
             .as_ref()
-            .is_some_and(|pattern| any_over_pattern(pattern, func)),
-        Pattern::MatchOr(ast::PatternMatchOr { patterns, range: _ }) => patterns
-            .iter()
-            .any(|pattern| any_over_pattern(pattern, func)),
+            .map_or(Maybe::No, |pattern| maybe_over_pattern(pattern, func)),
+        Pattern::MatchOr(ast::PatternMatchOr { patterns, range: _ }) => {
+            patterns.iter().fold(Maybe::No, |acc, pattern| {
+                acc.merge(maybe_over_pattern(pattern, func))
+            })
+        }
     }
 }
 
@@ -319,24 +418,41 @@ pub fn any_over_f_string_element(
     element: &ast::FStringElement,
     func: &dyn Fn(&Expr) -> bool,
 ) -> bool {
+    maybe_over_f_string_element(element, func).to_bool()
+}
+
+pub fn maybe_over_f_string_element<T>(
+    element: &ast::FStringElement,
+    func: &dyn Fn(&Expr) -> T,
+) -> Maybe
+where
+    T: Into<Maybe>,
+{
     match element {
-        ast::FStringElement::Literal(_) => false,
+        ast::FStringElement::Literal(_) => Maybe::No,
         ast::FStringElement::Expression(ast::FStringExpressionElement {
             expression,
             format_spec,
             ..
-        }) => {
-            any_over_expr(expression, func)
-                || format_spec.as_ref().is_some_and(|spec| {
-                    spec.elements
-                        .iter()
-                        .any(|spec_element| any_over_f_string_element(spec_element, func))
+        }) => maybe_over_expr(expression, func).merge(format_spec.as_ref().map_or(
+            Maybe::No,
+            |spec| {
+                spec.elements.iter().fold(Maybe::No, |acc, element| {
+                    acc.merge(maybe_over_f_string_element(element, func))
                 })
-        }
+            },
+        )),
     }
 }
 
 pub fn any_over_stmt(stmt: &Stmt, func: &dyn Fn(&Expr) -> bool) -> bool {
+    maybe_over_stmt(stmt, func).to_bool()
+}
+
+pub fn maybe_over_stmt<T>(stmt: &Stmt, func: &dyn Fn(&Expr) -> T) -> Maybe
+where
+    T: Into<Maybe>,
+{
     match stmt {
         Stmt::FunctionDef(ast::StmtFunctionDef {
             parameters,
@@ -345,26 +461,36 @@ pub fn any_over_stmt(stmt: &Stmt, func: &dyn Fn(&Expr) -> bool) -> bool {
             decorator_list,
             returns,
             ..
-        }) => {
-            parameters.iter().any(|param| {
-                param
-                    .default()
-                    .is_some_and(|default| any_over_expr(default, func))
-                    || param
+        }) => parameters
+            .iter()
+            .fold(Maybe::No, |acc, param| {
+                acc.merge(
+                    param
+                        .default()
+                        .map_or(Maybe::No, |default| maybe_over_expr(default, func)),
+                )
+                .merge(
+                    param
                         .annotation()
-                        .is_some_and(|annotation| any_over_expr(annotation, func))
-            }) || type_params.as_ref().is_some_and(|type_params| {
-                type_params
-                    .iter()
-                    .any(|type_param| any_over_type_param(type_param, func))
-            }) || body.iter().any(|stmt| any_over_stmt(stmt, func))
-                || decorator_list
-                    .iter()
-                    .any(|decorator| any_over_expr(&decorator.expression, func))
-                || returns
+                        .map_or(Maybe::No, |annotation| maybe_over_expr(annotation, func)),
+                )
+            })
+            .merge(type_params.as_ref().map_or(Maybe::No, |type_params| {
+                type_params.iter().fold(Maybe::No, |acc, type_param| {
+                    acc.merge(maybe_over_type_param(type_param, func))
+                })
+            }))
+            .merge(body.iter().fold(Maybe::No, |acc, stmt| {
+                acc.merge(maybe_over_stmt(stmt, func))
+            }))
+            .merge(decorator_list.iter().fold(Maybe::No, |acc, decorator| {
+                acc.merge(maybe_over_expr(&decorator.expression, func))
+            }))
+            .merge(
+                returns
                     .as_ref()
-                    .is_some_and(|value| any_over_expr(value, func))
-        }
+                    .map_or(Maybe::No, |value| maybe_over_expr(value, func)),
+            ),
         Stmt::ClassDef(ast::StmtClassDef {
             arguments,
             type_params,
@@ -376,113 +502,126 @@ pub fn any_over_stmt(stmt: &Stmt, func: &dyn Fn(&Expr) -> bool) -> bool {
             // definition
             arguments
                 .as_deref()
-                .is_some_and(|Arguments { args, keywords, .. }| {
-                    args.iter().any(|expr| any_over_expr(expr, func))
-                        || keywords
-                            .iter()
-                            .any(|keyword| any_over_expr(&keyword.value, func))
+                .map_or(Maybe::No, |Arguments { args, keywords, .. }| {
+                    args.iter()
+                        .fold(Maybe::No, |acc, expr| {
+                            acc.merge(maybe_over_expr(expr, func))
+                        })
+                        .merge(keywords.iter().fold(Maybe::No, |acc, keyword| {
+                            acc.merge(maybe_over_expr(&keyword.value, func))
+                        }))
                 })
-                || type_params.as_ref().is_some_and(|type_params| {
-                    type_params
-                        .iter()
-                        .any(|type_param| any_over_type_param(type_param, func))
-                })
-                || body.iter().any(|stmt| any_over_stmt(stmt, func))
-                || decorator_list
-                    .iter()
-                    .any(|decorator| any_over_expr(&decorator.expression, func))
+                .merge(type_params.as_ref().map_or(Maybe::No, |type_params| {
+                    type_params.iter().fold(Maybe::No, |acc, type_param| {
+                        acc.merge(maybe_over_type_param(type_param, func))
+                    })
+                }))
+                .merge(body.iter().fold(Maybe::No, |acc, stmt| {
+                    acc.merge(maybe_over_stmt(stmt, func))
+                }))
+                .merge(decorator_list.iter().fold(Maybe::No, |acc, decorator| {
+                    acc.merge(maybe_over_expr(&decorator.expression, func))
+                }))
         }
         Stmt::Return(ast::StmtReturn { value, range: _ }) => value
             .as_ref()
-            .is_some_and(|value| any_over_expr(value, func)),
+            .map_or(Maybe::No, |value| maybe_over_expr(value, func)),
         Stmt::Delete(ast::StmtDelete { targets, range: _ }) => {
-            targets.iter().any(|expr| any_over_expr(expr, func))
+            targets.iter().fold(Maybe::No, |acc, expr| {
+                acc.merge(maybe_over_expr(expr, func))
+            })
         }
         Stmt::TypeAlias(ast::StmtTypeAlias {
             name,
             type_params,
             value,
             ..
-        }) => {
-            any_over_expr(name, func)
-                || type_params.as_ref().is_some_and(|type_params| {
-                    type_params
-                        .iter()
-                        .any(|type_param| any_over_type_param(type_param, func))
+        }) => maybe_over_expr(name, func)
+            .merge(type_params.as_ref().map_or(Maybe::No, |type_params| {
+                type_params.iter().fold(Maybe::No, |acc, type_param| {
+                    acc.merge(maybe_over_type_param(type_param, func))
                 })
-                || any_over_expr(value, func)
-        }
-        Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
-            targets.iter().any(|expr| any_over_expr(expr, func)) || any_over_expr(value, func)
-        }
+            }))
+            .merge(maybe_over_expr(value, func)),
+        Stmt::Assign(ast::StmtAssign { targets, value, .. }) => targets
+            .iter()
+            .fold(Maybe::No, |acc, expr| {
+                acc.merge(maybe_over_expr(expr, func))
+            })
+            .merge(maybe_over_expr(value, func)),
         Stmt::AugAssign(ast::StmtAugAssign { target, value, .. }) => {
-            any_over_expr(target, func) || any_over_expr(value, func)
+            maybe_over_expr(target, func).merge(maybe_over_expr(value, func))
         }
         Stmt::AnnAssign(ast::StmtAnnAssign {
             target,
             annotation,
             value,
             ..
-        }) => {
-            any_over_expr(target, func)
-                || any_over_expr(annotation, func)
-                || value
+        }) => maybe_over_expr(target, func)
+            .merge(maybe_over_expr(annotation, func))
+            .merge(
+                value
                     .as_ref()
-                    .is_some_and(|value| any_over_expr(value, func))
-        }
+                    .map_or(Maybe::No, |value| maybe_over_expr(value, func)),
+            ),
         Stmt::For(ast::StmtFor {
             target,
             iter,
             body,
             orelse,
             ..
-        }) => {
-            any_over_expr(target, func)
-                || any_over_expr(iter, func)
-                || any_over_body(body, func)
-                || any_over_body(orelse, func)
-        }
+        }) => maybe_over_expr(target, func)
+            .merge(maybe_over_expr(iter, func))
+            .merge(maybe_over_body(body, func))
+            .merge(maybe_over_body(orelse, func)),
         Stmt::While(ast::StmtWhile {
             test,
             body,
             orelse,
             range: _,
-        }) => any_over_expr(test, func) || any_over_body(body, func) || any_over_body(orelse, func),
+        }) => maybe_over_expr(test, func)
+            .merge(maybe_over_body(body, func))
+            .merge(maybe_over_body(orelse, func)),
         Stmt::If(ast::StmtIf {
             test,
             body,
             elif_else_clauses,
             range: _,
-        }) => {
-            any_over_expr(test, func)
-                || any_over_body(body, func)
-                || elif_else_clauses.iter().any(|clause| {
+        }) => maybe_over_expr(test, func)
+            .merge(maybe_over_body(body, func))
+            .merge(elif_else_clauses.iter().fold(Maybe::No, |acc, clause| {
+                acc.merge(
                     clause
                         .test
                         .as_ref()
-                        .is_some_and(|test| any_over_expr(test, func))
-                        || any_over_body(&clause.body, func)
-                })
-        }
-        Stmt::With(ast::StmtWith { items, body, .. }) => {
-            items.iter().any(|with_item| {
-                any_over_expr(&with_item.context_expr, func)
-                    || with_item
-                        .optional_vars
-                        .as_ref()
-                        .is_some_and(|expr| any_over_expr(expr, func))
-            }) || any_over_body(body, func)
-        }
+                        .map_or(Maybe::No, |test| maybe_over_expr(test, func))
+                        .merge(maybe_over_body(&clause.body, func)),
+                )
+            })),
+        Stmt::With(ast::StmtWith { items, body, .. }) => items
+            .iter()
+            .fold(Maybe::No, |acc, with_item| {
+                acc.merge(maybe_over_expr(&with_item.context_expr, func))
+                    .merge(
+                        with_item
+                            .optional_vars
+                            .as_ref()
+                            .map_or(Maybe::No, |expr| maybe_over_expr(expr, func)),
+                    )
+            })
+            .merge(maybe_over_body(body, func)),
         Stmt::Raise(ast::StmtRaise {
             exc,
             cause,
             range: _,
-        }) => {
-            exc.as_ref().is_some_and(|value| any_over_expr(value, func))
-                || cause
+        }) => exc
+            .as_ref()
+            .map_or(Maybe::No, |value| maybe_over_expr(value, func))
+            .merge(
+                cause
                     .as_ref()
-                    .is_some_and(|value| any_over_expr(value, func))
-        }
+                    .map_or(Maybe::No, |value| maybe_over_expr(value, func)),
+            ),
         Stmt::Try(ast::StmtTry {
             body,
             handlers,
@@ -490,58 +629,70 @@ pub fn any_over_stmt(stmt: &Stmt, func: &dyn Fn(&Expr) -> bool) -> bool {
             finalbody,
             is_star: _,
             range: _,
-        }) => {
-            any_over_body(body, func)
-                || handlers.iter().any(|handler| {
-                    let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
-                        type_,
-                        body,
-                        ..
-                    }) = handler;
-                    type_.as_ref().is_some_and(|expr| any_over_expr(expr, func))
-                        || any_over_body(body, func)
-                })
-                || any_over_body(orelse, func)
-                || any_over_body(finalbody, func)
-        }
+        }) => maybe_over_body(body, func)
+            .merge(handlers.iter().fold(Maybe::No, |acc, handler| {
+                let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+                    type_,
+                    body,
+                    ..
+                }) = handler;
+                acc.merge(
+                    type_
+                        .as_ref()
+                        .map_or(Maybe::No, |expr| maybe_over_expr(expr, func)),
+                )
+                .merge(maybe_over_body(body, func))
+            }))
+            .merge(maybe_over_body(orelse, func))
+            .merge(maybe_over_body(finalbody, func)),
         Stmt::Assert(ast::StmtAssert {
             test,
             msg,
             range: _,
-        }) => {
-            any_over_expr(test, func)
-                || msg.as_ref().is_some_and(|value| any_over_expr(value, func))
-        }
+        }) => maybe_over_expr(test, func).merge(
+            msg.as_ref()
+                .map_or(Maybe::No, |value| maybe_over_expr(value, func)),
+        ),
         Stmt::Match(ast::StmtMatch {
             subject,
             cases,
             range: _,
-        }) => {
-            any_over_expr(subject, func)
-                || cases.iter().any(|case| {
-                    let MatchCase {
-                        pattern,
-                        guard,
-                        body,
-                        range: _,
-                    } = case;
-                    any_over_pattern(pattern, func)
-                        || guard.as_ref().is_some_and(|expr| any_over_expr(expr, func))
-                        || any_over_body(body, func)
-                })
-        }
-        Stmt::Import(_) => false,
-        Stmt::ImportFrom(_) => false,
-        Stmt::Global(_) => false,
-        Stmt::Nonlocal(_) => false,
-        Stmt::Expr(ast::StmtExpr { value, range: _ }) => any_over_expr(value, func),
-        Stmt::Pass(_) | Stmt::Break(_) | Stmt::Continue(_) => false,
-        Stmt::IpyEscapeCommand(_) => false,
+        }) => maybe_over_expr(subject, func).merge(cases.iter().fold(Maybe::No, |acc, case| {
+            let MatchCase {
+                pattern,
+                guard,
+                body,
+                range: _,
+            } = case;
+            acc.merge(maybe_over_pattern(pattern, func))
+                .merge(
+                    guard
+                        .as_ref()
+                        .map_or(Maybe::No, |expr| maybe_over_expr(expr, func)),
+                )
+                .merge(maybe_over_body(body, func))
+        })),
+        Stmt::Import(_) => Maybe::No,
+        Stmt::ImportFrom(_) => Maybe::No,
+        Stmt::Global(_) => Maybe::No,
+        Stmt::Nonlocal(_) => Maybe::No,
+        Stmt::Expr(ast::StmtExpr { value, range: _ }) => maybe_over_expr(value, func),
+        Stmt::Pass(_) | Stmt::Break(_) | Stmt::Continue(_) => Maybe::No,
+        Stmt::IpyEscapeCommand(_) => Maybe::No,
     }
 }
 
 pub fn any_over_body(body: &[Stmt], func: &dyn Fn(&Expr) -> bool) -> bool {
-    body.iter().any(|stmt| any_over_stmt(stmt, func))
+    maybe_over_body(body, func).to_bool()
+}
+
+pub fn maybe_over_body<T>(body: &[Stmt], func: &dyn Fn(&Expr) -> T) -> Maybe
+where
+    T: Into<Maybe>,
+{
+    body.iter().fold(Maybe::No, |acc, stmt| {
+        acc.merge(maybe_over_stmt(stmt, func))
+    })
 }
 
 pub fn is_dunder(id: &str) -> bool {
