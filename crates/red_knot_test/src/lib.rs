@@ -41,14 +41,21 @@ pub fn run(path: &Path, title: &str) {
             any_failures = true;
             println!("\n{}\n", test.name().bold().underline());
 
-            for (lined_path, by_line) in failures {
-                println!("{}", lined_path.path.as_str().bold());
+            for (
+                AbsoluteLineNumberPath {
+                    path,
+                    line_number: absolute_line_number,
+                },
+                by_line,
+            ) in failures
+            {
+                println!("{}", path.as_str().bold());
                 for (line_number, failures) in by_line.iter() {
                     for failure in failures {
                         let absolute_line_info = format!(
                             "{}:{}",
                             title,
-                            lined_path.line_number.saturating_add(line_number.get())
+                            absolute_line_number.saturating_add(line_number.get())
                         );
                         let line_info = format!("line {line_number}:").cyan();
                         println!("{absolute_line_info}    {line_info} {failure}");
@@ -64,7 +71,7 @@ pub fn run(path: &Path, title: &str) {
     assert!(!any_failures, "Some tests failed.");
 }
 
-#[derive(PartialEq, PartialOrd, Eq, Ord, Hash)]
+#[derive(PartialEq, PartialOrd, Eq, Ord)]
 struct AbsoluteLineNumberPath {
     path: SystemPathBuf,
     line_number: OneIndexed,
@@ -91,7 +98,8 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
     let mut failures = BTreeMap::default();
 
     for numbered_path in paths {
-        let file = system_path_to_file(db, numbered_path.path.clone()).unwrap();
+        let path = numbered_path.path.clone();
+        let file = system_path_to_file(db, path.clone()).unwrap();
         let parsed = parsed_module(db, file);
 
         // TODO allow testing against code with syntax errors
@@ -99,7 +107,7 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
             parsed.errors().is_empty(),
             "Python syntax errors in {}, {:?}: {:?}",
             test.name(),
-            numbered_path.path,
+            path,
             parsed.errors()
         );
 
