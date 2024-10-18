@@ -5,14 +5,18 @@ use ruff_python_ast::str::Quote;
 use ruff_python_ast::str_prefix::{
     AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix,
 };
-use ruff_python_ast::{AnyStringFlags, StringFlags, StringLike, StringLikePart};
+use ruff_python_ast::{AnyStringFlags, FStringElement, StringFlags, StringLike, StringLikePart};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{leading_comments, trailing_comments};
 use crate::expression::parentheses::in_parentheses_only_soft_line_break_or_space;
-use crate::other::f_string::FormatFString;
+use crate::other::f_string::{FStringContext, FStringLayout, FormatFString};
+use crate::other::f_string_element::FormatFStringExpressionElement;
 use crate::other::string_literal::StringLiteralKind;
 use crate::prelude::*;
-use crate::preview::is_join_implicit_concatenated_string_enabled;
+use crate::preview::{
+    is_f_string_formatting_enabled, is_join_implicit_concatenated_string_enabled,
+};
 use crate::string::normalize::QuoteMetadata;
 use crate::string::{normalize_string, StringLikeExtensions, StringNormalizer, StringQuotes};
 
@@ -192,21 +196,81 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
         // TODO: FStrings when the f-string preview style is enabled???
 
         for part in self.string.parts() {
-            let content = f.context().locator().slice(part.content_range());
-            let normalized = normalize_string(
-                content,
-                0,
-                self.flags,
-                self.flags.is_f_string() && !part.flags().is_f_string(),
-                true,
-                false,
-            );
-            match normalized {
-                Cow::Borrowed(_) => source_text_slice(part.content_range()).fmt(f)?,
-                Cow::Owned(normalized) => text(&normalized).fmt(f)?,
+            match part {
+                StringLikePart::String(_) | StringLikePart::Bytes(_) => {
+                    FormatLiteralContent {
+                        range: part.content_range(),
+                        flags: self.flags,
+                        is_fstring: false,
+                    }
+                    .fmt(f)?;
+                }
+
+                StringLikePart::FString(f_string) => {
+                    if is_f_string_formatting_enabled(f.context()) {
+                        for element in &f_string.elements {
+                            match element {
+                                FStringElement::Literal(literal) => {
+                                    FormatLiteralContent {
+                                        range: literal.range(),
+                                        flags: self.flags,
+                                        is_fstring: true,
+                                    }
+                                    .fmt(f)?;
+                                }
+                                // Note, thsi doesn't work because comments inside the expression would only be formatted
+                                // once...
+                                FStringElement::Expression(expression) => {
+                                    let context = FStringContext::new(
+                                        self.flags,
+                                        FStringLayout::from_f_string(
+                                            f_string,
+                                            &f.context().locator(),
+                                        ),
+                                    );
+
+                                    FormatFStringExpressionElement::new(expression, context)
+                                        .fmt(f)?;
+                                }
+                            }
+                        }
+                    } else {
+                        FormatLiteralContent {
+                            range: part.content_range(),
+                            flags: self.flags,
+                            is_fstring: true,
+                        }
+                        .fmt(f)?;
+                    }
+                }
             }
         }
 
         quotes.fmt(f)
+    }
+}
+
+struct FormatLiteralContent {
+    range: TextRange,
+    flags: AnyStringFlags,
+    is_fstring: bool,
+}
+
+impl Format<PyFormatContext<'_>> for FormatLiteralContent {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
+        let content = f.context().locator().slice(self.range);
+        let normalized = normalize_string(
+            content,
+            0,
+            self.flags,
+            self.flags.is_f_string() && !self.is_fstring,
+            true,
+            false,
+        );
+
+        match normalized {
+            Cow::Borrowed(_) => source_text_slice(self.range).fmt(f),
+            Cow::Owned(normalized) => text(&normalized).fmt(f),
+        }
     }
 }

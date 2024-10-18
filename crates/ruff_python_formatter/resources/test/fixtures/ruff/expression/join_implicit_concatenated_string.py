@@ -47,9 +47,26 @@ b"aaaaaaaaa" b"bbbbbbbbbbbbbbbbbbbb" # Join
 # Escape `{` and `}` when marging an f-string with a string
 "a {not_a_variable}" f"b {10}" "c"
 
+# Join, and break expressions
 f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa{
-    expression
+expression
 }bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" f"cccccccccccccccccccc {20999}" "more"
+
+# Join, but don't break the expressions
+f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa{expression}bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" f"cccccccccccccccccccc {20999}" "more"
+
+f"test{
+expression
+}flat" f"can be {
+joined
+} together"
+
+aaaaaaaaaaa = f"test{
+expression
+}flat" f"cean beeeeeeee {
+joined
+} eeeeeeeeeeeeeeeeeeeeeeeeeeeee" # inline
+
 
 ##############################################################################
 # Don't join raw strings
