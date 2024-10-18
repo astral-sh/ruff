@@ -1441,6 +1441,32 @@ impl<'db> ClassType<'db> {
             })
     }
 
+    pub fn is_subclass_of(self, db: &'db dyn Db, other: Type) -> bool {
+        match other {
+            Type::Any | Type::Unknown | Type::Todo => true,
+            Type::Class(other_class) => {
+                // TODO: we need to iterate over the *MRO* here, not the bases
+                (other_class == self) || self.bases(db).any(|base| base == other)
+            }
+            // TODO: if a base is a Union, should we return a Vector of `bool`s
+            // indicating the various possible answers...?
+            Type::Union(_) | Type::Intersection(_) => false,
+            // TODO: not sure this is true if it's `Type::Instance(builtins.type)`...?
+            Type::Instance(_) => false,
+            Type::Never
+            | Type::None
+            | Type::BooleanLiteral(_)
+            | Type::BytesLiteral(_)
+            | Type::Function(_)
+            | Type::IntLiteral(_)
+            | Type::Module(_)
+            | Type::LiteralString
+            | Type::Tuple(_)
+            | Type::Unbound
+            | Type::StringLiteral(_) => false,
+        }
+    }
+
     /// Returns the class member of this class named `name`.
     ///
     /// The member resolves to a member of the class itself or any of its bases.
@@ -1671,6 +1697,7 @@ mod tests {
     #[test_case(Ty::LiteralString, Ty::BuiltinInstance("str"))]
     #[test_case(Ty::BytesLiteral("foo"), Ty::BuiltinInstance("bytes"))]
     #[test_case(Ty::IntLiteral(1), Ty::Union(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")]))]
+    #[test_case(Ty::BuiltinInstance("TypeError"), Ty::BuiltinInstance("Exception"))]
     fn is_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));

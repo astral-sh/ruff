@@ -2640,15 +2640,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                 op,
             ),
 
-            (Type::Instance(_), Type::StringLiteral(_), op) => {
+            (Type::Instance(_), Type::StringLiteral(_) | Type::LiteralString, op) => {
                 self.infer_binary_expression_type(left_ty, KnownClass::Str.to_instance(self.db), op)
             }
 
-            (Type::StringLiteral(_), Type::Instance(_), op) => self.infer_binary_expression_type(
-                KnownClass::Str.to_instance(self.db),
-                right_ty,
-                op,
-            ),
+            (Type::StringLiteral(_) | Type::LiteralString, Type::Instance(_), op) => self
+                .infer_binary_expression_type(KnownClass::Str.to_instance(self.db), right_ty, op),
 
             (Type::Instance(_), Type::BytesLiteral(_), op) => self.infer_binary_expression_type(
                 left_ty,
@@ -2663,7 +2660,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             ),
 
             (Type::Instance(left_class), Type::Instance(right_class), op) => {
-                if left_class != right_class && right_ty.is_assignable_to(self.db, left_ty) {
+                if left_class != right_class
+                    && right_class.is_subclass_of(self.db, Type::Class(left_class))
+                {
                     let reflected_dunder = op.reflected_dunder();
                     let rhs_reflected = right_class.class_member(self.db, reflected_dunder);
                     if !rhs_reflected.is_unbound()

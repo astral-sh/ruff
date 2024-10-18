@@ -169,7 +169,14 @@ reveal_type(A() + B())  # revealed: str
 
 For example, at runtime, `(1).__add__(1.2)` is `NotImplemented`, but
 `(1.2).__radd__(1) == 2.2`, meaning that `1 + 1.2` succeeds at runtime
-(producing `2.2`).
+(producing `2.2`). The runtime tries the second one only if the first one
+returns `NotImplemented` to signal failure .
+
+Typeshed and other stubs annotate dunder-method calls that would return
+`NotImplemented` as being "illegal" calls. `int.__add__` is annotated as only
+"accepting" `int`s, even though it strictly-speaking "accepts" any other object
+with raising an error -- it will simply return `NotImplemented`, allowing the
+runtime to try the `__radd__` method of the right-hand operand as well.
 
 ```py
 class A:
@@ -180,7 +187,10 @@ class B:
     def __rsub__(self, other: A) -> B:
         return B()
 
-A() - B()
+# TODO: this should be `B` (the return annotation of `B.__rsub__`),
+# because `A.__sub__` is annotated as only accepting `A`,
+# but `B.__rsub__` will accept `A`.
+reveal_type(A() - B())  # revealed: A
 ```
 
 ## Callable instances as dunders
@@ -241,15 +251,58 @@ class A:
     def __radd__(self, other) -> A: return self
 
 reveal_type(A() + 1)  # revealed: A
+# TODO should be `A` since `int.__add__` doesn't support `A` instances
 reveal_type(1 + A())  # revealed: int
+
 reveal_type(A() + "foo")  # revealed: A
-# TODO should be A since `str.__add__` doesn't support A instances
+# TODO should be `A` since `str.__add__` doesn't support `A` instances
+# TODO overloads
 reveal_type("foo" + A())  # revealed: @Todo
+
 reveal_type(A() + b"foo")  # revealed: A
+# TODO should be `A` since `bytes.__add__` doesn't support `A` instances
 reveal_type(b"foo" + A())  # revealed: bytes
+
 reveal_type(A() + ())  # revealed: A
-# TODO this should be A, since tuple's `__add__` doesn't support A instances
+# TODO this should be `A`, since `tuple.__add__` doesn't support `A` instances
 reveal_type(() + A())  # revealed: @Todo
+
+literal_string_instance = "foo" * 1_000_000_000
+# the test is not testing what it's meant to be testing if this isn't a `LiteralString`:
+reveal_type(literal_string_instance)  # revealed: LiteralString
+
+reveal_type(A() + literal_string_instance)  # revealed: A
+# TODO should be `A` since `str.__add__` doesn't support `A` instances
+# TODO overloads
+reveal_type(literal_string_instance + A())  # revealed: @Todo
+```
+
+## Operations involving instances of classes inheriting from `Any`
+
+`Any` and `Unknown` represent a set of possible runtime objects, wherein the
+bounds of the set are unknown. Whether the left-hand operand's dunder or the
+right-hand operand's reflected dunder depends on whether the right-hand operand
+is an instance of a class that is a subclass of the left-hand operand's class
+and overrides the reflected dunder. In the following example, because of the
+unknowable nature of `Any`/`Unknown`, we must consider both possibilities:
+`Any`/`Unknown` might resolve to an unknown third class that inherits from `X`
+and overrides `__radd__`; but it also might not. Thus, the correct answer here
+for the `reveal_type` is `int | Unknown`.
+
+```py
+from does_not_exist import Foo  # error: [unresolved-import]
+
+reveal_type(Foo)  # revealed: Unknown
+
+class X:
+    def __add__(self, other: object) -> int:
+        return 42
+
+class Y(Foo):
+    pass
+
+# TODO: Should be `int | Unknown`; see above discussion.
+reveal_type(X() + Y())  # revealed: int
 ```
 
 ## Unsupported
