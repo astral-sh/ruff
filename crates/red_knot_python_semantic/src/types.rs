@@ -569,7 +569,9 @@ impl<'db> Type<'db> {
             (Type::BytesLiteral(..), _) | (_, Type::BytesLiteral(..)) => true,
 
             (Type::Instance(..), Type::Instance(..)) => {
-                // TODO
+                // TODO: once we have support for `final`, there might be some cases where
+                // we can determine that two types are disjoint. For non-final classes, we
+                // return false (multiple inheritance).
                 false
             }
 
