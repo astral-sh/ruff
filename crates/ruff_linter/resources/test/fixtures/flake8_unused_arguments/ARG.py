@@ -55,6 +55,18 @@ class C:
     def f(x):
         print("Hello, world!")
 
+    def f(self, x):
+        msg[0] = "..."
+        raise NotImplementedError(msg)
+
+    def f(self, x):
+        msg = "..."
+        raise NotImplementedError(foo)
+
+    def f(self, x):
+        msg = "..."
+        raise NotImplementedError("must use msg")
+
     ###
     # Unused arguments attached to empty functions (OK).
     ###
@@ -110,10 +122,6 @@ class C:
     def f(self, x):
         msg = "..."
         raise NotImplementedError(msg)
-
-    def f(self, x):
-        msg = "..."
-        raise NotImplementedError("must use msg")
 
     def f(self, x, y):
         """Docstring."""

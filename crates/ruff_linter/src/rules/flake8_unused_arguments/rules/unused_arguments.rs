@@ -357,17 +357,15 @@ fn is_not_implemented_stub_with_variable(function_def: &StmtFunctionDef) -> bool
         return false;
     }
 
-    if arguments.len() != 1 {
+    let [argument] = &*arguments.args else {
         return false;
-    }
+    };
 
-    if let ast::Expr::Name(exception_arg_name) = &arguments.args[0] {
-        if let ast::Expr::Name(assign_var_name) = &targets[0] {
-            return assign_var_name.id == exception_arg_name.id;
-        }
-    }
+    let [target] = targets.as_slice() else {
+        return false;
+    };
 
-    true
+    argument.as_name_expr().map(|name| name.id()) == target.as_name_expr().map(|name| name.id())
 }
 
 /// ARG001, ARG002, ARG003, ARG004, ARG005

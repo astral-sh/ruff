@@ -28,11 +28,41 @@ ARG.py:43:16: ARG002 Unused method argument: `x`
 44 |         print("Hello, world!")
    |
 
-ARG.py:205:24: ARG002 Unused method argument: `x`
+ARG.py:58:17: ARG002 Unused method argument: `x`
+   |
+56 |         print("Hello, world!")
+57 | 
+58 |     def f(self, x):
+   |                 ^ ARG002
+59 |         msg[0] = "..."
+60 |         raise NotImplementedError(msg)
+   |
+
+ARG.py:62:17: ARG002 Unused method argument: `x`
+   |
+60 |         raise NotImplementedError(msg)
+61 | 
+62 |     def f(self, x):
+   |                 ^ ARG002
+63 |         msg = "..."
+64 |         raise NotImplementedError(foo)
+   |
+
+ARG.py:66:17: ARG002 Unused method argument: `x`
+   |
+64 |         raise NotImplementedError(foo)
+65 | 
+66 |     def f(self, x):
+   |                 ^ ARG002
+67 |         msg = "..."
+68 |         raise NotImplementedError("must use msg")
+   |
+
+ARG.py:213:24: ARG002 Unused method argument: `x`
     |
-203 | ###
-204 | class C:
-205 |     def __init__(self, x) -> None:
+211 | ###
+212 | class C:
+213 |     def __init__(self, x) -> None:
     |                        ^ ARG002
-206 |         print("Hello, world!")
+214 |         print("Hello, world!")
     |
