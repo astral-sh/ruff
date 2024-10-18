@@ -1454,7 +1454,7 @@ impl<Context> std::fmt::Debug for Group<'_, Context> {
 /// layout doesn't exceed the line width too, in which case it falls back to the flat layout.
 ///
 /// This IR is identical to the following [`best_fitting`] layout but is implemented as custom IR for
-/// best performance.
+/// better performance.
 ///
 /// ```rust
 /// # use ruff_formatter::prelude::*;
