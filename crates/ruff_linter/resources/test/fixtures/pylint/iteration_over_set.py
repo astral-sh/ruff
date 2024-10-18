@@ -56,3 +56,7 @@ for item in {1, 2, 3, 4, 5, 6, 2 // 1}:  # operations in set literals are fine
 
 for item in {1, 2, 3, 4, 5, 6, int("7")}:  # calls in set literals are fine
     print(f"I like {item}.")
+
+for item in {1, 2, 2}:  # duplicate literals will be ignored
+    # B033 catches this
+    print(f"I like {item}.")

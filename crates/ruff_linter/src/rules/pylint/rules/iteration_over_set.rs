@@ -1,7 +1,8 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::Expr;
+use ruff_python_ast::{comparable::ComparableExpr, Expr};
 use ruff_text_size::Ranged;
+use rustc_hash::FxHashSet;
 
 use crate::checkers::ast::Checker;
 
@@ -46,11 +47,21 @@ pub(crate) fn iteration_over_set(checker: &mut Checker, expr: &Expr) {
         return;
     };
 
-    // Only suggest a fix if all elements are literals.
-    // This is because we can't determine if the set is used to de-dupe
-    // the output values of a call, operation, etc.
-    if !set.iter().all(Expr::is_literal_expr) {
-        return;
+    let mut seen_values: FxHashSet<ComparableExpr> = FxHashSet::default();
+
+    for value in set {
+        if value.is_literal_expr() {
+            let comparable_value = ComparableExpr::from(value);
+
+            if !seen_values.insert(comparable_value) {
+                // if the set contains a duplicate literal value, early exit.
+                // rule `B033` can catch that.
+                return;
+            }
+        } else {
+            // If the set contains a non-literal expression, early exit.
+            return;
+        }
     }
 
     let mut diagnostic = Diagnostic::new(IterationOverSet, expr.range());
