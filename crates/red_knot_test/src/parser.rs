@@ -1,6 +1,7 @@
 use regex::{Captures, Regex};
 use ruff_index::{newtype_index, IndexVec};
-use ruff_source_file::OneIndexed;
+use ruff_source_file::{LineIndex, OneIndexed};
+use ruff_text_size::TextSize;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::LazyLock;
 
@@ -132,7 +133,9 @@ pub(crate) struct EmbeddedFile<'s> {
     pub(crate) path: &'s str,
     pub(crate) lang: &'s str,
     pub(crate) code: &'s str,
-    pub(crate) md_line_number: OneIndexed,
+
+    /// The line number of the ``` in the markdown file
+    pub(crate) starting_line_number: OneIndexed,
 }
 
 /// Matches an arbitrary amount of whitespace (including newlines), followed by a sequence of `#`
@@ -188,8 +191,10 @@ struct Parser<'s> {
     /// The unparsed remainder of the Markdown source.
     unparsed: &'s str,
 
-    /// Current line number of the parser
-    current_line_number: OneIndexed,
+    /// Current offset of the parser into the markdown file.
+    md_offset: TextSize,
+
+    line_index: LineIndex,
 
     /// Stack of ancestor sections.
     stack: SectionStack,
@@ -210,7 +215,8 @@ impl<'s> Parser<'s> {
             sections,
             files: IndexVec::default(),
             unparsed: source,
-            current_line_number: OneIndexed::new(1).unwrap(),
+            md_offset: TextSize::new(0),
+            line_index: LineIndex::from_source_text(&source),
             stack: SectionStack::new(root_section_id),
             current_section_files: None,
         }
@@ -231,10 +237,13 @@ impl<'s> Parser<'s> {
         }
     }
 
-    fn increment_line_count(&mut self, captures: &Captures<'s>) {
-        self.current_line_number = self
-            .current_line_number
-            .saturating_add(captures[0].lines().count());
+    fn increment_offset(&mut self, size: usize) -> anyhow::Result<()> {
+        self.md_offset = self
+            .md_offset
+            .checked_add(size.try_into()?)
+            .ok_or_else(|| anyhow::anyhow!("Overflow when incrementing offset by {size}"))?;
+
+        Ok(())
     }
 
     fn parse_impl(&mut self) -> anyhow::Result<()> {
@@ -247,7 +256,7 @@ impl<'s> Parser<'s> {
                 // ignore other Markdown syntax (paragraphs, etc) used as comments in the test
                 if let Some(next_newline) = self.unparsed.find('\n') {
                     (_, self.unparsed) = self.unparsed.split_at(next_newline + 1);
-                    self.current_line_number = self.current_line_number.saturating_add(1);
+                    self.increment_offset(next_newline + 1)?;
                 } else {
                     break;
                 }
@@ -283,7 +292,12 @@ impl<'s> Parser<'s> {
 
         self.current_section_files = None;
 
-        self.increment_line_count(captures);
+        self.increment_offset(
+            captures
+                .get(0)
+                .ok_or_else(|| anyhow::anyhow!("No captures found"))?
+                .len(),
+        )?;
 
         Ok(())
     }
@@ -318,7 +332,8 @@ impl<'s> Parser<'s> {
             // CODE_RE can't match without matches for 'lang' and 'code'.
             lang: captures.name("lang").unwrap().into(),
             code: captures.name("code").unwrap().into(),
-            md_line_number: self.current_line_number,
+
+            starting_line_number: self.line_index.line_index(self.md_offset),
         });
 
         if let Some(current_files) = &mut self.current_section_files {
@@ -340,7 +355,12 @@ impl<'s> Parser<'s> {
             self.current_section_files = Some(FxHashSet::from_iter([path]));
         }
 
-        self.increment_line_count(captures);
+        self.increment_offset(
+            captures
+                .get(0)
+                .ok_or_else(|| anyhow::anyhow!("No captures found"))?
+                .len(),
+        )?;
 
         Ok(())
     }

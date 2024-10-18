@@ -1,6 +1,6 @@
 use std::fmt;
 use std::fmt::{Debug, Formatter};
-use std::num::{NonZeroUsize, ParseIntError};
+use std::num::{IntErrorKind, NonZeroUsize, ParseIntError, TryFromIntError};
 use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -415,6 +415,22 @@ impl FromStr for OneIndexed {
     type Err = ParseIntError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(OneIndexed(NonZeroUsize::from_str(s)?))
+    }
+}
+
+impl TryFrom<usize> for OneIndexed {
+    type Error = TryFromIntError;
+
+    fn try_from(value: usize) -> Result<Self, Self::Error> {
+        Ok(OneIndexed(NonZeroUsize::try_from(value)?))
+    }
+}
+
+impl TryInto<usize> for OneIndexed {
+    type Error = IntErrorKind;
+
+    fn try_into(self) -> Result<usize, Self::Error> {
+        Ok(self.0.get())
     }
 }
 
