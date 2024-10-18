@@ -156,7 +156,7 @@ impl Transformer for Normalizer {
 
                         let mut collector = Collector::default();
 
-                        for part in fstring.value.iter() {
+                        for part in &fstring.value {
                             match part {
                                 ast::FStringPart::Literal(string_literal) => {
                                     collector

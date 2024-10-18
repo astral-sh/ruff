@@ -173,7 +173,7 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
             }
 
             // The preferred quote style is to preserve the quotes, so let's do that.
-            (Err(_), _) => string_flags,
+            (Err(()), _) => string_flags,
         };
 
         QuoteSelection {
