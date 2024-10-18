@@ -582,6 +582,9 @@ impl<'db> Type<'db> {
                 // TODO: once we have support for `final`, there might be some cases where
                 // we can determine that two types are disjoint. For non-final classes, we
                 // return false (multiple inheritance).
+
+                // TODO: is there anything specific to do for instances of KnownClass::Type?
+
                 false
             }
 
