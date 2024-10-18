@@ -327,11 +327,7 @@ fn call<'a>(
 fn is_not_implemented_stub_with_variable(function_def: &StmtFunctionDef) -> bool {
     // Ignore doc-strings.
     let statements = match function_def.body.as_slice() {
-        [Stmt::Expr(StmtExpr { value, .. }), rest @ ..]
-            if matches!(**value, ast::Expr::StringLiteral(_)) =>
-        {
-            rest
-        }
+        [Stmt::Expr(StmtExpr { value, .. }), rest @ ..] if value.is_string_literal_expr() => rest,
         _ => &function_def.body,
     };
 
