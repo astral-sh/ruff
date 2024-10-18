@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use ruff_formatter::{format_args, write};
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::str_prefix::{
     AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix,
@@ -37,13 +38,9 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedString<'_> {
         // if it fits on the line. Otherwise, parenthesize the string parts and format each part on its
         // own line.
         if let Some(flat) = FormatImplicitConcatenatedStringFlat::new(self.string, f.context()) {
-            ruff_formatter::write!(
+            write!(
                 f,
-                [
-                    // TODO: strings in expression statements aren't joined correctly because they aren't wrap in a group :(
-                    if_group_fits_on_line(&flat),
-                    if_group_breaks(&expanded)
-                ]
+                [if_group_fits_on_line(&flat), if_group_breaks(&expanded)]
             )
         } else {
             expanded.fmt(f)
@@ -87,7 +84,7 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringExpanded<'_
             });
 
             let part_comments = comments.leading_dangling_trailing(&part);
-            joiner.entry(&ruff_formatter::format_args![
+            joiner.entry(&format_args![
                 line_suffix_boundary(),
                 leading_comments(part_comments.leading),
                 format_part,
@@ -190,7 +187,7 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
         // Merges all string parts into a single string.
         let quotes = StringQuotes::from(self.flags);
 
-        ruff_formatter::write!(f, [self.flags.prefix(), quotes])?;
+        write!(f, [self.flags.prefix(), quotes])?;
 
         // TODO: FStrings when the f-string preview style is enabled???
 
