@@ -521,7 +521,16 @@ impl<'db> Type<'db> {
                         true
                     }
                 } else {
-                    true
+                    // We can not be sure if the tuple is disjoint from 'other' because:
+                    //   - 'other' might be the homogeneous arbitrary-length tuple type
+                    //     tuple[T, ...] (which we don't have support for yet); if all
+                    //     of our element types are subtypes of T, this is not disjoint
+                    //   - 'other' might be a user subtype of tuple, which, if generic
+                    //     over the same or compatible *Ts, would overlap with tuple.
+                    //
+                    // TODO: add checks for the above cases once we support them
+
+                    false
                 }
             }
 
@@ -1858,7 +1867,6 @@ mod tests {
     #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::IntLiteral(3))]
     #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(3), Ty::IntLiteral(4)]))]
     #[test_case(Ty::Intersection{pos: vec![Ty::BuiltinInstance("int"),  Ty::IntLiteral(1)], neg: vec![]}, Ty::IntLiteral(2))]
-    #[test_case(Ty::Tuple(vec![Ty::BuiltinInstance("int")]), Ty::BuiltinInstance("int"))]
     #[test_case(Ty::Tuple(vec![Ty::IntLiteral(1)]), Ty::Tuple(vec![Ty::IntLiteral(2)]))]
     #[test_case(Ty::Tuple(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Tuple(vec![Ty::IntLiteral(1)]))]
     #[test_case(Ty::Tuple(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Tuple(vec![Ty::IntLiteral(1), Ty::IntLiteral(3)]))]
