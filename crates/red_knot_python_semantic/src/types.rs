@@ -484,11 +484,6 @@ impl<'db> Type<'db> {
             (Type::Unbound, _) | (_, Type::Unbound) => false,
             (Type::Todo, _) | (_, Type::Todo) => false,
 
-            (ty @ (Type::Function(..) | Type::Module(..) | Type::Class(..)), other)
-            | (other, ty @ (Type::Function(..) | Type::Module(..) | Type::Class(..))) => {
-                ty != other
-            }
-
             (Type::Union(union), other) | (other, Type::Union(union)) => union
                 .elements(db)
                 .iter()
@@ -514,12 +509,18 @@ impl<'db> Type<'db> {
                 | Type::BooleanLiteral(..)
                 | Type::IntLiteral(..)
                 | Type::StringLiteral(..)
-                | Type::BytesLiteral(..)),
+                | Type::BytesLiteral(..)
+                | Type::Function(..)
+                | Type::Module(..)
+                | Type::Class(..)),
                 right @ (Type::None
                 | Type::BooleanLiteral(..)
                 | Type::IntLiteral(..)
                 | Type::StringLiteral(..)
-                | Type::BytesLiteral(..)),
+                | Type::BytesLiteral(..)
+                | Type::Function(..)
+                | Type::Module(..)
+                | Type::Class(..)),
             ) => left != right,
 
             (Type::None, Type::Instance(class_type)) | (Type::Instance(class_type), Type::None) => {
@@ -567,6 +568,15 @@ impl<'db> Type<'db> {
                 Some(KnownClass::Bytes | KnownClass::Object)
             ),
             (Type::BytesLiteral(..), _) | (_, Type::BytesLiteral(..)) => true,
+
+            (
+                Type::Function(..) | Type::Module(..) | Type::Class(..),
+                Type::Instance(class_type),
+            )
+            | (
+                Type::Instance(class_type),
+                Type::Function(..) | Type::Module(..) | Type::Class(..),
+            ) => !class_type.is_known(db, KnownClass::Object),
 
             (Type::Instance(..), Type::Instance(..)) => {
                 // TODO: once we have support for `final`, there might be some cases where
