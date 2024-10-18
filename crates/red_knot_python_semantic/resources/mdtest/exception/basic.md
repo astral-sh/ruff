@@ -4,6 +4,7 @@
 
 ```py
 import re
+
 try:
     x
 except NameError as e:

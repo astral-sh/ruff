@@ -20,12 +20,15 @@ Walking through examples:
 
 ```py
 from __future__ import annotations
+
+
 class A:
     def __lt__(self, other) -> A: ...
 class B:
     def __lt__(self, other) -> B: ...
 class C:
     def __lt__(self, other) -> C: ...
+
 
 x = A() < B() < C()
 reveal_type(x)  # revealed: A | B

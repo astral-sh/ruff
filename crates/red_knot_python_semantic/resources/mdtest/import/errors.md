@@ -4,6 +4,7 @@
 
 ```py
 import bar  # error: "Cannot resolve import `bar`"
+
 reveal_type(bar)  # revealed: Unknown
 ```
 
@@ -11,6 +12,7 @@ reveal_type(bar)  # revealed: Unknown
 
 ```py
 from bar import baz  # error: "Cannot resolve import `bar`"
+
 reveal_type(baz)  # revealed: Unknown
 ```
 
@@ -21,6 +23,7 @@ reveal_type(baz)  # revealed: Unknown
 
 ```py
 from a import thing  # error: "Module `a` has no member `thing`"
+
 reveal_type(thing)  # revealed: Unknown
 ```
 
@@ -28,6 +31,7 @@ reveal_type(thing)  # revealed: Unknown
 
 ```py path=a.py
 import foo as foo  # error: "Cannot resolve import `foo`"
+
 reveal_type(foo)  # revealed: Unknown
 ```
 
@@ -36,6 +40,7 @@ import" violation:
 
 ```py
 from a import foo
+
 reveal_type(foo)  # revealed: Unknown
 ```
 
@@ -48,5 +53,5 @@ x: int
 ```py
 from b import x
 
-x = 'foo'  # error: [invalid-assignment] "Object of type `Literal["foo"]"
+x = "foo"  # error: [invalid-assignment] "Object of type `Literal["foo"]"
 ```

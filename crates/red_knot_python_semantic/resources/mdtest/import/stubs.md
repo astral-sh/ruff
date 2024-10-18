@@ -4,6 +4,7 @@
 
 ```py
 from b import x
+
 y = x
 reveal_type(y)  # revealed: int
 ```
@@ -16,6 +17,7 @@ x: int
 
 ```py
 from b import x
+
 y = x
 reveal_type(y)  # revealed: int
 ```

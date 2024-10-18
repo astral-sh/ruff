@@ -7,5 +7,5 @@ if flag:
     x: str
 else:
     x: int
-x: bytes = b'foo'
+x: bytes = b"foo"
 ```

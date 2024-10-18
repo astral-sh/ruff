@@ -35,5 +35,5 @@ else:
 
 # error: [conflicting-declarations]
 # error: [invalid-assignment]
-x = b'foo'
+x = b"foo"
 ```

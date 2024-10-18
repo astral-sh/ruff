@@ -7,9 +7,11 @@ class IntIterator:
     def __next__(self) -> int:
         return 42
 
+
 class IntIterable:
     def __iter__(self) -> IntIterator:
         return IntIterator()
+
 
 for x in IntIterable():
     pass
@@ -24,11 +26,13 @@ class IntIterator:
     def __next__(self) -> int:
         return 42
 
+
 class IntIterable:
     def __iter__(self) -> IntIterator:
         return IntIterator()
 
-x = 'foo'
+
+x = "foo"
 
 for x in IntIterable():
     pass
@@ -43,14 +47,16 @@ class IntIterator:
     def __next__(self) -> int:
         return 42
 
+
 class IntIterable:
     def __iter__(self) -> IntIterator:
         return IntIterator()
 
+
 for x in IntIterable():
     pass
 else:
-    x = 'foo'
+    x = "foo"
 
 reveal_type(x)  # revealed: Literal["foo"]
 ```
@@ -62,15 +68,17 @@ class IntIterator:
     def __next__(self) -> int:
         return 42
 
+
 class IntIterable:
     def __iter__(self) -> IntIterator:
         return IntIterator()
+
 
 for x in IntIterable():
     if x > 5:
         break
 else:
-    x = 'foo'
+    x = "foo"
 
 reveal_type(x)  # revealed: int | Literal["foo"]
 ```
@@ -82,6 +90,7 @@ class OldStyleIterable:
     def __getitem__(self, key: int) -> int:
         return 42
 
+
 for x in OldStyleIterable():
     pass
 
@@ -91,7 +100,7 @@ reveal_type(x)  # revealed: Unbound | int
 ## With heterogeneous tuple
 
 ```py
-for x in (1, 'a', b'foo'):
+for x in (1, "a", b"foo"):
     pass
 
 reveal_type(x)  # revealed: Unbound | Literal[1] | Literal["a"] | Literal[b"foo"]
@@ -105,6 +114,7 @@ class NotIterable:
         __iter__ = 1
     else:
         __iter__ = None
+
 
 for x in NotIterable():  # error: "Object of type `NotIterable` is not iterable"
     pass
@@ -128,6 +138,7 @@ class NotIterable:
         return 42
 
     __iter__ = None
+
 
 for x in NotIterable():  # error: "Object of type `NotIterable` is not iterable"
     pass
