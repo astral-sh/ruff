@@ -1901,6 +1901,29 @@ mod tests {
         assert!(!b.is_disjoint_from(&db, a));
     }
 
+    #[test]
+    fn is_disjoint_from_union_of_class_types() {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/module.py",
+            "
+            class A: ...
+            class B: ...
+            x = A if flag else B
+        ",
+        )
+        .unwrap();
+        let module = ruff_db::files::system_path_to_file(&db, "/src/module.py").unwrap();
+
+        let type_a = super::global_symbol_ty(&db, module, "A");
+        let type_x = super::global_symbol_ty(&db, module, "x");
+
+        assert!(matches!(type_a, Type::Class(_)));
+        assert!(matches!(type_x, Type::Union(_)));
+
+        assert!(!type_a.is_disjoint_from(&db, type_x));
+    }
+
     #[test_case(Ty::None)]
     #[test_case(Ty::BoolLiteral(true))]
     #[test_case(Ty::BoolLiteral(false))]
