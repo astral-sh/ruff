@@ -106,10 +106,6 @@ pub(crate) struct FormatImplicitConcatenatedStringFlat<'a> {
 
 impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
     pub(crate) fn new(string: StringLike<'a>, context: &PyFormatContext) -> Option<Self> {
-        if !string.is_implicit_concatenated() {
-            return None;
-        }
-
         fn merge_flags(string: StringLike, context: &PyFormatContext) -> Option<AnyStringFlags> {
             if !is_join_implicit_concatenated_string_enabled(context) {
                 return None;
@@ -169,6 +165,10 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                 merged_quotes?.choose(preferred_quote),
                 false,
             ))
+        }
+
+        if !string.is_implicit_concatenated() {
+            return None;
         }
 
         Some(Self {

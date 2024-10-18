@@ -309,13 +309,11 @@ impl<'a> CanOmitOptionalParenthesesVisitor<'a> {
                     if !self.join_implicit_concatenated_strings {
                         self.update_max_precedence(OperatorPrecedence::String, string.value.len());
                     }
-                    return;
                 }
                 Expr::BytesLiteral(bytes) => {
                     if !self.join_implicit_concatenated_strings {
                         self.update_max_precedence(OperatorPrecedence::String, bytes.value.len());
                     }
-                    return;
                 }
                 // F-strings are allowed according to python's grammar but fail with a syntax error at runtime.
                 // That's why we need to support them for formatting.
@@ -326,7 +324,6 @@ impl<'a> CanOmitOptionalParenthesesVisitor<'a> {
                             string.value.as_slice().len(),
                         );
                     }
-                    return;
                 }
 
                 Expr::NumberLiteral(_) | Expr::Attribute(_) | Expr::UnaryOp(_) => {

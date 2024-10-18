@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
+assertion_line: 264
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/join_implicit_concatenated_string_assignment.py
 ---
 ## Input
@@ -247,9 +248,8 @@ a[aaaaaaa, b] = "ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"  #
 # The target should be flat
 # The string gets parenthesized because it, with the inlined comment, exceeds the line length limit.
 a[aaaaaaa, b] = (
-    "ccccccccccccccccccccccccccccc"
-    "ccccccccccccccccccccccccccccccccccccccccccc"
-)  # comment
+    "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"  # comment
+)
 
 
 # Split an overlong target, but join the string if it fits
@@ -299,9 +299,8 @@ type A[str, int, number] = (
 
 # Keep multiline if overlong
 type A[str, int, number] = (
-    "Literal[string, int] | None | "
-    "CustomTypeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
-)  # comment
+    "Literal[string, int] | None | CustomTypeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"  # comment
+)
 
 # Break the left if it is over-long, join the string
 type Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[

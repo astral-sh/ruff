@@ -31,3 +31,114 @@ ____aaa = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvv
 ____aaa = (
     "aaaaaaaaaaaaaaaaaaaaa" "aaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvv"  # c
 )
+
+
+#############################################################
+# Assignments where the target or annotations are splittable
+#############################################################
+
+
+# The target splits because of a magic trailing comma
+# The string is joined and not parenthesized because it just fits into the line length (including comment).
+a[
+    aaaaaaa,
+    b,
+] = "ccccccccccccccccccccccccccccc" "cccccccccccccccccccccccccccccccccccccccccc"  # comment
+
+# Same but starting with a joined string. They should both result in the same formatting.
+[
+    aaaaaaa,
+    b,
+] = "ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"  # comment
+
+# The target splits because of the magic trailing comma
+# The string is **not** joined because it with the inlined comment exceeds the line length limit.
+a[
+    aaaaaaa,
+    b,
+] = "ccccccccccccccccccccccccccccc" "ccccccccccccccccccccccccccccccccccccccccccc"  # comment
+
+
+# The target should be flat
+# The string should be joined because it fits into the line length
+a[
+    aaaaaaa,
+    b
+] = (
+    "ccccccccccccccccccccccccccccccccccc" "cccccccccccccccccccccccc"  # comment
+)
+
+# Same but starting with a joined string. They should both result in the same formatting.
+a[
+    aaaaaaa,
+    b
+] = "ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"  # comment
+
+# The target should be flat
+# The string gets parenthesized because it, with the inlined comment, exceeds the line length limit.
+a[
+    aaaaaaa,
+    b
+] = "ccccccccccccccccccccccccccccc" "ccccccccccccccccccccccccccccccccccccccccccc"  # comment
+
+
+# Split an overlong target, but join the string if it fits
+a[
+    aaaaaaa,
+    b
+].bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb = (
+    "ccccccccccccccccccccccccccccccccccccccccc" "cccccccccccccccccccccccccccccc"  # comment
+)
+
+# Split both if necessary and keep multiline
+a[
+    aaaaaaa,
+    b
+].bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb = (
+    "ccccccccccccccccccccccccccccccccccccccccc" "ccccccccccccccccccccccccccccccc"  # comment
+)
+
+#########################################################
+# Leading or trailing own line comments:
+# Preserve the parentheses
+########################################################
+a[
+    aaaaaaa,
+    b
+] = (
+    # test
+    "ccccccccccccccccccccccccccccc" "ccccccccccccccccccccccccccccccccccccccccccc"
+)
+
+a[
+    aaaaaaa,
+    b
+] = (
+    "ccccccccccccccccccccccccccccc" "ccccccccccccccccccccccccccccccccccccccccccc"
+    # test
+)
+
+a[
+    aaaaaaa,
+    b
+] = (
+    "ccccccccccccccccccccccccccccccccccccccccc" "ccccccccccccccccccccccccccccccccccccccccccc"
+    # test
+)
+
+
+#############################################################
+# Type alias statements
+#############################################################
+
+# First break the right, join the string
+type A[str, int, number] = "Literal[string, int] | None | " "CustomType" "| OtherCustomTypeExcee"  # comment
+
+# Keep multiline if overlong
+type A[str, int, number] = "Literal[string, int] | None | " "CustomTypeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"  # comment
+
+# Break the left if it is over-long, join the string
+type Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[stringgggggggggg, inttttttttttttttttttttttt, number] = "Literal[string, int] | None | " "CustomType"  # comment
+
+# Break both if necessary and keep multiline
+type Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[stringgggggggggg, inttttttttttttttttttttttt, number] = "Literal[string, int] | None | " "CustomTypeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"  # comment
