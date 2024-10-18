@@ -142,7 +142,11 @@ reveal_type(A() + B())  # revealed: MyString
 # N.B. Still a subtype of `A`, even though `A` does not appear directly in the class's `__bases__`
 class C(B): ...
 
-reveal_type(A() + C())  # revealed: MyString
+# TODO: we currently only understand direct subclasses as subtypes of the superclass.
+# We need to iterate through the full MRO rather than just the class's bases;
+# if we do, we'll understand `C` as a subtype of `A`, and correctly understand this as being
+# `MyString` rather than `str`
+reveal_type(A() + C())  # revealed: str
 ```
 
 ## Reflected precedence 2

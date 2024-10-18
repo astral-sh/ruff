@@ -440,6 +440,9 @@ impl<'db> Type<'db> {
                 .any(|&elem_ty| ty.is_subtype_of(db, elem_ty)),
             (_, Type::Instance(class)) if class.is_known(db, KnownClass::Object) => true,
             (Type::Instance(class), _) if class.is_known(db, KnownClass::Object) => false,
+            (Type::Instance(self_class), Type::Instance(target_class)) => self_class
+                .bases(db) // TODO: this should iterate through the MRO, not through the bases
+                .any(|base| base == Type::Class(target_class)),
             // TODO
             _ => false,
         }

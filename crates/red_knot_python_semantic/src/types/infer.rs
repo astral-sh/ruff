@@ -2642,17 +2642,36 @@ impl<'db> TypeInferenceBuilder<'db> {
                 op,
             ),
 
-            (Type::Instance(left_class), Type::Instance(right_class), op) => left_class
-                .class_member(self.db, op.dunder())
-                .call(self.db, &[left_ty, right_ty])
-                .return_ty(self.db)
-                .unwrap_or_else(|| {
-                    right_class
-                        .class_member(self.db, op.reflected_dunder())
-                        .call(self.db, &[right_ty, left_ty])
-                        .return_ty(self.db)
-                        .unwrap_or(Type::Unknown)
-                }),
+            (Type::Instance(left_class), Type::Instance(right_class), op) => {
+                if left_class != right_class && right_ty.is_assignable_to(self.db, left_ty) {
+                    let rhs_reflected = right_class.class_member(self.db, op.reflected_dunder());
+                    if !rhs_reflected.is_unbound()
+                        && rhs_reflected != left_class.class_member(self.db, op.reflected_dunder())
+                    {
+                        return rhs_reflected
+                            .call(self.db, &[right_ty, left_ty])
+                            .return_ty(self.db)
+                            .or_else(|| {
+                                left_class
+                                    .class_member(self.db, op.dunder())
+                                    .call(self.db, &[left_ty, right_ty])
+                                    .return_ty(self.db)
+                            })
+                            .unwrap_or(Type::Unknown);
+                    }
+                }
+                left_class
+                    .class_member(self.db, op.dunder())
+                    .call(self.db, &[left_ty, right_ty])
+                    .return_ty(self.db)
+                    .or_else(|| {
+                        right_class
+                            .class_member(self.db, op.reflected_dunder())
+                            .call(self.db, &[right_ty, left_ty])
+                            .return_ty(self.db)
+                    })
+                    .unwrap_or(Type::Unknown)
+            }
 
             _ => Type::Todo, // TODO
         }
