@@ -1,0 +1,306 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/join_implicit_concatenated_string.py
+---
+## Input
+```python
+"aaaaaaaaa" "bbbbbbbbbbbbbbbbbbbb" # Join
+
+(
+    "aaaaaaaaaaa" "bbbbbbbbbbbbbbbb"
+) # join
+
+
+(
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+) # too long to join
+
+"diffent '" 'quote "are fine"' # join
+
+
+b"aaaaaaaaa" b"bbbbbbbbbbbbbbbbbbbb" # Join
+
+(
+    b"aaaaaaaaaaa" b"bbbbbbbbbbbbbbbb"
+) # join
+
+
+(
+    b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" b"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+) # too long to join
+
+f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa{
+    expression
+}bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" f"cccccccccccccccccccc {20999}" "more"
+
+##############################################################################
+# Don't join raw strings
+##############################################################################
+
+r"a" "normal"
+R"a" "normal"
+
+f"test" fr"test"
+f"test" fR"test"
+
+
+##############################################################################
+# Don't join triple quoted strings
+##############################################################################
+
+"single" """triple"""
+
+"single" f""""single"""
+
+b"single" b"""triple"""
+
+
+##############################################################################
+# Join strings in with statements
+##############################################################################
+
+# Fits
+with "aa" "bbb" "cccccccccccccccccccccccccccccccccccccccccccccc":
+    pass
+
+# Parenthesize single-line
+with "aa" "bbb" "ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc":
+    pass
+
+# Multiline
+with "aa" "bbb" "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc":
+    pass
+
+with f"aaaaaaa{expression}bbbb" f"ccc {20999}" "more":
+    pass
+
+
+##############################################################################
+# For loops
+##############################################################################
+
+# Flat
+for a in "aaaaaaaaa" "bbbbbbbbb" "ccccccccc" "dddddddddd":
+    pass
+
+# Parenthesize single-line
+for a in "aaaaaaaaa" "bbbbbbbbb" "ccccccccc" "dddddddddd" "eeeeeeeeeeeeeee" "fffffffffffff" "ggggggggggggggg" "hh":
+    pass
+
+# Multiline
+for a in "aaaaaaaaa" "bbbbbbbbb" "ccccccccc" "dddddddddd" "eeeeeeeeeeeeeee" "fffffffffffff" "ggggggggggggggg" "hhhh":
+    pass
+
+##############################################################################
+# Assert statement
+##############################################################################
+
+# Fits
+assert "aaaaaaaaa" "bbbbbbbbbbbb", "cccccccccccccccc" "dddddddddddddddd"
+
+# Wrap right
+assert "aaaaaaaaa" "bbbbbbbbbbbb", "cccccccccccccccc" "dddddddddddddddd" "eeeeeeeeeeeee" "fffffffffff"
+
+# Right multiline
+assert "aaaaaaaaa" "bbbbbbbbbbbb", "cccccccccccccccc" "dddddddddddddddd" "eeeeeeeeeeeee" "fffffffffffffff" "ggggggggggggg" "hhhhhhhhhhh"
+
+# Wrap left
+assert "aaaaaaaaa" "bbbbbbbbbbbb" "cccccccccccccccc" "dddddddddddddddd" "eeeeeeeeeeeee" "fffffffffffffff", "ggggggggggggg" "hhhhhhhhhhh"
+
+# Left multiline
+assert "aaaaaaaaa" "bbbbbbbbbbbb" "cccccccccccccccc" "dddddddddddddddd" "eeeeeeeeeeeee" "fffffffffffffff" "ggggggggggggg", "hhhhhhhhhhh"
+
+# wrap both
+assert "aaaaaaaaa" "bbbbbbbbbbbb" "cccccccccccccccc" "dddddddddddddddd" "eeeeeeeeeeeee" "fffffffffffffff", "ggggggggggggg" "hhhhhhhhhhh" "iiiiiiiiiiiiiiiiii" "jjjjjjjjjjjjj" "kkkkkkkkkkkkkkkkk" "llllllllllll"
+
+# both multiline
+assert "aaaaaaaaa" "bbbbbbbbbbbb" "cccccccccccccccc" "dddddddddddddddd" "eeeeeeeeeeeee" "fffffffffffffff" "ggggggggggggg", "hhhhhhhhhhh" "iiiiiiiiiiiiiiiiii" "jjjjjjjjjjjjj" "kkkkkkkkkkkkkkkkk" "llllllllllll" "mmmmmmmmmmmmmm"
+```
+
+## Outputs
+### Output 1
+```
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Enabled
+target_version             = Py38
+source_type                = Python
+```
+
+```python
+"aaaaaaaaabbbbbbbbbbbbbbbbbbbb"  # Join
+
+("aaaaaaaaaaabbbbbbbbbbbbbbbb")  # join
+
+
+(
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+)  # too long to join
+
+'diffent \'quote "are fine"'  # join
+
+
+b"aaaaaaaaabbbbbbbbbbbbbbbbbbbb"  # Join
+
+(b"aaaaaaaaaaabbbbbbbbbbbbbbbb")  # join
+
+
+(
+    b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    b"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+)  # too long to join
+
+f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa{
+    expression
+}bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbcccccccccccccccccccc {20999}more"
+
+##############################################################################
+# Don't join raw strings
+##############################################################################
+
+r"a" "normal"
+R"a" "normal"
+
+f"test" rf"test"
+f"test" Rf"test"
+
+
+##############################################################################
+# Don't join triple quoted strings
+##############################################################################
+
+"single" """triple"""
+
+"single" f""""single"""
+
+b"single" b"""triple"""
+
+
+##############################################################################
+# Join strings in with statements
+##############################################################################
+
+# Fits
+with "aabbbcccccccccccccccccccccccccccccccccccccccccccccc":
+    pass
+
+# Parenthesize single-line
+with (
+    "aabbbccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+):
+    pass
+
+# Multiline
+with (
+    "aa"
+    "bbb"
+    "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+):
+    pass
+
+with f"aaaaaaa{expression}bbbbccc {20999}more":
+    pass
+
+
+##############################################################################
+# For loops
+##############################################################################
+
+# Flat
+for a in "aaaaaaaaabbbbbbbbbcccccccccdddddddddd":
+    pass
+
+# Parenthesize single-line
+for a in (
+    "aaaaaaaaabbbbbbbbbcccccccccddddddddddeeeeeeeeeeeeeeefffffffffffffggggggggggggggghh"
+):
+    pass
+
+# Multiline
+for a in (
+    "aaaaaaaaa"
+    "bbbbbbbbb"
+    "ccccccccc"
+    "dddddddddd"
+    "eeeeeeeeeeeeeee"
+    "fffffffffffff"
+    "ggggggggggggggg"
+    "hhhh"
+):
+    pass
+
+##############################################################################
+# Assert statement
+##############################################################################
+
+# Fits
+assert "aaaaaaaaabbbbbbbbbbbb", "ccccccccccccccccdddddddddddddddd"
+
+# Wrap right
+assert "aaaaaaaaabbbbbbbbbbbb", (
+    "ccccccccccccccccddddddddddddddddeeeeeeeeeeeeefffffffffff"
+)
+
+# Right multiline
+assert "aaaaaaaaabbbbbbbbbbbb", (
+    "cccccccccccccccc"
+    "dddddddddddddddd"
+    "eeeeeeeeeeeee"
+    "fffffffffffffff"
+    "ggggggggggggg"
+    "hhhhhhhhhhh"
+)
+
+# Wrap left
+assert (
+    "aaaaaaaaabbbbbbbbbbbbccccccccccccccccddddddddddddddddeeeeeeeeeeeeefffffffffffffff"
+), "ggggggggggggghhhhhhhhhhh"
+
+# Left multiline
+assert (
+    "aaaaaaaaa"
+    "bbbbbbbbbbbb"
+    "cccccccccccccccc"
+    "dddddddddddddddd"
+    "eeeeeeeeeeeee"
+    "fffffffffffffff"
+    "ggggggggggggg"
+), "hhhhhhhhhhh"
+
+# wrap both
+assert (
+    "aaaaaaaaabbbbbbbbbbbbccccccccccccccccddddddddddddddddeeeeeeeeeeeeefffffffffffffff"
+), (
+    "ggggggggggggg"
+    "hhhhhhhhhhh"
+    "iiiiiiiiiiiiiiiiii"
+    "jjjjjjjjjjjjj"
+    "kkkkkkkkkkkkkkkkk"
+    "llllllllllll"
+)
+
+# both multiline
+assert (
+    "aaaaaaaaa"
+    "bbbbbbbbbbbb"
+    "cccccccccccccccc"
+    "dddddddddddddddd"
+    "eeeeeeeeeeeee"
+    "fffffffffffffff"
+    "ggggggggggggg"
+), (
+    "hhhhhhhhhhh"
+    "iiiiiiiiiiiiiiiiii"
+    "jjjjjjjjjjjjj"
+    "kkkkkkkkkkkkkkkkk"
+    "llllllllllll"
+    "mmmmmmmmmmmmmm"
+)
+```

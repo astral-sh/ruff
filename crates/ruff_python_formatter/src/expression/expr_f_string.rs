@@ -7,6 +7,7 @@ use crate::expression::parentheses::{
 };
 use crate::other::f_string_part::FormatFStringPart;
 use crate::prelude::*;
+use crate::string::implicit::FormatImplicitConcatenatedStringFlat;
 use crate::string::{implicit::FormatImplicitConcatenatedString, Quoting, StringLikeExtensions};
 
 #[derive(Default)]
@@ -22,7 +23,18 @@ impl FormatNodeRule<ExprFString> for FormatExprFString {
                 f_string_quoting(item, &f.context().locator()),
             )
             .fmt(f),
-            _ => in_parentheses_only_group(&FormatImplicitConcatenatedString::new(item)).fmt(f),
+            _ => {
+                // Always join fstrings that aren't parenthesized and thus, are always on a single line.
+                if !f.context().node_level().is_parenthesized() {
+                    if let Some(format_flat) =
+                        FormatImplicitConcatenatedStringFlat::new(item.into(), f.context())
+                    {
+                        return format_flat.fmt(f);
+                    }
+                }
+
+                in_parentheses_only_group(&FormatImplicitConcatenatedString::new(item)).fmt(f)
+            }
         }
     }
 }

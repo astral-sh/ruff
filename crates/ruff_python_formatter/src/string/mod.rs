@@ -92,13 +92,6 @@ pub(crate) trait StringLikeExtensions {
     fn quoting(&self, locator: &Locator<'_>) -> Quoting;
 
     fn is_multiline(&self, source: &str) -> bool;
-
-    /// Tests if this is an implicitly concatenated string that can't be joined.
-    ///
-    /// * Returns `false` if this is not an implicitly concatenated string or the parts can't be joined
-    ///   because any part is a raw string, triple quoted string, or has leading or trailing comments.
-    /// * Returns `true` if it is an implicit concatenated string and Ruff tries to join it if it fits on the line.
-    fn is_implicit_and_can_join(&self, context: &PyFormatContext) -> bool;
 }
 
 impl StringLikeExtensions for ast::StringLike<'_> {
@@ -119,33 +112,5 @@ impl StringLikeExtensions for ast::StringLike<'_> {
                 memchr2(b'\n', b'\r', source[fstring.range].as_bytes()).is_some()
             }
         }
-    }
-
-    fn is_implicit_and_can_join(&self, context: &PyFormatContext) -> bool {
-        if !self.is_implicit_concatenated() {
-            return false;
-        }
-
-        for part in self.parts() {
-            // Similar to Black, don't collapse triple quoted and raw strings.
-            // We could technically join strings that are raw-strings and use the same quotes but lets not do this for now.
-            // Joining triple quoted strings is more complicated because an
-            // implicit concatenated string could become a docstring (if it's the first string in a block).
-            // That means the joined string formatting would have to call into
-            // the docstring formatting or otherwise guarantee that the output
-            // won't change on a second run.
-            if part.flags().is_triple_quoted() || part.flags().is_raw_string() {
-                return false;
-            }
-
-            // For now, preserve comments documenting a specific part over possibly
-            // collapsing onto a single line. Collapsing could result in pragma comments
-            // now covering more code.
-            if context.comments().leading_trailing(&part).next().is_some() {
-                return false;
-            }
-        }
-
-        true
     }
 }

@@ -112,17 +112,24 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
             }
 
             // Early exit if it's known that this string can't be joined
-            if !string.is_implicit_and_can_join(context) {
-                return None;
-            }
+            for part in string.parts() {
+                // Similar to Black, don't collapse triple quoted and raw strings.
+                // We could technically join strings that are raw-strings and use the same quotes but lets not do this for now.
+                // Joining triple quoted strings is more complicated because an
+                // implicit concatenated string could become a docstring (if it's the first string in a block).
+                // That means the joined string formatting would have to call into
+                // the docstring formatting or otherwise guarantee that the output
+                // won't change on a second run.
+                if part.flags().is_triple_quoted() || part.flags().is_raw_string() {
+                    return None;
+                }
 
-            // Don't merge multiline strings because that's pointless, a multiline string can
-            // never fit on a single line.
-            // TODO: The `is_multiline` implementation for f-string is an over-approximation and can
-            //   return `true` even if the f-string then gets formatted to a single line.
-            //   That's why we disregard the early exit here (it's just an optimisation).
-            if !string.is_fstring() && string.is_multiline(context.source()) {
-                return None;
+                // For now, preserve comments documenting a specific part over possibly
+                // collapsing onto a single line. Collapsing could result in pragma comments
+                // now covering more code.
+                if context.comments().leading_trailing(&part).next().is_some() {
+                    return None;
+                }
             }
 
             // The string is either a regular string, f-string, or bytes string.
