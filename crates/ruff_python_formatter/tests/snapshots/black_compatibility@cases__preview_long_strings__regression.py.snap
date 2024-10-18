@@ -1170,9 +1170,12 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
  )
  
  # Regression test for https://github.com/psf/black/issues/3455.
-@@ -674,7 +621,4 @@
+@@ -672,9 +619,6 @@
+ }
+ 
  # Regression test for https://github.com/psf/black/issues/3506.
- s = f"With single quote: '  {my_dict['foo']} With double quote: \"  {my_dict['bar']}"
+-s = f"With single quote: '  {my_dict['foo']} With double quote: \"  {my_dict['bar']}"
++s = f"With single quote: '  {my_dict['foo']} With double quote: \"  {my_dict["bar"]}"
  
 -s = (
 -    "Lorem Ipsum is simply dummy text of the printing and typesetting"
@@ -1805,7 +1808,7 @@ a_dict = {
 }
 
 # Regression test for https://github.com/psf/black/issues/3506.
-s = f"With single quote: '  {my_dict['foo']} With double quote: \"  {my_dict['bar']}"
+s = f"With single quote: '  {my_dict['foo']} With double quote: \"  {my_dict["bar"]}"
 
 s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:\'{my_dict["foo"]}\''
 ```

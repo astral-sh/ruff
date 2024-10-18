@@ -1,4 +1,4 @@
-use ruff_formatter::{format_args, write, FormatError};
+use ruff_formatter::{format_args, write, FormatError, RemoveSoftLinesBuffer};
 use ruff_python_ast::{
     AnyNodeRef, Expr, ExprAttribute, ExprCall, Operator, StmtAssign, StringLike, TypeParams,
 };
@@ -339,6 +339,11 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                     if let Some(flat) = format_implicit_flat {
                         inline_comments.mark_formatted();
 
+                        let flat = format_with(|f| {
+                            let mut buffer = RemoveSoftLinesBuffer::new(&mut *f);
+                            write!(buffer, [flat])
+                        });
+
                         let expanded = FormatImplicitConcatenatedStringExpanded::new(
                             StringLike::try_from(*value).unwrap(),
                         );
@@ -520,7 +525,12 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
 
                 let format_value = format_with(|f| {
                     if let Some(format_implicit_flat) = format_implicit_flat.as_ref() {
-                        format_implicit_flat.fmt(f)
+                        // Remove any soft line breaks emitted by the f-string formatting.
+                        // This is important when formatting f-strings as part of an assignment right side
+                        // because `best_fit_parenthesize` will otherwise still try to break inner
+                        // groups if wrapped in a `group(..).should_expand(true)`
+                        let mut buffer = RemoveSoftLinesBuffer::new(&mut *f);
+                        write!(buffer, [format_implicit_flat])
                     } else {
                         value.format().with_options(Parentheses::Never).fmt(f)
                     }
