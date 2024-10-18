@@ -5,6 +5,7 @@
 ```py
 class NotSubscriptable: ...
 
+
 a = NotSubscriptable()[0]  # error: "Cannot subscript object of type `NotSubscriptable` with no `__getitem__` method"
 ```
 
