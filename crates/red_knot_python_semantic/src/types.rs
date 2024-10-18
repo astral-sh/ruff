@@ -534,7 +534,7 @@ impl<'db> Type<'db> {
             (Type::BooleanLiteral(..), Type::Instance(class_type))
             | (Type::Instance(class_type), Type::BooleanLiteral(..)) => !matches!(
                 class_type.known(db),
-                Some(KnownClass::Bool | KnownClass::Object)
+                Some(KnownClass::Bool | KnownClass::Int | KnownClass::Object)
             ),
             (Type::BooleanLiteral(..), _) | (_, Type::BooleanLiteral(..)) => true,
 
@@ -1852,9 +1852,10 @@ mod tests {
     #[test_case(Ty::None, Ty::LiteralString)]
     #[test_case(Ty::None, Ty::BuiltinInstance("int"))]
     #[test_case(Ty::None, Ty::Tuple(vec![Ty::None]))]
-    #[test_case(Ty::BoolLiteral(true), Ty::BuiltinInstance("int"))]
     #[test_case(Ty::BoolLiteral(true), Ty::BoolLiteral(false))]
     #[test_case(Ty::BoolLiteral(true), Ty::Tuple(vec![Ty::None]))]
+    #[test_case(Ty::BoolLiteral(true), Ty::IntLiteral(1))]
+    #[test_case(Ty::BoolLiteral(false), Ty::IntLiteral(0))]
     #[test_case(Ty::IntLiteral(1), Ty::IntLiteral(2))]
     #[test_case(Ty::IntLiteral(1), Ty::Tuple(vec![Ty::None]))]
     #[test_case(Ty::StringLiteral("a"), Ty::StringLiteral("b"))]
@@ -1886,6 +1887,7 @@ mod tests {
     #[test_case(Ty::BoolLiteral(true), Ty::BoolLiteral(true))]
     #[test_case(Ty::BoolLiteral(false), Ty::BoolLiteral(false))]
     #[test_case(Ty::BoolLiteral(true), Ty::BuiltinInstance("bool"))]
+    #[test_case(Ty::BoolLiteral(true), Ty::BuiltinInstance("int"))]
     #[test_case(Ty::IntLiteral(1), Ty::IntLiteral(1))]
     #[test_case(Ty::StringLiteral("a"), Ty::StringLiteral("a"))]
     #[test_case(Ty::StringLiteral("a"), Ty::LiteralString)]

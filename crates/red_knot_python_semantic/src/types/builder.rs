@@ -811,7 +811,7 @@ mod tests {
         let db = setup_db();
 
         let t_p = KnownClass::Int.to_instance(&db);
-        let t_n = Type::BooleanLiteral(false);
+        let t_n = Type::StringLiteral(StringLiteralType::new(&db, "t_n"));
 
         let ty = IntersectionBuilder::new(&db)
             .add_positive(t_p)
