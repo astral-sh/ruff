@@ -522,28 +522,27 @@ impl<'db> Type<'db> {
                 | Type::BytesLiteral(..)),
             ) => left != right,
 
-            (Type::None, other) | (other, Type::None) => {
-                if let Type::Instance(class_type) = other {
-                    !matches!(
-                        class_type.known(db),
-                        Some(KnownClass::NoneType | KnownClass::Object)
-                    )
-                } else {
-                    true
-                }
+            (Type::None, Type::Instance(class_type)) | (Type::Instance(class_type), Type::None) => {
+                !matches!(
+                    class_type.known(db),
+                    Some(KnownClass::NoneType | KnownClass::Object)
+                )
             }
+            (Type::None, _) | (_, Type::None) => true,
 
             (Type::BooleanLiteral(..), Type::Instance(class_type))
             | (Type::Instance(class_type), Type::BooleanLiteral(..)) => !matches!(
                 class_type.known(db),
                 Some(KnownClass::Bool | KnownClass::Object)
             ),
+            (Type::BooleanLiteral(..), _) | (_, Type::BooleanLiteral(..)) => true,
 
             (Type::IntLiteral(..), Type::Instance(class_type))
             | (Type::Instance(class_type), Type::IntLiteral(..)) => !matches!(
                 class_type.known(db),
                 Some(KnownClass::Int | KnownClass::Object)
             ),
+            (Type::IntLiteral(..), _) | (_, Type::IntLiteral(..)) => true,
 
             (Type::StringLiteral(..), Type::LiteralString)
             | (Type::LiteralString, Type::StringLiteral(..)) => false,
@@ -552,6 +551,7 @@ impl<'db> Type<'db> {
                 class_type.known(db),
                 Some(KnownClass::Str | KnownClass::Object)
             ),
+            (Type::StringLiteral(..), _) | (_, Type::StringLiteral(..)) => true,
 
             (Type::LiteralString, Type::LiteralString) => false,
             (Type::LiteralString, Type::Instance(class_type))
@@ -566,6 +566,7 @@ impl<'db> Type<'db> {
                 class_type.known(db),
                 Some(KnownClass::Bytes | KnownClass::Object)
             ),
+            (Type::BytesLiteral(..), _) | (_, Type::BytesLiteral(..)) => true,
 
             (Type::Instance(..), Type::Instance(..)) => {
                 // TODO
@@ -1838,9 +1839,14 @@ mod tests {
     #[test_case(Ty::None, Ty::Tuple(vec![Ty::None]))]
     #[test_case(Ty::BoolLiteral(true), Ty::BuiltinInstance("int"))]
     #[test_case(Ty::BoolLiteral(true), Ty::BoolLiteral(false))]
+    #[test_case(Ty::BoolLiteral(true), Ty::Tuple(vec![Ty::None]))]
     #[test_case(Ty::IntLiteral(1), Ty::IntLiteral(2))]
+    #[test_case(Ty::IntLiteral(1), Ty::Tuple(vec![Ty::None]))]
     #[test_case(Ty::StringLiteral("a"), Ty::StringLiteral("b"))]
+    #[test_case(Ty::StringLiteral("a"), Ty::Tuple(vec![Ty::None]))]
     #[test_case(Ty::LiteralString, Ty::BytesLiteral("a"))]
+    #[test_case(Ty::BytesLiteral("a"), Ty::BytesLiteral("b"))]
+    #[test_case(Ty::BytesLiteral("a"), Ty::Tuple(vec![Ty::None]))]
     #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::IntLiteral(3))]
     #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(3), Ty::IntLiteral(4)]))]
     #[test_case(Ty::Intersection{pos: vec![Ty::BuiltinInstance("int"),  Ty::IntLiteral(1)], neg: vec![]}, Ty::IntLiteral(2))]
