@@ -16,8 +16,19 @@ class Number:
 
 a = Number()
 
-reveal_type(a) # revealed: Number
 reveal_type(+a) # revealed: int
 reveal_type(-a) # revealed: int
 reveal_type(~a) # revealed: int
+
+class NoDunder:
+  ...
+
+b = NoDunder()
++b
+-b
+~b
+reveal_type(+b) # revealed: Unknown
+reveal_type(-b) # revealed: Unknown
+reveal_type(~b) # revealed: Unknown
+
 ```

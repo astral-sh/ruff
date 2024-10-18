@@ -2,24 +2,47 @@
 
 ## Basic Arithmetic
 
+We try to be precise and all operations except for division will result in Literal type.
+
 ```py
 a = True
-b = True
-c = a + b
-d = a - b
-e = a * b
-f = a % b
-g = a // b
-h = a ** b
-i = a / b
-j = a | b
+b = False
 
-reveal_type(c)  # revealed: int
-reveal_type(d)  # revealed: int
-reveal_type(e)  # revealed: int
-reveal_type(f)  # revealed: int
-reveal_type(g)  # revealed: int
-reveal_type(h)  # revealed: int
-reveal_type(i)  # revealed: float
-reveal_type(j)  # revealed: bool
+reveal_type(a + a)  # revealed: int
+reveal_type(a + b)  # revealed: int
+reveal_type(b + a)  # revealed: int
+reveal_type(b + b)  # revealed: int
+
+reveal_type(a - a)  # revealed: int
+reveal_type(a - b)  # revealed: int
+reveal_type(b - a)  # revealed: int
+reveal_type(b - b)  # revealed: int
+
+reveal_type(a * a)  # revealed: int
+reveal_type(a * b)  # revealed: int
+reveal_type(b * a)  # revealed: int
+reveal_type(b * b)  # revealed: int
+
+reveal_type(a % a)  # revealed: int
+reveal_type(b % a)  # revealed: int
+
+reveal_type(a // a)  # revealed: int
+reveal_type(b // a)  # revealed: int
+
+reveal_type(a ** a)  # revealed: int
+reveal_type(a ** b)  # revealed: int
+reveal_type(b ** a)  # revealed: int
+reveal_type(b ** b)  # revealed: int
+
+# Division
+reveal_type(a / a)  # revealed: float
+reveal_type(b / a)  # revealed: float
+b / b  # error: [division-by-zero] "Cannot divide object of type `Literal[False]` by zero"
+a / b  # error: [division-by-zero] "Cannot divide object of type `Literal[True]` by zero"
+
+# aitwise OR
+reveal_type(a | a)  # revealed: bool
+reveal_type(a | b)  # revealed: bool
+reveal_type(b | a)  # revealed: bool
+reveal_type(b | b)  # revealed: bool
 ```

@@ -41,6 +41,8 @@ reveal_type(d)  # revealed: @Todo
 
 f = 1 / False # error: "Cannot divide object of type `Literal[1]` by zero"
 reveal_type(f)  # revealed: float
+True / False # error: [division-by-zero] "Cannot divide object of type `Literal[True]` by zero"
+bool(1) / False # error: [division-by-zero] "Cannot divide object of type `Literal[True]` by zero"
 
 e = 1.0 / 0  # error: "Cannot divide object of type `float` by zero"
 # TODO should be float
