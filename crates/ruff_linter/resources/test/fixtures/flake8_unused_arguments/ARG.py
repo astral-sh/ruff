@@ -111,6 +111,10 @@ class C:
         msg = "..."
         raise NotImplementedError(msg)
 
+    def f(self, x):
+        msg = "..."
+        raise NotImplementedError("must use msg")
+
     def f(self, x, y):
         """Docstring."""
         msg = f"{x}..."

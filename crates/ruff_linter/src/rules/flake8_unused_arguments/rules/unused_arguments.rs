@@ -331,7 +331,7 @@ fn is_not_implemented_stub_with_variable(function_def: &StmtFunctionDef) -> bool
         _ => &function_def.body,
     };
 
-    let [Stmt::Assign(ast::StmtAssign { value, .. }), Stmt::Raise(StmtRaise {
+    let [Stmt::Assign(ast::StmtAssign { targets, value, .. }), Stmt::Raise(StmtRaise {
         exc: Some(exception),
         ..
     })] = statements
@@ -359,6 +359,12 @@ fn is_not_implemented_stub_with_variable(function_def: &StmtFunctionDef) -> bool
 
     if arguments.len() != 1 {
         return false;
+    }
+
+    if let ast::Expr::Name(exception_arg_name) = &arguments.args[0] {
+        if let ast::Expr::Name(assign_var_name) = &targets[0] {
+            return assign_var_name.id == exception_arg_name.id;
+        }
     }
 
     true

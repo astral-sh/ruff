@@ -28,11 +28,11 @@ ARG.py:43:16: ARG002 Unused method argument: `x`
 44 |         print("Hello, world!")
    |
 
-ARG.py:201:24: ARG002 Unused method argument: `x`
+ARG.py:205:24: ARG002 Unused method argument: `x`
     |
-199 | ###
-200 | class C:
-201 |     def __init__(self, x) -> None:
+203 | ###
+204 | class C:
+205 |     def __init__(self, x) -> None:
     |                        ^ ARG002
-202 |         print("Hello, world!")
+206 |         print("Hello, world!")
     |
