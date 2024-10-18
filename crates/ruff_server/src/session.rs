@@ -5,12 +5,13 @@ use std::sync::Arc;
 use lsp_types::{ClientCapabilities, NotebookDocumentCellChange, Url};
 
 use crate::edit::{DocumentKey, DocumentVersion, NotebookDocument};
+use crate::server::Workspaces;
 use crate::{PositionEncoding, TextDocument};
 
 pub(crate) use self::capabilities::ResolvedClientCapabilities;
 pub use self::index::DocumentQuery;
-pub(crate) use self::settings::AllSettings;
 pub use self::settings::ClientSettings;
+pub(crate) use self::settings::{AllSettings, WorkspaceSettingsMap};
 
 mod capabilities;
 mod index;
@@ -42,11 +43,11 @@ impl Session {
         client_capabilities: &ClientCapabilities,
         position_encoding: PositionEncoding,
         global_settings: ClientSettings,
-        workspace_folders: Vec<(Url, ClientSettings)>,
+        workspaces: &Workspaces,
     ) -> crate::Result<Self> {
         Ok(Self {
             position_encoding,
-            index: index::Index::new(workspace_folders, &global_settings)?,
+            index: index::Index::new(workspaces, &global_settings)?,
             global_settings,
             resolved_client_capabilities: Arc::new(ResolvedClientCapabilities::new(
                 client_capabilities,
@@ -136,7 +137,7 @@ impl Session {
     }
 
     /// Open a workspace folder at the given `url`.
-    pub(crate) fn open_workspace_folder(&mut self, url: &Url) -> crate::Result<()> {
+    pub(crate) fn open_workspace_folder(&mut self, url: Url) -> crate::Result<()> {
         self.index.open_workspace_folder(url, &self.global_settings)
     }
 
