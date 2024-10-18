@@ -368,7 +368,7 @@ mod tests {
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
-    use crate::types::{KnownClass, UnionBuilder};
+    use crate::types::{KnownClass, StringLiteralType, UnionBuilder};
     use crate::ProgramSettings;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
     use test_case::test_case;
@@ -673,6 +673,26 @@ mod tests {
             .add_positive(t)
             .build();
         assert_eq!(ty, s);
+
+        let literal = Type::StringLiteral(StringLiteralType::new(&db, "a"));
+        let expected = IntersectionBuilder::new(&db)
+            .add_positive(s)
+            .add_negative(literal)
+            .build();
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(t)
+            .add_negative(literal)
+            .add_positive(s)
+            .build();
+        assert_eq!(ty, expected);
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(s)
+            .add_negative(literal)
+            .add_positive(t)
+            .build();
+        assert_eq!(ty, expected);
     }
 
     #[test]
@@ -693,6 +713,19 @@ mod tests {
         let ty = IntersectionBuilder::new(&db)
             .add_negative(s)
             .add_negative(t)
+            .build();
+        assert_eq!(ty, expected);
+
+        let object = KnownClass::Object.to_instance(&db);
+        let expected = IntersectionBuilder::new(&db)
+            .add_negative(t)
+            .add_positive(object)
+            .build();
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_negative(t)
+            .add_positive(object)
+            .add_negative(s)
             .build();
         assert_eq!(ty, expected);
     }
@@ -733,6 +766,21 @@ mod tests {
             .add_negative(t)
             .build();
         assert_eq!(ty, Type::Never);
+
+        // This should also work in the presence of additional contributions:
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(KnownClass::Object.to_instance(&db))
+            .add_negative(t)
+            .add_positive(s)
+            .build();
+        assert_eq!(ty, Type::Never);
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(s)
+            .add_negative(Type::StringLiteral(StringLiteralType::new(&db, "a")))
+            .add_negative(t)
+            .build();
+        assert_eq!(ty, Type::Never);
     }
 
     #[test]
@@ -746,7 +794,15 @@ mod tests {
             .add_positive(t1)
             .add_positive(t2)
             .build();
+        assert_eq!(ty, Type::Never);
 
+        // If there are any negative contributions, they should
+        // be removed too.
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(KnownClass::Str.to_instance(&db))
+            .add_negative(Type::LiteralString)
+            .add_positive(t2)
+            .build();
         assert_eq!(ty, Type::Never);
     }
 
@@ -768,6 +824,26 @@ mod tests {
             .add_positive(t_p)
             .build();
         assert_eq!(ty, t_p);
+
+        let int_literal = Type::IntLiteral(1);
+        let expected = IntersectionBuilder::new(&db)
+            .add_positive(t_p)
+            .add_negative(int_literal)
+            .build();
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(t_p)
+            .add_negative(int_literal)
+            .add_negative(t_n)
+            .build();
+        assert_eq!(ty, expected);
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_negative(t_n)
+            .add_negative(int_literal)
+            .add_positive(t_p)
+            .build();
+        assert_eq!(ty, expected);
     }
 
     #[test_case(true)]
