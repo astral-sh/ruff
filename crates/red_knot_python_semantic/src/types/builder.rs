@@ -367,6 +367,7 @@ mod tests {
     use crate::types::{KnownClass, UnionBuilder};
     use crate::ProgramSettings;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+    use test_case::test_case;
 
     fn setup_db() -> TestDb {
         let db = TestDb::new();
@@ -747,26 +748,25 @@ mod tests {
         assert_eq!(ty, t_p);
     }
 
-    #[test]
-    fn build_intersection_simplify_split_bool() {
+    #[test_case(true)]
+    #[test_case(false)]
+    fn build_intersection_simplify_split_bool(bool_value: bool) {
         let db = setup_db();
 
         let t_p = KnownClass::Bool.to_instance(&db);
 
-        for bool in [true, false] {
-            let t_n = Type::BooleanLiteral(bool);
+        let t_n = Type::BooleanLiteral(bool_value);
 
-            let ty = IntersectionBuilder::new(&db)
-                .add_positive(t_p)
-                .add_negative(t_n)
-                .build();
-            assert_eq!(ty, Type::BooleanLiteral(!bool));
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(t_p)
+            .add_negative(t_n)
+            .build();
+        assert_eq!(ty, Type::BooleanLiteral(!bool_value));
 
-            let ty = IntersectionBuilder::new(&db)
-                .add_negative(t_n)
-                .add_positive(t_p)
-                .build();
-            assert_eq!(ty, Type::BooleanLiteral(!bool));
-        }
+        let ty = IntersectionBuilder::new(&db)
+            .add_negative(t_n)
+            .add_positive(t_p)
+            .build();
+        assert_eq!(ty, Type::BooleanLiteral(!bool_value));
     }
 }
