@@ -15,20 +15,19 @@ impl FormatNodeRule<ExprBytesLiteral> for FormatExprBytesLiteral {
     fn fmt_fields(&self, item: &ExprBytesLiteral, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprBytesLiteral { value, .. } = item;
 
-        match value.as_slice() {
-            [bytes_literal] => bytes_literal.format().fmt(f),
-            _ => {
-                // Always join byte literals that aren't parenthesized and thus, always on a single line.
-                if !f.context().node_level().is_parenthesized() {
-                    if let Some(format_flat) =
-                        FormatImplicitConcatenatedStringFlat::new(item.into(), f.context())
-                    {
-                        return format_flat.fmt(f);
-                    }
+        if let [bytes_literal] = value.as_slice() {
+            bytes_literal.format().fmt(f)
+        } else {
+            // Always join byte literals that aren't parenthesized and thus, always on a single line.
+            if !f.context().node_level().is_parenthesized() {
+                if let Some(format_flat) =
+                    FormatImplicitConcatenatedStringFlat::new(item.into(), f.context())
+                {
+                    return format_flat.fmt(f);
                 }
-
-                in_parentheses_only_group(&FormatImplicitConcatenatedString::new(item)).fmt(f)
             }
+
+            in_parentheses_only_group(&FormatImplicitConcatenatedString::new(item)).fmt(f)
         }
     }
 }
