@@ -2997,6 +2997,14 @@ impl UnaryOp {
             UnaryOp::USub => "-",
         }
     }
+    pub const fn dunder(self) -> &'static str {
+        match self {
+            UnaryOp::Invert => "__invert__",
+            UnaryOp::Not => "__bool__",
+            UnaryOp::UAdd => "__pos__",
+            UnaryOp::USub => "__neg__",
+        }
+    }
 }
 
 impl fmt::Display for UnaryOp {
