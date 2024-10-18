@@ -339,10 +339,7 @@ fn is_not_implemented_stub_with_variable(function_def: &StmtFunctionDef) -> bool
         return false;
     };
 
-    if !matches!(
-        value.as_ref(),
-        ast::Expr::StringLiteral(_) | ast::Expr::FString(_)
-    ) {
+    if !matches!(**value, ast::Expr::StringLiteral(_) | ast::Expr::FString(_)) {
         return false;
     }
 
