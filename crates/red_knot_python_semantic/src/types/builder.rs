@@ -240,7 +240,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 }
             }
 
-            let mut to_remove = None;
+            let mut to_remove = SmallVec::<[usize; 1]>::new();
             for (index, existing_positive) in self.positive.iter().enumerate() {
                 // S & T = S    if S <: T
                 if existing_positive.is_subtype_of(db, new_positive) {
@@ -248,8 +248,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 }
                 // same rule, reverse order
                 if new_positive.is_subtype_of(db, *existing_positive) {
-                    to_remove = Some(index);
-                    // no break here, we want to apply the other rules as well.
+                    to_remove.push(index);
                 }
                 // A & B = Never    if A and B are disjoint
                 if new_positive.is_disjoint_from(db, *existing_positive) {
@@ -257,11 +256,11 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     return;
                 }
             }
-            if let Some(index) = to_remove {
-                self.positive.remove_index(index);
+            for index in to_remove.iter().rev() {
+                self.positive.swap_remove_index(*index);
             }
 
-            let mut to_remove = None;
+            let mut to_remove = SmallVec::<[usize; 1]>::new();
             for (index, existing_negative) in self.negative.iter().enumerate() {
                 // S & ~T = Never    if S <: T
                 if new_positive.is_subtype_of(db, *existing_negative) {
@@ -270,12 +269,11 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 }
                 // A & ~B = A    if A and B are disjoint
                 if existing_negative.is_disjoint_from(db, new_positive) {
-                    to_remove = Some(index);
-                    break;
+                    to_remove.push(index);
                 }
             }
-            if let Some(index) = to_remove {
-                self.negative.remove_index(index);
+            for index in to_remove.iter().rev() {
+                self.negative.swap_remove_index(*index);
             }
 
             self.positive.insert(new_positive);
@@ -311,19 +309,19 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 self.positive.insert(Type::BooleanLiteral(!bool));
             }
             _ => {
-                let mut to_remove = None;
+                let mut to_remove = SmallVec::<[usize; 1]>::new();
                 for (index, existing_negative) in self.negative.iter().enumerate() {
                     // ~S & ~T = ~T    if S <: T
                     if existing_negative.is_subtype_of(db, new_negative) {
-                        to_remove = Some(index);
+                        to_remove.push(index);
                     }
                     // same rule, reverse order
                     if new_negative.is_subtype_of(db, *existing_negative) {
                         return;
                     }
                 }
-                if let Some(index) = to_remove {
-                    self.negative.remove_index(index);
+                for index in to_remove.iter().rev() {
+                    self.negative.swap_remove_index(*index);
                 }
 
                 for existing_positive in &self.positive {
@@ -694,6 +692,24 @@ mod tests {
 
         let ty = IntersectionBuilder::new(&db)
             .add_negative(s)
+            .add_negative(t)
+            .build();
+        assert_eq!(ty, expected);
+    }
+
+    #[test]
+    fn build_intersection_simplify_negative_type_and_multiple_negative_subtypes() {
+        let db = setup_db();
+
+        let s1 = Type::IntLiteral(1);
+        let s2 = Type::IntLiteral(2);
+        let t = KnownClass::Int.to_instance(&db);
+
+        let expected = IntersectionBuilder::new(&db).add_negative(t).build();
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_negative(s1)
+            .add_negative(s2)
             .add_negative(t)
             .build();
         assert_eq!(ty, expected);
