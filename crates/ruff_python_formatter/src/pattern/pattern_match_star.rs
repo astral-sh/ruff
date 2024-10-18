@@ -18,10 +18,9 @@ impl FormatNodeRule<PatternMatchStar> for FormatPatternMatchStar {
 
         write!(f, [token("*"), dangling_comments(dangling)])?;
 
-        if let Some(name) = name {
-            write!(f, [name.format()])
-        } else {
-            write!(f, [token("_")])
+        match name {
+            Some(name) => write!(f, [name.format()]),
+            None => write!(f, [token("_")]),
         }
     }
 }

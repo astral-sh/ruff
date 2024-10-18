@@ -90,10 +90,9 @@ fn attributes_for_prefix(
     attributes: &BTreeMap<String, &[Attribute]>,
 ) -> proc_macro2::TokenStream {
     let attrs = intersection_all(codes.iter().map(|code| attributes[code]));
-    if attrs.is_empty() {
-        quote!()
-    } else {
-        quote!(#(#attrs)*)
+    match attrs.as_slice() {
+        [] => quote!(),
+        [..] => quote!(#(#attrs)*),
     }
 }
 
