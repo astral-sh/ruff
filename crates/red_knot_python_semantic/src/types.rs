@@ -589,8 +589,8 @@ impl<'db> Type<'db> {
                 } else {
                     // We can not be sure if the tuple is disjoint from 'other' because:
                     //   - 'other' might be the homogeneous arbitrary-length tuple type
-                    //     tuple[T, ...] (which we don't have support for yet); if all
-                    //     of our element types are subtypes of T, this is not disjoint
+                    //     tuple[T, ...] (which we don't have support for yet); if all of
+                    //     our element types are not disjoint with T, this is not disjoint
                     //   - 'other' might be a user subtype of tuple, which, if generic
                     //     over the same or compatible *Ts, would overlap with tuple.
                     //
