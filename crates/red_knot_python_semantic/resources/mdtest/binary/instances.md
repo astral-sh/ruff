@@ -302,7 +302,7 @@ class Y(Foo):
     pass
 
 # TODO: Should be `int | Unknown`; see above discussion.
-reveal_type(X() + Y())  # revealed: int
+reveal_type(X() + Y())  # revealed: Unknown
 ```
 
 ## Unsupported

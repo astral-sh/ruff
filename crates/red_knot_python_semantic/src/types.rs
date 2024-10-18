@@ -440,9 +440,9 @@ impl<'db> Type<'db> {
                 .any(|&elem_ty| ty.is_subtype_of(db, elem_ty)),
             (_, Type::Instance(class)) if class.is_known(db, KnownClass::Object) => true,
             (Type::Instance(class), _) if class.is_known(db, KnownClass::Object) => false,
-            (Type::Instance(self_class), Type::Instance(target_class)) => self_class
-                .bases(db) // TODO: this should iterate through the MRO, not through the bases
-                .any(|base| base == Type::Class(target_class)),
+            (Type::Instance(self_class), Type::Instance(target_class)) => {
+                self_class.is_subclass_of(db, target_class)
+            }
             // TODO
             _ => false,
         }
@@ -1441,30 +1441,14 @@ impl<'db> ClassType<'db> {
             })
     }
 
-    pub fn is_subclass_of(self, db: &'db dyn Db, other: Type) -> bool {
-        match other {
-            Type::Any | Type::Unknown | Type::Todo => true,
-            Type::Class(other_class) => {
-                // TODO: we need to iterate over the *MRO* here, not the bases
-                (other_class == self) || self.bases(db).any(|base| base == other)
-            }
-            // TODO: if a base is a Union, should we return a Vector of `bool`s
-            // indicating the various possible answers...?
-            Type::Union(_) | Type::Intersection(_) => false,
-            // TODO: not sure this is true if it's `Type::Instance(builtins.type)`...?
-            Type::Instance(_) => false,
-            Type::Never
-            | Type::None
-            | Type::BooleanLiteral(_)
-            | Type::BytesLiteral(_)
-            | Type::Function(_)
-            | Type::IntLiteral(_)
-            | Type::Module(_)
-            | Type::LiteralString
-            | Type::Tuple(_)
-            | Type::Unbound
-            | Type::StringLiteral(_) => false,
-        }
+    pub fn is_subclass_of(self, db: &'db dyn Db, other: ClassType) -> bool {
+        // TODO: we need to iterate over the *MRO* here, not the bases
+        (other == self)
+            || self.bases(db).any(|base| match base {
+                Type::Class(base_class) => base_class == other,
+                Type::Any | Type::Unknown => true,
+                _ => false,
+            })
     }
 
     /// Returns the class member of this class named `name`.

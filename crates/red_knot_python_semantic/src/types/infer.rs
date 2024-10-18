@@ -2660,9 +2660,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             ),
 
             (Type::Instance(left_class), Type::Instance(right_class), op) => {
-                if left_class != right_class
-                    && right_class.is_subclass_of(self.db, Type::Class(left_class))
-                {
+                if left_class != right_class && right_class.is_subclass_of(self.db, left_class) {
                     let reflected_dunder = op.reflected_dunder();
                     let rhs_reflected = right_class.class_member(self.db, reflected_dunder);
                     if !rhs_reflected.is_unbound()
