@@ -191,7 +191,7 @@ reveal_type(d)  # revealed: Literal[2]
 ### Simple unpacking
 
 ```py
-a, b = 'ab'
+a, b = "ab"
 reveal_type(a)  # revealed: LiteralString
 reveal_type(b)  # revealed: LiteralString
 ```
@@ -200,7 +200,7 @@ reveal_type(b)  # revealed: LiteralString
 
 ```py
 # TODO: Add diagnostic (there aren't enough values to unpack)
-a, b, c = 'ab'
+a, b, c = "ab"
 reveal_type(a)  # revealed: LiteralString
 reveal_type(b)  # revealed: LiteralString
 reveal_type(c)  # revealed: Unknown
@@ -210,7 +210,7 @@ reveal_type(c)  # revealed: Unknown
 
 ```py
 # TODO: Add diagnostic (too many values to unpack)
-a, b = 'abc'
+a, b = "abc"
 reveal_type(a)  # revealed: LiteralString
 reveal_type(b)  # revealed: LiteralString
 ```
