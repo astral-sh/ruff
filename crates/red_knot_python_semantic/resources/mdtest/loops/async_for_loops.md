@@ -33,7 +33,7 @@ async def foo():
         def __aiter__(self) -> IntAsyncIterator:
             return IntAsyncIterator()
 
-    #TODO(Alex): async iterables/iterators!
+    # TODO(Alex): async iterables/iterators!
     async for x in IntAsyncIterable():
         pass
 

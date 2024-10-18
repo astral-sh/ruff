@@ -61,6 +61,7 @@ reveal_type(c >= d)  # revealed: Literal[True]
 def bool_instance() -> bool: ...
 def int_instance() -> int: ...
 
+
 a = (bool_instance(),)
 b = (int_instance(),)
 
@@ -135,13 +136,14 @@ reveal_type(c >= c)  # revealed: Literal[True]
 #### Non Boolean Rich Comparisons
 
 ```py
-class A():
+class A:
     def __eq__(self, o) -> str: ...
     def __ne__(self, o) -> int: ...
     def __lt__(self, o) -> float: ...
     def __le__(self, o) -> object: ...
     def __gt__(self, o) -> tuple: ...
     def __ge__(self, o) -> list: ...
+
 
 a = (A(), A())
 
@@ -160,6 +162,7 @@ reveal_type(a >= a)  # revealed: @Todo
 
 ```py
 def int_instance() -> int: ...
+
 
 a = (1, 2)
 b = ((3, 4), (1, 2))
