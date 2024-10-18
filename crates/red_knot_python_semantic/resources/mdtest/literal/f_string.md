@@ -7,26 +7,13 @@ x = 0
 y = str()
 z = False
 
-a = f'hello'
-reveal_type(a)  # revealed: Literal["hello"]
-
-b = f'h {x}'
-reveal_type(b)  # revealed: Literal["h 0"]
-
-c = 'one ' f'single ' f'literal'
-reveal_type(c)  # revealed: Literal["one single literal"]
-
-d = 'first ' f'second({b})' f' third'
-reveal_type(d)  # revealed: Literal["first second(h 0) third"]
-
-e = f'-{y}-'
-reveal_type(e)  # revealed: str
-
-f = f'-{y}-' f'--' '--'
-reveal_type(f)  # revealed: str
-
-g = f'{z} == {False} is {True}'
-reveal_type(g)  # revealed: Literal["False == False is True"]
+reveal_type(f'hello')  # revealed: Literal["hello"]
+reveal_type(f'h {x}')  # revealed: Literal["h 0"]
+reveal_type('one ' f'single ' f'literal')  # revealed: Literal["one single literal"]
+reveal_type('first ' f'second({x})' f' third')  # revealed: Literal["first second(0) third"]
+reveal_type(f'-{y}-')  # revealed: str
+reveal_type(f'-{y}-' f'--' '--')  # revealed: str
+reveal_type(f'{z} == {False} is {True}')  # revealed: Literal["False == False is True"]
 ```
 
 ## Conversion Flags
