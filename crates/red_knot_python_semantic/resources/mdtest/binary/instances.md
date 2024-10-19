@@ -458,6 +458,25 @@ reveal_type(C() + A())
 reveal_type(B() + C())
 ```
 
+### Reflected dunder is not tried between two objects of the same type
+
+For the specific case where the left-hand operand is the exact same type as the
+right-hand operand, the reflected dunder of the right-hand operand is not
+tried; the runtime short-circuits after trying the unreflected dunder of the
+left-hand operand. For context, see
+[this mailing list discussion](https://mail.python.org/archives/list/python-dev@python.org/thread/7NZUCODEAPQFMRFXYRMGJXDSIS3WJYIV/).
+
+```py
+class Foo:
+    def __radd__(self, other: Foo) -> Foo:
+        return self
+
+
+# error: [unsupported-operator]
+# revealed: Unknown
+reveal_type(Foo() + Foo())
+```
+
 ### Wrong type
 
 TODO: check signature and error if `other` is the wrong type
