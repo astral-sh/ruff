@@ -2720,7 +2720,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         left: Type<'db>,
         op: ast::CmpOp,
         right: Type<'db>,
-    ) -> Result<Type<'db>, OperatorUnsupportedError<'db>> {
+    ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
         // Note: identity (is, is not) for equal builtin types is unreliable and not part of the
         // language spec.
         // - `[ast::CompOp::Is]`: return `false` if unequal, `bool` if equal
@@ -2763,7 +2763,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 }
                 // Undefined for (int, int)
-                ast::CmpOp::In | ast::CmpOp::NotIn => Err(OperatorUnsupportedError {
+                ast::CmpOp::In | ast::CmpOp::NotIn => Err(CompareUnsupportedError {
                     op,
                     left_ty: left,
                     right_ty: right,
@@ -2966,7 +2966,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         left: &[Type<'db>],
         op: RichCompareOperator,
         right: &[Type<'db>],
-    ) -> Result<Type<'db>, OperatorUnsupportedError<'db>> {
+    ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
         // Compare paired elements from left and right slices
         for (l_ty, r_ty) in left.iter().copied().zip(right.iter().copied()) {
             let eq_result = self
@@ -3483,7 +3483,7 @@ impl RichCompareOperator {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct OperatorUnsupportedError<'db> {
+struct CompareUnsupportedError<'db> {
     op: ast::CmpOp,
     left_ty: Type<'db>,
     right_ty: Type<'db>,
@@ -3570,7 +3570,7 @@ fn perform_rich_comparison<'db>(
     left: ClassType<'db>,
     right: ClassType<'db>,
     op: RichCompareOperator,
-) -> Result<Type<'db>, OperatorUnsupportedError<'db>> {
+) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
     // The following resource has details about the rich comparison algorithm:
     // https://snarky.ca/unravelling-rich-comparison-operators/
     //
@@ -3585,7 +3585,7 @@ fn perform_rich_comparison<'db>(
         return dunder
             .call(db, &[Type::Instance(left), Type::Instance(right)])
             .return_ty(db)
-            .ok_or_else(|| OperatorUnsupportedError {
+            .ok_or_else(|| CompareUnsupportedError {
                 op: op.into(),
                 left_ty: Type::Instance(left),
                 right_ty: Type::Instance(right),
@@ -3593,7 +3593,7 @@ fn perform_rich_comparison<'db>(
     }
 
     // TODO: reflected dunder -- (==, ==), (!=, !=), (<, >), (>, <), (<=, >=), (>=, <=)
-    Err(OperatorUnsupportedError {
+    Err(CompareUnsupportedError {
         op: op.into(),
         left_ty: Type::Instance(left),
         right_ty: Type::Instance(right),
