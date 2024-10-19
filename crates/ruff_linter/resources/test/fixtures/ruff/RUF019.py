@@ -23,6 +23,8 @@ v = "k" in d and d["k"]
 if f() in d and d[f()]:
     pass
 
+# RUF019, unsafe fixes
+
 if c.a in dct and dct[c.a]:
     pass
 
