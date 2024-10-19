@@ -29,10 +29,10 @@ reveal_type(b % a)  # revealed: Literal[0]
 reveal_type(a // a)  # revealed: Literal[1]
 reveal_type(b // a)  # revealed: Literal[0]
 
-reveal_type(a ** a)  # revealed: Literal[1]
-reveal_type(a ** b)  # revealed: Literal[1]
-reveal_type(b ** a)  # revealed: Literal[0]
-reveal_type(b ** b)  # revealed: Literal[1]
+reveal_type(a**a)  # revealed: Literal[1]
+reveal_type(a**b)  # revealed: Literal[1]
+reveal_type(b**a)  # revealed: Literal[0]
+reveal_type(b**b)  # revealed: Literal[1]
 
 # Division
 reveal_type(a / a)  # revealed: float

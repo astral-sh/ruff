@@ -16,12 +16,11 @@ reveal_type(5 % 3)  # revealed: Literal[2]
 For power if the result fits in the int literal type it will be a Literal type. Otherwise the
 outcome is int.
 
-
 ```py
 larget_u32 = 4_294_967_295
-reveal_type(2 ** 2)  # revealed: Literal[4]
-reveal_type(1 ** (larget_u32+ 1))  # revealed: int
-reveal_type(2 ** larget_u32)  # revealed: int
+reveal_type(2**2)  # revealed: Literal[4]
+reveal_type(1 ** (larget_u32 + 1))  # revealed: int
+reveal_type(2**larget_u32)  # revealed: int
 ```
 
 ## Division by Zero
@@ -54,8 +53,8 @@ reveal_type(int() / 0)
 # error: "Cannot divide object of type `Literal[1]` by zero"
 # revealed: float
 reveal_type(1 / False)
-True / False # error: [division-by-zero] "Cannot divide object of type `Literal[True]` by zero"
-bool(1) / False # error: [division-by-zero] "Cannot divide object of type `Literal[True]` by zero"
+True / False  # error: [division-by-zero] "Cannot divide object of type `Literal[True]` by zero"
+bool(1) / False  # error: [division-by-zero] "Cannot divide object of type `Literal[True]` by zero"
 
 # error: "Cannot divide object of type `float` by zero"
 # revealed: float
