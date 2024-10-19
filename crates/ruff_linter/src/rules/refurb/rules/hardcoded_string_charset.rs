@@ -151,16 +151,23 @@ pub(crate) fn hardcoded_string_charset_comparison(checker: &mut Checker, compare
 
     let bytes = value.to_str().as_bytes();
 
-    let Some(charset) = check_charset_as_set(bytes) else {
-        return;
+    // Check if the left-hand side is a single character
+    let is_single_char = match compare.left.as_ref() {
+        Expr::StringLiteral(ExprStringLiteral { value, .. }) => value.to_string().len() == 1,
+        _ => false,
     };
 
-    // In this case the diagnostic will be emitted via string_literal check.
-    if charset.bytes == bytes {
-        return;
+    if is_single_char {
+        // For single character comparisons, we can use set-like replacements
+        if let Some(charset) = check_charset_as_set(bytes) {
+            push_diagnostic(checker, string_literal.range, charset);
+        }
+    } else {
+        // For multi-character comparisons, only use exact matches
+        if let Some(charset) = check_charset_exact(bytes) {
+            push_diagnostic(checker, string_literal.range, charset);
+        }
     }
-
-    push_diagnostic(checker, string_literal.range, charset);
 }
 
 /// FURB156
