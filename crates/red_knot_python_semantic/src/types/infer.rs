@@ -537,14 +537,9 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// Raise a diagnostic if the given type cannot be divided by zero.
     ///
     /// Expects the resolved type of the left side of the binary expression.
-    fn check_division_by_zero(
-        &mut self,
-        expr: &ast::ExprBinOp,
-        left: Type<'db>,
-        original_left: Type<'db>,
-    ) {
+    fn check_division_by_zero(&mut self, expr: &ast::ExprBinOp, left: Type<'db>) {
         match left {
-            Type::IntLiteral(_) => {}
+            Type::BooleanLiteral(_) | Type::IntLiteral(_) => {}
             Type::Instance(cls)
                 if [KnownClass::Float, KnownClass::Int, KnownClass::Bool]
                     .iter()
@@ -564,7 +559,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             "division-by-zero",
             format_args!(
                 "Cannot {op} object of type `{}` {by_zero}",
-                original_left.display(self.db)
+                left.display(self.db)
             ),
         );
     }
@@ -2480,20 +2475,29 @@ impl<'db> TypeInferenceBuilder<'db> {
             (_, Type::Any) => Type::Any,
             (_, Type::Unknown) => Type::Unknown,
             (op @ (UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert), Type::Instance(class)) => {
-                let class_member = class.class_member(self.db, op.dunder());
+                let unary_dunder_method = match op {
+                    UnaryOp::Invert => "__invert__",
+                    UnaryOp::UAdd => "__pos__",
+                    UnaryOp::USub => "__neg__",
+                    _ => return Type::Unknown,
+                };
+                let class_member = class.class_member(self.db, unary_dunder_method);
                 let call = class_member.call(self.db, &[operand_type]);
-                if matches!(call, CallOutcome::NotCallable { not_callable_ty: _ }) {
-                    self.add_diagnostic(
-                        unary.into(),
-                        "unsupported-operator",
-                        format_args!(
-                            "Unary operator `{op}` is unsupported for type `{}`",
-                            operand_type.display(self.db),
-                        ),
-                    );
-                }
 
-                call.return_ty(self.db).unwrap_or(Type::Unknown)
+                match call.return_ty_result(self.db, AnyNodeRef::ExprUnaryOp(unary), self) {
+                    Ok(t) => t,
+                    Err(e) => {
+                        self.add_diagnostic(
+                            unary.into(),
+                            "unsupported-operator",
+                            format_args!(
+                                "Unary operator `{op}` is unsupported for type `{}`",
+                                operand_type.display(self.db),
+                            ),
+                        );
+                        e.return_ty()
+                    }
+                }
             }
             _ => Type::Todo, // TODO other unary op types
         }
@@ -2509,34 +2513,28 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let left_ty = self.infer_expression(left);
         let right_ty = self.infer_expression(right);
-        self.infer_binary_expression_type(binary, *op, left_ty, right_ty)
-    }
 
-    fn infer_binary_expression_type(
-        &mut self,
-        expr: &ast::ExprBinOp,
-        op: ast::Operator,
-        left_ty: Type<'db>,
-        right_ty: Type<'db>,
-    ) -> Type<'db> {
         // Check for division by zero; this doesn't change the inferred type for the expression, but
         // may emit a diagnostic
         if matches!(
             (op, right_ty),
             (
                 ast::Operator::Div | ast::Operator::FloorDiv | ast::Operator::Mod,
-                Type::IntLiteral(0)
+                Type::IntLiteral(0) | Type::BooleanLiteral(false)
             )
         ) {
-            // We want to print the original type that was used in the expression. The left type might
-            // have been converted to other types during the check.
-            // Since the type was previously inferred in the function that calls this or in the
-            // previous recursion this id will exist
-            let expr_id = expr.left.scoped_ast_id(self.db, self.scope());
-            let previous = self.types.expressions[&expr_id];
-            self.check_division_by_zero(expr, left_ty, previous);
+            self.check_division_by_zero(binary, left_ty);
         }
 
+        self.infer_binary_expression_type(*op, left_ty, right_ty)
+    }
+
+    fn infer_binary_expression_type(
+        &mut self,
+        op: ast::Operator,
+        left_ty: Type<'db>,
+        right_ty: Type<'db>,
+    ) -> Type<'db> {
         match (left_ty, right_ty, op) {
             // When interacting with Todo, Any and Unknown should propagate (as if we fix this
             // `Todo` in the future, the result would then become Any or Unknown, respectively.)
@@ -2646,13 +2644,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                 ruff_python_ast::Operator::BitOr,
             ) => Type::BooleanLiteral(b1 | b2),
 
-            (Type::BooleanLiteral(bool_value), right, op) => {
-                self.infer_binary_expression_type(expr, op, Type::IntLiteral(i64::from(bool_value)), right)
+            (Type::BooleanLiteral(bool_value), right, op) => self.infer_binary_expression_type(
+                op,
+                Type::IntLiteral(i64::from(bool_value)),
+                right,
+            ),
+            (left, Type::BooleanLiteral(bool_value), op) => {
+                self.infer_binary_expression_type(op, left, Type::IntLiteral(i64::from(bool_value)))
             }
-            (left, Type::BooleanLiteral(_), op) => {
-                let int_value = right_ty.expect_int_literal();
-                self.infer_binary_expression_type(expr, op, left, Type::IntLiteral(int_value))
-            }
+
             _ => Type::Todo, // TODO
         }
     }
