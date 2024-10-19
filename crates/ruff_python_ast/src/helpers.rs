@@ -47,7 +47,7 @@ pub fn contains_effect<F>(expr: &Expr, is_builtin: F) -> bool
 where
     F: Fn(&str) -> bool,
 {
-    maybe_contains_effect(expr, is_builtin).to_bool()
+    maybe_contains_effect(expr, is_builtin).is_yes()
 }
 
 pub fn maybe_contains_effect<F>(expr: &Expr, is_builtin: F) -> Maybe
@@ -116,6 +116,24 @@ where
             return Maybe::No;
         }
 
+        // Attribute access may have side effects
+        if matches!(expr, Expr::Attribute(_)) {
+            return Maybe::Maybe;
+        }
+
+        // __str__ or __repr__ on name expr may have side effects
+        if let Expr::FString(ast::ExprFString { value, .. }) = expr {
+            if value.elements().any(|element| {
+                if let ast::FStringElement::Expression(expr) = element {
+                    matches!(expr.expression.as_ref(), Expr::Name(_))
+                } else {
+                    false
+                }
+            }) {
+                return Maybe::Maybe;
+            }
+        }
+
         // Otherwise, avoid all complex expressions.
         matches!(
             expr,
@@ -129,7 +147,8 @@ where
                 | Expr::Yield(_)
                 | Expr::YieldFrom(_)
                 | Expr::IpyEscapeCommand(_)
-        ).into()
+        )
+        .into()
     })
 }
 
@@ -163,10 +182,6 @@ impl Maybe {
         matches!(self, Maybe::No)
     }
 
-    pub const fn to_bool(self) -> bool {
-        matches!(self, Maybe::Yes | Maybe::Maybe)
-    }
-
     #[must_use]
     pub fn merge(self, other: Self) -> Self {
         match (self, other) {
@@ -182,17 +197,14 @@ impl std::ops::Not for Maybe {
     type Output = bool;
 
     fn not(self) -> Self::Output {
-        match self {
-            Maybe::Yes | Maybe::Maybe => false,
-            Maybe::No => true,
-        }
+        !self.is_yes()
     }
 }
 
 /// Call `func` over every `Expr` in `expr`, returning `true` if any expression
 /// returns `true`..
 pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
-    maybe_over_expr(expr, func).to_bool()
+    maybe_over_expr(expr, func).is_yes()
 }
 
 pub fn maybe_over_expr<T>(expr: &Expr, func: &dyn Fn(&Expr) -> T) -> Maybe
@@ -351,7 +363,7 @@ where
 }
 
 pub fn any_over_type_param(type_param: &TypeParam, func: &dyn Fn(&Expr) -> bool) -> bool {
-    maybe_over_type_param(type_param, func).to_bool()
+    maybe_over_type_param(type_param, func).is_yes()
 }
 
 pub fn maybe_over_type_param<T>(type_param: &TypeParam, func: &dyn Fn(&Expr) -> T) -> Maybe
@@ -377,7 +389,7 @@ where
 }
 
 pub fn any_over_pattern(pattern: &Pattern, func: &dyn Fn(&Expr) -> bool) -> bool {
-    maybe_over_pattern(pattern, func).to_bool()
+    maybe_over_pattern(pattern, func).is_yes()
 }
 
 pub fn maybe_over_pattern<T>(pattern: &Pattern, func: &dyn Fn(&Expr) -> T) -> Maybe
@@ -425,7 +437,7 @@ pub fn any_over_f_string_element(
     element: &ast::FStringElement,
     func: &dyn Fn(&Expr) -> bool,
 ) -> bool {
-    maybe_over_f_string_element(element, func).to_bool()
+    maybe_over_f_string_element(element, func).is_yes()
 }
 
 pub fn maybe_over_f_string_element<T>(
@@ -453,7 +465,7 @@ where
 }
 
 pub fn any_over_stmt(stmt: &Stmt, func: &dyn Fn(&Expr) -> bool) -> bool {
-    maybe_over_stmt(stmt, func).to_bool()
+    maybe_over_stmt(stmt, func).is_yes()
 }
 
 pub fn maybe_over_stmt<T>(stmt: &Stmt, func: &dyn Fn(&Expr) -> T) -> Maybe
@@ -690,7 +702,7 @@ where
 }
 
 pub fn any_over_body(body: &[Stmt], func: &dyn Fn(&Expr) -> bool) -> bool {
-    maybe_over_body(body, func).to_bool()
+    maybe_over_body(body, func).is_yes()
 }
 
 pub fn maybe_over_body<T>(body: &[Stmt], func: &dyn Fn(&Expr) -> T) -> Maybe
