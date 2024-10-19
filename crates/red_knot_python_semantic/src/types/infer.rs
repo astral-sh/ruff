@@ -2644,12 +2644,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::BooleanLiteral(b1),
                 Type::BooleanLiteral(b2),
                 ruff_python_ast::Operator::BitOr,
-            ) => match (b1, b2) {
-                (true, true) => Type::BooleanLiteral(true),
-                (true, false) => Type::BooleanLiteral(true),
-                (false, true) => Type::BooleanLiteral(true),
-                (false, false) => Type::BooleanLiteral(false),
-            },
+            ) => Type::BooleanLiteral(b1 | b2),
 
             (Type::BooleanLiteral(bool_value), right, op) => {
                 self.infer_binary_expression_type(expr, op, Type::IntLiteral(i64::from(bool_value)), right)
