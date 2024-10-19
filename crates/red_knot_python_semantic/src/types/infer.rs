@@ -3470,7 +3470,7 @@ impl From<RichCompareOperator> for ast::CmpOp {
 }
 
 impl RichCompareOperator {
-    fn dunder_name(self) -> &'static str {
+    const fn dunder_name(self) -> &'static str {
         match self {
             RichCompareOperator::Eq => "__eq__",
             RichCompareOperator::Ne => "__ne__",
@@ -3585,7 +3585,7 @@ fn perform_rich_comparison<'db>(
         return dunder
             .call(db, &[Type::Instance(left), Type::Instance(right)])
             .return_ty(db)
-            .ok_or(OperatorUnsupportedError {
+            .ok_or_else(|| OperatorUnsupportedError {
                 op: op.into(),
                 left_ty: Type::Instance(left),
                 right_ty: Type::Instance(right),
