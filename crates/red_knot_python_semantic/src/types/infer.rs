@@ -2682,10 +2682,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                     .call(self.db, &[left_ty, right_ty])
                     .return_ty(self.db)
                     .or_else(|| {
-                        right_class
-                            .class_member(self.db, op.reflected_dunder())
-                            .call(self.db, &[right_ty, left_ty])
-                            .return_ty(self.db)
+                        if left_class == right_class {
+                            None
+                        } else {
+                            right_class
+                                .class_member(self.db, op.reflected_dunder())
+                                .call(self.db, &[right_ty, left_ty])
+                                .return_ty(self.db)
+                        }
                     })
             }
 
