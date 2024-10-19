@@ -143,11 +143,17 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             ops,
             comparators,
         } = expr_compare;
+        if !left.is_name_expr() && comparators.iter().all(|c| !c.is_name_expr()) {
+            // If none of the comparators are name expressions,
+            // we have no symbol to narrow down the type of.
+            return;
+        }
         let scope = self.scope();
+        let inference = infer_expression_types(self.db, expression);
+
         let comparator_tuples = std::iter::once(&**left)
             .chain(comparators)
             .tuple_windows::<(&ruff_python_ast::Expr, &ruff_python_ast::Expr)>();
-        let inference = infer_expression_types(self.db, expression);
         for (op, (left, right)) in std::iter::zip(&**ops, comparator_tuples) {
             if let ast::Expr::Name(ast::ExprName {
                 range: _,
