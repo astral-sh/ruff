@@ -57,7 +57,7 @@ use crate::types::{
 };
 use crate::Db;
 
-use super::{CallOutcome, KnownClass, UnionBuilder};
+use super::{KnownClass, UnionBuilder};
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -2589,13 +2589,13 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Pow) => {
                 let m = u32::try_from(m);
-                match m {
+                Some(match m {
                     Ok(m) => n
                         .checked_pow(m)
                         .map(Type::IntLiteral)
                         .unwrap_or_else(|| KnownClass::Int.to_instance(self.db)),
                     Err(_) => KnownClass::Int.to_instance(self.db),
-                }
+                })
             }
 
             (Type::BytesLiteral(lhs), Type::BytesLiteral(rhs), ast::Operator::Add) => {
@@ -2737,15 +2737,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::BooleanLiteral(b1),
                 Type::BooleanLiteral(b2),
                 ruff_python_ast::Operator::BitOr,
-            ) => Type::BooleanLiteral(b1 | b2),
+            ) => Some(Type::BooleanLiteral(b1 | b2)),
 
             (Type::BooleanLiteral(bool_value), right, op) => self.infer_binary_expression_type(
-                op,
                 Type::IntLiteral(i64::from(bool_value)),
                 right,
+                op,
             ),
             (left, Type::BooleanLiteral(bool_value), op) => {
-                self.infer_binary_expression_type(op, left, Type::IntLiteral(i64::from(bool_value)))
+                self.infer_binary_expression_type(left, Type::IntLiteral(i64::from(bool_value)), op)
             }
             _ => Some(Type::Todo), // TODO
         }
