@@ -47,7 +47,14 @@ pub fn contains_effect<F>(expr: &Expr, is_builtin: F) -> bool
 where
     F: Fn(&str) -> bool,
 {
-    any_over_expr(expr, &|expr| {
+    maybe_contains_effect(expr, is_builtin).to_bool()
+}
+
+pub fn maybe_contains_effect<F>(expr: &Expr, is_builtin: F) -> Maybe
+where
+    F: Fn(&str) -> bool,
+{
+    maybe_over_expr(expr, &|expr| {
         // Accept empty initializers.
         if let Expr::Call(ast::ExprCall {
             func,
@@ -59,9 +66,9 @@ where
             if arguments.is_empty() {
                 if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                     if !is_iterable_initializer(id.as_str(), |id| is_builtin(id)) {
-                        return true;
+                        return Maybe::Yes;
                     }
-                    return false;
+                    return Maybe::No;
                 }
             }
         }
@@ -85,7 +92,7 @@ where
                     | Expr::SetComp(_)
                     | Expr::DictComp(_)
             ) {
-                return true;
+                return Maybe::Yes;
             }
             if !matches!(
                 right.as_ref(),
@@ -104,9 +111,9 @@ where
                     | Expr::SetComp(_)
                     | Expr::DictComp(_)
             ) {
-                return true;
+                return Maybe::Yes;
             }
-            return false;
+            return Maybe::No;
         }
 
         // Otherwise, avoid all complex expressions.
@@ -122,7 +129,7 @@ where
                 | Expr::Yield(_)
                 | Expr::YieldFrom(_)
                 | Expr::IpyEscapeCommand(_)
-        )
+        ).into()
     })
 }
 
