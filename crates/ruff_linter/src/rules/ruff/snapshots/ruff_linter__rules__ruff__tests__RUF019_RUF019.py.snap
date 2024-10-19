@@ -120,3 +120,61 @@ RUF019.py:18:6: RUF019 [*] Unnecessary key check before dictionary access
 19 19 | 
 20 20 | # OK
 21 21 | v = "k" in d and d["k"]
+
+RUF019.py:26:4: RUF019 [*] Unnecessary key check before dictionary access
+   |
+24 |     pass
+25 | 
+26 | if c.a in dct and dct[c.a]:
+   |    ^^^^^^^^^^^^^^^^^^^^^^^ RUF019
+27 |     pass
+   |
+   = help: Replace with `dict.get`
+
+ℹ Unsafe fix
+23 23 | if f() in d and d[f()]:
+24 24 |     pass
+25 25 | 
+26    |-if c.a in dct and dct[c.a]:
+   26 |+if dct.get(c.a):
+27 27 |     pass
+28 28 | 
+29 29 | if f"{c}" in dct and dct[f"{c}"]:
+
+RUF019.py:29:4: RUF019 [*] Unnecessary key check before dictionary access
+   |
+27 |     pass
+28 | 
+29 | if f"{c}" in dct and dct[f"{c}"]:
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF019
+30 |     pass
+   |
+   = help: Replace with `dict.get`
+
+ℹ Unsafe fix
+26 26 | if c.a in dct and dct[c.a]:
+27 27 |     pass
+28 28 | 
+29    |-if f"{c}" in dct and dct[f"{c}"]:
+   29 |+if dct.get(f"{c}"):
+30 30 |     pass
+31 31 | 
+32 32 | if f"{c.a}" in dct and dct[f"{c.a}"]:
+
+RUF019.py:32:4: RUF019 [*] Unnecessary key check before dictionary access
+   |
+30 |     pass
+31 | 
+32 | if f"{c.a}" in dct and dct[f"{c.a}"]:
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF019
+33 |     pass
+   |
+   = help: Replace with `dict.get`
+
+ℹ Unsafe fix
+29 29 | if f"{c}" in dct and dct[f"{c}"]:
+30 30 |     pass
+31 31 | 
+32    |-if f"{c.a}" in dct and dct[f"{c.a}"]:
+   32 |+if dct.get(f"{c.a}"):
+33 33 |     pass

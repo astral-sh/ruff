@@ -3,7 +3,7 @@ use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::contains_effect;
+use ruff_python_ast::helpers::{maybe_contains_effect, Maybe};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_text_size::Ranged;
 
@@ -96,14 +96,18 @@ pub(crate) fn unnecessary_key_check(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    if contains_effect(obj_left, |id| checker.semantic().has_builtin_binding(id))
-        || contains_effect(key_left, |id| checker.semantic().has_builtin_binding(id))
-    {
-        return;
-    }
+    let is_fix_safe =
+        match maybe_contains_effect(obj_left, |id| checker.semantic().has_builtin_binding(id))
+            .merge(maybe_contains_effect(key_left, |id| {
+                checker.semantic().has_builtin_binding(id)
+            })) {
+            Maybe::Yes => return,
+            Maybe::Maybe => false,
+            Maybe::No => true,
+        };
 
     let mut diagnostic = Diagnostic::new(UnnecessaryKeyCheck, expr.range());
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+    let edit = Edit::range_replacement(
         format!(
             "{}.get({})",
             checker.locator().slice(
@@ -126,6 +130,11 @@ pub(crate) fn unnecessary_key_check(checker: &mut Checker, expr: &Expr) {
             ),
         ),
         expr.range(),
-    )));
+    );
+    diagnostic.set_fix(if is_fix_safe {
+        Fix::safe_edit(edit)
+    } else {
+        Fix::unsafe_edit(edit)
+    });
     checker.diagnostics.push(diagnostic);
 }
