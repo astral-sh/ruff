@@ -11,24 +11,21 @@ class Number:
     def __neg__(self) -> int:
         return -self.value
 
-    def __invert__(self) -> int:
-        return ~self.value
+    def __invert__(self) -> Literal[True]:
+        return True
 
 a = Number()
 
 reveal_type(+a) # revealed: int
 reveal_type(-a) # revealed: int
-reveal_type(~a) # revealed: int
+reveal_type(~a) # revealed: @Todo
 
 class NoDunder:
   ...
 
 b = NoDunder()
-+b
--b
-~b
-reveal_type(+b) # revealed: Unknown
-reveal_type(-b) # revealed: Unknown
-reveal_type(~b) # revealed: Unknown
++b # error: [unsupported-operator] "Operator `+` is unsupported for type `NoDunder`"
+-b # error: [unsupported-operator] "Operator `-` is unsupported for type `NoDunder`"
+~b # error: [unsupported-operator] "Operator `~` is unsupported for type `NoDunder`"
 
 ```

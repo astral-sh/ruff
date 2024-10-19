@@ -57,7 +57,7 @@ use crate::types::{
 };
 use crate::Db;
 
-use super::{KnownClass, UnionBuilder};
+use super::{CallOutcome, KnownClass, UnionBuilder};
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -2479,9 +2479,20 @@ impl<'db> TypeInferenceBuilder<'db> {
             (UnaryOp::Not, ty) => ty.bool(self.db).negate().into_type(self.db),
             (_, Type::Any) => Type::Any,
             (_, Type::Unknown) => Type::Unknown,
-            (op, Type::Instance(class)) => {
+            (op @ (UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert), Type::Instance(class)) => {
                 let class_member = class.class_member(self.db, op.dunder());
                 let call = class_member.call(self.db, &[operand_type]);
+                if matches!(call, CallOutcome::NotCallable { not_callable_ty: _ }) {
+                    self.add_diagnostic(
+                        unary.into(),
+                        "unsupported-operator",
+                        format_args!(
+                            "Operator `{op}` is unsupported for type `{}`",
+                            operand_type.display(self.db),
+                        ),
+                    );
+                }
+
                 call.return_ty(self.db).unwrap_or(Type::Unknown)
             }
             _ => Type::Todo, // TODO other unary op types
