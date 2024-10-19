@@ -2651,9 +2651,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 (false, false) => Type::BooleanLiteral(false),
             },
 
-            (Type::BooleanLiteral(_), right, op) => {
-                let int_value = left_ty.expect_int_literal();
-                self.infer_binary_expression_type(expr, op, Type::IntLiteral(int_value), right)
+            (Type::BooleanLiteral(bool_value), right, op) => {
+                self.infer_binary_expression_type(expr, op, Type::IntLiteral(i64::from(bool_value)), right)
             }
             (left, Type::BooleanLiteral(_), op) => {
                 let int_value = right_ty.expect_int_literal();
