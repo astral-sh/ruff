@@ -48,7 +48,7 @@ y = True if flag else False
 reveal_type(x)  # revealed: bool
 reveal_type(y)  # revealed: bool
 
-if y is not x is not False: # Interpreted as `(y is not x) and (x is not False)`
+if y is not x is not False:  # Interpreted as `(y is not x) and (x is not False)`
     reveal_type(x)  # revealed: Literal[True]
     reveal_type(y)  # revealed: bool
 ```
