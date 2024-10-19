@@ -2480,7 +2480,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     UnaryOp::UAdd => "__pos__",
                     UnaryOp::USub => "__neg__",
                     UnaryOp::Not => {
-                        unreachable!("Not operator is handled in it's own case");
+                        unreachable!("Not operator is handled in its own case");
                     }
                 };
                 let class_member = class.class_member(self.db, unary_dunder_method);
