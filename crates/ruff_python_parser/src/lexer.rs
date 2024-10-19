@@ -7,6 +7,7 @@
 //! [Lexical analysis]: https://docs.python.org/3/reference/lexical_analysis.html
 
 use std::cmp::Ordering;
+use std::mem::ManuallyDrop;
 use std::str::FromStr;
 
 use unicode_ident::{is_xid_continue, is_xid_start};
@@ -46,7 +47,7 @@ pub struct Lexer<'src> {
     current_range: TextRange,
 
     /// The value of the current token.
-    current_value: TokenValue,
+    current_value: CurrentTokenValue,
 
     /// Flags for the current token.
     current_flags: TokenFlags,
@@ -90,7 +91,7 @@ impl<'src> Lexer<'src> {
             state: State::AfterNewline,
             current_kind: TokenKind::EndOfFile,
             current_range: TextRange::empty(start_offset),
-            current_value: TokenValue::None,
+            current_value: CurrentTokenValue::default(),
             current_flags: TokenFlags::empty(),
             nesting: 0,
             indentations: Indentations::default(),
@@ -131,7 +132,7 @@ impl<'src> Lexer<'src> {
     /// All the subsequent call to this method without moving the lexer would always return the
     /// default value which is [`TokenValue::None`].
     pub(crate) fn take_value(&mut self) -> TokenValue {
-        std::mem::take(&mut self.current_value)
+        self.current_value.take()
     }
 
     /// Helper function to push the given error, updating the current range with the error location
@@ -145,7 +146,7 @@ impl<'src> Lexer<'src> {
     /// Lex the next token.
     pub fn next_token(&mut self) -> TokenKind {
         self.cursor.start_token();
-        self.current_value = TokenValue::None;
+        self.current_value.reset();
         self.current_flags = TokenFlags::empty();
         self.current_kind = self.lex_token();
         // For `Unknown` token, the `push_error` method updates the current range.
@@ -644,7 +645,8 @@ impl<'src> Lexer<'src> {
         let text = self.token_text();
 
         if !is_ascii {
-            self.current_value = TokenValue::Name(text.nfkc().collect::<Name>());
+            self.current_value
+                .set(TokenValue::Name(text.nfkc().collect::<Name>()));
             return TokenKind::Name;
         }
 
@@ -652,7 +654,7 @@ impl<'src> Lexer<'src> {
         // It helps Rust to predict that the Name::new call in the keyword match's default branch
         // is guaranteed to fit into a stack allocated (inline) Name.
         if text.len() > 8 {
-            self.current_value = TokenValue::Name(Name::new(text));
+            self.current_value.set(TokenValue::Name(Name::new(text)));
             return TokenKind::Name;
         }
 
@@ -696,7 +698,7 @@ impl<'src> Lexer<'src> {
             "with" => TokenKind::With,
             "yield" => TokenKind::Yield,
             _ => {
-                self.current_value = TokenValue::Name(Name::new(text));
+                self.current_value.set(TokenValue::Name(Name::new(text)));
                 TokenKind::Name
             }
         }
@@ -888,9 +890,10 @@ impl<'src> Lexer<'src> {
             normalized
         };
 
-        self.current_value = TokenValue::FStringMiddle(value.into_boxed_str());
-
         self.current_flags = fstring.flags();
+        self.current_value
+            .set(TokenValue::FStringMiddle(value.into_boxed_str()));
+
         Some(TokenKind::FStringMiddle)
     }
 
@@ -1001,11 +1004,11 @@ impl<'src> Lexer<'src> {
             }
         };
 
-        self.current_value = TokenValue::String(
+        self.current_value.set(TokenValue::String(
             self.source[TextRange::new(value_start, value_end)]
                 .to_string()
                 .into_boxed_str(),
-        );
+        ));
 
         TokenKind::String
     }
@@ -1051,7 +1054,7 @@ impl<'src> Lexer<'src> {
                 ));
             }
         };
-        self.current_value = TokenValue::Int(value);
+        self.current_value.set(TokenValue::Int(value));
         TokenKind::Int
     }
 
@@ -1113,20 +1116,21 @@ impl<'src> Lexer<'src> {
 
             // Parse trailing 'j':
             if self.cursor.eat_if(|c| matches!(c, 'j' | 'J')).is_some() {
-                self.current_value = TokenValue::Complex {
+                self.current_value.set(TokenValue::Complex {
                     real: 0.0,
                     imag: value,
-                };
+                });
                 TokenKind::Complex
             } else {
-                self.current_value = TokenValue::Float(value);
+                self.current_value.set(TokenValue::Float(value));
                 TokenKind::Float
             }
         } else {
             // Parse trailing 'j':
             if self.cursor.eat_if(|c| matches!(c, 'j' | 'J')).is_some() {
                 let imag = f64::from_str(number.as_str()).unwrap();
-                self.current_value = TokenValue::Complex { real: 0.0, imag };
+                self.current_value
+                    .set(TokenValue::Complex { real: 0.0, imag });
                 TokenKind::Complex
             } else {
                 let value = match Int::from_str(number.as_str()) {
@@ -1151,7 +1155,7 @@ impl<'src> Lexer<'src> {
                         ))
                     }
                 };
-                self.current_value = TokenValue::Int(value);
+                self.current_value.set(TokenValue::Int(value));
                 TokenKind::Int
             }
         }
@@ -1283,18 +1287,18 @@ impl<'src> Lexer<'src> {
                         _ => unreachable!("`question_count` is always 1 or 2"),
                     };
 
-                    self.current_value = TokenValue::IpyEscapeCommand {
+                    self.current_value.set(TokenValue::IpyEscapeCommand {
                         kind,
                         value: value.into_boxed_str(),
-                    };
+                    });
 
                     return TokenKind::IpyEscapeCommand;
                 }
                 '\n' | '\r' | EOF_CHAR => {
-                    self.current_value = TokenValue::IpyEscapeCommand {
+                    self.current_value.set(TokenValue::IpyEscapeCommand {
                         kind: escape_kind,
                         value: value.into_boxed_str(),
-                    };
+                    });
 
                     return TokenKind::IpyEscapeCommand;
                 }
@@ -1461,7 +1465,7 @@ impl<'src> Lexer<'src> {
     /// Creates a checkpoint to which the lexer can later return to using [`Self::rewind`].
     pub(crate) fn checkpoint(&self) -> LexerCheckpoint {
         LexerCheckpoint {
-            value: self.current_value.clone(),
+            value: self.current_value.cloned(),
             current_kind: self.current_kind,
             current_range: self.current_range,
             current_flags: self.current_flags,
@@ -1495,7 +1499,7 @@ impl<'src> Lexer<'src> {
         // We preserve the previous char using this method.
         cursor.skip_bytes(cursor_offset.to_usize());
 
-        self.current_value = value;
+        self.current_value.restore(value);
         self.current_kind = current_kind;
         self.current_range = current_range;
         self.current_flags = current_flags;
@@ -1661,6 +1665,70 @@ impl<'a> LexedText<'a> {
 /// Create a new [`Lexer`] for the given source code and [`Mode`].
 pub fn lex(source: &str, mode: Mode) -> Lexer {
     Lexer::new(source, mode, TextSize::default())
+}
+
+/// Stores the currently lexed value.
+///
+/// The lexer resets the current token value to [`TokenValue::None`] for every [`Lexer::next_token`] call.
+/// However, Rust can't prove that when the [`Lexer`] sets the value for the next token and still
+/// inserts the drop code to drop the value in case it isn't [`TokenValue::None`].
+///
+/// It's the [`Lexer`]'s responsibility to call [`CurrentTokenValue::reset`] before lexing
+/// the next token to ensure the value of the current value is correctly dropped.
+/// However, it can then use [`CurrentTokenValue::set`] to set the new value and bypass dropping the old value
+/// (because it is guaranteed to be `None` at that point).
+///
+/// Note, calling `set` more than once without calling `reset` will leak memory (but isn't unsafe).
+/// There are debug assertions in place to catch this.
+#[derive(Default, Debug)]
+struct CurrentTokenValue {
+    value: ManuallyDrop<TokenValue>,
+}
+
+impl CurrentTokenValue {
+    /// Reset the current token value to [`TokenValue::None`] and drop the containing value.
+    fn reset(&mut self) {
+        let value = std::mem::take(&mut self.value);
+
+        // Take the value to run drop
+        let _value = ManuallyDrop::into_inner(value);
+    }
+
+    /// Sets the current value without dropping the current value.
+    ///
+    /// This leaks memory but isn't unsafe if called when the current value is any other value than [`TokenValue::None`].
+    #[inline]
+    fn set(&mut self, value: TokenValue) {
+        debug_assert!(matches!(*self.value, TokenValue::None));
+
+        // Set the new value but don't run drop of the old value because it is `None`.
+        self.value = ManuallyDrop::new(value);
+    }
+
+    /// Drops the current value and sets a new value.
+    fn restore(&mut self, value: TokenValue) {
+        self.reset();
+        self.set(value);
+    }
+
+    fn cloned(&self) -> TokenValue {
+        (*self.value).clone()
+    }
+
+    /// Takes the value and resets the current value to [`TokenValue::None`].
+    fn take(&mut self) -> TokenValue {
+        let value = std::mem::take(&mut self.value);
+        ManuallyDrop::into_inner(value)
+    }
+}
+
+impl Drop for CurrentTokenValue {
+    fn drop(&mut self) {
+        #[allow(unsafe_code)]
+        unsafe {
+            ManuallyDrop::drop(&mut self.value);
+        }
+    }
 }
 
 #[cfg(test)]
