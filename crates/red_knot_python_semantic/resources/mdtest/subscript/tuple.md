@@ -3,7 +3,7 @@
 ## Basic
 
 ```py
-t = (1, 'a', 'b')
+t = (1, "a", "b")
 
 reveal_type(t[0])  # revealed: Literal[1]
 reveal_type(t[1])  # revealed: Literal["a"]

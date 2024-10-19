@@ -7,6 +7,7 @@
 
 ```py path=package/bar.py
 from .foo import X  # error: [unresolved-import]
+
 reveal_type(X)  # revealed: Unknown
 ```
 
@@ -21,6 +22,7 @@ X = 42
 
 ```py path=package/bar.py
 from .foo import X
+
 reveal_type(X)  # revealed: Literal[42]
 ```
 
@@ -35,6 +37,7 @@ X = 42
 
 ```py path=package/bar.py
 from .foo.bar.baz import X
+
 reveal_type(X)  # revealed: Literal[42]
 ```
 
@@ -46,6 +49,7 @@ X = 42
 
 ```py path=package/bar.py
 from . import X
+
 reveal_type(X)  # revealed: Literal[42]
 ```
 
@@ -53,6 +57,7 @@ reveal_type(X)  # revealed: Literal[42]
 
 ```py path=package/bar.py
 from . import X  # error: [unresolved-import]
+
 reveal_type(X)  # revealed: Unknown
 ```
 
@@ -60,6 +65,7 @@ reveal_type(X)  # revealed: Unknown
 
 ```py path=package/__init__.py
 from .foo import X
+
 reveal_type(X)  # revealed: Literal[42]
 ```
 
@@ -71,6 +77,7 @@ X = 42
 
 ```py path=package/__init__.py
 from .foo import X  # error: [unresolved-import]
+
 reveal_type(X)  # revealed: Unknown
 ```
 
@@ -85,6 +92,7 @@ X = 42
 
 ```py path=package/subpackage/subsubpackage/bar.py
 from ...foo import X
+
 reveal_type(X)  # revealed: Literal[42]
 ```
 
@@ -99,6 +107,7 @@ x
 
 ```py path=package/bar.py
 from .foo import x  # error: [unresolved-import]
+
 reveal_type(x)  # revealed: Unknown
 ```
 
@@ -114,6 +123,7 @@ X = 42
 ```py path=package/bar.py
 # TODO: support submodule imports
 from . import foo  # error: [unresolved-import]
+
 y = foo.X
 
 # TODO: should be `Literal[42]`

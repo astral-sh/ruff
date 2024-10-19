@@ -474,6 +474,150 @@ impl<'db> Type<'db> {
         self == other
     }
 
+    /// Return true if this type and `other` have no common elements.
+    ///
+    /// Note: This function aims to have no false positives, but might return
+    /// wrong `false` answers in some cases.
+    pub(crate) fn is_disjoint_from(self, db: &'db dyn Db, other: Type<'db>) -> bool {
+        match (self, other) {
+            (Type::Never, _) | (_, Type::Never) => true,
+
+            (Type::Any, _) | (_, Type::Any) => false,
+            (Type::Unknown, _) | (_, Type::Unknown) => false,
+            (Type::Unbound, _) | (_, Type::Unbound) => false,
+            (Type::Todo, _) | (_, Type::Todo) => false,
+
+            (Type::Union(union), other) | (other, Type::Union(union)) => union
+                .elements(db)
+                .iter()
+                .all(|e| e.is_disjoint_from(db, other)),
+
+            (Type::Intersection(intersection), other)
+            | (other, Type::Intersection(intersection)) => {
+                if intersection
+                    .positive(db)
+                    .iter()
+                    .any(|p| p.is_disjoint_from(db, other))
+                {
+                    true
+                } else {
+                    // TODO we can do better here. For example:
+                    // X & ~Literal[1] is disjoint from Literal[1]
+                    false
+                }
+            }
+
+            (
+                left @ (Type::None
+                | Type::BooleanLiteral(..)
+                | Type::IntLiteral(..)
+                | Type::StringLiteral(..)
+                | Type::BytesLiteral(..)
+                | Type::Function(..)
+                | Type::Module(..)
+                | Type::Class(..)),
+                right @ (Type::None
+                | Type::BooleanLiteral(..)
+                | Type::IntLiteral(..)
+                | Type::StringLiteral(..)
+                | Type::BytesLiteral(..)
+                | Type::Function(..)
+                | Type::Module(..)
+                | Type::Class(..)),
+            ) => left != right,
+
+            (Type::None, Type::Instance(class_type)) | (Type::Instance(class_type), Type::None) => {
+                !matches!(
+                    class_type.known(db),
+                    Some(KnownClass::NoneType | KnownClass::Object)
+                )
+            }
+            (Type::None, _) | (_, Type::None) => true,
+
+            (Type::BooleanLiteral(..), Type::Instance(class_type))
+            | (Type::Instance(class_type), Type::BooleanLiteral(..)) => !matches!(
+                class_type.known(db),
+                Some(KnownClass::Bool | KnownClass::Int | KnownClass::Object)
+            ),
+            (Type::BooleanLiteral(..), _) | (_, Type::BooleanLiteral(..)) => true,
+
+            (Type::IntLiteral(..), Type::Instance(class_type))
+            | (Type::Instance(class_type), Type::IntLiteral(..)) => !matches!(
+                class_type.known(db),
+                Some(KnownClass::Int | KnownClass::Object)
+            ),
+            (Type::IntLiteral(..), _) | (_, Type::IntLiteral(..)) => true,
+
+            (Type::StringLiteral(..), Type::LiteralString)
+            | (Type::LiteralString, Type::StringLiteral(..)) => false,
+            (Type::StringLiteral(..), Type::Instance(class_type))
+            | (Type::Instance(class_type), Type::StringLiteral(..)) => !matches!(
+                class_type.known(db),
+                Some(KnownClass::Str | KnownClass::Object)
+            ),
+            (Type::StringLiteral(..), _) | (_, Type::StringLiteral(..)) => true,
+
+            (Type::LiteralString, Type::LiteralString) => false,
+            (Type::LiteralString, Type::Instance(class_type))
+            | (Type::Instance(class_type), Type::LiteralString) => !matches!(
+                class_type.known(db),
+                Some(KnownClass::Str | KnownClass::Object)
+            ),
+            (Type::LiteralString, _) | (_, Type::LiteralString) => true,
+
+            (Type::BytesLiteral(..), Type::Instance(class_type))
+            | (Type::Instance(class_type), Type::BytesLiteral(..)) => !matches!(
+                class_type.known(db),
+                Some(KnownClass::Bytes | KnownClass::Object)
+            ),
+            (Type::BytesLiteral(..), _) | (_, Type::BytesLiteral(..)) => true,
+
+            (
+                Type::Function(..) | Type::Module(..) | Type::Class(..),
+                Type::Instance(class_type),
+            )
+            | (
+                Type::Instance(class_type),
+                Type::Function(..) | Type::Module(..) | Type::Class(..),
+            ) => !class_type.is_known(db, KnownClass::Object),
+
+            (Type::Instance(..), Type::Instance(..)) => {
+                // TODO: once we have support for `final`, there might be some cases where
+                // we can determine that two types are disjoint. For non-final classes, we
+                // return false (multiple inheritance).
+
+                // TODO: is there anything specific to do for instances of KnownClass::Type?
+
+                false
+            }
+
+            (Type::Tuple(tuple), other) | (other, Type::Tuple(tuple)) => {
+                if let Type::Tuple(other_tuple) = other {
+                    if tuple.len(db) == other_tuple.len(db) {
+                        tuple
+                            .elements(db)
+                            .iter()
+                            .zip(other_tuple.elements(db).iter())
+                            .any(|(e1, e2)| e1.is_disjoint_from(db, *e2))
+                    } else {
+                        true
+                    }
+                } else {
+                    // We can not be sure if the tuple is disjoint from 'other' because:
+                    //   - 'other' might be the homogeneous arbitrary-length tuple type
+                    //     tuple[T, ...] (which we don't have support for yet); if all of
+                    //     our element types are not disjoint with T, this is not disjoint
+                    //   - 'other' might be a user subtype of tuple, which, if generic
+                    //     over the same or compatible *Ts, would overlap with tuple.
+                    //
+                    // TODO: add checks for the above cases once we support them
+
+                    false
+                }
+            }
+        }
+    }
+
     /// Return true if there is just a single inhabitant for this type.
     ///
     /// Note: This function aims to have no false positives, but might return `false`
@@ -1573,8 +1717,8 @@ impl<'db> TupleType<'db> {
 #[cfg(test)]
 mod tests {
     use super::{
-        builtins_symbol_ty, BytesLiteralType, StringLiteralType, Truthiness, TupleType, Type,
-        UnionType,
+        builtins_symbol_ty, BytesLiteralType, IntersectionBuilder, StringLiteralType, Truthiness,
+        TupleType, Type, UnionType,
     };
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
@@ -1618,6 +1762,7 @@ mod tests {
         BytesLiteral(&'static str),
         BuiltinInstance(&'static str),
         Union(Vec<Ty>),
+        Intersection { pos: Vec<Ty>, neg: Vec<Ty> },
         Tuple(Vec<Ty>),
     }
 
@@ -1636,6 +1781,16 @@ mod tests {
                 Ty::BuiltinInstance(s) => builtins_symbol_ty(db, s).to_instance(db),
                 Ty::Union(tys) => {
                     UnionType::from_elements(db, tys.into_iter().map(|ty| ty.into_type(db)))
+                }
+                Ty::Intersection { pos, neg } => {
+                    let mut builder = IntersectionBuilder::new(db);
+                    for p in pos {
+                        builder = builder.add_positive(p.into_type(db));
+                    }
+                    for n in neg {
+                        builder = builder.add_negative(n.into_type(db));
+                    }
+                    builder.build()
                 }
                 Ty::Tuple(tys) => {
                     let elements: Box<_> = tys.into_iter().map(|ty| ty.into_type(db)).collect();
@@ -1711,6 +1866,93 @@ mod tests {
         let db = setup_db();
 
         assert!(from.into_type(&db).is_equivalent_to(&db, to.into_type(&db)));
+    }
+
+    #[test_case(Ty::Never, Ty::Never)]
+    #[test_case(Ty::Never, Ty::None)]
+    #[test_case(Ty::Never, Ty::BuiltinInstance("int"))]
+    #[test_case(Ty::None, Ty::BoolLiteral(true))]
+    #[test_case(Ty::None, Ty::IntLiteral(1))]
+    #[test_case(Ty::None, Ty::StringLiteral("test"))]
+    #[test_case(Ty::None, Ty::BytesLiteral("test"))]
+    #[test_case(Ty::None, Ty::LiteralString)]
+    #[test_case(Ty::None, Ty::BuiltinInstance("int"))]
+    #[test_case(Ty::None, Ty::Tuple(vec![Ty::None]))]
+    #[test_case(Ty::BoolLiteral(true), Ty::BoolLiteral(false))]
+    #[test_case(Ty::BoolLiteral(true), Ty::Tuple(vec![Ty::None]))]
+    #[test_case(Ty::BoolLiteral(true), Ty::IntLiteral(1))]
+    #[test_case(Ty::BoolLiteral(false), Ty::IntLiteral(0))]
+    #[test_case(Ty::IntLiteral(1), Ty::IntLiteral(2))]
+    #[test_case(Ty::IntLiteral(1), Ty::Tuple(vec![Ty::None]))]
+    #[test_case(Ty::StringLiteral("a"), Ty::StringLiteral("b"))]
+    #[test_case(Ty::StringLiteral("a"), Ty::Tuple(vec![Ty::None]))]
+    #[test_case(Ty::LiteralString, Ty::BytesLiteral("a"))]
+    #[test_case(Ty::BytesLiteral("a"), Ty::BytesLiteral("b"))]
+    #[test_case(Ty::BytesLiteral("a"), Ty::Tuple(vec![Ty::None]))]
+    #[test_case(Ty::BytesLiteral("a"), Ty::StringLiteral("a"))]
+    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::IntLiteral(3))]
+    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(3), Ty::IntLiteral(4)]))]
+    #[test_case(Ty::Intersection{pos: vec![Ty::BuiltinInstance("int"),  Ty::IntLiteral(1)], neg: vec![]}, Ty::IntLiteral(2))]
+    #[test_case(Ty::Tuple(vec![Ty::IntLiteral(1)]), Ty::Tuple(vec![Ty::IntLiteral(2)]))]
+    #[test_case(Ty::Tuple(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Tuple(vec![Ty::IntLiteral(1)]))]
+    #[test_case(Ty::Tuple(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Tuple(vec![Ty::IntLiteral(1), Ty::IntLiteral(3)]))]
+    fn is_disjoint_from(a: Ty, b: Ty) {
+        let db = setup_db();
+        let a = a.into_type(&db);
+        let b = b.into_type(&db);
+
+        assert!(a.is_disjoint_from(&db, b));
+        assert!(b.is_disjoint_from(&db, a));
+    }
+
+    #[test_case(Ty::Any, Ty::BuiltinInstance("int"))]
+    #[test_case(Ty::None, Ty::None)]
+    #[test_case(Ty::None, Ty::BuiltinInstance("object"))]
+    #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinInstance("int"))]
+    #[test_case(Ty::BuiltinInstance("str"), Ty::LiteralString)]
+    #[test_case(Ty::BoolLiteral(true), Ty::BoolLiteral(true))]
+    #[test_case(Ty::BoolLiteral(false), Ty::BoolLiteral(false))]
+    #[test_case(Ty::BoolLiteral(true), Ty::BuiltinInstance("bool"))]
+    #[test_case(Ty::BoolLiteral(true), Ty::BuiltinInstance("int"))]
+    #[test_case(Ty::IntLiteral(1), Ty::IntLiteral(1))]
+    #[test_case(Ty::StringLiteral("a"), Ty::StringLiteral("a"))]
+    #[test_case(Ty::StringLiteral("a"), Ty::LiteralString)]
+    #[test_case(Ty::StringLiteral("a"), Ty::BuiltinInstance("str"))]
+    #[test_case(Ty::LiteralString, Ty::LiteralString)]
+    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::IntLiteral(2))]
+    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(2), Ty::IntLiteral(3)]))]
+    #[test_case(Ty::Intersection{pos: vec![Ty::BuiltinInstance("int"), Ty::IntLiteral(2)], neg: vec![]}, Ty::IntLiteral(2))]
+    #[test_case(Ty::Tuple(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Tuple(vec![Ty::IntLiteral(1), Ty::BuiltinInstance("int")]))]
+    fn is_not_disjoint_from(a: Ty, b: Ty) {
+        let db = setup_db();
+        let a = a.into_type(&db);
+        let b = b.into_type(&db);
+
+        assert!(!a.is_disjoint_from(&db, b));
+        assert!(!b.is_disjoint_from(&db, a));
+    }
+
+    #[test]
+    fn is_disjoint_from_union_of_class_types() {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/module.py",
+            "
+            class A: ...
+            class B: ...
+            x = A if flag else B
+        ",
+        )
+        .unwrap();
+        let module = ruff_db::files::system_path_to_file(&db, "/src/module.py").unwrap();
+
+        let type_a = super::global_symbol_ty(&db, module, "A");
+        let type_x = super::global_symbol_ty(&db, module, "x");
+
+        assert!(matches!(type_a, Type::Class(_)));
+        assert!(matches!(type_x, Type::Union(_)));
+
+        assert!(!type_a.is_disjoint_from(&db, type_x));
     }
 
     #[test_case(Ty::None)]

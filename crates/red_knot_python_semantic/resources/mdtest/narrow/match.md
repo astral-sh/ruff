@@ -12,6 +12,5 @@ match x:
     case None:
         y = x
 
-# TODO intersection simplification: should be just Literal[0] | None
-reveal_type(y)  # revealed: Literal[0] | None | Literal[1] & None
+reveal_type(y)  # revealed: Literal[0] | None
 ```

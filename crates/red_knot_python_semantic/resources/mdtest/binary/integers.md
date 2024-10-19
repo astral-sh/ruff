@@ -42,7 +42,9 @@ reveal_type(int() / 0)
 # revealed: float
 reveal_type(1.0 / 0)
 
-class MyInt(int): pass
+
+class MyInt(int): ...
+
 
 # No error for a subclass of int
 # revealed: float

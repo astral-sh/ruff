@@ -216,74 +216,140 @@ impl<'db> InnerIntersectionBuilder<'db> {
     }
 
     /// Adds a positive type to this intersection.
-    fn add_positive(&mut self, db: &'db dyn Db, ty: Type<'db>) {
-        // TODO `Any`/`Unknown`/`Todo` actually should not self-cancel
-        match ty {
-            Type::Intersection(inter) => {
-                let pos = inter.positive(db);
-                let neg = inter.negative(db);
-                self.positive.extend(pos.difference(&self.negative));
-                self.negative.extend(neg.difference(&self.positive));
-                self.positive.retain(|elem| !neg.contains(elem));
-                self.negative.retain(|elem| !pos.contains(elem));
+    fn add_positive(&mut self, db: &'db dyn Db, new_positive: Type<'db>) {
+        if let Type::Intersection(other) = new_positive {
+            for pos in other.positive(db) {
+                self.add_positive(db, *pos);
             }
-            _ => {
-                if !self.negative.remove(&ty) {
-                    self.positive.insert(ty);
-                };
+            for neg in other.negative(db) {
+                self.add_negative(db, *neg);
             }
+        } else {
+            // ~Literal[True] & bool = Literal[False]
+            if let Type::Instance(class_type) = new_positive {
+                if class_type.is_known(db, KnownClass::Bool) {
+                    if let Some(&Type::BooleanLiteral(value)) = self
+                        .negative
+                        .iter()
+                        .find(|element| matches!(element, Type::BooleanLiteral(..)))
+                    {
+                        *self = Self::new();
+                        self.positive.insert(Type::BooleanLiteral(!value));
+                        return;
+                    }
+                }
+            }
+
+            let mut to_remove = SmallVec::<[usize; 1]>::new();
+            for (index, existing_positive) in self.positive.iter().enumerate() {
+                // S & T = S    if S <: T
+                if existing_positive.is_subtype_of(db, new_positive) {
+                    return;
+                }
+                // same rule, reverse order
+                if new_positive.is_subtype_of(db, *existing_positive) {
+                    to_remove.push(index);
+                }
+                // A & B = Never    if A and B are disjoint
+                if new_positive.is_disjoint_from(db, *existing_positive) {
+                    *self = Self::new();
+                    return;
+                }
+            }
+            for index in to_remove.iter().rev() {
+                self.positive.swap_remove_index(*index);
+            }
+
+            let mut to_remove = SmallVec::<[usize; 1]>::new();
+            for (index, existing_negative) in self.negative.iter().enumerate() {
+                // S & ~T = Never    if S <: T
+                if new_positive.is_subtype_of(db, *existing_negative) {
+                    *self = Self::new();
+                    return;
+                }
+                // A & ~B = A    if A and B are disjoint
+                if existing_negative.is_disjoint_from(db, new_positive) {
+                    to_remove.push(index);
+                }
+            }
+            for index in to_remove.iter().rev() {
+                self.negative.swap_remove_index(*index);
+            }
+
+            self.positive.insert(new_positive);
         }
     }
 
     /// Adds a negative type to this intersection.
-    fn add_negative(&mut self, db: &'db dyn Db, ty: Type<'db>) {
-        // TODO `Any`/`Unknown`/`Todo` actually should not self-cancel
-        match ty {
-            Type::Intersection(intersection) => {
-                let pos = intersection.negative(db);
-                let neg = intersection.positive(db);
-                self.positive.extend(pos.difference(&self.negative));
-                self.negative.extend(neg.difference(&self.positive));
-                self.positive.retain(|elem| !neg.contains(elem));
-                self.negative.retain(|elem| !pos.contains(elem));
+    fn add_negative(&mut self, db: &'db dyn Db, new_negative: Type<'db>) {
+        match new_negative {
+            Type::Intersection(inter) => {
+                for pos in inter.positive(db) {
+                    self.add_negative(db, *pos);
+                }
+                for neg in inter.negative(db) {
+                    self.add_positive(db, *neg);
+                }
             }
-            Type::Never => {}
             Type::Unbound => {}
+            ty @ (Type::Any | Type::Unknown | Type::Todo) => {
+                // Adding any of these types to the negative side of an intersection
+                // is equivalent to adding it to the positive side. We do this to
+                // simplify the representation.
+                self.positive.insert(ty);
+            }
+            // ~Literal[True] & bool = Literal[False]
+            Type::BooleanLiteral(bool)
+                if self
+                    .positive
+                    .iter()
+                    .any(|pos| *pos == KnownClass::Bool.to_instance(db)) =>
+            {
+                *self = Self::new();
+                self.positive.insert(Type::BooleanLiteral(!bool));
+            }
             _ => {
-                if !self.positive.remove(&ty) {
-                    self.negative.insert(ty);
-                };
+                let mut to_remove = SmallVec::<[usize; 1]>::new();
+                for (index, existing_negative) in self.negative.iter().enumerate() {
+                    // ~S & ~T = ~T    if S <: T
+                    if existing_negative.is_subtype_of(db, new_negative) {
+                        to_remove.push(index);
+                    }
+                    // same rule, reverse order
+                    if new_negative.is_subtype_of(db, *existing_negative) {
+                        return;
+                    }
+                }
+                for index in to_remove.iter().rev() {
+                    self.negative.swap_remove_index(*index);
+                }
+
+                for existing_positive in &self.positive {
+                    // S & ~T = Never    if S <: T
+                    if existing_positive.is_subtype_of(db, new_negative) {
+                        *self = Self::new();
+                        return;
+                    }
+                    // A & ~B = A    if A and B are disjoint
+                    if existing_positive.is_disjoint_from(db, new_negative) {
+                        return;
+                    }
+                }
+
+                self.negative.insert(new_negative);
             }
         }
     }
 
-    fn simplify(&mut self) {
-        // TODO this should be generalized based on subtyping, for now we just handle a few cases
-
-        // Never is a subtype of all types
-        if self.positive.contains(&Type::Never) {
-            self.positive.retain(Type::is_never);
-            self.negative.clear();
-        }
-
+    fn simplify_unbound(&mut self) {
         if self.positive.contains(&Type::Unbound) {
             self.positive.retain(Type::is_unbound);
             self.negative.clear();
         }
-
-        // None intersects only with object
-        for pos in &self.positive {
-            if let Type::Instance(_) = pos {
-                // could be `object` type
-            } else {
-                self.negative.remove(&Type::None);
-                break;
-            }
-        }
     }
 
     fn build(mut self, db: &'db dyn Db) -> Type<'db> {
-        self.simplify();
+        self.simplify_unbound();
         match (self.positive.len(), self.negative.len()) {
             (0, 0) => Type::Never,
             (1, 0) => self.positive[0],
@@ -302,9 +368,10 @@ mod tests {
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
-    use crate::types::{KnownClass, UnionBuilder};
+    use crate::types::{KnownClass, StringLiteralType, UnionBuilder};
     use crate::ProgramSettings;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+    use test_case::test_case;
 
     fn setup_db() -> TestDb {
         let db = TestDb::new();
@@ -473,7 +540,7 @@ mod tests {
             .expect_intersection();
 
         assert_eq!(intersection.pos_vec(&db), &[t2, ta]);
-        assert_eq!(intersection.neg_vec(&db), &[t1]);
+        assert_eq!(intersection.neg_vec(&db), &[]);
     }
 
     #[test]
@@ -481,7 +548,7 @@ mod tests {
         let db = setup_db();
         let ta = Type::Any;
         let t1 = Type::IntLiteral(1);
-        let t2 = Type::IntLiteral(2);
+        let t2 = KnownClass::Int.to_instance(&db);
         let i0 = IntersectionBuilder::new(&db)
             .add_positive(ta)
             .add_negative(t1)
@@ -492,8 +559,8 @@ mod tests {
             .build()
             .expect_intersection();
 
-        assert_eq!(intersection.pos_vec(&db), &[t2, t1]);
-        assert_eq!(intersection.neg_vec(&db), &[ta]);
+        assert_eq!(intersection.pos_vec(&db), &[ta, t1]);
+        assert_eq!(intersection.neg_vec(&db), &[]);
     }
 
     #[test]
@@ -574,11 +641,269 @@ mod tests {
     #[test]
     fn build_intersection_simplify_negative_none() {
         let db = setup_db();
+
         let ty = IntersectionBuilder::new(&db)
             .add_negative(Type::None)
             .add_positive(Type::IntLiteral(1))
             .build();
-
         assert_eq!(ty, Type::IntLiteral(1));
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(Type::IntLiteral(1))
+            .add_negative(Type::None)
+            .build();
+        assert_eq!(ty, Type::IntLiteral(1));
+    }
+
+    #[test]
+    fn build_intersection_simplify_positive_type_and_positive_subtype() {
+        let db = setup_db();
+
+        let t = KnownClass::Str.to_instance(&db);
+        let s = Type::LiteralString;
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(t)
+            .add_positive(s)
+            .build();
+        assert_eq!(ty, s);
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(s)
+            .add_positive(t)
+            .build();
+        assert_eq!(ty, s);
+
+        let literal = Type::StringLiteral(StringLiteralType::new(&db, "a"));
+        let expected = IntersectionBuilder::new(&db)
+            .add_positive(s)
+            .add_negative(literal)
+            .build();
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(t)
+            .add_negative(literal)
+            .add_positive(s)
+            .build();
+        assert_eq!(ty, expected);
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(s)
+            .add_negative(literal)
+            .add_positive(t)
+            .build();
+        assert_eq!(ty, expected);
+    }
+
+    #[test]
+    fn build_intersection_simplify_negative_type_and_negative_subtype() {
+        let db = setup_db();
+
+        let t = KnownClass::Str.to_instance(&db);
+        let s = Type::LiteralString;
+
+        let expected = IntersectionBuilder::new(&db).add_negative(t).build();
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_negative(t)
+            .add_negative(s)
+            .build();
+        assert_eq!(ty, expected);
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_negative(s)
+            .add_negative(t)
+            .build();
+        assert_eq!(ty, expected);
+
+        let object = KnownClass::Object.to_instance(&db);
+        let expected = IntersectionBuilder::new(&db)
+            .add_negative(t)
+            .add_positive(object)
+            .build();
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_negative(t)
+            .add_positive(object)
+            .add_negative(s)
+            .build();
+        assert_eq!(ty, expected);
+    }
+
+    #[test]
+    fn build_intersection_simplify_negative_type_and_multiple_negative_subtypes() {
+        let db = setup_db();
+
+        let s1 = Type::IntLiteral(1);
+        let s2 = Type::IntLiteral(2);
+        let t = KnownClass::Int.to_instance(&db);
+
+        let expected = IntersectionBuilder::new(&db).add_negative(t).build();
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_negative(s1)
+            .add_negative(s2)
+            .add_negative(t)
+            .build();
+        assert_eq!(ty, expected);
+    }
+
+    #[test]
+    fn build_intersection_simplify_negative_type_and_positive_subtype() {
+        let db = setup_db();
+
+        let t = KnownClass::Str.to_instance(&db);
+        let s = Type::LiteralString;
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_negative(t)
+            .add_positive(s)
+            .build();
+        assert_eq!(ty, Type::Never);
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(s)
+            .add_negative(t)
+            .build();
+        assert_eq!(ty, Type::Never);
+
+        // This should also work in the presence of additional contributions:
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(KnownClass::Object.to_instance(&db))
+            .add_negative(t)
+            .add_positive(s)
+            .build();
+        assert_eq!(ty, Type::Never);
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(s)
+            .add_negative(Type::StringLiteral(StringLiteralType::new(&db, "a")))
+            .add_negative(t)
+            .build();
+        assert_eq!(ty, Type::Never);
+    }
+
+    #[test]
+    fn build_intersection_simplify_disjoint_positive_types() {
+        let db = setup_db();
+
+        let t1 = Type::IntLiteral(1);
+        let t2 = Type::None;
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(t1)
+            .add_positive(t2)
+            .build();
+        assert_eq!(ty, Type::Never);
+
+        // If there are any negative contributions, they should
+        // be removed too.
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(KnownClass::Str.to_instance(&db))
+            .add_negative(Type::LiteralString)
+            .add_positive(t2)
+            .build();
+        assert_eq!(ty, Type::Never);
+    }
+
+    #[test]
+    fn build_intersection_simplify_disjoint_positive_and_negative_types() {
+        let db = setup_db();
+
+        let t_p = KnownClass::Int.to_instance(&db);
+        let t_n = Type::StringLiteral(StringLiteralType::new(&db, "t_n"));
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(t_p)
+            .add_negative(t_n)
+            .build();
+        assert_eq!(ty, t_p);
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_negative(t_n)
+            .add_positive(t_p)
+            .build();
+        assert_eq!(ty, t_p);
+
+        let int_literal = Type::IntLiteral(1);
+        let expected = IntersectionBuilder::new(&db)
+            .add_positive(t_p)
+            .add_negative(int_literal)
+            .build();
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(t_p)
+            .add_negative(int_literal)
+            .add_negative(t_n)
+            .build();
+        assert_eq!(ty, expected);
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_negative(t_n)
+            .add_negative(int_literal)
+            .add_positive(t_p)
+            .build();
+        assert_eq!(ty, expected);
+    }
+
+    #[test_case(true)]
+    #[test_case(false)]
+    fn build_intersection_simplify_split_bool(bool_value: bool) {
+        let db = setup_db();
+
+        let t_bool = KnownClass::Bool.to_instance(&db);
+        let t_bool_literal = Type::BooleanLiteral(bool_value);
+
+        // We add t_object in various orders (in first or second position) in
+        // the tests below to ensure that the boolean simplification eliminates
+        // everything from the intersection, not just `bool`.
+        let t_object = KnownClass::Object.to_instance(&db);
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(t_object)
+            .add_positive(t_bool)
+            .add_negative(t_bool_literal)
+            .build();
+        assert_eq!(ty, Type::BooleanLiteral(!bool_value));
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(t_bool)
+            .add_positive(t_object)
+            .add_negative(t_bool_literal)
+            .build();
+        assert_eq!(ty, Type::BooleanLiteral(!bool_value));
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(t_object)
+            .add_negative(t_bool_literal)
+            .add_positive(t_bool)
+            .build();
+        assert_eq!(ty, Type::BooleanLiteral(!bool_value));
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_negative(t_bool_literal)
+            .add_positive(t_object)
+            .add_positive(t_bool)
+            .build();
+        assert_eq!(ty, Type::BooleanLiteral(!bool_value));
+    }
+
+    #[test_case(Type::Any)]
+    #[test_case(Type::Unknown)]
+    #[test_case(Type::Todo)]
+    fn build_intersection_t_and_negative_t_does_not_simplify(ty: Type) {
+        let db = setup_db();
+
+        let result = IntersectionBuilder::new(&db)
+            .add_positive(ty)
+            .add_negative(ty)
+            .build();
+        assert_eq!(result, ty);
+
+        let result = IntersectionBuilder::new(&db)
+            .add_negative(ty)
+            .add_positive(ty)
+            .build();
+        assert_eq!(result, ty);
     }
 }
