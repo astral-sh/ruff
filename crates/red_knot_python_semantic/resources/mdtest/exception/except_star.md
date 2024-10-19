@@ -25,6 +25,6 @@ except* OSError as e:
 try:
     x
 except* (TypeError, AttributeError) as e:
-    #TODO(Alex): more precise would be `ExceptionGroup[TypeError | AttributeError]`.
+    # TODO(Alex): more precise would be `ExceptionGroup[TypeError | AttributeError]`.
     reveal_type(e)  # revealed: BaseExceptionGroup
 ```
