@@ -431,6 +431,41 @@ impl<'a> Comments<'a> {
     pub(crate) fn debug(&'a self, source_code: SourceCode<'a>) -> DebugComments<'a> {
         DebugComments::new(&self.data.comments, source_code)
     }
+
+    /// Returns true if the node itself or any of its descendants have comments.
+    pub(crate) fn contains_comments(&self, node: AnyNodeRef) -> bool {
+        use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal};
+
+        struct Visitor<'a> {
+            comments: &'a Comments<'a>,
+            has_comment: bool,
+        }
+
+        impl<'a> SourceOrderVisitor<'a> for Visitor<'a> {
+            fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
+                if self.has_comment {
+                    TraversalSignal::Skip
+                } else if self.comments.has(node) {
+                    self.has_comment = true;
+                    TraversalSignal::Skip
+                } else {
+                    TraversalSignal::Traverse
+                }
+            }
+        }
+
+        if self.has(node) {
+            return true;
+        }
+
+        let mut visitor = Visitor {
+            comments: self,
+            has_comment: false,
+        };
+        node.visit_preorder(&mut visitor);
+
+        visitor.has_comment
+    }
 }
 
 pub(crate) type LeadingDanglingTrailingComments<'a> = LeadingDanglingTrailing<'a, SourceComment>;

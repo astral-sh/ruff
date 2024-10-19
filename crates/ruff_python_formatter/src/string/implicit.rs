@@ -112,6 +112,20 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                 return None;
             }
 
+            // Multiline f-strings can't be joined if the f-string formatting is disabled because
+            // the string gets inserted in verbatim preserving the newlines.
+            if string.is_fstring()
+                && !is_f_string_formatting_enabled(context)
+                && string.is_multiline(context.source())
+            {
+                return None;
+            }
+
+            // Multiline strings can never fit on a single line.
+            if !string.is_fstring() && string.is_multiline(context.source()) {
+                return None;
+            }
+
             // Early exit if it's known that this string can't be joined
             for part in string.parts() {
                 // Similar to Black, don't collapse triple quoted and raw strings.
@@ -130,6 +144,37 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                 // now covering more code.
                 if context.comments().leading_trailing(&part).next().is_some() {
                     return None;
+                }
+
+                if let StringLikePart::FString(fstring) = part {
+                    if is_f_string_formatting_enabled(context) {
+                        if fstring.elements.iter().any(|element| match element {
+                            // Same as for other literals. Multiline literals can't fit on a single line.
+                            FStringElement::Literal(literal) => context
+                                .locator()
+                                .slice(literal.range())
+                                .contains(['\n', '\r']),
+                            FStringElement::Expression(expression) => {
+                                // The formatter preserves the whitespace around the debug text of an expression.
+                                // If the text contains any new lines, then it can't fit on a single line.
+                                if expression.debug_text.as_ref().is_some_and(|debug_text| {
+                                    debug_text.leading.contains(['\n', '\r'])
+                                        || debug_text.trailing.contains(['\n', '\r'])
+                                }) {
+                                    return true;
+                                }
+
+                                // Expressions containing comments can't be joined.
+                                if context.comments().contains_comments(expression.into()) {
+                                    return true;
+                                }
+
+                                false
+                            }
+                        }) {
+                            return None;
+                        }
+                    }
                 }
             }
 
@@ -184,6 +229,10 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
             string,
         })
     }
+
+    pub(crate) fn string(&self) -> StringLike<'a> {
+        self.string
+    }
 }
 
 impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
@@ -218,8 +267,8 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
                                     }
                                     .fmt(f)?;
                                 }
-                                // Note, thsi doesn't work because comments inside the expression would only be formatted
-                                // once...
+                                // Formatting the expression here and in the expanded version is safe **only**
+                                // because we assert that the f-string never contains any comments.
                                 FStringElement::Expression(expression) => {
                                     let context = FStringContext::new(
                                         self.flags,

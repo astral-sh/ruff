@@ -307,7 +307,6 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                     &comments,
                 ) {
                     let group_id = f.group_id("optional_parentheses");
-                    let f = &mut WithNodeLevel::new(NodeLevel::Expression(Some(group_id)), f);
 
                     // Special case for implicit concatenated strings in assignment value positions.
                     // The special handling is necessary to prevent an instability where an assignment has
@@ -338,15 +337,42 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                     // formatting.
                     if let Some(flat) = format_implicit_flat {
                         inline_comments.mark_formatted();
+                        let string = flat.string();
 
                         let flat = format_with(|f| {
-                            let mut buffer = RemoveSoftLinesBuffer::new(&mut *f);
-                            write!(buffer, [flat])
-                        });
+                            if string.is_fstring() {
+                                let mut buffer = RemoveSoftLinesBuffer::new(&mut *f);
 
-                        let expanded = FormatImplicitConcatenatedStringExpanded::new(
-                            StringLike::try_from(*value).unwrap(),
-                        );
+                                write!(buffer, [flat])
+                            } else {
+                                flat.fmt(f)
+                            }
+                        })
+                        .memoized();
+
+                        // F-String containing an expression with a magic trailing comma, a comment, or a
+                        // multiline debug expression should never be joined. Use the default layout.
+                        // ```python
+                        // aaaa = f"abcd{[
+                        //    1,
+                        //    2,
+                        // ]}" "more"
+                        // ```
+                        if string.is_fstring() && flat.inspect(f)?.will_break() {
+                            return maybe_parenthesize_expression(
+                                value,
+                                *statement,
+                                Parenthesize::IfBreaks,
+                            )
+                            .fmt(f);
+                        }
+
+                        let expanded = format_with(|f| {
+                            let f =
+                                &mut WithNodeLevel::new(NodeLevel::Expression(Some(group_id)), f);
+
+                            write!(f, [FormatImplicitConcatenatedStringExpanded::new(string)])
+                        });
 
                         // Join the implicit concatenated string if it fits on a single line
                         // ```python
@@ -502,7 +528,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                 // Prevent inline comments to be formatted as part of the expression.
                 inline_comments.mark_formatted();
 
-                let mut last_target = before_operator.memoized();
+                let last_target = before_operator.memoized();
                 let last_target_breaks = last_target.inspect(f)?.will_break();
 
                 // Don't parenthesize the `value` if it is known that the target will break.
@@ -525,12 +551,16 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
 
                 let format_value = format_with(|f| {
                     if let Some(format_implicit_flat) = format_implicit_flat.as_ref() {
-                        // Remove any soft line breaks emitted by the f-string formatting.
-                        // This is important when formatting f-strings as part of an assignment right side
-                        // because `best_fit_parenthesize` will otherwise still try to break inner
-                        // groups if wrapped in a `group(..).should_expand(true)`
-                        let mut buffer = RemoveSoftLinesBuffer::new(&mut *f);
-                        write!(buffer, [format_implicit_flat])
+                        if format_implicit_flat.string().is_fstring() {
+                            // Remove any soft line breaks emitted by the f-string formatting.
+                            // This is important when formatting f-strings as part of an assignment right side
+                            // because `best_fit_parenthesize` will otherwise still try to break inner
+                            // groups if wrapped in a `group(..).should_expand(true)`
+                            let mut buffer = RemoveSoftLinesBuffer::new(&mut *f);
+                            write!(buffer, [format_implicit_flat])
+                        } else {
+                            format_implicit_flat.fmt(f)
+                        }
                     } else {
                         value.format().with_options(Parentheses::Never).fmt(f)
                     }
@@ -620,7 +650,34 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                         split_target_flat_value
                     ]
                     .fmt(f)
-                } else if format_implicit_flat.is_some() {
+                } else if let Some(format_implicit_flat) = &format_implicit_flat {
+                    // F-String containing an expression with a magic trailing comma, a comment, or a
+                    // multiline debug expression should never be joined. Use the default layout.
+                    // ```python
+                    // aaaa = f"abcd{[
+                    //    1,
+                    //    2,
+                    // ]}" "more"
+                    // ```
+                    if format_implicit_flat.string().is_fstring()
+                        && format_value.inspect(f)?.will_break()
+                    {
+                        return write!(
+                            f,
+                            [
+                                before_operator,
+                                space(),
+                                operator,
+                                space(),
+                                maybe_parenthesize_expression(
+                                    value,
+                                    *statement,
+                                    Parenthesize::IfBreaks
+                                )
+                            ]
+                        );
+                    }
+
                     let group_id = f.group_id("optional_parentheses");
                     let format_expanded = format_with(|f| {
                         let f = &mut WithNodeLevel::new(NodeLevel::Expression(Some(group_id)), f);

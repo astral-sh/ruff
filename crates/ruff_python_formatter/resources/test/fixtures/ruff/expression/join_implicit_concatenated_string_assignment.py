@@ -232,3 +232,46 @@ a[
     f"ccccc{
     expression}cccccccccccccccccccccccccccccccc" "ccccccccccccccccccccccccccccccc"  # comment
 )
+
+# Don't inline f-strings that contain expressions that are guaranteed to split, e.b. because of a magic trailing comma
+aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+[a,]
+}" "moreeeeeeeeeeeeeeeeeeee" "test" # comment
+
+aaaaa[aaaaaaaaaaa] = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+[a,]
+}" "moreeeeeeeeeeeeeeeeeeee" "test" # comment
+
+# Don't inline f-strings that contain commented expressions
+aaaaaaaaaaaaaaaaaa = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeee{[
+        a  # comment
+    ]}" "moreeeeeeeeeeeeeeeeeetest"  # comment
+)
+
+aaaaa[aaaaaaaaaaa] = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeee{[
+        a  # comment
+    ]}" "moreeeeeeeeeeeeeeeeeetest"  # comment
+)
+
+# Don't inline f-strings with multiline debug expressions:
+aaaaaaaaaaaaaaaaaa = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeee{
+    a=}" "moreeeeeeeeeeeeeeeeeetest"  # comment
+)
+
+aaaaaaaaaaaaaaaaaa = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeee{a
+    =}" "moreeeeeeeeeeeeeeeeeetest"  # comment
+)
+
+aaaaa[aaaaaaaaaaa] = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeee{
+    a=}" "moreeeeeeeeeeeeeeeeeetest"  # comment
+)
+
+aaaaa[aaaaaaaaaaa] = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeee{a
+    =}" "moreeeeeeeeeeeeeeeeeetest"  # comment
+)
