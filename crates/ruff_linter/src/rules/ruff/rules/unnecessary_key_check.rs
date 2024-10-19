@@ -131,7 +131,7 @@ pub(crate) fn unnecessary_key_check(checker: &mut Checker, expr: &Expr) {
         ),
         expr.range(),
     );
-    diagnostic.set_fix(if is_fix_safe {
+    diagnostic.set_fix(if is_fix_safe || checker.settings.preview.is_disabled() {
         Fix::safe_edit(edit)
     } else {
         Fix::unsafe_edit(edit)

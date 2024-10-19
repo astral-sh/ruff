@@ -131,7 +131,7 @@ RUF019.py:26:4: RUF019 [*] Unnecessary key check before dictionary access
    |
    = help: Replace with `dict.get`
 
-ℹ Safe fix
+ℹ Unsafe fix
 23 23 | if f() in d and d[f()]:
 24 24 |     pass
 25 25 | 
@@ -151,7 +151,7 @@ RUF019.py:29:4: RUF019 [*] Unnecessary key check before dictionary access
    |
    = help: Replace with `dict.get`
 
-ℹ Safe fix
+ℹ Unsafe fix
 26 26 | if c.a in dct and dct[c.a]:
 27 27 |     pass
 28 28 | 
@@ -171,7 +171,7 @@ RUF019.py:32:4: RUF019 [*] Unnecessary key check before dictionary access
    |
    = help: Replace with `dict.get`
 
-ℹ Safe fix
+ℹ Unsafe fix
 29 29 | if f"{c}" in dct and dct[f"{c}"]:
 30 30 |     pass
 31 31 | 

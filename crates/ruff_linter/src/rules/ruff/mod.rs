@@ -384,6 +384,7 @@ mod tests {
     }
 
     #[test_case(Rule::ZipInsteadOfPairwise, Path::new("RUF007.py"))]
+    #[test_case(Rule::UnnecessaryKeyCheck, Path::new("RUF019.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
