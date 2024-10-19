@@ -2479,7 +2479,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                     UnaryOp::Invert => "__invert__",
                     UnaryOp::UAdd => "__pos__",
                     UnaryOp::USub => "__neg__",
-                    _ => return Type::Unknown,
+                    UnaryOp::Not => {
+                        debug_assert!(
+                            false,
+                            "Not operator should not be handled by dunder method call"
+                        );
+                        return Type::Unknown;
+                    }
                 };
                 let class_member = class.class_member(self.db, unary_dunder_method);
                 let call = class_member.call(self.db, &[operand_type]);
