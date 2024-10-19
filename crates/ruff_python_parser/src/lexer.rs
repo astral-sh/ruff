@@ -648,6 +648,14 @@ impl<'src> Lexer<'src> {
             return TokenKind::Name;
         }
 
+        // Short circuit for names that are longer than any known keyword.
+        // It helps Rust to predict that the Name::new call in the keyword match's default branch
+        // is guaranteed to fit into a stack allocated (inline) Name.
+        if text.len() > 8 {
+            self.current_value = TokenValue::Name(Name::new(text));
+            return TokenKind::Name;
+        }
+
         match text {
             "False" => TokenKind::False,
             "None" => TokenKind::None,
