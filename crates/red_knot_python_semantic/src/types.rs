@@ -355,6 +355,13 @@ impl<'db> Type<'db> {
     pub const fn into_int_literal_type(self) -> Option<i64> {
         match self {
             Type::IntLiteral(value) => Some(value),
+            Type::BooleanLiteral(b) => {
+                if b {
+                    Some(1)
+                } else {
+                    Some(0)
+                }
+            }
             _ => None,
         }
     }

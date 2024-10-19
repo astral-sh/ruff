@@ -537,15 +537,18 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// Raise a diagnostic if the given type cannot be divided by zero.
     ///
     /// Expects the resolved type of the left side of the binary expression.
-    fn check_division_by_zero(&mut self, expr: &ast::ExprBinOp, left: Type<'db>) {
+    fn check_division_by_zero(
+        &mut self,
+        expr: &ast::ExprBinOp,
+        left: Type<'db>,
+        original_left: Type<'db>,
+    ) {
         match left {
             Type::IntLiteral(_) => {}
             Type::Instance(cls)
                 if [KnownClass::Float, KnownClass::Int, KnownClass::Bool]
                     .iter()
                     .any(|&k| cls.is_known(self.db, k)) => {}
-            Type::BooleanLiteral(_) => {}
-
             _ => return,
         };
 
@@ -561,7 +564,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             "division-by-zero",
             format_args!(
                 "Cannot {op} object of type `{}` {by_zero}",
-                left.display(self.db)
+                original_left.display(self.db)
             ),
         );
     }
@@ -2495,17 +2498,32 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let left_ty = self.infer_expression(left);
         let right_ty = self.infer_expression(right);
+        self.infer_binary_expression_type(binary, *op, left_ty, right_ty)
+    }
 
+    fn infer_binary_expression_type(
+        &mut self,
+        expr: &ast::ExprBinOp,
+        op: ast::Operator,
+        left_ty: Type<'db>,
+        right_ty: Type<'db>,
+    ) -> Type<'db> {
         // Check for division by zero; this doesn't change the inferred type for the expression, but
         // may emit a diagnostic
         if matches!(
             (op, right_ty),
             (
                 ast::Operator::Div | ast::Operator::FloorDiv | ast::Operator::Mod,
-                Type::IntLiteral(0) | Type::BooleanLiteral(false)
+                Type::IntLiteral(0)
             )
         ) {
-            self.check_division_by_zero(binary, left_ty);
+            // We want to print the original type that was used in the expression. The left type might
+            // have been converted to other types during the check.
+            // Since the type was previously inferred in the function that calls this or in the
+            // previous recursion this id will exist
+            let expr_id = expr.left.scoped_ast_id(self.db, self.scope());
+            let previous = self.types.expressions[&expr_id];
+            self.check_division_by_zero(expr, left_ty, previous);
         }
 
         match (left_ty, right_ty, op) {
@@ -2529,11 +2547,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .map(Type::IntLiteral)
                 .unwrap_or_else(|| KnownClass::Int.to_instance(self.db)),
 
-            (
-                Type::IntLiteral(_),
-                Type::IntLiteral(_) | Type::BooleanLiteral(_),
-                ast::Operator::Div,
-            ) => KnownClass::Float.to_instance(self.db),
+            (Type::IntLiteral(_), Type::IntLiteral(_), ast::Operator::Div) => {
+                KnownClass::Float.to_instance(self.db)
+            }
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::FloorDiv) => n
                 .checked_div(m)
@@ -2544,6 +2560,17 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .checked_rem(m)
                 .map(Type::IntLiteral)
                 .unwrap_or_else(|| KnownClass::Int.to_instance(self.db)),
+
+            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Pow) => {
+                let m = u32::try_from(m);
+                match m {
+                    Ok(m) => n
+                        .checked_pow(m)
+                        .map(Type::IntLiteral)
+                        .unwrap_or_else(|| KnownClass::Int.to_instance(self.db)),
+                    Err(_) => KnownClass::Int.to_instance(self.db),
+                }
+            }
 
             (Type::BytesLiteral(lhs), Type::BytesLiteral(rhs), ast::Operator::Add) => {
                 Type::BytesLiteral(BytesLiteralType::new(
@@ -2602,21 +2629,25 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
 
-            (Type::BooleanLiteral(_), Type::BooleanLiteral(_), op) => match op {
-                ruff_python_ast::Operator::Add
-                | ruff_python_ast::Operator::Sub
-                | ruff_python_ast::Operator::Mult
-                | ruff_python_ast::Operator::Mod
-                | ruff_python_ast::Operator::Pow
-                | ruff_python_ast::Operator::LShift
-                | ruff_python_ast::Operator::RShift
-                | ruff_python_ast::Operator::BitXor
-                | ruff_python_ast::Operator::BitAnd
-                | ruff_python_ast::Operator::FloorDiv
-                | ruff_python_ast::Operator::MatMult => KnownClass::Int.to_instance(self.db),
-                ruff_python_ast::Operator::BitOr => KnownClass::Bool.to_instance(self.db),
-                ruff_python_ast::Operator::Div => KnownClass::Float.to_instance(self.db),
+            (
+                Type::BooleanLiteral(b1),
+                Type::BooleanLiteral(b2),
+                ruff_python_ast::Operator::BitOr,
+            ) => match (b1, b2) {
+                (true, true) => Type::BooleanLiteral(true),
+                (true, false) => Type::BooleanLiteral(true),
+                (false, true) => Type::BooleanLiteral(true),
+                (false, false) => Type::BooleanLiteral(false),
             },
+
+            (Type::BooleanLiteral(_), right, op) => {
+                let int_value = left_ty.expect_int_literal();
+                self.infer_binary_expression_type(expr, op, Type::IntLiteral(int_value), right)
+            }
+            (left, Type::BooleanLiteral(_), op) => {
+                let int_value = right_ty.expect_int_literal();
+                self.infer_binary_expression_type(expr, op, left, Type::IntLiteral(int_value))
+            }
             _ => Type::Todo, // TODO
         }
     }
