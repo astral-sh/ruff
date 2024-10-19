@@ -2487,7 +2487,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         unary.into(),
                         "unsupported-operator",
                         format_args!(
-                            "Operator `{op}` is unsupported for type `{}`",
+                            "Unary operator `{op}` is unsupported for type `{}`",
                             operand_type.display(self.db),
                         ),
                     );
