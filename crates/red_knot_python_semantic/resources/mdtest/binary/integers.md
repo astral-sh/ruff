@@ -11,6 +11,19 @@ reveal_type(-3 / 3)  # revealed: float
 reveal_type(5 % 3)  # revealed: Literal[2]
 ```
 
+## Power
+
+For power if the result fits in the int literal type it will be a Literal type. Otherwise the
+outcome is int.
+
+
+```py
+larget_u32 = 4_294_967_295
+reveal_type(2 ** 2)  # revealed: Literal[4]
+reveal_type(1 ** (larget_u32+ 1))  # revealed: int
+reveal_type(2 ** larget_u32)  # revealed: int
+```
+
 ## Division by Zero
 
 This error is really outside the current Python type system, because e.g. `int.__truediv__` and

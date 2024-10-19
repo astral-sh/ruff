@@ -24,8 +24,8 @@ class NoDunder:
   ...
 
 b = NoDunder()
-+b # error: [unsupported-operator] "Operator `+` is unsupported for type `NoDunder`"
--b # error: [unsupported-operator] "Operator `-` is unsupported for type `NoDunder`"
-~b # error: [unsupported-operator] "Operator `~` is unsupported for type `NoDunder`"
++b # error: [unsupported-operator] "Unary operator `+` is unsupported for type `NoDunder`"
+-b # error: [unsupported-operator] "Unary operator `-` is unsupported for type `NoDunder`"
+~b # error: [unsupported-operator] "Unary operator `~` is unsupported for type `NoDunder`"
 
 ```
