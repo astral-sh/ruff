@@ -440,6 +440,9 @@ impl<'db> Type<'db> {
                 .any(|&elem_ty| ty.is_subtype_of(db, elem_ty)),
             (_, Type::Instance(class)) if class.is_known(db, KnownClass::Object) => true,
             (Type::Instance(class), _) if class.is_known(db, KnownClass::Object) => false,
+            (Type::Instance(self_class), Type::Instance(target_class)) => {
+                self_class.is_subclass_of(db, target_class)
+            }
             // TODO
             _ => false,
         }
@@ -1582,6 +1585,18 @@ impl<'db> ClassType<'db> {
             })
     }
 
+    pub fn is_subclass_of(self, db: &'db dyn Db, other: ClassType) -> bool {
+        // TODO: we need to iterate over the *MRO* here, not the bases
+        (other == self)
+            || self.bases(db).any(|base| match base {
+                Type::Class(base_class) => base_class == other,
+                // `is_subclass_of` is checking the subtype relation, in which gradual types do not
+                // participate, so we should not return `True` if we find `Any/Unknown` in the
+                // bases.
+                _ => false,
+            })
+    }
+
     /// Returns the class member of this class named `name`.
     ///
     /// The member resolves to a member of the class itself or any of its bases.
@@ -1823,6 +1838,7 @@ mod tests {
     #[test_case(Ty::LiteralString, Ty::BuiltinInstance("str"))]
     #[test_case(Ty::BytesLiteral("foo"), Ty::BuiltinInstance("bytes"))]
     #[test_case(Ty::IntLiteral(1), Ty::Union(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")]))]
+    #[test_case(Ty::BuiltinInstance("TypeError"), Ty::BuiltinInstance("Exception"))]
     fn is_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));

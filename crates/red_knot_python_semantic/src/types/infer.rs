@@ -2497,71 +2497,98 @@ impl<'db> TypeInferenceBuilder<'db> {
             self.check_division_by_zero(binary, left_ty);
         }
 
+        self.infer_binary_expression_type(left_ty, right_ty, *op)
+            .unwrap_or_else(|| {
+                self.add_diagnostic(
+                    binary.into(),
+                    "unsupported-operator",
+                    format_args!(
+                        "Operator `{op}` is unsupported between objects of type `{}` and `{}`",
+                        left_ty.display(self.db),
+                        right_ty.display(self.db)
+                    ),
+                );
+                Type::Unknown
+            })
+    }
+
+    fn infer_binary_expression_type(
+        &mut self,
+        left_ty: Type<'db>,
+        right_ty: Type<'db>,
+        op: ast::Operator,
+    ) -> Option<Type<'db>> {
         match (left_ty, right_ty, op) {
             // When interacting with Todo, Any and Unknown should propagate (as if we fix this
             // `Todo` in the future, the result would then become Any or Unknown, respectively.)
-            (Type::Any, _, _) | (_, Type::Any, _) => Type::Any,
-            (Type::Unknown, _, _) | (_, Type::Unknown, _) => Type::Unknown,
+            (Type::Any, _, _) | (_, Type::Any, _) => Some(Type::Any),
+            (Type::Unknown, _, _) | (_, Type::Unknown, _) => Some(Type::Unknown),
 
-            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Add) => n
-                .checked_add(m)
-                .map(Type::IntLiteral)
-                .unwrap_or_else(|| KnownClass::Int.to_instance(self.db)),
+            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Add) => Some(
+                n.checked_add(m)
+                    .map(Type::IntLiteral)
+                    .unwrap_or_else(|| KnownClass::Int.to_instance(self.db)),
+            ),
 
-            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Sub) => n
-                .checked_sub(m)
-                .map(Type::IntLiteral)
-                .unwrap_or_else(|| KnownClass::Int.to_instance(self.db)),
+            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Sub) => Some(
+                n.checked_sub(m)
+                    .map(Type::IntLiteral)
+                    .unwrap_or_else(|| KnownClass::Int.to_instance(self.db)),
+            ),
 
-            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Mult) => n
-                .checked_mul(m)
-                .map(Type::IntLiteral)
-                .unwrap_or_else(|| KnownClass::Int.to_instance(self.db)),
+            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Mult) => Some(
+                n.checked_mul(m)
+                    .map(Type::IntLiteral)
+                    .unwrap_or_else(|| KnownClass::Int.to_instance(self.db)),
+            ),
 
             (Type::IntLiteral(_), Type::IntLiteral(_), ast::Operator::Div) => {
-                KnownClass::Float.to_instance(self.db)
+                Some(KnownClass::Float.to_instance(self.db))
             }
 
-            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::FloorDiv) => n
-                .checked_div(m)
-                .map(Type::IntLiteral)
-                .unwrap_or_else(|| KnownClass::Int.to_instance(self.db)),
+            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::FloorDiv) => Some(
+                n.checked_div(m)
+                    .map(Type::IntLiteral)
+                    .unwrap_or_else(|| KnownClass::Int.to_instance(self.db)),
+            ),
 
-            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Mod) => n
-                .checked_rem(m)
-                .map(Type::IntLiteral)
-                .unwrap_or_else(|| KnownClass::Int.to_instance(self.db)),
+            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Mod) => Some(
+                n.checked_rem(m)
+                    .map(Type::IntLiteral)
+                    .unwrap_or_else(|| KnownClass::Int.to_instance(self.db)),
+            ),
 
             (Type::BytesLiteral(lhs), Type::BytesLiteral(rhs), ast::Operator::Add) => {
-                Type::BytesLiteral(BytesLiteralType::new(
+                Some(Type::BytesLiteral(BytesLiteralType::new(
                     self.db,
                     [lhs.value(self.db).as_ref(), rhs.value(self.db).as_ref()]
                         .concat()
                         .into_boxed_slice(),
-                ))
+                )))
             }
 
             (Type::StringLiteral(lhs), Type::StringLiteral(rhs), ast::Operator::Add) => {
                 let lhs_value = lhs.value(self.db).to_string();
                 let rhs_value = rhs.value(self.db).as_ref();
-                if lhs_value.len() + rhs_value.len() <= Self::MAX_STRING_LITERAL_SIZE {
+                let ty = if lhs_value.len() + rhs_value.len() <= Self::MAX_STRING_LITERAL_SIZE {
                     Type::StringLiteral(StringLiteralType::new(self.db, {
                         (lhs_value + rhs_value).into_boxed_str()
                     }))
                 } else {
                     Type::LiteralString
-                }
+                };
+                Some(ty)
             }
 
             (
                 Type::StringLiteral(_) | Type::LiteralString,
                 Type::StringLiteral(_) | Type::LiteralString,
                 ast::Operator::Add,
-            ) => Type::LiteralString,
+            ) => Some(Type::LiteralString),
 
             (Type::StringLiteral(s), Type::IntLiteral(n), ast::Operator::Mult)
             | (Type::IntLiteral(n), Type::StringLiteral(s), ast::Operator::Mult) => {
-                if n < 1 {
+                let ty = if n < 1 {
                     Type::StringLiteral(StringLiteralType::new(self.db, ""))
                 } else if let Ok(n) = usize::try_from(n) {
                     if n.checked_mul(s.value(self.db).len())
@@ -2577,19 +2604,92 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 } else {
                     Type::LiteralString
-                }
+                };
+                Some(ty)
             }
 
             (Type::LiteralString, Type::IntLiteral(n), ast::Operator::Mult)
             | (Type::IntLiteral(n), Type::LiteralString, ast::Operator::Mult) => {
-                if n < 1 {
+                let ty = if n < 1 {
                     Type::StringLiteral(StringLiteralType::new(self.db, ""))
                 } else {
                     Type::LiteralString
-                }
+                };
+                Some(ty)
             }
 
-            _ => Type::Todo, // TODO
+            (Type::Instance(_), Type::IntLiteral(_), op) => {
+                self.infer_binary_expression_type(left_ty, KnownClass::Int.to_instance(self.db), op)
+            }
+
+            (Type::IntLiteral(_), Type::Instance(_), op) => self.infer_binary_expression_type(
+                KnownClass::Int.to_instance(self.db),
+                right_ty,
+                op,
+            ),
+
+            (Type::Instance(_), Type::Tuple(_), op) => self.infer_binary_expression_type(
+                left_ty,
+                KnownClass::Tuple.to_instance(self.db),
+                op,
+            ),
+
+            (Type::Tuple(_), Type::Instance(_), op) => self.infer_binary_expression_type(
+                KnownClass::Tuple.to_instance(self.db),
+                right_ty,
+                op,
+            ),
+
+            (Type::Instance(_), Type::StringLiteral(_) | Type::LiteralString, op) => {
+                self.infer_binary_expression_type(left_ty, KnownClass::Str.to_instance(self.db), op)
+            }
+
+            (Type::StringLiteral(_) | Type::LiteralString, Type::Instance(_), op) => self
+                .infer_binary_expression_type(KnownClass::Str.to_instance(self.db), right_ty, op),
+
+            (Type::Instance(_), Type::BytesLiteral(_), op) => self.infer_binary_expression_type(
+                left_ty,
+                KnownClass::Bytes.to_instance(self.db),
+                op,
+            ),
+
+            (Type::BytesLiteral(_), Type::Instance(_), op) => self.infer_binary_expression_type(
+                KnownClass::Bytes.to_instance(self.db),
+                right_ty,
+                op,
+            ),
+
+            (Type::Instance(left_class), Type::Instance(right_class), op) => {
+                if left_class != right_class && right_class.is_subclass_of(self.db, left_class) {
+                    let reflected_dunder = op.reflected_dunder();
+                    let rhs_reflected = right_class.class_member(self.db, reflected_dunder);
+                    if !rhs_reflected.is_unbound()
+                        && rhs_reflected != left_class.class_member(self.db, reflected_dunder)
+                    {
+                        return rhs_reflected
+                            .call(self.db, &[right_ty, left_ty])
+                            .return_ty(self.db)
+                            .or_else(|| {
+                                left_class
+                                    .class_member(self.db, op.dunder())
+                                    .call(self.db, &[left_ty, right_ty])
+                                    .return_ty(self.db)
+                            });
+                    }
+                }
+                left_class
+                    .class_member(self.db, op.dunder())
+                    .call(self.db, &[left_ty, right_ty])
+                    .return_ty(self.db)
+                    .or_else(|| {
+                        right_class
+                            .class_member(self.db, op.reflected_dunder())
+                            .call(self.db, &[right_ty, left_ty])
+                            .return_ty(self.db)
+                    })
+            }
+
+            _ => Some(Type::Todo), // TODO
         }
     }
 

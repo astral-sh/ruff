@@ -34,19 +34,19 @@ reveal_type(b)  # revealed: int
 c = 3 % 0  # error: "Cannot reduce object of type `Literal[3]` modulo zero"
 reveal_type(c)  # revealed: int
 
-d = int() / 0  # error: "Cannot divide object of type `int` by zero"
-# TODO should be int
-reveal_type(d)  # revealed: @Todo
+# error: "Cannot divide object of type `int` by zero"
+# revealed: float
+reveal_type(int() / 0)
 
-e = 1.0 / 0  # error: "Cannot divide object of type `float` by zero"
-# TODO should be float
-reveal_type(e)  # revealed: @Todo
+# error: "Cannot divide object of type `float` by zero"
+# revealed: float
+reveal_type(1.0 / 0)
 
 
 class MyInt(int): ...
 
 
 # No error for a subclass of int
-# TODO should be float
-reveal_type(MyInt(3) / 0)  # revealed: @Todo
+# revealed: float
+reveal_type(MyInt(3) / 0)
 ```
