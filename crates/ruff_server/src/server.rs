@@ -6,6 +6,8 @@ use lsp_types::InitializeParams;
 use lsp_types::WorkspaceFolder;
 use std::num::NonZeroUsize;
 use std::ops::Deref;
+// The new PanicInfoHook name requires MSRV >= 1.82
+#[allow(deprecated)]
 use std::panic::PanicInfo;
 use std::str::FromStr;
 use thiserror::Error;
@@ -125,6 +127,8 @@ impl Server {
     }
 
     pub fn run(self) -> crate::Result<()> {
+        // The new PanicInfoHook name requires MSRV >= 1.82
+        #[allow(deprecated)]
         type PanicHook = Box<dyn Fn(&PanicInfo<'_>) + 'static + Sync + Send>;
         struct RestorePanicHook {
             hook: Option<PanicHook>,

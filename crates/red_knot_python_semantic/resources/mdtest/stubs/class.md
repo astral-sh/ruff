@@ -6,5 +6,7 @@ In type stubs, classes can reference themselves in their base class definitions.
 
 ```py path=a.pyi
 class C(C): ...
+
+
 reveal_type(C)  # revealed: Literal[C]
 ```

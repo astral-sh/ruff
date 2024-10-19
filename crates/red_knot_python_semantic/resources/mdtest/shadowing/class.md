@@ -3,7 +3,9 @@
 ## Implicit error
 
 ```py
-class C: pass
+class C: ...
+
+
 C = 1  # error: "Implicit shadowing of class `C`; annotate to make it explicit if this is intentional"
 ```
 
@@ -12,6 +14,8 @@ C = 1  # error: "Implicit shadowing of class `C`; annotate to make it explicit i
 No diagnostic is raised in the case of explicit shadowing:
 
 ```py
-class C: pass
+class C: ...
+
+
 C: int = 1
 ```

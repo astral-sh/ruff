@@ -143,9 +143,10 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
         for (prefix, rules) in &rules_by_prefix {
             let prefix_ident = get_prefix_ident(prefix);
             let attrs = intersection_all(rules.iter().map(|(.., attrs)| attrs.as_slice()));
-            let attrs = match attrs.as_slice() {
-                [] => quote!(),
-                [..] => quote!(#(#attrs)*),
+            let attrs = if attrs.is_empty() {
+                quote!()
+            } else {
+                quote!(#(#attrs)*)
             };
             all_codes.push(quote! {
                 #attrs Self::#linter(#linter::#prefix_ident)
@@ -161,9 +162,10 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
             });
             let prefix_ident = get_prefix_ident(&prefix);
             let attrs = intersection_all(rules.iter().map(|(.., attrs)| attrs.as_slice()));
-            let attrs = match attrs.as_slice() {
-                [] => quote!(),
-                [..] => quote!(#(#attrs)*),
+            let attrs = if attrs.is_empty() {
+                quote!()
+            } else {
+                quote!(#(#attrs)*)
             };
             prefix_into_iter_match_arms.extend(quote! {
                 #attrs #linter::#prefix_ident => vec![#(#rule_paths,)*].into_iter(),
