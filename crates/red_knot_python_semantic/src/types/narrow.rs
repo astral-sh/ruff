@@ -6,6 +6,7 @@ use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, SymbolTable};
 use crate::semantic_index::symbol_table;
 use crate::types::{infer_expression_types, IntersectionBuilder, Type};
 use crate::Db;
+use itertools::Itertools;
 use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
@@ -142,19 +143,21 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             ops,
             comparators,
         } = expr_compare;
-
-        if let ast::Expr::Name(ast::ExprName {
-            range: _,
-            id,
-            ctx: _,
-        }) = left.as_ref()
-        {
-            // SAFETY: we should always have a symbol for every Name node.
-            let symbol = self.symbols().symbol_id_by_name(id).unwrap();
-            let scope = self.scope();
-            let inference = infer_expression_types(self.db, expression);
-            for (op, comparator) in std::iter::zip(ops, comparators) {
-                let comp_ty = inference.expression_ty(comparator.scoped_ast_id(self.db, scope));
+        let scope = self.scope();
+        let comparator_tuples = std::iter::once(&**left)
+            .chain(comparators)
+            .tuple_windows::<(&ruff_python_ast::Expr, &ruff_python_ast::Expr)>();
+        let inference = infer_expression_types(self.db, expression);
+        for (op, (left, right)) in std::iter::zip(&**ops, comparator_tuples) {
+            if let ast::Expr::Name(ast::ExprName {
+                range: _,
+                id,
+                ctx: _,
+            }) = left
+            {
+                // SAFETY: we should always have a symbol for every Name node.
+                let symbol = self.symbols().symbol_id_by_name(id).unwrap();
+                let comp_ty = inference.expression_ty(right.scoped_ast_id(self.db, scope));
                 match op {
                     ast::CmpOp::IsNot => {
                         if comp_ty.is_singleton() {
