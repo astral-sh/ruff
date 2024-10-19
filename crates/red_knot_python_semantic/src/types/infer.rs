@@ -541,9 +541,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         match left {
             Type::IntLiteral(_) => {}
             Type::Instance(cls)
-                if cls.is_known(self.db, KnownClass::Float)
-                    || cls.is_known(self.db, KnownClass::Int) => {}
+                if [KnownClass::Float, KnownClass::Int, KnownClass::Bool]
+                    .iter()
+                    .any(|&k| cls.is_known(self.db, k)) => {}
             Type::BooleanLiteral(_) => {}
+
             _ => return,
         };
 
