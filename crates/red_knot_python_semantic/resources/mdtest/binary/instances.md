@@ -82,7 +82,7 @@ reveal_type(B() ^ A())  # revealed: A
 reveal_type(B() | A())  # revealed: A
 ```
 
-## Return different type
+## Returning a different type
 
 The magic methods aren't required to return the type of `self`:
 
@@ -111,13 +111,14 @@ class A:
 class B:
     def __radd__(self, other: A) -> str: return "foo"
 
-# C is a subtype of C, but if the two sides are of equal types,
+reveal_type(A() + B())  # revealed:  int
+
+# Edge case: C is a subtype of C, *but* if the two sides are of *equal* types,
 # the lhs *still* takes precedence
 class C:
     def __add__(self, other: C) -> int: return 42
     def __radd__(self, other: C) -> str: return "foo"
 
-reveal_type(A() + B())  # revealed:  int
 reveal_type(C() + C())  # revealed: int
 ```
 
@@ -170,13 +171,14 @@ reveal_type(A() + B())  # revealed: str
 For example, at runtime, `(1).__add__(1.2)` is `NotImplemented`, but
 `(1.2).__radd__(1) == 2.2`, meaning that `1 + 1.2` succeeds at runtime
 (producing `2.2`). The runtime tries the second one only if the first one
-returns `NotImplemented` to signal failure .
+returns `NotImplemented` to signal failure.
 
 Typeshed and other stubs annotate dunder-method calls that would return
 `NotImplemented` as being "illegal" calls. `int.__add__` is annotated as only
 "accepting" `int`s, even though it strictly-speaking "accepts" any other object
-with raising an error -- it will simply return `NotImplemented`, allowing the
-runtime to try the `__radd__` method of the right-hand operand as well.
+without raising an exception -- it will simply return `NotImplemented`,
+allowing the runtime to try the `__radd__` method of the right-hand operand
+as well.
 
 ```py
 class A:
@@ -215,13 +217,13 @@ reveal_type(3j + 3.14)  # revealed: complex
 reveal_type(4.2 + 42)  # revealed: float
 reveal_type(3j + 3)  # revealed: complex
 
-# TODO should be complex, need to check arg type and fall back
+# TODO should be complex, need to check arg type and fall back to `rhs.__radd__`
 reveal_type(3.14 + 3j)  # revealed: float
 
-# TODO should be float, need to check arg type and fall back
+# TODO should be float, need to check arg type and fall back to `rhs.__radd__`
 reveal_type(42 + 4.2)  # revealed: int
 
-# TODO should be complex, need to check arg type and fall back
+# TODO should be complex, need to check arg type and fall back to `rhs.__radd__`
 reveal_type(3 + 3j)  # revealed: int
 
 def returns_int() -> int:
@@ -236,7 +238,7 @@ y = returns_int()
 reveal_type(x + y)  # revealed: int
 reveal_type(4.2 + x)  # revealed: float
 
-# TODO should be float, need to check arg type and fall back
+# TODO should be float, need to check arg type and fall back to `rhs.__radd__`
 reveal_type(y + 4.12)  # revealed: int
 ```
 
@@ -307,9 +309,9 @@ reveal_type(X() + Y())  # revealed: int
 
 ## Unsupported
 
-### Dunder on instance
+### Dunder as instance attribute
 
-The magic method must be on the class, not just on the instance:
+The magic method must exist on the class, not just on the instance:
 
 ```py
 def add_impl(self, other) -> int: return 1
