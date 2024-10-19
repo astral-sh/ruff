@@ -746,7 +746,7 @@
   "additionalProperties": false,
   "definitions": {
     "AnalyzeOptions": {
-      "description": "Configures Ruff's `analyze` command.",
+      "description": "Configures Ruff's `analyze` command amd runs analysis over Python source code",
       "type": "object",
       "properties": {
         "detect-string-imports": {
