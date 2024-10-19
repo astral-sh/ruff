@@ -4,7 +4,7 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-rust-version = "1.76"
+rust-version = "1.80"
 homepage = "https://docs.astral.sh/ruff"
 documentation = "https://docs.astral.sh/ruff"
 repository = "https://github.com/astral-sh/ruff"
@@ -101,7 +101,6 @@ memchr = { version = "2.7.1" }
 mimalloc = { version = "0.1.39" }
 natord = { version = "1.0.9" }
 notify = { version = "6.1.1" }
-once_cell = { version = "1.19.0" }
 ordermap = { version = "0.5.0" }
 path-absolutize = { version = "3.1.1" }
 path-slash = { version = "0.2.1" }

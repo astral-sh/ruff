@@ -1,11 +1,13 @@
 //! Settings for the `flake8-copyright` plugin.
 
-use once_cell::sync::Lazy;
-use regex::Regex;
 use std::fmt::{Display, Formatter};
+use std::sync::LazyLock;
+
+use regex::Regex;
+
+use ruff_macros::CacheKey;
 
 use crate::display_settings;
-use ruff_macros::CacheKey;
 
 #[derive(Debug, Clone, CacheKey)]
 pub struct Settings {
@@ -14,8 +16,8 @@ pub struct Settings {
     pub min_file_size: usize,
 }
 
-pub static COPYRIGHT: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*").unwrap());
+pub static COPYRIGHT: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*").unwrap());
 
 impl Default for Settings {
     fn default() -> Self {

@@ -1,15 +1,14 @@
+use itertools::Itertools;
+use rand::{Rng, SeedableRng};
+use serde::Serialize;
+use serde_json::error::Category;
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::{BufReader, Cursor, Read, Seek, SeekFrom, Write};
 use std::path::Path;
+use std::sync::OnceLock;
 use std::{io, iter};
-
-use itertools::Itertools;
-use once_cell::sync::OnceCell;
-use rand::{Rng, SeedableRng};
-use serde::Serialize;
-use serde_json::error::Category;
 use thiserror::Error;
 
 use ruff_diagnostics::{SourceMap, SourceMarker};
@@ -63,7 +62,7 @@ pub struct Notebook {
     source_code: String,
     /// The index of the notebook. This is used to map between the concatenated
     /// source code and the original notebook.
-    index: OnceCell<NotebookIndex>,
+    index: OnceLock<NotebookIndex>,
     /// The raw notebook i.e., the deserialized version of JSON string.
     raw: RawNotebook,
     /// The offsets of each cell in the concatenated source code. This includes
@@ -194,7 +193,7 @@ impl Notebook {
 
         Ok(Self {
             raw: raw_notebook,
-            index: OnceCell::new(),
+            index: OnceLock::new(),
             // The additional newline at the end is to maintain consistency for
             // all cells. These newlines will be removed before updating the
             // source code with the transformed content. Refer `update_cell_content`.

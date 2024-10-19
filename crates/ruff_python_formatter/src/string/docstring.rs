@@ -2,15 +2,15 @@
 // "reStructuredText."
 #![allow(clippy::doc_markdown)]
 
+use itertools::Itertools;
 use std::cmp::Ordering;
+use std::sync::LazyLock;
 use std::{borrow::Cow, collections::VecDeque};
 
-use itertools::Itertools;
-
+use regex::Regex;
 use ruff_formatter::printer::SourceMapGeneration;
 use ruff_python_ast::{str::Quote, StringFlags};
 use ruff_python_trivia::CommentRanges;
-use {once_cell::sync::Lazy, regex::Regex};
 use {
     ruff_formatter::{write, FormatOptions, IndentStyle, LineWidth, Printed},
     ruff_python_trivia::{is_python_whitespace, PythonWhitespace},
@@ -1075,7 +1075,7 @@ impl<'src> CodeExampleRst<'src> {
         // [directives]: https://docutils.sourceforge.io/docs/ref/rst/restructuredtext.html#directives
         // [Pygments lexer names]: https://pygments.org/docs/lexers/
         // [code-block]: https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-code-block
-        static DIRECTIVE_START: Lazy<Regex> = Lazy::new(|| {
+        static DIRECTIVE_START: LazyLock<Regex> = LazyLock::new(|| {
             Regex::new(
                 r"(?m)^\s*\.\. \s*(?i:code-block|sourcecode)::\s*(?i:python|py|python3|py3)$",
             )
@@ -1320,7 +1320,7 @@ impl<'src> CodeExampleMarkdown<'src> {
     ///
     /// [fenced code block]: https://spec.commonmark.org/0.30/#fenced-code-blocks
     fn new(original: InputDocstringLine<'src>) -> Option<CodeExampleMarkdown<'src>> {
-        static FENCE_START: Lazy<Regex> = Lazy::new(|| {
+        static FENCE_START: LazyLock<Regex> = LazyLock::new(|| {
             Regex::new(
                 r"(?xm)
                 ^

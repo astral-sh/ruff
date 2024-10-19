@@ -1,5 +1,6 @@
+use std::sync::LazyLock;
+
 use imperative::Mood;
-use once_cell::sync::Lazy;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -12,7 +13,7 @@ use crate::docstrings::Docstring;
 use crate::rules::pydocstyle::helpers::normalize_word;
 use crate::rules::pydocstyle::settings::Settings;
 
-static MOOD: Lazy<Mood> = Lazy::new(Mood::new);
+static MOOD: LazyLock<Mood> = LazyLock::new(Mood::new);
 
 /// ## What it does
 /// Checks for docstring first lines that are not in an imperative mood.

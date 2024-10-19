@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::cell::LazyCell;
 use std::ops::Deref;
 use std::path::Path;
 
@@ -440,7 +441,7 @@ fn diagnostics_to_messages(
     locator: &Locator,
     directives: &Directives,
 ) -> Vec<Message> {
-    let file = once_cell::unsync::Lazy::new(|| {
+    let file = LazyCell::new(|| {
         let mut builder =
             SourceFileBuilder::new(path.to_string_lossy().as_ref(), locator.contents());
 

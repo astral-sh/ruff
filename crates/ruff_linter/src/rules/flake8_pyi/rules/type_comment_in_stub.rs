@@ -1,7 +1,7 @@
-use once_cell::sync::Lazy;
 use regex::Regex;
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
+use std::sync::LazyLock;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -49,8 +49,8 @@ pub(crate) fn type_comment_in_stub(
     }
 }
 
-static TYPE_COMMENT_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^#\s*type:\s*([^#]+)(\s*#.*?)?$").unwrap());
+static TYPE_COMMENT_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^#\s*type:\s*([^#]+)(\s*#.*?)?$").unwrap());
 
-static TYPE_IGNORE_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^#\s*type:\s*ignore([^#]+)?(\s*#.*?)?$").unwrap());
+static TYPE_IGNORE_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^#\s*type:\s*ignore([^#]+)?(\s*#.*?)?$").unwrap());

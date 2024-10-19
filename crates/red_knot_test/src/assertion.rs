@@ -35,7 +35,6 @@
 //! ```
 
 use crate::db::Db;
-use once_cell::sync::Lazy;
 use regex::Regex;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
@@ -45,6 +44,7 @@ use ruff_source_file::{LineIndex, Locator, OneIndexed};
 use ruff_text_size::{Ranged, TextRange};
 use smallvec::SmallVec;
 use std::ops::Deref;
+use std::sync::LazyLock;
 
 /// Diagnostic assertion comments in a single embedded file.
 #[derive(Debug)]
@@ -239,10 +239,10 @@ impl<'a> Deref for LineAssertions<'a> {
     }
 }
 
-static TYPE_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^#\s*revealed:\s*(?<ty_display>.+?)\s*$").unwrap());
+static TYPE_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^#\s*revealed:\s*(?<ty_display>.+?)\s*$").unwrap());
 
-static ERROR_RE: Lazy<Regex> = Lazy::new(|| {
+static ERROR_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
         r#"^#\s*error:(\s*(?<column>\d+))?(\s*\[(?<rule>.+?)\])?(\s*"(?<message>.+?)")?\s*$"#,
     )

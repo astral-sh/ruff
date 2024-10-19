@@ -12,7 +12,6 @@ license = { workspace = true }
 
 [dependencies]
 ruff_db = { workspace = true }
-once_cell = { workspace = true }
 zip = { workspace = true }
 
 [build-dependencies]

@@ -2136,7 +2136,6 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "colored",
- "once_cell",
  "red_knot_python_semantic",
  "red_knot_vendored",
  "regex",
@@ -2154,7 +2153,6 @@ dependencies = [
 name = "red_knot_vendored"
 version = "0.0.0"
 dependencies = [
- "once_cell",
  "path-slash",
  "ruff_db",
  "walkdir",
@@ -2382,7 +2380,6 @@ dependencies = [
  "codspeed-criterion-compat",
  "criterion",
  "mimalloc",
- "once_cell",
  "rayon",
  "red_knot_python_semantic",
  "red_knot_workspace",
@@ -2515,7 +2512,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
- "once_cell",
  "red_knot_python_semantic",
  "ruff_cache",
  "ruff_db",
@@ -2560,7 +2556,6 @@ dependencies = [
  "log",
  "memchr",
  "natord",
- "once_cell",
  "path-absolutize",
  "pathdiff",
  "pep440_rs 0.6.6",
@@ -2616,7 +2611,6 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "itertools 0.13.0",
- "once_cell",
  "rand",
  "ruff_diagnostics",
  "ruff_source_file",
@@ -2638,7 +2632,6 @@ dependencies = [
  "compact_str",
  "is-macro",
  "itertools 0.13.0",
- "once_cell",
  "ruff_cache",
  "ruff_macros",
  "ruff_python_trivia",
@@ -2664,7 +2657,6 @@ dependencies = [
 name = "ruff_python_codegen"
 version = "0.0.0"
 dependencies = [
- "once_cell",
  "ruff_python_ast",
  "ruff_python_literal",
  "ruff_python_parser",
@@ -2682,7 +2674,6 @@ dependencies = [
  "insta",
  "itertools 0.13.0",
  "memchr",
- "once_cell",
  "regex",
  "ruff_cache",
  "ruff_formatter",
@@ -2843,7 +2834,6 @@ name = "ruff_source_file"
 version = "0.0.0"
 dependencies = [
  "memchr",
- "once_cell",
  "ruff_text_size",
  "serde",
 ]

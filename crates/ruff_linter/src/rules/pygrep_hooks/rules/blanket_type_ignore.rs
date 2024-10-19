@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use memchr::memchr_iter;
-use once_cell::sync::Lazy;
 use regex::Regex;
+use std::sync::LazyLock;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -102,8 +102,8 @@ pub(crate) fn blanket_type_ignore(
 
 // Match, e.g., `[attr-defined]` or `[attr-defined, misc]`.
 // See: https://github.com/python/mypy/blob/b43e0d34247a6d1b3b9d9094d184bbfcb9808bb9/mypy/fastparse.py#L327
-static TYPE_IGNORE_TAG_PATTERN: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^\s*\[(?P<codes>[^]#]*)]\s*(#.*)?$").unwrap());
+static TYPE_IGNORE_TAG_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\s*\[(?P<codes>[^]#]*)]\s*(#.*)?$").unwrap());
 
 /// Parse the optional `[...]` tag in a `# type: ignore[...]` comment.
 ///
