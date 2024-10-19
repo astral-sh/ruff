@@ -38,7 +38,8 @@ to the `except` suite *after* that redefinition.
 
 ```py path=union_type_inferred.py
 def could_raise_returns_str() -> str:
-    return 'foo'
+    return "foo"
+
 
 x = 1
 
@@ -60,7 +61,8 @@ unify and `x` is not inferred as having a union type following the
 
 ```py path=branches_unify_to_non_union_type.py
 def could_raise_returns_str() -> str:
-    return 'foo'
+    return "foo"
+
 
 x = 1
 
@@ -84,7 +86,8 @@ possibility when it comes to control-flow analysis.
 
 ```py
 def could_raise_returns_str() -> str:
-    return 'foo'
+    return "foo"
+
 
 x = 1
 
@@ -114,7 +117,8 @@ the three suites:
 
 ```py
 def could_raise_returns_str() -> str:
-    return 'foo'
+    return "foo"
+
 
 x = 1
 
@@ -147,7 +151,8 @@ the end of the `except` suite:
 
 ```py path=single_except.py
 def could_raise_returns_str() -> str:
-    return 'foo'
+    return "foo"
+
 
 x = 1
 
@@ -175,7 +180,8 @@ in their entireties:
 
 ```py
 def could_raise_returns_str() -> str:
-    return 'foo'
+    return "foo"
+
 
 x = 1
 
@@ -208,7 +214,8 @@ therefore `Literal[2]`:
 
 ```py path=redef_in_finally.py
 def could_raise_returns_str() -> str:
-    return 'foo'
+    return "foo"
+
 
 x = 1
 
@@ -235,7 +242,8 @@ suites, however; this is still a TODO item for us.)
 
 ```py path=no_redef_in_finally.py
 def could_raise_returns_str() -> str:
-    return 'foo'
+    return "foo"
+
 
 x = 1
 
@@ -267,13 +275,16 @@ following possibilities inside `finally` suites:
 
 ```py path=redef_in_finally.py
 def could_raise_returns_str() -> str:
-    return 'foo'
+    return "foo"
+
 
 def could_raise_returns_bytes() -> bytes:
-    return b'foo'
+    return b"foo"
+
 
 def could_raise_returns_bool() -> bool:
     return True
+
 
 x = 1
 
@@ -305,13 +316,16 @@ conclusion of the `finally` suite.)
 
 ```py path=no_redef_in_finally.py
 def could_raise_returns_str() -> str:
-    return 'foo'
+    return "foo"
+
 
 def could_raise_returns_bytes() -> bytes:
-    return b'foo'
+    return b"foo"
+
 
 def could_raise_returns_bool() -> bool:
     return True
+
 
 x = 1
 
@@ -336,19 +350,24 @@ An example with multiple `except` branches and a `finally` branch:
 
 ```py path=multiple_except_branches.py
 def could_raise_returns_str() -> str:
-    return 'foo'
+    return "foo"
+
 
 def could_raise_returns_bytes() -> bytes:
-    return b'foo'
+    return b"foo"
+
 
 def could_raise_returns_bool() -> bool:
     return True
 
+
 def could_raise_returns_memoryview() -> memoryview:
     return memoryview(b"")
 
+
 def could_raise_returns_float() -> float:
     return 3.14
+
 
 x = 1
 
@@ -383,19 +402,24 @@ partway through the `else` suite due to an exception raised *there*.
 
 ```py path=single_except_branch.py
 def could_raise_returns_str() -> str:
-    return 'foo'
+    return "foo"
+
 
 def could_raise_returns_bytes() -> bytes:
-    return b'foo'
+    return b"foo"
+
 
 def could_raise_returns_bool() -> bool:
     return True
 
+
 def could_raise_returns_memoryview() -> memoryview:
     return memoryview(b"")
 
+
 def could_raise_returns_float() -> float:
     return 3.14
+
 
 x = 1
 
@@ -426,25 +450,32 @@ The same again, this time with multiple `except` branches:
 
 ```py path=multiple_except_branches.py
 def could_raise_returns_str() -> str:
-    return 'foo'
+    return "foo"
+
 
 def could_raise_returns_bytes() -> bytes:
-    return b'foo'
+    return b"foo"
+
 
 def could_raise_returns_bool() -> bool:
     return True
 
+
 def could_raise_returns_memoryview() -> memoryview:
     return memoryview(b"")
+
 
 def could_raise_returns_float() -> float:
     return 3.14
 
+
 def could_raise_returns_range() -> range:
     return range(42)
 
+
 def could_raise_returns_slice() -> slice:
     return slice(None)
+
 
 x = 1
 
@@ -491,40 +522,54 @@ prior to the suite running to completion.
 
 ```py
 def could_raise_returns_str() -> str:
-    return 'foo'
+    return "foo"
+
 
 def could_raise_returns_bytes() -> bytes:
-    return b'foo'
+    return b"foo"
+
 
 def could_raise_returns_bool() -> bool:
     return True
 
+
 def could_raise_returns_memoryview() -> memoryview:
     return memoryview(b"")
+
 
 def could_raise_returns_float() -> float:
     return 3.14
 
+
 def could_raise_returns_range() -> range:
     return range(42)
+
 
 def could_raise_returns_slice() -> slice:
     return slice(None)
 
+
 def could_raise_returns_complex() -> complex:
     return 3j
+
 
 def could_raise_returns_bytearray() -> bytearray:
     return bytearray()
 
+
 class Foo: ...
+
+
 class Bar: ...
+
 
 def could_raise_returns_Foo() -> Foo:
     return Foo()
 
+
 def could_raise_returns_Bar() -> Bar:
     return Bar()
+
 
 x = 1
 
@@ -585,23 +630,29 @@ variable by that name in the outer scope:
 
 ```py
 def could_raise_returns_str() -> str:
-    return 'foo'
+    return "foo"
+
 
 def could_raise_returns_bytes() -> bytes:
-    return b'foo'
+    return b"foo"
+
 
 def could_raise_returns_range() -> range:
     return range(42)
 
+
 def could_raise_returns_bytearray() -> bytearray:
     return bytearray()
+
 
 def could_raise_returns_float() -> float:
     return 3.14
 
+
 x = 1
 
 try:
+
     def foo(param=could_raise_returns_str()):
         x = could_raise_returns_str()
 

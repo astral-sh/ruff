@@ -42,7 +42,9 @@ e = 1.0 / 0  # error: "Cannot divide object of type `float` by zero"
 # TODO should be float
 reveal_type(e)  # revealed: @Todo
 
-class MyInt(int): pass
+
+class MyInt(int): ...
+
 
 # No error for a subclass of int
 # TODO should be float

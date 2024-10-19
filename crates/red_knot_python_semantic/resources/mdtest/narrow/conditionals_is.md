@@ -14,8 +14,8 @@ reveal_type(x)  # revealed: None | Literal[1]
 ## `is` for other types
 
 ```py
-class A:
-    ...
+class A: ...
+
 
 x = A()
 y = x if flag else None

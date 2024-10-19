@@ -12,6 +12,7 @@ reveal_type(y)  # revealed: Unbound | Literal[3]
 
 ```py
 from maybe_unbound import x, y
+
 reveal_type(x)  # revealed: Literal[3]
 reveal_type(y)  # revealed: Literal[3]
 ```
@@ -30,6 +31,7 @@ Importing an annotated name prefers the declared type over the inferred type:
 
 ```py
 from maybe_unbound_annotated import x, y
+
 reveal_type(x)  # revealed: Literal[3]
 reveal_type(y)  # revealed: int
 ```
@@ -44,11 +46,13 @@ def f(): ...
 if flag:
     from c import f
 else:
+
     def f(): ...
 ```
 
 ```py
 from b import f
+
 # TODO: We should disambiguate in such cases, showing `Literal[b.f, c.f]`.
 reveal_type(f)  # revealed: Literal[f, f]
 ```
@@ -71,5 +75,6 @@ else:
 
 ```py
 from b import x
+
 reveal_type(x)  # revealed: int
 ```
