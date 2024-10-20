@@ -1,5 +1,4 @@
-use std::borrow::Cow;
-
+use memchr::memchr2;
 use ruff_formatter::{format_args, write};
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::str_prefix::{
@@ -7,6 +6,7 @@ use ruff_python_ast::str_prefix::{
 };
 use ruff_python_ast::{AnyStringFlags, FStringElement, StringFlags, StringLike, StringLikePart};
 use ruff_text_size::{Ranged, TextRange};
+use std::borrow::Cow;
 
 use crate::comments::{leading_comments, trailing_comments};
 use crate::expression::parentheses::in_parentheses_only_soft_line_break_or_space;
@@ -112,15 +112,6 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                 return None;
             }
 
-            // Multiline f-strings can't be joined if the f-string formatting is disabled because
-            // the string gets inserted in verbatim preserving the newlines.
-            if string.is_fstring()
-                && !is_f_string_formatting_enabled(context)
-                && string.is_multiline(context.source())
-            {
-                return None;
-            }
-
             // Multiline strings can never fit on a single line.
             if !string.is_fstring() && string.is_multiline(context.source()) {
                 return None;
@@ -147,14 +138,14 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                 }
 
                 if let StringLikePart::FString(fstring) = part {
-                    if is_f_string_formatting_enabled(context) {
-                        if fstring.elements.iter().any(|element| match element {
-                            // Same as for other literals. Multiline literals can't fit on a single line.
-                            FStringElement::Literal(literal) => context
-                                .locator()
-                                .slice(literal.range())
-                                .contains(['\n', '\r']),
-                            FStringElement::Expression(expression) => {
+                    if fstring.elements.iter().any(|element| match element {
+                        // Same as for other literals. Multiline literals can't fit on a single line.
+                        FStringElement::Literal(literal) => context
+                            .locator()
+                            .slice(literal.range())
+                            .contains(['\n', '\r']),
+                        FStringElement::Expression(expression) => {
+                            if is_f_string_formatting_enabled(context) {
                                 // The formatter preserves the whitespace around the debug text of an expression.
                                 // If the text contains any new lines, then it can't fit on a single line.
                                 if expression.debug_text.as_ref().is_some_and(|debug_text| {
@@ -170,10 +161,14 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                                 }
 
                                 false
+                            } else {
+                                // Multiline f-string expressions can't be joined if the f-string formatting is disabled because
+                                // the string gets inserted in verbatim preserving the newlines.
+                                context.locator().slice(expression).contains(['\n', '\r'])
                             }
-                        }) {
-                            return None;
                         }
+                    }) {
+                        return None;
                     }
                 }
             }
