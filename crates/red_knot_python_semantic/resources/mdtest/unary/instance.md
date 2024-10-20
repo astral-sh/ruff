@@ -1,6 +1,6 @@
 # Unary Operations
 
-## Defined Methods
+## Invert, UAdd, USub
 
 ```py
 from typing import Literal
