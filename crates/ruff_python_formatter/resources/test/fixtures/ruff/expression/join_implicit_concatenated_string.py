@@ -10,8 +10,18 @@
 ) # too long to join
 
 
-"diffent '" 'quote "are fine"' # join
+"different '" 'quote "are fine"' # join
 
+# More single quotes
+"one single'" "two 'single'" ' two "double"'
+
+# More double quotes
+'one double"' 'two "double"' " two 'single'"
+
+# Equal number of single and double quotes
+'two "double"' " two 'single'"
+
+f"{'Hy \"User\"'}" 'more'
 
 b"aaaaaaaaa" b"bbbbbbbbbbbbbbbbbbbb" # Join
 

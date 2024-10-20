@@ -1605,7 +1605,8 @@ fn docstring_format_source(
 /// that avoids `content""""` and `content\"""`. This does only applies to un-escaped backslashes,
 /// so `content\\ """` doesn't need a space while `content\\\ """` does.
 fn needs_chaperone_space(normalized: &NormalizedString, trim_end: &str) -> bool {
-    trim_end.ends_with(normalized.flags().quote_style().as_char())
+    normalized.flags().is_triple_quoted()
+        && trim_end.ends_with(normalized.flags().quote_style().as_char())
         || trim_end.chars().rev().take_while(|c| *c == '\\').count() % 2 == 1
 }
 

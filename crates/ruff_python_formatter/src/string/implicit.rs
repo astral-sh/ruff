@@ -197,27 +197,27 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
 
             // Only determining the preferred quote for the first string is sufficient
             // because we don't support joining triple quoted strings with non triple quoted strings.
-            let Ok(preferred_quote) = Quote::try_from(normalizer.preferred_quote_style(first_part))
-            else {
-                // TODO: Handle preserve
-                return None;
+            let quote = if let Ok(preferred_quote) =
+                Quote::try_from(normalizer.preferred_quote_style(first_part))
+            {
+                for part in string.parts() {
+                    let part_quote_metadata =
+                        QuoteMetadata::from_part(part, context, preferred_quote);
+
+                    if let Some(merged) = merged_quotes.as_mut() {
+                        *merged = part_quote_metadata.merge(merged)?;
+                    } else {
+                        merged_quotes = Some(part_quote_metadata);
+                    }
+                }
+
+                merged_quotes?.choose(preferred_quote)
+            } else {
+                // If the options is to preserve quotes, pick the quotes of the first string part.
+                first_part.flags().quote_style()
             };
 
-            for part in string.parts() {
-                let part_quote_metadata = QuoteMetadata::from_part(part, preferred_quote, context);
-
-                if let Some(merged) = merged_quotes.as_mut() {
-                    *merged = part_quote_metadata.merge(merged)?;
-                } else {
-                    merged_quotes = Some(part_quote_metadata);
-                }
-            }
-
-            Some(AnyStringFlags::new(
-                prefix,
-                merged_quotes?.choose(preferred_quote),
-                false,
-            ))
+            Some(AnyStringFlags::new(prefix, quote, false))
         }
 
         if !string.is_implicit_concatenated() {
