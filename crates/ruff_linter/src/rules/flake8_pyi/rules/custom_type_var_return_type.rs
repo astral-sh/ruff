@@ -78,7 +78,7 @@ pub(crate) fn custom_type_var_return_type(
     let Some(self_or_cls_annotation) = args
         .posonlyargs
         .iter()
-        .chain(args.args.iter())
+        .chain(&args.args)
         .next()
         .and_then(|parameter_with_default| parameter_with_default.parameter.annotation.as_ref())
     else {

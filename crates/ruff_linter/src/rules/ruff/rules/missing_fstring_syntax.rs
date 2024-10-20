@@ -189,12 +189,12 @@ fn should_be_fstring(
         .filter_map(ast::Expr::as_call_expr)
     {
         let ast::Arguments { keywords, args, .. } = &expr.arguments;
-        for keyword in &**keywords {
+        for keyword in keywords {
             if let Some(ident) = keyword.arg.as_ref() {
                 arg_names.insert(&ident.id);
             }
         }
-        for arg in &**args {
+        for arg in args {
             if let ast::Expr::Name(ast::ExprName { id, .. }) = arg {
                 arg_names.insert(id);
             }

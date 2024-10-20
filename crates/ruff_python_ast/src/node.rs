@@ -2731,7 +2731,7 @@ impl AstNode for ast::ExprCompare {
 
         visitor.visit_expr(left);
 
-        for (op, comparator) in ops.iter().zip(&**comparators) {
+        for (op, comparator) in ops.iter().zip(comparators) {
             visitor.visit_cmp_op(op);
             visitor.visit_expr(comparator);
         }

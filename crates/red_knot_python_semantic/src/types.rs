@@ -597,7 +597,7 @@ impl<'db> Type<'db> {
                         tuple
                             .elements(db)
                             .iter()
-                            .zip(other_tuple.elements(db).iter())
+                            .zip(other_tuple.elements(db))
                             .any(|(e1, e2)| e1.is_disjoint_from(db, *e2))
                     } else {
                         true
@@ -863,7 +863,7 @@ impl<'db> Type<'db> {
     fn iterate(self, db: &'db dyn Db) -> IterationOutcome<'db> {
         if let Type::Tuple(tuple_type) = self {
             return IterationOutcome::Iterable {
-                element_ty: UnionType::from_elements(db, &**tuple_type.elements(db)),
+                element_ty: UnionType::from_elements(db, tuple_type.elements(db)),
             };
         }
 
@@ -1310,7 +1310,7 @@ impl<'db> CallOutcome<'db> {
                 let mut not_callable = vec![];
                 let mut union_builder = UnionBuilder::new(db);
                 let mut revealed = false;
-                for outcome in &**outcomes {
+                for outcome in outcomes {
                     let return_ty = match outcome {
                         Self::NotCallable { not_callable_ty } => {
                             not_callable.push(*not_callable_ty);

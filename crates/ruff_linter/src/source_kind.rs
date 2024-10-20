@@ -135,9 +135,8 @@ impl std::fmt::Display for SourceKindDiff<'_> {
             }
             DiffKind::IpyNotebook(original, modified) => {
                 // Cell indices are 1-based.
-                for ((idx, src_cell), dst_cell) in (1u32..)
-                    .zip(original.cells().iter())
-                    .zip(modified.cells().iter())
+                for ((idx, src_cell), dst_cell) in
+                    (1u32..).zip(original.cells()).zip(modified.cells())
                 {
                     let (Cell::Code(src_cell), Cell::Code(dst_cell)) = (src_cell, dst_cell) else {
                         continue;

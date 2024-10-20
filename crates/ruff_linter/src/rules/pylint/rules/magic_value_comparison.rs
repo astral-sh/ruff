@@ -97,10 +97,7 @@ fn is_magic_value(literal_expr: LiteralExpressionRef, allowed_types: &[ConstantT
 
 /// PLR2004
 pub(crate) fn magic_value_comparison(checker: &mut Checker, left: &Expr, comparators: &[Expr]) {
-    for (left, right) in std::iter::once(left)
-        .chain(comparators.iter())
-        .tuple_windows()
-    {
+    for (left, right) in std::iter::once(left).chain(comparators).tuple_windows() {
         // If both of the comparators are literals, skip rule for the whole expression.
         // R0133: comparison-of-constants
         if as_literal(left).is_some() && as_literal(right).is_some() {
@@ -108,7 +105,7 @@ pub(crate) fn magic_value_comparison(checker: &mut Checker, left: &Expr, compara
         }
     }
 
-    for comparison_expr in std::iter::once(left).chain(comparators.iter()) {
+    for comparison_expr in std::iter::once(left).chain(comparators) {
         if let Some(value) = as_literal(comparison_expr) {
             if is_magic_value(value, &checker.settings.pylint.allow_magic_value_types) {
                 checker.diagnostics.push(Diagnostic::new(

@@ -116,7 +116,7 @@ fn is_infinite_iterator(arg: &Expr, semantic: &SemanticModel) -> bool {
                     }
 
                     // Ex) `iterools.repeat(1, times=None)`
-                    for keyword in &**keywords {
+                    for keyword in keywords {
                         if keyword.arg.as_ref().is_some_and(|name| name == "times") {
                             if keyword.value.is_none_literal_expr() {
                                 return true;

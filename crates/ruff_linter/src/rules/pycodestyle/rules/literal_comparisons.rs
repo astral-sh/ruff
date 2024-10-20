@@ -248,12 +248,7 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
     }
 
     // Check each comparator in order.
-    for (index, (op, next)) in compare
-        .ops
-        .iter()
-        .zip(compare.comparators.iter())
-        .enumerate()
-    {
+    for (index, (op, next)) in compare.ops.iter().zip(&compare.comparators).enumerate() {
         if helpers::is_constant_non_singleton(comparator) {
             comparator = next;
             continue;
