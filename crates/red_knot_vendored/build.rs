@@ -69,7 +69,7 @@ fn zip_dir(directory_path: &str, writer: File) -> ZipResult<File> {
 }
 
 fn main() {
-    println!("cargo:rerun-if-changed={TYPESHED_SOURCE_DIR}");
+    println!("cargo::rerun-if-changed={TYPESHED_SOURCE_DIR}");
     assert!(
         Path::new(TYPESHED_SOURCE_DIR).is_dir(),
         "Where is typeshed?"
