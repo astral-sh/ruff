@@ -749,20 +749,12 @@ impl<'db> Type<'db> {
             Type::None => Truthiness::AlwaysFalse,
             Type::Function(_) => Truthiness::AlwaysTrue,
             Type::Module(_) => Truthiness::AlwaysTrue,
-            Type::Class(class) => {
-                let bool_method = class.class_member(db, "__bool__").call(db, &[*self]);
-                let bool_rt = bool_method.return_ty(db);
-                if bool_rt.is_some_and(|t| t.bool(db) == Truthiness::AlwaysFalse) {
-                    return Truthiness::AlwaysFalse;
-                }
-                let len_method = class.class_member(db, "__len__").call(db, &[*self]);
-                let len_rt = len_method.return_ty(db);
-                if len_rt.is_some_and(|t| t.bool(db) == Truthiness::AlwaysFalse) {
-                    return Truthiness::AlwaysFalse;
-                }
-                Truthiness::AlwaysTrue
+            Type::Class(_) => {
+                // TODO: lookup `__bool__` and `__len__` methods on the class's metaclass
+                // More info in https://docs.python.org/3/library/stdtypes.html#truth-value-testing
+                Truthiness::Ambiguous
             }
-            Type::Instance(class) => Type::Class(*class).bool(db),
+            Type::Instance(_) => Truthiness::Ambiguous,
             Type::Union(union) => {
                 let union_elements = union.elements(db);
                 let first_element_truthiness = union_elements[0].bool(db);
