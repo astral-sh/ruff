@@ -1,7 +1,7 @@
-use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 use ruff_index::{newtype_index, IndexVec};
 use rustc_hash::{FxHashMap, FxHashSet};
+use std::sync::LazyLock;
 
 /// Parse the Markdown `source` as a test suite with given `title`.
 pub(crate) fn parse<'s>(title: &'s str, source: &'s str) -> anyhow::Result<MarkdownTestSuite<'s>> {
@@ -135,12 +135,12 @@ pub(crate) struct EmbeddedFile<'s> {
 
 /// Matches an arbitrary amount of whitespace (including newlines), followed by a sequence of `#`
 /// characters, followed by a title heading, followed by a newline.
-static HEADER_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^(\s*\n)*(?<level>#+)\s+(?<title>.+)\s*\n").unwrap());
+static HEADER_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^(\s*\n)*(?<level>#+)\s+(?<title>.+)\s*\n").unwrap());
 
 /// Matches a code block fenced by triple backticks, possibly with language and `key=val`
 /// configuration items following the opening backticks (in the "tag string" of the code block).
-static CODE_RE: Lazy<Regex> = Lazy::new(|| {
+static CODE_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^```(?<lang>\w+)(?<config>( +\S+)*)\s*\n(?<code>(.|\n)*?)\n?```\s*\n").unwrap()
 });
 

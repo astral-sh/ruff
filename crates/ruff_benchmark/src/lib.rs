@@ -82,7 +82,7 @@ impl TestFile {
     }
 }
 
-static TARGET_DIR: once_cell::sync::Lazy<PathBuf> = once_cell::sync::Lazy::new(|| {
+static TARGET_DIR: std::sync::LazyLock<PathBuf> = std::sync::LazyLock::new(|| {
     cargo_target_directory().unwrap_or_else(|| PathBuf::from("target"))
 });
 

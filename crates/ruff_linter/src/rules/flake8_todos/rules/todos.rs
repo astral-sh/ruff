@@ -1,8 +1,8 @@
-use once_cell::sync::Lazy;
 use regex::RegexSet;
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 use ruff_text_size::{TextLen, TextRange, TextSize};
+use std::sync::LazyLock;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -222,7 +222,7 @@ impl Violation for MissingSpaceAfterTodoColon {
     }
 }
 
-static ISSUE_LINK_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
+static ISSUE_LINK_REGEX_SET: LazyLock<RegexSet> = LazyLock::new(|| {
     RegexSet::new([
         r"^#\s*(http|https)://.*", // issue link
         r"^#\s*\d+$",              // issue code - like "003"

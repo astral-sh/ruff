@@ -46,10 +46,9 @@ libcst = { workspace = true }
 log = { workspace = true }
 memchr = { workspace = true }
 natord = { workspace = true }
-once_cell = { workspace = true }
 path-absolutize = { workspace = true, features = [
-  "once_cell_cache",
-  "use_unix_paths_on_wasm",
+    "once_cell_cache",
+    "use_unix_paths_on_wasm",
 ] }
 pathdiff = { workspace = true }
 pep440_rs = { workspace = true, features = ["serde"] }

@@ -20,7 +20,6 @@ ruff_python_parser = { workspace = true }
 
 anyhow = { workspace = true }
 clap = { workspace = true, optional = true }
-once_cell = { workspace = true }
 salsa = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }

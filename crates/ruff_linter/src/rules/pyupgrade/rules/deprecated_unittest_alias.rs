@@ -1,6 +1,6 @@
-use once_cell::sync::Lazy;
 use ruff_python_ast::{self as ast, Expr};
 use rustc_hash::FxHashMap;
+use std::sync::LazyLock;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -57,7 +57,7 @@ impl AlwaysFixableViolation for DeprecatedUnittestAlias {
     }
 }
 
-static DEPRECATED_ALIASES: Lazy<FxHashMap<&'static str, &'static str>> = Lazy::new(|| {
+static DEPRECATED_ALIASES: LazyLock<FxHashMap<&'static str, &'static str>> = LazyLock::new(|| {
     FxHashMap::from_iter([
         ("assertAlmostEquals", "assertAlmostEqual"),
         ("assertEquals", "assertEqual"),

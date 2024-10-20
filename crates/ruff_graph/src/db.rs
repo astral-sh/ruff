@@ -7,12 +7,11 @@ use ruff_db::system::{OsSystem, System, SystemPathBuf};
 use ruff_db::vendored::{VendoredFileSystem, VendoredFileSystemBuilder};
 use ruff_db::{Db as SourceDb, Upcast};
 
-static EMPTY_VENDORED: once_cell::sync::Lazy<VendoredFileSystem> =
-    once_cell::sync::Lazy::new(|| {
-        let mut builder = VendoredFileSystemBuilder::new(CompressionMethod::Stored);
-        builder.add_file("stdlib/VERSIONS", "\n").unwrap();
-        builder.finish().unwrap()
-    });
+static EMPTY_VENDORED: std::sync::LazyLock<VendoredFileSystem> = std::sync::LazyLock::new(|| {
+    let mut builder = VendoredFileSystemBuilder::new(CompressionMethod::Stored);
+    builder.add_file("stdlib/VERSIONS", "\n").unwrap();
+    builder.finish().unwrap()
+});
 
 #[salsa::db]
 #[derive(Default)]

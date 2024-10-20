@@ -23,7 +23,6 @@ aho-corasick = { workspace = true }
 bitflags = { workspace = true }
 is-macro = { workspace = true }
 itertools = { workspace = true }
-once_cell = { workspace = true }
 rustc-hash = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }

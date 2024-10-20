@@ -1,8 +1,9 @@
-use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 use std::borrow::Cow;
+use std::sync::LazyLock;
 
-static CURLY_BRACES: Lazy<Regex> = Lazy::new(|| Regex::new(r"(\\N\{[^}]+})|([{}])").unwrap());
+static CURLY_BRACES: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(\\N\{[^}]+})|([{}])").unwrap());
 
 pub(super) fn curly_escape(text: &str) -> Cow<'_, str> {
     // Match all curly braces. This will include named unicode escapes (like
@@ -20,7 +21,8 @@ pub(super) fn curly_escape(text: &str) -> Cow<'_, str> {
     })
 }
 
-static DOUBLE_CURLY_BRACES: Lazy<Regex> = Lazy::new(|| Regex::new(r"((\{\{)|(\}\}))").unwrap());
+static DOUBLE_CURLY_BRACES: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"((\{\{)|(\}\}))").unwrap());
 
 pub(super) fn curly_unescape(text: &str) -> Cow<'_, str> {
     // Match all double curly braces and replace with a single

@@ -1,6 +1,5 @@
 use std::collections::HashMap;
-
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 
 /// Returns the redirect target for the given code.
 pub(crate) fn get_redirect_target(code: &str) -> Option<&'static str> {
@@ -13,7 +12,7 @@ pub(crate) fn get_redirect(code: &str) -> Option<(&'static str, &'static str)> {
     REDIRECTS.get_key_value(code).map(|(k, v)| (*k, *v))
 }
 
-static REDIRECTS: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
+static REDIRECTS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
     HashMap::from_iter([
         // The following are here because we don't yet have the many-to-one mapping enabled.
         ("SIM111", "SIM110"),

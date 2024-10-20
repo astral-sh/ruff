@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use libcst_native::{Arg, Expression};
-use once_cell::sync::Lazy;
 use regex::Regex;
+use std::sync::LazyLock;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -127,8 +127,8 @@ fn is_sequential(indices: &[usize]) -> bool {
 
 // An opening curly brace, followed by any integer, followed by any text,
 // followed by a closing brace.
-static FORMAT_SPECIFIER: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\{(?P<int>\d+)(?P<fmt>.*?)}").unwrap());
+static FORMAT_SPECIFIER: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\{(?P<int>\d+)(?P<fmt>.*?)}").unwrap());
 
 /// Remove the explicit positional indices from a format string.
 fn remove_specifiers<'a>(value: &mut Expression<'a>, arena: &'a typed_arena::Arena<String>) {

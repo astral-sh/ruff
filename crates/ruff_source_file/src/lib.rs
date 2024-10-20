@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -134,9 +134,9 @@ impl SourceFileBuilder {
     /// Consumes `self` and returns the [`SourceFile`].
     pub fn finish(self) -> SourceFile {
         let index = if let Some(index) = self.index {
-            once_cell::sync::OnceCell::with_value(index)
+            OnceLock::from(index)
         } else {
-            once_cell::sync::OnceCell::new()
+            OnceLock::new()
         };
 
         SourceFile {
@@ -218,7 +218,7 @@ impl Ord for SourceFile {
 struct SourceFileInner {
     name: Box<str>,
     code: Box<str>,
-    line_index: once_cell::sync::OnceCell<LineIndex>,
+    line_index: OnceLock<LineIndex>,
 }
 
 impl PartialEq for SourceFileInner {

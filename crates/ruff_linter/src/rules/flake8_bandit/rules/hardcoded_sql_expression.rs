@@ -1,5 +1,7 @@
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
+
 use regex::Regex;
+
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::raw_contents;
@@ -9,7 +11,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
-static SQL_REGEX: Lazy<Regex> = Lazy::new(|| {
+static SQL_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)\b(select\s+.*\s+from\s|delete\s+from\s|(insert|replace)\s+.*\s+values\s|update\s+.*\s+set\s)")
     .unwrap()
 });

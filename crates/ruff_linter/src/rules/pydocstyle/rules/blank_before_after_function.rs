@@ -1,5 +1,5 @@
-use once_cell::sync::Lazy;
 use regex::Regex;
+use std::sync::LazyLock;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -98,8 +98,8 @@ impl AlwaysFixableViolation for NoBlankLineAfterFunction {
     }
 }
 
-static INNER_FUNCTION_OR_CLASS_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^\s+(?:(?:class|def|async def)\s|@)").unwrap());
+static INNER_FUNCTION_OR_CLASS_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\s+(?:(?:class|def|async def)\s|@)").unwrap());
 
 /// D201, D202
 pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring) {
