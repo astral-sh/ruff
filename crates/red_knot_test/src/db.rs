@@ -2,8 +2,7 @@ use red_knot_python_semantic::{
     Db as SemanticDb, Program, ProgramSettings, PythonVersion, SearchPathSettings,
 };
 use ruff_db::files::{File, Files};
-use ruff_db::system::{DbWithTestSystem, System, TestSystem};
-use ruff_db::system::{SystemPath, SystemPathBuf};
+use ruff_db::system::{DbWithTestSystem, System, SystemPath, SystemPathBuf, TestSystem};
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Upcast};
 
