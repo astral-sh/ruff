@@ -37,13 +37,13 @@ test-case = { workspace = true }
 memchr = { workspace = true }
 
 [dev-dependencies]
-dir-test = {workspace = true}
 ruff_db = { workspace = true, features = ["os", "testing"] }
 ruff_python_parser = { workspace = true }
 red_knot_test = { workspace = true }
 red_knot_vendored = { workspace = true }
 
 anyhow = { workspace = true }
+dir-test = {workspace = true}
 insta = { workspace = true }
 tempfile = { workspace = true }
 
