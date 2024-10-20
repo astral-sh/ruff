@@ -2136,6 +2136,7 @@ dependencies = [
  "libc",
  "lsp-server",
  "lsp-types",
+ "red_knot_python_semantic",
  "red_knot_workspace",
  "ruff_db",
  "ruff_notebook",

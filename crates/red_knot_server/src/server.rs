@@ -7,9 +7,9 @@ use std::panic::PanicInfo;
 
 use lsp_server::Message;
 use lsp_types::{
-    ClientCapabilities, DiagnosticOptions, DiagnosticServerCapabilities, MessageType,
-    ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    Url,
+    ClientCapabilities, DefinitionOptions, DiagnosticOptions, DiagnosticServerCapabilities,
+    MessageType, ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind,
+    TextDocumentSyncOptions, Url, WorkDoneProgressOptions,
 };
 
 use self::connection::{Connection, ConnectionInitializer};
@@ -186,6 +186,7 @@ impl Server {
         let mut scheduler =
             schedule::Scheduler::new(&mut session, worker_threads, connection.make_sender());
 
+        log_err_msg!("WELCOME TO RUFF LSP");
         for msg in connection.incoming() {
             if connection.handle_shutdown(&msg)? {
                 break;
@@ -218,6 +219,12 @@ impl Server {
     fn server_capabilities(position_encoding: PositionEncoding) -> ServerCapabilities {
         ServerCapabilities {
             position_encoding: Some(position_encoding.into()),
+            // XXX there's definitely a better construction strategy here
+            definition_provider: Some(lsp_types::OneOf::Right(DefinitionOptions {
+                work_done_progress_options: WorkDoneProgressOptions {
+                    work_done_progress: None,
+                },
+            })),
             diagnostic_provider: Some(DiagnosticServerCapabilities::Options(DiagnosticOptions {
                 identifier: Some(crate::DIAGNOSTIC_NAME.into()),
                 ..Default::default()

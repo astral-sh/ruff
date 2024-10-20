@@ -11,6 +11,7 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+red_knot_python_semantic = { workspace = true }
 red_knot_workspace = { workspace = true }
 ruff_db = { workspace = true }
 ruff_notebook = { workspace = true }

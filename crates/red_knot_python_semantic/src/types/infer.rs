@@ -92,6 +92,7 @@ fn infer_definition_types_cycle_recovery<'db>(
     if category.is_binding() {
         inference.bindings.insert(input, Type::Unknown);
     }
+    db.report_untracked_read();
     // TODO we don't fill in expression types for the cycle-participant definitions, which can
     // later cause a panic when looking up an expression type.
     inference
