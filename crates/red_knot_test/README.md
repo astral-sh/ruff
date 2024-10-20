@@ -34,14 +34,14 @@ syntax, it's just how this README embeds an example mdtest Markdown document.)
 See actual example mdtest suites in
 [`crates/red_knot_python_semantic/resources/mdtest`](https://github.com/astral-sh/ruff/tree/main/crates/red_knot_python_semantic/resources/mdtest).
 
-> ℹ️ Note: If you use `rstest` to generate a separate test for all Markdown files in a certain directory,
+> ℹ️ Note: If you use `dir-test`, `rstest` or similar to generate a separate test for all Markdown files in a certain directory,
 > as with the example in `crates/red_knot_python_semantic/tests/mdtest.rs`,
 > you will likely want to also make sure that the crate the tests are in is rebuilt every time a
 > Markdown file is added or removed from the directory. See
 > [`crates/red_knot_python_semantic/build.rs`](https://github.com/astral-sh/ruff/tree/main/crates/red_knot_python_semantic/build.rs)
 > for an example of how to do this.
 >
-> This is because `rstest` generates its tests at build time rather than at runtime.
+> This is because these macros generate their tests at build time rather than at runtime.
 > Without the `build.rs` file to force a rebuild when a Markdown file is added or removed,
 > a new Markdown test suite might not be run unless some other change in the crate caused a rebuild
 > following the addition of the new test file.
