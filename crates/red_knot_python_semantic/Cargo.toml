@@ -43,8 +43,8 @@ red_knot_test = { workspace = true }
 red_knot_vendored = { workspace = true }
 
 anyhow = { workspace = true }
+dir-test = {workspace = true}
 insta = { workspace = true }
-rstest = { workspace = true }
 tempfile = { workspace = true }
 
 [lints]
