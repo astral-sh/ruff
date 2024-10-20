@@ -459,10 +459,10 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
             range: _,
         }) => {
             visitor.visit_expr(left);
-            for cmp_op in &**ops {
+            for cmp_op in ops {
                 visitor.visit_cmp_op(cmp_op);
             }
-            for expr in &**comparators {
+            for expr in comparators {
                 visitor.visit_expr(expr);
             }
         }

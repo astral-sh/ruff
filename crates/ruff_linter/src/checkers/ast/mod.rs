@@ -732,7 +732,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
                 // The default values of the parameters needs to be evaluated in the enclosing
                 // scope.
-                for parameter in &**parameters {
+                for parameter in parameters {
                     if let Some(expr) = parameter.default() {
                         self.visit_expr(expr);
                     }
@@ -744,7 +744,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     self.visit_type_params(type_params);
                 }
 
-                for parameter in &**parameters {
+                for parameter in parameters {
                     if let Some(expr) = parameter.annotation() {
                         if singledispatch && !parameter.is_variadic() {
                             self.visit_runtime_required_annotation(expr);

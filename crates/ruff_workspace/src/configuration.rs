@@ -803,7 +803,7 @@ impl LintConfiguration {
                     .select
                     .iter()
                     .flatten()
-                    .chain(selection.extend_select.iter())
+                    .chain(&selection.extend_select)
                     .filter(|s| s.specificity() == spec)
                 {
                     for rule in selector.rules(&preview) {
@@ -830,7 +830,7 @@ impl LintConfiguration {
                     .fixable
                     .iter()
                     .flatten()
-                    .chain(selection.extend_fixable.iter())
+                    .chain(&selection.extend_fixable)
                     .filter(|s| s.specificity() == spec)
                 {
                     for rule in selector.all_rules() {

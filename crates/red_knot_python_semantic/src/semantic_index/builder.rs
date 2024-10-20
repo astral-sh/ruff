@@ -1012,7 +1012,7 @@ where
 
                 // Add symbols and definitions for the parameters to the lambda scope.
                 if let Some(parameters) = &lambda.parameters {
-                    for parameter in &**parameters {
+                    for parameter in parameters {
                         self.declare_parameter(parameter);
                     }
                 }

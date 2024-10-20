@@ -870,7 +870,7 @@ pub(crate) fn string_dot_format_missing_argument(
     let missing: Vec<String> = summary
         .autos
         .iter()
-        .chain(summary.indices.iter())
+        .chain(&summary.indices)
         .filter(|&&i| i >= args.len())
         .map(ToString::to_string)
         .chain(

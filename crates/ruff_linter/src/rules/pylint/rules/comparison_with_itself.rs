@@ -55,7 +55,7 @@ pub(crate) fn comparison_with_itself(
     comparators: &[Expr],
 ) {
     for ((left, right), op) in std::iter::once(left)
-        .chain(comparators.iter())
+        .chain(comparators)
         .tuple_windows()
         .zip(ops)
     {

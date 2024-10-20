@@ -140,7 +140,7 @@ pub(crate) fn bad_exit_annotation(checker: &mut Checker, function: &StmtFunction
     let non_self_positional_args: SmallVec<[&ParameterWithDefault; 3]> = parameters
         .posonlyargs
         .iter()
-        .chain(parameters.args.iter())
+        .chain(&parameters.args)
         .skip(1)
         .collect();
 

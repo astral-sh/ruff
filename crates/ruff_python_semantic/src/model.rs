@@ -795,7 +795,7 @@ impl<'a> SemanticModel<'a> {
                 let resolved: QualifiedName = qualified_name
                     .segments()
                     .iter()
-                    .chain(tail.iter())
+                    .chain(tail)
                     .copied()
                     .collect();
                 Some(resolved)
@@ -809,7 +809,7 @@ impl<'a> SemanticModel<'a> {
                         .segments()
                         .iter()
                         .take(1)
-                        .chain(tail.iter())
+                        .chain(tail)
                         .copied()
                         .collect(),
                 )
@@ -832,7 +832,7 @@ impl<'a> SemanticModel<'a> {
                     qualified_name
                         .segments()
                         .iter()
-                        .chain(tail.iter())
+                        .chain(tail)
                         .copied()
                         .collect()
                 };

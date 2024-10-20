@@ -153,7 +153,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             let symbol = self.symbols().symbol_id_by_name(id).unwrap();
             let scope = self.scope();
             let inference = infer_expression_types(self.db, expression);
-            for (op, comparator) in std::iter::zip(&**ops, &**comparators) {
+            for (op, comparator) in std::iter::zip(ops, comparators) {
                 let comp_ty = inference.expression_ty(comparator.scoped_ast_id(self.db, scope));
                 match op {
                     ast::CmpOp::IsNot => {

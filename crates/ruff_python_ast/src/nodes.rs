@@ -2048,7 +2048,7 @@ impl PartialEq for ConcatenatedStringLiteral {
         // The `zip` here is safe because we have checked the length of both parts.
         self.strings
             .iter()
-            .zip(other.strings.iter())
+            .zip(&other.strings)
             .all(|(s1, s2)| s1 == s2)
     }
 }
@@ -3657,6 +3657,14 @@ impl<'a> IntoIterator for &'a Parameters {
     type Item = AnyParameterRef<'a>;
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a Box<Parameters> {
+    type IntoIter = ParametersIterator<'a>;
+    type Item = AnyParameterRef<'a>;
+    fn into_iter(self) -> Self::IntoIter {
+        (&**self).into_iter()
     }
 }
 

@@ -2809,7 +2809,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = compare;
 
         self.infer_expression(left);
-        for right in comparators.as_ref() {
+        for right in comparators {
             self.infer_expression(right);
         }
 
@@ -2823,10 +2823,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         Self::infer_chained_boolean_types(
             self.db,
             ast::BoolOp::And,
-            std::iter::once(left.as_ref())
-                .chain(comparators.as_ref().iter())
+            std::iter::once(&**left)
+                .chain(comparators)
                 .tuple_windows::<(_, _)>()
-                .zip(ops.iter())
+                .zip(ops)
                 .map(|((left, right), op)| {
                     let left_ty = self.expression_ty(left);
                     let right_ty = self.expression_ty(right);
@@ -3036,8 +3036,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             (Type::Tuple(lhs), Type::Tuple(rhs)) => {
                 // Note: This only works on heterogeneous tuple types.
-                let lhs_elements = lhs.elements(self.db).as_ref();
-                let rhs_elements = rhs.elements(self.db).as_ref();
+                let lhs_elements = lhs.elements(self.db);
+                let rhs_elements = rhs.elements(self.db);
 
                 let mut lexicographic_type_comparison =
                     |op| self.infer_lexicographic_type_comparison(lhs_elements, op, rhs_elements);

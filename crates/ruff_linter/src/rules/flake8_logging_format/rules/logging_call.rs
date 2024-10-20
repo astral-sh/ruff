@@ -110,7 +110,7 @@ fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
             ..
         }) => {
             if checker.semantic().match_builtin_expr(func, "dict") {
-                for keyword in &**keywords {
+                for keyword in keywords {
                     if let Some(attr) = &keyword.arg {
                         if is_reserved_attr(attr) {
                             checker.diagnostics.push(Diagnostic::new(

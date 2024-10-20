@@ -57,7 +57,7 @@ pub(crate) fn comparison_of_constant(
     comparators: &[Expr],
 ) {
     for ((left, right), op) in std::iter::once(left)
-        .chain(comparators.iter())
+        .chain(comparators)
         .tuple_windows()
         .zip(ops)
     {

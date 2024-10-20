@@ -219,7 +219,7 @@ impl<'a> Resolver<'a> {
 
     /// Return an iterator over the resolved [`Settings`] in this [`Resolver`].
     pub fn settings(&self) -> impl Iterator<Item = &Settings> {
-        std::iter::once(&self.pyproject_config.settings).chain(self.settings.iter())
+        std::iter::once(&self.pyproject_config.settings).chain(&self.settings)
     }
 }
 

@@ -141,7 +141,7 @@ pub(crate) fn fastapi_unused_path_parameter(
         .parameters
         .args
         .iter()
-        .chain(function_def.parameters.kwonlyargs.iter())
+        .chain(&function_def.parameters.kwonlyargs)
         .map(|ParameterWithDefault { parameter, .. }| {
             parameter_alias(parameter, checker.semantic())
                 .unwrap_or_else(|| parameter.name.as_str())
