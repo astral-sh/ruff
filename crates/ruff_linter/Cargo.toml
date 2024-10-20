@@ -51,7 +51,7 @@ path-absolutize = { workspace = true, features = [
     "use_unix_paths_on_wasm",
 ] }
 pathdiff = { workspace = true }
-pep440_rs = { workspace = true, features = ["serde"] }
+pep440_rs = { workspace = true }
 pyproject-toml = { workspace = true }
 quick-junit = { workspace = true }
 regex = { workspace = true }
