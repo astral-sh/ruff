@@ -539,10 +539,11 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// Expects the resolved type of the left side of the binary expression.
     fn check_division_by_zero(&mut self, expr: &ast::ExprBinOp, left: Type<'db>) {
         match left {
-            Type::IntLiteral(_) => {}
+            Type::BooleanLiteral(_) | Type::IntLiteral(_) => {}
             Type::Instance(cls)
-                if cls.is_known(self.db, KnownClass::Float)
-                    || cls.is_known(self.db, KnownClass::Int) => {}
+                if [KnownClass::Float, KnownClass::Int, KnownClass::Bool]
+                    .iter()
+                    .any(|&k| cls.is_known(self.db, k)) => {}
             _ => return,
         };
 
@@ -2459,7 +2460,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             operand,
         } = unary;
 
-        match (op, self.infer_expression(operand)) {
+        let operand_type = self.infer_expression(operand);
+
+        match (op, operand_type) {
             (UnaryOp::UAdd, Type::IntLiteral(value)) => Type::IntLiteral(value),
             (UnaryOp::USub, Type::IntLiteral(value)) => Type::IntLiteral(-value),
             (UnaryOp::Invert, Type::IntLiteral(value)) => Type::IntLiteral(!value),
@@ -2469,7 +2472,35 @@ impl<'db> TypeInferenceBuilder<'db> {
             (UnaryOp::Invert, Type::BooleanLiteral(bool)) => Type::IntLiteral(!i64::from(bool)),
 
             (UnaryOp::Not, ty) => ty.bool(self.db).negate().into_type(self.db),
+            (_, Type::Any) => Type::Any,
+            (_, Type::Unknown) => Type::Unknown,
+            (op @ (UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert), Type::Instance(class)) => {
+                let unary_dunder_method = match op {
+                    UnaryOp::Invert => "__invert__",
+                    UnaryOp::UAdd => "__pos__",
+                    UnaryOp::USub => "__neg__",
+                    UnaryOp::Not => {
+                        unreachable!("Not operator is handled in its own case");
+                    }
+                };
+                let class_member = class.class_member(self.db, unary_dunder_method);
+                let call = class_member.call(self.db, &[operand_type]);
 
+                match call.return_ty_result(self.db, AnyNodeRef::ExprUnaryOp(unary), self) {
+                    Ok(t) => t,
+                    Err(e) => {
+                        self.add_diagnostic(
+                            unary.into(),
+                            "unsupported-operator",
+                            format_args!(
+                                "Unary operator `{op}` is unsupported for type `{}`",
+                                operand_type.display(self.db),
+                            ),
+                        );
+                        e.return_ty()
+                    }
+                }
+            }
             _ => Type::Todo, // TODO other unary op types
         }
     }
@@ -2491,7 +2522,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             (op, right_ty),
             (
                 ast::Operator::Div | ast::Operator::FloorDiv | ast::Operator::Mod,
-                Type::IntLiteral(0),
+                Type::IntLiteral(0) | Type::BooleanLiteral(false)
             )
         ) {
             self.check_division_by_zero(binary, left_ty);
@@ -2557,6 +2588,17 @@ impl<'db> TypeInferenceBuilder<'db> {
                     .map(Type::IntLiteral)
                     .unwrap_or_else(|| KnownClass::Int.to_instance(self.db)),
             ),
+
+            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Pow) => {
+                let m = u32::try_from(m);
+                Some(match m {
+                    Ok(m) => n
+                        .checked_pow(m)
+                        .map(Type::IntLiteral)
+                        .unwrap_or_else(|| KnownClass::Int.to_instance(self.db)),
+                    Err(_) => KnownClass::Int.to_instance(self.db),
+                })
+            }
 
             (Type::BytesLiteral(lhs), Type::BytesLiteral(rhs), ast::Operator::Add) => {
                 Some(Type::BytesLiteral(BytesLiteralType::new(
@@ -2693,6 +2735,20 @@ impl<'db> TypeInferenceBuilder<'db> {
                     })
             }
 
+            (
+                Type::BooleanLiteral(b1),
+                Type::BooleanLiteral(b2),
+                ruff_python_ast::Operator::BitOr,
+            ) => Some(Type::BooleanLiteral(b1 | b2)),
+
+            (Type::BooleanLiteral(bool_value), right, op) => self.infer_binary_expression_type(
+                Type::IntLiteral(i64::from(bool_value)),
+                right,
+                op,
+            ),
+            (left, Type::BooleanLiteral(bool_value), op) => {
+                self.infer_binary_expression_type(left, Type::IntLiteral(i64::from(bool_value)), op)
+            }
             _ => Some(Type::Todo), // TODO
         }
     }
