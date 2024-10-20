@@ -5,7 +5,7 @@ use ruff_db::files::system_path_to_file;
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::Path;
 
 type Failures = BTreeMap<SystemPathBuf, matcher::FailuresByLine>;
 
@@ -19,7 +19,7 @@ mod parser;
 ///
 /// Panic on test failure, and print failure details.
 #[allow(clippy::print_stdout)]
-pub fn run(path: &PathBuf, title: &str) {
+pub fn run(path: &Path, title: &str) {
     let source = std::fs::read_to_string(path).unwrap();
     let suite = match test_parser::parse(title, &source) {
         Ok(suite) => suite,
