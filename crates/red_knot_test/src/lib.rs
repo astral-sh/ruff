@@ -1,7 +1,7 @@
 use colored::Colorize;
 use parser as test_parser;
 use red_knot_python_semantic::types::check_types;
-use ruff_db::files::system_path_to_file;
+use ruff_db::files::{system_path_to_file, Files};
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 use std::collections::BTreeMap;
@@ -28,9 +28,15 @@ pub fn run(path: &Path, title: &str) {
         }
     };
 
+    let mut db = db::Db::setup(SystemPathBuf::from("/src"));
+
     let mut any_failures = false;
     for test in suite.tests() {
-        if let Err(failures) = run_test(&test) {
+        // Remove all files so that the db is in a "fresh" state.
+        db.memory_file_system().remove_all();
+        Files::sync_all(&mut db);
+
+        if let Err(failures) = run_test(&mut db, &test) {
             any_failures = true;
             println!("\n{}\n", test.name().bold().underline());
 
@@ -52,9 +58,8 @@ pub fn run(path: &Path, title: &str) {
     assert!(!any_failures, "Some tests failed.");
 }
 
-fn run_test(test: &parser::MarkdownTest) -> Result<(), Failures> {
-    let workspace_root = SystemPathBuf::from("/src");
-    let mut db = db::Db::setup(workspace_root.clone());
+fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures> {
+    let workspace_root = db.workspace_root().to_path_buf();
 
     let mut system_paths = vec![];
 
@@ -71,8 +76,8 @@ fn run_test(test: &parser::MarkdownTest) -> Result<(), Failures> {
     let mut failures = BTreeMap::default();
 
     for path in system_paths {
-        let file = system_path_to_file(&db, path.clone()).unwrap();
-        let parsed = parsed_module(&db, file);
+        let file = system_path_to_file(db, path.clone()).unwrap();
+        let parsed = parsed_module(db, file);
 
         // TODO allow testing against code with syntax errors
         assert!(
@@ -83,7 +88,7 @@ fn run_test(test: &parser::MarkdownTest) -> Result<(), Failures> {
             parsed.errors()
         );
 
-        matcher::match_file(&db, file, check_types(&db, file)).unwrap_or_else(|line_failures| {
+        matcher::match_file(db, file, check_types(db, file)).unwrap_or_else(|line_failures| {
             failures.insert(path, line_failures);
         });
     }
