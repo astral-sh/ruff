@@ -35,7 +35,7 @@ smallvec = { workspace = true }
 static_assertions = { workspace = true }
 test-case = { workspace = true }
 memchr = { workspace = true }
-dir-test = "0.3.0"
+dir-test = {workspace = true}
 
 [dev-dependencies]
 ruff_db = { workspace = true, features = ["os", "testing"] }
