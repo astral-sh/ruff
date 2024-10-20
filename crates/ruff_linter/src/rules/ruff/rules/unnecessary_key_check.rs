@@ -3,7 +3,7 @@ use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{maybe_contains_effect, Maybe};
+use ruff_python_ast::helpers::{contains_effect, Maybe};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_text_size::Ranged;
 
@@ -97,10 +97,9 @@ pub(crate) fn unnecessary_key_check(checker: &mut Checker, expr: &Expr) {
     }
 
     let applicability =
-        match maybe_contains_effect(obj_left, |id| checker.semantic().has_builtin_binding(id))
-            .merge(maybe_contains_effect(key_left, |id| {
-                checker.semantic().has_builtin_binding(id)
-            })) {
+        match contains_effect(obj_left, |id| checker.semantic().has_builtin_binding(id)).merge(
+            contains_effect(key_left, |id| checker.semantic().has_builtin_binding(id)),
+        ) {
             Maybe::Yes => return,
             Maybe::Maybe => {
                 if checker.settings.preview.is_enabled() {

@@ -39,18 +39,11 @@ where
     matches!(id, "list" | "tuple" | "set" | "dict" | "frozenset") && is_builtin(id)
 }
 
-/// Return `true` if the `Expr` contains an expression that appears to include a
-/// side-effect (like a function call).
+/// Return `Maybe::Yes`, `Maybe::Maybe`, or `Maybe::No` if the `Expr` contains an expression that appears to include a
+/// side-effect (like a function call) or not.
 ///
 /// Accepts a closure that determines whether a given name (e.g., `"list"`) is a Python builtin.
-pub fn contains_effect<F>(expr: &Expr, is_builtin: F) -> bool
-where
-    F: Fn(&str) -> bool,
-{
-    maybe_contains_effect(expr, is_builtin).is_yes()
-}
-
-pub fn maybe_contains_effect<F>(expr: &Expr, is_builtin: F) -> Maybe
+pub fn contains_effect<F>(expr: &Expr, is_builtin: F) -> Maybe
 where
     F: Fn(&str) -> bool,
 {
@@ -189,15 +182,6 @@ impl Maybe {
             (Maybe::Maybe, _) | (_, Maybe::Maybe) => Maybe::Maybe,
             (Maybe::No, Maybe::No) => Maybe::No,
         }
-    }
-}
-
-// Not ops implementation for Maybe
-impl std::ops::Not for Maybe {
-    type Output = bool;
-
-    fn not(self) -> Self::Output {
-        !self.is_yes()
     }
 }
 

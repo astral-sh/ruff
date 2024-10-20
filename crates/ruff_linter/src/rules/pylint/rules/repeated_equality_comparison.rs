@@ -211,7 +211,7 @@ fn to_allowed_value<'a>(
         return None;
     }
 
-    if contains_effect(value, |id| semantic.has_builtin_binding(id)) {
+    if contains_effect(value, |id| semantic.has_builtin_binding(id)).is_yes() {
         return None;
     }
 

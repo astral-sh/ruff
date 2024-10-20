@@ -387,7 +387,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                 },
                 expr.range(),
             );
-            if !contains_effect(target, |id| checker.semantic().has_builtin_binding(id)) {
+            if !contains_effect(target, |id| checker.semantic().has_builtin_binding(id)).is_yes() {
                 // Grab the types used in each duplicate `isinstance` call (e.g., `int` and `str`
                 // in `isinstance(obj, int) or isinstance(obj, str)`).
                 let types: Vec<&Expr> = indices
@@ -526,10 +526,9 @@ pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
         let (indices, comparators): (Vec<_>, Vec<_>) = matches.iter().copied().unzip();
 
         // Avoid rewriting (e.g.) `a == "foo" or a == f()`.
-        if comparators
-            .iter()
-            .any(|expr| contains_effect(expr, |id| checker.semantic().has_builtin_binding(id)))
-        {
+        if comparators.iter().any(|expr| {
+            contains_effect(expr, |id| checker.semantic().has_builtin_binding(id)).is_yes()
+        }) {
             continue;
         }
 
@@ -625,7 +624,7 @@ pub(crate) fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    if contains_effect(expr, |id| checker.semantic().has_builtin_binding(id)) {
+    if contains_effect(expr, |id| checker.semantic().has_builtin_binding(id)).is_yes() {
         return;
     }
 
@@ -682,7 +681,7 @@ pub(crate) fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    if contains_effect(expr, |id| checker.semantic().has_builtin_binding(id)) {
+    if contains_effect(expr, |id| checker.semantic().has_builtin_binding(id)).is_yes() {
         return;
     }
 
@@ -766,7 +765,7 @@ fn is_short_circuit(
         // Keep track of the location of the furthest-right, non-effectful expression.
         if value_truthiness.is_unknown()
             && (!checker.semantic().in_boolean_test()
-                || contains_effect(value, |id| checker.semantic().has_builtin_binding(id)))
+                || contains_effect(value, |id| checker.semantic().has_builtin_binding(id)).is_yes())
         {
             furthest = next_value;
             continue;

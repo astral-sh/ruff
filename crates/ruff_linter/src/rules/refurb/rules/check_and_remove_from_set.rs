@@ -89,7 +89,7 @@ pub(crate) fn check_and_remove_from_set(checker: &mut Checker, if_stmt: &ast::St
         // `element` in the check should be the same as `element` in the body
         || !compare(&check_element.into(), &remove_element.into())
         // `element` shouldn't have a side effect, otherwise we might change the semantics of the program.
-        || contains_effect(check_element, |id| checker.semantic().has_builtin_binding(id))
+        || contains_effect(check_element, |id| checker.semantic().has_builtin_binding(id)).is_yes()
     {
         return;
     }
