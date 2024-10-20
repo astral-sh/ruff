@@ -1,5 +1,7 @@
 # Unary Operations
 
+## Defined Methods
+
 ```py
 from typing import Literal
 
@@ -28,4 +30,37 @@ b = NoDunder()
 +b  # error: [unsupported-operator] "Unary operator `+` is unsupported for type `NoDunder`"
 -b  # error: [unsupported-operator] "Unary operator `-` is unsupported for type `NoDunder`"
 ~b  # error: [unsupported-operator] "Unary operator `~` is unsupported for type `NoDunder`"
+```
+
+## Not
+
+Not operator is inferred based on <https://docs.python.org/3/library/stdtypes.html#truth-value-testing>
+Unless the `__bool__` or `__len__` is returning `False` it's always true.
+
+```py
+class AlwaysTrue:
+    def __bool__(self) -> Literal[True]:
+        return True
+
+
+# error: [invalid-method] "Method __bool__ for type `AlwaysTrue` returns type `@Todo` rather than `bool`"
+# revealed: bool
+reveal_type(not AlwaysTrue())
+
+
+class AlwaysFalse:
+    def __bool__(self) -> Literal[False]:
+        return False
+
+
+# error: [invalid-method] "Method __bool__ for type `AlwaysFalse` returns type `@Todo` rather than `bool`"
+# revealed: bool
+reveal_type(not AlwaysFalse())
+
+
+class NoBoolMethod: ...
+
+
+# revealed: Literal[False]
+reveal_type(not NoBoolMethod())
 ```

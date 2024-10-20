@@ -2875,7 +2875,48 @@ impl<'db> TypeInferenceBuilder<'db> {
             (UnaryOp::USub, Type::BooleanLiteral(bool)) => Type::IntLiteral(-i64::from(bool)),
             (UnaryOp::Invert, Type::BooleanLiteral(bool)) => Type::IntLiteral(!i64::from(bool)),
 
-            (UnaryOp::Not, ty) => ty.bool(self.db).negate().into_type(self.db),
+            (UnaryOp::Not, ty) => {
+                // TODO: move to Type::bool method
+                // I initially wrote this code in the bool method but it caused a cycle. And since
+                // the cycle detection was not turned on for that method it was crashing.
+                let bool_type = if let Type::Instance(class) = ty {
+                    let bool_method = class.class_member(self.db, "__bool__");
+                    let bool_call = bool_method.call(self.db, &[operand_type]);
+
+                    let bool_rt = bool_call.return_ty(self.db);
+                    match bool_rt {
+                        Some(ty) => {
+                            // TODO: if the bool_rt is not boolean we can emit diagnostic.
+                            // https://pyright-play.net/?code=GYJw9gtgBALgngBwJYDsDmUkQWEMoAySMApiAIYA2AULQMaXkDOTUAggFzVQ9QAmJYFAD6wgEZgwlUQAomJSsACUAWgB8mFDC69dUECRgBXECigAGWgYBuJKsPgISMlGHxsZSpUA
+                            match ty {
+                                Type::BooleanLiteral(_) => {}
+                                Type::Instance(cls) => {
+                                    if !cls.is_known(self.db, KnownClass::Bool) {
+                                        self.add_diagnostic(
+                                            unary.into(),
+                                            "invalid-method",
+                                            format_args!("Method __bool__ for type `{}` returns type `{}` rather than `bool`", class.name(self.db), ty.display(self.db))
+                                        );
+                                    }
+                                }
+                                _ => {
+                                    self.add_diagnostic(
+                                        unary.into(),
+                                        "invalid-method",
+                                        format_args!("Method __bool__ for type `{}` returns type `{}` rather than `bool`", class.name(self.db), ty.display(self.db)),
+                                    );
+                                }
+                            }
+                            ty.bool(self.db)
+                        }
+                        // TODO: Also call the len method
+                        None => Truthiness::AlwaysTrue,
+                    }
+                } else {
+                    ty.bool(self.db)
+                };
+                bool_type.negate().into_type(self.db)
+            }
             (_, Type::Any) => Type::Any,
             (_, Type::Unknown) => Type::Unknown,
             (
