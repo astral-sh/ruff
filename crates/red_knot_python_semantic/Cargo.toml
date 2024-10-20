@@ -35,12 +35,12 @@ smallvec = { workspace = true }
 static_assertions = { workspace = true }
 test-case = { workspace = true }
 memchr = { workspace = true }
-dir-test = {workspace = true}
 
 [dev-dependencies]
 ruff_db = { workspace = true, features = ["os", "testing"] }
 ruff_python_parser = { workspace = true }
 red_knot_test = { workspace = true }
+dir-test = {workspace = true}
 red_knot_vendored = { workspace = true }
 
 anyhow = { workspace = true }
