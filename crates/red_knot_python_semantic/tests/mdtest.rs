@@ -16,5 +16,7 @@ fn mdtest(fixture: Fixture<&str>) {
         .canonicalize()
         .unwrap();
 
-    path.strip_prefix(crate_dir.to_str().unwrap()).unwrap_or(path).to_string();
+    path.strip_prefix(crate_dir.to_str().unwrap())
+        .unwrap_or(path)
+        .to_string();
 }
