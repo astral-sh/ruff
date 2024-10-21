@@ -7,7 +7,8 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for iterations over `set` literals.
+/// Checks for iteration over a `set` literal where each element in the set is
+/// itself a literal value.
 ///
 /// ## Why is this bad?
 /// Iterating over a `set` is less efficient than iterating over a sequence
