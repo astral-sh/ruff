@@ -3119,7 +3119,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// Performs lexicographic comparison between two slices of types.
     ///
     /// For lexicographic comparison, elements from both slices are compared pairwise using
-    /// `infer_binary_type_comparison`. If a conclusive result cannot be determined as a `BoolLiteral`,
+    /// `infer_binary_type_comparison`. If a conclusive result cannot be determined as a `BooleanLiteral`,
     /// it returns `bool`. Returns `None` if the comparison is not supported.
     fn infer_lexicographic_type_comparison(
         &mut self,
