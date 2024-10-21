@@ -52,7 +52,7 @@ pub fn run(path: &Path, title: &str) {
         }
     }
 
-    println!("{}\n", "-".repeat(50));
+    println!("\n{}\n", "-".repeat(50));
 
     assert!(!any_failures, "Some tests failed.");
 }
