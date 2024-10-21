@@ -25,5 +25,3 @@ quote.py:64:28: TCH004 [*] Move import `pandas.DataFrame` out of type-checking b
 65 66 | 
 66 67 |     def func(value: DataFrame):
 67 68 |         ...
-
-
