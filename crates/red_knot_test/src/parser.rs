@@ -1,5 +1,5 @@
 use memchr::memchr2;
-use regex::{Captures, Regex};
+use regex::{Captures, Match, Regex};
 use ruff_index::{newtype_index, IndexVec};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::LazyLock;
@@ -141,7 +141,7 @@ static HEADER_RE: LazyLock<Regex> =
 /// Matches a code block fenced by triple backticks, possibly with language and `key=val`
 /// configuration items following the opening backticks (in the "tag string" of the code block).
 static CODE_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^```(?<lang>(?-u:\w)+)(?<config>(?: +\S+)*)\s*\n(?<code>(?:.|\n)*?)\n?```\s*\n")
+    Regex::new(r"^```(?<lang>(?-u:\w)+)?(?<config>(?: +\S+)*)\s*\n(?<code>(?:.|\n)*?)\n?```\s*\n")
         .unwrap()
 });
 
@@ -244,8 +244,9 @@ impl<'s> Parser<'s> {
                         }
                     }
                     '`' => {
-                        if let Some(captures) = self.scan(&CODE_RE) {
+                        if let Some(captures) = CODE_RE.captures(self.unparsed) {
                             self.parse_code_block(&captures)?;
+                            self.unparsed = &self.unparsed[captures.get(0).unwrap().end()..];
                             continue;
                         }
                     }
@@ -328,8 +329,12 @@ impl<'s> Parser<'s> {
         self.files.push(EmbeddedFile {
             path,
             section: parent,
+            lang: captures
+                .name("lang")
+                .as_ref()
+                .map(Match::as_str)
+                .unwrap_or_default(),
             // CODE_RE can't match without matches for 'lang' and 'code'.
-            lang: captures.name("lang").unwrap().into(),
             code: captures.name("code").unwrap().into(),
         });
 
@@ -361,16 +366,6 @@ impl<'s> Parser<'s> {
             // We would have errored before pushing a child section if there were files, so we know
             // no parent section can have files.
             self.current_section_files = None;
-        }
-    }
-
-    /// Get capture groups and advance cursor past match if unparsed text matches `pattern`.
-    fn scan(&mut self, pattern: &Regex) -> Option<Captures<'s>> {
-        if let Some(captures) = pattern.captures(self.unparsed) {
-            self.unparsed = &self.unparsed[captures.get(0).unwrap().end()..];
-            Some(captures)
-        } else {
-            None
         }
     }
 }
@@ -486,7 +481,7 @@ mod tests {
         assert_eq!(test2.name(), "file.md - Two");
 
         let [main, foo] = test1.files().collect::<Vec<_>>()[..] else {
-            panic!("expected two file");
+            panic!("expected two files");
         };
 
         assert_eq!(main.path, "main.py");
@@ -549,6 +544,49 @@ mod tests {
         };
 
         assert_eq!(file.code, "x = 1\ny = 2");
+    }
+
+    #[test]
+    fn empty_file() {
+        let source = dedent(
+            "
+            ```py
+            ```
+            ",
+        );
+
+        let mf = super::parse("file.md", &source).unwrap();
+
+        let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
+            panic!("expected one test");
+        };
+        let [file] = test.files().collect::<Vec<_>>()[..] else {
+            panic!("expected one file");
+        };
+
+        assert_eq!(file.code, "");
+    }
+
+    #[test]
+    fn no_lang() {
+        let source = dedent(
+            "
+            ```
+            x = 10
+            ```
+            ",
+        );
+
+        let mf = super::parse("file.md", &source).unwrap();
+
+        let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
+            panic!("expected one test");
+        };
+        let [file] = test.files().collect::<Vec<_>>()[..] else {
+            panic!("expected one file");
+        };
+
+        assert_eq!(file.code, "x = 10");
     }
 
     #[test]
