@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF034.py:5:5: RUF034 Useless if-else condition
+RUF034.py:5:5: RUF034 [*] Useless if-else condition
   |
 4 | # Invalid
 5 | x = 1 if True else 1
@@ -9,8 +9,19 @@ RUF034.py:5:5: RUF034 Useless if-else condition
 6 | 
 7 | # Invalid
   |
+  = help: Assign `1` directly
 
-RUF034.py:8:5: RUF034 Useless if-else condition
+ℹ Safe fix
+2 2 | x = 1 if True else 2
+3 3 | 
+4 4 | # Invalid
+5   |-x = 1 if True else 1
+  5 |+x = 1
+6 6 | 
+7 7 | # Invalid
+8 8 | x = "a" if True else "a"
+
+RUF034.py:8:5: RUF034 [*] Useless if-else condition
    |
  7 | # Invalid
  8 | x = "a" if True else "a"
@@ -18,10 +29,63 @@ RUF034.py:8:5: RUF034 Useless if-else condition
  9 | 
 10 | # Invalid
    |
+   = help: Assign `"a"` directly
 
-RUF034.py:11:5: RUF034 Useless if-else condition
+ℹ Safe fix
+5 5 | x = 1 if True else 1
+6 6 | 
+7 7 | # Invalid
+8   |-x = "a" if True else "a"
+  8 |+x = "a"
+9 9 | 
+10 10 | # Invalid
+11 11 | x = 0.1 if False else 0.1
+
+RUF034.py:11:5: RUF034 [*] Useless if-else condition
    |
 10 | # Invalid
 11 | x = 0.1 if False else 0.1
    |     ^^^^^^^^^^^^^^^^^^^^^ RUF034
+12 | 
+13 | # Invalid (may contain side effects from dunder methods, so no autofixes given)
    |
+   = help: Assign `0.1` directly
+
+ℹ Safe fix
+8  8  | x = "a" if True else "a"
+9  9  | 
+10 10 | # Invalid
+11    |-x = 0.1 if False else 0.1
+   11 |+x = 0.1
+12 12 | 
+13 13 | # Invalid (may contain side effects from dunder methods, so no autofixes given)
+14 14 | x = 1 if x > 0.2 else 1
+
+RUF034.py:14:5: RUF034 Useless if-else condition
+   |
+13 | # Invalid (may contain side effects from dunder methods, so no autofixes given)
+14 | x = 1 if x > 0.2 else 1
+   |     ^^^^^^^^^^^^^^^^^^^ RUF034
+15 | x = 2 if x == 1 else 2
+16 | x = 3 if f(x) else 3
+   |
+   = help: Remove useless if-else condition
+
+RUF034.py:15:5: RUF034 Useless if-else condition
+   |
+13 | # Invalid (may contain side effects from dunder methods, so no autofixes given)
+14 | x = 1 if x > 0.2 else 1
+15 | x = 2 if x == 1 else 2
+   |     ^^^^^^^^^^^^^^^^^^ RUF034
+16 | x = 3 if f(x) else 3
+   |
+   = help: Remove useless if-else condition
+
+RUF034.py:16:5: RUF034 Useless if-else condition
+   |
+14 | x = 1 if x > 0.2 else 1
+15 | x = 2 if x == 1 else 2
+16 | x = 3 if f(x) else 3
+   |     ^^^^^^^^^^^^^^^^ RUF034
+   |
+   = help: Remove useless if-else condition
