@@ -38,7 +38,7 @@ pub fn run(path: &Path, title: &str) {
 
         if let Err(failures) = run_test(&mut db, &test) {
             any_failures = true;
-            println!("\n{}", test.name().bold().underline());
+            println!("\n{}\n", test.name().bold().underline());
 
             for by_line in failures {
                 for (line_number, failures) in by_line.iter() {
