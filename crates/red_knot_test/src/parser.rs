@@ -1,7 +1,7 @@
 use memchr::memchr2;
 use regex::{Captures, Match, Regex};
 use ruff_index::{newtype_index, IndexVec};
-use ruff_source_file::{LineIndex, OneIndexed};
+use ruff_source_file::LineIndex;
 use ruff_text_size::TextSize;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::LazyLock;
@@ -22,6 +22,9 @@ pub(crate) struct MarkdownTestSuite<'s> {
 
     /// Test files embedded within the Markdown file.
     files: IndexVec<EmbeddedFileId, EmbeddedFile<'s>>,
+
+    /// Line index of entire Markdown file
+    line_index: LineIndex,
 }
 
 impl<'s> MarkdownTestSuite<'s> {
@@ -30,6 +33,10 @@ impl<'s> MarkdownTestSuite<'s> {
             suite: self,
             current_file_index: 0,
         }
+    }
+
+    pub(crate) fn line_index(&self) -> &LineIndex {
+        &self.line_index
     }
 }
 
@@ -135,8 +142,8 @@ pub(crate) struct EmbeddedFile<'s> {
     pub(crate) lang: &'s str,
     pub(crate) code: &'s str,
 
-    /// The line number of the backticks in the markdown file
-    pub(crate) starting_line_number: OneIndexed,
+    /// The offset of the backticks in the markdown file
+    pub(crate) md_offset: TextSize,
 }
 
 /// Matches a sequence of `#` characters, followed by a title heading, followed by a newline.
@@ -235,6 +242,7 @@ impl<'s> Parser<'s> {
         MarkdownTestSuite {
             sections: self.sections,
             files: self.files,
+            line_index: self.line_index,
         }
     }
 
@@ -245,6 +253,15 @@ impl<'s> Parser<'s> {
             .ok_or_else(|| anyhow::anyhow!("Overflow when incrementing offset by {size}"))?;
 
         Ok(())
+    }
+
+    fn increment_captures(&mut self, captures: &Captures<'s>) -> anyhow::Result<()> {
+        self.increment_offset(
+            captures
+                .get(0)
+                .ok_or_else(|| anyhow::anyhow!("No captures found"))?
+                .len(),
+        )
     }
 
     fn parse_impl(&mut self) -> anyhow::Result<()> {
@@ -320,13 +337,6 @@ impl<'s> Parser<'s> {
 
         self.current_section_files = None;
 
-        self.increment_offset(
-            captures
-                .get(0)
-                .ok_or_else(|| anyhow::anyhow!("No captures found"))?
-                .len(),
-        )?;
-
         Ok(())
     }
 
@@ -365,7 +375,7 @@ impl<'s> Parser<'s> {
             // CODE_RE can't match without matches for 'lang' and 'code'.
             code: captures.name("code").unwrap().into(),
 
-            starting_line_number: self.line_index.line_index(self.md_offset),
+            md_offset: self.md_offset,
         });
 
         if let Some(current_files) = &mut self.current_section_files {
@@ -386,13 +396,6 @@ impl<'s> Parser<'s> {
         } else {
             self.current_section_files = Some(FxHashSet::from_iter([path]));
         }
-
-        self.increment_offset(
-            captures
-                .get(0)
-                .ok_or_else(|| anyhow::anyhow!("No captures found"))?
-                .len(),
-        )?;
 
         Ok(())
     }
