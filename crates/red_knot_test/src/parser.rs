@@ -1,5 +1,7 @@
 use regex::{Captures, Regex};
 use ruff_index::{newtype_index, IndexVec};
+use ruff_source_file::LineIndex;
+use ruff_text_size::TextSize;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::LazyLock;
 
@@ -19,6 +21,9 @@ pub(crate) struct MarkdownTestSuite<'s> {
 
     /// Test files embedded within the Markdown file.
     files: IndexVec<EmbeddedFileId, EmbeddedFile<'s>>,
+
+    /// Line index of entire Markdown file
+    line_index: LineIndex,
 }
 
 impl<'s> MarkdownTestSuite<'s> {
@@ -27,6 +32,10 @@ impl<'s> MarkdownTestSuite<'s> {
             suite: self,
             current_file_index: 0,
         }
+    }
+
+    pub(crate) fn line_index(&self) -> &LineIndex {
+        &self.line_index
     }
 }
 
@@ -131,6 +140,9 @@ pub(crate) struct EmbeddedFile<'s> {
     pub(crate) path: &'s str,
     pub(crate) lang: &'s str,
     pub(crate) code: &'s str,
+
+    /// The offset of the backticks in the markdown file
+    pub(crate) md_offset: TextSize,
 }
 
 /// Matches an arbitrary amount of whitespace (including newlines), followed by a sequence of `#`
@@ -186,6 +198,11 @@ struct Parser<'s> {
     /// The unparsed remainder of the Markdown source.
     unparsed: &'s str,
 
+    /// Current offset of the parser into the markdown file.
+    md_offset: TextSize,
+
+    line_index: LineIndex,
+
     /// Stack of ancestor sections.
     stack: SectionStack,
 
@@ -205,6 +222,8 @@ impl<'s> Parser<'s> {
             sections,
             files: IndexVec::default(),
             unparsed: source,
+            md_offset: TextSize::new(0),
+            line_index: LineIndex::from_source_text(source),
             stack: SectionStack::new(root_section_id),
             current_section_files: None,
         }
@@ -222,19 +241,41 @@ impl<'s> Parser<'s> {
         MarkdownTestSuite {
             sections: self.sections,
             files: self.files,
+            line_index: self.line_index,
         }
+    }
+
+    fn increment_offset(&mut self, size: usize) -> anyhow::Result<()> {
+        self.md_offset = self
+            .md_offset
+            .checked_add(size.try_into()?)
+            .ok_or_else(|| anyhow::anyhow!("Overflow when incrementing offset by {size}"))?;
+
+        Ok(())
+    }
+
+    fn increment_captures(&mut self, captures: &Captures<'s>) -> anyhow::Result<()> {
+        self.increment_offset(
+            captures
+                .get(0)
+                .ok_or_else(|| anyhow::anyhow!("No captures found"))?
+                .len(),
+        )
     }
 
     fn parse_impl(&mut self) -> anyhow::Result<()> {
         while !self.unparsed.is_empty() {
             if let Some(captures) = self.scan(&HEADER_RE) {
                 self.parse_header(&captures)?;
+                self.increment_captures(&captures)?;
             } else if let Some(captures) = self.scan(&CODE_RE) {
                 self.parse_code_block(&captures)?;
+                self.increment_captures(&captures)?;
             } else {
                 // ignore other Markdown syntax (paragraphs, etc) used as comments in the test
                 if let Some(next_newline) = self.unparsed.find('\n') {
                     (_, self.unparsed) = self.unparsed.split_at(next_newline + 1);
+                    self.increment_offset(next_newline + 1)?;
                 } else {
                     break;
                 }
@@ -303,6 +344,8 @@ impl<'s> Parser<'s> {
             // CODE_RE can't match without matches for 'lang' and 'code'.
             lang: captures.name("lang").unwrap().into(),
             code: captures.name("code").unwrap().into(),
+
+            md_offset: self.md_offset,
         });
 
         if let Some(current_files) = &mut self.current_section_files {
