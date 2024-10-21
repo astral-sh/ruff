@@ -667,6 +667,55 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Return true if this type is non-empty and all inhabitants of this type compare equal.
+    pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::None
+            | Type::Function(..)
+            | Type::Module(..)
+            | Type::Class(..)
+            | Type::IntLiteral(..)
+            | Type::BooleanLiteral(..)
+            | Type::StringLiteral(..)
+            | Type::BytesLiteral(..) => true,
+
+            Type::Tuple(tuple) => tuple
+                .elements(db)
+                .iter()
+                .all(|elem| elem.is_single_valued(db)),
+
+            Type::Instance(class_type) => match class_type.known(db) {
+                Some(KnownClass::NoneType) => true,
+                Some(
+                    KnownClass::Bool
+                    | KnownClass::Object
+                    | KnownClass::Bytes
+                    | KnownClass::Type
+                    | KnownClass::Int
+                    | KnownClass::Float
+                    | KnownClass::Str
+                    | KnownClass::List
+                    | KnownClass::Tuple
+                    | KnownClass::Set
+                    | KnownClass::Dict
+                    | KnownClass::GenericAlias
+                    | KnownClass::ModuleType
+                    | KnownClass::FunctionType,
+                ) => false,
+                None => false,
+            },
+
+            Type::Any
+            | Type::Never
+            | Type::Unknown
+            | Type::Unbound
+            | Type::Todo
+            | Type::Union(..)
+            | Type::Intersection(..)
+            | Type::LiteralString => false,
+        }
+    }
+
     /// Resolve a member access of a type.
     ///
     /// For example, if `foo` is `Type::Instance(<Bar>)`,
@@ -1963,6 +2012,31 @@ mod tests {
         let db = setup_db();
 
         assert!(from.into_type(&db).is_singleton());
+    }
+
+    #[test_case(Ty::None)]
+    #[test_case(Ty::BooleanLiteral(true))]
+    #[test_case(Ty::IntLiteral(1))]
+    #[test_case(Ty::StringLiteral("abc"))]
+    #[test_case(Ty::BytesLiteral("abc"))]
+    #[test_case(Ty::Tuple(vec![]))]
+    #[test_case(Ty::Tuple(vec![Ty::BooleanLiteral(true), Ty::IntLiteral(1)]))]
+    fn is_single_valued(from: Ty) {
+        let db = setup_db();
+
+        assert!(from.into_type(&db).is_single_valued(&db));
+    }
+
+    #[test_case(Ty::Never)]
+    #[test_case(Ty::Any)]
+    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]))]
+    #[test_case(Ty::Tuple(vec![Ty::None, Ty::BuiltinInstance("int")]))]
+    #[test_case(Ty::BuiltinInstance("str"))]
+    #[test_case(Ty::LiteralString)]
+    fn is_not_single_valued(from: Ty) {
+        let db = setup_db();
+
+        assert!(!from.into_type(&db).is_single_valued(&db));
     }
 
     #[test_case(Ty::Never)]
