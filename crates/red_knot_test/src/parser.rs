@@ -134,15 +134,14 @@ pub(crate) struct EmbeddedFile<'s> {
     pub(crate) code: &'s str,
 }
 
-/// Matches an arbitrary amount of whitespace (including newlines), followed by a sequence of `#`
-/// characters, followed by a title heading, followed by a newline.
+/// Matches a sequence of `#` characters, followed by a title heading, followed by a newline.
 static HEADER_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^(?<level>#+)\s+(?<title>.+)\s*\n").unwrap());
 
 /// Matches a code block fenced by triple backticks, possibly with language and `key=val`
 /// configuration items following the opening backticks (in the "tag string" of the code block).
 static CODE_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^```(?<lang>(?-u:\w)+)(?<config>( +\S+)*)\s*\n(?<code>(.|\n)*?)\n?```\s*\n")
+    Regex::new(r"^```(?<lang>(?-u:\w)+)(?<config>(?: +\S+)*)\s*\n(?<code>(?:.|\n)*?)\n?```\s*\n")
         .unwrap()
 });
 
