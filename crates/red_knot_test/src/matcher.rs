@@ -41,6 +41,20 @@ impl FailuresByLine {
     fn is_empty(&self) -> bool {
         self.lines.is_empty()
     }
+
+    pub(crate) fn offset_errors(self, offset: OneIndexed) -> Self {
+        Self {
+            failures: self.failures,
+            lines: self
+                .lines
+                .into_iter()
+                .map(|line_failures| LineFailures {
+                    line_number: line_failures.line_number.saturating_add(offset.get()),
+                    range: line_failures.range,
+                })
+                .collect(),
+        }
+    }
 }
 
 #[derive(Debug)]

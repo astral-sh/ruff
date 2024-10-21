@@ -7,7 +7,7 @@ use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 use ruff_source_file::OneIndexed;
 use std::path::Path;
 
-type Failures = Vec<(AbsoluteLineNumberPath, matcher::FailuresByLine)>;
+type Failures = Vec<matcher::FailuresByLine>;
 
 mod assertion;
 mod db;
@@ -38,16 +38,12 @@ pub fn run(path: &Path, title: &str) {
 
         if let Err(failures) = run_test(&mut db, &test) {
             any_failures = true;
-            println!("\n{}\n", test.name().bold().underline());
+            println!("\n{}", test.name().bold().underline());
 
-            for (contextual_path, by_line) in failures {
-                println!("{}", contextual_path.path.as_str().bold());
+            for by_line in failures {
                 for (line_number, failures) in by_line.iter() {
                     for failure in failures {
-                        let absolute_line_number = contextual_path
-                            .starting_line_number
-                            .saturating_add(line_number.try_into().unwrap());
-                        let line_info = format!("{title}:{absolute_line_number}").cyan();
+                        let line_info = format!("{title}:{line_number}").cyan();
 
                         println!("    {line_info} {failure}");
                     }
@@ -87,7 +83,8 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
         });
     }
 
-    let mut failures = vec![];
+    let mut failures = Vec::with_capacity(paths.len());
+    paths.sort_by(|a, b| a.starting_line_number.cmp(&b.starting_line_number));
 
     for contextual_path in paths {
         let file = system_path_to_file(db, contextual_path.path.clone()).unwrap();
@@ -102,14 +99,18 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures
             parsed.errors()
         );
 
-        matcher::match_file(db, file, check_types(db, file)).unwrap_or_else(|line_failures| {
-            failures.push((contextual_path, line_failures));
-        });
+        match matcher::match_file(db, file, check_types(db, file)) {
+            Ok(()) => {}
+            Err(line_failures) => {
+                failures.push(line_failures.offset_errors(contextual_path.starting_line_number));
+            }
+        }
     }
+
     if failures.is_empty() {
         Ok(())
     } else {
-        failures.sort_by(|(a, _), (b, _)| a.path.cmp(&b.path));
+        failures.shrink_to_fit();
         Err(failures)
     }
 }
