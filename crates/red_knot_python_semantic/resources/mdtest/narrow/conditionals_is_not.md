@@ -42,8 +42,8 @@ if x is not y:
 The type guard removes `False` from the union type of the tested value only.
 
 ```py
-x = True if flag else False
-y = True if flag else False
+x = True if x_flag else False
+y = True if y_flag else False
 
 reveal_type(x)  # revealed: bool
 reveal_type(y)  # revealed: bool

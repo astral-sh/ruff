@@ -29,8 +29,8 @@ reveal_type(y)  # revealed: A | None
 ## `is` in chained comparisons
 
 ```py
-x = True if flag else False
-y = True if flag else False
+x = True if x_flag else False
+y = True if y_flag else False
 
 reveal_type(x)  # revealed: bool
 reveal_type(y)  # revealed: bool
