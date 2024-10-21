@@ -135,7 +135,7 @@ pub(crate) struct EmbeddedFile<'s> {
     pub(crate) lang: &'s str,
     pub(crate) code: &'s str,
 
-    /// The line number of the ``` in the markdown file
+    /// The line number of the backticks in the markdown file
     pub(crate) starting_line_number: OneIndexed,
 }
 
@@ -217,7 +217,7 @@ impl<'s> Parser<'s> {
             files: IndexVec::default(),
             unparsed: source,
             md_offset: TextSize::new(0),
-            line_index: LineIndex::from_source_text(&source),
+            line_index: LineIndex::from_source_text(source),
             stack: SectionStack::new(root_section_id),
             current_section_files: None,
         }
