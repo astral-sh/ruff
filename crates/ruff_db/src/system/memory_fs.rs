@@ -351,6 +351,17 @@ impl MemoryFileSystem {
 
         Ok(ReadDirectory::new(collected))
     }
+
+    /// Removes all files and directories except the current working directory.
+    pub fn remove_all(&self) {
+        self.inner.virtual_files.write().unwrap().clear();
+
+        self.inner
+            .by_path
+            .write()
+            .unwrap()
+            .retain(|key, _| key == self.inner.cwd.as_utf8_path());
+    }
 }
 
 impl Default for MemoryFileSystem {

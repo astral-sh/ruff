@@ -2,13 +2,13 @@ use red_knot_python_semantic::{
     Db as SemanticDb, Program, ProgramSettings, PythonVersion, SearchPathSettings,
 };
 use ruff_db::files::{File, Files};
-use ruff_db::system::SystemPathBuf;
-use ruff_db::system::{DbWithTestSystem, System, TestSystem};
+use ruff_db::system::{DbWithTestSystem, System, SystemPath, SystemPathBuf, TestSystem};
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Upcast};
 
 #[salsa::db]
 pub(crate) struct Db {
+    workspace_root: SystemPathBuf,
     storage: salsa::Storage<Self>,
     files: Files,
     system: TestSystem,
@@ -18,6 +18,7 @@ pub(crate) struct Db {
 impl Db {
     pub(crate) fn setup(workspace_root: SystemPathBuf) -> Self {
         let db = Self {
+            workspace_root,
             storage: salsa::Storage::default(),
             system: TestSystem::default(),
             vendored: red_knot_vendored::file_system().clone(),
@@ -25,19 +26,23 @@ impl Db {
         };
 
         db.memory_file_system()
-            .create_directory_all(&workspace_root)
+            .create_directory_all(&db.workspace_root)
             .unwrap();
 
         Program::from_settings(
             &db,
             &ProgramSettings {
                 target_version: PythonVersion::default(),
-                search_paths: SearchPathSettings::new(workspace_root),
+                search_paths: SearchPathSettings::new(db.workspace_root.clone()),
             },
         )
         .expect("Invalid search path settings");
 
         db
+    }
+
+    pub(crate) fn workspace_root(&self) -> &SystemPath {
+        &self.workspace_root
     }
 }
 
