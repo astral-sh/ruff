@@ -1,6 +1,6 @@
 use std::fmt;
 use std::fmt::{Debug, Formatter};
-use std::num::{IntErrorKind, NonZeroUsize, ParseIntError, TryFromIntError};
+use std::num::{NonZeroUsize, ParseIntError};
 use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -394,6 +394,18 @@ impl OneIndexed {
             None => Self::MIN,
         }
     }
+
+    /// Checked addition. Returns `None` if overflow occurred.
+    #[must_use]
+    pub fn checked_add(self, rhs: Self) -> Option<Self> {
+        self.0.checked_add(rhs.0.get()).map(Self)
+    }
+
+    /// Checked subtraction. Returns `None` if overflow occurred.
+    #[must_use]
+    pub fn checked_sub(self, rhs: Self) -> Option<Self> {
+        self.0.get().checked_sub(rhs.get()).and_then(Self::new)
+    }
 }
 
 impl fmt::Display for OneIndexed {
@@ -415,22 +427,6 @@ impl FromStr for OneIndexed {
     type Err = ParseIntError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(OneIndexed(NonZeroUsize::from_str(s)?))
-    }
-}
-
-impl TryFrom<usize> for OneIndexed {
-    type Error = TryFromIntError;
-
-    fn try_from(value: usize) -> Result<Self, Self::Error> {
-        Ok(OneIndexed(NonZeroUsize::try_from(value)?))
-    }
-}
-
-impl TryInto<usize> for OneIndexed {
-    type Error = IntErrorKind;
-
-    fn try_into(self) -> Result<usize, Self::Error> {
-        Ok(self.0.get())
     }
 }
 

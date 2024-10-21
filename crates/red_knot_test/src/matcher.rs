@@ -49,14 +49,10 @@ impl FailuresByLine {
                 .lines
                 .into_iter()
                 .map(|line_failures| LineFailures {
-                    line_number: OneIndexed::try_from(
-                        line_failures
-                            .line_number
-                            .get()
-                            .checked_add(offset.get())
-                            .unwrap(),
-                    )
-                    .unwrap(),
+                    line_number: line_failures
+                        .line_number
+                        .checked_add(offset)
+                        .expect("The number of lines in a test file should fit into a `usize`"),
                     range: line_failures.range,
                 })
                 .collect(),
