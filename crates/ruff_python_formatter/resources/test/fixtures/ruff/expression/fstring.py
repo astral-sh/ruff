@@ -94,6 +94,8 @@ x = f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa { # comment 8
                                              "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb" } ccccccccccccccc"
 x = f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa { # comment 9
                                              "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb" = } ccccccccccccccc"
+x = f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa { # comment 9
+                                             'bbbbbbbbbbbbbbbbbbbbbbbbbbbbb' = } ccccccccccccccc"
 
 # Multiple larger expressions which exceeds the line length limit. Here, we need to decide
 # whether to split at the first or second expression. This should work similarly to the
@@ -144,18 +146,37 @@ xxxxxxx = f"{
     {'aaaaaaaaaaaaaaaaaaaaaaaaa', 'bbbbbbbbbbbbbbbbbbbbbbbbbbb', 'cccccccccccccccccccccccccc'}
 }"
 
+#############################################################################################
 # Quotes
+#############################################################################################
 f"foo 'bar' {x}"
 f"foo \"bar\" {x}"
 f'foo "bar" {x}'
 f'foo \'bar\' {x}'
 f"foo {"bar"}"
-f"foo {'\'bar\''}"
+
+f"single quoted '{x}' double quoted \"{x}\"" # Same number of quotes => use preferred quote style
+f"single quote ' {x} double quoted \"{x}\""  # More double quotes => use single quotes
+f"single quoted '{x}' double quote \" {x}"  # More single quotes => use double quotes
+
+fr"single quotes ' {x}"  # Keep double because `'` can't be escaped
+fr'double quotes " {x}'  # Keep single because `"` can't be escaped
+fr'flip quotes {x}'  # Use preferred quotes, because raw string contains now quotes.
 
 # Here, the formatter will remove the escapes which is correct because they aren't allowed
 # pre 3.12. This means we can assume that the f-string is used in the context of 3.12.
+f"foo {'\'bar\''}"
 f"foo {'\"bar\"'}"
 
+# Quotes inside the expressions have no impact on the quote selection of the outer string.
+# Required so that the following two examples result in the same formatting.
+f'foo {10 + len("bar")}'
+f"foo {10 + len('bar')}"
+
+# Pre 312, preserve the outer quotes if the f-string contains quotes in the debug expression
+f'foo {10 + len("bar")=}'
+f'''foo {10 + len('''bar''')=}'''
+f'''foo {10 + len('bar')=}'''  # Fine to change the quotes because it uses triple quotes
 
 # Triple-quoted strings
 # It's ok to use the same quote char for the inner string if it's single-quoted.
@@ -163,6 +184,10 @@ f"""test {'inner'}"""
 f"""test {"inner"}"""
 # But if the inner string is also triple-quoted then we should preserve the existing quotes.
 f"""test {'''inner'''}"""
+
+# Not valid Pre 3.12
+f"""test {f'inner {'''inner inner'''}'}"""
+f"""test {f'''inner {"""inner inner"""}'''}"""
 
 # Magic trailing comma
 #
@@ -312,6 +337,6 @@ hello {
 # Implicit concatenated f-string containing quotes
 _ = (
     'This string should change its quotes to double quotes'
-    f'This string uses double quotes in an expression {"woah"}'
+    f'This string uses double quotes in an expression {"it's a quote"}'
     f'This f-string does not use any quotes.'
 )
