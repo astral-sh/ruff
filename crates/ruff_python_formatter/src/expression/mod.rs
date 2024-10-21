@@ -21,6 +21,7 @@ use crate::expression::parentheses::{
 use crate::prelude::*;
 use crate::preview::{
     is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled,
+    is_f_string_implicit_concatenated_string_literal_quotes_enabled,
     is_hug_parens_with_braces_and_square_brackets_enabled,
 };
 
@@ -768,15 +769,26 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. })
                 if value.is_implicit_concatenated() =>
             {
-                self.update_max_precedence(OperatorPrecedence::String);
+                if !is_f_string_implicit_concatenated_string_literal_quotes_enabled(self.context) {
+                    self.update_max_precedence(OperatorPrecedence::String);
+                }
+
+                return;
             }
             Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. })
                 if value.is_implicit_concatenated() =>
             {
-                self.update_max_precedence(OperatorPrecedence::String);
+                if !is_f_string_implicit_concatenated_string_literal_quotes_enabled(self.context) {
+                    self.update_max_precedence(OperatorPrecedence::String);
+                }
+
+                return;
             }
             Expr::FString(ast::ExprFString { value, .. }) if value.is_implicit_concatenated() => {
-                self.update_max_precedence(OperatorPrecedence::String);
+                if !is_f_string_implicit_concatenated_string_literal_quotes_enabled(self.context) {
+                    self.update_max_precedence(OperatorPrecedence::String);
+                }
+
                 return;
             }
 

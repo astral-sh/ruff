@@ -196,6 +196,8 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
                 quote_selection.flags,
                 // TODO: Remove the `b'{'` in `choose_quotes` when promoting the
                 // `format_fstring` preview style
+                false,
+                false,
                 is_f_string_formatting_enabled(self.context),
             )
         } else {
@@ -235,6 +237,16 @@ pub(crate) struct QuoteMetadata {
 /// Tracks information about the used quotes in a string which is used
 /// to choose the quotes for a part.
 impl QuoteMetadata {
+    pub(crate) fn from_part(
+        part: StringLikePart,
+        preferred_quote: Quote,
+        context: &PyFormatContext,
+    ) -> Self {
+        let text = context.locator().slice(part.content_range());
+
+        Self::from_str(text, part.flags(), preferred_quote)
+    }
+
     pub(crate) fn from_str(text: &str, flags: AnyStringFlags, preferred_quote: Quote) -> Self {
         let kind = if flags.is_raw_string() {
             QuoteMetadataKind::raw(text, preferred_quote, flags.is_triple_quoted())
@@ -274,6 +286,31 @@ impl QuoteMetadata {
                 Ordering::Equal => preferred_quote,
                 Ordering::Greater => Quote::Double,
             },
+        }
+    }
+
+    pub(super) fn merge(self, other: &QuoteMetadata) -> Option<QuoteMetadata> {
+        match (self.kind, other.kind) {
+            (
+                QuoteMetadataKind::Regular {
+                    single_quotes: self_single,
+                    double_quotes: self_double,
+                },
+                QuoteMetadataKind::Regular {
+                    single_quotes: other_single,
+                    double_quotes: other_double,
+                },
+            ) => Some(Self {
+                kind: QuoteMetadataKind::Regular {
+                    single_quotes: self_single + other_single,
+                    double_quotes: self_double + other_double,
+                },
+                source_style: self.source_style,
+            }),
+            // Can't merge quotes from raw strings (even when both strings are raw)
+            (QuoteMetadataKind::Raw { .. }, _) | (_, QuoteMetadataKind::Raw { .. }) => None,
+            // Can't merge quotes from triple quoted strings (even when both strings are triple quoted)
+            (QuoteMetadataKind::Triple { .. }, _) | (_, QuoteMetadataKind::Triple { .. }) => None,
         }
     }
 }
@@ -481,6 +518,8 @@ pub(crate) fn normalize_string(
     input: &str,
     start_offset: usize,
     new_flags: AnyStringFlags,
+    escape_braces: bool,
+    flip_nested_fstring_quotes: bool,
     format_f_string: bool,
 ) -> Cow<str> {
     // The normalized string if `input` is not yet normalized.
@@ -503,16 +542,24 @@ pub(crate) fn normalize_string(
 
     while let Some((index, c)) = chars.next() {
         if matches!(c, '{' | '}') && is_fstring {
-            if chars.peek().copied().is_some_and(|(_, next)| next == c) {
-                // Skip over the second character of the double braces
-                chars.next();
-            } else if c == '{' {
-                formatted_value_nesting += 1;
-            } else {
-                // Safe to assume that `c == '}'` here because of the matched pattern above
-                formatted_value_nesting = formatted_value_nesting.saturating_sub(1);
+            if escape_braces {
+                // Escape `{` and `}` when converting a regular string literal to an f-string literal.
+                output.push_str(&input[last_index..=index]);
+                output.push(c);
+                last_index = index + c.len_utf8();
+                continue;
+            } else if is_fstring {
+                if chars.peek().copied().is_some_and(|(_, next)| next == c) {
+                    // Skip over the second character of the double braces
+                    chars.next();
+                } else if c == '{' {
+                    formatted_value_nesting += 1;
+                } else {
+                    // Safe to assume that `c == '}'` here because of the matched pattern above
+                    formatted_value_nesting = formatted_value_nesting.saturating_sub(1);
+                }
+                continue;
             }
-            continue;
         }
 
         if c == '\r' {
@@ -579,6 +626,14 @@ pub(crate) fn normalize_string(
                 output.push_str(&input[last_index..index]);
                 output.push('\\');
                 output.push(c);
+                last_index = index + preferred_quote.len_utf8();
+            } else if c == preferred_quote
+                && flip_nested_fstring_quotes
+                && formatted_value_nesting > 0
+            {
+                // Flip the quotes
+                output.push_str(&input[last_index..index]);
+                output.push(opposite_quote);
                 last_index = index + preferred_quote.len_utf8();
             }
         }
@@ -744,6 +799,7 @@ mod tests {
 
     use super::UnicodeEscape;
     use crate::string::normalize_string;
+    use ruff_python_ast::str_prefix::FStringPrefix;
     use ruff_python_ast::{
         str::Quote,
         str_prefix::{AnyStringPrefix, ByteStringPrefix},
@@ -772,9 +828,35 @@ mod tests {
                 Quote::Double,
                 false,
             ),
+            false,
+            false,
             true,
         );
 
         assert_eq!(r"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a", &normalized);
+    }
+
+    #[test]
+    fn normalize_nested_fstring() {
+        let input =
+            r#"With single quote: '  {my_dict['foo']} With double quote: "  {my_dict["bar"]}"#;
+
+        let normalized = normalize_string(
+            input,
+            0,
+            AnyStringFlags::new(
+                AnyStringPrefix::Format(FStringPrefix::Regular),
+                Quote::Double,
+                false,
+            ),
+            false,
+            true,
+            false,
+        );
+
+        assert_eq!(
+            "With single quote: '  {my_dict['foo']} With double quote: \\\"  {my_dict['bar']}",
+            &normalized
+        );
     }
 }
