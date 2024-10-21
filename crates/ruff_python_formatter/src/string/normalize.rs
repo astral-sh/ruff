@@ -53,14 +53,6 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
                     return QuoteStyle::Preserve;
                 }
 
-                if let FStringState::InsideExpressionElement(parent_context) =
-                    self.context.f_string_state()
-                {
-                    return QuoteStyle::from(
-                        parent_context.f_string().flags().quote_style().opposite(),
-                    );
-                }
-
                 // Per PEP 8, always prefer double quotes for triple-quoted strings.
                 // Except when using quote-style-preserve.
                 if string.flags().is_triple_quoted() {
@@ -115,6 +107,20 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
                         QuoteStyle::Double
                     }
                 } else {
+                    // For f-strings prefer alternating the quotes unless it's a triple quoted string,
+                    // then prefer using the preferred quotes.
+                    if let FStringState::InsideExpressionElement(parent_context) =
+                        self.context.f_string_state()
+                    {
+                        let parent_flags = parent_context.f_string().flags();
+
+                        if !parent_flags.is_triple_quoted() {
+                            return QuoteStyle::from(
+                                parent_context.f_string().flags().quote_style().opposite(),
+                            );
+                        }
+                    }
+
                     preferred_quote_style
                 }
             }
@@ -275,7 +281,10 @@ impl QuoteMetadata {
             StringLikePart::FString(fstring) => {
                 // TODO: Should we limit this behavior to Post 312?
                 if is_f_string_formatting_enabled(context) {
-                    let mut literals = fstring.elements.iter().filter_map(FStringElement::as_literal);
+                    let mut literals = fstring
+                        .elements
+                        .iter()
+                        .filter_map(FStringElement::as_literal);
 
                     let Some(first) = literals.next() else {
                         return QuoteMetadata::from_str("", part.flags(), preferred_quote);

@@ -399,9 +399,9 @@ result_f = (
 )
 
 # https://github.com/astral-sh/ruff/issues/6841
-x = f"""a{''}b"""
+x = f"""a{""}b"""
 y = f'''c{1}d"""e'''
-z = f"""a{''}b""" f'''c{1}d"""e'''
+z = f"""a{""}b""" f'''c{1}d"""e'''
 
 # F-String formatting test cases (Preview)
 
@@ -511,10 +511,10 @@ f"foo {'"bar"'}"
 
 # Triple-quoted strings
 # It's ok to use the same quote char for the inner string if it's single-quoted.
-f"""test {'inner'}"""
-f"""test {'inner'}"""
+f"""test {"inner"}"""
+f"""test {"inner"}"""
 # But if the inner string is also triple-quoted then we should preserve the existing quotes.
-f"""test {'''inner'''}"""
+f"""test {"""inner"""}"""
 
 # Magic trailing comma
 #
@@ -616,10 +616,10 @@ x = f"""
 # Here, the debug expression is in a nested f-string so we should start preserving
 # whitespaces from that point onwards. This means we should format the outer f-string.
 x = f"""{
-    'foo '  # comment 24
-    + f'{   x =
+    "foo "  # comment 24
+    + f"{   x =
 
-       }'  # comment 25
+       }"  # comment 25
 }
         """
 
@@ -641,19 +641,19 @@ if indent0:
         if indent2:
             foo = f"""hello world
 hello {
-                f'aaaaaaa {
+                f"aaaaaaa {
                     [
-                        "aaaaaaaaaaaaaaaaaaaaa",
-                        "bbbbbbbbbbbbbbbbbbbbb",
-                        "ccccccccccccccccccccc",
-                        "ddddddddddddddddddddd",
+                        'aaaaaaaaaaaaaaaaaaaaa',
+                        'bbbbbbbbbbbbbbbbbbbbb',
+                        'ccccccccccccccccccccc',
+                        'ddddddddddddddddddddd',
                     ]
-                } bbbbbbbb'
+                } bbbbbbbb"
                 + [
-                    'aaaaaaaaaaaaaaaaaaaaa',
-                    'bbbbbbbbbbbbbbbbbbbbb',
-                    'ccccccccccccccccccccc',
-                    'ddddddddddddddddddddd',
+                    "aaaaaaaaaaaaaaaaaaaaa",
+                    "bbbbbbbbbbbbbbbbbbbbb",
+                    "ccccccccccccccccccccc",
+                    "ddddddddddddddddddddd",
                 ]
             } --------
 """
@@ -1022,18 +1022,6 @@ _ = (
      "    f()\n"
      # XXX: The following line changes depending on whether the tests
      # are run through the interactive interpreter or with -m
-@@ -57,9 +57,9 @@
- )
- 
- # https://github.com/astral-sh/ruff/issues/6841
--x = f"""a{""}b"""
-+x = f"""a{''}b"""
- y = f'''c{1}d"""e'''
--z = f"""a{""}b""" f'''c{1}d"""e'''
-+z = f"""a{''}b""" f'''c{1}d"""e'''
- 
- # F-String formatting test cases (Preview)
- 
 @@ -67,64 +67,72 @@
  x = f"{a}"
  x = f"{
@@ -1144,7 +1132,7 @@ _ = (
  }"
  
  # Quotes
-@@ -147,18 +159,18 @@
+@@ -147,20 +159,20 @@
  f'foo "bar" {x}'
  f'foo "bar" {x}'
  f"foo 'bar' {x}"
@@ -1161,12 +1149,15 @@ _ = (
  
  # Triple-quoted strings
  # It's ok to use the same quote char for the inner string if it's single-quoted.
- f"""test {'inner'}"""
--f"""test {"inner"}"""
-+f"""test {'inner'}"""
+-f"""test {'inner'}"""
+ f"""test {"inner"}"""
++f"""test {"inner"}"""
  # But if the inner string is also triple-quoted then we should preserve the existing quotes.
- f"""test {'''inner'''}"""
+-f"""test {'''inner'''}"""
++f"""test {"""inner"""}"""
  
+ # Magic trailing comma
+ #
 @@ -171,63 +183,66 @@
  f"aaaaaaa {['aaaaaaaaaaaaaaa', 'bbbbbbbbbbbbb', 'ccccccccccccccccc', 'ddddddddddddddd', 'eeeeeeeeeeeeee']} aaaaaaa"
  
@@ -1301,12 +1292,12 @@ _ = (
 -x = f"""{"foo " +    # comment 24
 -    f"{   x =
 +x = f"""{
-+    'foo '  # comment 24
-+    + f'{   x =
++    "foo "  # comment 24
++    + f"{   x =
  
 -       }"    # comment 25
 - }
-+       }'  # comment 25
++       }"  # comment 25
 +}
          """
  
@@ -1341,19 +1332,19 @@ _ = (
 -              'ddddddddddddddddddddd'
 -          ]
 -      } --------
-+                f'aaaaaaa {
++                f"aaaaaaa {
 +                    [
-+                        "aaaaaaaaaaaaaaaaaaaaa",
-+                        "bbbbbbbbbbbbbbbbbbbbb",
-+                        "ccccccccccccccccccccc",
-+                        "ddddddddddddddddddddd",
++                        'aaaaaaaaaaaaaaaaaaaaa',
++                        'bbbbbbbbbbbbbbbbbbbbb',
++                        'ccccccccccccccccccccc',
++                        'ddddddddddddddddddddd',
 +                    ]
-+                } bbbbbbbb'
++                } bbbbbbbb"
 +                + [
-+                    'aaaaaaaaaaaaaaaaaaaaa',
-+                    'bbbbbbbbbbbbbbbbbbbbb',
-+                    'ccccccccccccccccccccc',
-+                    'ddddddddddddddddddddd',
++                    "aaaaaaaaaaaaaaaaaaaaa",
++                    "bbbbbbbbbbbbbbbbbbbbb",
++                    "ccccccccccccccccccccc",
++                    "ddddddddddddddddddddd",
 +                ]
 +            } --------
  """
