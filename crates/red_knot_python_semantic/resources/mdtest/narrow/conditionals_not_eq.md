@@ -42,15 +42,17 @@ if C != A:
     reveal_type(C)  # revealed: Literal[B]
 ```
 
-## `!=` for non-singleton types
+## `!=` for non-single-valued types
 
-Non-singleton types should *not* narrow the type: two instances of a
-non-singleton class may occupy different addresses in memory even if
-they compare equal.
+Only single-valued types should narrow the type:
 
 ```py
-x = 1
+def int_instance() -> int: ...
 
-if x != 0:
-    reveal_type(x)  # revealed: Literal[1]
+
+x = int_instance() if flag else None
+y = int_instance()
+
+if x != y:
+    reveal_type(x)  # revealed: int | None
 ```
