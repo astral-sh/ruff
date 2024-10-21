@@ -1756,7 +1756,7 @@ mod tests {
         None,
         Any,
         IntLiteral(i64),
-        BoolLiteral(bool),
+        BooleanLiteral(bool),
         StringLiteral(&'static str),
         LiteralString,
         BytesLiteral(&'static str),
@@ -1775,7 +1775,7 @@ mod tests {
                 Ty::Any => Type::Any,
                 Ty::IntLiteral(n) => Type::IntLiteral(n),
                 Ty::StringLiteral(s) => Type::StringLiteral(StringLiteralType::new(db, s)),
-                Ty::BoolLiteral(b) => Type::BooleanLiteral(b),
+                Ty::BooleanLiteral(b) => Type::BooleanLiteral(b),
                 Ty::LiteralString => Type::LiteralString,
                 Ty::BytesLiteral(s) => Type::BytesLiteral(BytesLiteralType::new(db, s.as_bytes())),
                 Ty::BuiltinInstance(s) => builtins_symbol_ty(db, s).to_instance(db),
@@ -1872,17 +1872,17 @@ mod tests {
     #[test_case(Ty::Never, Ty::Never)]
     #[test_case(Ty::Never, Ty::None)]
     #[test_case(Ty::Never, Ty::BuiltinInstance("int"))]
-    #[test_case(Ty::None, Ty::BoolLiteral(true))]
+    #[test_case(Ty::None, Ty::BooleanLiteral(true))]
     #[test_case(Ty::None, Ty::IntLiteral(1))]
     #[test_case(Ty::None, Ty::StringLiteral("test"))]
     #[test_case(Ty::None, Ty::BytesLiteral("test"))]
     #[test_case(Ty::None, Ty::LiteralString)]
     #[test_case(Ty::None, Ty::BuiltinInstance("int"))]
     #[test_case(Ty::None, Ty::Tuple(vec![Ty::None]))]
-    #[test_case(Ty::BoolLiteral(true), Ty::BoolLiteral(false))]
-    #[test_case(Ty::BoolLiteral(true), Ty::Tuple(vec![Ty::None]))]
-    #[test_case(Ty::BoolLiteral(true), Ty::IntLiteral(1))]
-    #[test_case(Ty::BoolLiteral(false), Ty::IntLiteral(0))]
+    #[test_case(Ty::BooleanLiteral(true), Ty::BooleanLiteral(false))]
+    #[test_case(Ty::BooleanLiteral(true), Ty::Tuple(vec![Ty::None]))]
+    #[test_case(Ty::BooleanLiteral(true), Ty::IntLiteral(1))]
+    #[test_case(Ty::BooleanLiteral(false), Ty::IntLiteral(0))]
     #[test_case(Ty::IntLiteral(1), Ty::IntLiteral(2))]
     #[test_case(Ty::IntLiteral(1), Ty::Tuple(vec![Ty::None]))]
     #[test_case(Ty::StringLiteral("a"), Ty::StringLiteral("b"))]
@@ -1911,10 +1911,10 @@ mod tests {
     #[test_case(Ty::None, Ty::BuiltinInstance("object"))]
     #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinInstance("int"))]
     #[test_case(Ty::BuiltinInstance("str"), Ty::LiteralString)]
-    #[test_case(Ty::BoolLiteral(true), Ty::BoolLiteral(true))]
-    #[test_case(Ty::BoolLiteral(false), Ty::BoolLiteral(false))]
-    #[test_case(Ty::BoolLiteral(true), Ty::BuiltinInstance("bool"))]
-    #[test_case(Ty::BoolLiteral(true), Ty::BuiltinInstance("int"))]
+    #[test_case(Ty::BooleanLiteral(true), Ty::BooleanLiteral(true))]
+    #[test_case(Ty::BooleanLiteral(false), Ty::BooleanLiteral(false))]
+    #[test_case(Ty::BooleanLiteral(true), Ty::BuiltinInstance("bool"))]
+    #[test_case(Ty::BooleanLiteral(true), Ty::BuiltinInstance("int"))]
     #[test_case(Ty::IntLiteral(1), Ty::IntLiteral(1))]
     #[test_case(Ty::StringLiteral("a"), Ty::StringLiteral("a"))]
     #[test_case(Ty::StringLiteral("a"), Ty::LiteralString)]
@@ -1957,8 +1957,8 @@ mod tests {
     }
 
     #[test_case(Ty::None)]
-    #[test_case(Ty::BoolLiteral(true))]
-    #[test_case(Ty::BoolLiteral(false))]
+    #[test_case(Ty::BooleanLiteral(true))]
+    #[test_case(Ty::BooleanLiteral(false))]
     fn is_singleton(from: Ty) {
         let db = setup_db();
 
@@ -1971,7 +1971,7 @@ mod tests {
     #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]))]
     #[test_case(Ty::Tuple(vec![]))]
     #[test_case(Ty::Tuple(vec![Ty::None]))]
-    #[test_case(Ty::Tuple(vec![Ty::None, Ty::BoolLiteral(true)]))]
+    #[test_case(Ty::Tuple(vec![Ty::None, Ty::BooleanLiteral(true)]))]
     fn is_not_singleton(from: Ty) {
         let db = setup_db();
 
@@ -2007,8 +2007,8 @@ mod tests {
     }
 
     #[test_case(Ty::IntLiteral(1), Ty::StringLiteral("1"))]
-    #[test_case(Ty::BoolLiteral(true), Ty::StringLiteral("True"))]
-    #[test_case(Ty::BoolLiteral(false), Ty::StringLiteral("False"))]
+    #[test_case(Ty::BooleanLiteral(true), Ty::StringLiteral("True"))]
+    #[test_case(Ty::BooleanLiteral(false), Ty::StringLiteral("False"))]
     #[test_case(Ty::StringLiteral("ab'cd"), Ty::StringLiteral("ab'cd"))] // no quotes
     #[test_case(Ty::LiteralString, Ty::LiteralString)]
     #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str"))]
@@ -2019,8 +2019,8 @@ mod tests {
     }
 
     #[test_case(Ty::IntLiteral(1), Ty::StringLiteral("1"))]
-    #[test_case(Ty::BoolLiteral(true), Ty::StringLiteral("True"))]
-    #[test_case(Ty::BoolLiteral(false), Ty::StringLiteral("False"))]
+    #[test_case(Ty::BooleanLiteral(true), Ty::StringLiteral("True"))]
+    #[test_case(Ty::BooleanLiteral(false), Ty::StringLiteral("False"))]
     #[test_case(Ty::StringLiteral("ab'cd"), Ty::StringLiteral("'ab\\'cd'"))] // single quotes
     #[test_case(Ty::LiteralString, Ty::LiteralString)]
     #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str"))]
