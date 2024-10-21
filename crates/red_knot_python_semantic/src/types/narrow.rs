@@ -178,6 +178,14 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                     ast::CmpOp::Is => {
                         self.constraints.insert(symbol, comp_ty);
                     }
+                    ast::CmpOp::NotEq => {
+                        if comp_ty.is_single_valued(self.db) {
+                            let ty = IntersectionBuilder::new(self.db)
+                                .add_negative(comp_ty)
+                                .build();
+                            self.constraints.insert(symbol, ty);
+                        }
+                    }
                     _ => {
                         // TODO other comparison types
                     }
