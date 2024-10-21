@@ -2156,6 +2156,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "colored",
+ "memchr",
  "red_knot_python_semantic",
  "red_knot_vendored",
  "regex",

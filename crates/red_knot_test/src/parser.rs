@@ -1,4 +1,5 @@
-use regex::{Captures, Regex};
+use memchr::memchr2;
+use regex::{Captures, Match, Regex};
 use ruff_index::{newtype_index, IndexVec};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::LazyLock;
@@ -133,15 +134,15 @@ pub(crate) struct EmbeddedFile<'s> {
     pub(crate) code: &'s str,
 }
 
-/// Matches an arbitrary amount of whitespace (including newlines), followed by a sequence of `#`
-/// characters, followed by a title heading, followed by a newline.
+/// Matches a sequence of `#` characters, followed by a title heading, followed by a newline.
 static HEADER_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^(\s*\n)*(?<level>#+)\s+(?<title>.+)\s*\n").unwrap());
+    LazyLock::new(|| Regex::new(r"^(?<level>#+)\s+(?<title>.+)\s*\n").unwrap());
 
 /// Matches a code block fenced by triple backticks, possibly with language and `key=val`
 /// configuration items following the opening backticks (in the "tag string" of the code block).
 static CODE_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^```(?<lang>\w+)(?<config>( +\S+)*)\s*\n(?<code>(.|\n)*?)\n?```\s*\n").unwrap()
+    Regex::new(r"^```(?<lang>(?-u:\w)+)?(?<config>(?: +\S+)*)\s*\n(?<code>(?:.|\n)*?)\n?```\s*\n")
+        .unwrap()
 });
 
 #[derive(Debug)]
@@ -226,33 +227,61 @@ impl<'s> Parser<'s> {
     }
 
     fn parse_impl(&mut self) -> anyhow::Result<()> {
-        while !self.unparsed.is_empty() {
-            if let Some(captures) = self.scan(&HEADER_RE) {
-                self.parse_header(&captures)?;
-            } else if let Some(captures) = self.scan(&CODE_RE) {
-                self.parse_code_block(&captures)?;
-            } else {
-                // ignore other Markdown syntax (paragraphs, etc) used as comments in the test
-                if let Some(next_newline) = self.unparsed.find('\n') {
-                    (_, self.unparsed) = self.unparsed.split_at(next_newline + 1);
-                } else {
-                    break;
+        while let Some(position) = memchr2(b'`', b'#', self.unparsed.as_bytes()) {
+            let (before, after) = self.unparsed.split_at(position);
+            self.unparsed = after;
+
+            // code blocks and headers must start on a new line.
+            if before.is_empty() || before.ends_with('\n') {
+                let c = after.as_bytes()[0] as char;
+
+                match c {
+                    '#' => {
+                        if let Some(find) = HEADER_RE.find(self.unparsed) {
+                            self.parse_header(find.as_str())?;
+                            self.unparsed = &self.unparsed[find.end()..];
+                            continue;
+                        }
+                    }
+                    '`' => {
+                        if let Some(captures) = CODE_RE.captures(self.unparsed) {
+                            self.parse_code_block(&captures)?;
+                            self.unparsed = &self.unparsed[captures.get(0).unwrap().end()..];
+                            continue;
+                        }
+                    }
+                    _ => unreachable!(),
                 }
+            }
+
+            // Skip to the end of the line
+            if let Some(position) = memchr::memchr(b'\n', self.unparsed.as_bytes()) {
+                self.unparsed = &self.unparsed[position + 1..];
+            } else {
+                break;
             }
         }
 
         Ok(())
     }
 
-    fn parse_header(&mut self, captures: &Captures<'s>) -> anyhow::Result<()> {
-        let header_level = captures["level"].len();
+    fn parse_header(&mut self, header: &'s str) -> anyhow::Result<()> {
+        let mut trimmed = header.trim();
+
+        let mut header_level = 0usize;
+        while let Some(rest) = trimmed.strip_prefix('#') {
+            header_level += 1;
+            trimmed = rest;
+        }
+
+        let title = trimmed.trim_start();
+
         self.pop_sections_to_level(header_level);
 
         let parent = self.stack.parent();
 
         let section = Section {
-            // HEADER_RE can't match without a match for group 'title'.
-            title: captures.name("title").unwrap().into(),
+            title,
             level: header_level.try_into()?,
             parent_id: Some(parent),
         };
@@ -300,8 +329,12 @@ impl<'s> Parser<'s> {
         self.files.push(EmbeddedFile {
             path,
             section: parent,
+            lang: captures
+                .name("lang")
+                .as_ref()
+                .map(Match::as_str)
+                .unwrap_or_default(),
             // CODE_RE can't match without matches for 'lang' and 'code'.
-            lang: captures.name("lang").unwrap().into(),
             code: captures.name("code").unwrap().into(),
         });
 
@@ -333,17 +366,6 @@ impl<'s> Parser<'s> {
             // We would have errored before pushing a child section if there were files, so we know
             // no parent section can have files.
             self.current_section_files = None;
-        }
-    }
-
-    /// Get capture groups and advance cursor past match if unparsed text matches `pattern`.
-    fn scan(&mut self, pattern: &Regex) -> Option<Captures<'s>> {
-        if let Some(captures) = pattern.captures(self.unparsed) {
-            let (_, unparsed) = self.unparsed.split_at(captures.get(0).unwrap().end());
-            self.unparsed = unparsed;
-            Some(captures)
-        } else {
-            None
         }
     }
 }
@@ -429,6 +451,57 @@ mod tests {
     }
 
     #[test]
+    fn multiple_file_tests() {
+        let source = dedent(
+            "
+            # One
+
+            ```py path=main.py
+            from foo import y
+            ```
+
+            ```py path=foo.py
+            y = 2
+            ```
+
+            # Two
+
+            ```py
+            y = 2
+            ```
+            ",
+        );
+        let mf = super::parse("file.md", &source).unwrap();
+
+        let [test1, test2] = &mf.tests().collect::<Vec<_>>()[..] else {
+            panic!("expected two tests");
+        };
+
+        assert_eq!(test1.name(), "file.md - One");
+        assert_eq!(test2.name(), "file.md - Two");
+
+        let [main, foo] = test1.files().collect::<Vec<_>>()[..] else {
+            panic!("expected two files");
+        };
+
+        assert_eq!(main.path, "main.py");
+        assert_eq!(main.lang, "py");
+        assert_eq!(main.code, "from foo import y");
+
+        assert_eq!(foo.path, "foo.py");
+        assert_eq!(foo.lang, "py");
+        assert_eq!(foo.code, "y = 2");
+
+        let [file] = test2.files().collect::<Vec<_>>()[..] else {
+            panic!("expected one file");
+        };
+
+        assert_eq!(file.path, "test.py");
+        assert_eq!(file.lang, "py");
+        assert_eq!(file.code, "y = 2");
+    }
+
+    #[test]
     fn custom_file_path() {
         let source = dedent(
             "
@@ -471,6 +544,49 @@ mod tests {
         };
 
         assert_eq!(file.code, "x = 1\ny = 2");
+    }
+
+    #[test]
+    fn empty_file() {
+        let source = dedent(
+            "
+            ```py
+            ```
+            ",
+        );
+
+        let mf = super::parse("file.md", &source).unwrap();
+
+        let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
+            panic!("expected one test");
+        };
+        let [file] = test.files().collect::<Vec<_>>()[..] else {
+            panic!("expected one file");
+        };
+
+        assert_eq!(file.code, "");
+    }
+
+    #[test]
+    fn no_lang() {
+        let source = dedent(
+            "
+            ```
+            x = 10
+            ```
+            ",
+        );
+
+        let mf = super::parse("file.md", &source).unwrap();
+
+        let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
+            panic!("expected one test");
+        };
+        let [file] = test.files().collect::<Vec<_>>()[..] else {
+            panic!("expected one file");
+        };
+
+        assert_eq!(file.code, "x = 10");
     }
 
     #[test]

@@ -21,6 +21,7 @@ ruff_text_size = { workspace = true }
 
 anyhow = { workspace = true }
 colored = { workspace = true }
+memchr = { workspace = true }
 regex = { workspace = true }
 rustc-hash = { workspace = true }
 salsa = { workspace = true }
