@@ -30,15 +30,12 @@ impl FormatNodeRule<ExprStringLiteral> for FormatExprStringLiteral {
         match value.as_slice() {
             [string_literal] => string_literal.format().with_options(self.kind).fmt(f),
             _ => {
-                // This is just a sanity check because [`DocstringStmt::try_from_statement`]
-                // ensures that the docstring is a *single* string literal.
-                assert!(!self.kind.is_docstring());
-
                 // Always join strings that aren't parenthesized and thus, always on a single line.
                 if !f.context().node_level().is_parenthesized() {
-                    if let Some(format_flat) =
+                    if let Some(mut format_flat) =
                         FormatImplicitConcatenatedStringFlat::new(item.into(), f.context())
                     {
+                        format_flat.set_docstring(self.kind.is_docstring());
                         return format_flat.fmt(f);
                     }
                 }
