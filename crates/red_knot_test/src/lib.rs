@@ -45,7 +45,6 @@ pub fn run(path: &Path, title: &str) {
                 for (line_number, failures) in by_line.iter() {
                     for failure in failures {
                         let line_info = format!("{title}:{line_number}").cyan();
-
                         println!("    {line_info} {failure}");
                     }
                 }
