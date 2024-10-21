@@ -1,4 +1,3 @@
-use memchr::memchr2;
 use ruff_formatter::{format_args, write};
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::str_prefix::{
@@ -103,6 +102,7 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringExpanded<'_
 pub(crate) struct FormatImplicitConcatenatedStringFlat<'a> {
     string: StringLike<'a>,
     flags: AnyStringFlags,
+    docstring: bool,
 }
 
 impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
@@ -222,7 +222,12 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
         Some(Self {
             flags: merge_flags(string, context)?,
             string,
+            docstring: false,
         })
+    }
+
+    pub(crate) fn set_docstring(&mut self, is_docstring: bool) {
+        self.docstring = is_docstring;
     }
 
     pub(crate) fn string(&self) -> StringLike<'a> {
@@ -239,15 +244,51 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
 
         // TODO: FStrings when the f-string preview style is enabled???
 
-        for part in self.string.parts() {
+        let mut parts = self.string.parts().peekable();
+
+        // Trim implicit concatenated strings in docstring positions.
+        // Skip over any trailing parts that are all whitespace.
+        // Leading parts are handled as part of the formatting loop below.
+        if self.docstring {
+            for part in self.string.parts().rev() {
+                assert!(part.is_string_literal());
+
+                if f.context()
+                    .locator()
+                    .slice(part.content_range())
+                    .trim()
+                    .is_empty()
+                {
+                    // Don't format the part.
+                    parts.next_back();
+                } else {
+                    break;
+                }
+            }
+        }
+
+        let mut first_non_empty = self.docstring;
+
+        while let Some(part) = parts.next() {
             match part {
                 StringLikePart::String(_) | StringLikePart::Bytes(_) => {
                     FormatLiteralContent {
                         range: part.content_range(),
                         flags: self.flags,
                         is_fstring: false,
+                        trim_start: first_non_empty && self.docstring,
+                        trim_end: self.docstring && parts.peek().is_none(),
                     }
                     .fmt(f)?;
+
+                    if first_non_empty {
+                        first_non_empty = f
+                            .context()
+                            .locator()
+                            .slice(part.content_range())
+                            .trim_start()
+                            .is_empty();
+                    }
                 }
 
                 StringLikePart::FString(f_string) => {
@@ -259,6 +300,8 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
                                         range: literal.range(),
                                         flags: self.flags,
                                         is_fstring: true,
+                                        trim_end: false,
+                                        trim_start: false,
                                     }
                                     .fmt(f)?;
                                 }
@@ -283,6 +326,8 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
                             range: part.content_range(),
                             flags: self.flags,
                             is_fstring: true,
+                            trim_end: false,
+                            trim_start: false,
                         }
                         .fmt(f)?;
                     }
@@ -298,12 +343,14 @@ struct FormatLiteralContent {
     range: TextRange,
     flags: AnyStringFlags,
     is_fstring: bool,
+    trim_start: bool,
+    trim_end: bool,
 }
 
 impl Format<PyFormatContext<'_>> for FormatLiteralContent {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let content = f.context().locator().slice(self.range);
-        let normalized = normalize_string(
+        let mut normalized = normalize_string(
             content,
             0,
             self.flags,
@@ -312,9 +359,29 @@ impl Format<PyFormatContext<'_>> for FormatLiteralContent {
             false,
         );
 
-        match normalized {
-            Cow::Borrowed(_) => source_text_slice(self.range).fmt(f),
-            Cow::Owned(normalized) => text(&normalized).fmt(f),
+        // Trim the start and end of the string if it's the first or last part of a docstring.
+        // This is rare, so don't bother with optimizing to use `Cow`.
+        if self.trim_start {
+            let trimmed = normalized.trim_start();
+            if trimmed.len() < normalized.len() {
+                normalized = trimmed.to_string().into();
+            }
+        }
+
+        if self.trim_end {
+            let trimmed = normalized.trim_end();
+            if trimmed.len() < normalized.len() {
+                normalized = trimmed.to_string().into();
+            }
+        }
+
+        if normalized.is_empty() {
+            Ok(())
+        } else {
+            match normalized {
+                Cow::Borrowed(_) => source_text_slice(self.range).fmt(f),
+                Cow::Owned(normalized) => text(&normalized).fmt(f),
+            }
         }
     }
 }

@@ -227,3 +227,35 @@ match x:
         ddddddddddddddddddddddddddd,
     ]:
         pass
+
+
+##############################################################################
+# In docstring positions
+##############################################################################
+
+def short_docstring():
+    "Implicit" "concatenated" "docstring"
+
+def long_docstring():
+    "Loooooooooooooooooooooong" "doooooooooooooooooooocstriiiiiiiiiiiiiiiiiiiiiiiiiiiiiiing" "exceding the line width" "but it should be concatenated anyways because it is single line"
+
+def docstring_with_leading_whitespace():
+    "    This is a " "implicit" "concatenated" "docstring"
+
+def docstring_with_trailing_whitespace():
+    "This is a " "implicit" "concatenated" "docstring    "
+
+def docstring_with_leading_empty_parts():
+    "       " "   " "" "This is a " "implicit" "concatenated" "docstring"
+
+def docstring_with_trailing_empty_parts():
+    "This is a " "implicit" "concatenated" "docstring" ""   "  " "           "
+
+def all_empty():
+    "          " "       " " "
+
+def byte_string_in_docstring_position():
+    b"  don't trim the" b"bytes literal "
+
+def f_string_in_docstring_position():
+    f"  don't trim the" "f-string literal "
