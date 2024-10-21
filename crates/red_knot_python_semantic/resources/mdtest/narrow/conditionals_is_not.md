@@ -36,3 +36,19 @@ y = 345
 if x is not y:
     reveal_type(x)  # revealed: Literal[345]
 ```
+
+## `is not` in chained comparisons
+
+The type guard removes `False` from the union type of the tested value only.
+
+```py
+x = True if x_flag else False
+y = True if y_flag else False
+
+reveal_type(x)  # revealed: bool
+reveal_type(y)  # revealed: bool
+
+if y is not x is not False:  # Interpreted as `(y is not x) and (x is not False)`
+    reveal_type(x)  # revealed: Literal[True]
+    reveal_type(y)  # revealed: bool
+```

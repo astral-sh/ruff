@@ -25,3 +25,17 @@ if y is x:
 
 reveal_type(y)  # revealed: A | None
 ```
+
+## `is` in chained comparisons
+
+```py
+x = True if x_flag else False
+y = True if y_flag else False
+
+reveal_type(x)  # revealed: bool
+reveal_type(y)  # revealed: bool
+
+if y is x is False:  # Interpreted as `(y is x) and (x is False)`
+    reveal_type(x)  # revealed: Literal[False]
+    reveal_type(y)  # revealed: bool
+```
