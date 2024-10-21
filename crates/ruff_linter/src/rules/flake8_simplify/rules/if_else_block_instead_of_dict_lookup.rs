@@ -78,7 +78,7 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &mut Checker, stmt_i
     };
 
     if value.as_ref().is_some_and(|value| {
-        contains_effect(value, |id| checker.semantic().has_builtin_binding(id))
+        contains_effect(value, |id| checker.semantic().has_builtin_binding(id)).is_yes()
     }) {
         return;
     }
@@ -111,7 +111,7 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &mut Checker, stmt_i
                     return;
                 };
                 if value.as_ref().is_some_and(|value| {
-                    contains_effect(value, |id| checker.semantic().has_builtin_binding(id))
+                    contains_effect(value, |id| checker.semantic().has_builtin_binding(id)).is_yes()
                 }) {
                     return;
                 };
@@ -137,7 +137,7 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &mut Checker, stmt_i
                 };
 
                 if value.as_ref().is_some_and(|value| {
-                    contains_effect(value, |id| checker.semantic().has_builtin_binding(id))
+                    contains_effect(value, |id| checker.semantic().has_builtin_binding(id)).is_yes()
                 }) {
                     return;
                 };
