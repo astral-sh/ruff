@@ -1833,6 +1833,7 @@ mod tests {
     #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinInstance("object"))]
     #[test_case(Ty::Never, Ty::IntLiteral(1))]
     #[test_case(Ty::IntLiteral(1), Ty::BuiltinInstance("int"))]
+    #[test_case(Ty::BooleanLiteral(true), Ty::BuiltinInstance("bool"))]
     #[test_case(Ty::StringLiteral("foo"), Ty::BuiltinInstance("str"))]
     #[test_case(Ty::StringLiteral("foo"), Ty::LiteralString)]
     #[test_case(Ty::LiteralString, Ty::BuiltinInstance("str"))]
