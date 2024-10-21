@@ -139,6 +139,22 @@ fn push_diagnostic(checker: &mut Checker, range: TextRange, charset: &NamedChars
     checker.diagnostics.push(diagnostic);
 }
 
+// Helper function to check if the replacement is safe
+fn is_safe_replacement(left: &[u8], right: &[u8]) -> bool {
+    let is_substring = |needle: &[u8], haystack: &[u8]| {
+        haystack
+            .windows(needle.len())
+            .any(|window| window == needle)
+    };
+
+    let is_substring_of_original = is_substring(left, right);
+    let is_substring_of_replacement = KNOWN_NAMED_CHARSETS
+        .iter()
+        .any(|charset| is_substring(left, charset.bytes));
+
+    is_substring_of_original == is_substring_of_replacement
+}
+
 /// FURB156
 pub(crate) fn hardcoded_string_charset_comparison(checker: &mut Checker, compare: &ExprCompare) {
     let (
@@ -149,18 +165,28 @@ pub(crate) fn hardcoded_string_charset_comparison(checker: &mut Checker, compare
         return;
     };
 
-    let bytes = value.to_str().as_bytes();
+    let right_bytes = value.to_str().as_bytes();
 
-    let Some(charset) = check_charset_as_set(bytes) else {
-        return;
+    let left_value = match compare.left.as_ref() {
+        Expr::StringLiteral(ExprStringLiteral { value, .. }) => value.to_string(),
+        _ => return, // If left side is not a string literal, we can't safely analyze it
     };
 
-    // In this case the diagnostic will be emitted via string_literal check.
-    if charset.bytes == bytes {
-        return;
-    }
+    let left_bytes = left_value.as_bytes();
 
-    push_diagnostic(checker, string_literal.range, charset);
+    // Check if we can safely use set-like replacement
+    let can_use_set_like = left_bytes.is_empty() || is_safe_replacement(left_bytes, right_bytes);
+
+    if can_use_set_like {
+        if let Some(charset) = check_charset_as_set(right_bytes) {
+            push_diagnostic(checker, string_literal.range, charset);
+        }
+    } else {
+        // For cases where set-like replacement isn't safe, only use exact matches
+        if let Some(charset) = check_charset_exact(right_bytes) {
+            push_diagnostic(checker, string_literal.range, charset);
+        }
+    }
 }
 
 /// FURB156
