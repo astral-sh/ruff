@@ -434,6 +434,10 @@ impl<'db> Type<'db> {
             {
                 true
             }
+            (Type::Union(union), ty) => union
+                .elements(db)
+                .iter()
+                .all(|&elem_ty| elem_ty.is_subtype_of(db, ty)),
             (ty, Type::Union(union)) => union
                 .elements(db)
                 .iter()
@@ -1839,6 +1843,8 @@ mod tests {
     #[test_case(Ty::LiteralString, Ty::BuiltinInstance("str"))]
     #[test_case(Ty::BytesLiteral("foo"), Ty::BuiltinInstance("bytes"))]
     #[test_case(Ty::IntLiteral(1), Ty::Union(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")]))]
+    #[test_case(Ty::Union(vec![Ty::BuiltinInstance("str"), Ty::BuiltinInstance("int")]), Ty::BuiltinInstance("object"))]
+    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2), Ty::IntLiteral(3)]))]
     #[test_case(Ty::BuiltinInstance("TypeError"), Ty::BuiltinInstance("Exception"))]
     fn is_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
@@ -1852,6 +1858,8 @@ mod tests {
     #[test_case(Ty::IntLiteral(1), Ty::Any)]
     #[test_case(Ty::IntLiteral(1), Ty::Union(vec![Ty::Unknown, Ty::BuiltinInstance("str")]))]
     #[test_case(Ty::IntLiteral(1), Ty::BuiltinInstance("str"))]
+    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::IntLiteral(1))]
+    #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(3)]))]
     #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str"))]
     #[test_case(Ty::BuiltinInstance("int"), Ty::IntLiteral(1))]
     fn is_not_subtype_of(from: Ty, to: Ty) {
