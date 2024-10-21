@@ -399,9 +399,9 @@ result_f = (
 )
 
 # https://github.com/astral-sh/ruff/issues/6841
-x = f"""a{""}b"""
+x = f"""a{''}b"""
 y = f'''c{1}d"""e'''
-z = f"""a{""}b""" f'''c{1}d"""e'''
+z = f"""a{''}b""" f'''c{1}d"""e'''
 
 # F-String formatting test cases (Preview)
 
@@ -429,10 +429,10 @@ aaaaaaaaaaa = (
 
 # This should never add the optional parentheses because even after adding them, the
 # f-string exceeds the line length limit.
-x = f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa {"bbbbbbbbbbbbbbbbbbbbbbbbbbbbb"} ccccccccccccccc"
+x = f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa {'bbbbbbbbbbbbbbbbbbbbbbbbbbbbb'} ccccccccccccccc"
 x = f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa { "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb" = } ccccccccccccccc"
 x = f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa {  # comment 8
-    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    'bbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
 } ccccccccccccccc"
 x = f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa { # comment 9
                                              "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb" = } ccccccccccccccc"
@@ -501,8 +501,8 @@ f"foo 'bar' {x}"
 f'foo "bar" {x}'
 f'foo "bar" {x}'
 f"foo 'bar' {x}"
-f"foo {"bar"}"
-f"foo {'\'bar\''}"
+f"foo {'bar'}"
+f"foo {"'bar'"}"
 
 # Here, the formatter will remove the escapes which is correct because they aren't allowed
 # pre 3.12. This means we can assume that the f-string is used in the context of 3.12.
@@ -511,8 +511,8 @@ f"foo {'"bar"'}"
 
 # Triple-quoted strings
 # It's ok to use the same quote char for the inner string if it's single-quoted.
-f"""test {"inner"}"""
-f"""test {"inner"}"""
+f"""test {'inner'}"""
+f"""test {'inner'}"""
 # But if the inner string is also triple-quoted then we should preserve the existing quotes.
 f"""test {'''inner'''}"""
 
@@ -616,10 +616,10 @@ x = f"""
 # Here, the debug expression is in a nested f-string so we should start preserving
 # whitespaces from that point onwards. This means we should format the outer f-string.
 x = f"""{
-    "foo "  # comment 24
-    + f"{   x =
+    'foo '  # comment 24
+    + f'{   x =
 
-       }"  # comment 25
+       }'  # comment 25
 }
         """
 
@@ -641,19 +641,19 @@ if indent0:
         if indent2:
             foo = f"""hello world
 hello {
-                f"aaaaaaa {
+                f'aaaaaaa {
                     [
-                        'aaaaaaaaaaaaaaaaaaaaa',
-                        'bbbbbbbbbbbbbbbbbbbbb',
-                        'ccccccccccccccccccccc',
-                        'ddddddddddddddddddddd',
+                        "aaaaaaaaaaaaaaaaaaaaa",
+                        "bbbbbbbbbbbbbbbbbbbbb",
+                        "ccccccccccccccccccccc",
+                        "ddddddddddddddddddddd",
                     ]
-                } bbbbbbbb"
+                } bbbbbbbb'
                 + [
-                    "aaaaaaaaaaaaaaaaaaaaa",
-                    "bbbbbbbbbbbbbbbbbbbbb",
-                    "ccccccccccccccccccccc",
-                    "ddddddddddddddddddddd",
+                    'aaaaaaaaaaaaaaaaaaaaa',
+                    'bbbbbbbbbbbbbbbbbbbbb',
+                    'ccccccccccccccccccccc',
+                    'ddddddddddddddddddddd',
                 ]
             } --------
 """
@@ -662,7 +662,7 @@ hello {
 # Implicit concatenated f-string containing quotes
 _ = (
     "This string should change its quotes to double quotes"
-    f'This string uses double quotes in an expression {"woah"}'
+    f"This string uses double quotes in an expression {'woah'}"
     f"This f-string does not use any quotes."
 )
 ```
@@ -1022,6 +1022,18 @@ _ = (
      "    f()\n"
      # XXX: The following line changes depending on whether the tests
      # are run through the interactive interpreter or with -m
+@@ -57,9 +57,9 @@
+ )
+ 
+ # https://github.com/astral-sh/ruff/issues/6841
+-x = f"""a{""}b"""
++x = f"""a{''}b"""
+ y = f'''c{1}d"""e'''
+-z = f"""a{""}b""" f'''c{1}d"""e'''
++z = f"""a{''}b""" f'''c{1}d"""e'''
+ 
+ # F-String formatting test cases (Preview)
+ 
 @@ -67,64 +67,72 @@
  x = f"{a}"
  x = f"{
@@ -1052,12 +1064,12 @@ _ = (
  # This should never add the optional parentheses because even after adding them, the
  # f-string exceeds the line length limit.
 -x = f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa { "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb" } ccccccccccccccc"
-+x = f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa {"bbbbbbbbbbbbbbbbbbbbbbbbbbbbb"} ccccccccccccccc"
++x = f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa {'bbbbbbbbbbbbbbbbbbbbbbbbbbbbb'} ccccccccccccccc"
  x = f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa { "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb" = } ccccccccccccccc"
 -x = f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa { # comment 8
 -                                             "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb" } ccccccccccccccc"
 +x = f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa {  # comment 8
-+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
++    'bbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
 +} ccccccccccccccc"
  x = f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa { # comment 9
                                               "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb" = } ccccccccccccccc"
@@ -1132,7 +1144,14 @@ _ = (
  }"
  
  # Quotes
-@@ -152,13 +164,13 @@
+@@ -147,18 +159,18 @@
+ f'foo "bar" {x}'
+ f'foo "bar" {x}'
+ f"foo 'bar' {x}"
+-f"foo {"bar"}"
+-f"foo {'\'bar\''}"
++f"foo {'bar'}"
++f"foo {"'bar'"}"
  
  # Here, the formatter will remove the escapes which is correct because they aren't allowed
  # pre 3.12. This means we can assume that the f-string is used in the context of 3.12.
@@ -1142,9 +1161,9 @@ _ = (
  
  # Triple-quoted strings
  # It's ok to use the same quote char for the inner string if it's single-quoted.
--f"""test {'inner'}"""
- f"""test {"inner"}"""
-+f"""test {"inner"}"""
+ f"""test {'inner'}"""
+-f"""test {"inner"}"""
++f"""test {'inner'}"""
  # But if the inner string is also triple-quoted then we should preserve the existing quotes.
  f"""test {'''inner'''}"""
  
@@ -1282,12 +1301,12 @@ _ = (
 -x = f"""{"foo " +    # comment 24
 -    f"{   x =
 +x = f"""{
-+    "foo "  # comment 24
-+    + f"{   x =
++    'foo '  # comment 24
++    + f'{   x =
  
 -       }"    # comment 25
 - }
-+       }"  # comment 25
++       }'  # comment 25
 +}
          """
  
@@ -1322,19 +1341,19 @@ _ = (
 -              'ddddddddddddddddddddd'
 -          ]
 -      } --------
-+                f"aaaaaaa {
++                f'aaaaaaa {
 +                    [
-+                        'aaaaaaaaaaaaaaaaaaaaa',
-+                        'bbbbbbbbbbbbbbbbbbbbb',
-+                        'ccccccccccccccccccccc',
-+                        'ddddddddddddddddddddd',
++                        "aaaaaaaaaaaaaaaaaaaaa",
++                        "bbbbbbbbbbbbbbbbbbbbb",
++                        "ccccccccccccccccccccc",
++                        "ddddddddddddddddddddd",
 +                    ]
-+                } bbbbbbbb"
++                } bbbbbbbb'
 +                + [
-+                    "aaaaaaaaaaaaaaaaaaaaa",
-+                    "bbbbbbbbbbbbbbbbbbbbb",
-+                    "ccccccccccccccccccccc",
-+                    "ddddddddddddddddddddd",
++                    'aaaaaaaaaaaaaaaaaaaaa',
++                    'bbbbbbbbbbbbbbbbbbbbb',
++                    'ccccccccccccccccccccc',
++                    'ddddddddddddddddddddd',
 +                ]
 +            } --------
  """
@@ -1343,9 +1362,10 @@ _ = (
  # Implicit concatenated f-string containing quotes
  _ = (
 -    'This string should change its quotes to double quotes'
-+    "This string should change its quotes to double quotes"
-     f'This string uses double quotes in an expression {"woah"}'
+-    f'This string uses double quotes in an expression {"woah"}'
 -    f'This f-string does not use any quotes.'
++    "This string should change its quotes to double quotes"
++    f"This string uses double quotes in an expression {'woah'}"
 +    f"This f-string does not use any quotes."
  )
 ```

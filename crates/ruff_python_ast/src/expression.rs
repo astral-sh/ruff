@@ -524,6 +524,10 @@ impl StringLikePart<'_> {
             self.end() - kind.closer_len(),
         )
     }
+
+    pub const fn is_fstring(self) -> bool {
+        matches!(self, Self::FString(_))
+    }
 }
 
 impl<'a> From<&'a ast::StringLiteral> for StringLikePart<'a> {
