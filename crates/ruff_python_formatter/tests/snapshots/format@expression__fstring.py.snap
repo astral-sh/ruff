@@ -429,10 +429,10 @@ aaaaaaaaaaa = (
 
 # This should never add the optional parentheses because even after adding them, the
 # f-string exceeds the line length limit.
-x = f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa {"bbbbbbbbbbbbbbbbbbbbbbbbbbbbb"} ccccccccccccccc"
+x = f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa {'bbbbbbbbbbbbbbbbbbbbbbbbbbbbb'} ccccccccccccccc"
 x = f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa { "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb" = } ccccccccccccccc"
 x = f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa {  # comment 8
-    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    'bbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
 } ccccccccccccccc"
 x = f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa { # comment 9
                                              "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb" = } ccccccccccccccc"
@@ -501,8 +501,8 @@ f"foo 'bar' {x}"
 f'foo "bar" {x}'
 f'foo "bar" {x}'
 f"foo 'bar' {x}"
-f"foo {"bar"}"
-f"foo {'\'bar\''}"
+f"foo {'bar'}"
+f"foo {"'bar'"}"
 
 # Here, the formatter will remove the escapes which is correct because they aren't allowed
 # pre 3.12. This means we can assume that the f-string is used in the context of 3.12.
@@ -514,7 +514,7 @@ f"foo {'"bar"'}"
 f"""test {"inner"}"""
 f"""test {"inner"}"""
 # But if the inner string is also triple-quoted then we should preserve the existing quotes.
-f"""test {'''inner'''}"""
+f"""test {"""inner"""}"""
 
 # Magic trailing comma
 #
@@ -662,7 +662,7 @@ hello {
 # Implicit concatenated f-string containing quotes
 _ = (
     "This string should change its quotes to double quotes"
-    f'This string uses double quotes in an expression {"woah"}'
+    f"This string uses double quotes in an expression {'woah'}"
     f"This f-string does not use any quotes."
 )
 ```
@@ -1052,12 +1052,12 @@ _ = (
  # This should never add the optional parentheses because even after adding them, the
  # f-string exceeds the line length limit.
 -x = f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa { "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb" } ccccccccccccccc"
-+x = f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa {"bbbbbbbbbbbbbbbbbbbbbbbbbbbbb"} ccccccccccccccc"
++x = f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa {'bbbbbbbbbbbbbbbbbbbbbbbbbbbbb'} ccccccccccccccc"
  x = f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa { "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb" = } ccccccccccccccc"
 -x = f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa { # comment 8
 -                                             "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb" } ccccccccccccccc"
 +x = f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa {  # comment 8
-+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
++    'bbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
 +} ccccccccccccccc"
  x = f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa { # comment 9
                                               "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb" = } ccccccccccccccc"
@@ -1132,7 +1132,14 @@ _ = (
  }"
  
  # Quotes
-@@ -152,13 +164,13 @@
+@@ -147,20 +159,20 @@
+ f'foo "bar" {x}'
+ f'foo "bar" {x}'
+ f"foo 'bar' {x}"
+-f"foo {"bar"}"
+-f"foo {'\'bar\''}"
++f"foo {'bar'}"
++f"foo {"'bar'"}"
  
  # Here, the formatter will remove the escapes which is correct because they aren't allowed
  # pre 3.12. This means we can assume that the f-string is used in the context of 3.12.
@@ -1146,8 +1153,11 @@ _ = (
  f"""test {"inner"}"""
 +f"""test {"inner"}"""
  # But if the inner string is also triple-quoted then we should preserve the existing quotes.
- f"""test {'''inner'''}"""
+-f"""test {'''inner'''}"""
++f"""test {"""inner"""}"""
  
+ # Magic trailing comma
+ #
 @@ -171,63 +183,66 @@
  f"aaaaaaa {['aaaaaaaaaaaaaaa', 'bbbbbbbbbbbbb', 'ccccccccccccccccc', 'ddddddddddddddd', 'eeeeeeeeeeeeee']} aaaaaaa"
  
@@ -1343,9 +1353,10 @@ _ = (
  # Implicit concatenated f-string containing quotes
  _ = (
 -    'This string should change its quotes to double quotes'
-+    "This string should change its quotes to double quotes"
-     f'This string uses double quotes in an expression {"woah"}'
+-    f'This string uses double quotes in an expression {"woah"}'
 -    f'This f-string does not use any quotes.'
++    "This string should change its quotes to double quotes"
++    f"This string uses double quotes in an expression {'woah'}"
 +    f"This f-string does not use any quotes."
  )
 ```

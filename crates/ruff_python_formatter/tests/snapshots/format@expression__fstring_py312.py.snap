@@ -36,16 +36,3 @@ source_type                = Python
 # Quotes reuse
 f"{'a'}"
 ```
-
-
-#### Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -3,4 +3,4 @@
- # version isn't set.
- 
- # Quotes reuse
--f"{'a'}"
-+f"{"a"}"
-```
