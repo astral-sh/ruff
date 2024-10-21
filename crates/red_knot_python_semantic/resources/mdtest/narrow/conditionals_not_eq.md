@@ -27,6 +27,21 @@ if x != 1:
     reveal_type(x)  # revealed: Literal[2]
 ```
 
+## `x != y` where `y` is a single-valued type
+
+```py
+class A: ...
+
+
+class B: ...
+
+
+C = A if flag else B
+
+if C != A:
+    reveal_type(C)  # revealed: Literal[B]
+```
+
 ## `!=` for non-singleton types
 
 Non-singleton types should *not* narrow the type: two instances of a
