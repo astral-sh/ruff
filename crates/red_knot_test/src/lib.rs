@@ -4,7 +4,8 @@ use red_knot_python_semantic::types::check_types;
 use ruff_db::files::system_path_to_file;
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
-use ruff_source_file::OneIndexed;
+use ruff_source_file::{LineIndex, OneIndexed};
+use ruff_text_size::TextSize;
 use std::path::Path;
 
 type Failures = Vec<matcher::FailuresByLine>;
@@ -30,7 +31,7 @@ pub fn run(path: &Path, title: &str) {
 
     let mut any_failures = false;
     for test in suite.tests() {
-        if let Err(failures) = run_test(&test) {
+        if let Err(failures) = run_test(&test, suite.line_index()) {
             any_failures = true;
             println!("\n{}\n", test.name().bold().underline());
 
@@ -55,11 +56,11 @@ pub fn run(path: &Path, title: &str) {
 struct AbsoluteLineNumberPath {
     path: SystemPathBuf,
 
-    // Line number of the ``` that starts the code block
-    starting_line_number: OneIndexed,
+    // Offset of the backticks that starts the code block in the Markdown file
+    md_offset: TextSize,
 }
 
-fn run_test(test: &parser::MarkdownTest) -> Result<(), Failures> {
+fn run_test(test: &parser::MarkdownTest, line_index: &LineIndex) -> Result<(), Failures> {
     let workspace_root = SystemPathBuf::from("/src");
     let mut db = db::Db::setup(workspace_root.clone());
 
@@ -74,16 +75,17 @@ fn run_test(test: &parser::MarkdownTest) -> Result<(), Failures> {
         db.write_file(&full_path, file.code).unwrap();
         paths.push(AbsoluteLineNumberPath {
             path: full_path,
-            starting_line_number: file.starting_line_number,
+            md_offset: file.md_offset,
         });
     }
 
     let mut failures = Vec::with_capacity(paths.len());
-    paths.sort_by(|a, b| a.starting_line_number.cmp(&b.starting_line_number));
 
     for contextual_path in paths {
         let file = system_path_to_file(&db, contextual_path.path.clone()).unwrap();
         let parsed = parsed_module(&db, file);
+
+        let mut cached_starting_line_number: Option<OneIndexed> = None;
 
         // TODO allow testing against code with syntax errors
         assert!(
@@ -97,7 +99,13 @@ fn run_test(test: &parser::MarkdownTest) -> Result<(), Failures> {
         match matcher::match_file(&db, file, check_types(&db, file)) {
             Ok(()) => {}
             Err(line_failures) => {
-                failures.push(line_failures.offset_errors(contextual_path.starting_line_number));
+                let offset = cached_starting_line_number.unwrap_or_else(|| {
+                    let offset = line_index.line_index(contextual_path.md_offset);
+                    cached_starting_line_number = Some(offset);
+                    offset
+                });
+
+                failures.push(line_failures.offset_errors(offset));
             }
         }
     }
@@ -105,7 +113,6 @@ fn run_test(test: &parser::MarkdownTest) -> Result<(), Failures> {
     if failures.is_empty() {
         Ok(())
     } else {
-        failures.shrink_to_fit();
         Err(failures)
     }
 }

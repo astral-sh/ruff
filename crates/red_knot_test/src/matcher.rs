@@ -49,7 +49,14 @@ impl FailuresByLine {
                 .lines
                 .into_iter()
                 .map(|line_failures| LineFailures {
-                    line_number: line_failures.line_number.saturating_add(offset.get()),
+                    line_number: OneIndexed::try_from(
+                        line_failures
+                            .line_number
+                            .get()
+                            .checked_add(offset.get())
+                            .unwrap(),
+                    )
+                    .unwrap(),
                     range: line_failures.range,
                 })
                 .collect(),
