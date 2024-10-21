@@ -13,6 +13,8 @@ x = None if flag else 1
 
 if x is not None:
     reveal_type(x)  # revealed: Literal[1]
+else:
+    reveal_type(x)  # revealed: None
 
 reveal_type(x)  # revealed: None | Literal[1]
 ```
@@ -29,6 +31,8 @@ reveal_type(x)  # revealed: bool
 
 if x is not False:
     reveal_type(x)  # revealed: Literal[True]
+else:
+    reveal_type(x)  # revealed: Literal[False]
 ```
 
 ## `is not` for non-singleton types
@@ -42,6 +46,8 @@ x = 345
 y = 345
 
 if x is not y:
+    reveal_type(x)  # revealed: Literal[345]
+else:
     reveal_type(x)  # revealed: Literal[345]
 ```
 
@@ -62,5 +68,8 @@ reveal_type(y)  # revealed: bool
 
 if y is not x is not False:  # Interpreted as `(y is not x) and (x is not False)`
     reveal_type(x)  # revealed: Literal[True]
+    reveal_type(y)  # revealed: bool
+else:
+    reveal_type(x)  # revealed: bool
     reveal_type(y)  # revealed: bool
 ```

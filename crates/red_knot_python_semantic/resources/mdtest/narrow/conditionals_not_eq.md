@@ -11,6 +11,8 @@ x = None if flag else 1
 
 if x != None:
     reveal_type(x)  # revealed: Literal[1]
+else:
+    reveal_type(x)  # revealed: None
 ```
 
 ## `!=` for other singleton types
@@ -24,6 +26,8 @@ x = True if flag else False
 
 if x != False:
     reveal_type(x)  # revealed: Literal[True]
+else:
+    reveal_type(x)  # revealed: Literal[False]
 ```
 
 ## `x != y` where `y` is of literal type
@@ -54,6 +58,8 @@ C = A if flag else B
 
 if C != A:
     reveal_type(C)  # revealed: Literal[B]
+else:
+    reveal_type(C)  # revealed: Literal[A]
 ```
 
 ## `!=` for non-single-valued types
@@ -72,5 +78,8 @@ x = int_instance() if flag else None
 y = int_instance()
 
 if x != y:
+    reveal_type(x)  # revealed: int | None
+else:
+    # TODO: Should reveal `int` here, as the intersection of `int` and `None` is `int`.
     reveal_type(x)  # revealed: int | None
 ```

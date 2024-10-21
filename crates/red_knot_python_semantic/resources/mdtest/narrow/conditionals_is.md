@@ -11,6 +11,8 @@ x = None if flag else 1
 
 if x is None:
     reveal_type(x)  # revealed: None
+else:
+    reveal_type(x)  # revealed: Literal[1]
 
 reveal_type(x)  # revealed: None | Literal[1]
 ```
@@ -30,6 +32,8 @@ y = x if flag else None
 
 if y is x:
     reveal_type(y)  # revealed: A
+else:
+    reveal_type(y)  # revealed: A | None
 
 reveal_type(y)  # revealed: A | None
 ```
@@ -50,4 +54,20 @@ reveal_type(y)  # revealed: bool
 if y is x is False:  # Interpreted as `(y is x) and (x is False)`
     reveal_type(x)  # revealed: Literal[False]
     reveal_type(y)  # revealed: bool
+else:
+    reveal_type(x)  # revealed: bool
+    reveal_type(y)  # revealed: bool
+```
+
+## `is` in elif clause
+
+```py
+x = None if flag else (1 if flag2 else True)
+reveal_type(x)  # revealed: None | Literal[1] | Literal[True]
+if x is None:
+    reveal_type(x)  # revealed: None
+elif x is True:
+    reveal_type(x)  # revealed: Literal[True]
+else:
+    reveal_type(x)  # revealed: Literal[1]
 ```
