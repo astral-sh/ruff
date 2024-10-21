@@ -65,8 +65,8 @@ impl AlwaysFixableViolation for OneBlankLineBeforeClass {
 /// docstring from its methods.
 ///
 /// This rule may not apply to all projects; its applicability is a matter of
-/// convention. By default, this rule is enabled when using the `google`
-/// convention, and disabled when using the `numpy` and `pep257` conventions.
+/// convention. By default, this rule is enabled when using the `numpy` and `pep257`
+/// conventions, and disabled when using the `google` convention.
 ///
 /// ## Example
 /// ```python
