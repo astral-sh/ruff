@@ -49,7 +49,6 @@ pub fn run(path: &Path, title: &str) {
                         println!("    {line_info} {failure}");
                     }
                 }
-                println!();
             }
         }
     }
