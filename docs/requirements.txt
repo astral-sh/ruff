@@ -3,7 +3,7 @@ ruff==0.6.9
 mkdocs==1.6.1
 mkdocs-material==9.1.18
 mkdocs-redirects==1.2.1
-mdformat==0.7.17
+mdformat==0.7.18
 mdformat-mkdocs==3.0.0
 mdformat-admon==2.0.6
 # Using a commit from pygments main branch so we get
