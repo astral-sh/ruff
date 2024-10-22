@@ -394,6 +394,18 @@ impl OneIndexed {
             None => Self::MIN,
         }
     }
+
+    /// Checked addition. Returns `None` if overflow occurred.
+    #[must_use]
+    pub fn checked_add(self, rhs: Self) -> Option<Self> {
+        self.0.checked_add(rhs.0.get()).map(Self)
+    }
+
+    /// Checked subtraction. Returns `None` if overflow occurred.
+    #[must_use]
+    pub fn checked_sub(self, rhs: Self) -> Option<Self> {
+        self.0.get().checked_sub(rhs.get()).and_then(Self::new)
+    }
 }
 
 impl fmt::Display for OneIndexed {
