@@ -1,11 +1,12 @@
-use ruff_formatter::{format_args, write};
+use std::borrow::Cow;
+
+use ruff_formatter::{format_args, write, FormatContext};
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::str_prefix::{
     AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix,
 };
 use ruff_python_ast::{AnyStringFlags, FStringElement, StringFlags, StringLike, StringLikePart};
 use ruff_text_size::{Ranged, TextRange};
-use std::borrow::Cow;
 
 use crate::comments::{leading_comments, trailing_comments};
 use crate::expression::parentheses::in_parentheses_only_soft_line_break_or_space;
@@ -16,7 +17,10 @@ use crate::prelude::*;
 use crate::preview::{
     is_f_string_formatting_enabled, is_join_implicit_concatenated_string_enabled,
 };
-use crate::string::normalize::QuoteMetadata;
+use crate::string::normalize::{
+    is_fstring_with_quoted_debug_expression,
+    is_fstring_with_triple_quoted_literal_expression_containing_quotes, QuoteMetadata,
+};
 use crate::string::{normalize_string, StringLikeExtensions, StringNormalizer, StringQuotes};
 
 /// Formats any implicitly concatenated string. This could be any valid combination
@@ -117,6 +121,14 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                 return None;
             }
 
+            let first_part = string.parts().next()?;
+
+            // The string is either a regular string, f-string, or bytes string.
+            let normalizer = StringNormalizer::from_context(context);
+
+            // Some if a part requires preserving its quotes.
+            let mut preserve_quotes_requirement: Option<Quote> = None;
+
             // Early exit if it's known that this string can't be joined
             for part in string.parts() {
                 // Similar to Black, don't collapse triple quoted and raw strings.
@@ -170,13 +182,29 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                     }) {
                         return None;
                     }
+
+                    // Avoid invalid syntax for pre Python 312:
+                    // * When joining parts that have debug expressions with quotes: `f"{10 + len('bar')=}" f'{10 + len("bar")=}'
+                    // * When joining parts that contain triple quoted strings with quotes: `f"{'''test ' '''}" f'{"""other " """}'`
+                    if !context.options().target_version().supports_pep_701() {
+                        if is_fstring_with_quoted_debug_expression(fstring, context)
+                            || is_fstring_with_triple_quoted_literal_expression_containing_quotes(
+                                fstring, context,
+                            )
+                        {
+                            if preserve_quotes_requirement
+                                .is_some_and(|quote| quote != part.flags().quote_style())
+                            {
+                                return None;
+                            } else {
+                                preserve_quotes_requirement = Some(part.flags().quote_style());
+                            }
+                        }
+                    }
                 }
             }
 
             // The string is either a regular string, f-string, or bytes string.
-            let normalizer = StringNormalizer::from_context(context);
-
-            // TODO: Do we need to respect the quoting from an enclosing f-string?
             let mut merged_quotes: Option<QuoteMetadata> = None;
 
             // Only preserve the string type but disregard the `u` and `r` prefixes.
@@ -187,8 +215,6 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                 StringLike::Bytes(_) => AnyStringPrefix::Bytes(ByteStringPrefix::Regular),
                 StringLike::FString(_) => AnyStringPrefix::Format(FStringPrefix::Regular),
             };
-
-            let first_part = string.parts().next()?;
 
             // Only determining the preferred quote for the first string is sufficient
             // because we don't support joining triple quoted strings with non triple quoted strings.
@@ -208,7 +234,7 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
 
                 merged_quotes?.choose(preferred_quote)
             } else {
-                // If the options is to preserve quotes, pick the quotes of the first string part.
+                // Use the quotes of the first part if the quotes should be preserved.
                 first_part.flags().quote_style()
             };
 
@@ -241,8 +267,6 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
         let quotes = StringQuotes::from(self.flags);
 
         write!(f, [self.flags.prefix(), quotes])?;
-
-        // TODO: FStrings when the f-string preview style is enabled???
 
         let mut parts = self.string.parts().peekable();
 

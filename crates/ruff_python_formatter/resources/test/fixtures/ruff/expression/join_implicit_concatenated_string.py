@@ -78,6 +78,27 @@ joined
 } eeeeeeeeeeeeeeeeeeeeeeeeeeeee" # inline
 
 
+f"single quoted '{x}'" f'double quoted "{x}"' # Same number of quotes => use preferred quote style
+f"single quote ' {x}" f'double quoted "{x}"'  # More double quotes => use single quotes
+f"single quoted '{x}'" f'double quote " {x}"'  # More single quotes => use double quotes
+
+# Different triple quoted strings
+f"{'''test'''}" f'{"""other"""}'
+
+# Now with inner quotes
+f"{'''test ' '''}" f'{"""other " """}'
+f"{some_where_nested('''test ' ''')}" f'{"""other " """ + "more"}'
+f"{b'''test ' '''}" f'{b"""other " """}'
+f"{f'''test ' '''}" f'{f"""other " """}'
+
+# debug expressions containing quotes
+f"{10 + len('bar')=}" f"{10 + len('bar')=}"
+f"{10 + len('bar')=}" f'no debug{10}' f"{10 + len('bar')=}"
+
+# We can't savely merge this pre Python 3.12 without altering the debug expression.
+f"{10 + len('bar')=}" f'{10 + len("bar")=}'
+
+
 ##############################################################################
 # Don't join raw strings
 ##############################################################################

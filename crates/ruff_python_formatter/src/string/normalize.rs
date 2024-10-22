@@ -44,6 +44,9 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
     /// The formatter should use the preferred quote style unless
     /// it can't because the string contains the preferred quotes OR
     /// it leads to more escaping.
+    ///
+    /// Note: If you add more cases here where we return `QuoteStyle::Preserve`,
+    /// make sure to also add them to [`FormatImplicitConcatenatedStringFlat::new`].
     pub(super) fn preferred_quote_style(&self, string: StringLikePart) -> QuoteStyle {
         match self.quoting {
             Quoting::Preserve => QuoteStyle::Preserve,
@@ -1009,7 +1012,9 @@ mod tests {
     use ruff_python_ast::str_prefix::FStringPrefix;
 
     use crate::string::normalize_string;
+    use crate::string::normalize_string;
 
+    use super::UnicodeEscape;
     use super::UnicodeEscape;
 
     #[test]
