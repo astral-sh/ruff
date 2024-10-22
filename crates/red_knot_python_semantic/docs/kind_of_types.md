@@ -15,16 +15,45 @@ at the same memory address for the entire duration of a Python program.
 
 Examples of singleton types in red-knot's model of Python include:
 
-- `types.EllipsisType` (the sole inhabitant is `builtins.Ellipsis`).
-- `types.NotImplementedType` (the sole inhabitant is `builtins.NotImplemented`).
+- `types.EllipsisType` (the sole inhabitant is `builtins.Ellipsis`;
+    the constructor always returns the same object):
+
+    ```pycon
+    >>> from types import EllipsisType
+    >>> EllipsisType() is EllipsisType() is ... is Ellipsis
+    True
+    >>> id(EllipsisType()) == id(...)
+    True
+    ```
+
+- `types.NotImplementedType`
+    (in the same way as `types.EllipsisType` and `builtins.Ellipsis`,
+    the sole inhabitant is `builtins.NotImplemented`).
+
 - `None` (which can also be spelled as `Literal[None]`).
     The sole inhabitant of the type is the runtime constant `None` itself.
+
 - `Literal[True]`: the sole inhabitant of the type is the constant `True`.
+
 - `Literal[False]`: the sole inhabitant of the type is the constant `False`.
-- `Literal[E.A]`, where `E` is an enum class which has a member `A` (the sole inhabitant is `E.A`).
+
+- `Literal[E.A]`, `Literal[E.B]` or `Literal[E.C]` for the following enum `E`
+    (the sole inhabitant of `Literal[E.A]` is the enum member `E.A`):
+
+    ```py
+    from enum import Enum, auto
+
+    class E(Enum):
+        A = auto()
+        B = auto()
+        C = auto()
+    ```
+
 - A "literal class type": a type representing a single known class (and none of its possible subclasses).
-- A "literal function type": a type representing a single known function
+
+- A "literal function type": a type that represents a single known function
     (and excludes all other functions, even if they have the same signature).
+
 - A "literal module type": a type representing a single known module.
 
 Since it is known that all inhabitants of a given singleton type share the same memory address,
@@ -39,8 +68,13 @@ def f(x: str | None):
         ...  # x can be narrowed to `None`
 ```
 
-All singleton types are also sealed types, closed types and single-value types
-(see below for definitions).
+All singleton types are also sealed types, and closed types; nearly all are single-value types.
+(See below for definitions of these other concepts.)
+
+The number of singleton types in Python is theoretically infinite
+(for any given theoretical runtime object `x`, you could theorise a singleton type `Y` for which
+the sole inhabitant of `Y` would be the runtime object `x`). However, only a small fraction of
+the set of possible singleton types are recognised as being singleton types by red-knot's model.
 
 ## Sealed types
 
@@ -49,10 +83,6 @@ that there is only a finite and pre-determined set of inhabitants at runtime.
 It follows from this that for every sealed type,
 there is also only a finite and pre-determined set of *subtypes* of that type.
 
-A sealed type in Python has the property
-that its proper subtypes[^2] are all disjunct from one another,
-and the union of all the proper subtypes of a sealed type is exactly equal to the sealed type.
-
 All singleton types are sealed types; however, not all sealed types are singleton types.
 
 Examples of sealed types (other than the singleton types listed above) are:
@@ -60,9 +90,8 @@ Examples of sealed types (other than the singleton types listed above) are:
 - `bool`:
 
     - The only inhabitants of `bool` at runtime are the constants `True` and `False`.
-    - The only proper subtypes of `bool` are `Literal[True]`, `Literal[False]`, and `Never`.
-        `Literal[True]`, `Literal[False]` and `Never` are all disjunct types,
-        and their union is exactly equal to `bool`.
+    - The only proper subtypes[^2] of `bool` are `Literal[True]`, `Literal[False]`, and `Never`;
+        their union is exactly equal to `bool`.
 
 - Enums: consider the following enum class:
 
@@ -76,10 +105,20 @@ Examples of sealed types (other than the singleton types listed above) are:
     ```
 
     - The only inhabitants of the `Foo` type at runtime are the enum `Foo`'s members:
-        `Foo.X` and `Foo.Y`
-    - The only proper subtypes of `Foo` are `Literal[Foo.X]`, `Literal[Foo.Y]`, `Literal[Foo.Z]`, and `Never`.
-        `Literal[Foo.X]`, `Literal[Foo.Y]`, `Literal[Foo.Z]` and `Never` are all disjunct,
-        and the union `Literal[Foo.X, Foo.Y, Foo.Z] | Never` is exactly equal to the type `Foo`.
+        `Foo.X`, `Foo.Y` and `Foo.Z`.
+
+    - The only proper subtypes of `Foo` are:
+
+        - `Literal[Foo.X]`
+        - `Literal[Foo.Y]`
+        - `Literal[Foo.Z]`
+        - `Literal[Foo.X, Foo.Y]`
+        - `Literal[Foo.X, Foo.Z]`
+        - `Literal[Foo.Y, Foo.Z]`
+        - `Never`
+
+        The union of the proper subtypes of `Foo` (`Literal[Foo.X, Foo.Y, Foo.Z] | Never`)
+        is exactly equal to the type `Foo`.
 
 Because a sealed type is equivalent to the union of all of its proper subtypes,
 for any given sealed type `X` where the only proper subtypes of `X` are `A`, `B` and `C`,
@@ -93,7 +132,6 @@ class X(Enum):
     B = auto()
     C = auto()
 
-
 def f(var: X):
     ...  # the type of `var` here is `X` (which is equivalent to `Literal[X.A, X.B, X.C]`)
 
@@ -105,26 +143,23 @@ def f(var: X):
 
 ## Single-value types
 
-A single-value type is a non-empty type for which it is known
-that all inhabitants of the type are equivalent with respect to their runtime value.
-All singleton types are single-value types, but not all single-value types are singleton types.
-
-Examples of single-value types that are not singleton types
-are `Literal["foo"]`, `Literal[b"foo"]`, `Literal[123456]`, and `tuple[Literal[True], Literal[False]]`.
-All runtime inhabitants of the `Literal["foo"]` type are entirely fungible and equal
-(they are all equal to the string `"foo"`).
-However, they are not necessarily the *same* object in terms of identity;
-multiple instances of the `"foo"` string can exist at runtime at different memory addresses.[^1]
-This means that it is not safe to narrow a single-value type by identity unless it is also known
-that the type is a singleton type.
-
-In order for a type to be considered a single-value type,
-there must exist a reflexive, symmetric, and transitive equivalence relation
-between all inhabitants of the type. It follows that for a single-value type in Python,
-all inhabitants must be instances of the same runtime class,
+For a given type `T`, `T` can be said to be a single-value type if there exists an
+[equivalence relation](https://en.wikipedia.org/wiki/Equivalence_relation)
+between all inhabitants of the type and the equivalence relation is satisfied between
+all inhabitants of the type. For a Python type to be categorised as a single-value type,
+all inhabitants of the type must be instances of the same runtime class,
 and the class in question must have `__eq__` and `__ne__` methods
 such that the equality relation between instances of the class
 is reflexive, symmetric, and transitive.
+
+Nearly all singleton types are single-value types, but the reverse is not true.
+Many single-value types exists that are not singleton types: examples include
+`Literal[123456]`, `Literal[b"foo"]`, `tuple[Literal[True], Literal[False]]`, and `Literal["foo"]`.
+All runtime inhabitants of the `Literal["foo"]` type are equal to the string `"foo"`.
+However, they are not necessarily the *same* object in terms of identity;
+multiple `str` instances equal to `"foo"` can exist at runtime at different memory addresses.[^1]
+This means that it is not safe to narrow a single-value type by identity unless it is also known
+that the type is a singleton type.
 
 Single-value types in unions can be safely narrowed using inequality (but not using equality):
 
@@ -145,6 +180,24 @@ def f(x: str | Literal[1]):
              # to compare equal with `1`)
     else:
         ...  # `x` can be narrowed to `str` if not equal to `1`
+```
+
+An example of a singleton type that is not a single-value type
+would be `Literal[Ham.A]` for the following `Ham` enum:
+because the `Ham` class overrides `__eq__`, we can no longer say for sure
+that the `Ham` type can be safely narrowed using inequality as in the above example
+(but we *can* still narrow the `Ham` type using identity, as with all singleton types):
+
+```py
+from enum import Enum, auto
+
+class Ham(Enum):
+    A = auto()
+    B = auto()
+    C = auto()
+
+    def __eq__(self, other):
+        return True
 ```
 
 ## Closed types
