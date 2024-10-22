@@ -3311,7 +3311,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // even if the target version is Python 3.8 or lower,
                 // despite the fact that there will be no corresponding `__class_getitem__`
                 // method in these `sys.version_info` branches.
-                if value_ty.is_class_literal(self.db) {
+                if value_ty.is_subtype_of(self.db, KnownClass::Type.to_instance(self.db)) {
                     let dunder_class_getitem_method = value_ty.member(self.db, "__class_getitem__");
                     if !dunder_class_getitem_method.is_unbound() {
                         return dunder_class_getitem_method

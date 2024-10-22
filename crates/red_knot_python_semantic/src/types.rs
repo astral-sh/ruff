@@ -393,16 +393,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Return true if the type is a class or a union of classes.
-    pub fn is_class_literal(&self, db: &'db dyn Db) -> bool {
-        match self {
-            Type::Union(union) => union.elements(db).iter().all(|ty| ty.is_class_literal(db)),
-            Type::ClassLiteral(_) => true,
-            // / TODO include type[X], once we add that type
-            _ => false,
-        }
-    }
-
     /// Return true if this type is a [subtype of] type `target`.
     ///
     /// [subtype of]: https://typing.readthedocs.io/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
@@ -431,6 +421,11 @@ impl<'db> Type<'db> {
             }
             (Type::BytesLiteral(_), Type::Instance(class))
                 if class.is_known(db, KnownClass::Bytes) =>
+            {
+                true
+            }
+            (Type::ClassLiteral(..), Type::Instance(class))
+                if class.is_known(db, KnownClass::Type) =>
             {
                 true
             }
@@ -1914,6 +1909,32 @@ mod tests {
     fn is_not_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(!from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
+    }
+
+    #[test]
+    fn is_subtype_of_class_literals() {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/module.py",
+            "
+            class A: ...
+            class B: ...
+            U = A if flag else B
+        ",
+        )
+        .unwrap();
+        let module = ruff_db::files::system_path_to_file(&db, "/src/module.py").unwrap();
+
+        let type_a = super::global_symbol_ty(&db, module, "A");
+        let type_u = super::global_symbol_ty(&db, module, "U");
+
+        assert!(matches!(type_a, Type::ClassLiteral(_)));
+        assert!(type_a.is_subtype_of(&db, Ty::BuiltinInstance("type").into_type(&db)));
+        assert!(type_a.is_subtype_of(&db, Ty::BuiltinInstance("object").into_type(&db)));
+
+        assert!(matches!(type_u, Type::Union(_)));
+        assert!(type_u.is_subtype_of(&db, Ty::BuiltinInstance("type").into_type(&db)));
+        assert!(type_u.is_subtype_of(&db, Ty::BuiltinInstance("object").into_type(&db)));
     }
 
     #[test_case(
