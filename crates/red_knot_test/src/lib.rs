@@ -61,10 +61,10 @@ pub fn run(path: &Path, title: &str) {
     assert!(!any_failures, "Some tests failed.");
 }
 
-fn run_test(db: &mut db::Db, spec: &parser::MarkdownSpec) -> Result<(), Failures> {
+fn run_test(db: &mut db::Db, spec: &parser::MarkdownTest) -> Result<(), Failures> {
     let workspace_root = db.workspace_root().to_path_buf();
 
-    let tests: Vec<_> = spec
+    let test_files: Vec<_> = spec
         .files()
         .map(|embedded| {
             assert!(
@@ -75,31 +75,31 @@ fn run_test(db: &mut db::Db, spec: &parser::MarkdownSpec) -> Result<(), Failures
             db.write_file(&full_path, embedded.code).unwrap();
             let file = system_path_to_file(db, full_path).unwrap();
 
-            Test {
+            TestFile {
                 file,
                 backtick_offset: embedded.md_offset,
             }
         })
         .collect();
 
-    let failures: Failures = tests
+    let failures: Failures = test_files
         .into_iter()
-        .filter_map(|test| {
-            let parsed = parsed_module(db, test.file);
+        .filter_map(|test_file| {
+            let parsed = parsed_module(db, test_file.file);
 
             // TODO allow testing against code with syntax errors
             assert!(
                 parsed.errors().is_empty(),
-                "Python syntax errors in {}, {:?}: {:?}",
+                "Python syntax errors in {}, {}: {:?}",
                 spec.name(),
-                test.file.path(db),
+                test_file.file.path(db),
                 parsed.errors()
             );
 
-            match matcher::match_file(db, test.file, check_types(db, test.file)) {
+            match matcher::match_file(db, test_file.file, check_types(db, test_file.file)) {
                 Ok(()) => None,
-                Err(line_failures) => Some(TestFailures {
-                    backtick_offset: test.backtick_offset,
+                Err(line_failures) => Some(FileFailures {
+                    backtick_offset: test_file.backtick_offset,
                     by_line: line_failures,
                 }),
             }
@@ -113,17 +113,18 @@ fn run_test(db: &mut db::Db, spec: &parser::MarkdownSpec) -> Result<(), Failures
     }
 }
 
-type Failures = Vec<TestFailures>;
+type Failures = Vec<FileFailures>;
 
-/// Failures of a single markdown test.
-struct TestFailures {
+/// The failures for a single file in a test by line number.
+struct FileFailures {
     /// The offset of the backticks that starts the code block in the Markdown file
     backtick_offset: TextSize,
     /// The failures by lines in the code block.
     by_line: matcher::FailuresByLine,
 }
 
-struct Test {
+/// File in a test.
+struct TestFile {
     file: File,
 
     // Offset of the backticks that starts the code block in the Markdown file

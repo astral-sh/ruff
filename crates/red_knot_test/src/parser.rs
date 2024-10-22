@@ -41,13 +41,13 @@ impl<'s> MarkdownTestSuite<'s> {
 /// headers in the file), containing one or more embedded Python files as fenced code blocks, and
 /// containing no nested header subsections.
 #[derive(Debug)]
-pub(crate) struct MarkdownSpec<'m, 's> {
+pub(crate) struct MarkdownTest<'m, 's> {
     suite: &'m MarkdownTestSuite<'s>,
     section: &'m Section<'s>,
     files: &'m [EmbeddedFile<'s>],
 }
 
-impl<'m, 's> MarkdownSpec<'m, 's> {
+impl<'m, 's> MarkdownTest<'m, 's> {
     pub(crate) fn name(&self) -> String {
         let mut name = String::new();
         let mut parent_id = self.section.parent_id;
@@ -71,7 +71,7 @@ impl<'m, 's> MarkdownSpec<'m, 's> {
     }
 }
 
-/// Iterator yielding all [`MarkdownSpec`]s in a [`MarkdownTestSuite`].
+/// Iterator yielding all [`MarkdownTest`]s in a [`MarkdownTestSuite`].
 #[derive(Debug)]
 pub(crate) struct MarkdownTestIterator<'m, 's> {
     suite: &'m MarkdownTestSuite<'s>,
@@ -79,7 +79,7 @@ pub(crate) struct MarkdownTestIterator<'m, 's> {
 }
 
 impl<'m, 's> Iterator for MarkdownTestIterator<'m, 's> {
-    type Item = MarkdownSpec<'m, 's>;
+    type Item = MarkdownTest<'m, 's>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut current_file_index = self.current_file_index;
@@ -92,7 +92,7 @@ impl<'m, 's> Iterator for MarkdownTestIterator<'m, 's> {
         let files = &self.suite.files[EmbeddedFileId::from_usize(self.current_file_index)
             ..EmbeddedFileId::from_usize(current_file_index)];
         self.current_file_index = current_file_index;
-        Some(MarkdownSpec {
+        Some(MarkdownTest {
             suite: self.suite,
             section: &self.suite.sections[section_id],
             files,
@@ -110,7 +110,7 @@ struct SectionId;
 /// same number or fewer `#` characters).
 ///
 /// A header section may either contain one or more embedded Python files (making it a
-/// [`MarkdownSpec`]), or it may contain nested sections (headers with more `#` characters), but
+/// [`MarkdownTest`]), or it may contain nested sections (headers with more `#` characters), but
 /// not both.
 #[derive(Debug)]
 struct Section<'s> {
@@ -127,7 +127,7 @@ struct EmbeddedFileId;
 /// Currently must be a Python file (`py` language) or type stub (`pyi`). In the future we plan
 /// support other kinds of files as well (TOML configuration, typeshed VERSIONS, `pth` files...).
 ///
-/// A Python embedded file makes its containing [`Section`] into a [`MarkdownSpec`], and will be
+/// A Python embedded file makes its containing [`Section`] into a [`MarkdownTest`], and will be
 /// type-checked and searched for inline-comment assertions to match against the diagnostics from
 /// type checking.
 #[derive(Debug)]
