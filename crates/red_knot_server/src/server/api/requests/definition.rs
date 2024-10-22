@@ -1,8 +1,13 @@
 use std::borrow::Cow;
 
-use lsp_types::{request::GotoDefinition, GotoDefinitionParams, GotoDefinitionResponse};
+use lsp_types::{
+    request::GotoDefinition, GotoDefinitionParams, GotoDefinitionResponse, Location, Range,
+};
 
-use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
+use crate::{
+    server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler},
+    session::DefLocation,
+};
 
 pub(crate) struct GotoDefinitionHandler;
 
@@ -26,7 +31,14 @@ impl BackgroundDocumentRequestHandler for GotoDefinitionHandler {
             snapshot.definition_at_location(params.text_document_position_params.position, &db);
 
         match lookup_result {
-            Some(loc) => todo!(),
+            Some(DefLocation::Location { url, range }) => {
+                eprintln!("GOT SOMETHING!");
+                let result = Location { uri: url, range };
+                return Ok(Some(GotoDefinitionResponse::Array(vec![result])));
+            }
+            Some(DefLocation::Todo { s }) => {
+                log_err_msg!("GOT TODO: {}", s);
+            }
             None => {
                 log_err_msg!("NOTHING FOUND");
             }

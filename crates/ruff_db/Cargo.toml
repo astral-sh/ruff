@@ -34,6 +34,7 @@ tracing-subscriber = { workspace = true, optional = true }
 tracing-tree = { workspace = true, optional = true }
 rustc-hash = { workspace = true }
 zip = { workspace = true }
+url = { workspace = true }
 
 [target.'cfg(target_arch="wasm32")'.dependencies]
 web-time = { version = "1.1.0" }

@@ -238,7 +238,7 @@ mod symbol_state;
 
 /// Applicable definitions and constraints for every use of a name.
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) struct UseDefMap<'db> {
+pub struct UseDefMap<'db> {
     /// Array of [`Definition`] in this scope.
     all_definitions: IndexVec<ScopedDefinitionId, Definition<'db>>,
 
@@ -267,10 +267,7 @@ pub(crate) struct UseDefMap<'db> {
 }
 
 impl<'db> UseDefMap<'db> {
-    pub(crate) fn bindings_at_use(
-        &self,
-        use_id: ScopedUseId,
-    ) -> BindingWithConstraintsIterator<'_, 'db> {
+    pub fn bindings_at_use(&self, use_id: ScopedUseId) -> BindingWithConstraintsIterator<'_, 'db> {
         self.bindings_iterator(&self.bindings_by_use[use_id])
     }
 
@@ -357,7 +354,7 @@ enum SymbolDefinitions {
 }
 
 #[derive(Debug)]
-pub(crate) struct BindingWithConstraintsIterator<'map, 'db> {
+pub struct BindingWithConstraintsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, Definition<'db>>,
     all_constraints: &'map IndexVec<ScopedConstraintId, Constraint<'db>>,
     inner: BindingIdWithConstraintsIterator<'map>,
@@ -381,11 +378,13 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
 
 impl std::iter::FusedIterator for BindingWithConstraintsIterator<'_, '_> {}
 
-pub(crate) struct BindingWithConstraints<'map, 'db> {
-    pub(crate) binding: Definition<'db>,
-    pub(crate) constraints: ConstraintsIterator<'map, 'db>,
+#[derive(Debug)]
+pub struct BindingWithConstraints<'map, 'db> {
+    pub binding: Definition<'db>,
+    pub constraints: ConstraintsIterator<'map, 'db>,
 }
 
+#[derive(Debug)]
 pub(crate) struct ConstraintsIterator<'map, 'db> {
     all_constraints: &'map IndexVec<ScopedConstraintId, Constraint<'db>>,
     constraint_ids: ConstraintIdIterator<'map>,

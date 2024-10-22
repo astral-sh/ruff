@@ -12,7 +12,7 @@ use crate::Db;
 pub struct Definition<'db> {
     /// The file in which the definition occurs.
     #[id]
-    pub(crate) file: File,
+    pub file: File,
 
     /// The scope in which the definition occurs.
     #[id]
@@ -582,7 +582,7 @@ impl ExceptHandlerDefinitionKind {
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
-pub(crate) struct DefinitionNodeKey(NodeKey);
+pub struct DefinitionNodeKey(pub NodeKey);
 
 impl From<&ast::Alias> for DefinitionNodeKey {
     fn from(node: &ast::Alias) -> Self {

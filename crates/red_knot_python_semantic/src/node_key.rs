@@ -5,9 +5,9 @@ use ruff_text_size::{Ranged, TextRange};
 ///
 /// Compares two nodes by their kind and text range.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-pub(super) struct NodeKey {
+pub struct NodeKey {
     kind: NodeKind,
-    range: TextRange,
+    pub range: TextRange,
 }
 
 impl NodeKey {

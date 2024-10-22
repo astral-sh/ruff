@@ -2426,6 +2426,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "tracing-tree",
+ "url",
  "web-time",
  "zip",
 ]

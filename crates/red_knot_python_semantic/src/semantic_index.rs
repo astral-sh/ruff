@@ -66,7 +66,7 @@ pub(crate) fn symbol_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<Sym
 /// Salsa can avoid invalidating dependent queries if this scope's use-def map
 /// is unchanged.
 #[salsa::tracked]
-pub(crate) fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseDefMap<'db>> {
+pub fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseDefMap<'db>> {
     let file = scope.file(db);
     let _span =
         tracing::trace_span!("use_def_map", scope=?scope.as_id(), file=%file.path(db)).entered();
@@ -137,10 +137,18 @@ impl<'db> SemanticIndex<'db> {
         self.use_def_maps[scope_id].clone()
     }
 
-    pub(crate) fn ast_ids(&self, scope_id: FileScopeId) -> &AstIds {
+    pub fn ast_ids(&self, scope_id: FileScopeId) -> &AstIds {
         &self.ast_ids[scope_id]
     }
 
+    pub fn find_dnk(&self, def: &Definition<'db>) -> &DefinitionNodeKey {
+        for (dnk, other_def) in &self.definitions_by_node {
+            if other_def == def {
+                return dnk;
+            }
+        }
+        panic!("Could not find DNK!");
+    }
     /// Returns the ID of the `expression`'s enclosing scope.
     pub fn expression_scope_id(&self, expression: impl Into<ExpressionNodeKey>) -> FileScopeId {
         self.scopes_by_expression[&expression.into()]
@@ -192,10 +200,7 @@ impl<'db> SemanticIndex<'db> {
     }
 
     /// Returns the [`Definition`] salsa ingredient for `definition_key`.
-    pub(crate) fn definition(
-        &self,
-        definition_key: impl Into<DefinitionNodeKey>,
-    ) -> Definition<'db> {
+    pub fn definition(&self, definition_key: impl Into<DefinitionNodeKey>) -> Definition<'db> {
         self.definitions_by_node[&definition_key.into()]
     }
 
