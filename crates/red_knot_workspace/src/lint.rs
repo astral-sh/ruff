@@ -142,7 +142,7 @@ fn lint_bad_override(context: &SemanticLintContext, class: &ast::StmtClassDef) {
 
     let override_ty = semantic.global_symbol_ty(&typing, "override");
 
-    let Type::Class(class_ty) = class.ty(semantic) else {
+    let Type::ClassLiteral(class_ty) = class.ty(semantic) else {
         return;
     };
 
@@ -151,7 +151,7 @@ fn lint_bad_override(context: &SemanticLintContext, class: &ast::StmtClassDef) {
         .iter()
         .filter_map(|stmt| stmt.as_function_def_stmt())
     {
-        let Type::Function(ty) = function.ty(semantic) else {
+        let Type::FunctionLiteral(ty) = function.ty(semantic) else {
             return;
         };
 

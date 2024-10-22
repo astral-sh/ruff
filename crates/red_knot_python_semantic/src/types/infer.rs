@@ -510,12 +510,12 @@ impl<'db> TypeInferenceBuilder<'db> {
         assigned_ty: Type<'db>,
     ) {
         match declared_ty {
-            Type::Class(class) => {
+            Type::ClassLiteral(class) => {
                 self.add_diagnostic(node, "invalid-assignment", format_args!(
                         "Implicit shadowing of class `{}`; annotate to make it explicit if this is intentional",
                         class.name(self.db)));
             }
-            Type::Function(function) => {
+            Type::FunctionLiteral(function) => {
                 self.add_diagnostic(node, "invalid-assignment", format_args!(
                         "Implicit shadowing of function `{}`; annotate to make it explicit if this is intentional",
                         function.name(self.db)));
@@ -778,7 +778,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             _ => None,
         };
-        let function_ty = Type::Function(FunctionType::new(
+        let function_ty = Type::FunctionLiteral(FunctionType::new(
             self.db,
             name.id.clone(),
             function_kind,
@@ -887,7 +887,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .as_ref()
             .and_then(|module| KnownClass::maybe_from_module(module, name.as_str()));
 
-        let class_ty = Type::Class(ClassType::new(
+        let class_ty = Type::ClassLiteral(ClassType::new(
             self.db,
             name.id.clone(),
             definition,
@@ -1056,13 +1056,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             // anything else is invalid and should lead to a diagnostic being reported --Alex
             match node_ty {
                 Type::Any | Type::Unknown => node_ty,
-                Type::Class(class_ty) => Type::Instance(class_ty),
+                Type::ClassLiteral(class_ty) => Type::Instance(class_ty),
                 Type::Tuple(tuple) => UnionType::from_elements(
                     self.db,
-                    tuple
-                        .elements(self.db)
-                        .iter()
-                        .map(|ty| ty.into_class_type().map_or(Type::Todo, Type::Instance)),
+                    tuple.elements(self.db).iter().map(|ty| {
+                        ty.into_class_literal_type()
+                            .map_or(Type::Todo, Type::Instance)
+                    }),
                 ),
                 _ => Type::Todo,
             }
@@ -1311,7 +1311,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
                     }
                     _ => {
-                        let value_ty = if matches!(value_ty, Type::LiteralString) {
+                        let value_ty = if value_ty.is_literal_string() {
                             Type::LiteralString
                         } else {
                             value_ty
@@ -1773,7 +1773,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn module_ty_from_name(&self, module_name: &ModuleName) -> Option<Type<'db>> {
-        resolve_module(self.db, module_name).map(|module| Type::Module(module.file()))
+        resolve_module(self.db, module_name).map(|module| Type::ModuleLiteral(module.file()))
     }
 
     fn infer_decorator(&mut self, decorator: &ast::Decorator) -> Type<'db> {
@@ -3311,7 +3311,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // even if the target version is Python 3.8 or lower,
                 // despite the fact that there will be no corresponding `__class_getitem__`
                 // method in these `sys.version_info` branches.
-                if value_ty.is_class(self.db) {
+                if value_ty.is_subtype_of(self.db, KnownClass::Type.to_instance(self.db)) {
                     let dunder_class_getitem_method = value_ty.member(self.db, "__class_getitem__");
                     if !dunder_class_getitem_method.is_unbound() {
                         return dunder_class_getitem_method
@@ -3331,7 +3331,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             });
                     }
 
-                    if matches!(value_ty, Type::Class(class) if class.is_known(self.db, KnownClass::Type))
+                    if matches!(value_ty, Type::ClassLiteral(class) if class.is_known(self.db, KnownClass::Type))
                     {
                         return KnownClass::GenericAlias.to_instance(self.db);
                     }
@@ -3907,7 +3907,7 @@ mod tests {
         let mod_file = system_path_to_file(&db, "src/mod.py").expect("file to exist");
         let ty = global_symbol_ty(&db, mod_file, "Sub");
 
-        let class = ty.expect_class();
+        let class = ty.expect_class_literal();
 
         let base_names: Vec<_> = class
             .bases(&db)
@@ -3933,9 +3933,9 @@ mod tests {
 
         let mod_file = system_path_to_file(&db, "src/mod.py").unwrap();
         let ty = global_symbol_ty(&db, mod_file, "C");
-        let class_id = ty.expect_class();
+        let class_id = ty.expect_class_literal();
         let member_ty = class_id.class_member(&db, &Name::new_static("f"));
-        let func = member_ty.expect_function();
+        let func = member_ty.expect_function_literal();
 
         assert_eq!(func.name(&db), "f");
         Ok(())
@@ -4113,7 +4113,7 @@ mod tests {
         db.write_file("src/a.py", "def example() -> int: return 42")?;
 
         let mod_file = system_path_to_file(&db, "src/a.py").unwrap();
-        let function = global_symbol_ty(&db, mod_file, "example").expect_function();
+        let function = global_symbol_ty(&db, mod_file, "example").expect_function_literal();
         let returns = function.return_type(&db);
         assert_eq!(returns.display(&db).to_string(), "int");
 
@@ -4142,14 +4142,14 @@ mod tests {
 
         let a = system_path_to_file(&db, "src/a.py").expect("file to exist");
         let c_ty = global_symbol_ty(&db, a, "C");
-        let c_class = c_ty.expect_class();
+        let c_class = c_ty.expect_class_literal();
         let mut c_bases = c_class.bases(&db);
         let b_ty = c_bases.next().unwrap();
-        let b_class = b_ty.expect_class();
+        let b_class = b_ty.expect_class_literal();
         assert_eq!(b_class.name(&db), "B");
         let mut b_bases = b_class.bases(&db);
         let a_ty = b_bases.next().unwrap();
-        let a_class = a_ty.expect_class();
+        let a_class = a_ty.expect_class_literal();
         assert_eq!(a_class.name(&db), "A");
 
         Ok(())
@@ -4299,7 +4299,7 @@ mod tests {
         let ty = global_symbol_ty(&db, file, "C");
 
         let base = ty
-            .expect_class()
+            .expect_class_literal()
             .bases(&db)
             .next()
             .expect("there should be at least one base");

@@ -231,7 +231,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     if let Some(&Type::BooleanLiteral(value)) = self
                         .negative
                         .iter()
-                        .find(|element| matches!(element, Type::BooleanLiteral(..)))
+                        .find(|element| element.is_boolean_literal())
                     {
                         *self = Self::new();
                         self.positive.insert(Type::BooleanLiteral(!value));
