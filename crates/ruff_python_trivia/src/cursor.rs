@@ -26,6 +26,16 @@ impl<'a> Cursor<'a> {
         self.chars.clone()
     }
 
+    /// Returns the remaining input as byte slice.
+    pub fn as_bytes(&self) -> &'a [u8] {
+        self.as_str().as_bytes()
+    }
+
+    /// Returns the remaining input as string slice.
+    pub fn as_str(&self) -> &'a str {
+        self.chars.as_str()
+    }
+
     /// Peeks the next character from the input stream without consuming it.
     /// Returns [`EOF_CHAR`] if the file is at the end of the file.
     pub fn first(&self) -> char {
@@ -109,5 +119,14 @@ impl<'a> Cursor<'a> {
         while predicate(self.last()) && !self.is_eof() {
             self.bump_back();
         }
+    }
+
+    /// Skips the next `count` bytes.
+    ///
+    /// ## Panics
+    ///  - If `count` is larger than the remaining bytes in the input stream.
+    ///  - If `count` indexes into a multi-byte character.
+    pub fn skip_bytes(&mut self, count: usize) {
+        self.chars = self.chars.as_str()[count..].chars();
     }
 }

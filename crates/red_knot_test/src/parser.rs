@@ -1,8 +1,9 @@
 use memchr::memchr2;
 use regex::{Captures, Match, Regex};
 use ruff_index::{newtype_index, IndexVec};
+use ruff_python_trivia::Cursor;
 use ruff_source_file::LineIndex;
-use ruff_text_size::TextSize;
+use ruff_text_size::{TextLen, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::LazyLock;
 
@@ -197,10 +198,9 @@ struct Parser<'s> {
     files: IndexVec<EmbeddedFileId, EmbeddedFile<'s>>,
 
     /// The unparsed remainder of the Markdown source.
-    unparsed: &'s str,
+    cursor: Cursor<'s>,
 
-    /// Current offset of the parser into the markdown file.
-    md_offset: TextSize,
+    source_len: TextSize,
 
     line_index: LineIndex,
 
@@ -222,8 +222,8 @@ impl<'s> Parser<'s> {
         Self {
             sections,
             files: IndexVec::default(),
-            unparsed: source,
-            md_offset: TextSize::new(0),
+            cursor: Cursor::new(source),
+            source_len: source.text_len(),
             line_index: LineIndex::from_source_text(source),
             stack: SectionStack::new(root_section_id),
             current_section_files: None,
@@ -246,45 +246,24 @@ impl<'s> Parser<'s> {
         }
     }
 
-    fn increment_offset(&mut self, size: usize) -> anyhow::Result<()> {
-        self.md_offset = self
-            .md_offset
-            .checked_add(size.try_into()?)
-            .ok_or_else(|| anyhow::anyhow!("Overflow when incrementing offset by {size}"))?;
-
-        Ok(())
-    }
-
-    fn increment_captures(&mut self, captures: &Captures<'s>) -> anyhow::Result<()> {
-        self.increment_offset(
-            captures
-                .get(0)
-                .ok_or_else(|| anyhow::anyhow!("No captures found"))?
-                .len(),
-        )
-    }
-
     fn parse_impl(&mut self) -> anyhow::Result<()> {
-        while let Some(position) = memchr2(b'`', b'#', self.unparsed.as_bytes()) {
-            let (before, after) = self.unparsed.split_at(position);
-            self.unparsed = after;
+        while let Some(position) = memchr2(b'`', b'#', self.cursor.as_bytes()) {
+            self.cursor.skip_bytes(position.saturating_sub(1));
 
             // code blocks and headers must start on a new line.
-            if before.is_empty() || before.ends_with('\n') {
-                let c = after.as_bytes()[0] as char;
-
-                match c {
+            if position == 0 || self.cursor.eat_char('\n') {
+                match self.cursor.first() {
                     '#' => {
-                        if let Some(find) = HEADER_RE.find(self.unparsed) {
+                        if let Some(find) = HEADER_RE.find(self.cursor.as_str()) {
                             self.parse_header(find.as_str())?;
-                            self.unparsed = &self.unparsed[find.end()..];
+                            self.cursor.skip_bytes(find.len());
                             continue;
                         }
                     }
                     '`' => {
-                        if let Some(captures) = CODE_RE.captures(self.unparsed) {
+                        if let Some(captures) = CODE_RE.captures(self.cursor.as_str()) {
                             self.parse_code_block(&captures)?;
-                            self.unparsed = &self.unparsed[captures.get(0).unwrap().end()..];
+                            self.cursor.skip_bytes(captures.get(0).unwrap().len());
                             continue;
                         }
                     }
@@ -293,8 +272,8 @@ impl<'s> Parser<'s> {
             }
 
             // Skip to the end of the line
-            if let Some(position) = memchr::memchr(b'\n', self.unparsed.as_bytes()) {
-                self.unparsed = &self.unparsed[position + 1..];
+            if let Some(position) = memchr::memchr(b'\n', self.cursor.as_bytes()) {
+                self.cursor.skip_bytes(position);
             } else {
                 break;
             }
@@ -375,7 +354,7 @@ impl<'s> Parser<'s> {
             // CODE_RE can't match without matches for 'lang' and 'code'.
             code: captures.name("code").unwrap().into(),
 
-            md_offset: self.md_offset,
+            md_offset: self.offset(),
         });
 
         if let Some(current_files) = &mut self.current_section_files {
@@ -407,6 +386,11 @@ impl<'s> Parser<'s> {
             // no parent section can have files.
             self.current_section_files = None;
         }
+    }
+
+    /// Retrieves the current offset of the cursor within the source code.
+    fn offset(&self) -> TextSize {
+        self.source_len - self.cursor.text_len()
     }
 }
 
