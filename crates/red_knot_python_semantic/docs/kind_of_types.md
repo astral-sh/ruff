@@ -105,8 +105,8 @@ def f(var: X):
 
 ## Single-value types
 
-A single-value type is a type for which it is known
-that all inhabitants of the type are equivalent with respect to their underlying value.
+A single-value type is a non-empty type for which it is known
+that all inhabitants of the type are equivalent with respect to their runtime value.
 All singleton types are single-value types, but not all single-value types are singleton types.
 
 Examples of single-value types that are not singleton types
