@@ -304,6 +304,10 @@ impl<'db> Type<'db> {
             .expect("Expected a Type::ClassLiteral variant")
     }
 
+    pub const fn is_class_literal(&self) -> bool {
+        matches!(self, Type::ClassLiteral(..))
+    }
+
     pub const fn into_module_literal_type(self) -> Option<File> {
         match self {
             Type::ModuleLiteral(file) => Some(file),
@@ -326,6 +330,10 @@ impl<'db> Type<'db> {
     pub fn expect_union(self) -> UnionType<'db> {
         self.into_union_type()
             .expect("Expected a Type::Union variant")
+    }
+
+    pub const fn is_union(&self) -> bool {
+        matches!(self, Type::Union(..))
     }
 
     pub const fn into_intersection_type(self) -> Option<IntersectionType<'db>> {
@@ -352,6 +360,10 @@ impl<'db> Type<'db> {
             .expect("Expected a Type::FunctionLiteral variant")
     }
 
+    pub const fn is_function_literal(&self) -> bool {
+        matches!(self, Type::FunctionLiteral(..))
+    }
+
     pub const fn into_int_literal_type(self) -> Option<i64> {
         match self {
             Type::IntLiteral(value) => Some(value),
@@ -362,6 +374,14 @@ impl<'db> Type<'db> {
     pub fn expect_int_literal(self) -> i64 {
         self.into_int_literal_type()
             .expect("Expected a Type::IntLiteral variant")
+    }
+
+    pub const fn is_boolean_literal(&self) -> bool {
+        matches!(self, Type::BooleanLiteral(..))
+    }
+
+    pub const fn is_literal_string(&self) -> bool {
+        matches!(self, Type::LiteralString)
     }
 
     pub fn may_be_unbound(&self, db: &'db dyn Db) -> bool {
@@ -1928,11 +1948,11 @@ mod tests {
         let type_a = super::global_symbol_ty(&db, module, "A");
         let type_u = super::global_symbol_ty(&db, module, "U");
 
-        assert!(matches!(type_a, Type::ClassLiteral(_)));
+        assert!(type_a.is_class_literal());
         assert!(type_a.is_subtype_of(&db, Ty::BuiltinInstance("type").into_type(&db)));
         assert!(type_a.is_subtype_of(&db, Ty::BuiltinInstance("object").into_type(&db)));
 
-        assert!(matches!(type_u, Type::Union(_)));
+        assert!(type_u.is_union());
         assert!(type_u.is_subtype_of(&db, Ty::BuiltinInstance("type").into_type(&db)));
         assert!(type_u.is_subtype_of(&db, Ty::BuiltinInstance("object").into_type(&db)));
     }
@@ -2019,19 +2039,19 @@ mod tests {
             "
             class A: ...
             class B: ...
-            x = A if flag else B
+            U = A if flag else B
         ",
         )
         .unwrap();
         let module = ruff_db::files::system_path_to_file(&db, "/src/module.py").unwrap();
 
         let type_a = super::global_symbol_ty(&db, module, "A");
-        let type_x = super::global_symbol_ty(&db, module, "x");
+        let type_u = super::global_symbol_ty(&db, module, "U");
 
-        assert!(matches!(type_a, Type::ClassLiteral(_)));
-        assert!(matches!(type_x, Type::Union(_)));
+        assert!(type_a.is_class_literal());
+        assert!(type_u.is_union());
 
-        assert!(!type_a.is_disjoint_from(&db, type_x));
+        assert!(!type_a.is_disjoint_from(&db, type_u));
     }
 
     #[test_case(Ty::None)]

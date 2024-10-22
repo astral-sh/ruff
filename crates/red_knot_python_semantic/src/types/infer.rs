@@ -1311,7 +1311,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
                     }
                     _ => {
-                        let value_ty = if matches!(value_ty, Type::LiteralString) {
+                        let value_ty = if value_ty.is_literal_string() {
                             Type::LiteralString
                         } else {
                             value_ty

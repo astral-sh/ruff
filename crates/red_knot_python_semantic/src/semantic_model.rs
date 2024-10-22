@@ -175,7 +175,6 @@ mod tests {
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
-    use crate::types::Type;
     use crate::{HasTy, ProgramSettings, SemanticModel};
 
     fn setup_db<'a>(files: impl IntoIterator<Item = (&'a str, &'a str)>) -> anyhow::Result<TestDb> {
@@ -205,7 +204,7 @@ mod tests {
         let model = SemanticModel::new(&db, foo);
         let ty = function.ty(&model);
 
-        assert!(matches!(ty, Type::FunctionLiteral(_)));
+        assert!(ty.is_function_literal());
 
         Ok(())
     }
@@ -222,7 +221,7 @@ mod tests {
         let model = SemanticModel::new(&db, foo);
         let ty = class.ty(&model);
 
-        assert!(matches!(ty, Type::ClassLiteral(_)));
+        assert!(ty.is_class_literal());
 
         Ok(())
     }
@@ -243,7 +242,7 @@ mod tests {
         let model = SemanticModel::new(&db, bar);
         let ty = alias.ty(&model);
 
-        assert!(matches!(ty, Type::ClassLiteral(_)));
+        assert!(ty.is_class_literal());
 
         Ok(())
     }
