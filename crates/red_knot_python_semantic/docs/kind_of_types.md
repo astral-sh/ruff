@@ -81,8 +81,8 @@ Examples of sealed types (other than the singleton types listed above) are:
         `Literal[Foo.X]`, `Literal[Foo.Y]`, `Literal[Foo.Z]` and `Never` are all disjunct,
         and the union `Literal[Foo.X, Foo.Y, Foo.Z] | Never` is exactly equal to the type `Foo`.
 
-Because a singleton type is equivalent to the union of all of its proper subtypes,
-for any given singleton type `X` where the only proper subtypes of `X` are `A`, `B` and `C`,
+Because a sealed type is equivalent to the union of all of its proper subtypes,
+for any given sealed type `X` where the only proper subtypes of `X` are `A`, `B` and `C`,
 `X & ~A == B | C`. To give a Python example:
 
 ```py
