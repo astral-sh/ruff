@@ -292,27 +292,27 @@ impl<'db> Type<'db> {
         matches!(self, Type::Never)
     }
 
-    pub const fn into_class_type(self) -> Option<ClassType<'db>> {
+    pub const fn into_class_literal_type(self) -> Option<ClassType<'db>> {
         match self {
             Type::ClassLiteral(class_type) => Some(class_type),
             _ => None,
         }
     }
 
-    pub fn expect_class(self) -> ClassType<'db> {
-        self.into_class_type()
+    pub fn expect_class_literal(self) -> ClassType<'db> {
+        self.into_class_literal_type()
             .expect("Expected a Type::ClassLiteral variant")
     }
 
-    pub const fn into_module_type(self) -> Option<File> {
+    pub const fn into_module_literal_type(self) -> Option<File> {
         match self {
             Type::ModuleLiteral(file) => Some(file),
             _ => None,
         }
     }
 
-    pub fn expect_module(self) -> File {
-        self.into_module_type()
+    pub fn expect_module_literal(self) -> File {
+        self.into_module_literal_type()
             .expect("Expected a Type::ModuleLiteral variant")
     }
 
@@ -340,15 +340,15 @@ impl<'db> Type<'db> {
             .expect("Expected a Type::Intersection variant")
     }
 
-    pub const fn into_function_type(self) -> Option<FunctionType<'db>> {
+    pub const fn into_function_literal_type(self) -> Option<FunctionType<'db>> {
         match self {
             Type::FunctionLiteral(function_type) => Some(function_type),
             _ => None,
         }
     }
 
-    pub fn expect_function(self) -> FunctionType<'db> {
-        self.into_function_type()
+    pub fn expect_function_literal(self) -> FunctionType<'db> {
+        self.into_function_literal_type()
             .expect("Expected a Type::FunctionLiteral variant")
     }
 
@@ -394,9 +394,9 @@ impl<'db> Type<'db> {
     }
 
     /// Return true if the type is a class or a union of classes.
-    pub fn is_class(&self, db: &'db dyn Db) -> bool {
+    pub fn is_class_literal(&self, db: &'db dyn Db) -> bool {
         match self {
-            Type::Union(union) => union.elements(db).iter().all(|ty| ty.is_class(db)),
+            Type::Union(union) => union.elements(db).iter().all(|ty| ty.is_class_literal(db)),
             Type::ClassLiteral(_) => true,
             // / TODO include type[X], once we add that type
             _ => false,

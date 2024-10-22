@@ -1059,10 +1059,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::ClassLiteral(class_ty) => Type::Instance(class_ty),
                 Type::Tuple(tuple) => UnionType::from_elements(
                     self.db,
-                    tuple
-                        .elements(self.db)
-                        .iter()
-                        .map(|ty| ty.into_class_type().map_or(Type::Todo, Type::Instance)),
+                    tuple.elements(self.db).iter().map(|ty| {
+                        ty.into_class_literal_type()
+                            .map_or(Type::Todo, Type::Instance)
+                    }),
                 ),
                 _ => Type::Todo,
             }
@@ -3311,7 +3311,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // even if the target version is Python 3.8 or lower,
                 // despite the fact that there will be no corresponding `__class_getitem__`
                 // method in these `sys.version_info` branches.
-                if value_ty.is_class(self.db) {
+                if value_ty.is_class_literal(self.db) {
                     let dunder_class_getitem_method = value_ty.member(self.db, "__class_getitem__");
                     if !dunder_class_getitem_method.is_unbound() {
                         return dunder_class_getitem_method
@@ -3907,7 +3907,7 @@ mod tests {
         let mod_file = system_path_to_file(&db, "src/mod.py").expect("file to exist");
         let ty = global_symbol_ty(&db, mod_file, "Sub");
 
-        let class = ty.expect_class();
+        let class = ty.expect_class_literal();
 
         let base_names: Vec<_> = class
             .bases(&db)
@@ -3933,9 +3933,9 @@ mod tests {
 
         let mod_file = system_path_to_file(&db, "src/mod.py").unwrap();
         let ty = global_symbol_ty(&db, mod_file, "C");
-        let class_id = ty.expect_class();
+        let class_id = ty.expect_class_literal();
         let member_ty = class_id.class_member(&db, &Name::new_static("f"));
-        let func = member_ty.expect_function();
+        let func = member_ty.expect_function_literal();
 
         assert_eq!(func.name(&db), "f");
         Ok(())
@@ -4113,7 +4113,7 @@ mod tests {
         db.write_file("src/a.py", "def example() -> int: return 42")?;
 
         let mod_file = system_path_to_file(&db, "src/a.py").unwrap();
-        let function = global_symbol_ty(&db, mod_file, "example").expect_function();
+        let function = global_symbol_ty(&db, mod_file, "example").expect_function_literal();
         let returns = function.return_type(&db);
         assert_eq!(returns.display(&db).to_string(), "int");
 
@@ -4142,14 +4142,14 @@ mod tests {
 
         let a = system_path_to_file(&db, "src/a.py").expect("file to exist");
         let c_ty = global_symbol_ty(&db, a, "C");
-        let c_class = c_ty.expect_class();
+        let c_class = c_ty.expect_class_literal();
         let mut c_bases = c_class.bases(&db);
         let b_ty = c_bases.next().unwrap();
-        let b_class = b_ty.expect_class();
+        let b_class = b_ty.expect_class_literal();
         assert_eq!(b_class.name(&db), "B");
         let mut b_bases = b_class.bases(&db);
         let a_ty = b_bases.next().unwrap();
-        let a_class = a_ty.expect_class();
+        let a_class = a_ty.expect_class_literal();
         assert_eq!(a_class.name(&db), "A");
 
         Ok(())
@@ -4299,7 +4299,7 @@ mod tests {
         let ty = global_symbol_ty(&db, file, "C");
 
         let base = ty
-            .expect_class()
+            .expect_class_literal()
             .bases(&db)
             .next()
             .expect("there should be at least one base");
