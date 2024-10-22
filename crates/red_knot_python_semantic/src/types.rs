@@ -415,27 +415,24 @@ impl<'db> Type<'db> {
             (_, Type::Unknown | Type::Any | Type::Todo) => false,
             (Type::Never, _) => true,
             (_, Type::Never) => false,
+            (_, Type::Instance(class)) if class.is_known(db, KnownClass::Object) => true,
+            (Type::Instance(class), _) if class.is_known(db, KnownClass::Object) => false,
             (Type::BooleanLiteral(_), Type::Instance(class))
-                if matches!(class.known(db), Some(KnownClass::Bool | KnownClass::Object)) =>
+                if class.is_known(db, KnownClass::Bool) =>
             {
                 true
             }
-            (Type::IntLiteral(_), Type::Instance(class))
-                if matches!(class.known(db), Some(KnownClass::Int | KnownClass::Object)) =>
-            {
+            (Type::IntLiteral(_), Type::Instance(class)) if class.is_known(db, KnownClass::Int) => {
                 true
             }
             (Type::StringLiteral(_), Type::LiteralString) => true,
             (Type::StringLiteral(_) | Type::LiteralString, Type::Instance(class))
-                if matches!(class.known(db), Some(KnownClass::Str | KnownClass::Object)) =>
+                if class.is_known(db, KnownClass::Str) =>
             {
                 true
             }
             (Type::BytesLiteral(_), Type::Instance(class))
-                if matches!(
-                    class.known(db),
-                    Some(KnownClass::Bytes | KnownClass::Object)
-                ) =>
+                if class.is_known(db, KnownClass::Bytes) =>
             {
                 true
             }
@@ -447,8 +444,6 @@ impl<'db> Type<'db> {
                 .elements(db)
                 .iter()
                 .any(|&elem_ty| ty.is_subtype_of(db, elem_ty)),
-            (_, Type::Instance(class)) if class.is_known(db, KnownClass::Object) => true,
-            (Type::Instance(class), _) if class.is_known(db, KnownClass::Object) => false,
             (Type::Instance(self_class), Type::Instance(target_class)) => {
                 self_class.is_subclass_of(db, target_class)
             }
