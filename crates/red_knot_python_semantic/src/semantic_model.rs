@@ -205,7 +205,7 @@ mod tests {
         let model = SemanticModel::new(&db, foo);
         let ty = function.ty(&model);
 
-        assert!(matches!(ty, Type::Function(_)));
+        assert!(matches!(ty, Type::FunctionLiteral(_)));
 
         Ok(())
     }
@@ -222,7 +222,7 @@ mod tests {
         let model = SemanticModel::new(&db, foo);
         let ty = class.ty(&model);
 
-        assert!(matches!(ty, Type::Class(_)));
+        assert!(matches!(ty, Type::ClassLiteral(_)));
 
         Ok(())
     }
@@ -243,7 +243,7 @@ mod tests {
         let model = SemanticModel::new(&db, bar);
         let ty = alias.ty(&model);
 
-        assert!(matches!(ty, Type::Class(_)));
+        assert!(matches!(ty, Type::ClassLiteral(_)));
 
         Ok(())
     }

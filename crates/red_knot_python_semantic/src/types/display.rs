@@ -34,8 +34,8 @@ impl Display for DisplayType<'_> {
                 | Type::BooleanLiteral(_)
                 | Type::StringLiteral(_)
                 | Type::BytesLiteral(_)
-                | Type::Class(_)
-                | Type::Function(_)
+                | Type::ClassLiteral(_)
+                | Type::FunctionLiteral(_)
         ) {
             write!(f, "Literal[{representation}]")
         } else {
@@ -69,13 +69,13 @@ impl Display for DisplayRepresentation<'_> {
             // `[Type::Todo]`'s display should be explicit that is not a valid display of
             // any other type
             Type::Todo => f.write_str("@Todo"),
-            Type::Module(file) => {
+            Type::ModuleLiteral(file) => {
                 write!(f, "<module '{:?}'>", file.path(self.db))
             }
             // TODO functions and classes should display using a fully qualified name
-            Type::Class(class) => f.write_str(class.name(self.db)),
+            Type::ClassLiteral(class) => f.write_str(class.name(self.db)),
             Type::Instance(class) => f.write_str(class.name(self.db)),
-            Type::Function(function) => f.write_str(function.name(self.db)),
+            Type::FunctionLiteral(function) => f.write_str(function.name(self.db)),
             Type::Union(union) => union.display(self.db).fmt(f),
             Type::Intersection(intersection) => intersection.display(self.db).fmt(f),
             Type::IntLiteral(n) => n.fmt(f),
@@ -138,7 +138,7 @@ impl Display for DisplayUnionType<'_> {
                 let Some(mut literals) = grouped_literals.remove(&literal_kind) else {
                     continue;
                 };
-                if literal_kind == LiteralTypeKind::IntLiteral {
+                if literal_kind == LiteralTypeKind::Int {
                     literals.sort_unstable_by_key(|ty| ty.expect_int_literal());
                 }
                 join.entry(&DisplayLiteralGroup {
@@ -183,9 +183,9 @@ impl Display for DisplayLiteralGroup<'_> {
 enum LiteralTypeKind {
     Class,
     Function,
-    IntLiteral,
-    StringLiteral,
-    BytesLiteral,
+    Int,
+    String,
+    Bytes,
 }
 
 impl TryFrom<Type<'_>> for LiteralTypeKind {
@@ -193,11 +193,11 @@ impl TryFrom<Type<'_>> for LiteralTypeKind {
 
     fn try_from(value: Type<'_>) -> Result<Self, Self::Error> {
         match value {
-            Type::Class(_) => Ok(Self::Class),
-            Type::Function(_) => Ok(Self::Function),
-            Type::IntLiteral(_) => Ok(Self::IntLiteral),
-            Type::StringLiteral(_) => Ok(Self::StringLiteral),
-            Type::BytesLiteral(_) => Ok(Self::BytesLiteral),
+            Type::ClassLiteral(_) => Ok(Self::Class),
+            Type::FunctionLiteral(_) => Ok(Self::Function),
+            Type::IntLiteral(_) => Ok(Self::Int),
+            Type::StringLiteral(_) => Ok(Self::String),
+            Type::BytesLiteral(_) => Ok(Self::Bytes),
             _ => Err(()),
         }
     }

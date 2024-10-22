@@ -255,11 +255,11 @@ pub enum Type<'db> {
     /// `Todo` would change the output type.
     Todo,
     /// A specific function object
-    Function(FunctionType<'db>),
+    FunctionLiteral(FunctionType<'db>),
     /// A specific module object
-    Module(File),
+    ModuleLiteral(File),
     /// A specific class object
-    Class(ClassType<'db>),
+    ClassLiteral(ClassType<'db>),
     /// The set of Python objects with the given class in their __class__'s method resolution order
     Instance(ClassType<'db>),
     /// The set of objects in any of the types in the union
@@ -294,26 +294,26 @@ impl<'db> Type<'db> {
 
     pub const fn into_class_type(self) -> Option<ClassType<'db>> {
         match self {
-            Type::Class(class_type) => Some(class_type),
+            Type::ClassLiteral(class_type) => Some(class_type),
             _ => None,
         }
     }
 
     pub fn expect_class(self) -> ClassType<'db> {
         self.into_class_type()
-            .expect("Expected a Type::Class variant")
+            .expect("Expected a Type::ClassLiteral variant")
     }
 
     pub const fn into_module_type(self) -> Option<File> {
         match self {
-            Type::Module(file) => Some(file),
+            Type::ModuleLiteral(file) => Some(file),
             _ => None,
         }
     }
 
     pub fn expect_module(self) -> File {
         self.into_module_type()
-            .expect("Expected a Type::Module variant")
+            .expect("Expected a Type::ModuleLiteral variant")
     }
 
     pub const fn into_union_type(self) -> Option<UnionType<'db>> {
@@ -342,14 +342,14 @@ impl<'db> Type<'db> {
 
     pub const fn into_function_type(self) -> Option<FunctionType<'db>> {
         match self {
-            Type::Function(function_type) => Some(function_type),
+            Type::FunctionLiteral(function_type) => Some(function_type),
             _ => None,
         }
     }
 
     pub fn expect_function(self) -> FunctionType<'db> {
         self.into_function_type()
-            .expect("Expected a Type::Function variant")
+            .expect("Expected a Type::FunctionLiteral variant")
     }
 
     pub const fn into_int_literal_type(self) -> Option<i64> {
@@ -387,8 +387,8 @@ impl<'db> Type<'db> {
 
     pub fn is_stdlib_symbol(&self, db: &'db dyn Db, module_name: &str, name: &str) -> bool {
         match self {
-            Type::Class(class) => class.is_stdlib_symbol(db, module_name, name),
-            Type::Function(function) => function.is_stdlib_symbol(db, module_name, name),
+            Type::ClassLiteral(class) => class.is_stdlib_symbol(db, module_name, name),
+            Type::FunctionLiteral(function) => function.is_stdlib_symbol(db, module_name, name),
             _ => false,
         }
     }
@@ -397,7 +397,7 @@ impl<'db> Type<'db> {
     pub fn is_class(&self, db: &'db dyn Db) -> bool {
         match self {
             Type::Union(union) => union.elements(db).iter().all(|ty| ty.is_class(db)),
-            Type::Class(_) => true,
+            Type::ClassLiteral(_) => true,
             // / TODO include type[X], once we add that type
             _ => false,
         }
@@ -517,17 +517,17 @@ impl<'db> Type<'db> {
                 | Type::IntLiteral(..)
                 | Type::StringLiteral(..)
                 | Type::BytesLiteral(..)
-                | Type::Function(..)
-                | Type::Module(..)
-                | Type::Class(..)),
+                | Type::FunctionLiteral(..)
+                | Type::ModuleLiteral(..)
+                | Type::ClassLiteral(..)),
                 right @ (Type::None
                 | Type::BooleanLiteral(..)
                 | Type::IntLiteral(..)
                 | Type::StringLiteral(..)
                 | Type::BytesLiteral(..)
-                | Type::Function(..)
-                | Type::Module(..)
-                | Type::Class(..)),
+                | Type::FunctionLiteral(..)
+                | Type::ModuleLiteral(..)
+                | Type::ClassLiteral(..)),
             ) => left != right,
 
             (Type::None, Type::Instance(class_type)) | (Type::Instance(class_type), Type::None) => {
@@ -577,12 +577,12 @@ impl<'db> Type<'db> {
             (Type::BytesLiteral(..), _) | (_, Type::BytesLiteral(..)) => true,
 
             (
-                Type::Function(..) | Type::Module(..) | Type::Class(..),
+                Type::FunctionLiteral(..) | Type::ModuleLiteral(..) | Type::ClassLiteral(..),
                 Type::Instance(class_type),
             )
             | (
                 Type::Instance(class_type),
-                Type::Function(..) | Type::Module(..) | Type::Class(..),
+                Type::FunctionLiteral(..) | Type::ModuleLiteral(..) | Type::ClassLiteral(..),
             ) => !class_type.is_known(db, KnownClass::Object),
 
             (Type::Instance(..), Type::Instance(..)) => {
@@ -643,7 +643,7 @@ impl<'db> Type<'db> {
                 // are both of type Literal[345], for example.
                 false
             }
-            Type::None | Type::BooleanLiteral(_) | Type::Function(..) | Type::Class(..) | Type::Module(..) => true,
+            Type::None | Type::BooleanLiteral(_) | Type::FunctionLiteral(..) | Type::ClassLiteral(..) | Type::ModuleLiteral(..) => true,
             Type::Tuple(..) => {
                 // The empty tuple is a singleton on CPython and PyPy, but not on other Python
                 // implementations such as GraalPy. Its *use* as a singleton is discouraged and
@@ -675,9 +675,9 @@ impl<'db> Type<'db> {
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         match self {
             Type::None
-            | Type::Function(..)
-            | Type::Module(..)
-            | Type::Class(..)
+            | Type::FunctionLiteral(..)
+            | Type::ModuleLiteral(..)
+            | Type::ClassLiteral(..)
             | Type::IntLiteral(..)
             | Type::BooleanLiteral(..)
             | Type::StringLiteral(..)
@@ -747,12 +747,12 @@ impl<'db> Type<'db> {
                 // TODO: attribute lookup on None type
                 Type::Todo
             }
-            Type::Function(_) => {
+            Type::FunctionLiteral(_) => {
                 // TODO: attribute lookup on function type
                 Type::Todo
             }
-            Type::Module(file) => global_symbol_ty(db, *file, name),
-            Type::Class(class) => class.class_member(db, name),
+            Type::ModuleLiteral(file) => global_symbol_ty(db, *file, name),
+            Type::ClassLiteral(class) => class.class_member(db, name),
             Type::Instance(_) => {
                 // TODO MRO? get_own_instance_member, get_instance_member
                 Type::Todo
@@ -800,9 +800,9 @@ impl<'db> Type<'db> {
                 Truthiness::Ambiguous
             }
             Type::None => Truthiness::AlwaysFalse,
-            Type::Function(_) => Truthiness::AlwaysTrue,
-            Type::Module(_) => Truthiness::AlwaysTrue,
-            Type::Class(_) => {
+            Type::FunctionLiteral(_) => Truthiness::AlwaysTrue,
+            Type::ModuleLiteral(_) => Truthiness::AlwaysTrue,
+            Type::ClassLiteral(_) => {
                 // TODO: lookup `__bool__` and `__len__` methods on the class's metaclass
                 // More info in https://docs.python.org/3/library/stdtypes.html#truth-value-testing
                 Truthiness::Ambiguous
@@ -847,7 +847,7 @@ impl<'db> Type<'db> {
     fn call(self, db: &'db dyn Db, arg_types: &[Type<'db>]) -> CallOutcome<'db> {
         match self {
             // TODO validate typed call arguments vs callable signature
-            Type::Function(function_type) => match function_type.known(db) {
+            Type::FunctionLiteral(function_type) => match function_type.known(db) {
                 None => CallOutcome::callable(function_type.return_type(db)),
                 Some(KnownFunction::RevealType) => CallOutcome::revealed(
                     function_type.return_type(db),
@@ -856,7 +856,7 @@ impl<'db> Type<'db> {
             },
 
             // TODO annotated return type on `__new__` or metaclass `__call__`
-            Type::Class(class) => {
+            Type::ClassLiteral(class) => {
                 CallOutcome::callable(match class.known(db) {
                     // If the class is the builtin-bool class (for example `bool(1)`), we try to
                     // return the specific truthiness value of the input arg, `Literal[True]` for
@@ -976,7 +976,7 @@ impl<'db> Type<'db> {
             Type::Unknown => Type::Unknown,
             Type::Unbound => Type::Unknown,
             Type::Never => Type::Never,
-            Type::Class(class) => Type::Instance(*class),
+            Type::ClassLiteral(class) => Type::Instance(*class),
             Type::Union(union) => union.map(db, |element| element.to_instance(db)),
             // TODO: we can probably do better here: --Alex
             Type::Intersection(_) => Type::Todo,
@@ -984,9 +984,9 @@ impl<'db> Type<'db> {
             // since they already indicate that the object is an instance of some kind:
             Type::BooleanLiteral(_)
             | Type::BytesLiteral(_)
-            | Type::Function(_)
+            | Type::FunctionLiteral(_)
             | Type::Instance(_)
-            | Type::Module(_)
+            | Type::ModuleLiteral(_)
             | Type::IntLiteral(_)
             | Type::StringLiteral(_)
             | Type::Tuple(_)
@@ -1002,17 +1002,17 @@ impl<'db> Type<'db> {
         match self {
             Type::Unbound => Type::Unbound,
             Type::Never => Type::Never,
-            Type::Instance(class) => Type::Class(*class),
+            Type::Instance(class) => Type::ClassLiteral(*class),
             Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
             Type::BooleanLiteral(_) => KnownClass::Bool.to_class(db),
             Type::BytesLiteral(_) => KnownClass::Bytes.to_class(db),
             Type::IntLiteral(_) => KnownClass::Int.to_class(db),
-            Type::Function(_) => KnownClass::FunctionType.to_class(db),
-            Type::Module(_) => KnownClass::ModuleType.to_class(db),
+            Type::FunctionLiteral(_) => KnownClass::FunctionType.to_class(db),
+            Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class(db),
             Type::Tuple(_) => KnownClass::Tuple.to_class(db),
             Type::None => KnownClass::NoneType.to_class(db),
             // TODO not accurate if there's a custom metaclass...
-            Type::Class(_) => KnownClass::Type.to_class(db),
+            Type::ClassLiteral(_) => KnownClass::Type.to_class(db),
             // TODO can we do better here? `type[LiteralString]`?
             Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class(db),
             // TODO: `type[Any]`?
@@ -1642,7 +1642,7 @@ impl<'db> ClassType<'db> {
         // TODO: we need to iterate over the *MRO* here, not the bases
         (other == self)
             || self.bases(db).any(|base| match base {
-                Type::Class(base_class) => base_class == other,
+                Type::ClassLiteral(base_class) => base_class == other,
                 // `is_subclass_of` is checking the subtype relation, in which gradual types do not
                 // participate, so we should not return `True` if we find `Any/Unknown` in the
                 // bases.
@@ -2007,7 +2007,7 @@ mod tests {
         let type_a = super::global_symbol_ty(&db, module, "A");
         let type_x = super::global_symbol_ty(&db, module, "x");
 
-        assert!(matches!(type_a, Type::Class(_)));
+        assert!(matches!(type_a, Type::ClassLiteral(_)));
         assert!(matches!(type_x, Type::Union(_)));
 
         assert!(!type_a.is_disjoint_from(&db, type_x));

@@ -510,12 +510,12 @@ impl<'db> TypeInferenceBuilder<'db> {
         assigned_ty: Type<'db>,
     ) {
         match declared_ty {
-            Type::Class(class) => {
+            Type::ClassLiteral(class) => {
                 self.add_diagnostic(node, "invalid-assignment", format_args!(
                         "Implicit shadowing of class `{}`; annotate to make it explicit if this is intentional",
                         class.name(self.db)));
             }
-            Type::Function(function) => {
+            Type::FunctionLiteral(function) => {
                 self.add_diagnostic(node, "invalid-assignment", format_args!(
                         "Implicit shadowing of function `{}`; annotate to make it explicit if this is intentional",
                         function.name(self.db)));
@@ -778,7 +778,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             _ => None,
         };
-        let function_ty = Type::Function(FunctionType::new(
+        let function_ty = Type::FunctionLiteral(FunctionType::new(
             self.db,
             name.id.clone(),
             function_kind,
@@ -887,7 +887,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .as_ref()
             .and_then(|module| KnownClass::maybe_from_module(module, name.as_str()));
 
-        let class_ty = Type::Class(ClassType::new(
+        let class_ty = Type::ClassLiteral(ClassType::new(
             self.db,
             name.id.clone(),
             definition,
@@ -1056,7 +1056,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             // anything else is invalid and should lead to a diagnostic being reported --Alex
             match node_ty {
                 Type::Any | Type::Unknown => node_ty,
-                Type::Class(class_ty) => Type::Instance(class_ty),
+                Type::ClassLiteral(class_ty) => Type::Instance(class_ty),
                 Type::Tuple(tuple) => UnionType::from_elements(
                     self.db,
                     tuple
@@ -1773,7 +1773,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn module_ty_from_name(&self, module_name: &ModuleName) -> Option<Type<'db>> {
-        resolve_module(self.db, module_name).map(|module| Type::Module(module.file()))
+        resolve_module(self.db, module_name).map(|module| Type::ModuleLiteral(module.file()))
     }
 
     fn infer_decorator(&mut self, decorator: &ast::Decorator) -> Type<'db> {
@@ -3331,7 +3331,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             });
                     }
 
-                    if matches!(value_ty, Type::Class(class) if class.is_known(self.db, KnownClass::Type))
+                    if matches!(value_ty, Type::ClassLiteral(class) if class.is_known(self.db, KnownClass::Type))
                     {
                         return KnownClass::GenericAlias.to_instance(self.db);
                     }
