@@ -110,8 +110,8 @@ that all inhabitants of the type are equivalent with respect to their runtime va
 All singleton types are single-value types, but not all single-value types are singleton types.
 
 Examples of single-value types that are not singleton types
-are `Literal["foo"]`, `Literal[b"foo"]`, and `Literal[123456]`.
-All inhabitants of the `Literal["foo"]` type are entirely fungible and equal
+are `Literal["foo"]`, `Literal[b"foo"]`, `Literal[123456]`, and `tuple[Literal[True], Literal[False]]`.
+All runtime inhabitants of the `Literal["foo"]` type are entirely fungible and equal
 (they are all equal to the string `"foo"`).
 However, they are not necessarily the *same* object in terms of identity;
 multiple instances of the `"foo"` string can exist at runtime at different memory addresses.[^1]
@@ -133,18 +133,18 @@ from typing import Literal
 
 def f(x: str | Literal[1]):
     if x != 1:
-        ...  # x can be narrowed to `str` if not equal to `1`
+        ...  # `x` can be narrowed to `str` if not equal to `1`
     else:
-        ...  # type of x is still `str | Literal[1]`
+        ...  # type of `x` is still `str | Literal[1]`
              # (`x` could be an instance of a `str` subclass that overrides `__eq__`
              # to compare equal with `1`)
 
     if x == 1:
-        ...  # type of x is still `str | Literal[1]`
+        ...  # type of `x` is still `str | Literal[1]`
              # (`x` could be an instance of a `str` subclass that overrides `__eq__`
              # to compare equal with `1`)
     else:
-        ...  # x can be narrowed to `str` if not equal to `1`
+        ...  # `x` can be narrowed to `str` if not equal to `1`
 ```
 
 ## Closed types
@@ -170,14 +170,14 @@ from typing import final
 class Spam: ...
 ```
 
-However, runtime subclassability does not correspond exactly to whether a class is closed or not.
-For example, the `bool` type is (correctly) decorated with `@final` in typeshed's stubs,
-indicating that the class cannot be subclassed at runtime.
-However, `bool` has two proper subtypes other than `Never`: `Literal[True]` and `Literal[False]`.
-As such, although both its subtypes are closed, `bool` itself cannot be considered a closed type.
-Similarly, attempting to subclass the `Eggs` enum in the following example
+However, runtime subclassability does not correspond exactly to whether a type is closed or not.
+For example, the `bool` *class* is (correctly) decorated with `@final` in typeshed's stubs,
+indicating that it cannot be subclassed at runtime. However, the `bool` *type*
+has two proper subtypes other than `Never`: `Literal[True]` and `Literal[False]`.
+As such, although all its subtypes are closed, `bool` itself cannot be considered a closed type.
+Similarly, attempting to subclass the `Eggs` class in the following example
 will lead to an exception at runtime, and type checkers should treat all
-enum classes as implicitly `@final`. Nonetheless, the `Eggs` type cannot be considered closed,
+enum classes as implicitly `@final`. Nonetheless, the `Eggs` *type* cannot be considered closed,
 as it has three proper subtypes other than `Never`:
 `Literal[Eggs.A]`, `Literal[Eggs.B]` and `Literal[Eggs.C]`.
 
