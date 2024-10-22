@@ -16,12 +16,21 @@ impl BackgroundDocumentRequestHandler for GotoDefinitionHandler {
     }
 
     fn run_with_snapshot(
-        _snapshot: crate::DocumentSnapshot,
-        _db: red_knot_workspace::db::RootDatabase,
+        snapshot: crate::DocumentSnapshot,
+        db: red_knot_workspace::db::RootDatabase,
         _notifier: crate::server::client::Notifier,
-        _params: GotoDefinitionParams,
+        params: GotoDefinitionParams,
     ) -> crate::server::api::Result<Option<GotoDefinitionResponse>> {
-        log_err_msg!("WOULD HAVE TRIED LOOKUP");
+        log_err_msg!("ATTEMPTING LOOKUP...");
+        let lookup_result =
+            snapshot.definition_at_location(params.text_document_position_params.position, &db);
+
+        match lookup_result {
+            Some(loc) => todo!(),
+            None => {
+                log_err_msg!("NOTHING FOUND");
+            }
+        }
         Ok(None)
     }
 }

@@ -142,10 +142,7 @@ impl<'db> SemanticIndex<'db> {
     }
 
     /// Returns the ID of the `expression`'s enclosing scope.
-    pub(crate) fn expression_scope_id(
-        &self,
-        expression: impl Into<ExpressionNodeKey>,
-    ) -> FileScopeId {
+    pub fn expression_scope_id(&self, expression: impl Into<ExpressionNodeKey>) -> FileScopeId {
         self.scopes_by_expression[&expression.into()]
     }
 
