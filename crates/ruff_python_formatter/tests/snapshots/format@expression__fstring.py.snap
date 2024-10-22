@@ -191,6 +191,12 @@ f"""test {"inner"}"""
 # But if the inner string is also triple-quoted then we should preserve the existing quotes.
 f"""test {'''inner'''}"""
 
+# It's not okay to change the quote style if the inner string is triple quoted and contains a quote.
+f'{"""other " """}'
+f'{"""other " """ + "more"}'
+f'{b"""other " """}'
+f'{f"""other " """}'
+
 # Not valid Pre 3.12
 f"""test {f'inner {'''inner inner'''}'}"""
 f"""test {f'''inner {"""inner inner"""}'''}"""
@@ -562,6 +568,12 @@ f"""test {"inner"}"""
 # But if the inner string is also triple-quoted then we should preserve the existing quotes.
 f"""test {'''inner'''}"""
 
+# It's not okay to change the quote style if the inner string is triple quoted and contains a quote.
+f'{"""other " """}'
+f'{"""other " """ + "more"}'
+f'{b"""other " """}'
+f'{f"""other " """}'
+
 # Not valid Pre 3.12
 f"""test {f"inner {'''inner inner'''}"}"""
 f"""test {f'''inner {"""inner inner"""}'''}"""
@@ -919,6 +931,12 @@ f"""test {"inner"}"""
 # But if the inner string is also triple-quoted then we should preserve the existing quotes.
 f"""test {'''inner'''}"""
 
+# It's not okay to change the quote style if the inner string is triple quoted and contains a quote.
+f'{"""other " """}'
+f'{"""other " """ + "more"}'
+f'{b"""other " """}'
+f'{f"""other " """}'
+
 # Not valid Pre 3.12
 f"""test {f'inner {'''inner inner'''}'}"""
 f"""test {f'''inner {"""inner inner"""}'''}"""
@@ -1217,7 +1235,7 @@ _ = (
  
  f"single quoted '{x}' double quoted \"{x}\""  # Same number of quotes => use preferred quote style
  f'single quote \' {x} double quoted "{x}"'  # More double quotes => use single quotes
-@@ -163,28 +175,28 @@
+@@ -163,23 +175,23 @@
  
  # Here, the formatter will remove the escapes which is correct because they aren't allowed
  # pre 3.12. This means we can assume that the f-string is used in the context of 3.12.
@@ -1246,13 +1264,16 @@ _ = (
  # But if the inner string is also triple-quoted then we should preserve the existing quotes.
  f"""test {'''inner'''}"""
  
+@@ -190,7 +202,7 @@
+ f'{f"""other " """}'
+ 
  # Not valid Pre 3.12
 -f"""test {f'inner {'''inner inner'''}'}"""
 +f"""test {f"inner {'''inner inner'''}"}"""
  f"""test {f'''inner {"""inner inner"""}'''}"""
  
  # Magic trailing comma
-@@ -196,63 +208,66 @@
+@@ -202,63 +214,66 @@
  f"aaaaaaa {['aaaaaaaaaaaaaaa', 'bbbbbbbbbbbbb', 'ccccccccccccccccc', 'ddddddddddddddd', 'eeeeeeeeeeeeee']} aaaaaaa"
  
  # And, if the trailing comma is already present, we still need to remove it.
@@ -1347,7 +1368,7 @@ _ = (
       # comment} cccccccccc"""
  
  # Conversion flags
-@@ -260,24 +275,21 @@
+@@ -266,24 +281,21 @@
  # This is not a valid Python code because of the additional whitespace between the `!`
  # and conversion type. But, our parser isn't strict about this. This should probably be
  # removed once we have a strict parser.
@@ -1379,7 +1400,7 @@ _ = (
  
  x = f"""
  {              # comment 22
-@@ -286,19 +298,19 @@
+@@ -292,19 +304,19 @@
  
  # Here, the debug expression is in a nested f-string so we should start preserving
  # whitespaces from that point onwards. This means we should format the outer f-string.
@@ -1407,7 +1428,7 @@ _ = (
      # comment 27
      # comment 28
  } woah {x}"
-@@ -312,27 +324,27 @@
+@@ -318,27 +330,27 @@
          if indent2:
              foo = f"""hello world
  hello {

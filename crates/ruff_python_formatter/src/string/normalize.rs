@@ -3,7 +3,10 @@ use std::cmp::Ordering;
 use std::iter::FusedIterator;
 
 use ruff_formatter::FormatContext;
-use ruff_python_ast::{str::Quote, AnyStringFlags, FStringElement, StringFlags, StringLikePart};
+use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
+use ruff_python_ast::{
+    str::Quote, AnyStringFlags, BytesLiteral, FString, StringFlags, StringLikePart, StringLiteral,
+};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::context::FStringState;
@@ -51,6 +54,27 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
 
                 if preferred_quote_style.is_preserve() {
                     return QuoteStyle::Preserve;
+                }
+
+                // There are two cases where it's necessary to preserve the quotes
+                // if the target version is pre 3.12 and the part is an f-string.
+                if !self.context.options().target_version().supports_pep_701() {
+                    if let StringLikePart::FString(fstring) = string {
+                        // An f-string expression contains a debug text with a quote character
+                        // because the formatter will emit the debug expression **exactly** the same as in the source text.
+                        if is_fstring_with_quoted_debug_expression(fstring, self.context) {
+                            return QuoteStyle::Preserve;
+                        }
+
+                        // An f-string expression that contains a triple quoted string literal expression
+                        // that contains a quote.
+                        if is_fstring_with_triple_quoted_literal_expression_containing_quotes(
+                            fstring,
+                            self.context,
+                        ) {
+                            return QuoteStyle::Preserve;
+                        }
+                    }
                 }
 
                 // For f-strings prefer alternating the quotes unless The outer string is triple quoted and the inner isn't.
@@ -125,49 +149,6 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
 
     /// Computes the strings preferred quotes.
     pub(crate) fn choose_quotes(&self, string: StringLikePart) -> QuoteSelection {
-        // Preserve the f-string quotes if the target version isn't newer or equal than Python 3.12
-        // and an f-string expression contains a debug text with a quote character
-        // because the formatter will emit the debug expression **exctly** the same as in the source text.
-        if is_f_string_formatting_enabled(self.context)
-            && !self.context.options().target_version().supports_pep_701()
-        {
-            if let StringLikePart::FString(fstring) = string {
-                if fstring
-                    .elements
-                    .iter()
-                    .filter_map(FStringElement::as_expression)
-                    .any(|expression| {
-                        if expression.debug_text.is_some() {
-                            let content = self.context.locator().slice(expression.range());
-                            match string.flags().quote_style() {
-                                Quote::Single => {
-                                    if string.flags().is_triple_quoted() {
-                                        content.contains(r#"""""#)
-                                    } else {
-                                        content.contains('"')
-                                    }
-                                }
-                                Quote::Double => {
-                                    if string.flags().is_triple_quoted() {
-                                        content.contains("'''")
-                                    } else {
-                                        content.contains('\'')
-                                    }
-                                }
-                            }
-                        } else {
-                            false
-                        }
-                    })
-                {
-                    return QuoteSelection {
-                        flags: string.flags(),
-                        first_quote_or_normalized_char_offset: None,
-                    };
-                }
-            }
-        }
-
         let raw_content = self.context.locator().slice(string.content_range());
         let first_quote_or_normalized_char_offset = raw_content
             .bytes()
@@ -284,10 +265,7 @@ impl QuoteMetadata {
                     // ```python
                     // f"{'escaping a quote like this \" is a syntax error pre 312'}"
                     // ```
-                    let mut literals = fstring
-                        .elements
-                        .iter()
-                        .filter_map(FStringElement::as_literal);
+                    let mut literals = fstring.elements.literals();
 
                     let Some(first) = literals.next() else {
                         return QuoteMetadata::from_str("", part.flags(), preferred_quote);
@@ -877,17 +855,141 @@ impl UnicodeEscape {
     }
 }
 
+/// Returns `true` if `string` is an f-string part that contains a debug expression that uses quotes
+/// and the format target is pre Python 312
+/// We can't join f-strings where:
+///
+/// ```python
+/// f"{10 + len('bar')=}"
+/// f'{10 + len("bar")=}'
+/// f""""{10 + len('''bar''')=}"""
+/// ```
+pub(super) fn is_fstring_with_quoted_debug_expression(
+    fstring: &FString,
+    context: &PyFormatContext,
+) -> bool {
+    if fstring.elements.expressions().any(|expression| {
+        if expression.debug_text.is_some() {
+            let content = context.locator().slice(expression.range());
+            match fstring.flags.quote_style() {
+                Quote::Single => {
+                    if fstring.flags.is_triple_quoted() {
+                        content.contains(r#"""""#)
+                    } else {
+                        content.contains('"')
+                    }
+                }
+                Quote::Double => {
+                    if fstring.flags.is_triple_quoted() {
+                        content.contains("'''")
+                    } else {
+                        content.contains('\'')
+                    }
+                }
+            }
+        } else {
+            false
+        }
+    }) {
+        return true;
+    }
+
+    false
+}
+
+/// Tests if the `fstring` contains any triple quoted string, byte, or f-string literal that
+/// contains a quote character opposite to its own quote character.
+///
+/// ```python
+/// f'{"""other " """}'
+/// ```
+///
+/// We can't flip the quote of the outer f-string because it would result in invalid syntax:
+/// ```python
+/// f"{'''other " '''}'
+/// ```
+pub(super) fn is_fstring_with_triple_quoted_literal_expression_containing_quotes(
+    fstring: &FString,
+    context: &PyFormatContext,
+) -> bool {
+    struct Visitor<'a> {
+        context: &'a PyFormatContext<'a>,
+        found: bool,
+    }
+
+    impl Visitor<'_> {
+        fn visit_string_like_part(&mut self, part: StringLikePart) {
+            if !part.flags().is_triple_quoted() || self.found {
+                return;
+            }
+
+            let contains_quotes = match part {
+                StringLikePart::String(_) | StringLikePart::Bytes(_) => {
+                    self.contains_quote(part.content_range(), part.flags())
+                }
+                StringLikePart::FString(fstring) => {
+                    let mut contains_quotes = false;
+                    for literal in fstring.elements.literals() {
+                        if self.contains_quote(literal.range(), fstring.flags.into()) {
+                            contains_quotes = true;
+                            break;
+                        }
+                    }
+
+                    contains_quotes
+                }
+            };
+
+            if contains_quotes {
+                self.found = true;
+            }
+        }
+
+        fn contains_quote(&self, range: TextRange, flags: AnyStringFlags) -> bool {
+            self.context
+                .locator()
+                .slice(range)
+                .contains(flags.quote_style().as_char())
+        }
+    }
+
+    impl SourceOrderVisitor<'_> for Visitor<'_> {
+        fn visit_f_string(&mut self, f_string: &FString) {
+            self.visit_string_like_part(StringLikePart::FString(f_string));
+        }
+
+        fn visit_string_literal(&mut self, string_literal: &StringLiteral) {
+            self.visit_string_like_part(StringLikePart::String(string_literal));
+        }
+
+        fn visit_bytes_literal(&mut self, bytes_literal: &BytesLiteral) {
+            self.visit_string_like_part(StringLikePart::Bytes(bytes_literal));
+        }
+    }
+
+    let mut visitor = Visitor {
+        context,
+        found: false,
+    };
+
+    ruff_python_ast::visitor::source_order::walk_f_string(&mut visitor, fstring);
+
+    visitor.found
+}
+
 #[cfg(test)]
 mod tests {
     use std::borrow::Cow;
 
-    use super::UnicodeEscape;
-    use crate::string::normalize_string;
     use ruff_python_ast::{
         str::Quote,
         str_prefix::{AnyStringPrefix, ByteStringPrefix},
         AnyStringFlags,
     };
+
+    use crate::string::normalize_string;
+
+    use super::UnicodeEscape;
 
     #[test]
     fn normalize_32_escape() {

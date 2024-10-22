@@ -185,6 +185,12 @@ f"""test {"inner"}"""
 # But if the inner string is also triple-quoted then we should preserve the existing quotes.
 f"""test {'''inner'''}"""
 
+# It's not okay to change the quote style if the inner string is triple quoted and contains a quote.
+f'{"""other " """}'
+f'{"""other " """ + "more"}'
+f'{b"""other " """}'
+f'{f"""other " """}'
+
 # Not valid Pre 3.12
 f"""test {f'inner {'''inner inner'''}'}"""
 f"""test {f'''inner {"""inner inner"""}'''}"""
