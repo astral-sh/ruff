@@ -137,7 +137,7 @@ pub(crate) struct EmbeddedFile<'s> {
     pub(crate) lang: &'s str,
     pub(crate) code: &'s str,
 
-    /// The offset of the backticks in the markdown file
+    /// The offset of the backticks beginning the code block within the markdown file
     pub(crate) md_offset: TextSize,
 }
 
