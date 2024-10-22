@@ -415,6 +415,8 @@ impl<'db> Type<'db> {
             (_, Type::Unknown | Type::Any | Type::Todo) => false,
             (Type::Never, _) => true,
             (_, Type::Never) => false,
+            (_, Type::Instance(class)) if class.is_known(db, KnownClass::Object) => true,
+            (Type::Instance(class), _) if class.is_known(db, KnownClass::Object) => false,
             (Type::BooleanLiteral(_), Type::Instance(class))
                 if class.is_known(db, KnownClass::Bool) =>
             {
@@ -442,8 +444,6 @@ impl<'db> Type<'db> {
                 .elements(db)
                 .iter()
                 .any(|&elem_ty| ty.is_subtype_of(db, elem_ty)),
-            (_, Type::Instance(class)) if class.is_known(db, KnownClass::Object) => true,
-            (Type::Instance(class), _) if class.is_known(db, KnownClass::Object) => false,
             (Type::Instance(self_class), Type::Instance(target_class)) => {
                 self_class.is_subclass_of(db, target_class)
             }
@@ -1884,13 +1884,20 @@ mod tests {
 
     #[test_case(Ty::BuiltinInstance("str"), Ty::BuiltinInstance("object"))]
     #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinInstance("object"))]
+    #[test_case(Ty::BuiltinInstance("bool"), Ty::BuiltinInstance("object"))]
+    #[test_case(Ty::BuiltinInstance("bool"), Ty::BuiltinInstance("int"))]
     #[test_case(Ty::Never, Ty::IntLiteral(1))]
     #[test_case(Ty::IntLiteral(1), Ty::BuiltinInstance("int"))]
+    #[test_case(Ty::IntLiteral(1), Ty::BuiltinInstance("object"))]
     #[test_case(Ty::BooleanLiteral(true), Ty::BuiltinInstance("bool"))]
+    #[test_case(Ty::BooleanLiteral(true), Ty::BuiltinInstance("object"))]
     #[test_case(Ty::StringLiteral("foo"), Ty::BuiltinInstance("str"))]
+    #[test_case(Ty::StringLiteral("foo"), Ty::BuiltinInstance("object"))]
     #[test_case(Ty::StringLiteral("foo"), Ty::LiteralString)]
     #[test_case(Ty::LiteralString, Ty::BuiltinInstance("str"))]
+    #[test_case(Ty::LiteralString, Ty::BuiltinInstance("object"))]
     #[test_case(Ty::BytesLiteral("foo"), Ty::BuiltinInstance("bytes"))]
+    #[test_case(Ty::BytesLiteral("foo"), Ty::BuiltinInstance("object"))]
     #[test_case(Ty::IntLiteral(1), Ty::Union(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")]))]
     #[test_case(Ty::Union(vec![Ty::BuiltinInstance("str"), Ty::BuiltinInstance("int")]), Ty::BuiltinInstance("object"))]
     #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2), Ty::IntLiteral(3)]))]
