@@ -253,6 +253,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 // A & B = Never    if A and B are disjoint
                 if new_positive.is_disjoint_from(db, *existing_positive) {
                     *self = Self::new();
+                    self.positive.insert(Type::Never);
                     return;
                 }
             }
@@ -265,6 +266,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 // S & ~T = Never    if S <: T
                 if new_positive.is_subtype_of(db, *existing_negative) {
                     *self = Self::new();
+                    self.positive.insert(Type::Never);
                     return;
                 }
                 // A & ~B = A    if A and B are disjoint
@@ -328,6 +330,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     // S & ~T = Never    if S <: T
                     if existing_positive.is_subtype_of(db, new_negative) {
                         *self = Self::new();
+                        self.positive.insert(Type::Never);
                         return;
                     }
                     // A & ~B = A    if A and B are disjoint
@@ -351,7 +354,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
     fn build(mut self, db: &'db dyn Db) -> Type<'db> {
         self.simplify_unbound();
         match (self.positive.len(), self.negative.len()) {
-            (0, 0) => Type::Never,
+            (0, 0) => KnownClass::Object.to_instance(db),
             (1, 0) => self.positive[0],
             _ => {
                 self.positive.shrink_to_fit();
@@ -521,6 +524,15 @@ mod tests {
 
         assert_eq!(intersection.pos_vec(&db), &[ta]);
         assert_eq!(intersection.neg_vec(&db), &[t0]);
+    }
+
+    #[test]
+    fn build_intersection_empty_intersection_equals_object() {
+        let db = setup_db();
+
+        let ty = IntersectionBuilder::new(&db).build();
+
+        assert_eq!(ty, KnownClass::Object.to_instance(&db));
     }
 
     #[test]

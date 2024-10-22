@@ -148,18 +148,18 @@ fn bindings_ty<'db>(
              binding,
              constraints,
          }| {
-            let mut constraint_tys =
-                constraints.filter_map(|constraint| narrowing_constraint(db, constraint, binding));
+            let mut constraint_tys = constraints
+                .filter_map(|constraint| narrowing_constraint(db, constraint, binding))
+                .peekable();
+
             let binding_ty = binding_ty(db, binding);
-            if let Some(first_constraint_ty) = constraint_tys.next() {
-                let mut builder = IntersectionBuilder::new(db);
-                builder = builder
-                    .add_positive(binding_ty)
-                    .add_positive(first_constraint_ty);
-                for constraint_ty in constraint_tys {
-                    builder = builder.add_positive(constraint_ty);
-                }
-                builder.build()
+            if constraint_tys.peek().is_some() {
+                constraint_tys
+                    .fold(
+                        IntersectionBuilder::new(db).add_positive(binding_ty),
+                        IntersectionBuilder::add_positive,
+                    )
+                    .build()
             } else {
                 binding_ty
             }
