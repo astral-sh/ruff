@@ -1004,17 +1004,15 @@ pub(super) fn is_fstring_with_triple_quoted_literal_expression_containing_quotes
 mod tests {
     use std::borrow::Cow;
 
+    use ruff_python_ast::str_prefix::FStringPrefix;
     use ruff_python_ast::{
         str::Quote,
         str_prefix::{AnyStringPrefix, ByteStringPrefix},
         AnyStringFlags,
     };
-    use ruff_python_ast::str_prefix::FStringPrefix;
 
     use crate::string::normalize_string;
-    use crate::string::normalize_string;
 
-    use super::UnicodeEscape;
     use super::UnicodeEscape;
 
     #[test]

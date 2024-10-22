@@ -196,9 +196,8 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                                 .is_some_and(|quote| quote != part.flags().quote_style())
                             {
                                 return None;
-                            } else {
-                                preserve_quotes_requirement = Some(part.flags().quote_style());
                             }
+                            preserve_quotes_requirement = Some(part.flags().quote_style());
                         }
                     }
                 }
