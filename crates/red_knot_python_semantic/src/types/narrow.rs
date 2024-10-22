@@ -4,7 +4,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, SymbolTable};
 use crate::semantic_index::symbol_table;
-use crate::types::{infer_expression_types, IntersectionBuilder, Type};
+use crate::types::{infer_expression_types, IntersectionBuilder, KnownClass, Type};
 use crate::Db;
 use itertools::Itertools;
 use ruff_python_ast as ast;
@@ -168,6 +168,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                     ast::CmpOp::IsNot => {
                         if comp_ty.is_singleton() {
                             let ty = IntersectionBuilder::new(self.db)
+                                .add_positive(KnownClass::Object.to_instance(self.db))
                                 .add_negative(comp_ty)
                                 .build();
                             self.constraints.insert(symbol, ty);
@@ -181,6 +182,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                     ast::CmpOp::NotEq => {
                         if comp_ty.is_single_valued(self.db) {
                             let ty = IntersectionBuilder::new(self.db)
+                                .add_positive(KnownClass::Object.to_instance(self.db))
                                 .add_negative(comp_ty)
                                 .build();
                             self.constraints.insert(symbol, ty);

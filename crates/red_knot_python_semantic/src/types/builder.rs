@@ -351,7 +351,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
     fn build(mut self, db: &'db dyn Db) -> Type<'db> {
         self.simplify_unbound();
         match (self.positive.len(), self.negative.len()) {
-            (0, 0) => Type::Never,
+            (0, _) => Type::Never,
             (1, 0) => self.positive[0],
             _ => {
                 self.positive.shrink_to_fit();
@@ -524,6 +524,26 @@ mod tests {
     }
 
     #[test]
+    fn build_intersection_empty_intersection_equals_never() {
+        let db = setup_db();
+
+        let ty = IntersectionBuilder::new(&db).build();
+
+        assert_eq!(ty, Type::Never);
+    }
+
+    #[test]
+    fn build_intersection_no_positives() {
+        let db = setup_db();
+
+        let ty = IntersectionBuilder::new(&db)
+            .add_negative(Type::IntLiteral(1))
+            .build();
+
+        assert_eq!(ty, Type::Never);
+    }
+
+    #[test]
     fn build_intersection_flatten_positive() {
         let db = setup_db();
         let ta = Type::Any;
@@ -632,6 +652,17 @@ mod tests {
         let db = setup_db();
         let ty = IntersectionBuilder::new(&db)
             .add_negative(Type::Unbound)
+            .add_positive(Type::IntLiteral(1))
+            .build();
+
+        assert_eq!(ty, Type::IntLiteral(1));
+    }
+
+    #[test]
+    fn build_intersection_simplify_positive_object() {
+        let db = setup_db();
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(KnownClass::Object.to_instance(&db))
             .add_positive(Type::IntLiteral(1))
             .build();
 
