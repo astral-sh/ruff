@@ -1,7 +1,7 @@
 use colored::Colorize;
 use parser as test_parser;
 use red_knot_python_semantic::types::check_types;
-use ruff_db::files::{system_path_to_file, Files};
+use ruff_db::files::{system_path_to_file, File, Files};
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 use ruff_source_file::LineIndex;
@@ -61,56 +61,50 @@ pub fn run(path: &Path, title: &str) {
     assert!(!any_failures, "Some tests failed.");
 }
 
-struct AbsoluteLineNumberPath {
-    path: SystemPathBuf,
-
-    // Offset of the backticks that starts the code block in the Markdown file
-    backtick_offset: TextSize,
-}
-
-fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures> {
+fn run_test(db: &mut db::Db, spec: &parser::MarkdownSpec) -> Result<(), Failures> {
     let workspace_root = db.workspace_root().to_path_buf();
 
-    let mut paths: Vec<AbsoluteLineNumberPath> = Vec::with_capacity(test.files().count());
+    let tests: Vec<_> = spec
+        .files()
+        .map(|embedded| {
+            assert!(
+                matches!(embedded.lang, "py" | "pyi"),
+                "Non-Python files not supported yet."
+            );
+            let full_path = workspace_root.join(embedded.path);
+            db.write_file(&full_path, embedded.code).unwrap();
+            let file = system_path_to_file(db, full_path).unwrap();
 
-    for file in test.files() {
-        assert!(
-            matches!(file.lang, "py" | "pyi"),
-            "Non-Python files not supported yet."
-        );
-        let full_path = workspace_root.join(file.path);
-        db.write_file(&full_path, file.code).unwrap();
-        paths.push(AbsoluteLineNumberPath {
-            path: full_path,
-            backtick_offset: file.md_offset,
-        });
-    }
-
-    let mut failures = Vec::with_capacity(paths.len());
-
-    for contextual_path in paths {
-        let file = system_path_to_file(db, contextual_path.path.clone()).unwrap();
-        let parsed = parsed_module(db, file);
-
-        // TODO allow testing against code with syntax errors
-        assert!(
-            parsed.errors().is_empty(),
-            "Python syntax errors in {}, {:?}: {:?}",
-            test.name(),
-            contextual_path.path,
-            parsed.errors()
-        );
-
-        match matcher::match_file(db, file, check_types(db, file)) {
-            Ok(()) => {}
-            Err(line_failures) => {
-                failures.push(TestFailures {
-                    backtick_offset: contextual_path.backtick_offset,
-                    by_line: line_failures,
-                });
+            Test {
+                file,
+                backtick_offset: embedded.md_offset,
             }
-        }
-    }
+        })
+        .collect();
+
+    let failures: Failures = tests
+        .into_iter()
+        .filter_map(|test| {
+            let parsed = parsed_module(db, test.file);
+
+            // TODO allow testing against code with syntax errors
+            assert!(
+                parsed.errors().is_empty(),
+                "Python syntax errors in {}, {:?}: {:?}",
+                spec.name(),
+                test.file.path(db),
+                parsed.errors()
+            );
+
+            match matcher::match_file(db, test.file, check_types(db, test.file)) {
+                Ok(()) => None,
+                Err(line_failures) => Some(TestFailures {
+                    backtick_offset: test.backtick_offset,
+                    by_line: line_failures,
+                }),
+            }
+        })
+        .collect();
 
     if failures.is_empty() {
         Ok(())
@@ -127,4 +121,11 @@ struct TestFailures {
     backtick_offset: TextSize,
     /// The failures by lines in the code block.
     by_line: matcher::FailuresByLine,
+}
+
+struct Test {
+    file: File,
+
+    // Offset of the backticks that starts the code block in the Markdown file
+    backtick_offset: TextSize,
 }
