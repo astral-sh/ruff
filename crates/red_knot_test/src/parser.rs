@@ -1,11 +1,12 @@
+use std::sync::LazyLock;
+
 use memchr::memchr2;
 use regex::{Captures, Match, Regex};
+use rustc_hash::{FxHashMap, FxHashSet};
+
 use ruff_index::{newtype_index, IndexVec};
 use ruff_python_trivia::Cursor;
-use ruff_source_file::LineIndex;
 use ruff_text_size::{TextLen, TextSize};
-use rustc_hash::{FxHashMap, FxHashSet};
-use std::sync::LazyLock;
 
 /// Parse the Markdown `source` as a test suite with given `title`.
 pub(crate) fn parse<'s>(title: &'s str, source: &'s str) -> anyhow::Result<MarkdownTestSuite<'s>> {
@@ -23,9 +24,6 @@ pub(crate) struct MarkdownTestSuite<'s> {
 
     /// Test files embedded within the Markdown file.
     files: IndexVec<EmbeddedFileId, EmbeddedFile<'s>>,
-
-    /// Line index of entire Markdown file
-    line_index: LineIndex,
 }
 
 impl<'s> MarkdownTestSuite<'s> {
@@ -34,10 +32,6 @@ impl<'s> MarkdownTestSuite<'s> {
             suite: self,
             current_file_index: 0,
         }
-    }
-
-    pub(crate) fn line_index(&self) -> &LineIndex {
-        &self.line_index
     }
 }
 
@@ -202,8 +196,6 @@ struct Parser<'s> {
 
     source_len: TextSize,
 
-    line_index: LineIndex,
-
     /// Stack of ancestor sections.
     stack: SectionStack,
 
@@ -224,7 +216,6 @@ impl<'s> Parser<'s> {
             files: IndexVec::default(),
             cursor: Cursor::new(source),
             source_len: source.text_len(),
-            line_index: LineIndex::from_source_text(source),
             stack: SectionStack::new(root_section_id),
             current_section_files: None,
         }
@@ -242,7 +233,6 @@ impl<'s> Parser<'s> {
         MarkdownTestSuite {
             sections: self.sections,
             files: self.files,
-            line_index: self.line_index,
         }
     }
 

@@ -4,11 +4,9 @@ use red_knot_python_semantic::types::check_types;
 use ruff_db::files::{system_path_to_file, Files};
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
-use ruff_source_file::{LineIndex, OneIndexed};
+use ruff_source_file::LineIndex;
 use ruff_text_size::TextSize;
 use std::path::Path;
-
-type Failures = Vec<matcher::FailuresByLine>;
 
 mod assertion;
 mod db;
@@ -37,14 +35,20 @@ pub fn run(path: &Path, title: &str) {
         db.memory_file_system().remove_all();
         Files::sync_all(&mut db);
 
-        if let Err(failures) = run_test(&mut db, &test, suite.line_index()) {
+        if let Err(failures) = run_test(&mut db, &test) {
             any_failures = true;
             println!("\n{}\n", test.name().bold().underline());
 
-            for by_line in failures {
-                for (line_number, failures) in by_line.iter() {
+            let md_index = LineIndex::from_source_text(&source);
+
+            for test_failures in failures {
+                let backtick_line = md_index.line_index(test_failures.backtick_offset);
+
+                for (relative_line_number, failures) in test_failures.by_line.iter() {
                     for failure in failures {
-                        let line_info = format!("{title}:{line_number}").cyan();
+                        let absolute_line_number =
+                            backtick_line.checked_add(relative_line_number).unwrap();
+                        let line_info = format!("{title}:{absolute_line_number}").cyan();
                         println!("    {line_info} {failure}");
                     }
                 }
@@ -61,10 +65,10 @@ struct AbsoluteLineNumberPath {
     path: SystemPathBuf,
 
     // Offset of the backticks that starts the code block in the Markdown file
-    md_offset: TextSize,
+    backtick_offset: TextSize,
 }
 
-fn run_test(db: &mut db::Db, test: &parser::MarkdownTest, line_index: &LineIndex) -> Result<(), Failures> {
+fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures> {
     let workspace_root = db.workspace_root().to_path_buf();
 
     let mut paths: Vec<AbsoluteLineNumberPath> = Vec::with_capacity(test.files().count());
@@ -78,7 +82,7 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest, line_index: &LineIndex
         db.write_file(&full_path, file.code).unwrap();
         paths.push(AbsoluteLineNumberPath {
             path: full_path,
-            md_offset: file.md_offset,
+            backtick_offset: file.md_offset,
         });
     }
 
@@ -87,8 +91,6 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest, line_index: &LineIndex
     for contextual_path in paths {
         let file = system_path_to_file(db, contextual_path.path.clone()).unwrap();
         let parsed = parsed_module(db, file);
-
-        let mut cached_starting_line_number: Option<OneIndexed> = None;
 
         // TODO allow testing against code with syntax errors
         assert!(
@@ -102,13 +104,10 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest, line_index: &LineIndex
         match matcher::match_file(db, file, check_types(db, file)) {
             Ok(()) => {}
             Err(line_failures) => {
-                let offset = cached_starting_line_number.unwrap_or_else(|| {
-                    let offset = line_index.line_index(contextual_path.md_offset);
-                    cached_starting_line_number = Some(offset);
-                    offset
+                failures.push(TestFailures {
+                    backtick_offset: contextual_path.backtick_offset,
+                    by_line: line_failures,
                 });
-
-                failures.push(line_failures.offset_errors(offset));
             }
         }
     }
@@ -118,4 +117,14 @@ fn run_test(db: &mut db::Db, test: &parser::MarkdownTest, line_index: &LineIndex
     } else {
         Err(failures)
     }
+}
+
+type Failures = Vec<TestFailures>;
+
+/// Failures of a single markdown test.
+struct TestFailures {
+    /// The offset of the backticks that starts the code block in the Markdown file
+    backtick_offset: TextSize,
+    /// The failures by lines in the code block.
+    by_line: matcher::FailuresByLine,
 }
