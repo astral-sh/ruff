@@ -61,10 +61,10 @@ pub fn run(path: &Path, title: &str) {
     assert!(!any_failures, "Some tests failed.");
 }
 
-fn run_test(db: &mut db::Db, spec: &parser::MarkdownTest) -> Result<(), Failures> {
+fn run_test(db: &mut db::Db, test: &parser::MarkdownTest) -> Result<(), Failures> {
     let workspace_root = db.workspace_root().to_path_buf();
 
-    let test_files: Vec<_> = spec
+    let test_files: Vec<_> = test
         .files()
         .map(|embedded| {
             assert!(
@@ -91,7 +91,7 @@ fn run_test(db: &mut db::Db, spec: &parser::MarkdownTest) -> Result<(), Failures
             assert!(
                 parsed.errors().is_empty(),
                 "Python syntax errors in {}, {}: {:?}",
-                spec.name(),
+                test.name(),
                 test_file.file.path(db),
                 parsed.errors()
             );
