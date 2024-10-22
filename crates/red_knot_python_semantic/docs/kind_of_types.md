@@ -60,9 +60,9 @@ Examples of sealed types (other than the singleton types listed above) are:
 - `bool`:
 
     - The only inhabitants of `bool` at runtime are the constants `True` and `False`.
-    - The only proper subtypes of `bool` are `Literal[True]` and `Literal[False]`.
-        `Literal[True]` and `Literal[False]` are disjunct types, and their union is
-        exactly equal to `bool`.
+    - The only proper subtypes of `bool` are `Literal[True]`, `Literal[False]`, and `Never`.
+        `Literal[True]`, `Literal[False]` and `Never` are all disjunct types,
+        and their union is exactly equal to `bool`.
 
 - Enums: consider the following enum class:
 
@@ -72,13 +72,14 @@ Examples of sealed types (other than the singleton types listed above) are:
     class Foo(Enum):
         X = auto()
         Y = auto()
+        Z = auto()
     ```
 
     - The only inhabitants of the `Foo` type at runtime are the enum `Foo`'s members:
         `Foo.X` and `Foo.Y`
-    - The only proper subtypes of `Foo` are `Literal[Foo.X]` and `Literal[Foo.Y]`.
-        `Literal[Foo.X]` and `Literal[Foo.Y]` are disjunct, and the union `Literal[Foo.X, Foo.Y]`
-        is exactly equal to the type `Foo`.
+    - The only proper subtypes of `Foo` are `Literal[Foo.X]`, `Literal[Foo.Y]`, `Literal[Foo.Z]`, and `Never`.
+        `Literal[Foo.X]`, `Literal[Foo.Y]`, `Literal[Foo.Z]` and `Never` are all disjunct,
+        and the union `Literal[Foo.X, Foo.Y, Foo.Z] | Never` is exactly equal to the type `Foo`.
 
 Because a singleton type is equivalent to the union of all of its proper subtypes,
 for any given singleton type `X` where the only proper subtypes of `X` are `A`, `B` and `C`,
@@ -148,9 +149,10 @@ def f(x: str | Literal[1]):
 
 ## Closed types
 
-A closed type is a type for which it is known that the type has no subtypes except for the type itself;
-it is "closed for extension".
-For a given closed type `X`, the only subtype of `X` is `X`; `X` has no *proper* subtypes.
+A closed type is a type for which it is known that the type has no subtypes
+except for the type itself and `Never`; it is "closed for extension".
+For a given closed type `X`, the only subtypes of `X` are `X` and `Never`;
+the only *proper* subtype of `X` is `Never`.
 
 All singleton types and single-value types are closed types.
 However, not all closed types are singleton types or single-value types.
@@ -170,12 +172,14 @@ class Spam: ...
 
 However, runtime subclassability does not correspond exactly to whether a class is closed or not.
 For example, the `bool` type is (correctly) decorated with `@final` in typeshed's stubs,
-indicating that the class cannot be subclassed at runtime. However, `bool` has two proper subtypes,
-`Literal[True]` and `Literal[False]`. As such, although both its subtypes are closed,
-`bool` itself cannot be considered a closed type. Similarly, attempting to subclass the `Eggs` enum
-in the following example will lead to an exception at runtime, and type checkers should treat all
+indicating that the class cannot be subclassed at runtime.
+However, `bool` has two proper subtypes other than `Never`: `Literal[True]` and `Literal[False]`.
+As such, although both its subtypes are closed, `bool` itself cannot be considered a closed type.
+Similarly, attempting to subclass the `Eggs` enum in the following example
+will lead to an exception at runtime, and type checkers should treat all
 enum classes as implicitly `@final`. Nonetheless, the `Eggs` type cannot be considered closed,
-as it has three proper subtypes (`Literal[Eggs.A]`, `Literal[Eggs.B]` and `Literal[Eggs.C]`):
+as it has three proper subtypes other than `Never`:
+`Literal[Eggs.A]`, `Literal[Eggs.B]` and `Literal[Eggs.C]`.
 
 ```py
 from enum import Enum, auto
