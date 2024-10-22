@@ -148,12 +148,21 @@ fn bindings_ty<'db>(
              binding,
              constraints,
          }| {
-            let constraint_tys =
-                constraints.filter_map(|constraint| narrowing_constraint(db, constraint, binding));
+            let mut constraint_tys = constraints
+                .filter_map(|constraint| narrowing_constraint(db, constraint, binding))
+                .peekable();
 
-            constraint_tys.fold(binding_ty(db, binding), |ty, constraint_ty| {
-                ty.intersect(db, constraint_ty)
-            })
+            let binding_ty = binding_ty(db, binding);
+            if constraint_tys.peek().is_some() {
+                constraint_tys
+                    .fold(
+                        IntersectionBuilder::new(db).add_positive(binding_ty),
+                        IntersectionBuilder::add_positive,
+                    )
+                    .build()
+            } else {
+                binding_ty
+            }
         },
     );
     let mut all_types = unbound_ty.into_iter().chain(def_types);
@@ -1048,14 +1057,6 @@ impl<'db> Type<'db> {
             // TODO: handle more complex types
             _ => KnownClass::Str.to_instance(db),
         }
-    }
-
-    #[must_use]
-    pub fn intersect(&self, db: &'db dyn Db, other: Type<'db>) -> Type<'db> {
-        IntersectionBuilder::new(db)
-            .add_positive(*self)
-            .add_positive(other)
-            .build()
     }
 }
 
@@ -2109,35 +2110,5 @@ mod tests {
         let db = setup_db();
 
         assert_eq!(ty.into_type(&db).repr(&db), expected.into_type(&db));
-    }
-
-    #[test]
-    fn type_intersect() {
-        // Note: There are no tests for `Type::intersect`, as that functionality is covered
-        // by the tests for `IntersectionBuilder`. This particular test is a regression test
-        // for https://github.com/astral-sh/ruff/issues/13870.
-
-        let db = setup_db();
-
-        let t_1 = Type::IntLiteral(1);
-        let t_2 = Type::IntLiteral(2);
-        let t_3 = Type::IntLiteral(3);
-        let union = UnionType::from_elements(&db, [t_1, t_2, t_3]);
-
-        let t_object = Ty::BuiltinInstance("object").into_type(&db);
-        let constraint1 = IntersectionBuilder::new(&db)
-            .add_positive(t_object)
-            .add_negative(t_1)
-            .build();
-        let constraint2 = IntersectionBuilder::new(&db)
-            .add_positive(t_object)
-            .add_negative(t_2)
-            .build();
-
-        let ty = union
-            .intersect(&db, constraint1)
-            .intersect(&db, constraint2);
-
-        assert_eq!(ty, t_3);
     }
 }
