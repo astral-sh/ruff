@@ -119,13 +119,13 @@ impl Display for DisplayUnionType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let elements = self.ty.elements(self.db);
 
-        // Group literal types by kind.
-        let mut grouped_literals = FxHashMap::default();
+        // Group condensed-display types by kind.
+        let mut grouped_condensed_kinds = FxHashMap::default();
 
         for element in elements {
-            if let Ok(literal_kind) = LiteralTypeKind::try_from(*element) {
-                grouped_literals
-                    .entry(literal_kind)
+            if let Ok(kind) = CondensedDisplayTypeKind::try_from(*element) {
+                grouped_condensed_kinds
+                    .entry(kind)
                     .or_insert_with(Vec::new)
                     .push(*element);
             }
@@ -134,15 +134,15 @@ impl Display for DisplayUnionType<'_> {
         let mut join = f.join(" | ");
 
         for element in elements {
-            if let Ok(literal_kind) = LiteralTypeKind::try_from(*element) {
-                let Some(mut literals) = grouped_literals.remove(&literal_kind) else {
+            if let Ok(kind) = CondensedDisplayTypeKind::try_from(*element) {
+                let Some(mut condensed_kind) = grouped_condensed_kinds.remove(&kind) else {
                     continue;
                 };
-                if literal_kind == LiteralTypeKind::Int {
-                    literals.sort_unstable_by_key(|ty| ty.expect_int_literal());
+                if kind == CondensedDisplayTypeKind::Int {
+                    condensed_kind.sort_unstable_by_key(|ty| ty.expect_int_literal());
                 }
                 join.entry(&DisplayLiteralGroup {
-                    literals,
+                    literals: condensed_kind,
                     db: self.db,
                 });
             } else {
@@ -152,7 +152,7 @@ impl Display for DisplayUnionType<'_> {
 
         join.finish()?;
 
-        debug_assert!(grouped_literals.is_empty());
+        debug_assert!(grouped_condensed_kinds.is_empty());
 
         Ok(())
     }
@@ -180,7 +180,7 @@ impl Display for DisplayLiteralGroup<'_> {
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-enum LiteralTypeKind {
+enum CondensedDisplayTypeKind {
     Class,
     Function,
     Int,
@@ -188,7 +188,7 @@ enum LiteralTypeKind {
     Bytes,
 }
 
-impl TryFrom<Type<'_>> for LiteralTypeKind {
+impl TryFrom<Type<'_>> for CondensedDisplayTypeKind {
     type Error = ();
 
     fn try_from(value: Type<'_>) -> Result<Self, Self::Error> {
