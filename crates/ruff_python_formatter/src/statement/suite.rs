@@ -2,7 +2,7 @@ use ruff_formatter::{
     write, FormatContext, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions,
 };
 use ruff_python_ast::helpers::is_compound_statement;
-use ruff_python_ast::{self as ast, PySourceType, Stmt, Suite};
+use ruff_python_ast::{self as ast, Expr, PySourceType, Stmt, Suite};
 use ruff_python_ast::{AnyNodeRef, StmtExpr};
 use ruff_python_trivia::{lines_after, lines_after_ignoring_end_of_line_trivia, lines_before};
 use ruff_text_size::{Ranged, TextRange};
@@ -138,7 +138,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
 
             SuiteKind::Function | SuiteKind::Class | SuiteKind::TopLevel => {
                 if let Some(docstring) =
-                    DocstringStmt::try_from_statement(first, self.kind, source_type)
+                    DocstringStmt::try_from_statement(first, self.kind, f.context())
                 {
                     SuiteChildStatement::Docstring(docstring)
                 } else {
@@ -179,7 +179,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 // Insert a newline after a module level docstring, but treat
                 // it as a docstring otherwise. See: https://github.com/psf/black/pull/3932.
                 self.kind == SuiteKind::TopLevel
-                    && DocstringStmt::try_from_statement(first.statement(), self.kind, source_type)
+                    && DocstringStmt::try_from_statement(first.statement(), self.kind, f.context())
                         .is_some()
             };
 
@@ -785,29 +785,41 @@ impl<'a> DocstringStmt<'a> {
     fn try_from_statement(
         stmt: &'a Stmt,
         suite_kind: SuiteKind,
-        source_type: PySourceType,
+        context: &PyFormatContext,
     ) -> Option<DocstringStmt<'a>> {
         // Notebooks don't have a concept of modules, therefore, don't recognise the first string as the module docstring.
-        if source_type.is_ipynb() && suite_kind == SuiteKind::TopLevel {
+        if context.options().source_type().is_ipynb() && suite_kind == SuiteKind::TopLevel {
             return None;
         }
 
-        let Stmt::Expr(ast::StmtExpr { value, .. }) = stmt else {
+        let Stmt::Expr(expr_stmt) = stmt else {
             return None;
         };
 
-        value.is_string_literal_expr().then_some(DocstringStmt {
+        if !Self::is_docstring_statement(expr_stmt, context) {
+            return None;
+        }
+
+        Some(DocstringStmt {
             docstring: stmt,
             suite_kind,
         })
     }
 
-    pub(crate) fn is_docstring_statement(stmt: &StmtExpr, source_type: PySourceType) -> bool {
-        if source_type.is_ipynb() {
+    pub(crate) fn is_docstring_statement(stmt: &StmtExpr, context: &PyFormatContext) -> bool {
+        if context.options().source_type().is_ipynb() {
             return false;
         }
 
-        stmt.value.is_string_literal_expr()
+        if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = stmt.value.as_ref() {
+            if value.is_implicit_concatenated() {
+                !value.iter().any(|literal| context.comments().has(literal))
+            } else {
+                true
+            }
+        } else {
+            false
+        }
     }
 }
 

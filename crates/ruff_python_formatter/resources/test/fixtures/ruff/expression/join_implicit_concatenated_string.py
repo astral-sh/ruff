@@ -50,6 +50,7 @@ b"aaaaaaaaa" b"bbbbbbbbbbbbbbbbbbbb" # Join
     "cccccccccccccc"
 )
 
+
 ##############################################################################
 # F-strings
 ##############################################################################
@@ -285,7 +286,12 @@ def single_quoted():
     ' content\ ' '     '
     return
 
-
+def implicit_with_comment():
+    (
+        "a"
+        # leading
+        "the comment above"
+    )
 
 ##############################################################################
 # Regressions
