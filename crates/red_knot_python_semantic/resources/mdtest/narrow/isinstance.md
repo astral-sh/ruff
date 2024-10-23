@@ -128,6 +128,9 @@ if imported_isinstance(x, int):
 
 ```py
 x = 1 if flag else "a"
+
+# TODO: this should cause us to emit a diagnostic
+# (`isinstance` has no `foo` parameter)
 if isinstance(x, int, foo="bar"):
     reveal_type(x)  # revealed: Literal[1] | Literal["a"]
 ```
