@@ -123,3 +123,11 @@ x = 1 if flag else "a"
 if imported_isinstance(x, int):
     reveal_type(x)  # revealed: Literal[1]
 ```
+
+## Do not narrow if there are keyword arguments
+
+```py
+x = 1 if flag else "a"
+if isinstance(x, int, foo="bar"):
+    reveal_type(x)  # revealed: Literal[1] | Literal["a"]
+```

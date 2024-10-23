@@ -228,7 +228,9 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             .expression_ty(expr_call.func.scoped_ast_id(self.db, scope))
             .into_function_literal_type()
         {
-            if func_type.known(self.db) == Some(KnownFunction::IsInstance) {
+            if func_type.known(self.db) == Some(KnownFunction::IsInstance)
+                && expr_call.arguments.keywords.is_empty()
+            {
                 if let [ast::Expr::Name(ast::ExprName { id, .. }), rhs] = &*expr_call.arguments.args
                 {
                     let symbol = self.symbols().symbol_id_by_name(id).unwrap();
