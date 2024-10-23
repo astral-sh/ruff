@@ -266,10 +266,9 @@ pub(crate) fn quote_annotation(
     }
 
     let quote = stylist.quote();
-    let mut quote_annotation = QuoteAnnotation::new(semantic, stylist);
-    quote_annotation.visit_expr(expr);
-
-    let annotation = quote_annotation.annotation;
+    let mut quote_annotator = QuoteAnnotator::new(semantic, stylist);
+    quote_annotator.visit_expr(expr);
+    let annotation = quote_annotator.into_annotation();
 
     Ok(Edit::range_replacement(
         format!("{quote}{annotation}{quote}"),
@@ -298,22 +297,22 @@ pub(crate) fn filter_contained(edits: Vec<Edit>) -> Vec<Edit> {
 }
 
 #[derive(Copy, PartialEq, Clone)]
-enum QuoteAnnotationState {
+enum QuoteAnnotatorState {
     Literal,
     AnnotatedFirst,
     AnnotatedRest,
     Other,
 }
 
-pub(crate) struct QuoteAnnotation<'a> {
+pub(crate) struct QuoteAnnotator<'a> {
     stylist: &'a Stylist<'a>,
     semantic: &'a SemanticModel<'a>,
-    state: Vec<QuoteAnnotationState>,
+    state: Vec<QuoteAnnotatorState>,
     annotation: String,
 }
 
-impl<'a> QuoteAnnotation<'a> {
-    pub(crate) fn new(semantic: &'a SemanticModel<'a>, stylist: &'a Stylist<'a>) -> Self {
+impl<'a> QuoteAnnotator<'a> {
+    fn new(semantic: &'a SemanticModel<'a>, stylist: &'a Stylist<'a>) -> Self {
         Self {
             stylist,
             semantic,
@@ -321,9 +320,13 @@ impl<'a> QuoteAnnotation<'a> {
             annotation: String::new(),
         }
     }
+
+    fn into_annotation(self) -> String {
+        self.annotation
+    }
 }
 
-impl<'a> source_order::SourceOrderVisitor<'a> for QuoteAnnotation<'a> {
+impl<'a> source_order::SourceOrderVisitor<'a> for QuoteAnnotator<'a> {
     fn visit_expr(&mut self, expr: &'a Expr) {
         let generator = Generator::from(self.stylist);
 
@@ -338,14 +341,14 @@ impl<'a> source_order::SourceOrderVisitor<'a> for QuoteAnnotation<'a> {
                         .semantic
                         .match_typing_qualified_name(&qualified_name, "Literal")
                     {
-                        self.state.push(QuoteAnnotationState::Literal);
+                        self.state.push(QuoteAnnotatorState::Literal);
                     } else if self
                         .semantic
                         .match_typing_qualified_name(&qualified_name, "Annotated")
                     {
-                        self.state.push(QuoteAnnotationState::AnnotatedFirst);
+                        self.state.push(QuoteAnnotatorState::AnnotatedFirst);
                     } else {
-                        self.state.push(QuoteAnnotationState::Other);
+                        self.state.push(QuoteAnnotatorState::Other);
                     }
                 }
 
@@ -359,8 +362,8 @@ impl<'a> source_order::SourceOrderVisitor<'a> for QuoteAnnotation<'a> {
                 };
                 self.visit_expr(first);
                 if let Some(last) = self.state.last_mut() {
-                    if *last == QuoteAnnotationState::AnnotatedFirst {
-                        *last = QuoteAnnotationState::AnnotatedRest;
+                    if *last == QuoteAnnotatorState::AnnotatedFirst {
+                        *last = QuoteAnnotatorState::AnnotatedRest;
                     }
                 }
                 for expr in remaining {
@@ -379,7 +382,7 @@ impl<'a> source_order::SourceOrderVisitor<'a> for QuoteAnnotation<'a> {
             }
             _ => {
                 let source = match self.state.last().copied() {
-                    Some(QuoteAnnotationState::Literal | QuoteAnnotationState::AnnotatedRest) => {
+                    Some(QuoteAnnotatorState::Literal | QuoteAnnotatorState::AnnotatedRest) => {
                         let mut source = generator.expr(expr);
                         source = source.replace(
                             self.stylist.quote().as_char(),
@@ -388,7 +391,7 @@ impl<'a> source_order::SourceOrderVisitor<'a> for QuoteAnnotation<'a> {
                         source
                     }
                     None
-                    | Some(QuoteAnnotationState::AnnotatedFirst | QuoteAnnotationState::Other) => {
+                    | Some(QuoteAnnotatorState::AnnotatedFirst | QuoteAnnotatorState::Other) => {
                         let mut source = generator.expr(expr);
                         source = source.replace(self.stylist.quote().as_char(), "");
                         source = source.replace(self.stylist.quote().opposite().as_char(), "");
