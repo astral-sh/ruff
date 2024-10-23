@@ -69,7 +69,7 @@ invalid_characters.py:63:35: PLE2510 [*] Invalid unescaped character backspace, 
 63 | raw_single_singlequote = r'\ \' " ␈'
    |                                   ^ PLE2510
 64 | raw_triple_singlequote = r'''\ ' " '''
-65 | raw_triple_singlequote_2 = r'''​\''''
+65 | raw_triple_singlequote_2 = r'''​ \''' \''''
    |
    = help: Replace with escape sequence
 
@@ -80,7 +80,7 @@ invalid_characters.py:63:35: PLE2510 [*] Invalid unescaped character backspace, 
 63    |-raw_single_singlequote = r'\ \' " ␈'
    63 |+raw_single_singlequote = '\\ \\\' " \b'
 64 64 | raw_triple_singlequote = r'''\ ' " '''
-65 65 | raw_triple_singlequote_2 = r'''​\''''
+65 65 | raw_triple_singlequote_2 = r'''​ \''' \''''
 66 66 | raw_single_doublequote = r"\ ' \" ␛"
 
 invalid_characters.py:77:1: PLE2510 [*] Invalid unescaped character backspace, use "\b" instead

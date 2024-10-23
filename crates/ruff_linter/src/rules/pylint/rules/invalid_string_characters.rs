@@ -265,9 +265,16 @@ pub(crate) fn invalid_string_characters<'a>(
             let replacement: &str = match c {
                 '\\' => "\\\\",
                 '\'' | '"' => {
-                    // Quotes don't have to be escaped in triple-quoted strings,
-                    // *except* at the very end (like """this: \"""").
-                    if string_flags.is_triple_quoted() && column + 1 < string_content.len() {
+                    // Quotes only have to be escaped in triple-quoted strings at the beginning
+                    // of a triplet (like `\"""\"""` within the string, or `\""""` at the end).
+                    // For simplicity, escape all quotes followed by the same character
+                    // (e.g., `r""" \""" \""""` becomes `""" \\\"\"" \""""`).
+                    if string_flags.is_triple_quoted()
+                        && string_content
+                            .as_bytes()
+                            .get(column + 1)
+                            .is_some_and(|c2| char::from(*c2) != c)
+                    {
                         continue;
                     }
                     match (c, string_flags.quote_style()) {
