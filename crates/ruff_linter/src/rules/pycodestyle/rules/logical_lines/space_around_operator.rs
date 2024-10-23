@@ -302,6 +302,7 @@ const fn is_operator_token(token: TokenKind) -> bool {
             | TokenKind::Equal
             | TokenKind::Percent
             | TokenKind::NotEqual
+            | TokenKind::EqEqual
             | TokenKind::LessEqual
             | TokenKind::GreaterEqual
             | TokenKind::CircumFlex
