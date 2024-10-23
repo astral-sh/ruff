@@ -4,7 +4,9 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, SymbolTable};
 use crate::semantic_index::symbol_table;
-use crate::types::{infer_expression_types, IntersectionBuilder, Type};
+use crate::types::{
+    infer_expression_types, IntersectionBuilder, KnownFunction, Type, UnionBuilder,
+};
 use crate::Db;
 use itertools::Itertools;
 use ruff_python_ast as ast;
@@ -60,6 +62,28 @@ fn all_narrowing_constraints_for_expression<'db>(
     NarrowingConstraintsBuilder::new(db, Constraint::Expression(expression)).finish()
 }
 
+/// Generate a constraint from the *type* of the second argument of an `isinstance` call.
+///
+/// Example: for `isinstance(…, str)`, we would infer `Type::ClassLiteral(str)` from the
+/// second argument, but we need to generate a `Type::Instance(str)` constraint that can
+/// be used to narrow down the type of the first argument.
+fn generate_isinstance_constraint<'db>(
+    db: &'db dyn Db,
+    classinfo: &Type<'db>,
+) -> Option<Type<'db>> {
+    match classinfo {
+        Type::ClassLiteral(class) => Some(Type::Instance(*class)),
+        Type::Tuple(tuple) => {
+            let mut builder = UnionBuilder::new(db);
+            for element in tuple.elements(db) {
+                builder = builder.add(generate_isinstance_constraint(db, element)?);
+            }
+            Some(builder.build())
+        }
+        _ => None,
+    }
+}
+
 type NarrowingConstraints<'db> = FxHashMap<ScopedSymbolId, Type<'db>>;
 
 struct NarrowingConstraintsBuilder<'db> {
@@ -88,10 +112,15 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
     }
 
     fn evaluate_expression_constraint(&mut self, expression: Expression<'db>) {
-        if let ast::Expr::Compare(expr_compare) = expression.node_ref(self.db).node() {
-            self.add_expr_compare(expr_compare, expression);
+        match expression.node_ref(self.db).node() {
+            ast::Expr::Compare(expr_compare) => {
+                self.add_expr_compare(expr_compare, expression);
+            }
+            ast::Expr::Call(expr_call) => {
+                self.add_expr_call(expr_call, expression);
+            }
+            _ => {} // TODO other test expression kinds
         }
-        // TODO other test expression kinds
     }
 
     fn evaluate_pattern_constraint(&mut self, pattern: PatternConstraint<'db>) {
@@ -188,6 +217,33 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                     }
                     _ => {
                         // TODO other comparison types
+                    }
+                }
+            }
+        }
+    }
+
+    fn add_expr_call(&mut self, expr_call: &ast::ExprCall, expression: Expression<'db>) {
+        let scope = self.scope();
+        let inference = infer_expression_types(self.db, expression);
+
+        if let Some(func_type) = inference
+            .expression_ty(expr_call.func.scoped_ast_id(self.db, scope))
+            .into_function_literal_type()
+        {
+            if func_type.is_known(self.db, KnownFunction::IsInstance)
+                && expr_call.arguments.keywords.is_empty()
+            {
+                if let [ast::Expr::Name(ast::ExprName { id, .. }), rhs] = &*expr_call.arguments.args
+                {
+                    let symbol = self.symbols().symbol_id_by_name(id).unwrap();
+
+                    let rhs_type = inference.expression_ty(rhs.scoped_ast_id(self.db, scope));
+
+                    // TODO: add support for PEP 604 union types on the right hand side:
+                    // isinstance(x, str | (int | float))
+                    if let Some(constraint) = generate_isinstance_constraint(self.db, &rhs_type) {
+                        self.constraints.insert(symbol, constraint);
                     }
                 }
             }

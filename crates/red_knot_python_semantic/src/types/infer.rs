@@ -779,6 +779,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             "reveal_type" if definition.is_typing_definition(self.db) => {
                 Some(KnownFunction::RevealType)
             }
+            "isinstance" if definition.is_builtin_definition(self.db) => {
+                Some(KnownFunction::IsInstance)
+            }
             _ => None,
         };
         let function_ty = Type::FunctionLiteral(FunctionType::new(
