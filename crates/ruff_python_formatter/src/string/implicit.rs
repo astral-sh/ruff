@@ -74,6 +74,8 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringExpanded<'_
         let comments = f.context().comments().clone();
         let quoting = self.string.quoting(&f.context().locator());
 
+        let join_implicit_concatenated_string_enabled =
+            is_join_implicit_concatenated_string_enabled(f.context());
         let mut joiner = f.join_with(in_parentheses_only_soft_line_break_or_space());
 
         for part in self.string.parts() {
@@ -94,6 +96,7 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringExpanded<'_
 
             let part_comments = comments.leading_dangling_trailing(&part);
             joiner.entry(&format_args![
+                (!join_implicit_concatenated_string_enabled).then_some(line_suffix_boundary()),
                 leading_comments(part_comments.leading),
                 format_part,
                 trailing_comments(part_comments.trailing)
