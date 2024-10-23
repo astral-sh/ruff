@@ -82,6 +82,16 @@ if isinstance(x, A):
         reveal_type(x)  # revealed: A & B
 ```
 
+## No narrowing for instances of `builtins.type`
+
+```py
+t = type("t", (), {})
+x = 1 if flag else "foo"
+
+if isinstance(x, t):
+    reveal_type(x)  # revealed: Literal[1] | Literal["foo"]
+```
+
 ## Do not use custom `isinstance` for narrowing
 
 ```py
