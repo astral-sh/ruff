@@ -56,6 +56,7 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedString<'_> {
     }
 }
 
+/// Formats an implicit concatenated string where parts are separated by a space or line break.
 pub(crate) struct FormatImplicitConcatenatedStringExpanded<'a> {
     string: StringLike<'a>,
 }
@@ -103,6 +104,7 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringExpanded<'_
     }
 }
 
+/// Formats an implicit concatenated string where parts are joined into a single string if possible.
 pub(crate) struct FormatImplicitConcatenatedStringFlat<'a> {
     string: StringLike<'a>,
     flags: AnyStringFlags,
@@ -110,6 +112,7 @@ pub(crate) struct FormatImplicitConcatenatedStringFlat<'a> {
 }
 
 impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
+    /// Creates a new formatter. Returns `None` if the string can't be merged into a single string.
     pub(crate) fn new(string: StringLike<'a>, context: &PyFormatContext) -> Option<Self> {
         fn merge_flags(string: StringLike, context: &PyFormatContext) -> Option<AnyStringFlags> {
             if !is_join_implicit_concatenated_string_enabled(context) {
@@ -160,10 +163,9 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                             if is_f_string_formatting_enabled(context) {
                                 // The formatter preserves the whitespace around the debug text of an expression.
                                 // If the text contains any new lines, then it can't fit on a single line.
-                                if expression.debug_text.as_ref().is_some_and(|debug_text| {
-                                    debug_text.leading.contains(['\n', '\r'])
-                                        || debug_text.trailing.contains(['\n', '\r'])
-                                }) {
+                                if expression.debug_text.is_some()
+                                    && context.locator().slice(expression).contains(['\n', '\r'])
+                                {
                                     return true;
                                 }
 

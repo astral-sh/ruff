@@ -429,10 +429,6 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                         best_fit_parenthesize(&format_once(|f| {
                             inline_comments.mark_formatted();
 
-                            // Can we just call `FormatImplicitString` here with a custom layout assigns a group id
-                            // that we can reference in `if_group_breaks` and `if_group_fits_on_line`.
-                            // The other alternative is that this code creates the `FormatImplicitStringGroup` and by-passes
-                            // calling `FormatStringLiteralExpression` directly.
                             value.format().with_options(Parentheses::Never).fmt(f)?;
 
                             if !inline_comments.is_empty() {
@@ -652,6 +648,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                 } else if let Some(format_implicit_flat) = &format_implicit_flat {
                     // F-String containing an expression with a magic trailing comma, a comment, or a
                     // multiline debug expression should never be joined. Use the default layout.
+                    //
                     // ```python
                     // aaaa = f"abcd{[
                     //    1,
@@ -688,6 +685,8 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                     })
                     .memoized();
 
+                    // Keep the target flat, parenthesize the value, and keep it multiline.
+                    //
                     // ```python
                     // Literal[ "a", "b"] = (
                     //      "looooooooooooooooooooooooooooooong"
@@ -712,6 +711,8 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                         )
                     });
 
+                    // Expand the parent and parenthesize the joined string with the inlined comment.
+                    //
                     // ```python
                     // Literal[
                     //     "a",
@@ -739,6 +740,8 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                         )
                     });
 
+                    // The most expanded variant: Expand both the target and the string.
+                    //
                     // ```python
                     // Literal[
                     //     "a",

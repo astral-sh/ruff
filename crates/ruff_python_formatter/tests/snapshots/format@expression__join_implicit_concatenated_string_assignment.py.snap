@@ -268,6 +268,11 @@ aaaaaaaaaaaaaaaaaa = (
 )
 
 aaaaaaaaaaaaaaaaaa = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeee{a +
+    b=}" "moreeeeeeeeeeeeeeeeeetest"  # comment
+)
+
+aaaaaaaaaaaaaaaaaa = (
     f"testeeeeeeeeeeeeeeeeeeeeeeeee{a
     =}" "moreeeeeeeeeeeeeeeeeetest"  # comment
 )
@@ -572,6 +577,12 @@ aaaaa[aaaaaaaaaaa] = (
 aaaaaaaaaaaaaaaaaa = (
     f"testeeeeeeeeeeeeeeeeeeeeeeeee{
     a=}"
+    "moreeeeeeeeeeeeeeeeeetest"  # comment
+)
+
+aaaaaaaaaaaaaaaaaa = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeee{a +
+    b=}"
     "moreeeeeeeeeeeeeeeeeetest"  # comment
 )
 

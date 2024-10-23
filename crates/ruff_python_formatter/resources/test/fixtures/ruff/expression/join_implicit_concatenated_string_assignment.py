@@ -262,6 +262,11 @@ aaaaaaaaaaaaaaaaaa = (
 )
 
 aaaaaaaaaaaaaaaaaa = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeee{a +
+    b=}" "moreeeeeeeeeeeeeeeeeetest"  # comment
+)
+
+aaaaaaaaaaaaaaaaaa = (
     f"testeeeeeeeeeeeeeeeeeeeeeeeee{a
     =}" "moreeeeeeeeeeeeeeeeeetest"  # comment
 )
