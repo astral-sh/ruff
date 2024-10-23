@@ -1,6 +1,7 @@
 use std::iter::FusedIterator;
 use std::sync::Arc;
 
+use ruff_text_size::TextRange;
 use rustc_hash::{FxBuildHasher, FxHashMap};
 use salsa::plumbing::AsId;
 
@@ -141,6 +142,16 @@ impl<'db> SemanticIndex<'db> {
         &self.ast_ids[scope_id]
     }
 
+    pub fn definition_range(&self, def: &Definition<'db>) -> TextRange {
+        // XXX this function doesn't need to exist?
+        // or at least it shouldn't work like this I think
+        for (dnk, other_def) in &self.definitions_by_node {
+            if other_def == def {
+                return dnk.0.range;
+            }
+        }
+        panic!("Could not find definition")
+    }
     pub fn find_dnk(&self, def: &Definition<'db>) -> &DefinitionNodeKey {
         for (dnk, other_def) in &self.definitions_by_node {
             if other_def == def {
