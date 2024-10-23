@@ -40,9 +40,8 @@ impl FormatNodeRule<ExprStringLiteral> for FormatExprStringLiteral {
                     }
                 }
 
-                in_parentheses_only_group(&FormatImplicitConcatenatedString::new(item))
+                in_parentheses_only_group(&FormatImplicitConcatenatedString::new(item)).fmt(f)
             }
-            .fmt(f),
         }
     }
 }

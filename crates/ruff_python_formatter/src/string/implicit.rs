@@ -92,7 +92,6 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringExpanded<'_
 
             let part_comments = comments.leading_dangling_trailing(&part);
             joiner.entry(&format_args![
-                line_suffix_boundary(),
                 leading_comments(part_comments.leading),
                 format_part,
                 trailing_comments(part_comments.trailing)
