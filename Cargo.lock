@@ -2205,6 +2205,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "crossbeam",
+ "lsp-types",
  "notify",
  "rayon",
  "red_knot_python_semantic",

@@ -27,7 +27,7 @@ rayon = { workspace = true }
 rustc-hash = { workspace = true }
 salsa = { workspace = true }
 tracing = { workspace = true }
-
+lsp-types = { workspace = true }
 [dev-dependencies]
 ruff_db = { workspace = true, features = ["testing"] }
 tempfile = { workspace = true }
