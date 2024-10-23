@@ -61,3 +61,23 @@ x = 1 if flag else "a"
 if isinstance(x, (bool, (bytes, int))):
     reveal_type(x)  # revealed: Literal[1]
 ```
+
+## Class types
+
+```py
+class A: ...
+
+
+class B: ...
+
+
+def get_object() -> object: ...
+
+
+x = get_object()
+
+if isinstance(x, A):
+    reveal_type(x)  # revealed: A
+    if isinstance(x, B):
+        reveal_type(x)  # revealed: A & B
+```
