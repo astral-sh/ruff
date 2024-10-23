@@ -265,7 +265,9 @@ pub(crate) fn invalid_string_characters<'a>(
             let replacement: &str = match c {
                 '\\' => "\\\\",
                 '\'' | '"' => {
-                    if string_flags.is_triple_quoted() {
+                    // Quotes don't have to be escaped in triple-quoted strings,
+                    // *except* at the very end (like """this: \"""").
+                    if string_flags.is_triple_quoted() && column + 1 < string_content.len() {
                         continue;
                     }
                     match (c, string_flags.quote_style()) {
