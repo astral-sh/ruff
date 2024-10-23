@@ -17,6 +17,7 @@ use crate::prelude::*;
 use crate::preview::{
     is_f_string_formatting_enabled, is_join_implicit_concatenated_string_enabled,
 };
+use crate::string::docstring::needs_chaperone_space;
 use crate::string::normalize::{
     is_fstring_with_quoted_debug_expression,
     is_fstring_with_triple_quoted_literal_expression_containing_quotes, QuoteMetadata,
@@ -397,13 +398,16 @@ impl Format<PyFormatContext<'_>> for FormatLiteralContent {
             }
         }
 
-        if normalized.is_empty() {
-            Ok(())
-        } else {
-            match normalized {
-                Cow::Borrowed(_) => source_text_slice(self.range).fmt(f),
-                Cow::Owned(normalized) => text(&normalized).fmt(f),
+        if !normalized.is_empty() {
+            match &normalized {
+                Cow::Borrowed(_) => source_text_slice(self.range).fmt(f)?,
+                Cow::Owned(normalized) => text(normalized).fmt(f)?,
+            }
+
+            if self.trim_end && needs_chaperone_space(self.flags, &normalized, f.context()) {
+                space().fmt(f)?;
             }
         }
+        Ok(())
     }
 }

@@ -281,6 +281,11 @@ def byte_string_in_docstring_position():
 def f_string_in_docstring_position():
     f"  don't trim the" "f-string literal "
 
+def single_quoted():
+    ' content\ ' '     '
+    return
+
+
 
 ##############################################################################
 # Regressions

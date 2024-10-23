@@ -618,16 +618,15 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                 // ] = c
                 // ```
                 let split_target_flat_value = format_with(|f| {
+                    if is_join_implicit_concatenated_string_enabled(f.context()) {
+                        group(&last_target).should_expand(true).fmt(f)?;
+                    } else {
+                        last_target.fmt(f)?;
+                    }
+
                     write!(
                         f,
-                        [
-                            group(&last_target).should_expand(true),
-                            space(),
-                            operator,
-                            space(),
-                            format_value,
-                            inline_comments
-                        ]
+                        [space(), operator, space(), format_value, inline_comments]
                     )
                 });
 
