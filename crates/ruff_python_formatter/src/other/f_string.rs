@@ -1,12 +1,12 @@
+use ruff_formatter::write;
+use ruff_python_ast::{AnyStringFlags, FString, StringFlags};
+use ruff_source_file::Locator;
+
 use crate::prelude::*;
 use crate::preview::{
     is_f_string_formatting_enabled, is_f_string_implicit_concatenated_string_literal_quotes_enabled,
 };
 use crate::string::{Quoting, StringNormalizer, StringQuotes};
-use ruff_formatter::write;
-use ruff_python_ast::{AnyStringFlags, FString, StringFlags};
-use ruff_source_file::Locator;
-use ruff_text_size::Ranged;
 
 use super::f_string_element::FormatFStringElement;
 
@@ -35,7 +35,7 @@ impl Format<PyFormatContext<'_>> for FormatFString<'_> {
         // f-string instead of globally for the entire f-string expression.
         let quoting =
             if is_f_string_implicit_concatenated_string_literal_quotes_enabled(f.context()) {
-                f_string_quoting(self.value, &locator)
+                Quoting::CanChange
             } else {
                 self.quoting
             };
@@ -92,17 +92,21 @@ impl Format<PyFormatContext<'_>> for FormatFString<'_> {
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct FStringContext {
-    flags: AnyStringFlags,
+    /// The string flags of the enclosing f-string part.
+    enclosing_flags: AnyStringFlags,
     layout: FStringLayout,
 }
 
 impl FStringContext {
     const fn new(flags: AnyStringFlags, layout: FStringLayout) -> Self {
-        Self { flags, layout }
+        Self {
+            enclosing_flags: flags,
+            layout,
+        }
     }
 
     pub(crate) fn flags(self) -> AnyStringFlags {
-        self.flags
+        self.enclosing_flags
     }
 
     pub(crate) const fn layout(self) -> FStringLayout {
@@ -147,22 +151,5 @@ impl FStringLayout {
 
     pub(crate) const fn is_multiline(self) -> bool {
         matches!(self, FStringLayout::Multiline)
-    }
-}
-
-fn f_string_quoting(f_string: &FString, locator: &Locator) -> Quoting {
-    let triple_quoted = f_string.flags.is_triple_quoted();
-
-    if f_string.elements.expressions().any(|expression| {
-        let string_content = locator.slice(expression.range());
-        if triple_quoted {
-            string_content.contains(r#"""""#) || string_content.contains("'''")
-        } else {
-            string_content.contains(['"', '\''])
-        }
-    }) {
-        Quoting::Preserve
-    } else {
-        Quoting::CanChange
     }
 }

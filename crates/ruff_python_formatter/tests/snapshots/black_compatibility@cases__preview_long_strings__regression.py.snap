@@ -1201,10 +1201,10 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
 +    "With single quote: ' "
 +    f" {my_dict['foo']}"
 +    ' With double quote: " '
-+    f' {my_dict["bar"]}'
++    f" {my_dict['bar']}"
  )
 +
-+s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:\'{my_dict["foo"]}\''
++s = f"Lorem Ipsum is simply dummy text of the printing and typesetting industry:'{my_dict['foo']}'"
 ```
 
 ## Ruff Output
@@ -1839,10 +1839,10 @@ s = (
     "With single quote: ' "
     f" {my_dict['foo']}"
     ' With double quote: " '
-    f' {my_dict["bar"]}'
+    f" {my_dict['bar']}"
 )
 
-s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:\'{my_dict["foo"]}\''
+s = f"Lorem Ipsum is simply dummy text of the printing and typesetting industry:'{my_dict['foo']}'"
 ```
 
 ## Black Output

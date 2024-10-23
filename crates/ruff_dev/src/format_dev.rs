@@ -251,8 +251,7 @@ pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
         }
         info!(
             parent: None,
-            "Done: {} stability errors, {} files, similarity index {:.5}), files with differences: {} took {:.2}s, {} input files contained syntax errors ",
-            error_count,
+            "Done: {error_count} stability/syntax errors, {} files, similarity index {:.5}), files with differences: {} took {:.2}s, {} input files contained syntax errors ",
             result.file_count,
             result.statistics.similarity_index(),
             result.statistics.files_with_differences,
@@ -796,7 +795,7 @@ impl CheckFileError {
             | CheckFileError::PrintError(_)
             | CheckFileError::Panic { .. } => false,
             #[cfg(not(debug_assertions))]
-            CheckFileError::Slow(_) => false,
+            CheckFileError::Slow(_) => true,
         }
     }
 }

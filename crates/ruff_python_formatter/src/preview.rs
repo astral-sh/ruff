@@ -15,11 +15,13 @@ pub(crate) const fn is_hug_parens_with_braces_and_square_brackets_enabled(
 }
 
 /// Returns `true` if the [`f-string formatting`](https://github.com/astral-sh/ruff/issues/7594) preview style is enabled.
+/// WARNING: This preview style depends on `is_f_string_implicit_concatenated_string_literal_quotes_enabled`.
 pub(crate) fn is_f_string_formatting_enabled(context: &PyFormatContext) -> bool {
     context.is_preview()
 }
 
 /// See [#13539](https://github.com/astral-sh/ruff/pull/13539)
+/// Remove `Quoting` when stabalizing this preview style.
 pub(crate) fn is_f_string_implicit_concatenated_string_literal_quotes_enabled(
     context: &PyFormatContext,
 ) -> bool {

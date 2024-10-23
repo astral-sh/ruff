@@ -941,7 +941,7 @@ log.info(f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share
  log.info(
 -    "Skipping:"
 -    f" {desc['db_id']} {foo('bar',x=123)} {'foo' != 'bar'} {(x := 'abc=')} {pos_share=} {desc['status']} {desc['exposure_max']}"
-+    f'Skipping: {desc["db_id"]} {foo("bar", x=123)} {"foo" != "bar"} {(x := "abc=")} {pos_share=} {desc["status"]} {desc["exposure_max"]}'
++    f"Skipping: {desc['db_id']} {foo('bar', x=123)} {'foo' != 'bar'} {(x := 'abc=')} {pos_share=} {desc['status']} {desc['exposure_max']}"
  )
  
  log.info(
@@ -965,7 +965,7 @@ log.info(f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share
  log.info(
 -    "Skipping:"
 -    f" {'a' == 'b' == 'c' == 'd'} {desc['ms_name']} {money=} {dte=} {pos_share=} {desc['status']} {desc['exposure_max']}"
-+    f'Skipping: {"a" == "b" == "c" == "d"} {desc["ms_name"]} {money=} {dte=} {pos_share=} {desc["status"]} {desc["exposure_max"]}'
++    f"Skipping: {'a' == 'b' == 'c' == 'd'} {desc['ms_name']} {money=} {dte=} {pos_share=} {desc['status']} {desc['exposure_max']}"
  )
  
  log.info(
@@ -1406,7 +1406,7 @@ log.info(
 )
 
 log.info(
-    f'Skipping: {desc["db_id"]} {foo("bar", x=123)} {"foo" != "bar"} {(x := "abc=")} {pos_share=} {desc["status"]} {desc["exposure_max"]}'
+    f"Skipping: {desc['db_id']} {foo('bar', x=123)} {'foo' != 'bar'} {(x := 'abc=')} {pos_share=} {desc['status']} {desc['exposure_max']}"
 )
 
 log.info(
@@ -1422,7 +1422,7 @@ log.info(
 )
 
 log.info(
-    f'Skipping: {"a" == "b" == "c" == "d"} {desc["ms_name"]} {money=} {dte=} {pos_share=} {desc["status"]} {desc["exposure_max"]}'
+    f"Skipping: {'a' == 'b' == 'c' == 'd'} {desc['ms_name']} {money=} {dte=} {pos_share=} {desc['status']} {desc['exposure_max']}"
 )
 
 log.info(

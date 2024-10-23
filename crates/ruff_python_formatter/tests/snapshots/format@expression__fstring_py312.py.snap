@@ -10,6 +10,17 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression
 
 # Quotes reuse
 f"{'a'}"
+
+# 312+, it's okay to change the outer quotes even when there's a debug expression using the same quotes
+f'foo {10 + len("bar")=}'
+f'''foo {10 + len("""bar""")=}'''
+
+# 312+, it's okay to change the quotes here without creating an invalid f-string
+f'{"""other " """}'
+f'{"""other " """ + "more"}'
+f'{b"""other " """}'
+f'{f"""other " """}'
+
 ```
 
 ## Outputs
@@ -35,6 +46,16 @@ source_type                = Python
 
 # Quotes reuse
 f"{'a'}"
+
+# 312+, it's okay to change the outer quotes even when there's a debug expression using the same quotes
+f'foo {10 + len("bar")=}'
+f'''foo {10 + len("""bar""")=}'''
+
+# 312+, it's okay to change the quotes here without creating an invalid f-string
+f'{"""other " """}'
+f'{"""other " """ + "more"}'
+f'{b"""other " """}'
+f'{f"""other " """}'
 ```
 
 
@@ -42,10 +63,22 @@ f"{'a'}"
 ```diff
 --- Stable
 +++ Preview
-@@ -3,4 +3,4 @@
- # version isn't set.
+@@ -6,11 +6,11 @@
+ f"{'a'}"
  
- # Quotes reuse
--f"{'a'}"
-+f"{"a"}"
+ # 312+, it's okay to change the outer quotes even when there's a debug expression using the same quotes
+-f'foo {10 + len("bar")=}'
+-f'''foo {10 + len("""bar""")=}'''
++f"foo {10 + len("bar")=}"
++f"""foo {10 + len("""bar""")=}"""
+ 
+ # 312+, it's okay to change the quotes here without creating an invalid f-string
+-f'{"""other " """}'
+-f'{"""other " """ + "more"}'
+-f'{b"""other " """}'
+-f'{f"""other " """}'
++f"{'''other " '''}"
++f"{'''other " ''' + 'more'}"
++f"{b'''other " '''}"
++f"{f'''other " '''}"
 ```
