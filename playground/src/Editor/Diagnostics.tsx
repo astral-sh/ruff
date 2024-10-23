@@ -67,10 +67,10 @@ function Items({
 
   return (
     <ul className="space-y-0.5 flex-grow overflow-y-scroll">
-      {diagnostics.map((diagnostic) => {
+      {diagnostics.map((diagnostic, index) => {
         return (
           <li
-            key={`${diagnostic.location.row}:${diagnostic.location.column}-${diagnostic.code}`}
+            key={`${diagnostic.location.row}:${diagnostic.location.column}-${diagnostic.code ?? index}`}
           >
             <button
               onClick={() =>
