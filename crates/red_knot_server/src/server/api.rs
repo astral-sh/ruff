@@ -35,8 +35,7 @@ pub(super) fn request<'a>(req: server::Request) -> Task<'a> {
             tracing::warn!("Received request {method} which does not have a handler");
             Err(Error::new(
                 anyhow::Error::msg(format!(
-                    "Received request {} which does not have a handler",
-                    method
+                    "Received request {method} which does not have a handler"
                 )),
                 ErrorCode::MethodNotFound,
             ))

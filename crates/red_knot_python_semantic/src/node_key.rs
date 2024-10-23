@@ -7,7 +7,7 @@ use ruff_text_size::{Ranged, TextRange};
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct NodeKey {
     kind: NodeKind,
-    pub range: TextRange,
+    range: TextRange,
 }
 
 impl NodeKey {
@@ -20,5 +20,9 @@ impl NodeKey {
             kind: node.kind(),
             range: node.range(),
         }
+    }
+
+    pub(super) fn range(&self) -> TextRange {
+        self.range
     }
 }

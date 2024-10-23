@@ -65,7 +65,7 @@ impl RootDatabase {
     }
 
     pub fn definition_at_location(&self, file: File, position: Position) -> Option<DefLocation> {
-        return definition_at_location(file, position, self);
+        definition_at_location(file, position, self)
     }
     /// Returns a mutable reference to the system.
     ///

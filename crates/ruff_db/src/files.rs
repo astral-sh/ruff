@@ -373,10 +373,10 @@ impl File {
         eprintln!("TRY_URL ON {:?}", p);
         match p {
             FilePath::System(s) => {
-                return url::Url::parse(&("file://".to_string() + &s.to_string())).unwrap()
+                url::Url::parse(&("file://".to_string() + &s.to_string())).unwrap()
             }
-            FilePath::SystemVirtual(sv) => todo!(),
-            FilePath::Vendored(sv) => todo!(),
+            FilePath::SystemVirtual(_) => todo!(),
+            FilePath::Vendored(_) => todo!(),
         }
     }
 

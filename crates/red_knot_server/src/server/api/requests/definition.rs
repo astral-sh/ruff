@@ -2,6 +2,8 @@ use std::borrow::Cow;
 
 use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
 use lsp_types::{request::GotoDefinition, GotoDefinitionParams, GotoDefinitionResponse, Location};
+// XXX the one place where I'm using something from red_knot_python_semantic
+// maybe need to just move the type?
 use red_knot_python_semantic::location::DefLocation;
 use red_knot_workspace::db::RootDatabase;
 

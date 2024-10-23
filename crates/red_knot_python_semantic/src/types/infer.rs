@@ -63,7 +63,7 @@ use super::{KnownClass, UnionBuilder};
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
 /// scope.
 #[salsa::tracked(return_ref)]
-pub fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> TypeInference<'db> {
+pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> TypeInference<'db> {
     let file = scope.file(db);
     let _span =
         tracing::trace_span!("infer_scope_types", scope=?scope.as_id(), file=%file.path(db))

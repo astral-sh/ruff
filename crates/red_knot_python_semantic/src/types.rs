@@ -1766,7 +1766,7 @@ impl<'db> ClassType<'db> {
                 return result;
             }
         }
-        return None;
+        None
     }
 }
 
