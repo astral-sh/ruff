@@ -805,6 +805,54 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Finds the definition of a member access of a type.
+    ///
+    /// For example, if `foo` is `Type::Instance(<Bar>)`,
+    /// `foo.member(&db, "baz")` returns the definition of `baz` attributes
+    /// as accessed from instances of the `Bar` class.
+    #[must_use]
+    pub fn member_def(&self, db: &'db dyn Db, name: &str) -> Option<Definition<'db>> {
+        match self {
+            // TODO
+            Type::Any => None,
+            // TODO
+            Type::Never => None,
+            // TODO
+            Type::Unknown => None,
+            // TODO
+            Type::Unbound => None,
+            // TODO
+            Type::None => None,
+            // TODO
+            Type::Function(_) => None,
+            // TODO
+            Type::Module(_) => None,
+            Type::Class(class) => class.class_member_def(db, name),
+            // TODO
+            Type::Instance(class) => {
+                // TODO MRO? get_own_instance_member, get_instance_member
+                return class.class_member_def(db, name);
+            }
+            // TODO
+            Type::Union(_) => None,
+            // TODO
+            Type::Intersection(_) => None,
+            // TODO
+            Type::BooleanLiteral(_) => None,
+            // TODO
+            Type::StringLiteral(_) => None,
+            // TODO
+            Type::LiteralString => None,
+            // TODO
+            Type::BytesLiteral(_) => None,
+            // TODO
+            Type::Tuple(_) => None,
+            // TODO
+            Type::Todo => None,
+            // TODO
+            Type::IntLiteral(_) => None,
+        }
+    }
     /// Resolves the boolean value of a type.
     ///
     /// This is used to determine the value that would be returned
@@ -1693,6 +1741,32 @@ impl<'db> ClassType<'db> {
         }
 
         Type::Unbound
+    }
+
+    pub fn class_member_def(self, db: &'db dyn Db, name: &str) -> Option<Definition<'db>> {
+        self.own_class_member_def(db, name)
+            .or_else(|| self.inherited_class_member_def(db, name))
+    }
+
+    pub fn own_class_member_def(self, db: &'db dyn Db, name: &str) -> Option<Definition<'db>> {
+        let scope = self.body_scope(db);
+        let st = symbol_table(db, scope);
+        st.symbol_id_by_name(name)
+            .and_then(|sid| use_def_map(db, scope).first_binding_for_symbol_id(sid))
+    }
+
+    pub fn inherited_class_member_def(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+    ) -> Option<Definition<'db>> {
+        for base in self.bases(db) {
+            let result = base.member_def(db, name);
+            if result.is_some() {
+                return result;
+            }
+        }
+        return None;
     }
 }
 
