@@ -31,6 +31,7 @@ use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
 /// variants, like `bool | int`.
 ///
 /// ## Example
+///
 /// ```python
 /// from math import ceil, floor
 ///
@@ -44,6 +45,7 @@ use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
 /// ```
 ///
 /// Instead, refactor into separate implementations:
+///
 /// ```python
 /// from math import ceil, floor
 ///
@@ -61,6 +63,7 @@ use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
 /// ```
 ///
 /// Or, refactor to use an `Enum`:
+///
 /// ```python
 /// from enum import Enum
 ///
@@ -70,11 +73,11 @@ use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
 ///     DOWN = 2
 ///
 ///
-/// def round_number(value: float, method: RoundingMethod) -> float:
-///     ...
+/// def round_number(value: float, method: RoundingMethod) -> float: ...
 /// ```
 ///
 /// Or, make the argument a keyword-only argument:
+///
 /// ```python
 /// from math import ceil, floor
 ///

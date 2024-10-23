@@ -78,3 +78,10 @@ open("foo", "r")
 open("foo", "rt")
 open("f", "r", encoding="UTF-8")
 open("f", "wt")
+
+
+import aiofiles
+
+aiofiles.open("foo", "U")
+aiofiles.open("foo", "r")
+aiofiles.open("foo", mode="r")

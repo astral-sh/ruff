@@ -1,6 +1,7 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::any_over_body;
+use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr, StmtFor};
 use ruff_python_semantic::analyze::typing::is_set;
 use ruff_text_size::Ranged;
@@ -41,7 +42,7 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
 #[violation]
 pub struct ModifiedIteratingSet {
-    name: String,
+    name: Name,
 }
 
 impl AlwaysFixableViolation for ModifiedIteratingSet {

@@ -10,7 +10,6 @@ use ruff_source_file::{OneIndexed, SourceCode, SourceLocation};
 use ruff_text_size::Ranged;
 
 use crate::message::{Emitter, EmitterContext, Message};
-use crate::registry::AsRule;
 
 #[derive(Default)]
 pub struct JsonEmitter;
@@ -50,20 +49,22 @@ impl Serialize for ExpandedMessages<'_> {
 }
 
 pub(crate) fn message_to_json_value(message: &Message, context: &EmitterContext) -> Value {
-    let source_code = message.file.to_source_code();
+    let source_code = message.source_file().to_source_code();
     let notebook_index = context.notebook_index(message.filename());
 
-    let fix = message.fix.as_ref().map(|fix| {
+    let fix = message.fix().map(|fix| {
         json!({
             "applicability": fix.applicability(),
-            "message": message.kind.suggestion.as_deref(),
+            "message": message.suggestion(),
             "edits": &ExpandedEdits { edits: fix.edits(), source_code: &source_code, notebook_index },
         })
     });
 
     let mut start_location = source_code.source_location(message.start());
     let mut end_location = source_code.source_location(message.end());
-    let mut noqa_location = source_code.source_location(message.noqa_offset);
+    let mut noqa_location = message
+        .noqa_offset()
+        .map(|offset| source_code.source_location(offset));
     let mut notebook_cell_index = None;
 
     if let Some(notebook_index) = notebook_index {
@@ -74,19 +75,19 @@ pub(crate) fn message_to_json_value(message: &Message, context: &EmitterContext)
         );
         start_location = notebook_index.translate_location(&start_location);
         end_location = notebook_index.translate_location(&end_location);
-        noqa_location = notebook_index.translate_location(&noqa_location);
+        noqa_location = noqa_location.map(|location| notebook_index.translate_location(&location));
     }
 
     json!({
-        "code": message.kind.rule().noqa_code().to_string(),
-        "url": message.kind.rule().url(),
-        "message": message.kind.body,
+        "code": message.rule().map(|rule| rule.noqa_code().to_string()),
+        "url": message.rule().and_then(|rule| rule.url()),
+        "message": message.body(),
         "fix": fix,
         "cell": notebook_cell_index,
         "location": start_location,
         "end_location": end_location,
         "filename": message.filename(),
-        "noqa_row": noqa_location.row
+        "noqa_row": noqa_location.map(|location| location.row)
     })
 }
 
@@ -170,7 +171,7 @@ mod tests {
 
     use crate::message::tests::{
         capture_emitter_notebook_output, capture_emitter_output, create_messages,
-        create_notebook_messages,
+        create_notebook_messages, create_syntax_error_messages,
     };
     use crate::message::JsonEmitter;
 
@@ -178,6 +179,14 @@ mod tests {
     fn output() {
         let mut emitter = JsonEmitter;
         let content = capture_emitter_output(&mut emitter, &create_messages());
+
+        assert_snapshot!(content);
+    }
+
+    #[test]
+    fn syntax_errors() {
+        let mut emitter = JsonEmitter;
+        let content = capture_emitter_output(&mut emitter, &create_syntax_error_messages());
 
         assert_snapshot!(content);
     }

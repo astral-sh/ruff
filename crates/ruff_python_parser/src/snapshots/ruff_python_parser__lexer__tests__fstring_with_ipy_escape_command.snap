@@ -31,7 +31,7 @@ expression: lex_source(source)
     ),
     (
         Name(
-            "pwd",
+            Name("pwd"),
         ),
         8..11,
     ),

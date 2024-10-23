@@ -43,30 +43,24 @@ A002.py:5:17: A002 Argument `bytes` is shadowing a Python builtin
 6 |     pass
   |
 
-A002.py:8:17: A002 Argument `id` is shadowing a Python builtin
-  |
-6 |     pass
-7 | 
-8 | async def func3(id, dir):
-  |                 ^^ A002
-9 |     pass
-  |
-
-A002.py:8:21: A002 Argument `dir` is shadowing a Python builtin
-  |
-6 |     pass
-7 | 
-8 | async def func3(id, dir):
-  |                     ^^^ A002
-9 |     pass
-  |
-
-A002.py:11:16: A002 Argument `float` is shadowing a Python builtin
+A002.py:9:17: A002 Argument `id` is shadowing a Python builtin
    |
- 9 |     pass
-10 | 
-11 | map([], lambda float: ...)
+ 9 | async def func3(id, dir):
+   |                 ^^ A002
+10 |     pass
+   |
+
+A002.py:9:21: A002 Argument `dir` is shadowing a Python builtin
+   |
+ 9 | async def func3(id, dir):
+   |                     ^^^ A002
+10 |     pass
+   |
+
+A002.py:13:16: A002 Argument `float` is shadowing a Python builtin
+   |
+13 | map([], lambda float: ...)
    |                ^^^^^ A002
+14 | 
+15 | from typing import override, overload
    |
-
-

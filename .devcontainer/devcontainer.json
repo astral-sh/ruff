@@ -20,7 +20,7 @@
 			"extensions": [
 				"ms-python.python",
 				"rust-lang.rust-analyzer",
-				"serayuzgur.crates",
+				"fill-labs.dependi",
 				"tamasfe.even-better-toml",
 				"Swellaby.vscode-rust-test-adapter",
 				"charliermarsh.ruff"

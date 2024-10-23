@@ -19,7 +19,7 @@ Module(
                             operand: Name(
                                 ExprName {
                                     range: 4..5,
-                                    id: "x",
+                                    id: Name("x"),
                                     ctx: Load,
                                 },
                             ),

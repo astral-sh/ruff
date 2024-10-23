@@ -18,7 +18,7 @@ Module(
                             left: Name(
                                 ExprName {
                                     range: 0..1,
-                                    id: "x",
+                                    id: Name("x"),
                                     ctx: Load,
                                 },
                             ),
@@ -39,7 +39,7 @@ Module(
                                                         parameter: Parameter {
                                                             range: 16..17,
                                                             name: Identifier {
-                                                                id: "y",
+                                                                id: Name("y"),
                                                                 range: 16..17,
                                                             },
                                                             annotation: None,
@@ -55,7 +55,7 @@ Module(
                                         body: Name(
                                             ExprName {
                                                 range: 19..20,
-                                                id: "y",
+                                                id: Name("y"),
                                                 ctx: Load,
                                             },
                                         ),
@@ -75,7 +75,7 @@ Module(
                             left: Name(
                                 ExprName {
                                     range: 22..23,
-                                    id: "x",
+                                    id: Name("x"),
                                     ctx: Load,
                                 },
                             ),
@@ -90,7 +90,7 @@ Module(
                                             Name(
                                                 ExprName {
                                                     range: 33..34,
-                                                    id: "y",
+                                                    id: Name("y"),
                                                     ctx: Load,
                                                 },
                                             ),

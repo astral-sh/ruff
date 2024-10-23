@@ -29,3 +29,13 @@ def anotherfunc():
     a = 1
     if a == 1:
         raise exceptions.Exception("Another except")  # That's fine
+
+
+def yetanotherfunc():
+    a = 1
+    if a == 1:
+        raise BaseException("Custom message")
+
+    b = 1
+    if b == 1:
+        raise BaseException

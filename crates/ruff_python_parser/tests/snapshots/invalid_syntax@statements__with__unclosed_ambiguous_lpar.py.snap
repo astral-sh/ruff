@@ -19,7 +19,7 @@ Module(
                             context_expr: Name(
                                 ExprName {
                                     range: 6..6,
-                                    id: "",
+                                    id: Name(""),
                                     ctx: Invalid,
                                 },
                             ),
@@ -36,7 +36,7 @@ Module(
                                         left: Name(
                                             ExprName {
                                                 range: 9..10,
-                                                id: "x",
+                                                id: Name("x"),
                                                 ctx: Load,
                                             },
                                         ),
@@ -44,7 +44,7 @@ Module(
                                         right: Name(
                                             ExprName {
                                                 range: 13..14,
-                                                id: "y",
+                                                id: Name("y"),
                                                 ctx: Load,
                                             },
                                         ),

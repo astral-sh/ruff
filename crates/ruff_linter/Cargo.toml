@@ -1,6 +1,6 @@
 [package]
 name = "ruff_linter"
-version = "0.4.8"
+version = "0.7.0"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -17,7 +17,7 @@ ruff_cache = { workspace = true }
 ruff_diagnostics = { workspace = true, features = ["serde"] }
 ruff_notebook = { workspace = true }
 ruff_macros = { workspace = true }
-ruff_python_ast = { workspace = true, features = ["serde"] }
+ruff_python_ast = { workspace = true, features = ["serde", "cache"] }
 ruff_python_codegen = { workspace = true }
 ruff_python_index = { workspace = true }
 ruff_python_literal = { workspace = true }
@@ -46,13 +46,12 @@ libcst = { workspace = true }
 log = { workspace = true }
 memchr = { workspace = true }
 natord = { workspace = true }
-once_cell = { workspace = true }
 path-absolutize = { workspace = true, features = [
-  "once_cell_cache",
-  "use_unix_paths_on_wasm",
+    "once_cell_cache",
+    "use_unix_paths_on_wasm",
 ] }
 pathdiff = { workspace = true }
-pep440_rs = { workspace = true, features = ["serde"] }
+pep440_rs = { workspace = true }
 pyproject-toml = { workspace = true }
 quick-junit = { workspace = true }
 regex = { workspace = true }
@@ -69,17 +68,18 @@ toml = { workspace = true }
 typed-arena = { workspace = true }
 unicode-width = { workspace = true }
 unicode_names2 = { workspace = true }
+unicode-normalization = { workspace = true }
 url = { workspace = true }
 
 [dev-dependencies]
-insta = { workspace = true }
+insta = { workspace = true, features = ["filters", "json", "redactions"] }
 test-case = { workspace = true }
 # Disable colored output in tests
 colored = { workspace = true, features = ["no-color"] }
 
 [features]
 default = []
-schemars = ["dep:schemars"]
+schemars = ["dep:schemars", "ruff_python_ast/schemars"]
 # Enables rules for internal integration tests
 test-rules = []
 

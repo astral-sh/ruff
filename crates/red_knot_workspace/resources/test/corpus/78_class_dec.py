@@ -1,0 +1,4 @@
+@foo
+class C:
+   pass
+

@@ -7,8 +7,8 @@ your project. For a more detailed overview, see [_Configuring Ruff_](configurati
 
 To start, we'll install Ruff through PyPI (or with your [preferred package manager](installation.md)):
 
-```shell
-pip install ruff
+```console
+$ pip install ruff
 ```
 
 Let's then assume that our project structure looks like:
@@ -37,8 +37,8 @@ def sum_even_numbers(numbers: Iterable[int]) -> int:
 
 We can run the Ruff linter over our project via `ruff check`:
 
-```shell
-❯ ruff check
+```console
+$ ruff check
 numbers/numbers.py:3:8: F401 [*] `os` imported but unused
 Found 1 error.
 [*] 1 fixable with the `--fix` option.
@@ -47,8 +47,8 @@ Found 1 error.
 Ruff identified an unused import, which is a common error in Python code. Ruff considers this a
 "fixable" error, so we can resolve the issue automatically by running `ruff check --fix`:
 
-```shell
-❯ ruff check --fix
+```console
+$ ruff check --fix
 Found 1 error (1 fixed, 0 remaining).
 ```
 
@@ -73,14 +73,14 @@ def sum_even_numbers(numbers: Iterable[int]) -> int:
 
 Note Ruff runs in the current directory by default, but you can pass specific paths to check:
 
-```shell
-❯ ruff check numbers/numbers.py
+```console
+$ ruff check numbers/numbers.py
 ```
 
 Now that our project is passing `ruff check`, we can run the Ruff formatter via `ruff format`:
 
-```shell
-❯ ruff format
+```console
+$ ruff format
 1 file reformatted
 ```
 
@@ -140,8 +140,8 @@ To configure Ruff, let's create a configuration file in our project's root direc
 
 Running Ruff again, we see that it now enforces a maximum line width, with a limit of 79:
 
-```shell
-❯ ruff check
+```console
+$ ruff check
 numbers/numbers.py:5:80: E501 Line too long (90 > 79)
 Found 1 error.
 ```
@@ -222,8 +222,8 @@ rules, we can set our configuration file to the following:
 If we run Ruff again, we'll see that it now enforces the pyupgrade rules. In particular, Ruff flags
 the use of the deprecated `typing.Iterable` instead of `collections.abc.Iterable`:
 
-```shell
-❯ ruff check
+```console
+$ ruff check
 numbers/numbers.py:1:1: UP035 [*] Import from `collections.abc` instead: `Iterable`
 Found 1 error.
 [*] 1 fixable with the `--fix` option.
@@ -265,8 +265,8 @@ all functions have docstrings:
 
 If we run Ruff again, we'll see that it now enforces the pydocstyle rules:
 
-```shell
-❯ ruff check
+```console
+$ ruff check
 numbers/__init__.py:1:1: D104 Missing docstring in public package
 numbers/numbers.py:1:1: UP035 [*] Import from `collections.abc` instead: `Iterable`
 numbers/numbers.py:1:1: D100 Missing docstring in public module
@@ -290,8 +290,8 @@ def sum_even_numbers(numbers: Iterable[int]) -> int:
 
 Running `ruff check` again, we'll see that it no longer flags the `Iterable` import:
 
-```shell
-❯ ruff check
+```console
+$ ruff check
 numbers/__init__.py:1:1: D104 Missing docstring in public package
 numbers/numbers.py:1:1: D100 Missing docstring in public module
 Found 3 errors.
@@ -321,8 +321,8 @@ Ruff enables this workflow via the `--add-noqa` flag, which will add a `# noqa` 
 line based on its existing violations. We can combine `--add-noqa` with the `--select` command-line
 flag to add `# noqa` directives to all existing `UP035` violations:
 
-```shell
-❯ ruff check --select UP035 --add-noqa .
+```console
+$ ruff check --select UP035 --add-noqa .
 Added 1 noqa directive.
 ```
 
@@ -357,7 +357,7 @@ This tutorial has focused on Ruff's command-line interface, but Ruff can also be
     - id: ruff-format
 ```
 
-Ruff can also be used as a [VS Code extension](https://github.com/astral-sh/ruff-vscode) or
-alongside any other editor through the [Ruff LSP](https://github.com/astral-sh/ruff-lsp).
+Ruff can also be integrated into your editor of choice. Refer to the [Editors](editors/index.md)
+section for more information.
 
-For more, see [_Integrations_](integrations.md).
+For other integrations, see the [Integrations](integrations.md) section.

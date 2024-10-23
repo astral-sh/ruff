@@ -15,7 +15,7 @@ Module(
                     name: Name(
                         ExprName {
                             range: 5..6,
-                            id: "X",
+                            id: Name("X"),
                             ctx: Store,
                         },
                     ),
@@ -27,7 +27,7 @@ Module(
                                     TypeParamTypeVar {
                                         range: 7..15,
                                         name: Identifier {
-                                            id: "T",
+                                            id: Name("T"),
                                             range: 7..8,
                                         },
                                         bound: None,
@@ -38,7 +38,7 @@ Module(
                                                     value: Name(
                                                         ExprName {
                                                             range: 12..15,
-                                                            id: "int",
+                                                            id: Name("int"),
                                                             ctx: Load,
                                                         },
                                                     ),
@@ -54,7 +54,7 @@ Module(
                     value: Name(
                         ExprName {
                             range: 19..22,
-                            id: "int",
+                            id: Name("int"),
                             ctx: Load,
                         },
                     ),
@@ -66,7 +66,7 @@ Module(
                     name: Name(
                         ExprName {
                             range: 28..29,
-                            id: "X",
+                            id: Name("X"),
                             ctx: Store,
                         },
                     ),
@@ -78,7 +78,7 @@ Module(
                                     TypeParamTypeVar {
                                         range: 30..41,
                                         name: Identifier {
-                                            id: "T",
+                                            id: Name("T"),
                                             range: 30..31,
                                         },
                                         bound: None,
@@ -90,7 +90,7 @@ Module(
                                                         Name(
                                                             ExprName {
                                                                 range: 40..41,
-                                                                id: "x",
+                                                                id: Name("x"),
                                                                 ctx: Load,
                                                             },
                                                         ),
@@ -106,7 +106,7 @@ Module(
                     value: Name(
                         ExprName {
                             range: 45..48,
-                            id: "int",
+                            id: Name("int"),
                             ctx: Load,
                         },
                     ),
@@ -118,7 +118,7 @@ Module(
                     name: Name(
                         ExprName {
                             range: 54..55,
-                            id: "X",
+                            id: Name("X"),
                             ctx: Store,
                         },
                     ),
@@ -130,7 +130,7 @@ Module(
                                     TypeParamTypeVar {
                                         range: 56..69,
                                         name: Identifier {
-                                            id: "T",
+                                            id: Name("T"),
                                             range: 56..57,
                                         },
                                         bound: None,
@@ -142,7 +142,7 @@ Module(
                                                         Name(
                                                             ExprName {
                                                                 range: 67..68,
-                                                                id: "x",
+                                                                id: Name("x"),
                                                                 ctx: Load,
                                                             },
                                                         ),
@@ -158,7 +158,7 @@ Module(
                     value: Name(
                         ExprName {
                             range: 73..76,
-                            id: "int",
+                            id: Name("int"),
                             ctx: Load,
                         },
                     ),
@@ -170,7 +170,7 @@ Module(
                     name: Name(
                         ExprName {
                             range: 82..83,
-                            id: "X",
+                            id: Name("X"),
                             ctx: Store,
                         },
                     ),
@@ -182,7 +182,7 @@ Module(
                                     TypeParamTypeVar {
                                         range: 84..100,
                                         name: Identifier {
-                                            id: "T",
+                                            id: Name("T"),
                                             range: 84..85,
                                         },
                                         bound: None,
@@ -193,7 +193,7 @@ Module(
                                                     value: Name(
                                                         ExprName {
                                                             range: 99..100,
-                                                            id: "x",
+                                                            id: Name("x"),
                                                             ctx: Load,
                                                         },
                                                     ),
@@ -208,7 +208,7 @@ Module(
                     value: Name(
                         ExprName {
                             range: 104..107,
-                            id: "int",
+                            id: Name("int"),
                             ctx: Load,
                         },
                     ),
@@ -220,7 +220,7 @@ Module(
                     name: Name(
                         ExprName {
                             range: 113..114,
-                            id: "X",
+                            id: Name("X"),
                             ctx: Store,
                         },
                     ),
@@ -232,7 +232,7 @@ Module(
                                     TypeParamTypeVar {
                                         range: 115..120,
                                         name: Identifier {
-                                            id: "T",
+                                            id: Name("T"),
                                             range: 115..116,
                                         },
                                         bound: None,
@@ -240,7 +240,7 @@ Module(
                                             Name(
                                                 ExprName {
                                                     range: 119..120,
-                                                    id: "x",
+                                                    id: Name("x"),
                                                     ctx: Load,
                                                 },
                                             ),
@@ -251,7 +251,7 @@ Module(
                                     TypeParamTypeVar {
                                         range: 124..127,
                                         name: Identifier {
-                                            id: "int",
+                                            id: Name("int"),
                                             range: 124..127,
                                         },
                                         bound: None,
@@ -264,7 +264,7 @@ Module(
                     value: Name(
                         ExprName {
                             range: 131..134,
-                            id: "int",
+                            id: Name("int"),
                             ctx: Load,
                         },
                     ),
@@ -276,7 +276,7 @@ Module(
                     name: Name(
                         ExprName {
                             range: 140..141,
-                            id: "X",
+                            id: Name("X"),
                             ctx: Store,
                         },
                     ),
@@ -288,14 +288,14 @@ Module(
                                     TypeParamTypeVar {
                                         range: 142..155,
                                         name: Identifier {
-                                            id: "T",
+                                            id: Name("T"),
                                             range: 142..143,
                                         },
                                         bound: Some(
                                             Name(
                                                 ExprName {
                                                     range: 145..148,
-                                                    id: "int",
+                                                    id: Name("int"),
                                                     ctx: Load,
                                                 },
                                             ),
@@ -307,7 +307,7 @@ Module(
                                                     value: Name(
                                                         ExprName {
                                                             range: 152..155,
-                                                            id: "int",
+                                                            id: Name("int"),
                                                             ctx: Load,
                                                         },
                                                     ),
@@ -323,7 +323,7 @@ Module(
                     value: Name(
                         ExprName {
                             range: 159..162,
-                            id: "int",
+                            id: Name("int"),
                             ctx: Load,
                         },
                     ),

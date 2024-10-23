@@ -11,6 +11,7 @@ mod tests {
 
     use anyhow::Result;
     use regex::Regex;
+    use rustc_hash::FxHashMap;
 
     use test_case::test_case;
 
@@ -22,13 +23,14 @@ mod tests {
     use ruff_source_file::Locator;
     use ruff_text_size::Ranged;
 
-    use crate::linter::{check_path, LinterResult};
+    use crate::linter::check_path;
     use crate::registry::{AsRule, Linter, Rule};
+    use crate::rules::isort;
     use crate::rules::pyflakes;
     use crate::settings::types::PreviewMode;
     use crate::settings::{flags, LinterSettings};
     use crate::source_kind::SourceKind;
-    use crate::test::{test_path, test_snippet};
+    use crate::test::{test_contents, test_path, test_snippet};
     use crate::{assert_messages, directives};
 
     #[test_case(Rule::UnusedImport, Path::new("F401_0.py"))]
@@ -125,6 +127,8 @@ mod tests {
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_27.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_28.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_29.pyi"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_30.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_31.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_0.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_1.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_2.py"))]
@@ -204,6 +208,18 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn f821_with_builtin_added_on_new_py_version_but_old_target_version_specified() {
+        let diagnostics = test_snippet(
+            "PythonFinalizationError",
+            &LinterSettings {
+                target_version: crate::settings::types::PythonVersion::Py312,
+                ..LinterSettings::for_rule(Rule::UndefinedName)
+            },
+        );
+        assert_messages!(diagnostics);
+    }
+
     #[test_case(Rule::UnusedVariable, Path::new("F841_4.py"))]
     #[test_case(Rule::UnusedImport, Path::new("__init__.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_24/__init__.py"))]
@@ -228,6 +244,44 @@ mod tests {
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
+    }
+
+    #[test_case(
+        r"import submodule.a",
+        "f401_preview_first_party_submodule_no_dunder_all"
+    )]
+    #[test_case(
+        r"
+        import submodule.a
+        __all__ = ['FOO']
+        FOO = 42",
+        "f401_preview_first_party_submodule_dunder_all"
+    )]
+    fn f401_preview_first_party_submodule(contents: &str, snapshot: &str) {
+        let diagnostics = test_contents(
+            &SourceKind::Python(dedent(contents).to_string()),
+            Path::new("f401_preview_first_party_submodule/__init__.py"),
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                isort: isort::settings::Settings {
+                    // This case specifically tests the scenario where
+                    // the unused import is a first-party submodule import;
+                    // use the isort settings to ensure that the `submodule.a` import
+                    // is recognised as first-party in the test:
+                    known_modules: isort::categorize::KnownModules::new(
+                        vec!["submodule".parse().unwrap()],
+                        vec![],
+                        vec![],
+                        vec![],
+                        FxHashMap::default(),
+                    ),
+                    ..isort::settings::Settings::default()
+                },
+                ..LinterSettings::for_rule(Rule::UnusedImport)
+            },
+        )
+        .0;
+        assert_messages!(snapshot, diagnostics);
     }
 
     #[test_case(Rule::UnusedImport, Path::new("F401_24/__init__.py"))]
@@ -256,6 +310,7 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_27__all_mistyped/__init__.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_28__all_multiple/__init__.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_29__all_conditional/__init__.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_30.py"))]
     fn f401_deprecated_option(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "{}_deprecated_option_{}",
@@ -270,6 +325,21 @@ mod tests {
             },
         )?;
         assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+    #[test_case(Rule::UnusedImport, Path::new("F401_31.py"))]
+    fn f401_allowed_unused_imports_option(rule_code: Rule, path: &Path) -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyflakes").join(path).as_path(),
+            &LinterSettings {
+                pyflakes: pyflakes::settings::Settings {
+                    allowed_unused_imports: vec!["hvplot.pandas".to_string()],
+                    ..pyflakes::settings::Settings::default()
+                },
+                ..LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -372,7 +442,7 @@ mod tests {
             Path::new("pyflakes/project/foo/bar.py"),
             &LinterSettings {
                 typing_modules: vec!["foo.typical".to_string()],
-                ..LinterSettings::for_rules(vec![Rule::UndefinedName])
+                ..LinterSettings::for_rule(Rule::UndefinedName)
             },
         )?;
         assert_messages!(diagnostics);
@@ -385,7 +455,7 @@ mod tests {
             Path::new("pyflakes/project/foo/bop/baz.py"),
             &LinterSettings {
                 typing_modules: vec!["foo.typical".to_string()],
-                ..LinterSettings::for_rules(vec![Rule::UndefinedName])
+                ..LinterSettings::for_rule(Rule::UndefinedName)
             },
         )?;
         assert_messages!(diagnostics);
@@ -400,8 +470,9 @@ mod tests {
             &LinterSettings {
                 pyflakes: pyflakes::settings::Settings {
                     extend_generics: vec!["django.db.models.ForeignKey".to_string()],
+                    ..pyflakes::settings::Settings::default()
                 },
-                ..LinterSettings::for_rules(vec![Rule::UnusedImport])
+                ..LinterSettings::for_rule(Rule::UnusedImport)
             },
         )?;
         assert_messages!(snapshot, diagnostics);
@@ -649,10 +720,7 @@ mod tests {
             &locator,
             &indexer,
         );
-        let LinterResult {
-            data: mut diagnostics,
-            ..
-        } = check_path(
+        let mut diagnostics = check_path(
             Path::new("<filename>"),
             None,
             &locator,
@@ -2413,7 +2481,7 @@ mod tests {
     fn used_in_lambda() {
         flakes(
             r"import fu;
-        lambda: fu
+lambda: fu
         ",
             &[],
         );
@@ -2432,7 +2500,7 @@ mod tests {
     fn used_in_slice_obj() {
         flakes(
             r#"import fu;
-        "meow"[::fu]
+"meow"[::fu]
         "#,
             &[],
         );
@@ -3033,16 +3101,6 @@ mod tests {
             r#"
         from interior import decorate
         @decorate
-        def f():
-            return "hello"
-        "#,
-            &[],
-        );
-
-        flakes(
-            r#"
-        from interior import decorate
-        @decorate('value", &[]);
         def f():
             return "hello"
         "#,

@@ -64,9 +64,6 @@ pub enum Linter {
     /// [flake8-async](https://pypi.org/project/flake8-async/)
     #[prefix = "ASYNC"]
     Flake8Async,
-    /// [flake8-trio](https://pypi.org/project/flake8-trio/)
-    #[prefix = "TRIO"]
-    Flake8Trio,
     /// [flake8-bandit](https://pypi.org/project/flake8-bandit/)
     #[prefix = "S"]
     Flake8Bandit,
@@ -196,6 +193,9 @@ pub enum Linter {
     /// NumPy-specific rules
     #[prefix = "NPY"]
     Numpy,
+    /// [FastAPI](https://pypi.org/project/fastapi/)
+    #[prefix = "FAST"]
+    FastApi,
     /// [Airflow](https://pypi.org/project/apache-airflow/)
     #[prefix = "AIR"]
     Airflow,
@@ -205,6 +205,9 @@ pub enum Linter {
     /// [refurb](https://pypi.org/project/refurb/)
     #[prefix = "FURB"]
     Refurb,
+    /// [pydoclint](https://pypi.org/project/pydoclint/)
+    #[prefix = "DOC"]
+    Pydoclint,
     /// Ruff-specific rules
     #[prefix = "RUF"]
     Ruff,
@@ -301,7 +304,9 @@ impl Rule {
             | Rule::UTF8EncodingDeclaration => LintSource::Tokens,
             Rule::IOError => LintSource::Io,
             Rule::UnsortedImports | Rule::MissingRequiredImport => LintSource::Imports,
-            Rule::ImplicitNamespacePackage | Rule::InvalidModuleName => LintSource::Filesystem,
+            Rule::ImplicitNamespacePackage
+            | Rule::InvalidModuleName
+            | Rule::BuiltinModuleShadowing => LintSource::Filesystem,
             Rule::IndentationWithInvalidMultiple
             | Rule::IndentationWithInvalidMultipleComment
             | Rule::MissingWhitespace

@@ -7,7 +7,7 @@ expression: newline_in_brackets_eol(WINDOWS_EOL)
 [
     (
         Name(
-            "x",
+            Name("x"),
         ),
         0..1,
     ),

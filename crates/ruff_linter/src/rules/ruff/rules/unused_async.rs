@@ -4,8 +4,10 @@ use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::source_order;
 use ruff_python_ast::{self as ast, AnyNodeRef, Expr, Stmt};
 use ruff_python_semantic::analyze::function_type::is_stub;
+use ruff_python_semantic::Modules;
 
 use crate::checkers::ast::Checker;
+use crate::rules::fastapi::rules::is_fastapi_route;
 
 /// ## What it does
 /// Checks for functions declared `async` that do not await or otherwise use features requiring the
@@ -119,7 +121,7 @@ fn function_def_visit_preorder_except_body<'a, V>(
 
     visitor.visit_parameters(parameters);
 
-    for expr in returns {
+    if let Some(expr) = returns {
         visitor.visit_annotation(expr);
     }
 }
@@ -170,6 +172,12 @@ pub(crate) fn unused_async(
 
     // Ignore stubs (e.g., `...`).
     if is_stub(function_def, checker.semantic()) {
+        return;
+    }
+
+    if checker.semantic().seen_module(Modules::FASTAPI)
+        && is_fastapi_route(function_def, checker.semantic())
+    {
         return;
     }
 

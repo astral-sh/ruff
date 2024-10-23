@@ -15,7 +15,7 @@ Module(
                     is_async: true,
                     decorator_list: [],
                     name: Identifier {
-                        id: "foo",
+                        id: Name("foo"),
                         range: 10..13,
                     },
                     type_params: None,

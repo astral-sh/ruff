@@ -28,21 +28,29 @@ use crate::rules::pyupgrade::helpers::curly_escape;
 /// formatting.
 ///
 /// ## Example
+///
 /// ```python
 /// "%s, %s" % ("Hello", "World")  # "Hello, World"
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// "{}, {}".format("Hello", "World")  # "Hello, World"
 /// ```
 ///
+/// ```python
+/// f"{'Hello'}, {'World'}"  # "Hello, World"
+/// ```
+///
 /// ## Fix safety
+///
 /// In cases where the format string contains a single generic format specifier
 /// (e.g. `%s`), and the right-hand side is an ambiguous expression,
 /// we cannot offer a safe fix.
 ///
 /// For example, given:
+///
 /// ```python
 /// "%s" % val
 /// ```
@@ -150,8 +158,19 @@ fn handle_part(part: &CFormatPart<String>) -> Cow<'_, str> {
                     match precision {
                         CFormatPrecision::Quantity(quantity) => match quantity {
                             CFormatQuantity::Amount(amount) => {
-                                format_string.push('.');
-                                format_string.push_str(&amount.to_string());
+                                // Integer-only presentation types.
+                                //
+                                // See: https://docs.python.org/3/library/string.html#format-specification-mini-language
+                                if matches!(
+                                    spec.format_char,
+                                    'b' | 'c' | 'd' | 'o' | 'x' | 'X' | 'n'
+                                ) {
+                                    format_string.push('0');
+                                    format_string.push_str(&amount.to_string());
+                                } else {
+                                    format_string.push('.');
+                                    format_string.push_str(&amount.to_string());
+                                }
                             }
                             CFormatQuantity::FromValuesTuple => {
                                 unreachable!("Width should be a usize")
@@ -187,8 +206,8 @@ fn percent_to_format(format_string: &CFormatString) -> String {
 
 /// If a tuple has one argument, remove the comma; otherwise, return it as-is.
 fn clean_params_tuple<'a>(right: &Expr, locator: &Locator<'a>) -> Cow<'a, str> {
-    if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &right {
-        if elts.len() == 1 {
+    if let Expr::Tuple(tuple) = &right {
+        if tuple.len() == 1 {
             if !locator.contains_line_break(right.range()) {
                 let mut contents = locator.slice(right).to_string();
                 for (i, character) in contents.chars().rev().enumerate() {
@@ -216,38 +235,35 @@ fn clean_params_dictionary(right: &Expr, locator: &Locator, stylist: &Stylist) -
         let mut seen: Vec<&str> = vec![];
         let mut indent = None;
         for ast::DictItem { key, value } in items {
-            match key {
-                Some(key) => {
-                    if let Expr::StringLiteral(ast::ExprStringLiteral {
-                        value: key_string, ..
-                    }) = key
-                    {
-                        // If the dictionary key is not a valid variable name, abort.
-                        if !is_identifier(key_string.to_str()) {
-                            return None;
-                        }
-                        // If there are multiple entries of the same key, abort.
-                        if seen.contains(&key_string.to_str()) {
-                            return None;
-                        }
-                        seen.push(key_string.to_str());
-                        if is_multi_line {
-                            if indent.is_none() {
-                                indent = indentation(locator, key);
-                            }
-                        }
-
-                        let value_string = locator.slice(value);
-                        arguments.push(format!("{key_string}={value_string}"));
-                    } else {
-                        // If there are any non-string keys, abort.
+            if let Some(key) = key {
+                if let Expr::StringLiteral(ast::ExprStringLiteral {
+                    value: key_string, ..
+                }) = key
+                {
+                    // If the dictionary key is not a valid variable name, abort.
+                    if !is_identifier(key_string.to_str()) {
                         return None;
                     }
-                }
-                None => {
+                    // If there are multiple entries of the same key, abort.
+                    if seen.contains(&key_string.to_str()) {
+                        return None;
+                    }
+                    seen.push(key_string.to_str());
+                    if is_multi_line {
+                        if indent.is_none() {
+                            indent = indentation(locator, key);
+                        }
+                    }
+
                     let value_string = locator.slice(value);
-                    arguments.push(format!("**{value_string}"));
+                    arguments.push(format!("{key_string}={value_string}"));
+                } else {
+                    // If there are any non-string keys, abort.
+                    return None;
                 }
+            } else {
+                let value_string = locator.slice(value);
+                arguments.push(format!("**{value_string}"));
             }
         }
         // If we couldn't parse out key values, abort.
@@ -368,6 +384,11 @@ pub(crate) fn printf_string_formatting(
             return;
         };
         if !convertible(&format_string, right) {
+            if checker.settings.preview.is_enabled() {
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(PrintfStringFormatting, string_expr.range()));
+            }
             return;
         }
 
@@ -426,6 +447,11 @@ pub(crate) fn printf_string_formatting(
             let Some(params_string) =
                 clean_params_dictionary(right, checker.locator(), checker.stylist())
             else {
+                if checker.settings.preview.is_enabled() {
+                    checker
+                        .diagnostics
+                        .push(Diagnostic::new(PrintfStringFormatting, string_expr.range()));
+                }
                 return;
             };
             Cow::Owned(params_string)

@@ -1,5 +1,6 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
+use std::borrow::Cow;
 use std::fmt;
 use std::fmt::Debug;
 use std::iter::FusedIterator;
@@ -12,6 +13,7 @@ use itertools::Itertools;
 
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
+use crate::name::Name;
 use crate::{
     int,
     str::Quote,
@@ -855,6 +857,27 @@ impl ExprDict {
     pub fn value(&self, n: usize) -> &Expr {
         self.items[n].value()
     }
+
+    pub fn iter(&self) -> std::slice::Iter<'_, DictItem> {
+        self.items.iter()
+    }
+
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+}
+
+impl<'a> IntoIterator for &'a ExprDict {
+    type IntoIter = std::slice::Iter<'a, DictItem>;
+    type Item = &'a DictItem;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
 }
 
 impl From<ExprDict> for Expr {
@@ -952,6 +975,29 @@ impl<'a> ExactSizeIterator for DictValueIterator<'a> {}
 pub struct ExprSet {
     pub range: TextRange,
     pub elts: Vec<Expr>,
+}
+
+impl ExprSet {
+    pub fn iter(&self) -> std::slice::Iter<'_, Expr> {
+        self.elts.iter()
+    }
+
+    pub fn len(&self) -> usize {
+        self.elts.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.elts.is_empty()
+    }
+}
+
+impl<'a> IntoIterator for &'a ExprSet {
+    type IntoIter = std::slice::Iter<'a, Expr>;
+    type Item = &'a Expr;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
 }
 
 impl From<ExprSet> for Expr {
@@ -1250,7 +1296,7 @@ impl FStringValue {
 
     /// Returns an iterator over all the [`FStringPart`]s contained in this value
     /// that allows modification.
-    pub(crate) fn iter_mut(&mut self) -> IterMut<FStringPart> {
+    pub fn iter_mut(&mut self) -> IterMut<FStringPart> {
         self.as_mut_slice().iter_mut()
     }
 
@@ -1703,7 +1749,7 @@ impl StringLiteralValue {
 
     /// Returns an iterator over all the [`StringLiteral`] parts contained in this value
     /// that allows modification.
-    pub(crate) fn iter_mut(&mut self) -> IterMut<StringLiteral> {
+    pub fn iter_mut(&mut self) -> IterMut<StringLiteral> {
         self.as_mut_slice().iter_mut()
     }
 
@@ -1719,7 +1765,7 @@ impl StringLiteralValue {
     }
 
     /// Returns an iterator over the [`char`]s of each string literal part.
-    pub fn chars(&self) -> impl Iterator<Item = char> + '_ {
+    pub fn chars(&self) -> impl Iterator<Item = char> + Clone + '_ {
         self.iter().flat_map(|part| part.value.chars())
     }
 
@@ -1759,12 +1805,6 @@ impl PartialEq<str> for StringLiteralValue {
         }
         // The `zip` here is safe because we have checked the length of both parts.
         self.chars().zip(other.chars()).all(|(c1, c2)| c1 == c2)
-    }
-}
-
-impl PartialEq<String> for StringLiteralValue {
-    fn eq(&self, other: &String) -> bool {
-        self == other.as_str()
     }
 }
 
@@ -2008,7 +2048,7 @@ impl PartialEq for ConcatenatedStringLiteral {
         // The `zip` here is safe because we have checked the length of both parts.
         self.strings
             .iter()
-            .zip(other.strings.iter())
+            .zip(&other.strings)
             .all(|(s1, s2)| s1 == s2)
     }
 }
@@ -2098,7 +2138,7 @@ impl BytesLiteralValue {
 
     /// Returns an iterator over all the [`BytesLiteral`] parts contained in this value
     /// that allows modification.
-    pub(crate) fn iter_mut(&mut self) -> IterMut<BytesLiteral> {
+    pub fn iter_mut(&mut self) -> IterMut<BytesLiteral> {
         self.as_mut_slice().iter_mut()
     }
 
@@ -2113,7 +2153,7 @@ impl BytesLiteralValue {
     }
 
     /// Returns an iterator over the bytes of the concatenated bytes.
-    fn bytes(&self) -> impl Iterator<Item = u8> + '_ {
+    pub fn bytes(&self) -> impl Iterator<Item = u8> + '_ {
         self.iter().flat_map(|part| part.as_slice().iter().copied())
     }
 }
@@ -2144,6 +2184,22 @@ impl PartialEq<[u8]> for BytesLiteralValue {
         self.bytes()
             .zip(other.iter().copied())
             .all(|(b1, b2)| b1 == b2)
+    }
+}
+
+impl<'a> From<&'a BytesLiteralValue> for Cow<'a, [u8]> {
+    fn from(value: &'a BytesLiteralValue) -> Self {
+        match &value.inner {
+            BytesLiteralValueInner::Single(BytesLiteral {
+                value: bytes_value, ..
+            }) => Cow::from(bytes_value.as_ref()),
+            BytesLiteralValueInner::Concatenated(bytes_literal_vec) => Cow::Owned(
+                bytes_literal_vec
+                    .iter()
+                    .flat_map(|bytes_literal| bytes_literal.value.to_vec())
+                    .collect::<Vec<u8>>(),
+            ),
+        }
     }
 }
 
@@ -2740,8 +2796,14 @@ impl From<ExprStarred> for Expr {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprName {
     pub range: TextRange,
-    pub id: String,
+    pub id: Name,
     pub ctx: ExprContext,
+}
+
+impl ExprName {
+    pub fn id(&self) -> &Name {
+        &self.id
+    }
 }
 
 impl From<ExprName> for Expr {
@@ -2756,6 +2818,29 @@ pub struct ExprList {
     pub range: TextRange,
     pub elts: Vec<Expr>,
     pub ctx: ExprContext,
+}
+
+impl ExprList {
+    pub fn iter(&self) -> std::slice::Iter<'_, Expr> {
+        self.elts.iter()
+    }
+
+    pub fn len(&self) -> usize {
+        self.elts.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.elts.is_empty()
+    }
+}
+
+impl<'a> IntoIterator for &'a ExprList {
+    type IntoIter = std::slice::Iter<'a, Expr>;
+    type Item = &'a Expr;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
 }
 
 impl From<ExprList> for Expr {
@@ -2773,6 +2858,29 @@ pub struct ExprTuple {
 
     /// Whether the tuple is parenthesized in the source code.
     pub parenthesized: bool,
+}
+
+impl ExprTuple {
+    pub fn iter(&self) -> std::slice::Iter<'_, Expr> {
+        self.elts.iter()
+    }
+
+    pub fn len(&self) -> usize {
+        self.elts.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.elts.is_empty()
+    }
+}
+
+impl<'a> IntoIterator for &'a ExprTuple {
+    type IntoIter = std::slice::Iter<'a, Expr>;
+    type Item = &'a Expr;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
 }
 
 impl From<ExprTuple> for Expr {
@@ -2861,6 +2969,42 @@ impl Operator {
             Operator::BitXor => "^",
             Operator::BitAnd => "&",
             Operator::FloorDiv => "//",
+        }
+    }
+
+    pub const fn dunder(self) -> &'static str {
+        match self {
+            Operator::Add => "__add__",
+            Operator::Sub => "__sub__",
+            Operator::Mult => "__mul__",
+            Operator::MatMult => "__matmul__",
+            Operator::Div => "__truediv__",
+            Operator::Mod => "__mod__",
+            Operator::Pow => "__pow__",
+            Operator::LShift => "__lshift__",
+            Operator::RShift => "__rshift__",
+            Operator::BitOr => "__or__",
+            Operator::BitXor => "__xor__",
+            Operator::BitAnd => "__and__",
+            Operator::FloorDiv => "__floordiv__",
+        }
+    }
+
+    pub const fn reflected_dunder(self) -> &'static str {
+        match self {
+            Operator::Add => "__radd__",
+            Operator::Sub => "__rsub__",
+            Operator::Mult => "__rmul__",
+            Operator::MatMult => "__rmatmul__",
+            Operator::Div => "__rtruediv__",
+            Operator::Mod => "__rmod__",
+            Operator::Pow => "__rpow__",
+            Operator::LShift => "__rlshift__",
+            Operator::RShift => "__rrshift__",
+            Operator::BitOr => "__ror__",
+            Operator::BitXor => "__rxor__",
+            Operator::BitAnd => "__rand__",
+            Operator::FloorDiv => "__rfloordiv__",
         }
     }
 }
@@ -3029,6 +3173,29 @@ impl Pattern {
             Pattern::MatchAs(PatternMatchAs { pattern: None, .. }) => true,
             Pattern::MatchOr(PatternMatchOr { patterns, .. }) => {
                 patterns.iter().any(Pattern::is_irrefutable)
+            }
+            _ => false,
+        }
+    }
+
+    /// Checks if the [`Pattern`] is a [wildcard pattern].
+    ///
+    /// The following are wildcard patterns:
+    /// ```python
+    /// match subject:
+    ///     case _ as x: ...
+    ///     case _ | _: ...
+    ///     case _: ...
+    /// ```
+    ///
+    /// [wildcard pattern]: https://docs.python.org/3/reference/compound_stmts.html#wildcard-patterns
+    pub fn is_wildcard(&self) -> bool {
+        match self {
+            Pattern::MatchAs(PatternMatchAs { pattern, .. }) => {
+                pattern.as_deref().map_or(true, Pattern::is_wildcard)
+            }
+            Pattern::MatchOr(PatternMatchOr { patterns, .. }) => {
+                patterns.iter().all(Pattern::is_wildcard)
             }
             _ => false,
         }
@@ -3493,6 +3660,14 @@ impl<'a> IntoIterator for &'a Parameters {
     }
 }
 
+impl<'a> IntoIterator for &'a Box<Parameters> {
+    type IntoIter = ParametersIterator<'a>;
+    type Item = AnyParameterRef<'a>;
+    fn into_iter(self) -> Self::IntoIter {
+        (&**self).into_iter()
+    }
+}
+
 /// An alternative type of AST `arg`. This is used for each function argument that might have a default value.
 /// Used by `Arguments` original type.
 ///
@@ -3763,17 +3938,21 @@ impl IpyEscapeKind {
 /// ```
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Identifier {
-    pub id: String,
+    pub id: Name,
     pub range: TextRange,
 }
 
 impl Identifier {
     #[inline]
-    pub fn new(id: impl Into<String>, range: TextRange) -> Self {
+    pub fn new(id: impl Into<Name>, range: TextRange) -> Self {
         Self {
             id: id.into(),
             range,
         }
+    }
+
+    pub fn id(&self) -> &Name {
+        &self.id
     }
 
     pub fn is_valid(&self) -> bool {
@@ -3798,7 +3977,7 @@ impl PartialEq<str> for Identifier {
 impl PartialEq<String> for Identifier {
     #[inline]
     fn eq(&self, other: &String) -> bool {
-        &self.id == other
+        self.id == other
     }
 }
 
@@ -3817,22 +3996,15 @@ impl AsRef<str> for Identifier {
     }
 }
 
-impl AsRef<String> for Identifier {
-    #[inline]
-    fn as_ref(&self) -> &String {
-        &self.id
-    }
-}
-
 impl std::fmt::Display for Identifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Display::fmt(&self.id, f)
     }
 }
 
-impl From<Identifier> for String {
+impl From<Identifier> for Name {
     #[inline]
-    fn from(identifier: Identifier) -> String {
+    fn from(identifier: Identifier) -> Name {
         identifier.id
     }
 }

@@ -1,4 +1,3 @@
-use crate::edit::DocumentKey;
 use crate::server::api::diagnostics::clear_diagnostics_for_document;
 use crate::server::api::LSPResult;
 use crate::server::client::{Notifier, Requester};
@@ -22,21 +21,15 @@ impl super::SyncNotificationHandler for DidClose {
             text_document: types::TextDocumentIdentifier { uri },
         }: types::DidCloseTextDocumentParams,
     ) -> Result<()> {
+        let key = session.key_from_url(uri);
         // Publish an empty diagnostic report for the document. This will de-register any existing diagnostics.
-        let snapshot = session
-            .take_snapshot(uri.clone())
-            .ok_or_else(|| anyhow::anyhow!("Unable to take snapshot for document with URL {uri}"))
-            .with_failure_code(lsp_server::ErrorCode::InternalError)?;
-        clear_diagnostics_for_document(snapshot.query(), &notifier)?;
-
-        let key = snapshot.query().make_key();
-
-        // Notebook cells will go through the `textDocument/didClose` path.
-        // We still want to publish empty diagnostics for them, but we
-        // shouldn't call `session.close_document` on them.
-        if matches!(key, DocumentKey::NotebookCell(_)) {
+        let Some(snapshot) = session.take_snapshot(key.clone().into_url()) else {
+            tracing::debug!(
+                "Unable to close document with key {key} - the snapshot was unavailable"
+            );
             return Ok(());
-        }
+        };
+        clear_diagnostics_for_document(snapshot.query(), &notifier)?;
 
         session
             .close_document(&key)

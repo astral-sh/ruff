@@ -6,6 +6,7 @@ True and  False
 True  and False
 #: E271
 if   1:
+    pass
 #: E273
 True and		False
 #: E273 E274
@@ -76,3 +77,8 @@ type	Number = int
 match(foo):
     case(1):
         pass
+
+# https://github.com/astral-sh/ruff/issues/12094
+pass;
+
+yield, x

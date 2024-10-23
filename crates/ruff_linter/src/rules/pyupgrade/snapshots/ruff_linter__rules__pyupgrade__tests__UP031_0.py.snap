@@ -1007,6 +1007,8 @@ UP031_0.py:131:5: UP031 [*] Use format specifiers instead of percent format
 130 | # Refer: https://github.com/astral-sh/ruff/issues/11736
 131 | x: "'%s + %s' % (1, 2)"
     |     ^^^^^^^^^^^^^^^^^^ UP031
+132 | 
+133 | # See: https://github.com/astral-sh/ruff/issues/12421
     |
     = help: Replace with format specifiers
 
@@ -1016,3 +1018,149 @@ UP031_0.py:131:5: UP031 [*] Use format specifiers instead of percent format
 130 130 | # Refer: https://github.com/astral-sh/ruff/issues/11736
 131     |-x: "'%s + %s' % (1, 2)"
     131 |+x: "'{} + {}'.format(1, 2)"
+132 132 | 
+133 133 | # See: https://github.com/astral-sh/ruff/issues/12421
+134 134 | print("%.2X" % 1)
+
+UP031_0.py:134:7: UP031 [*] Use format specifiers instead of percent format
+    |
+133 | # See: https://github.com/astral-sh/ruff/issues/12421
+134 | print("%.2X" % 1)
+    |       ^^^^^^^^^^ UP031
+135 | print("%.02X" % 1)
+136 | print("%02X" % 1)
+    |
+    = help: Replace with format specifiers
+
+ℹ Unsafe fix
+131 131 | x: "'%s + %s' % (1, 2)"
+132 132 | 
+133 133 | # See: https://github.com/astral-sh/ruff/issues/12421
+134     |-print("%.2X" % 1)
+    134 |+print("{:02X}".format(1))
+135 135 | print("%.02X" % 1)
+136 136 | print("%02X" % 1)
+137 137 | print("%.00002X" % 1)
+
+UP031_0.py:135:7: UP031 [*] Use format specifiers instead of percent format
+    |
+133 | # See: https://github.com/astral-sh/ruff/issues/12421
+134 | print("%.2X" % 1)
+135 | print("%.02X" % 1)
+    |       ^^^^^^^^^^^ UP031
+136 | print("%02X" % 1)
+137 | print("%.00002X" % 1)
+    |
+    = help: Replace with format specifiers
+
+ℹ Unsafe fix
+132 132 | 
+133 133 | # See: https://github.com/astral-sh/ruff/issues/12421
+134 134 | print("%.2X" % 1)
+135     |-print("%.02X" % 1)
+    135 |+print("{:02X}".format(1))
+136 136 | print("%02X" % 1)
+137 137 | print("%.00002X" % 1)
+138 138 | print("%.20X" % 1)
+
+UP031_0.py:136:7: UP031 [*] Use format specifiers instead of percent format
+    |
+134 | print("%.2X" % 1)
+135 | print("%.02X" % 1)
+136 | print("%02X" % 1)
+    |       ^^^^^^^^^^ UP031
+137 | print("%.00002X" % 1)
+138 | print("%.20X" % 1)
+    |
+    = help: Replace with format specifiers
+
+ℹ Unsafe fix
+133 133 | # See: https://github.com/astral-sh/ruff/issues/12421
+134 134 | print("%.2X" % 1)
+135 135 | print("%.02X" % 1)
+136     |-print("%02X" % 1)
+    136 |+print("{:02X}".format(1))
+137 137 | print("%.00002X" % 1)
+138 138 | print("%.20X" % 1)
+139 139 | 
+
+UP031_0.py:137:7: UP031 [*] Use format specifiers instead of percent format
+    |
+135 | print("%.02X" % 1)
+136 | print("%02X" % 1)
+137 | print("%.00002X" % 1)
+    |       ^^^^^^^^^^^^^^ UP031
+138 | print("%.20X" % 1)
+    |
+    = help: Replace with format specifiers
+
+ℹ Unsafe fix
+134 134 | print("%.2X" % 1)
+135 135 | print("%.02X" % 1)
+136 136 | print("%02X" % 1)
+137     |-print("%.00002X" % 1)
+    137 |+print("{:02X}".format(1))
+138 138 | print("%.20X" % 1)
+139 139 | 
+140 140 | print("%2X" % 1)
+
+UP031_0.py:138:7: UP031 [*] Use format specifiers instead of percent format
+    |
+136 | print("%02X" % 1)
+137 | print("%.00002X" % 1)
+138 | print("%.20X" % 1)
+    |       ^^^^^^^^^^^ UP031
+139 | 
+140 | print("%2X" % 1)
+    |
+    = help: Replace with format specifiers
+
+ℹ Unsafe fix
+135 135 | print("%.02X" % 1)
+136 136 | print("%02X" % 1)
+137 137 | print("%.00002X" % 1)
+138     |-print("%.20X" % 1)
+    138 |+print("{:020X}".format(1))
+139 139 | 
+140 140 | print("%2X" % 1)
+141 141 | print("%02X" % 1)
+
+UP031_0.py:140:7: UP031 [*] Use format specifiers instead of percent format
+    |
+138 | print("%.20X" % 1)
+139 | 
+140 | print("%2X" % 1)
+    |       ^^^^^^^^^ UP031
+141 | print("%02X" % 1)
+    |
+    = help: Replace with format specifiers
+
+ℹ Unsafe fix
+137 137 | print("%.00002X" % 1)
+138 138 | print("%.20X" % 1)
+139 139 | 
+140     |-print("%2X" % 1)
+    140 |+print("{:2X}".format(1))
+141 141 | print("%02X" % 1)
+142 142 | 
+143 143 | # UP031 (no longer false negatives, but offer no fix because of more complex syntax)
+
+UP031_0.py:141:7: UP031 [*] Use format specifiers instead of percent format
+    |
+140 | print("%2X" % 1)
+141 | print("%02X" % 1)
+    |       ^^^^^^^^^^ UP031
+142 | 
+143 | # UP031 (no longer false negatives, but offer no fix because of more complex syntax)
+    |
+    = help: Replace with format specifiers
+
+ℹ Unsafe fix
+138 138 | print("%.20X" % 1)
+139 139 | 
+140 140 | print("%2X" % 1)
+141     |-print("%02X" % 1)
+    141 |+print("{:02X}".format(1))
+142 142 | 
+143 143 | # UP031 (no longer false negatives, but offer no fix because of more complex syntax)
+144 144 |

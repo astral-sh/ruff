@@ -1,6 +1,6 @@
 [package]
 name = "red_knot"
-version = "0.1.0"
+version = "0.0.0"
 edition.workspace = true
 rust-version.workspace = true
 homepage.workspace = true
@@ -12,35 +12,27 @@ license.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ruff_python_parser = { workspace = true }
-ruff_python_ast = { workspace = true }
-ruff_text_size = { workspace = true }
-ruff_index = { workspace = true }
-ruff_notebook = { workspace = true }
+red_knot_python_semantic = { workspace = true }
+red_knot_workspace = { workspace = true, features = ["zstd"] }
+red_knot_server = { workspace = true }
+ruff_db = { workspace = true, features = ["os", "cache"] }
 
 anyhow = { workspace = true }
-bitflags = { workspace = true }
+chrono = { workspace = true }
+clap = { workspace = true, features = ["wrap_help"] }
+colored = { workspace = true }
+countme = { workspace = true, features = ["enable"] }
 crossbeam = { workspace = true }
 ctrlc = { version = "3.4.4" }
-dashmap = { workspace = true }
-hashbrown = { workspace = true }
-indexmap = { workspace = true }
-is-macro = { workspace = true }
-notify = { workspace = true }
-parking_lot = { workspace = true }
 rayon = { workspace = true }
-rustc-hash = { workspace = true }
-smol_str = { version = "0.2.1" }
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
+salsa = { workspace = true }
+tracing = { workspace = true, features = ["release_max_level_debug"] }
+tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
+tracing-flame = { workspace = true }
 tracing-tree = { workspace = true }
-zip = { workspace = true }
-
-[build-dependencies]
-zip = { workspace = true }
-walkdir = { workspace = true }
 
 [dev-dependencies]
+filetime = { workspace = true }
 tempfile = { workspace = true }
 
 [lints]

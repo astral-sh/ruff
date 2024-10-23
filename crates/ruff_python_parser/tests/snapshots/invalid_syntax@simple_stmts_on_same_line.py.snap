@@ -15,7 +15,7 @@ Module(
                     value: Name(
                         ExprName {
                             range: 0..1,
-                            id: "a",
+                            id: Name("a"),
                             ctx: Load,
                         },
                     ),
@@ -27,7 +27,7 @@ Module(
                     value: Name(
                         ExprName {
                             range: 2..3,
-                            id: "b",
+                            id: Name("b"),
                             ctx: Load,
                         },
                     ),
@@ -42,7 +42,7 @@ Module(
                             left: Name(
                                 ExprName {
                                     range: 4..5,
-                                    id: "a",
+                                    id: Name("a"),
                                     ctx: Load,
                                 },
                             ),
@@ -50,7 +50,7 @@ Module(
                             right: Name(
                                 ExprName {
                                     range: 8..9,
-                                    id: "b",
+                                    id: Name("b"),
                                     ctx: Load,
                                 },
                             ),
@@ -67,7 +67,7 @@ Module(
                             left: Name(
                                 ExprName {
                                     range: 10..11,
-                                    id: "c",
+                                    id: Name("c"),
                                     ctx: Load,
                                 },
                             ),
@@ -75,7 +75,7 @@ Module(
                             right: Name(
                                 ExprName {
                                     range: 14..15,
-                                    id: "d",
+                                    id: Name("d"),
                                     ctx: Load,
                                 },
                             ),

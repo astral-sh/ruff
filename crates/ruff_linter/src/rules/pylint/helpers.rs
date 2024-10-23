@@ -1,8 +1,6 @@
-use std::fmt;
-
 use ruff_python_ast as ast;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{visitor, Arguments, CmpOp, Expr, Stmt};
+use ruff_python_ast::{visitor, Arguments, Expr, Stmt};
 use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::{ScopeKind, SemanticModel};
 use ruff_text_size::TextRange;
@@ -55,34 +53,6 @@ pub(super) fn in_dunder_method(
         return false;
     }
     true
-}
-
-/// A wrapper around [`CmpOp`] that implements `Display`.
-#[derive(Debug)]
-pub(super) struct CmpOpExt(CmpOp);
-
-impl From<&CmpOp> for CmpOpExt {
-    fn from(cmp_op: &CmpOp) -> Self {
-        CmpOpExt(*cmp_op)
-    }
-}
-
-impl fmt::Display for CmpOpExt {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let representation = match self.0 {
-            CmpOp::Eq => "==",
-            CmpOp::NotEq => "!=",
-            CmpOp::Lt => "<",
-            CmpOp::LtE => "<=",
-            CmpOp::Gt => ">",
-            CmpOp::GtE => ">=",
-            CmpOp::Is => "is",
-            CmpOp::IsNot => "is not",
-            CmpOp::In => "in",
-            CmpOp::NotIn => "not in",
-        };
-        write!(f, "{representation}")
-    }
 }
 
 /// Visitor to track reads from an iterable in a loop.
@@ -174,27 +144,25 @@ impl<'a> Visitor<'_> for SequenceIndexVisitor<'a> {
         if self.modified {
             return;
         }
-        match expr {
-            Expr::Subscript(ast::ExprSubscript {
-                value,
-                slice,
-                range,
-                ..
-            }) => {
-                let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
-                    return;
-                };
+        if let Expr::Subscript(ast::ExprSubscript {
+            value,
+            slice,
+            range,
+            ..
+        }) = expr
+        {
+            if let Expr::Name(ast::ExprName { id, .. }) = &**value {
                 if id == self.sequence_name {
-                    let Expr::Name(ast::ExprName { id, .. }) = slice.as_ref() else {
-                        return;
-                    };
-                    if id == self.index_name {
-                        self.accesses.push(*range);
+                    if let Expr::Name(ast::ExprName { id, .. }) = &**slice {
+                        if id == self.index_name {
+                            self.accesses.push(*range);
+                        }
                     }
                 }
             }
-            _ => visitor::walk_expr(self, expr),
         }
+
+        visitor::walk_expr(self, expr);
     }
 }
 

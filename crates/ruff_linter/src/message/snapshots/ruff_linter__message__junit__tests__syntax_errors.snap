@@ -1,0 +1,15 @@
+---
+source: crates/ruff_linter/src/message/junit.rs
+expression: content
+---
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="ruff" tests="2" failures="2" errors="0">
+    <testsuite name="syntax_errors.py" tests="2" disabled="0" errors="0" failures="2" package="org.ruff">
+        <testcase name="org.ruff" classname="syntax_errors" line="1" column="15">
+            <failure message="SyntaxError: Expected one or more symbol names after import">line 1, col 15, SyntaxError: Expected one or more symbol names after import</failure>
+        </testcase>
+        <testcase name="org.ruff" classname="syntax_errors" line="3" column="12">
+            <failure message="SyntaxError: Expected &apos;)&apos;, found newline">line 3, col 12, SyntaxError: Expected &apos;)&apos;, found newline</failure>
+        </testcase>
+    </testsuite>
+</testsuites>

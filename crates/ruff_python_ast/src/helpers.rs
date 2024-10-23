@@ -7,7 +7,7 @@ use ruff_python_trivia::{indentation_at_offset, CommentRanges, SimpleTokenKind, 
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::name::{QualifiedName, QualifiedNameBuilder};
+use crate::name::{Name, QualifiedName, QualifiedNameBuilder};
 use crate::parenthesize::parenthesized_range;
 use crate::statement_visitor::StatementVisitor;
 use crate::visitor::Visitor;
@@ -582,8 +582,8 @@ pub const fn is_singleton(expr: &Expr) -> bool {
 
 /// Return `true` if the [`Expr`] is a literal or tuple of literals.
 pub fn is_constant(expr: &Expr) -> bool {
-    if let Expr::Tuple(ast::ExprTuple { elts, .. }) = expr {
-        elts.iter().all(is_constant)
+    if let Expr::Tuple(tuple) = expr {
+        tuple.iter().all(is_constant)
     } else {
         expr.is_literal_expr()
     }
@@ -630,8 +630,8 @@ pub fn extract_handled_exceptions(handlers: &[ExceptHandler]) -> Vec<&Expr> {
         match handler {
             ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { type_, .. }) => {
                 if let Some(type_) = type_ {
-                    if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &type_.as_ref() {
-                        for type_ in elts {
+                    if let Expr::Tuple(tuple) = &**type_ {
+                        for type_ in tuple {
                             handled_exceptions.push(type_);
                         }
                     } else {
@@ -1004,6 +1004,14 @@ impl Visitor<'_> for AwaitVisitor {
             crate::visitor::walk_expr(self, expr);
         }
     }
+
+    fn visit_comprehension(&mut self, comprehension: &'_ crate::Comprehension) {
+        if comprehension.is_async {
+            self.seen_await = true;
+        } else {
+            crate::visitor::walk_comprehension(self, comprehension);
+        }
+    }
 }
 
 /// Return `true` if a `Stmt` is a docstring.
@@ -1185,8 +1193,8 @@ impl Truthiness {
                     Self::Truthy
                 }
             }
-            Expr::Dict(ast::ExprDict { items, .. }) => {
-                if items.is_empty() {
+            Expr::Dict(dict) => {
+                if dict.is_empty() {
                     Self::Falsey
                 } else {
                     Self::Truthy
@@ -1403,7 +1411,7 @@ pub fn pep_604_union(elts: &[Expr]) -> Expr {
 }
 
 /// Format the expression as a `typing.Optional`-style optional.
-pub fn typing_optional(elt: Expr, binding: String) -> Expr {
+pub fn typing_optional(elt: Expr, binding: Name) -> Expr {
     Expr::Subscript(ast::ExprSubscript {
         value: Box::new(Expr::Name(ast::ExprName {
             id: binding,
@@ -1417,8 +1425,8 @@ pub fn typing_optional(elt: Expr, binding: String) -> Expr {
 }
 
 /// Format the expressions as a `typing.Union`-style union.
-pub fn typing_union(elts: &[Expr], binding: String) -> Expr {
-    fn tuple(elts: &[Expr], binding: String) -> Expr {
+pub fn typing_union(elts: &[Expr], binding: Name) -> Expr {
+    fn tuple(elts: &[Expr], binding: Name) -> Expr {
         match elts {
             [] => Expr::Tuple(ast::ExprTuple {
                 elts: vec![],

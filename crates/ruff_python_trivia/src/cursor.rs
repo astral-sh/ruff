@@ -5,6 +5,8 @@ use ruff_text_size::{TextLen, TextSize};
 pub const EOF_CHAR: char = '\0';
 
 /// A [`Cursor`] over a string.
+///
+/// Based on [`rustc`'s `Cursor`](https://github.com/rust-lang/rust/blob/d1b7355d3d7b4ead564dbecb1d240fcc74fff21b/compiler/rustc_lexer/src/cursor.rs)
 #[derive(Debug, Clone)]
 pub struct Cursor<'a> {
     chars: Chars<'a>,
@@ -22,6 +24,16 @@ impl<'a> Cursor<'a> {
     /// Return the remaining input as a string slice.
     pub fn chars(&self) -> Chars<'a> {
         self.chars.clone()
+    }
+
+    /// Returns the remaining input as byte slice.
+    pub fn as_bytes(&self) -> &'a [u8] {
+        self.as_str().as_bytes()
+    }
+
+    /// Returns the remaining input as string slice.
+    pub fn as_str(&self) -> &'a str {
+        self.chars.as_str()
     }
 
     /// Peeks the next character from the input stream without consuming it.
@@ -107,5 +119,14 @@ impl<'a> Cursor<'a> {
         while predicate(self.last()) && !self.is_eof() {
             self.bump_back();
         }
+    }
+
+    /// Skips the next `count` bytes.
+    ///
+    /// ## Panics
+    ///  - If `count` is larger than the remaining bytes in the input stream.
+    ///  - If `count` indexes into a multi-byte character.
+    pub fn skip_bytes(&mut self, count: usize) {
+        self.chars = self.chars.as_str()[count..].chars();
     }
 }

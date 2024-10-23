@@ -258,3 +258,10 @@ F821_17.py:103:17: F821 Undefined name `t`
     |                 ^ F821
 104 |                 return x
     |
+
+F821_17.py:116:40: F821 Undefined name `T`
+    |
+116 | def cannot_access_in_default[T](t: T = T):  # F821
+    |                                        ^ F821
+117 |     pass
+    |

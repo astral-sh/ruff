@@ -1,5 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::typing::is_list;
 use ruff_python_semantic::{Binding, SemanticModel};
@@ -61,7 +62,7 @@ pub(crate) fn slice_copy(checker: &mut Checker, subscript: &ast::ExprSubscript) 
         return;
     };
     let mut diagnostic = Diagnostic::new(SliceCopy, subscript.range());
-    let replacement = generate_method_call(name, "copy", checker.generator());
+    let replacement = generate_method_call(name.clone(), "copy", checker.generator());
     diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
         replacement,
         subscript.start(),
@@ -74,7 +75,7 @@ pub(crate) fn slice_copy(checker: &mut Checker, subscript: &ast::ExprSubscript) 
 fn match_list_full_slice<'a>(
     subscript: &'a ast::ExprSubscript,
     semantic: &SemanticModel,
-) -> Option<&'a str> {
+) -> Option<&'a Name> {
     // Check that it is `obj[:]`.
     if !matches!(
         subscript.slice.as_ref(),

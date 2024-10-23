@@ -14,7 +14,7 @@ Module(
                     range: 0..10,
                     names: [
                         Identifier {
-                            id: "x",
+                            id: Name("x"),
                             range: 9..10,
                         },
                     ],
@@ -25,15 +25,15 @@ Module(
                     range: 11..27,
                     names: [
                         Identifier {
-                            id: "x",
+                            id: Name("x"),
                             range: 20..21,
                         },
                         Identifier {
-                            id: "y",
+                            id: Name("y"),
                             range: 23..24,
                         },
                         Identifier {
-                            id: "z",
+                            id: Name("z"),
                             range: 26..27,
                         },
                     ],

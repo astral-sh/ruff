@@ -2,6 +2,7 @@ use ast::ExprContext;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::pep_604_union;
+use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::{Ranged, TextRange};
@@ -16,17 +17,17 @@ use crate::checkers::ast::Checker;
 /// annotation, but is cleaner and more concise.
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// field: type[int] | type[float] | str
 /// ```
 ///
 /// Use instead:
-/// ```python
+/// ```pyi
 /// field: type[int | float] | str
 /// ```
 #[violation]
 pub struct UnnecessaryTypeUnion {
-    members: Vec<String>,
+    members: Vec<Name>,
     is_pep604_union: bool,
 }
 
@@ -83,10 +84,10 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
     traverse_union(&mut collect_type_exprs, semantic, union);
 
     if type_exprs.len() > 1 {
-        let type_members: Vec<String> = type_exprs
+        let type_members: Vec<Name> = type_exprs
             .clone()
             .into_iter()
-            .map(|type_expr| checker.locator().slice(type_expr).to_string())
+            .map(|type_expr| Name::new(checker.locator().slice(type_expr)))
             .collect();
 
         let mut diagnostic = Diagnostic::new(
@@ -101,7 +102,7 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
             let content = if let Some(subscript) = subscript {
                 let types = &Expr::Subscript(ast::ExprSubscript {
                     value: Box::new(Expr::Name(ast::ExprName {
-                        id: "type".into(),
+                        id: Name::new_static("type"),
                         ctx: ExprContext::Load,
                         range: TextRange::default(),
                     })),
@@ -154,7 +155,7 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
                 let elts: Vec<Expr> = type_exprs.into_iter().cloned().collect();
                 let types = Expr::Subscript(ast::ExprSubscript {
                     value: Box::new(Expr::Name(ast::ExprName {
-                        id: "type".into(),
+                        id: Name::new_static("type"),
                         ctx: ExprContext::Load,
                         range: TextRange::default(),
                     })),

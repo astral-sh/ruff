@@ -6,19 +6,15 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for imports that are not at the top of the file. For Jupyter notebooks, this
-/// checks for imports that are not at the top of the cell.
+/// Checks for imports that are not at the top of the file.
 ///
 /// ## Why is this bad?
 /// According to [PEP 8], "imports are always put at the top of the file, just after any
 /// module comments and docstrings, and before module globals and constants."
 ///
-/// This rule makes an exception for `sys.path` modifications,  allowing for
-/// `sys.path.insert`, `sys.path.append`, and similar modifications between import
-/// statements.
-///
-/// In [preview], this rule also allows `os.environ` modifications between import
-/// statements.
+/// This rule makes an exception for both `sys.path` modifications (allowing for
+/// `sys.path.insert`, `sys.path.append`, etc.) and `os.environ` modifications
+/// between imports.
 ///
 /// ## Example
 /// ```python
@@ -39,8 +35,10 @@ use crate::checkers::ast::Checker;
 /// a = 1
 /// ```
 ///
+/// ## Notebook behavior
+/// For Jupyter notebooks, this rule checks for imports that are not at the top of a *cell*.
+///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
-/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct ModuleImportNotAtTopOfFile {
     source_type: PySourceType,

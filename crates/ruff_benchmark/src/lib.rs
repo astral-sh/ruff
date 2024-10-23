@@ -72,7 +72,17 @@ pub struct TestFile {
     code: String,
 }
 
-static TARGET_DIR: once_cell::sync::Lazy<PathBuf> = once_cell::sync::Lazy::new(|| {
+impl TestFile {
+    pub fn code(&self) -> &str {
+        &self.code
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+}
+
+static TARGET_DIR: std::sync::LazyLock<PathBuf> = std::sync::LazyLock::new(|| {
     cargo_target_directory().unwrap_or_else(|| PathBuf::from("target"))
 });
 
@@ -116,7 +126,7 @@ impl TestFile {
             // SAFETY: There's always the `target` directory
             let parent = cached_filename.parent().unwrap();
             if let Err(error) = std::fs::create_dir_all(parent) {
-                eprintln!("Failed to crate the directory for the test case {name}: {error}");
+                eprintln!("Failed to create the directory for the test case {name}: {error}");
             } else if let Err(error) = std::fs::write(cached_filename, &content) {
                 eprintln!("Failed to cache test case file downloaded from {url}: {error}");
             }

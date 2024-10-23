@@ -5,18 +5,20 @@ use std::sync::Arc;
 use lsp_types::{ClientCapabilities, NotebookDocumentCellChange, Url};
 
 use crate::edit::{DocumentKey, DocumentVersion, NotebookDocument};
+use crate::server::Workspaces;
 use crate::{PositionEncoding, TextDocument};
 
 pub(crate) use self::capabilities::ResolvedClientCapabilities;
-pub(crate) use self::index::DocumentQuery;
-pub(crate) use self::settings::{AllSettings, ClientSettings};
+pub use self::index::DocumentQuery;
+pub use self::settings::ClientSettings;
+pub(crate) use self::settings::{AllSettings, WorkspaceSettingsMap};
 
 mod capabilities;
 mod index;
 mod settings;
 
 /// The global state for the LSP
-pub(crate) struct Session {
+pub struct Session {
     /// Used to retrieve information about open documents and settings.
     index: index::Index,
     /// The global position encoding, negotiated during LSP initialization.
@@ -29,7 +31,7 @@ pub(crate) struct Session {
 
 /// An immutable snapshot of `Session` that references
 /// a specific document.
-pub(crate) struct DocumentSnapshot {
+pub struct DocumentSnapshot {
     resolved_client_capabilities: Arc<ResolvedClientCapabilities>,
     client_settings: settings::ResolvedClientSettings,
     document_ref: index::DocumentQuery,
@@ -37,15 +39,15 @@ pub(crate) struct DocumentSnapshot {
 }
 
 impl Session {
-    pub(crate) fn new(
+    pub fn new(
         client_capabilities: &ClientCapabilities,
         position_encoding: PositionEncoding,
         global_settings: ClientSettings,
-        workspace_folders: Vec<(Url, ClientSettings)>,
+        workspaces: &Workspaces,
     ) -> crate::Result<Self> {
         Ok(Self {
             position_encoding,
-            index: index::Index::new(workspace_folders, &global_settings)?,
+            index: index::Index::new(workspaces, &global_settings)?,
             global_settings,
             resolved_client_capabilities: Arc::new(ResolvedClientCapabilities::new(
                 client_capabilities,
@@ -53,12 +55,12 @@ impl Session {
         })
     }
 
-    pub(crate) fn key_from_url(&self, url: Url) -> DocumentKey {
+    pub fn key_from_url(&self, url: Url) -> DocumentKey {
         self.index.key_from_url(url)
     }
 
     /// Creates a document snapshot with the URL referencing the document to snapshot.
-    pub(crate) fn take_snapshot(&self, url: Url) -> Option<DocumentSnapshot> {
+    pub fn take_snapshot(&self, url: Url) -> Option<DocumentSnapshot> {
         let key = self.key_from_url(url);
         Some(DocumentSnapshot {
             resolved_client_capabilities: self.resolved_client_capabilities.clone(),
@@ -98,7 +100,7 @@ impl Session {
     ///
     /// The document key must point to a notebook document or cell, or this will
     /// throw an error.
-    pub(crate) fn update_notebook_document(
+    pub fn update_notebook_document(
         &mut self,
         key: &DocumentKey,
         cells: Option<NotebookDocumentCellChange>,
@@ -112,7 +114,7 @@ impl Session {
 
     /// Registers a notebook document at the provided `url`.
     /// If a document is already open here, it will be overwritten.
-    pub(crate) fn open_notebook_document(&mut self, url: Url, document: NotebookDocument) {
+    pub fn open_notebook_document(&mut self, url: Url, document: NotebookDocument) {
         self.index.open_notebook_document(url, document);
     }
 
@@ -135,7 +137,7 @@ impl Session {
     }
 
     /// Open a workspace folder at the given `url`.
-    pub(crate) fn open_workspace_folder(&mut self, url: &Url) -> crate::Result<()> {
+    pub(crate) fn open_workspace_folder(&mut self, url: Url) -> crate::Result<()> {
         self.index.open_workspace_folder(url, &self.global_settings)
     }
 
@@ -143,6 +145,18 @@ impl Session {
     pub(crate) fn close_workspace_folder(&mut self, url: &Url) -> crate::Result<()> {
         self.index.close_workspace_folder(url)?;
         Ok(())
+    }
+
+    pub(crate) fn num_documents(&self) -> usize {
+        self.index.num_documents()
+    }
+
+    pub(crate) fn num_workspaces(&self) -> usize {
+        self.index.num_workspaces()
+    }
+
+    pub(crate) fn list_config_files(&self) -> Vec<&std::path::Path> {
+        self.index.list_config_files()
     }
 
     pub(crate) fn resolved_client_capabilities(&self) -> &ResolvedClientCapabilities {
@@ -163,7 +177,7 @@ impl DocumentSnapshot {
         &self.client_settings
     }
 
-    pub(crate) fn query(&self) -> &index::DocumentQuery {
+    pub fn query(&self) -> &index::DocumentQuery {
         &self.document_ref
     }
 

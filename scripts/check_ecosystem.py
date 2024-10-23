@@ -121,17 +121,23 @@ REPOSITORIES: list[Repository] = [
     Repository("aiven", "aiven-client", "main"),
     Repository("alteryx", "featuretools", "main"),
     Repository("apache", "airflow", "main", select="ALL"),
+    Repository("apache", "superset", "master", select="ALL"),
     Repository("aws", "aws-sam-cli", "develop"),
+    Repository("binary-husky", "gpt_academic", "master"),
     Repository("bloomberg", "pytest-memray", "main"),
     Repository("bokeh", "bokeh", "branch-3.3", select="ALL"),
-    Repository("demisto", "content", "master"),
+    # Disabled due to use of explicit `select` with `E999`, which is no longer
+    # supported in `--preview`.
+    # See: https://github.com/astral-sh/ruff/pull/12129
+    # Repository("demisto", "content", "master"),
     Repository("docker", "docker-py", "main"),
+    Repository("facebookresearch", "chameleon", "main"),
     Repository("freedomofpress", "securedrop", "develop"),
     Repository("fronzbot", "blinkpy", "dev"),
-    Repository("binary-husky", "gpt_academic", "master"),
     Repository("ibis-project", "ibis", "master"),
     Repository("ing-bank", "probatus", "main"),
     Repository("jrnl-org", "jrnl", "develop"),
+    Repository("langchain-ai", "langchain", "main"),
     Repository("latchbio", "latch", "main"),
     Repository("lnbits", "lnbits", "main"),
     Repository("milvus-io", "pymilvus", "master"),
@@ -146,6 +152,7 @@ REPOSITORIES: list[Repository] = [
     Repository("python", "mypy", "master"),
     Repository("python", "typeshed", "main", select="PYI"),
     Repository("python-poetry", "poetry", "master"),
+    Repository("qdrant", "qdrant-client", "master"),
     Repository("reflex-dev", "reflex", "main"),
     Repository("rotki", "rotki", "develop"),
     Repository("scikit-build", "scikit-build", "main"),
@@ -184,7 +191,7 @@ async def check(
     if exclude:
         ruff_args.extend(["--exclude", exclude])
     if show_fixes:
-        ruff_args.extend(["--show-fixes", "--ecosystem-ci"])
+        ruff_args.extend(["--show-fixes"])
 
     start = time.time()
     proc = await create_subprocess_exec(

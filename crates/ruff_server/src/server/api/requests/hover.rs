@@ -101,7 +101,7 @@ fn format_rule_text(rule: Rule) -> String {
         output.push('\n');
     }
 
-    if rule.is_preview() || rule.is_nursery() {
+    if rule.is_preview() {
         output.push_str(r"This rule is in preview and is not stable.");
         output.push('\n');
         output.push('\n');

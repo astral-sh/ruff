@@ -20,9 +20,7 @@ ruff_python_ast = { workspace = true }
 ruff_python_codegen = { workspace = true }
 ruff_python_formatter = { workspace = true }
 ruff_python_parser = { workspace = true }
-ruff_python_stdlib = { workspace = true }
 ruff_python_trivia = { workspace = true }
-ruff_text_size = { workspace = true }
 ruff_workspace = { workspace = true, features = ["schemars"] }
 
 anyhow = { workspace = true }

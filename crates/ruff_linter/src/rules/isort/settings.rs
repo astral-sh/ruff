@@ -9,11 +9,11 @@ use rustc_hash::FxHashSet;
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
-use ruff_macros::CacheKey;
-
 use crate::display_settings;
 use crate::rules::isort::categorize::KnownModules;
 use crate::rules::isort::ImportType;
+use ruff_macros::CacheKey;
+use ruff_python_semantic::NameImport;
 
 use super::categorize::ImportSection;
 
@@ -47,7 +47,7 @@ impl Display for RelativeImportsOrder {
 #[derive(Debug, Clone, CacheKey)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Settings {
-    pub required_imports: BTreeSet<String>,
+    pub required_imports: BTreeSet<NameImport>,
     pub combine_as_imports: bool,
     pub force_single_line: bool,
     pub force_sort_within_sections: bool,

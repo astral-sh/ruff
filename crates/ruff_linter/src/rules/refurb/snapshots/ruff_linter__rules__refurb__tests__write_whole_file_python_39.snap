@@ -1,0 +1,86 @@
+---
+source: crates/ruff_linter/src/rules/refurb/mod.rs
+---
+FURB103.py:12:6: FURB103 `open` and `write` should be replaced by `Path("file.txt").write_text("test")`
+   |
+11 | # FURB103
+12 | with open("file.txt", "w") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB103
+13 |     f.write("test")
+   |
+
+FURB103.py:16:6: FURB103 `open` and `write` should be replaced by `Path("file.txt").write_bytes(foobar)`
+   |
+15 | # FURB103
+16 | with open("file.txt", "wb") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB103
+17 |     f.write(foobar)
+   |
+
+FURB103.py:20:6: FURB103 `open` and `write` should be replaced by `Path("file.txt").write_bytes(b"abc")`
+   |
+19 | # FURB103
+20 | with open("file.txt", mode="wb") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB103
+21 |     f.write(b"abc")
+   |
+
+FURB103.py:24:6: FURB103 `open` and `write` should be replaced by `Path("file.txt").write_text(foobar, encoding="utf8")`
+   |
+23 | # FURB103
+24 | with open("file.txt", "w", encoding="utf8") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB103
+25 |     f.write(foobar)
+   |
+
+FURB103.py:28:6: FURB103 `open` and `write` should be replaced by `Path("file.txt").write_text(foobar, errors="ignore")`
+   |
+27 | # FURB103
+28 | with open("file.txt", "w", errors="ignore") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB103
+29 |     f.write(foobar)
+   |
+
+FURB103.py:32:6: FURB103 `open` and `write` should be replaced by `Path("file.txt").write_text(foobar)`
+   |
+31 | # FURB103
+32 | with open("file.txt", mode="w") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB103
+33 |     f.write(foobar)
+   |
+
+FURB103.py:36:6: FURB103 `open` and `write` should be replaced by `Path(foo()).write_bytes(bar())`
+   |
+35 | # FURB103
+36 | with open(foo(), "wb") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^^ FURB103
+37 |     # The body of `with` is non-trivial, but the recommendation holds.
+38 |     bar("pre")
+   |
+
+FURB103.py:44:6: FURB103 `open` and `write` should be replaced by `Path("a.txt").write_text(x)`
+   |
+43 | # FURB103
+44 | with open("a.txt", "w") as a, open("b.txt", "wb") as b:
+   |      ^^^^^^^^^^^^^^^^^^^^^^^ FURB103
+45 |     a.write(x)
+46 |     b.write(y)
+   |
+
+FURB103.py:44:31: FURB103 `open` and `write` should be replaced by `Path("b.txt").write_bytes(y)`
+   |
+43 | # FURB103
+44 | with open("a.txt", "w") as a, open("b.txt", "wb") as b:
+   |                               ^^^^^^^^^^^^^^^^^^^^^^^^ FURB103
+45 |     a.write(x)
+46 |     b.write(y)
+   |
+
+FURB103.py:49:18: FURB103 `open` and `write` should be replaced by `Path("file.txt").write_text(bar(bar(a + x)))`
+   |
+48 | # FURB103
+49 | with foo() as a, open("file.txt", "w") as b, foo() as c:
+   |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB103
+50 |     # We have other things in here, multiple with items, but the user
+51 |     # writes a single time to file and that bit they can replace.
+   |

@@ -1,10 +1,9 @@
 //! Struct used to efficiently slice source code at (row, column) Locations.
 
-use std::ops::Add;
-
 use memchr::{memchr2, memrchr2};
-use once_cell::unsync::OnceCell;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+use std::cell::OnceCell;
+use std::ops::Add;
 
 use crate::newlines::find_newline;
 use crate::{LineIndex, OneIndexed, SourceCode, SourceLocation};
@@ -23,10 +22,10 @@ impl<'a> Locator<'a> {
         }
     }
 
-    pub const fn with_index(contents: &'a str, index: LineIndex) -> Self {
+    pub fn with_index(contents: &'a str, index: LineIndex) -> Self {
         Self {
             contents,
-            index: OnceCell::with_value(index),
+            index: OnceCell::from(index),
         }
     }
 

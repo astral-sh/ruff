@@ -22,6 +22,10 @@ use ruff_macros::{derive_message_formats, violation};
 ///     for inner_host_id, host in [[12.13, "Venus"], [14.15, "Mars"]]:
 ///         print(host_id, inner_host_id, host)
 /// ```
+///
+/// ## Options
+/// - `lint.dummy-variable-rgx`
+///
 /// ## References
 /// - [Pylint documentation](https://pylint.readthedocs.io/en/latest/user_guide/messages/refactor/redefined-argument-from-local.html)
 

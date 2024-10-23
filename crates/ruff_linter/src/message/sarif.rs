@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::io::Write;
 
 use anyhow::Result;
@@ -9,10 +10,8 @@ use ruff_source_file::OneIndexed;
 use crate::codes::Rule;
 use crate::fs::normalize_path;
 use crate::message::{Emitter, EmitterContext, Message};
-use crate::registry::{AsRule, Linter, RuleNamespace};
+use crate::registry::{Linter, RuleNamespace};
 use crate::VERSION;
-
-use strum::IntoEnumIterator;
 
 pub struct SarifEmitter;
 
@@ -28,6 +27,10 @@ impl Emitter for SarifEmitter {
             .map(SarifResult::from_message)
             .collect::<Result<Vec<_>>>()?;
 
+        let unique_rules: HashSet<_> = results.iter().filter_map(|result| result.rule).collect();
+        let mut rules: Vec<SarifRule> = unique_rules.into_iter().map(SarifRule::from).collect();
+        rules.sort_by(|a, b| a.code.cmp(&b.code));
+
         let output = json!({
             "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
             "version": "2.1.0",
@@ -36,7 +39,7 @@ impl Emitter for SarifEmitter {
                     "driver": {
                         "name": "ruff",
                         "informationUri": "https://github.com/astral-sh/ruff",
-                        "rules": Rule::iter().map(SarifRule::from).collect::<Vec<_>>(),
+                        "rules": rules,
                         "version": VERSION.to_string(),
                     }
                 },
@@ -103,7 +106,7 @@ impl Serialize for SarifRule<'_> {
 
 #[derive(Debug)]
 struct SarifResult {
-    rule: Rule,
+    rule: Option<Rule>,
     level: String,
     message: String,
     uri: String,
@@ -120,9 +123,9 @@ impl SarifResult {
         let end_location = message.compute_end_location();
         let path = normalize_path(message.filename());
         Ok(Self {
-            rule: message.kind.rule(),
+            rule: message.rule(),
             level: "error".to_string(),
-            message: message.kind.name.clone(),
+            message: message.body().to_string(),
             uri: url::Url::from_file_path(&path)
                 .map_err(|()| anyhow::anyhow!("Failed to convert path to URL: {}", path.display()))?
                 .to_string(),
@@ -140,9 +143,9 @@ impl SarifResult {
         let end_location = message.compute_end_location();
         let path = normalize_path(message.filename());
         Ok(Self {
-            rule: message.kind.rule(),
+            rule: message.rule(),
             level: "error".to_string(),
-            message: message.kind.name.clone(),
+            message: message.body().to_string(),
             uri: path.display().to_string(),
             start_line: start_location.row,
             start_column: start_location.column,
@@ -175,7 +178,7 @@ impl Serialize for SarifResult {
                     }
                 }
             }],
-            "ruleId": self.rule.noqa_code().to_string(),
+            "ruleId": self.rule.map(|rule| rule.noqa_code().to_string()),
         })
         .serialize(serializer)
     }
@@ -183,8 +186,9 @@ impl Serialize for SarifResult {
 
 #[cfg(test)]
 mod tests {
-
-    use crate::message::tests::{capture_emitter_output, create_messages};
+    use crate::message::tests::{
+        capture_emitter_output, create_messages, create_syntax_error_messages,
+    };
     use crate::message::SarifEmitter;
 
     fn get_output() -> String {
@@ -199,14 +203,20 @@ mod tests {
     }
 
     #[test]
+    fn valid_syntax_error_json() {
+        let mut emitter = SarifEmitter {};
+        let content = capture_emitter_output(&mut emitter, &create_syntax_error_messages());
+        serde_json::from_str::<serde_json::Value>(&content).unwrap();
+    }
+
+    #[test]
     fn test_results() {
         let content = get_output();
-        let sarif = serde_json::from_str::<serde_json::Value>(content.as_str()).unwrap();
-        let rules = sarif["runs"][0]["tool"]["driver"]["rules"]
-            .as_array()
-            .unwrap();
-        let results = sarif["runs"][0]["results"].as_array().unwrap();
-        assert_eq!(results.len(), 3);
-        assert!(rules.len() > 3);
+        let value = serde_json::from_str::<serde_json::Value>(&content).unwrap();
+
+        insta::assert_json_snapshot!(value, {
+            ".runs[0].tool.driver.version" => "[VERSION]",
+            ".runs[0].results[].locations[].physicalLocation.artifactLocation.uri" => "[URI]",
+        });
     }
 }

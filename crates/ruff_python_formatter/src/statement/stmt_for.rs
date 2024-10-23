@@ -7,6 +7,7 @@ use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
 use crate::statement::clause::{clause_body, clause_header, ClauseHeader, ElseClause};
+use crate::statement::suite::SuiteKind;
 
 #[derive(Debug)]
 struct ExprTupleWithoutParentheses<'a>(&'a Expr);
@@ -63,7 +64,11 @@ impl FormatNodeRule<StmtFor> for FormatStmtFor {
                         maybe_parenthesize_expression(iter, item, Parenthesize::IfBreaks),
                     ],
                 ),
-                clause_body(body, trailing_condition_comments),
+                clause_body(
+                    body,
+                    SuiteKind::other(orelse.is_empty()),
+                    trailing_condition_comments
+                ),
             ]
         )?;
 
@@ -85,7 +90,7 @@ impl FormatNodeRule<StmtFor> for FormatStmtFor {
                         &token("else"),
                     )
                     .with_leading_comments(leading, body.last()),
-                    clause_body(orelse, trailing),
+                    clause_body(orelse, SuiteKind::other(true), trailing),
                 ]
             )?;
         }

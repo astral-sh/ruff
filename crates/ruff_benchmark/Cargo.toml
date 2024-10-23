@@ -13,6 +13,7 @@ license = { workspace = true }
 
 [lib]
 bench = false
+test = false
 doctest = false
 
 [[bench]]
@@ -31,21 +32,29 @@ harness = false
 name = "formatter"
 harness = false
 
+[[bench]]
+name = "red_knot"
+harness = false
+
 [dependencies]
-once_cell = { workspace = true }
+codspeed-criterion-compat = { workspace = true, default-features = false, optional = true }
+criterion = { workspace = true, default-features = false }
+rayon = { workspace = true }
+rustc-hash = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 url = { workspace = true }
 ureq = { workspace = true }
-criterion = { workspace = true, default-features = false }
-codspeed-criterion-compat = { workspace = true, default-features = false, optional = true }
 
 [dev-dependencies]
+ruff_db = { workspace = true }
 ruff_linter = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_python_formatter = { workspace = true }
 ruff_python_parser = { workspace = true }
 ruff_python_trivia = { workspace = true }
+red_knot_python_semantic = { workspace = true }
+red_knot_workspace = { workspace = true }
 
 [lints]
 workspace = true

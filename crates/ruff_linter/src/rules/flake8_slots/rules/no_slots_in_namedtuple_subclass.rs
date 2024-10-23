@@ -92,23 +92,25 @@ pub(crate) fn no_slots_in_namedtuple_subclass(
     }
 }
 
-/// If the class has a call-based namedtuple in its bases,
-/// return the kind of namedtuple it is
-/// (either `collections.namedtuple()`, or `typing.NamedTuple()`).
-/// Else, return `None`.
+/// If the class's bases consist solely of named tuples, return the kind of named tuple
+/// (either `collections.namedtuple()`, or `typing.NamedTuple()`). Otherwise, return `None`.
 fn namedtuple_base(bases: &[Expr], semantic: &SemanticModel) -> Option<NamedTupleKind> {
+    let mut kind = None;
     for base in bases {
-        let Expr::Call(ast::ExprCall { func, .. }) = base else {
-            continue;
-        };
-        let Some(qualified_name) = semantic.resolve_qualified_name(func) else {
-            continue;
-        };
-        match qualified_name.segments() {
-            ["collections", "namedtuple"] => return Some(NamedTupleKind::Collections),
-            ["typing", "NamedTuple"] => return Some(NamedTupleKind::Typing),
-            _ => continue,
+        if let Expr::Call(ast::ExprCall { func, .. }) = base {
+            // Ex) `collections.namedtuple()`
+            let qualified_name = semantic.resolve_qualified_name(func)?;
+            match qualified_name.segments() {
+                ["collections", "namedtuple"] => kind = kind.or(Some(NamedTupleKind::Collections)),
+                ["typing", "NamedTuple"] => kind = kind.or(Some(NamedTupleKind::Typing)),
+                // Ex) `enum.Enum`
+                _ => return None,
+            }
+        } else if !semantic.match_builtin_expr(base, "object") {
+            // Allow inheriting from `object`.
+
+            return None;
         }
     }
-    None
+    kind
 }

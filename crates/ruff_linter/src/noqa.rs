@@ -361,7 +361,7 @@ impl<'a> FileNoqaDirectives<'a> {
         let mut lines = vec![];
 
         for range in comment_ranges {
-            match ParsedFileExemption::try_extract(&contents[*range]) {
+            match ParsedFileExemption::try_extract(&contents[range]) {
                 Err(err) => {
                     #[allow(deprecated)]
                     let line = locator.compute_line_index(range.start());
@@ -403,7 +403,7 @@ impl<'a> FileNoqaDirectives<'a> {
                     };
 
                     lines.push(FileNoqaDirectiveLine {
-                        range: *range,
+                        range,
                         parsed_file_exemption: exemption,
                         matches,
                     });
@@ -922,7 +922,7 @@ impl<'a> NoqaDirectives<'a> {
         let mut directives = Vec::new();
 
         for range in comment_ranges {
-            match Directive::try_extract(locator.slice(*range), range.start()) {
+            match Directive::try_extract(locator.slice(range), range.start()) {
                 Err(err) => {
                     #[allow(deprecated)]
                     let line = locator.compute_line_index(range.start());
@@ -1063,7 +1063,7 @@ mod tests {
 
     use crate::generate_noqa_edits;
     use crate::noqa::{add_noqa_inner, Directive, NoqaMapping, ParsedFileExemption};
-    use crate::rules::pycodestyle::rules::AmbiguousVariableName;
+    use crate::rules::pycodestyle::rules::{AmbiguousVariableName, UselessSemicolon};
     use crate::rules::pyflakes::rules::UnusedVariable;
     use crate::rules::pyupgrade::rules::PrintfStringFormatting;
 
@@ -1377,6 +1377,38 @@ print(
                 "  # noqa: UP031\n".to_string(),
                 68.into(),
                 69.into()
+            ))]
+        );
+    }
+
+    #[test]
+    fn syntax_error() {
+        let path = Path::new("/tmp/foo.txt");
+        let source = "\
+foo;
+bar =
+";
+        let diagnostics = [Diagnostic::new(
+            UselessSemicolon,
+            TextRange::new(4.into(), 5.into()),
+        )];
+        let noqa_line_for = NoqaMapping::default();
+        let comment_ranges = CommentRanges::default();
+        let edits = generate_noqa_edits(
+            path,
+            &diagnostics,
+            &Locator::new(source),
+            &comment_ranges,
+            &[],
+            &noqa_line_for,
+            LineEnding::Lf,
+        );
+        assert_eq!(
+            edits,
+            vec![Some(Edit::replacement(
+                "  # noqa: E703\n".to_string(),
+                4.into(),
+                5.into()
             ))]
         );
     }

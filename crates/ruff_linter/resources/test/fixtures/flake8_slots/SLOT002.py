@@ -1,4 +1,5 @@
 from collections import namedtuple
+from enum import Enum
 from typing import NamedTuple
 
 
@@ -19,4 +20,16 @@ class Good(namedtuple("foo", ["str", "int"])):  # OK
 
 
 class Good(NamedTuple):  # Ok
+    pass
+
+
+class Good(namedtuple("foo", ["str", "int"]), Enum):
+    pass
+
+
+class UnusualButStillBad(namedtuple("foo", ["str", "int"]), NamedTuple("foo", [("x", int, "y", int)])):
+    pass
+
+
+class UnusualButStillBad(namedtuple("foo", ["str", "int"]), object):
     pass

@@ -4,7 +4,6 @@ use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, ParameterWithDefault, Stmt};
-use ruff_python_parser::typing::parse_type_annotation;
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::Definition;
 use ruff_python_stdlib::typing::simple_magic_return_type;
@@ -24,15 +23,15 @@ use crate::rules::ruff::typing::type_hint_resolves_to_any;
 /// any provided arguments match expectation.
 ///
 /// ## Example
+///
 /// ```python
-/// def foo(x):
-///     ...
+/// def foo(x): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// def foo(x: int):
-///     ...
+/// def foo(x: int): ...
 /// ```
 #[violation]
 pub struct MissingTypeFunctionArgument {
@@ -56,15 +55,15 @@ impl Violation for MissingTypeFunctionArgument {
 /// any provided arguments match expectation.
 ///
 /// ## Example
+///
 /// ```python
-/// def foo(*args):
-///     ...
+/// def foo(*args): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// def foo(*args: int):
-///     ...
+/// def foo(*args: int): ...
 /// ```
 #[violation]
 pub struct MissingTypeArgs {
@@ -88,15 +87,15 @@ impl Violation for MissingTypeArgs {
 /// any provided arguments match expectation.
 ///
 /// ## Example
+///
 /// ```python
-/// def foo(**kwargs):
-///     ...
+/// def foo(**kwargs): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// def foo(**kwargs: int):
-///     ...
+/// def foo(**kwargs: int): ...
 /// ```
 #[violation]
 pub struct MissingTypeKwargs {
@@ -127,17 +126,17 @@ impl Violation for MissingTypeKwargs {
 /// annotation is not strictly necessary.
 ///
 /// ## Example
+///
 /// ```python
 /// class Foo:
-///     def bar(self):
-///         ...
+///     def bar(self): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// class Foo:
-///     def bar(self: "Foo"):
-///         ...
+///     def bar(self: "Foo"): ...
 /// ```
 #[violation]
 pub struct MissingTypeSelf {
@@ -168,19 +167,19 @@ impl Violation for MissingTypeSelf {
 /// annotation is not strictly necessary.
 ///
 /// ## Example
+///
 /// ```python
 /// class Foo:
 ///     @classmethod
-///     def bar(cls):
-///         ...
+///     def bar(cls): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// class Foo:
 ///     @classmethod
-///     def bar(cls: Type["Foo"]):
-///         ...
+///     def bar(cls: Type["Foo"]): ...
 /// ```
 #[violation]
 pub struct MissingTypeCls {
@@ -449,29 +448,29 @@ impl Violation for MissingReturnTypeClassMethod {
 /// `Any` as an "escape hatch" only when it is really needed.
 ///
 /// ## Example
+///
 /// ```python
-/// def foo(x: Any):
-///     ...
+/// def foo(x: Any): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// def foo(x: int):
-///     ...
+/// def foo(x: int): ...
 /// ```
 ///
 /// ## Known problems
 ///
 /// Type aliases are unsupported and can lead to false positives.
 /// For example, the following will trigger this rule inadvertently:
+///
 /// ```python
 /// from typing import Any
 ///
 /// MyAny = Any
 ///
 ///
-/// def foo(x: MyAny):
-///     ...
+/// def foo(x: MyAny): ...
 /// ```
 ///
 /// ## References
@@ -514,13 +513,10 @@ fn check_dynamically_typed<F>(
 {
     if let Expr::StringLiteral(string_expr) = annotation {
         // Quoted annotations
-        if let Ok((parsed_annotation, _)) =
-            parse_type_annotation(string_expr, checker.locator().contents())
-        {
+        if let Some(parsed_annotation) = checker.parse_type_annotation(string_expr) {
             if type_hint_resolves_to_any(
-                parsed_annotation.expr(),
-                checker.semantic(),
-                checker.locator(),
+                parsed_annotation.expression(),
+                checker,
                 checker.settings.target_version.minor(),
             ) {
                 diagnostics.push(Diagnostic::new(
@@ -530,12 +526,7 @@ fn check_dynamically_typed<F>(
             }
         }
     } else {
-        if type_hint_resolves_to_any(
-            annotation,
-            checker.semantic(),
-            checker.locator(),
-            checker.settings.target_version.minor(),
-        ) {
+        if type_hint_resolves_to_any(annotation, checker, checker.settings.target_version.minor()) {
             diagnostics.push(Diagnostic::new(
                 AnyType { name: func() },
                 annotation.range(),

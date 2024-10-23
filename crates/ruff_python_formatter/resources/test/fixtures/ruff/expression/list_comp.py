@@ -105,3 +105,66 @@ aaaaaaaaaaaaaaaaaaaaa = [
 # Parenthesized targets and iterators.
 [x for (x) in y]
 [x for x in (y)]
+
+
+# Leading expression comments:
+y = [
+    a
+    for (
+        # comment
+        a
+    ) in (
+        # comment
+        x
+    )
+    if (
+        # asdasd
+        "askldaklsdnmklasmdlkasmdlkasmdlkasmdasd"
+        != "as,mdnaskldmlkasdmlaksdmlkasdlkasdm"
+        and "zxcm,.nzxclm,zxnckmnzxckmnzxczxc" != "zxcasdasdlmnasdlknaslkdnmlaskdm"
+    )
+    if (
+        # comment
+        x
+    )
+]
+
+# Tuple target:
+y = [
+    a
+    for
+        # comment
+        a, b
+     in x
+    if  True
+]
+
+
+y = [
+    a
+    for (
+        # comment
+        a, b
+    )
+    in x
+    if  True
+]
+
+
+y = [
+    a
+    for
+        # comment
+        a
+    in
+        # comment
+        x
+    if
+        # asdasd
+        "askldaklsdnmklasmdlkasmdlkasmdlkasmdasd"
+        != "as,mdnaskldmlkasdmlaksdmlkasdlkasdm"
+        and "zxcm,.nzxclm,zxnckmnzxckmnzxczxc" != "zxcasdasdlmnasdlknaslkdnmlaskdm"
+    if
+        # comment
+        x
+]

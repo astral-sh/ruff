@@ -85,7 +85,7 @@ Module(
                                                         expression: Name(
                                                             ExprName {
                                                                 range: 23..24,
-                                                                id: "x",
+                                                                id: Name("x"),
                                                                 ctx: Load,
                                                             },
                                                         ),
@@ -159,7 +159,7 @@ Module(
                                                         expression: Name(
                                                             ExprName {
                                                                 range: 40..41,
-                                                                id: "x",
+                                                                id: Name("x"),
                                                                 ctx: Load,
                                                             },
                                                         ),
@@ -238,7 +238,7 @@ Module(
                                                         expression: Name(
                                                             ExprName {
                                                                 range: 58..59,
-                                                                id: "x",
+                                                                id: Name("x"),
                                                                 ctx: Load,
                                                             },
                                                         ),
@@ -312,6 +312,16 @@ Module(
 
 
   |
+1 | f"hello
+2 | 1 + 1
+3 | f"hello {x
+  |            Syntax Error: f-string: unterminated string
+4 | 2 + 2
+5 | f"hello {x:
+  |
+
+
+  |
 2 | 1 + 1
 3 | f"hello {x
 4 | 2 + 2
@@ -322,31 +332,22 @@ Module(
 
 
   |
+1 | f"hello
+2 | 1 + 1
+3 | f"hello {x
+  |            Syntax Error: Expected FStringEnd, found Unknown
+4 | 2 + 2
+5 | f"hello {x:
+  |
+
+
+  |
 3 | f"hello {x
 4 | 2 + 2
 5 | f"hello {x:
-  | ^^ Syntax Error: Simple statements must be separated by newlines or semicolons
+  |             Syntax Error: f-string: unterminated string
 6 | 3 + 3
 7 | f"hello {x}
-  |
-
-
-  |
-4 | 2 + 2
-5 | f"hello {x:
-6 | 3 + 3
-  | ^ Syntax Error: Expected an f-string element or the end of the f-string
-7 | f"hello {x}
-8 | 4 + 4
-  |
-
-
-  |
-5 | f"hello {x:
-6 | 3 + 3
-7 | f"hello {x}
-  | ^^ Syntax Error: Simple statements must be separated by newlines or semicolons
-8 | 4 + 4
   |
 
 
@@ -355,31 +356,5 @@ Module(
 6 | 3 + 3
 7 | f"hello {x}
   |             Syntax Error: f-string: unterminated string
-8 | 4 + 4
-  |
-
-
-  |
-6 | 3 + 3
-7 | f"hello {x}
-8 | 4 + 4
-  | ^ Syntax Error: Expected an f-string element or the end of the f-string
-  |
-
-
-  |
-7 | f"hello {x}
-8 | 4 + 4
-  |
-
-
-  |
-7 | f"hello {x}
-8 | 4 + 4
-  |
-
-
-  |
-7 | f"hello {x}
 8 | 4 + 4
   |

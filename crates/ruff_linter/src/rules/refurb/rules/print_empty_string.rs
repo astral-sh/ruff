@@ -1,7 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_codegen::Generator;
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -85,11 +87,15 @@ pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
 
             let mut diagnostic = Diagnostic::new(PrintEmptyString { reason }, call.range());
 
-            diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-                generate_suggestion(call, Separator::Remove, checker.generator()),
-                call.start(),
-                call.end(),
-            )));
+            diagnostic.set_fix(
+                EmptyStringFix::from_call(
+                    call,
+                    Separator::Remove,
+                    checker.semantic(),
+                    checker.generator(),
+                )
+                .into_fix(),
+            );
 
             checker.diagnostics.push(diagnostic);
         }
@@ -109,11 +115,15 @@ pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
                     call.range(),
                 );
 
-                diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-                    generate_suggestion(call, Separator::Remove, checker.generator()),
-                    call.start(),
-                    call.end(),
-                )));
+                diagnostic.set_fix(
+                    EmptyStringFix::from_call(
+                        call,
+                        Separator::Remove,
+                        checker.semantic(),
+                        checker.generator(),
+                    )
+                    .into_fix(),
+                );
 
                 checker.diagnostics.push(diagnostic);
             }
@@ -172,11 +182,10 @@ pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
                 call.range(),
             );
 
-            diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-                generate_suggestion(call, separator, checker.generator()),
-                call.start(),
-                call.end(),
-            )));
+            diagnostic.set_fix(
+                EmptyStringFix::from_call(call, separator, checker.semantic(), checker.generator())
+                    .into_fix(),
+            );
 
             checker.diagnostics.push(diagnostic);
         }
@@ -200,37 +209,68 @@ enum Separator {
     Retain,
 }
 
-/// Generate a suggestion to remove the empty string positional argument and
-/// the `sep` keyword argument, if it exists.
-fn generate_suggestion(call: &ast::ExprCall, separator: Separator, generator: Generator) -> String {
-    let mut call = call.clone();
+#[derive(Debug, Clone)]
+struct EmptyStringFix(Fix);
 
-    // Remove all empty string positional arguments.
-    call.arguments.args = call
-        .arguments
-        .args
-        .iter()
-        .filter(|arg| !is_empty_string(arg))
-        .cloned()
-        .collect::<Vec<_>>()
-        .into_boxed_slice();
+impl EmptyStringFix {
+    /// Generate a suggestion to remove the empty string positional argument and
+    /// the `sep` keyword argument, if it exists.
+    fn from_call(
+        call: &ast::ExprCall,
+        separator: Separator,
+        semantic: &SemanticModel,
+        generator: Generator,
+    ) -> Self {
+        let range = call.range();
+        let mut call = call.clone();
+        let mut applicability = Applicability::Safe;
 
-    // Remove the `sep` keyword argument if it exists.
-    if separator == Separator::Remove {
-        call.arguments.keywords = call
+        // Remove all empty string positional arguments.
+        call.arguments.args = call
             .arguments
-            .keywords
+            .args
             .iter()
-            .filter(|keyword| {
-                keyword
-                    .arg
-                    .as_ref()
-                    .map_or(true, |arg| arg.as_str() != "sep")
-            })
+            .filter(|arg| !is_empty_string(arg))
             .cloned()
             .collect::<Vec<_>>()
             .into_boxed_slice();
+
+        // Remove the `sep` keyword argument if it exists.
+        if separator == Separator::Remove {
+            call.arguments.keywords = call
+                .arguments
+                .keywords
+                .iter()
+                .filter(|keyword| {
+                    let Some(arg) = keyword.arg.as_ref() else {
+                        return true;
+                    };
+
+                    if arg.as_str() != "sep" {
+                        return true;
+                    }
+
+                    if contains_effect(&keyword.value, |id| semantic.has_builtin_binding(id)) {
+                        applicability = Applicability::Unsafe;
+                    }
+
+                    false
+                })
+                .cloned()
+                .collect::<Vec<_>>()
+                .into_boxed_slice();
+        }
+
+        let contents = generator.expr(&call.into());
+
+        Self(Fix::applicable_edit(
+            Edit::range_replacement(contents, range),
+            applicability,
+        ))
     }
 
-    generator.expr(&call.into())
+    /// Return the [`Fix`] contained in this [`EmptyStringFix`].
+    fn into_fix(self) -> Fix {
+        self.0
+    }
 }

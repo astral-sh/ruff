@@ -1,24 +1,24 @@
 use std::cmp::Ordering;
-use std::hash::BuildHasherDefault;
 use std::ops::Deref;
 
 use bitflags::bitflags;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxBuildHasher, FxHashSet};
 
+use ruff_python_ast::name::Name;
 use ruff_python_ast::{
     self as ast, BoolOp, CmpOp, ConversionFlag, Expr, ExprContext, FStringElement, FStringElements,
     IpyEscapeKind, Number, Operator, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::lexer::TokenValue;
 use crate::parser::progress::ParserProgress;
 use crate::parser::{helpers, FunctionKind, Parser};
 use crate::string::{parse_fstring_literal_element, parse_string_literal, StringType};
+use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
-use crate::{FStringErrorType, Mode, ParseErrorType, TokenKind};
+use crate::{FStringErrorType, Mode, ParseErrorType};
 
-use super::{Parenthesized, RecoveryContextKind};
+use super::{FStringElementsKind, Parenthesized, RecoveryContextKind};
 
 /// A token set consisting of a newline or end of file.
 const NEWLINE_EOF_SET: TokenSet = TokenSet::new([TokenKind::Newline, TokenKind::EndOfFile]);
@@ -478,14 +478,11 @@ impl<'src> Parser<'src> {
             let TokenValue::Name(name) = self.bump_value(TokenKind::Name) else {
                 unreachable!();
             };
-            return ast::Identifier {
-                id: name.to_string(),
-                range,
-            };
+            return ast::Identifier { id: name, range };
         }
 
         if self.current_token_kind().is_soft_keyword() {
-            let id = self.src_text(range).to_string();
+            let id = Name::new(self.src_text(range));
             self.bump_soft_keyword_as_name();
             return ast::Identifier { id, range };
         }
@@ -500,7 +497,7 @@ impl<'src> Parser<'src> {
                 range,
             );
 
-            let id = self.src_text(range).to_string();
+            let id = Name::new(self.src_text(range));
             self.bump_any();
             ast::Identifier { id, range }
         } else {
@@ -510,7 +507,7 @@ impl<'src> Parser<'src> {
             );
 
             ast::Identifier {
-                id: String::new(),
+                id: Name::empty(),
                 range: self.missing_node_range(),
             }
         }
@@ -598,7 +595,7 @@ impl<'src> Parser<'src> {
                     );
                     Expr::Name(ast::ExprName {
                         range: self.missing_node_range(),
-                        id: String::new(),
+                        id: Name::empty(),
                         ctx: ExprContext::Invalid,
                     })
                 }
@@ -720,7 +717,7 @@ impl<'src> Parser<'src> {
                             &parsed_expr,
                         );
                         ast::Identifier {
-                            id: String::new(),
+                            id: Name::empty(),
                             range: parsed_expr.range(),
                         }
                     };
@@ -794,7 +791,7 @@ impl<'src> Parser<'src> {
                 value: Box::new(value),
                 slice: Box::new(Expr::Name(ast::ExprName {
                     range: slice_range,
-                    id: String::new(),
+                    id: Name::empty(),
                     ctx: ExprContext::Invalid,
                 })),
                 ctx: ExprContext::Load,
@@ -1307,7 +1304,7 @@ impl<'src> Parser<'src> {
         let flags = self.tokens.current_flags().as_any_string_flags();
 
         self.bump(TokenKind::FStringStart);
-        let elements = self.parse_fstring_elements(flags);
+        let elements = self.parse_fstring_elements(flags, FStringElementsKind::Regular);
 
         self.expect(TokenKind::FStringEnd);
 
@@ -1323,10 +1320,14 @@ impl<'src> Parser<'src> {
     /// # Panics
     ///
     /// If the parser isn't positioned at a `{` or `FStringMiddle` token.
-    fn parse_fstring_elements(&mut self, flags: ast::AnyStringFlags) -> FStringElements {
+    fn parse_fstring_elements(
+        &mut self,
+        flags: ast::AnyStringFlags,
+        kind: FStringElementsKind,
+    ) -> FStringElements {
         let mut elements = vec![];
 
-        self.parse_list(RecoveryContextKind::FStringElements, |parser| {
+        self.parse_list(RecoveryContextKind::FStringElements(kind), |parser| {
             let element = match parser.current_token_kind() {
                 TokenKind::Lbrace => {
                     FStringElement::Expression(parser.parse_fstring_expression_element(flags))
@@ -1463,7 +1464,7 @@ impl<'src> Parser<'src> {
 
         let format_spec = if self.eat(TokenKind::Colon) {
             let spec_start = self.node_start();
-            let elements = self.parse_fstring_elements(flags);
+            let elements = self.parse_fstring_elements(flags, FStringElementsKind::FormatSpec);
             Some(Box::new(ast::FStringFormatSpec {
                 range: self.node_range(spec_start),
                 elements,
@@ -2271,14 +2272,13 @@ impl<'src> Parser<'src> {
         command
     }
 
-    /// Validate that the given arguments doesn't have any duplicate keyword argument.
-    ///
-    /// Report errors for all the duplicate names found.
+    /// Performs the following validations on the function call arguments:
+    /// 1. There aren't any duplicate keyword argument
+    /// 2. If there are more than one argument (positional or keyword), all generator expressions
+    ///    present should be parenthesized.
     fn validate_arguments(&mut self, arguments: &ast::Arguments) {
-        let mut all_arg_names = FxHashSet::with_capacity_and_hasher(
-            arguments.keywords.len(),
-            BuildHasherDefault::default(),
-        );
+        let mut all_arg_names =
+            FxHashSet::with_capacity_and_hasher(arguments.keywords.len(), FxBuildHasher);
 
         for (name, range) in arguments
             .keywords
@@ -2291,6 +2291,25 @@ impl<'src> Parser<'src> {
                     ParseErrorType::DuplicateKeywordArgumentError(arg_name.to_string()),
                     range,
                 );
+            }
+        }
+
+        if arguments.len() > 1 {
+            for arg in &*arguments.args {
+                if let Some(ast::ExprGenerator {
+                    range,
+                    parenthesized: false,
+                    ..
+                }) = arg.as_generator_expr()
+                {
+                    // test_ok args_unparenthesized_generator
+                    // sum(x for x in range(10))
+
+                    // test_err args_unparenthesized_generator
+                    // sum(x for x in range(10), 5)
+                    // total(1, 2, x for x in range(5), 6)
+                    self.add_error(ParseErrorType::UnparenthesizedGeneratorExpression, range);
+                }
             }
         }
     }

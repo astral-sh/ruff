@@ -15,7 +15,8 @@ use crate::checkers::ast::Checker;
 /// should instead contain only a single statement (e.g., `...`).
 ///
 /// ## Example
-/// ```python
+///
+/// ```pyi
 /// def function():
 ///     x = 1
 ///     y = 2
@@ -23,9 +24,9 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// Use instead:
-/// ```python
-/// def function():
-///     ...
+///
+/// ```pyi
+/// def function(): ...
 /// ```
 #[violation]
 pub struct StubBodyMultipleStatements;

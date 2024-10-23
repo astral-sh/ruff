@@ -18,12 +18,12 @@ Module(
                             value: Name(
                                 ExprName {
                                     range: 0..5,
-                                    id: "value",
+                                    id: Name("value"),
                                     ctx: Load,
                                 },
                             ),
                             attr: Identifier {
-                                id: "attr",
+                                id: Name("attr"),
                                 range: 6..10,
                             },
                             ctx: Load,
@@ -43,12 +43,12 @@ Module(
                                     value: Name(
                                         ExprName {
                                             range: 11..16,
-                                            id: "value",
+                                            id: Name("value"),
                                             ctx: Load,
                                         },
                                     ),
                                     attr: Identifier {
-                                        id: "attr",
+                                        id: Name("attr"),
                                         range: 17..21,
                                     },
                                     ctx: Load,
@@ -75,7 +75,7 @@ Module(
                                     func: Name(
                                         ExprName {
                                             range: 24..29,
-                                            id: "value",
+                                            id: Name("value"),
                                             ctx: Load,
                                         },
                                     ),
@@ -87,7 +87,7 @@ Module(
                                 },
                             ),
                             attr: Identifier {
-                                id: "attr",
+                                id: Name("attr"),
                                 range: 32..36,
                             },
                             ctx: Load,
@@ -113,7 +113,7 @@ Module(
                                                     func: Name(
                                                         ExprName {
                                                             range: 37..42,
-                                                            id: "value",
+                                                            id: Name("value"),
                                                             ctx: Load,
                                                         },
                                                     ),
@@ -125,7 +125,7 @@ Module(
                                                 },
                                             ),
                                             attr: Identifier {
-                                                id: "attr",
+                                                id: Name("attr"),
                                                 range: 45..49,
                                             },
                                             ctx: Load,
@@ -139,7 +139,7 @@ Module(
                                 },
                             ),
                             attr: Identifier {
-                                id: "foo",
+                                id: Name("foo"),
                                 range: 52..55,
                             },
                             ctx: Load,
@@ -159,19 +159,19 @@ Module(
                                     value: Name(
                                         ExprName {
                                             range: 56..61,
-                                            id: "value",
+                                            id: Name("value"),
                                             ctx: Load,
                                         },
                                     ),
                                     attr: Identifier {
-                                        id: "attr",
+                                        id: Name("attr"),
                                         range: 62..66,
                                     },
                                     ctx: Load,
                                 },
                             ),
                             attr: Identifier {
-                                id: "foo",
+                                id: Name("foo"),
                                 range: 67..70,
                             },
                             ctx: Load,
@@ -194,12 +194,12 @@ Module(
                                             value: Name(
                                                 ExprName {
                                                     range: 72..77,
-                                                    id: "value",
+                                                    id: Name("value"),
                                                     ctx: Load,
                                                 },
                                             ),
                                             attr: Identifier {
-                                                id: "attr",
+                                                id: Name("attr"),
                                                 range: 79..83,
                                             },
                                             ctx: Load,
@@ -213,7 +213,7 @@ Module(
                                 },
                             ),
                             attr: Identifier {
-                                id: "foo",
+                                id: Name("foo"),
                                 range: 86..89,
                             },
                             ctx: Load,

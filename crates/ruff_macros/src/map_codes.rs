@@ -11,7 +11,7 @@ use syn::{
 use crate::rule_code_prefix::{get_prefix_ident, intersection_all};
 
 /// A rule entry in the big match statement such a
-/// `(Pycodestyle, "E112") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::NoIndentedBlock),`
+/// `(Pycodestyle, "E112") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::NoIndentedBlock),`
 #[derive(Clone)]
 struct Rule {
     /// The actual name of the rule, e.g., `NoIndentedBlock`.
@@ -20,7 +20,7 @@ struct Rule {
     linter: Ident,
     /// The code associated with the rule, e.g., `"E112"`.
     code: LitStr,
-    /// The rule group identifier, e.g., `RuleGroup::Nursery`.
+    /// The rule group identifier, e.g., `RuleGroup::Preview`.
     group: Path,
     /// The path to the struct implementing the rule, e.g.
     /// `rules::pycodestyle::rules::logical_lines::NoIndentedBlock`
@@ -143,9 +143,10 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
         for (prefix, rules) in &rules_by_prefix {
             let prefix_ident = get_prefix_ident(prefix);
             let attrs = intersection_all(rules.iter().map(|(.., attrs)| attrs.as_slice()));
-            let attrs = match attrs.as_slice() {
-                [] => quote!(),
-                [..] => quote!(#(#attrs)*),
+            let attrs = if attrs.is_empty() {
+                quote!()
+            } else {
+                quote!(#(#attrs)*)
             };
             all_codes.push(quote! {
                 #attrs Self::#linter(#linter::#prefix_ident)
@@ -161,9 +162,10 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
             });
             let prefix_ident = get_prefix_ident(&prefix);
             let attrs = intersection_all(rules.iter().map(|(.., attrs)| attrs.as_slice()));
-            let attrs = match attrs.as_slice() {
-                [] => quote!(),
-                [..] => quote!(#(#attrs)*),
+            let attrs = if attrs.is_empty() {
+                quote!()
+            } else {
+                quote!(#(#attrs)*)
             };
             prefix_into_iter_match_arms.extend(quote! {
                 #attrs #linter::#prefix_ident => vec![#(#rule_paths,)*].into_iter(),
@@ -321,11 +323,6 @@ See also https://github.com/astral-sh/ruff/issues/2186.
                 matches!(self.group(), RuleGroup::Stable)
             }
 
-            #[allow(deprecated)]
-            pub fn is_nursery(&self) -> bool {
-                matches!(self.group(), RuleGroup::Nursery)
-            }
-
             pub fn is_deprecated(&self) -> bool {
                 matches!(self.group(), RuleGroup::Deprecated)
             }
@@ -373,13 +370,13 @@ fn generate_iter_impl(
 
     quote! {
         impl Linter {
-            /// Rules not in the nursery.
+            /// Rules not in the preview.
             pub fn rules(self: &Linter) -> ::std::vec::IntoIter<Rule> {
                 match self {
                     #linter_rules_match_arms
                 }
             }
-            /// All rules, including those in the nursery.
+            /// All rules, including those in the preview.
             pub fn all_rules(self: &Linter) -> ::std::vec::IntoIter<Rule> {
                 match self {
                     #linter_all_rules_match_arms
@@ -481,7 +478,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
 }
 
 impl Parse for Rule {
-    /// Parses a match arm such as `(Pycodestyle, "E112") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::NoIndentedBlock),`
+    /// Parses a match arm such as `(Pycodestyle, "E112") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::NoIndentedBlock),`
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let attrs = Attribute::parse_outer(input)?;
         let pat_tuple;

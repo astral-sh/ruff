@@ -5,8 +5,9 @@ use bitflags::bitflags;
 
 use crate::all::DunderAllName;
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
+use ruff_python_ast::helpers::extract_handled_exceptions;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::Stmt;
+use ruff_python_ast::{self as ast, Stmt};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -35,9 +36,18 @@ pub struct Binding<'a> {
 }
 
 impl<'a> Binding<'a> {
+    /// Return `true` if this [`Binding`] is unused.
+    ///
+    /// This method is the opposite of [`Binding::is_used`].
+    pub fn is_unused(&self) -> bool {
+        self.references.is_empty()
+    }
+
     /// Return `true` if this [`Binding`] is used.
+    ///
+    /// This method is the opposite of [`Binding::is_unused`].
     pub fn is_used(&self) -> bool {
-        !self.references.is_empty()
+        !self.is_unused()
     }
 
     /// Returns an iterator over all references for the current [`Binding`].
@@ -114,6 +124,18 @@ impl<'a> Binding<'a> {
         self.flags.contains(BindingFlags::PRIVATE_DECLARATION)
     }
 
+    /// Return `true` if this [`Binding`] took place inside an exception handler,
+    /// e.g. `y` in:
+    /// ```python
+    /// try:
+    ///      x = 42
+    /// except RuntimeError:
+    ///      y = 42
+    /// ```
+    pub const fn in_exception_handler(&self) -> bool {
+        self.flags.contains(BindingFlags::IN_EXCEPT_HANDLER)
+    }
+
     /// Return `true` if this binding "redefines" the given binding, as per Pyflake's definition of
     /// redefinition.
     pub fn redefines(&self, existing: &Binding) -> bool {
@@ -177,16 +199,31 @@ impl<'a> Binding<'a> {
             | BindingKind::Builtin => {
                 return false;
             }
+            // Assignment-assignment bindings are not considered redefinitions, as in:
+            // ```python
+            // x = 1
+            // x = 2
+            // ```
+            BindingKind::Assignment | BindingKind::NamedExprAssignment => {
+                if matches!(
+                    existing.kind,
+                    BindingKind::Assignment | BindingKind::NamedExprAssignment
+                ) {
+                    return false;
+                }
+            }
             _ => {}
         }
-        // Otherwise, the shadowed binding must be a class definition, function definition, or
-        // import to be considered a redefinition.
+        // Otherwise, the shadowed binding must be a class definition, function definition,
+        // import, or assignment to be considered a redefinition.
         matches!(
             existing.kind,
             BindingKind::ClassDefinition(_)
                 | BindingKind::FunctionDefinition(_)
                 | BindingKind::Import(_)
                 | BindingKind::FromImport(_)
+                | BindingKind::Assignment
+                | BindingKind::NamedExprAssignment
         )
     }
 
@@ -318,6 +355,18 @@ bitflags! {
         /// (x, y) = 1, 2
         /// ```
         const UNPACKED_ASSIGNMENT = 1 << 9;
+
+        /// The binding took place inside an exception handling.
+        ///
+        /// For example, the `x` binding in the following example
+        /// would *not* have this flag set, but the `y` binding *would*:
+        /// ```python
+        /// try:
+        ///     x = 42
+        /// except RuntimeError:
+        ///     y = 42
+        /// ```
+        const IN_EXCEPT_HANDLER = 1 << 10;
     }
 }
 
@@ -452,12 +501,6 @@ pub enum BindingKind<'a> {
     /// ```
     LoopVar,
 
-    /// A binding for a comprehension variable, like `x` in:
-    /// ```python
-    /// [x for x in range(10)]
-    /// ```
-    ComprehensionVar,
-
     /// A binding for a with statement variable, like `x` in:
     /// ```python
     /// with open('foo.py') as x:
@@ -570,6 +613,26 @@ bitflags! {
         const NAME_ERROR = 0b0000_0001;
         const MODULE_NOT_FOUND_ERROR = 0b0000_0010;
         const IMPORT_ERROR = 0b0000_0100;
+        const ATTRIBUTE_ERROR = 0b000_100;
+    }
+}
+
+impl Exceptions {
+    pub fn from_try_stmt(
+        ast::StmtTry { handlers, .. }: &ast::StmtTry,
+        semantic: &SemanticModel,
+    ) -> Self {
+        let mut handled_exceptions = Self::empty();
+        for type_ in extract_handled_exceptions(handlers) {
+            handled_exceptions |= match semantic.resolve_builtin_symbol(type_) {
+                Some("NameError") => Self::NAME_ERROR,
+                Some("ModuleNotFoundError") => Self::MODULE_NOT_FOUND_ERROR,
+                Some("ImportError") => Self::IMPORT_ERROR,
+                Some("AttributeError") => Self::ATTRIBUTE_ERROR,
+                _ => continue,
+            }
+        }
+        handled_exceptions
     }
 }
 

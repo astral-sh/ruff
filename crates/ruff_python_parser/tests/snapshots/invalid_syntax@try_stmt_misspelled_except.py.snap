@@ -31,14 +31,14 @@ Module(
                     target: Name(
                         ExprName {
                             range: 14..19,
-                            id: "exept",
+                            id: Name("exept"),
                             ctx: Store,
                         },
                     ),
                     annotation: Name(
                         ExprName {
                             range: 20..20,
-                            id: "",
+                            id: Name(""),
                             ctx: Invalid,
                         },
                     ),
@@ -63,7 +63,7 @@ Module(
                         Name(
                             ExprName {
                                 range: 77..78,
-                                id: "a",
+                                id: Name("a"),
                                 ctx: Store,
                             },
                         ),
@@ -115,14 +115,14 @@ Module(
                     target: Name(
                         ExprName {
                             range: 114..119,
-                            id: "exept",
+                            id: Name("exept"),
                             ctx: Store,
                         },
                     ),
                     annotation: Name(
                         ExprName {
                             range: 120..120,
-                            id: "",
+                            id: Name(""),
                             ctx: Invalid,
                         },
                     ),
@@ -142,7 +142,7 @@ Module(
                         Name(
                             ExprName {
                                 range: 159..160,
-                                id: "b",
+                                id: Name("b"),
                                 ctx: Store,
                             },
                         ),

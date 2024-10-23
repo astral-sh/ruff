@@ -76,7 +76,7 @@ pub(crate) fn compare_to_empty_string(
 
     let mut first = true;
     for ((lhs, rhs), op) in std::iter::once(left)
-        .chain(comparators.iter())
+        .chain(comparators)
         .tuple_windows::<(&Expr, &Expr)>()
         .zip(ops)
     {

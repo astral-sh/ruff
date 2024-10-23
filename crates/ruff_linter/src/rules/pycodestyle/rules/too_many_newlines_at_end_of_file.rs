@@ -60,7 +60,7 @@ pub(crate) fn too_many_newlines_at_end_of_file(diagnostics: &mut Vec<Diagnostic>
     let mut end: Option<TextSize> = None;
 
     // Count the number of trailing newlines.
-    for token in tokens.up_to_first_unknown().iter().rev() {
+    for token in tokens.iter().rev() {
         match token.kind() {
             TokenKind::NonLogicalNewline | TokenKind::Newline => {
                 if num_trailing_newlines == 0 {

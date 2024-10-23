@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_python_parser/src/parser/tests.rs
-expression: parse_ast
+expression: suite
 ---
 [
     Assign(
@@ -10,7 +10,7 @@ expression: parse_ast
                 Name(
                     ExprName {
                         range: 0..1,
-                        id: "x",
+                        id: Name("x"),
                         ctx: Store,
                     },
                 ),

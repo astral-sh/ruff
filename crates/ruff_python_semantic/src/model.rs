@@ -1,5 +1,3 @@
-pub mod all;
-
 use std::path::Path;
 
 use bitflags::bitflags;
@@ -7,8 +5,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_python_ast::helpers::from_relative_import;
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
-use ruff_python_ast::{self as ast, Expr, ExprContext, Operator, Stmt};
-use ruff_python_stdlib::path::is_python_stub_file;
+use ruff_python_ast::{self as ast, Expr, ExprContext, Operator, PySourceType, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::binding::{
@@ -26,6 +23,8 @@ use crate::reference::{
 };
 use crate::scope::{Scope, ScopeId, ScopeKind, Scopes};
 use crate::Imported;
+
+pub mod all;
 
 /// A semantic model for a Python module, to enable querying the module's semantic information.
 pub struct SemanticModel<'a> {
@@ -124,7 +123,21 @@ pub struct SemanticModel<'a> {
     /// Modules that have been seen by the semantic model.
     pub seen: Modules,
 
-    /// Exceptions that have been handled by the current scope.
+    /// Exceptions that are handled by the current `try` block.
+    ///
+    /// For example, if we're visiting the `x = 1` assignment below,
+    /// `AttributeError` is considered to be a "handled exception",
+    /// but `TypeError` is not:
+    ///
+    /// ```py
+    /// try:
+    ///     try:
+    ///         foo()
+    ///     except TypeError:
+    ///         pass
+    /// except AttributeError:
+    ///     pass
+    /// ```
     pub handled_exceptions: Vec<Exceptions>,
 
     /// Map from [`ast::ExprName`] node (represented as a [`NameId`]) to the [`Binding`] to which
@@ -782,7 +795,7 @@ impl<'a> SemanticModel<'a> {
                 let resolved: QualifiedName = qualified_name
                     .segments()
                     .iter()
-                    .chain(tail.iter())
+                    .chain(tail)
                     .copied()
                     .collect();
                 Some(resolved)
@@ -796,7 +809,7 @@ impl<'a> SemanticModel<'a> {
                         .segments()
                         .iter()
                         .take(1)
-                        .chain(tail.iter())
+                        .chain(tail)
                         .copied()
                         .collect(),
                 )
@@ -819,7 +832,7 @@ impl<'a> SemanticModel<'a> {
                     qualified_name
                         .segments()
                         .iter()
-                        .chain(tail.iter())
+                        .chain(tail)
                         .copied()
                         .collect()
                 };
@@ -893,7 +906,7 @@ impl<'a> SemanticModel<'a> {
         self.current_scopes()
             .enumerate()
             .find_map(|(scope_index, scope)| {
-                scope.bindings().find_map(|(name, binding_id)| {
+                let mut imported_names = scope.bindings().filter_map(|(name, binding_id)| {
                     let binding = &self.bindings[binding_id];
                     match &binding.kind {
                         // Ex) Given `module="sys"` and `object="exit"`:
@@ -936,7 +949,7 @@ impl<'a> SemanticModel<'a> {
                                             .all(|scope| !scope.has(name))
                                         {
                                             return Some(ImportedName {
-                                                name: (*name).to_string(),
+                                                name: name.to_string(),
                                                 source,
                                                 range: self.nodes[source].range(),
                                                 context: binding.context,
@@ -973,7 +986,22 @@ impl<'a> SemanticModel<'a> {
                         _ => {}
                     }
                     None
-                })
+                });
+
+                let first = imported_names.next()?;
+                if let Some(second) = imported_names.next() {
+                    // Multiple candidates. We need to sort them because `scope.bindings()` is a HashMap
+                    // which doesn't have a stable iteration order.
+
+                    let mut imports: Vec<_> =
+                        [first, second].into_iter().chain(imported_names).collect();
+                    imports.sort_unstable_by_key(|import| import.range.start());
+
+                    // Return the binding that was imported last.
+                    imports.pop()
+                } else {
+                    Some(first)
+                }
             })
     }
 
@@ -1058,7 +1086,7 @@ impl<'a> SemanticModel<'a> {
         let id = self.node_id.expect("No current node");
         self.nodes
             .ancestor_ids(id)
-            .filter_map(move |id| self.nodes[id].as_expression())
+            .map_while(move |id| self.nodes[id].as_expression())
     }
 
     /// Return the current [`Expr`].
@@ -1170,18 +1198,16 @@ impl<'a> SemanticModel<'a> {
     /// Given a [`NodeId`], return its parent, if any.
     #[inline]
     pub fn parent_expression(&self, node_id: NodeId) -> Option<&'a Expr> {
-        self.nodes
-            .ancestor_ids(node_id)
-            .filter_map(|id| self.nodes[id].as_expression())
-            .nth(1)
+        let parent_node_id = self.nodes.ancestor_ids(node_id).nth(1)?;
+        self.nodes[parent_node_id].as_expression()
     }
 
     /// Given a [`NodeId`], return the [`NodeId`] of the parent expression, if any.
     pub fn parent_expression_id(&self, node_id: NodeId) -> Option<NodeId> {
-        self.nodes
-            .ancestor_ids(node_id)
-            .filter(|id| self.nodes[*id].is_expression())
-            .nth(1)
+        let parent_node_id = self.nodes.ancestor_ids(node_id).nth(1)?;
+        self.nodes[parent_node_id]
+            .is_expression()
+            .then_some(parent_node_id)
     }
 
     /// Return the [`Stmt`] corresponding to the given [`NodeId`].
@@ -1191,6 +1217,14 @@ impl<'a> SemanticModel<'a> {
             .ancestor_ids(node_id)
             .find_map(|id| self.nodes[id].as_statement())
             .expect("No statement found")
+    }
+
+    /// Returns an [`Iterator`] over the statements, starting from the given [`NodeId`].
+    /// through to any parents.
+    pub fn statements(&self, node_id: NodeId) -> impl Iterator<Item = &'a Stmt> + '_ {
+        self.nodes
+            .ancestor_ids(node_id)
+            .filter_map(move |id| self.nodes[id].as_statement())
     }
 
     /// Given a [`Stmt`], return its parent, if any.
@@ -1213,9 +1247,7 @@ impl<'a> SemanticModel<'a> {
     /// Return the [`Expr`] corresponding to the given [`NodeId`].
     #[inline]
     pub fn expression(&self, node_id: NodeId) -> Option<&'a Expr> {
-        self.nodes
-            .ancestor_ids(node_id)
-            .find_map(|id| self.nodes[id].as_expression())
+        self.nodes[node_id].as_expression()
     }
 
     /// Returns an [`Iterator`] over the expressions, starting from the given [`NodeId`].
@@ -1223,7 +1255,7 @@ impl<'a> SemanticModel<'a> {
     pub fn expressions(&self, node_id: NodeId) -> impl Iterator<Item = &'a Expr> + '_ {
         self.nodes
             .ancestor_ids(node_id)
-            .filter_map(move |id| self.nodes[id].as_expression())
+            .map_while(move |id| self.nodes[id].as_expression())
     }
 
     /// Mark a Python module as "seen" by the semantic model. Future callers can quickly discount
@@ -1231,11 +1263,14 @@ impl<'a> SemanticModel<'a> {
     pub fn add_module(&mut self, module: &str) {
         match module {
             "_typeshed" => self.seen.insert(Modules::TYPESHED),
+            "anyio" => self.seen.insert(Modules::ANYIO),
             "builtins" => self.seen.insert(Modules::BUILTINS),
             "collections" => self.seen.insert(Modules::COLLECTIONS),
+            "contextvars" => self.seen.insert(Modules::CONTEXTVARS),
             "dataclasses" => self.seen.insert(Modules::DATACLASSES),
             "datetime" => self.seen.insert(Modules::DATETIME),
             "django" => self.seen.insert(Modules::DJANGO),
+            "fastapi" => self.seen.insert(Modules::FASTAPI),
             "logging" => self.seen.insert(Modules::LOGGING),
             "mock" => self.seen.insert(Modules::MOCK),
             "numpy" => self.seen.insert(Modules::NUMPY),
@@ -1407,9 +1442,7 @@ impl<'a> SemanticModel<'a> {
     /// variable to be "used" if it's shadowed by another variable with usages.
     pub fn is_unused(&self, expr: &Expr) -> bool {
         match expr {
-            Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                elts.iter().all(|expr| self.is_unused(expr))
-            }
+            Expr::Tuple(tuple) => tuple.iter().all(|expr| self.is_unused(expr)),
             Expr::Name(ast::ExprName { id, .. }) => {
                 // Treat a variable as used if it has any usages, _or_ it's shadowed by another variable
                 // with usages.
@@ -1430,7 +1463,7 @@ impl<'a> SemanticModel<'a> {
                     .get_all(id)
                     .map(|binding_id| self.binding(binding_id))
                     .filter(|binding| binding.start() >= expr.start())
-                    .all(|binding| !binding.is_used())
+                    .all(Binding::is_unused)
             }
             _ => false,
         }
@@ -1820,6 +1853,9 @@ bitflags! {
         const TYPESHED = 1 << 16;
         const DATACLASSES = 1 << 17;
         const BUILTINS = 1 << 18;
+        const CONTEXTVARS = 1 << 19;
+        const ANYIO = 1 << 20;
+        const FASTAPI = 1 << 21;
     }
 }
 
@@ -2054,7 +2090,7 @@ bitflags! {
         /// `__future__`-style type annotations are enabled in this model.
         /// That could be because it's a stub file,
         /// or it could be because it's a non-stub file that has `from __future__ import annotations`
-        /// a the top of the module.
+        /// at the top of the module.
         const FUTURE_ANNOTATIONS_OR_STUB = Self::FUTURE_ANNOTATIONS.bits() | Self::STUB_FILE.bits();
 
         /// The model has traversed past the module docstring.
@@ -2209,7 +2245,7 @@ bitflags! {
 
 impl SemanticModelFlags {
     pub fn new(path: &Path) -> Self {
-        if is_python_stub_file(path) {
+        if PySourceType::from(path).is_stub() {
             Self::STUB_FILE
         } else {
             Self::default()

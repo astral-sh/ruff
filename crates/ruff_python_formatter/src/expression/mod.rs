@@ -19,7 +19,10 @@ use crate::expression::parentheses::{
     OptionalParentheses, Parentheses, Parenthesize,
 };
 use crate::prelude::*;
-use crate::preview::is_hug_parens_with_braces_and_square_brackets_enabled;
+use crate::preview::{
+    is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled,
+    is_hug_parens_with_braces_and_square_brackets_enabled,
+};
 
 mod binary_like;
 pub(crate) mod expr_attribute;
@@ -324,7 +327,7 @@ fn format_with_parentheses_comments(
     )
 }
 
-/// Wraps an expression in an optional parentheses except if its [`NeedsParentheses::needs_parentheses`] implementation
+/// Wraps an expression in optional parentheses except if its [`NeedsParentheses::needs_parentheses`] implementation
 /// indicates that it is okay to omit the parentheses. For example, parentheses can always be omitted for lists,
 /// because they already bring their own parentheses.
 pub(crate) fn maybe_parenthesize_expression<'a, T>(
@@ -382,23 +385,38 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
             OptionalParentheses::Always => OptionalParentheses::Always,
             // The reason to add parentheses is to avoid a syntax error when breaking an expression over multiple lines.
             // Therefore, it is unnecessary to add an additional pair of parentheses if an outer expression
-            // is parenthesized.
-            _ if f.context().node_level().is_parenthesized() => OptionalParentheses::Never,
+            // is parenthesized. Unless, it's the `Parenthesize::IfBreaksParenthesizedNested` layout
+            // where parenthesizing nested `maybe_parenthesized_expression` is explicitly desired.
+            _ if f.context().node_level().is_parenthesized() => {
+                if !is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled(
+                    f.context(),
+                ) {
+                    OptionalParentheses::Never
+                } else if matches!(parenthesize, Parenthesize::IfBreaksParenthesizedNested) {
+                    return parenthesize_if_expands(
+                        &expression.format().with_options(Parentheses::Never),
+                    )
+                    .with_indent(!is_expression_huggable(expression, f.context()))
+                    .fmt(f);
+                } else {
+                    return expression.format().with_options(Parentheses::Never).fmt(f);
+                }
+            }
             needs_parentheses => needs_parentheses,
         };
 
         match needs_parentheses {
             OptionalParentheses::Multiline => match parenthesize {
-                Parenthesize::IfBreaksOrIfRequired => {
+
+                Parenthesize::IfBreaksParenthesized | Parenthesize::IfBreaksParenthesizedNested if !is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled(f.context()) => {
                     parenthesize_if_expands(&expression.format().with_options(Parentheses::Never))
                         .fmt(f)
                 }
-
                 Parenthesize::IfRequired => {
                     expression.format().with_options(Parentheses::Never).fmt(f)
                 }
 
-                Parenthesize::Optional | Parenthesize::IfBreaks => {
+                Parenthesize::Optional | Parenthesize::IfBreaks | Parenthesize::IfBreaksParenthesized | Parenthesize::IfBreaksParenthesizedNested => {
                     if can_omit_optional_parentheses(expression, f.context()) {
                         optional_parentheses(&expression.format().with_options(Parentheses::Never))
                             .fmt(f)
@@ -411,7 +429,7 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                 }
             },
             OptionalParentheses::BestFit => match parenthesize {
-                Parenthesize::IfBreaksOrIfRequired => {
+                Parenthesize::IfBreaksParenthesized | Parenthesize::IfBreaksParenthesizedNested => {
                     parenthesize_if_expands(&expression.format().with_options(Parentheses::Never))
                         .fmt(f)
                 }
@@ -435,13 +453,13 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                 }
             },
             OptionalParentheses::Never => match parenthesize {
-                Parenthesize::IfBreaksOrIfRequired => {
+                Parenthesize::IfBreaksParenthesized |  Parenthesize::IfBreaksParenthesizedNested if !is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled(f.context()) => {
                     parenthesize_if_expands(&expression.format().with_options(Parentheses::Never))
                         .with_indent(!is_expression_huggable(expression, f.context()))
                         .fmt(f)
                 }
 
-                Parenthesize::Optional | Parenthesize::IfBreaks | Parenthesize::IfRequired => {
+                Parenthesize::Optional | Parenthesize::IfBreaks | Parenthesize::IfRequired | Parenthesize::IfBreaksParenthesized |  Parenthesize::IfBreaksParenthesizedNested => {
                     expression.format().with_options(Parentheses::Never).fmt(f)
                 }
             },
@@ -1052,7 +1070,7 @@ pub(crate) fn has_own_parentheses(
                 ..
             },
         ) => {
-            if !tuple.elts.is_empty() || context.comments().has_dangling(AnyNodeRef::from(expr)) {
+            if !tuple.is_empty() || context.comments().has_dangling(AnyNodeRef::from(expr)) {
                 Some(OwnParentheses::NonEmpty)
             } else {
                 Some(OwnParentheses::Empty)
@@ -1216,10 +1234,10 @@ pub(crate) fn is_splittable_expression(expr: &Expr, context: &PyFormatContext) -
         | Expr::YieldFrom(_) => true,
 
         // Sequence types can split if they contain at least one element.
-        Expr::Tuple(tuple) => !tuple.elts.is_empty(),
-        Expr::Dict(dict) => !dict.items.is_empty(),
-        Expr::Set(set) => !set.elts.is_empty(),
-        Expr::List(list) => !list.elts.is_empty(),
+        Expr::Tuple(tuple) => !tuple.is_empty(),
+        Expr::Dict(dict) => !dict.is_empty(),
+        Expr::Set(set) => !set.is_empty(),
+        Expr::List(list) => !list.is_empty(),
 
         Expr::UnaryOp(unary) => is_splittable_expression(unary.operand.as_ref(), context),
         Expr::Yield(ast::ExprYield { value, .. }) => value.is_some(),

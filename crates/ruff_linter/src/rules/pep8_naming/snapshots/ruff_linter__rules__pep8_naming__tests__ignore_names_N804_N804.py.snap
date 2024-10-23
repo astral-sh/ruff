@@ -20,6 +20,25 @@ N804.py:5:27: N804 [*] First argument of a class method should be named `cls`
 7 7 | 
 8 8 |     @classmethod
 
+N804.py:9:20: N804 [*] First argument of a class method should be named `cls`
+   |
+ 8 |     @classmethod
+ 9 |     def badAllowed(self, x, /, other):
+   |                    ^^^^ N804
+10 |         ...
+   |
+   = help: Rename `self` to `cls`
+
+ℹ Unsafe fix
+6  6  |         ...
+7  7  | 
+8  8  |     @classmethod
+9     |-    def badAllowed(self, x, /, other):
+   9  |+    def badAllowed(cls, x, /, other):
+10 10 |         ...
+11 11 | 
+12 12 |     @classmethod
+
 N804.py:13:18: N804 [*] First argument of a class method should be named `cls`
    |
 12 |     @classmethod
@@ -38,6 +57,25 @@ N804.py:13:18: N804 [*] First argument of a class method should be named `cls`
 14 14 |         ...
 15 15 | 
 16 16 | 
+
+N804.py:18:20: N804 [*] First argument of a class method should be named `cls`
+   |
+17 | class MetaClass(ABCMeta):
+18 |     def badAllowed(self):
+   |                    ^^^^ N804
+19 |         pass
+   |
+   = help: Rename `self` to `cls`
+
+ℹ Unsafe fix
+15 15 | 
+16 16 | 
+17 17 | class MetaClass(ABCMeta):
+18    |-    def badAllowed(self):
+   18 |+    def badAllowed(cls):
+19 19 |         pass
+20 20 | 
+21 21 |     def stillBad(self):
 
 N804.py:21:18: N804 [*] First argument of a class method should be named `cls`
    |

@@ -12,3 +12,10 @@ except (*retriable_exceptions,):
     pass
 except(ValueError,):
     pass
+
+list_exceptions = [FileExistsError, FileNotFoundError]
+
+try:
+    pass
+except (*list_exceptions,):
+    pass

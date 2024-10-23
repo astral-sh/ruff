@@ -26,6 +26,11 @@ use super::super::helpers::at_last_top_level_expression_in_cell;
 /// foo = 1 + 1
 /// ```
 ///
+/// ## Notebook behavior
+/// For Jupyter Notebooks, this rule is not applied to the last top-level expression in a cell.
+/// This is because it's common to have a notebook cell that ends with an expression,
+/// which will result in the `repr` of the evaluated expression being printed as the cell's output.
+///
 /// ## Known problems
 /// This rule ignores expression types that are commonly used for their side
 /// effects, such as function calls.
@@ -81,9 +86,6 @@ pub(crate) fn useless_expression(checker: &mut Checker, value: &Expr) {
         return;
     }
 
-    // For Jupyter Notebooks, ignore the last top-level expression for each cell.
-    // This is because it's common to have a cell that ends with an expression
-    // to display it's value.
     if checker.source_type.is_ipynb()
         && at_last_top_level_expression_in_cell(
             checker.semantic(),

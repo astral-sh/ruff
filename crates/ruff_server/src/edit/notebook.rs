@@ -1,8 +1,7 @@
-use std::{collections::HashMap, hash::BuildHasherDefault};
-
 use anyhow::Ok;
-use lsp_types::{NotebookCellKind, Url};
-use rustc_hash::FxHashMap;
+use lsp_types::NotebookCellKind;
+use ruff_notebook::CellMetadata;
+use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use crate::{PositionEncoding, TextDocument};
 
@@ -13,7 +12,7 @@ pub(super) type CellId = usize;
 /// The state of a notebook document in the server. Contains an array of cells whose
 /// contents are internally represented by [`TextDocument`]s.
 #[derive(Clone, Debug)]
-pub(crate) struct NotebookDocument {
+pub struct NotebookDocument {
     cells: Vec<NotebookCell>,
     metadata: ruff_notebook::RawNotebookMetadata,
     version: DocumentVersion,
@@ -24,13 +23,13 @@ pub(crate) struct NotebookDocument {
 /// A single cell within a notebook, which has text contents represented as a `TextDocument`.
 #[derive(Clone, Debug)]
 struct NotebookCell {
-    url: Url,
+    url: lsp_types::Url,
     kind: NotebookCellKind,
     document: TextDocument,
 }
 
 impl NotebookDocument {
-    pub(crate) fn new(
+    pub fn new(
         version: DocumentVersion,
         cells: Vec<lsp_types::NotebookCell>,
         metadata: serde_json::Map<String, serde_json::Value>,
@@ -59,7 +58,7 @@ impl NotebookDocument {
 
     /// Generates a pseudo-representation of a notebook that lacks per-cell metadata and contextual information
     /// but should still work with Ruff's linter.
-    pub(crate) fn make_ruff_notebook(&self) -> ruff_notebook::Notebook {
+    pub fn make_ruff_notebook(&self) -> ruff_notebook::Notebook {
         let cells = self
             .cells
             .iter()
@@ -67,7 +66,7 @@ impl NotebookDocument {
                 NotebookCellKind::Code => ruff_notebook::Cell::Code(ruff_notebook::CodeCell {
                     execution_count: None,
                     id: None,
-                    metadata: serde_json::Value::Null,
+                    metadata: CellMetadata::default(),
                     outputs: vec![],
                     source: ruff_notebook::SourceValue::String(
                         cell.document.contents().to_string(),
@@ -77,7 +76,7 @@ impl NotebookDocument {
                     ruff_notebook::Cell::Markdown(ruff_notebook::MarkdownCell {
                         attachments: None,
                         id: None,
-                        metadata: serde_json::Value::Null,
+                        metadata: CellMetadata::default(),
                         source: ruff_notebook::SourceValue::String(
                             cell.document.contents().to_string(),
                         ),
@@ -111,24 +110,66 @@ impl NotebookDocument {
             text_content,
         }) = cells
         {
+            // The structural changes should be done first, as they may affect the cell index.
             if let Some(structure) = structure {
                 let start = structure.array.start as usize;
                 let delete = structure.array.delete_count as usize;
+
+                // This is required because of the way the `NotebookCell` is modelled. We include
+                // the `TextDocument` within the `NotebookCell` so when it's deleted, the
+                // corresponding `TextDocument` is removed as well. But, when cells are
+                // re-oredered, the change request doesn't provide the actual contents of the cell.
+                // Instead, it only provides that (a) these cell URIs were removed, and (b) these
+                // cell URIs were added.
+                // https://github.com/astral-sh/ruff/issues/12573
+                let mut deleted_cells = FxHashMap::default();
+
+                // First, delete the cells and remove them from the index.
                 if delete > 0 {
                     for cell in self.cells.drain(start..start + delete) {
                         self.cell_index.remove(&cell.url);
+                        deleted_cells.insert(cell.url, cell.document);
                     }
                 }
+
+                // Second, insert the new cells with the available information. This array does not
+                // provide the actual contents of the cells, so we'll initialize them with empty
+                // contents.
                 for cell in structure.array.cells.into_iter().flatten().rev() {
-                    self.cells
-                        .insert(start, NotebookCell::new(cell, String::new(), version));
+                    if let Some(text_document) = deleted_cells.remove(&cell.document) {
+                        let version = text_document.version();
+                        self.cells.push(NotebookCell::new(
+                            cell,
+                            text_document.into_contents(),
+                            version,
+                        ));
+                    } else {
+                        self.cells
+                            .insert(start, NotebookCell::new(cell, String::new(), 0));
+                    }
                 }
 
-                // register any new cells in the index and update existing ones that came after the insertion
-                for (i, cell) in self.cells.iter().enumerate().skip(start) {
-                    self.cell_index.insert(cell.url.clone(), i);
+                // Third, register the new cells in the index and update existing ones that came
+                // after the insertion.
+                for (index, cell) in self.cells.iter().enumerate().skip(start) {
+                    self.cell_index.insert(cell.url.clone(), index);
+                }
+
+                // Finally, update the text document that represents the cell with the actual
+                // contents. This should be done at the end so that both the `cells` and
+                // `cell_index` are updated before we start applying the changes to the cells.
+                if let Some(did_open) = structure.did_open {
+                    for cell_text_document in did_open {
+                        if let Some(cell) = self.cell_by_uri_mut(&cell_text_document.uri) {
+                            cell.document = TextDocument::new(
+                                cell_text_document.text,
+                                cell_text_document.version,
+                            );
+                        }
+                    }
                 }
             }
+
             if let Some(cell_data) = data {
                 for cell in cell_data {
                     if let Some(existing_cell) = self.cell_by_uri_mut(&cell.document) {
@@ -136,6 +177,7 @@ impl NotebookDocument {
                     }
                 }
             }
+
             if let Some(content_changes) = text_content {
                 for content_change in content_changes {
                     if let Some(cell) = self.cell_by_uri_mut(&content_change.document.uri) {
@@ -145,9 +187,11 @@ impl NotebookDocument {
                 }
             }
         }
+
         if let Some(metadata_change) = metadata_change {
             self.metadata = serde_json::from_value(serde_json::Value::Object(metadata_change))?;
         }
+
         Ok(())
     }
 
@@ -178,8 +222,7 @@ impl NotebookDocument {
     }
 
     fn make_cell_index(cells: &[NotebookCell]) -> FxHashMap<lsp_types::Url, CellId> {
-        let mut index =
-            HashMap::with_capacity_and_hasher(cells.len(), BuildHasherDefault::default());
+        let mut index = FxHashMap::with_capacity_and_hasher(cells.len(), FxBuildHasher);
         for (i, cell) in cells.iter().enumerate() {
             index.insert(cell.url.clone(), i);
         }

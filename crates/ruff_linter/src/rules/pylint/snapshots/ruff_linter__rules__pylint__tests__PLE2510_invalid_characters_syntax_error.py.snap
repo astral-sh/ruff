@@ -1,0 +1,110 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+invalid_characters_syntax_error.py:5:6: PLE2510 Invalid unescaped character backspace, use "\b" instead
+  |
+4 | # Before any syntax error
+5 | b = '␈'
+  |      ^ PLE2510
+6 | # Unterminated string
+7 | b = '␈
+  |
+  = help: Replace with escape sequence
+
+invalid_characters_syntax_error.py:7:5: SyntaxError: missing closing quote in string literal
+  |
+5 | b = '␈'
+6 | # Unterminated string
+7 | b = '␈
+  |     ^
+8 | b = '␈'
+9 | # Unterminated f-string
+  |
+
+invalid_characters_syntax_error.py:7:7: SyntaxError: Expected a statement
+   |
+ 5 | b = '␈'
+ 6 | # Unterminated string
+ 7 | b = '␈
+   |       ^
+ 8 | b = '␈'
+ 9 | # Unterminated f-string
+10 | b = f'␈
+   |
+
+invalid_characters_syntax_error.py:8:6: PLE2510 Invalid unescaped character backspace, use "\b" instead
+   |
+ 6 | # Unterminated string
+ 7 | b = '␈
+ 8 | b = '␈'
+   |      ^ PLE2510
+ 9 | # Unterminated f-string
+10 | b = f'␈
+   |
+   = help: Replace with escape sequence
+
+invalid_characters_syntax_error.py:10:7: SyntaxError: f-string: unterminated string
+   |
+ 8 | b = '␈'
+ 9 | # Unterminated f-string
+10 | b = f'␈
+   |       ^
+11 | b = f'␈'
+12 | # Implicitly concatenated
+   |
+
+invalid_characters_syntax_error.py:10:8: SyntaxError: Expected FStringEnd, found newline
+   |
+ 8 | b = '␈'
+ 9 | # Unterminated f-string
+10 | b = f'␈
+   |        ^
+11 | b = f'␈'
+12 | # Implicitly concatenated
+13 | b = '␈' f'␈' '␈
+   |
+
+invalid_characters_syntax_error.py:11:7: PLE2510 Invalid unescaped character backspace, use "\b" instead
+   |
+ 9 | # Unterminated f-string
+10 | b = f'␈
+11 | b = f'␈'
+   |       ^ PLE2510
+12 | # Implicitly concatenated
+13 | b = '␈' f'␈' '␈
+   |
+   = help: Replace with escape sequence
+
+invalid_characters_syntax_error.py:13:6: PLE2510 Invalid unescaped character backspace, use "\b" instead
+   |
+11 | b = f'␈'
+12 | # Implicitly concatenated
+13 | b = '␈' f'␈' '␈
+   |      ^ PLE2510
+   |
+   = help: Replace with escape sequence
+
+invalid_characters_syntax_error.py:13:11: PLE2510 Invalid unescaped character backspace, use "\b" instead
+   |
+11 | b = f'␈'
+12 | # Implicitly concatenated
+13 | b = '␈' f'␈' '␈
+   |           ^ PLE2510
+   |
+   = help: Replace with escape sequence
+
+invalid_characters_syntax_error.py:13:14: SyntaxError: missing closing quote in string literal
+   |
+11 | b = f'␈'
+12 | # Implicitly concatenated
+13 | b = '␈' f'␈' '␈
+   |              ^
+   |
+
+invalid_characters_syntax_error.py:13:16: SyntaxError: Expected a statement
+   |
+11 | b = f'␈'
+12 | # Implicitly concatenated
+13 | b = '␈' f'␈' '␈
+   |                ^
+   |

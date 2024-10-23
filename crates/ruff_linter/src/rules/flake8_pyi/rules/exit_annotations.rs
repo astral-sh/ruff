@@ -23,21 +23,20 @@ use crate::checkers::ast::Checker;
 /// unexpected behavior when interacting with type checkers.
 ///
 /// ## Example
-/// ```python
-/// from types import TracebackType
 ///
+/// ```pyi
+/// from types import TracebackType
 ///
 /// class Foo:
 ///     def __exit__(
 ///         self, typ: BaseException, exc: BaseException, tb: TracebackType
-///     ) -> None:
-///         ...
+///     ) -> None: ...
 /// ```
 ///
 /// Use instead:
-/// ```python
-/// from types import TracebackType
 ///
+/// ```pyi
+/// from types import TracebackType
 ///
 /// class Foo:
 ///     def __exit__(
@@ -45,8 +44,7 @@ use crate::checkers::ast::Checker;
 ///         typ: type[BaseException] | None,
 ///         exc: BaseException | None,
 ///         tb: TracebackType | None,
-///     ) -> None:
-///         ...
+///     ) -> None: ...
 /// ```
 #[violation]
 pub struct BadExitAnnotation {
@@ -142,7 +140,7 @@ pub(crate) fn bad_exit_annotation(checker: &mut Checker, function: &StmtFunction
     let non_self_positional_args: SmallVec<[&ParameterWithDefault; 3]> = parameters
         .posonlyargs
         .iter()
-        .chain(parameters.args.iter())
+        .chain(&parameters.args)
         .skip(1)
         .collect();
 

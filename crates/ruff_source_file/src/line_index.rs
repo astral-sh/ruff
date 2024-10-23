@@ -14,11 +14,12 @@ use crate::SourceLocation;
 /// Index for fast [byte offset](TextSize) to [`SourceLocation`] conversions.
 ///
 /// Cloning a [`LineIndex`] is cheap because it only requires bumping a reference count.
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct LineIndex {
     inner: Arc<LineIndexInner>,
 }
 
+#[derive(Eq, PartialEq)]
 struct LineIndexInner {
     line_starts: Vec<TextSize>,
     kind: IndexKind,
@@ -221,6 +222,57 @@ impl LineIndex {
     }
 
     /// Returns the [byte offset](TextSize) at `line` and `column`.
+    ///
+    /// ## Examples
+    ///
+    /// ### ASCII
+    ///
+    /// ```
+    /// use ruff_source_file::{LineIndex, OneIndexed};
+    /// use ruff_text_size::TextSize;
+    /// let source = r#"a = 4
+    /// c = "some string"
+    /// x = b"#;
+    ///
+    /// let index = LineIndex::from_source_text(source);
+    ///
+    /// // First line, first column
+    /// assert_eq!(index.offset(OneIndexed::from_zero_indexed(0), OneIndexed::from_zero_indexed(0), source), TextSize::new(0));
+    ///
+    /// // Second line, 4th column
+    /// assert_eq!(index.offset(OneIndexed::from_zero_indexed(1), OneIndexed::from_zero_indexed(4), source), TextSize::new(10));
+    ///
+    /// // Offset past the end of the first line
+    /// assert_eq!(index.offset(OneIndexed::from_zero_indexed(0), OneIndexed::from_zero_indexed(10), source), TextSize::new(6));
+    ///
+    /// // Offset past the end of the file
+    /// assert_eq!(index.offset(OneIndexed::from_zero_indexed(3), OneIndexed::from_zero_indexed(0), source), TextSize::new(29));
+    /// ```
+    ///
+    /// ### UTF8
+    ///
+    /// ```
+    /// use ruff_source_file::{LineIndex, OneIndexed};
+    /// use ruff_text_size::TextSize;
+    /// let source = r#"a = 4
+    /// c = "❤️"
+    /// x = b"#;
+    ///
+    /// let index = LineIndex::from_source_text(source);
+    ///
+    /// // First line, first column
+    /// assert_eq!(index.offset(OneIndexed::from_zero_indexed(0), OneIndexed::from_zero_indexed(0), source), TextSize::new(0));
+    ///
+    /// // Third line, 2nd column, after emoji
+    /// assert_eq!(index.offset(OneIndexed::from_zero_indexed(2), OneIndexed::from_zero_indexed(1), source), TextSize::new(20));
+    ///
+    /// // Offset past the end of the second line
+    /// assert_eq!(index.offset(OneIndexed::from_zero_indexed(1), OneIndexed::from_zero_indexed(10), source), TextSize::new(19));
+    ///
+    /// // Offset past the end of the file
+    /// assert_eq!(index.offset(OneIndexed::from_zero_indexed(3), OneIndexed::from_zero_indexed(0), source), TextSize::new(24));
+    /// ```
+    ///
     pub fn offset(&self, line: OneIndexed, column: OneIndexed, contents: &str) -> TextSize {
         // If start-of-line position after last line
         if line.to_zero_indexed() > self.line_starts().len() {
@@ -232,7 +284,7 @@ impl LineIndex {
         match self.kind() {
             IndexKind::Ascii => {
                 line_range.start()
-                    + TextSize::try_from(column.get())
+                    + TextSize::try_from(column.to_zero_indexed())
                         .unwrap_or(line_range.len())
                         .clamp(TextSize::new(0), line_range.len())
             }
@@ -240,7 +292,7 @@ impl LineIndex {
                 let rest = &contents[line_range];
                 let column_offset: TextSize = rest
                     .chars()
-                    .take(column.get())
+                    .take(column.to_zero_indexed())
                     .map(ruff_text_size::TextLen::text_len)
                     .sum();
                 line_range.start() + column_offset
@@ -268,7 +320,7 @@ impl Debug for LineIndex {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 enum IndexKind {
     /// Optimized index for an ASCII only document
     Ascii,
@@ -341,6 +393,18 @@ impl OneIndexed {
             Some(value) => Self(value),
             None => Self::MIN,
         }
+    }
+
+    /// Checked addition. Returns `None` if overflow occurred.
+    #[must_use]
+    pub fn checked_add(self, rhs: Self) -> Option<Self> {
+        self.0.checked_add(rhs.0.get()).map(Self)
+    }
+
+    /// Checked subtraction. Returns `None` if overflow occurred.
+    #[must_use]
+    pub fn checked_sub(self, rhs: Self) -> Option<Self> {
+        self.0.get().checked_sub(rhs.get()).and_then(Self::new)
     }
 }
 

@@ -1,11 +1,10 @@
-use std::hash::BuildHasherDefault;
-
 use anyhow::{anyhow, bail, Result};
+use ruff_python_ast::name::Name;
 use ruff_python_ast::{
     self as ast, Arguments, CmpOp, Expr, ExprContext, Identifier, Keyword, Stmt, UnaryOp,
 };
 use ruff_text_size::TextRange;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxBuildHasher, FxHashMap};
 
 /// An enum to represent the different types of assertions present in the
 /// `unittest` module. Note: any variants that can't be replaced with plain
@@ -249,13 +248,11 @@ impl UnittestAssert {
         }
 
         // Generate a map from argument name to value.
-        let mut args_map: FxHashMap<&str, &Expr> = FxHashMap::with_capacity_and_hasher(
-            args.len() + keywords.len(),
-            BuildHasherDefault::default(),
-        );
+        let mut args_map: FxHashMap<&str, &Expr> =
+            FxHashMap::with_capacity_and_hasher(args.len() + keywords.len(), FxBuildHasher);
 
         // Process positional arguments.
-        for (arg_name, value) in arg_spec.iter().zip(args.iter()) {
+        for (arg_name, value) in arg_spec.iter().zip(args) {
             args_map.insert(arg_name, value);
         }
 
@@ -383,7 +380,7 @@ impl UnittestAssert {
                     .ok_or_else(|| anyhow!("Missing argument `cls`"))?;
                 let msg = args.get("msg").copied();
                 let node = ast::ExprName {
-                    id: "isinstance".into(),
+                    id: Name::new_static("isinstance"),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
                 };
@@ -421,7 +418,7 @@ impl UnittestAssert {
                     .ok_or_else(|| anyhow!("Missing argument `regex`"))?;
                 let msg = args.get("msg").copied();
                 let node = ast::ExprName {
-                    id: "re".into(),
+                    id: Name::new_static("re"),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
                 };

@@ -1,0 +1,64 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E204.py:14:2: E204 [*] Whitespace after decorator
+   |
+13 | # E204
+14 | @ foo
+   |  ^ E204
+15 | def baz():
+16 |     print('baz')
+   |
+   = help: Remove whitespace
+
+ℹ Safe fix
+11 11 |     print('bar')
+12 12 | 
+13 13 | # E204
+14    |-@ foo
+   14 |+@foo
+15 15 | def baz():
+16 16 |     print('baz')
+17 17 | 
+
+E204.py:25:6: E204 [*] Whitespace after decorator
+   |
+24 |     # E204
+25 |     @ foo
+   |      ^ E204
+26 |     def baz(self):
+27 |         print('baz')
+   |
+   = help: Remove whitespace
+
+ℹ Safe fix
+22 22 |         print('bar')
+23 23 | 
+24 24 |     # E204
+25    |-    @ foo
+   25 |+    @foo
+26 26 |     def baz(self):
+27 27 |         print('baz')
+28 28 | 
+
+E204.py:31:2: E204 [*] Whitespace after decorator
+   |
+30 |   # E204
+31 |   @ \
+   |  __^
+32 | | foo
+   | |_^ E204
+33 |   def baz():
+34 |       print('baz')
+   |
+   = help: Remove whitespace
+
+ℹ Safe fix
+28 28 | 
+29 29 | 
+30 30 | # E204
+31    |-@ \
+32    |-foo
+   31 |+@foo
+33 32 | def baz():
+34 33 |     print('baz')

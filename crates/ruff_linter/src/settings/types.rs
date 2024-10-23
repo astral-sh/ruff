@@ -7,7 +7,8 @@ use std::string::ToString;
 
 use anyhow::{bail, Result};
 use globset::{Glob, GlobMatcher, GlobSet, GlobSetBuilder};
-use pep440_rs::{Version as Pep440Version, VersionSpecifier, VersionSpecifiers};
+use log::debug;
+use pep440_rs::{Operator, Version as Pep440Version, Version, VersionSpecifier, VersionSpecifiers};
 use rustc_hash::FxHashMap;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use strum::IntoEnumIterator;
@@ -57,7 +58,7 @@ pub enum PythonVersion {
 impl From<PythonVersion> for Pep440Version {
     fn from(version: PythonVersion) -> Self {
         let (major, minor) = version.as_tuple();
-        Self::from_str(&format!("{major}.{minor}.100")).unwrap()
+        Self::new([u64::from(major), u64::from(minor)])
     }
 }
 
@@ -87,18 +88,36 @@ impl PythonVersion {
         self.as_tuple().1
     }
 
+    /// Infer the minimum supported [`PythonVersion`] from a `requires-python` specifier.
     pub fn get_minimum_supported_version(requires_version: &VersionSpecifiers) -> Option<Self> {
-        let mut minimum_version = None;
-        for python_version in PythonVersion::iter() {
-            if requires_version
-                .iter()
-                .all(|specifier| specifier.contains(&python_version.into()))
-            {
-                minimum_version = Some(python_version);
-                break;
-            }
+        /// Truncate a version to its major and minor components.
+        fn major_minor(version: &Version) -> Option<Version> {
+            let major = version.release().first()?;
+            let minor = version.release().get(1)?;
+            Some(Version::new([major, minor]))
         }
-        minimum_version
+
+        // Extract the minimum supported version from the specifiers.
+        let minimum_version = requires_version
+            .iter()
+            .filter(|specifier| {
+                matches!(
+                    specifier.operator(),
+                    Operator::Equal
+                        | Operator::EqualStar
+                        | Operator::ExactEqual
+                        | Operator::TildeEqual
+                        | Operator::GreaterThan
+                        | Operator::GreaterThanEqual
+                )
+            })
+            .filter_map(|specifier| major_minor(specifier.version()))
+            .min()?;
+
+        debug!("Detected minimum supported `requires-python` version: {minimum_version}");
+
+        // Find the Python version that matches the minimum supported version.
+        PythonVersion::iter().find(|version| Version::from(*version) == minimum_version)
     }
 
     /// Return `true` if the current version supports [PEP 701].
@@ -457,56 +476,41 @@ impl From<ExtensionPair> for (String, Language) {
         (value.extension, value.language)
     }
 }
+
 #[derive(Debug, Clone, Default, CacheKey)]
-pub struct ExtensionMapping {
-    mapping: FxHashMap<String, Language>,
-}
+pub struct ExtensionMapping(FxHashMap<String, Language>);
 
 impl ExtensionMapping {
     /// Return the [`Language`] for the given file.
     pub fn get(&self, path: &Path) -> Option<Language> {
         let ext = path.extension()?.to_str()?;
-        self.mapping.get(ext).copied()
-    }
-}
-
-impl Display for ExtensionMapping {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        display_settings! {
-            formatter = f,
-            namespace = "linter.extension",
-            fields = [
-                self.mapping | debug
-            ]
-        }
-        Ok(())
+        self.0.get(ext).copied()
     }
 }
 
 impl From<FxHashMap<String, Language>> for ExtensionMapping {
     fn from(value: FxHashMap<String, Language>) -> Self {
-        Self { mapping: value }
+        Self(value)
     }
 }
 
 impl FromIterator<ExtensionPair> for ExtensionMapping {
     fn from_iter<T: IntoIterator<Item = ExtensionPair>>(iter: T) -> Self {
-        Self {
-            mapping: iter
-                .into_iter()
+        Self(
+            iter.into_iter()
                 .map(|pair| (pair.extension, pair.language))
                 .collect(),
-        }
+        )
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug, Hash, Default)]
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 #[serde(rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub enum SerializationFormat {
-    Text,
+pub enum OutputFormat {
     Concise,
+    #[default]
     Full,
     Json,
     JsonLines,
@@ -520,10 +524,9 @@ pub enum SerializationFormat {
     Sarif,
 }
 
-impl Display for SerializationFormat {
+impl Display for OutputFormat {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Text => write!(f, "text"),
             Self::Concise => write!(f, "concise"),
             Self::Full => write!(f, "full"),
             Self::Json => write!(f, "json"),
@@ -536,16 +539,6 @@ impl Display for SerializationFormat {
             Self::Rdjson => write!(f, "rdjson"),
             Self::Azure => write!(f, "azure"),
             Self::Sarif => write!(f, "sarif"),
-        }
-    }
-}
-
-impl SerializationFormat {
-    pub fn default(preview: bool) -> Self {
-        if preview {
-            Self::Full
-        } else {
-            Self::Concise
         }
     }
 }

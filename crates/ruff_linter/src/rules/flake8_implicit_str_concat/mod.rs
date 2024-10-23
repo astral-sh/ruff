@@ -15,6 +15,14 @@ mod tests {
 
     #[test_case(Rule::SingleLineImplicitStringConcatenation, Path::new("ISC.py"))]
     #[test_case(Rule::MultiLineImplicitStringConcatenation, Path::new("ISC.py"))]
+    #[test_case(
+        Rule::SingleLineImplicitStringConcatenation,
+        Path::new("ISC_syntax_error.py")
+    )]
+    #[test_case(
+        Rule::MultiLineImplicitStringConcatenation,
+        Path::new("ISC_syntax_error.py")
+    )]
     #[test_case(Rule::ExplicitStringConcatenation, Path::new("ISC.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());

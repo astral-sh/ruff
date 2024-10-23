@@ -1,3 +1,4 @@
+use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr, ExprContext, Pattern};
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
@@ -110,7 +111,7 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
                     range,
                     value: Box::new(Expr::Name(ast::ExprName {
                         range: TextRange::new(range.end() - "_".text_len(), range.end()),
-                        id: "_".to_string(),
+                        id: Name::new_static("_"),
                         ctx: ExprContext::Store,
                     })),
                     ctx: ExprContext::Store,
@@ -124,7 +125,7 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
         }) => match (pattern, name) {
             (Some(_), Some(_)) => Expr::Name(ast::ExprName {
                 range,
-                id: String::new(),
+                id: Name::empty(),
                 ctx: ExprContext::Invalid,
             }),
             (Some(pattern), None) => pattern_to_expr(*pattern),
@@ -135,7 +136,7 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
             }),
             (None, None) => Expr::Name(ast::ExprName {
                 range,
-                id: "_".to_string(),
+                id: Name::new_static("_"),
                 ctx: ExprContext::Store,
             }),
         },

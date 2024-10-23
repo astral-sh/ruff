@@ -20,7 +20,7 @@ use crate::registry::Rule;
 /// `if sys.platform == "linux"`.
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// if sys.platform.startswith("linux"):
 ///     # Linux specific definitions
 ///     ...
@@ -30,7 +30,7 @@ use crate::registry::Rule;
 /// ```
 ///
 /// Instead, use a simple string comparison, such as `==` or `!=`:
-/// ```python
+/// ```pyi
 /// if sys.platform == "linux":
 ///     # Linux specific definitions
 ///     ...
@@ -64,15 +64,13 @@ impl Violation for UnrecognizedPlatformCheck {
 /// The list of known platforms is: "linux", "win32", "cygwin", "darwin".
 ///
 /// ## Example
-/// ```python
-/// if sys.platform == "linus":
-///     ...
+/// ```pyi
+/// if sys.platform == "linus": ...
 /// ```
 ///
 /// Use instead:
-/// ```python
-/// if sys.platform == "linux":
-///     ...
+/// ```pyi
+/// if sys.platform == "linux": ...
 /// ```
 ///
 /// ## References

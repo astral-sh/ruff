@@ -18,10 +18,10 @@ use crate::fix::edits::delete_stmt;
 /// equivalent, `object.__str__` and `object.__repr__`, respectively.
 ///
 /// ## Example
-/// ```python
+///
+/// ```pyi
 /// class Foo:
-///     def __repr__(self) -> str:
-///         ...
+///     def __repr__(self) -> str: ...
 /// ```
 #[violation]
 pub struct StrOrReprDefinedInStub {

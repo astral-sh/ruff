@@ -21,12 +21,12 @@ use crate::renamer::Renamer;
 /// `set` builtin.
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// from collections.abc import Set
 /// ```
 ///
 /// Use instead:
-/// ```python
+/// ```pyi
 /// from collections.abc import Set as AbstractSet
 /// ```
 ///

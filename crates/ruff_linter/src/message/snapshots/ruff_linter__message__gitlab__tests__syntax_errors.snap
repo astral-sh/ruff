@@ -1,0 +1,30 @@
+---
+source: crates/ruff_linter/src/message/gitlab.rs
+expression: redact_fingerprint(&content)
+---
+[
+  {
+    "description": "SyntaxError: Expected one or more symbol names after import",
+    "fingerprint": "<redacted>",
+    "location": {
+      "lines": {
+        "begin": 1,
+        "end": 2
+      },
+      "path": "syntax_errors.py"
+    },
+    "severity": "major"
+  },
+  {
+    "description": "SyntaxError: Expected ')', found newline",
+    "fingerprint": "<redacted>",
+    "location": {
+      "lines": {
+        "begin": 3,
+        "end": 4
+      },
+      "path": "syntax_errors.py"
+    },
+    "severity": "major"
+  }
+]

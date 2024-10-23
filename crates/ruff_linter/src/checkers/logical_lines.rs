@@ -6,7 +6,7 @@ use ruff_python_parser::{TokenKind, Tokens};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::registry::AsRule;
+use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle::rules::logical_lines::{
     extraneous_whitespace, indentation, missing_whitespace, missing_whitespace_after_keyword,
     missing_whitespace_around_operator, redundant_backslash, space_after_comma,
@@ -45,36 +45,111 @@ pub(crate) fn check_logical_lines(
     let mut prev_indent_level = None;
     let indent_char = stylist.indentation().as_char();
 
+    let enforce_space_around_operator = settings.rules.any_enabled(&[
+        Rule::MultipleSpacesBeforeOperator,
+        Rule::MultipleSpacesAfterOperator,
+        Rule::TabBeforeOperator,
+        Rule::TabAfterOperator,
+    ]);
+    let enforce_whitespace_around_named_parameter_equals = settings.rules.any_enabled(&[
+        Rule::UnexpectedSpacesAroundKeywordParameterEquals,
+        Rule::MissingWhitespaceAroundParameterEquals,
+    ]);
+    let enforce_missing_whitespace_around_operator = settings.rules.any_enabled(&[
+        Rule::MissingWhitespaceAroundOperator,
+        Rule::MissingWhitespaceAroundArithmeticOperator,
+        Rule::MissingWhitespaceAroundBitwiseOrShiftOperator,
+        Rule::MissingWhitespaceAroundModuloOperator,
+    ]);
+    let enforce_missing_whitespace = settings.rules.enabled(Rule::MissingWhitespace);
+    let enforce_space_after_comma = settings
+        .rules
+        .any_enabled(&[Rule::MultipleSpacesAfterComma, Rule::TabAfterComma]);
+    let enforce_extraneous_whitespace = settings.rules.any_enabled(&[
+        Rule::WhitespaceAfterOpenBracket,
+        Rule::WhitespaceBeforeCloseBracket,
+        Rule::WhitespaceBeforePunctuation,
+    ]);
+    let enforce_whitespace_around_keywords = settings.rules.any_enabled(&[
+        Rule::MultipleSpacesAfterKeyword,
+        Rule::MultipleSpacesBeforeKeyword,
+        Rule::TabAfterKeyword,
+        Rule::TabBeforeKeyword,
+    ]);
+    let enforce_missing_whitespace_after_keyword =
+        settings.rules.enabled(Rule::MissingWhitespaceAfterKeyword);
+    let enforce_whitespace_before_comment = settings.rules.any_enabled(&[
+        Rule::TooFewSpacesBeforeInlineComment,
+        Rule::NoSpaceAfterInlineComment,
+        Rule::NoSpaceAfterBlockComment,
+        Rule::MultipleLeadingHashesForBlockComment,
+    ]);
+    let enforce_whitespace_before_parameters =
+        settings.rules.enabled(Rule::WhitespaceBeforeParameters);
+    let enforce_redundant_backslash = settings.rules.enabled(Rule::RedundantBackslash);
+    let enforce_indentation = settings.rules.any_enabled(&[
+        Rule::IndentationWithInvalidMultiple,
+        Rule::NoIndentedBlock,
+        Rule::UnexpectedIndentation,
+        Rule::IndentationWithInvalidMultipleComment,
+        Rule::NoIndentedBlockComment,
+        Rule::UnexpectedIndentationComment,
+        Rule::OverIndented,
+    ]);
+
     for line in &LogicalLines::from_tokens(tokens, locator) {
         if line.flags().contains(TokenFlags::OPERATOR) {
-            space_around_operator(&line, &mut context);
-            whitespace_around_named_parameter_equals(&line, &mut context);
-            missing_whitespace_around_operator(&line, &mut context);
-            missing_whitespace(&line, &mut context);
+            if enforce_space_around_operator {
+                space_around_operator(&line, &mut context);
+            }
+
+            if enforce_whitespace_around_named_parameter_equals {
+                whitespace_around_named_parameter_equals(&line, &mut context);
+            }
+
+            if enforce_missing_whitespace_around_operator {
+                missing_whitespace_around_operator(&line, &mut context);
+            }
+
+            if enforce_missing_whitespace {
+                missing_whitespace(&line, &mut context);
+            }
         }
-        if line.flags().contains(TokenFlags::PUNCTUATION) {
+
+        if line.flags().contains(TokenFlags::PUNCTUATION) && enforce_space_after_comma {
             space_after_comma(&line, &mut context);
         }
 
         if line
             .flags()
             .intersects(TokenFlags::OPERATOR | TokenFlags::BRACKET | TokenFlags::PUNCTUATION)
+            && enforce_extraneous_whitespace
         {
             extraneous_whitespace(&line, &mut context);
         }
 
         if line.flags().contains(TokenFlags::KEYWORD) {
-            whitespace_around_keywords(&line, &mut context);
-            missing_whitespace_after_keyword(&line, &mut context);
+            if enforce_whitespace_around_keywords {
+                whitespace_around_keywords(&line, &mut context);
+            }
+
+            if enforce_missing_whitespace_after_keyword {
+                missing_whitespace_after_keyword(&line, &mut context);
+            }
         }
 
-        if line.flags().contains(TokenFlags::COMMENT) {
+        if line.flags().contains(TokenFlags::COMMENT) && enforce_whitespace_before_comment {
             whitespace_before_comment(&line, locator, &mut context);
         }
 
         if line.flags().contains(TokenFlags::BRACKET) {
-            whitespace_before_parameters(&line, &mut context);
-            redundant_backslash(&line, locator, indexer, &mut context);
+            if enforce_whitespace_before_parameters {
+                whitespace_before_parameters(&line, &mut context);
+            }
+
+            if enforce_redundant_backslash {
+                redundant_backslash(&line, locator, indexer, &mut context);
+            }
         }
 
         // Extract the indentation level.
@@ -92,16 +167,18 @@ pub(crate) fn check_logical_lines(
 
         let indent_size = 4;
 
-        for kind in indentation(
-            &line,
-            prev_line.as_ref(),
-            indent_char,
-            indent_level,
-            prev_indent_level,
-            indent_size,
-        ) {
-            if settings.rules.enabled(kind.rule()) {
-                context.push_diagnostic(Diagnostic::new(kind, range));
+        if enforce_indentation {
+            for kind in indentation(
+                &line,
+                prev_line.as_ref(),
+                indent_char,
+                indent_level,
+                prev_indent_level,
+                indent_size,
+            ) {
+                if settings.rules.enabled(kind.rule()) {
+                    context.push_diagnostic(Diagnostic::new(kind, range));
+                }
             }
         }
 

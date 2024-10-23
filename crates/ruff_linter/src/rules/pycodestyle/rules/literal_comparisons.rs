@@ -32,7 +32,7 @@ impl EqCmpOp {
 ///
 /// ## Why is this bad?
 /// According to [PEP 8], "Comparisons to singletons like None should always be done with
-/// is or is not, never the equality operators."
+/// `is` or `is not`, never the equality operators."
 ///
 /// ## Example
 /// ```python
@@ -48,7 +48,15 @@ impl EqCmpOp {
 ///     pass
 /// ```
 ///
+/// ## Fix safety
+///
+/// This rule's fix is marked as unsafe, as it may alter runtime behavior when
+/// used with libraries that override the `==`/`__eq__` or `!=`/`__ne__` operators.
+/// In these cases, `is`/`is not` may not be equivalent to `==`/`!=`. For more
+/// information, see [this issue].
+///
 /// [PEP 8]: https://peps.python.org/pep-0008/#programming-recommendations
+/// [this issue]: https://github.com/astral-sh/ruff/issues/4560
 #[violation]
 pub struct NoneComparison(EqCmpOp);
 
@@ -101,7 +109,15 @@ impl AlwaysFixableViolation for NoneComparison {
 ///     ...
 /// ```
 ///
+/// ## Fix safety
+///
+/// This rule's fix is marked as unsafe, as it may alter runtime behavior when
+/// used with libraries that override the `==`/`__eq__` or `!=`/`__ne__` operators.
+/// In these cases, `is`/`is not` may not be equivalent to `==`/`!=`. For more
+/// information, see [this issue].
+///
 /// [PEP 8]: https://peps.python.org/pep-0008/#programming-recommendations
+/// [this issue]: https://github.com/astral-sh/ruff/issues/4560
 #[violation]
 pub struct TrueFalseComparison {
     value: bool,
@@ -232,12 +248,7 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
     }
 
     // Check each comparator in order.
-    for (index, (op, next)) in compare
-        .ops
-        .iter()
-        .zip(compare.comparators.iter())
-        .enumerate()
-    {
+    for (index, (op, next)) in compare.ops.iter().zip(&compare.comparators).enumerate() {
         if helpers::is_constant_non_singleton(comparator) {
             comparator = next;
             continue;

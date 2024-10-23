@@ -7,7 +7,100 @@
 
 use std::fmt;
 
-use ruff_python_ast::{BoolOp, Operator, UnaryOp};
+use bitflags::bitflags;
+
+use ruff_python_ast::name::Name;
+use ruff_python_ast::str::Quote;
+use ruff_python_ast::str_prefix::{
+    AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix,
+};
+use ruff_python_ast::{AnyStringFlags, BoolOp, Int, IpyEscapeKind, Operator, StringFlags, UnaryOp};
+use ruff_text_size::{Ranged, TextRange};
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct Token {
+    /// The kind of the token.
+    kind: TokenKind,
+    /// The range of the token.
+    range: TextRange,
+    /// The set of flags describing this token.
+    flags: TokenFlags,
+}
+
+impl Token {
+    pub(crate) fn new(kind: TokenKind, range: TextRange, flags: TokenFlags) -> Token {
+        Self { kind, range, flags }
+    }
+
+    /// Returns the token kind.
+    #[inline]
+    pub const fn kind(&self) -> TokenKind {
+        self.kind
+    }
+
+    /// Returns the token as a tuple of (kind, range).
+    #[inline]
+    pub const fn as_tuple(&self) -> (TokenKind, TextRange) {
+        (self.kind, self.range)
+    }
+
+    /// Returns `true` if the current token is a triple-quoted string of any kind.
+    ///
+    /// # Panics
+    ///
+    /// If it isn't a string or any f-string tokens.
+    pub fn is_triple_quoted_string(self) -> bool {
+        assert!(self.is_any_string());
+        self.flags.is_triple_quoted()
+    }
+
+    /// Returns the [`Quote`] style for the current string token of any kind.
+    ///
+    /// # Panics
+    ///
+    /// If it isn't a string or any f-string tokens.
+    pub fn string_quote_style(self) -> Quote {
+        assert!(self.is_any_string());
+        self.flags.quote_style()
+    }
+
+    /// Returns `true` if this is any kind of string token.
+    const fn is_any_string(self) -> bool {
+        matches!(
+            self.kind,
+            TokenKind::String
+                | TokenKind::FStringStart
+                | TokenKind::FStringMiddle
+                | TokenKind::FStringEnd
+        )
+    }
+}
+
+impl Ranged for Token {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+impl fmt::Debug for Token {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?} {:?}", self.kind, self.range)?;
+        if !self.flags.is_empty() {
+            f.write_str(" (flags = ")?;
+            let mut first = true;
+            for (name, _) in self.flags.iter_names() {
+                if first {
+                    first = false;
+                } else {
+                    f.write_str(" | ")?;
+                }
+                f.write_str(name)?;
+            }
+            f.write_str(")")?;
+        }
+        Ok(())
+    }
+}
 
 /// A kind of a token.
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, PartialOrd, Ord)]
@@ -192,13 +285,15 @@ pub enum TokenKind {
 }
 
 impl TokenKind {
+    /// Returns `true` if this is an end of file token.
     #[inline]
     pub const fn is_eof(self) -> bool {
         matches!(self, TokenKind::EndOfFile)
     }
 
+    /// Returns `true` if this is either a newline or non-logical newline token.
     #[inline]
-    pub const fn is_newline(self) -> bool {
+    pub const fn is_any_newline(self) -> bool {
         matches!(self, TokenKind::Newline | TokenKind::NonLogicalNewline)
     }
 
@@ -294,21 +389,16 @@ impl TokenKind {
         )
     }
 
+    /// Returns `true` if this is a singleton token i.e., `True`, `False`, or `None`.
     #[inline]
     pub const fn is_singleton(self) -> bool {
         matches!(self, TokenKind::False | TokenKind::True | TokenKind::None)
     }
 
+    /// Returns `true` if this is a trivia token i.e., a comment or a non-logical newline.
     #[inline]
     pub const fn is_trivia(&self) -> bool {
-        matches!(
-            self,
-            TokenKind::Newline
-                | TokenKind::Indent
-                | TokenKind::Dedent
-                | TokenKind::NonLogicalNewline
-                | TokenKind::Comment
-        )
+        matches!(self, TokenKind::Comment | TokenKind::NonLogicalNewline)
     }
 
     #[inline]
@@ -594,11 +684,126 @@ impl fmt::Display for TokenKind {
     }
 }
 
-#[cfg(target_pointer_width = "64")]
-mod sizes {
-    use crate::lexer::{LexicalError, LexicalErrorType};
-    use static_assertions::assert_eq_size;
+bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(crate) struct TokenFlags: u8 {
+        /// The token is a string with double quotes (`"`).
+        const DOUBLE_QUOTES = 1 << 0;
+        /// The token is a triple-quoted string i.e., it starts and ends with three consecutive
+        /// quote characters (`"""` or `'''`).
+        const TRIPLE_QUOTED_STRING = 1 << 1;
 
-    assert_eq_size!(LexicalErrorType, [u8; 24]);
-    assert_eq_size!(LexicalError, [u8; 32]);
+        /// The token is a unicode string i.e., prefixed with `u` or `U`
+        const UNICODE_STRING = 1 << 2;
+        /// The token is a byte string i.e., prefixed with `b` or `B`
+        const BYTE_STRING = 1 << 3;
+        /// The token is an f-string i.e., prefixed with `f` or `F`
+        const F_STRING = 1 << 4;
+        /// The token is a raw string and the prefix character is in lowercase.
+        const RAW_STRING_LOWERCASE = 1 << 5;
+        /// The token is a raw string and the prefix character is in uppercase.
+        const RAW_STRING_UPPERCASE = 1 << 6;
+
+        /// The token is a raw string i.e., prefixed with `r` or `R`
+        const RAW_STRING = Self::RAW_STRING_LOWERCASE.bits() | Self::RAW_STRING_UPPERCASE.bits();
+    }
+}
+
+impl StringFlags for TokenFlags {
+    fn quote_style(self) -> Quote {
+        if self.intersects(TokenFlags::DOUBLE_QUOTES) {
+            Quote::Double
+        } else {
+            Quote::Single
+        }
+    }
+
+    fn is_triple_quoted(self) -> bool {
+        self.intersects(TokenFlags::TRIPLE_QUOTED_STRING)
+    }
+
+    fn prefix(self) -> AnyStringPrefix {
+        if self.intersects(TokenFlags::F_STRING) {
+            if self.intersects(TokenFlags::RAW_STRING_LOWERCASE) {
+                AnyStringPrefix::Format(FStringPrefix::Raw { uppercase_r: false })
+            } else if self.intersects(TokenFlags::RAW_STRING_UPPERCASE) {
+                AnyStringPrefix::Format(FStringPrefix::Raw { uppercase_r: true })
+            } else {
+                AnyStringPrefix::Format(FStringPrefix::Regular)
+            }
+        } else if self.intersects(TokenFlags::BYTE_STRING) {
+            if self.intersects(TokenFlags::RAW_STRING_LOWERCASE) {
+                AnyStringPrefix::Bytes(ByteStringPrefix::Raw { uppercase_r: false })
+            } else if self.intersects(TokenFlags::RAW_STRING_UPPERCASE) {
+                AnyStringPrefix::Bytes(ByteStringPrefix::Raw { uppercase_r: true })
+            } else {
+                AnyStringPrefix::Bytes(ByteStringPrefix::Regular)
+            }
+        } else if self.intersects(TokenFlags::RAW_STRING_LOWERCASE) {
+            AnyStringPrefix::Regular(StringLiteralPrefix::Raw { uppercase: false })
+        } else if self.intersects(TokenFlags::RAW_STRING_UPPERCASE) {
+            AnyStringPrefix::Regular(StringLiteralPrefix::Raw { uppercase: true })
+        } else if self.intersects(TokenFlags::UNICODE_STRING) {
+            AnyStringPrefix::Regular(StringLiteralPrefix::Unicode)
+        } else {
+            AnyStringPrefix::Regular(StringLiteralPrefix::Empty)
+        }
+    }
+}
+
+impl TokenFlags {
+    /// Returns `true` if the token is an f-string.
+    pub(crate) const fn is_f_string(self) -> bool {
+        self.intersects(TokenFlags::F_STRING)
+    }
+
+    /// Returns `true` if the token is a triple-quoted f-string.
+    pub(crate) fn is_triple_quoted_fstring(self) -> bool {
+        self.contains(TokenFlags::F_STRING | TokenFlags::TRIPLE_QUOTED_STRING)
+    }
+
+    /// Returns `true` if the token is a raw string.
+    pub(crate) const fn is_raw_string(self) -> bool {
+        self.intersects(TokenFlags::RAW_STRING)
+    }
+
+    /// Converts this type to [`AnyStringFlags`], setting the equivalent flags.
+    pub(crate) fn as_any_string_flags(self) -> AnyStringFlags {
+        AnyStringFlags::new(self.prefix(), self.quote_style(), self.is_triple_quoted())
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+pub(crate) enum TokenValue {
+    #[default]
+    None,
+    /// Token value for a name, commonly known as an identifier.
+    ///
+    /// Unicode names are NFKC-normalized by the lexer,
+    /// matching [the behaviour of Python's lexer](https://docs.python.org/3/reference/lexical_analysis.html#identifiers)
+    Name(Name),
+    /// Token value for an integer.
+    Int(Int),
+    /// Token value for a floating point number.
+    Float(f64),
+    /// Token value for a complex number.
+    Complex {
+        /// The real part of the complex number.
+        real: f64,
+        /// The imaginary part of the complex number.
+        imag: f64,
+    },
+    /// Token value for a string.
+    String(Box<str>),
+    /// Token value that includes the portion of text inside the f-string that's not
+    /// part of the expression part and isn't an opening or closing brace.
+    FStringMiddle(Box<str>),
+    /// Token value for IPython escape commands. These are recognized by the lexer
+    /// only when the mode is [`Mode::Ipython`].
+    IpyEscapeCommand {
+        /// The magic command value.
+        value: Box<str>,
+        /// The kind of magic command.
+        kind: IpyEscapeKind,
+    },
 }

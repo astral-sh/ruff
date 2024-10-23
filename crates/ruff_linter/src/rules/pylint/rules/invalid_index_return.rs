@@ -12,7 +12,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for `__index__` implementations that return a value other than an integer.
+/// Checks for `__index__` implementations that return non-integer values.
 ///
 /// ## Why is this bad?
 /// The `__index__` method should return an integer. Returning a different
@@ -37,7 +37,6 @@ use crate::checkers::ast::Checker;
 ///     def __index__(self):
 ///         return 2
 /// ```
-///
 ///
 /// ## References
 /// - [Python documentation: The `__index__` method](https://docs.python.org/3/reference/datamodel.html#object.__index__)

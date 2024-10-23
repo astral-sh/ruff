@@ -1,0 +1,396 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF030.py:6:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
+  |
+4 | # Expects:
+5 | # - single StringLiteral
+6 | assert True, print("This print is not intentional.")
+  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF030
+7 | 
+8 | # Concatenated string literals
+  |
+  = help: Remove `print`
+
+ℹ Unsafe fix
+3 3 | # Standard Case
+4 4 | # Expects:
+5 5 | # - single StringLiteral
+6   |-assert True, print("This print is not intentional.")
+  6 |+assert True, "This print is not intentional."
+7 7 | 
+8 8 | # Concatenated string literals
+9 9 | # Expects:
+
+RUF030.py:11:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
+   |
+ 9 | # Expects:
+10 | # - single StringLiteral
+11 | assert True, print("This print" " is not intentional.")
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF030
+12 | 
+13 | # Positional arguments, string literals
+   |
+   = help: Remove `print`
+
+ℹ Unsafe fix
+8  8  | # Concatenated string literals
+9  9  | # Expects:
+10 10 | # - single StringLiteral
+11    |-assert True, print("This print" " is not intentional.")
+   11 |+assert True, "This print is not intentional."
+12 12 | 
+13 13 | # Positional arguments, string literals
+14 14 | # Expects:
+
+RUF030.py:16:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
+   |
+14 | # Expects:
+15 | # - single StringLiteral concatenated with " "
+16 | assert True, print("This print", "is not intentional")
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF030
+17 | 
+18 | # Concatenated string literals combined with Positional arguments
+   |
+   = help: Remove `print`
+
+ℹ Unsafe fix
+13 13 | # Positional arguments, string literals
+14 14 | # Expects:
+15 15 | # - single StringLiteral concatenated with " "
+16    |-assert True, print("This print", "is not intentional")
+   16 |+assert True, "This print is not intentional"
+17 17 | 
+18 18 | # Concatenated string literals combined with Positional arguments
+19 19 | # Expects:
+
+RUF030.py:21:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
+   |
+19 | # Expects:
+20 | # - single stringliteral concatenated with " " only between `print` and `is`
+21 | assert True, print("This " "print", "is not intentional.")
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF030
+22 | 
+23 | # Positional arguments, string literals with a variable
+   |
+   = help: Remove `print`
+
+ℹ Unsafe fix
+18 18 | # Concatenated string literals combined with Positional arguments
+19 19 | # Expects:
+20 20 | # - single stringliteral concatenated with " " only between `print` and `is`
+21    |-assert True, print("This " "print", "is not intentional.")
+   21 |+assert True, "This print is not intentional."
+22 22 | 
+23 23 | # Positional arguments, string literals with a variable
+24 24 | # Expects:
+
+RUF030.py:26:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
+   |
+24 | # Expects:
+25 | # - single FString concatenated with " "
+26 | assert True, print("This", print.__name__, "is not intentional.")
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF030
+27 | 
+28 | # Mixed brackets string literals
+   |
+   = help: Remove `print`
+
+ℹ Unsafe fix
+23 23 | # Positional arguments, string literals with a variable
+24 24 | # Expects:
+25 25 | # - single FString concatenated with " "
+26    |-assert True, print("This", print.__name__, "is not intentional.")
+   26 |+assert True, f"This {print.__name__} is not intentional."
+27 27 | 
+28 28 | # Mixed brackets string literals
+29 29 | # Expects:
+
+RUF030.py:31:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
+   |
+29 | # Expects:
+30 | # - single StringLiteral concatenated with " "
+31 | assert True, print("This print", 'is not intentional', """and should be removed""")
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF030
+32 | 
+33 | # Mixed brackets with other brackets inside
+   |
+   = help: Remove `print`
+
+ℹ Unsafe fix
+28 28 | # Mixed brackets string literals
+29 29 | # Expects:
+30 30 | # - single StringLiteral concatenated with " "
+31    |-assert True, print("This print", 'is not intentional', """and should be removed""")
+   31 |+assert True, "This print is not intentional and should be removed"
+32 32 | 
+33 33 | # Mixed brackets with other brackets inside
+34 34 | # Expects:
+
+RUF030.py:36:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
+   |
+34 | # Expects:
+35 | # - single StringLiteral concatenated with " " and escaped brackets
+36 | assert True, print("This print", 'is not "intentional"', """and "should" be 'removed'""")
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF030
+37 | 
+38 | # Positional arguments, string literals with a separator
+   |
+   = help: Remove `print`
+
+ℹ Unsafe fix
+33 33 | # Mixed brackets with other brackets inside
+34 34 | # Expects:
+35 35 | # - single StringLiteral concatenated with " " and escaped brackets
+36    |-assert True, print("This print", 'is not "intentional"', """and "should" be 'removed'""")
+   36 |+assert True, "This print is not \"intentional\" and \"should\" be 'removed'"
+37 37 | 
+38 38 | # Positional arguments, string literals with a separator
+39 39 | # Expects:
+
+RUF030.py:41:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
+   |
+39 | # Expects:
+40 | # - single StringLiteral concatenated with "|"
+41 | assert True, print("This print", "is not intentional", sep="|")
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF030
+42 | 
+43 | # Positional arguments, string literals with None as separator
+   |
+   = help: Remove `print`
+
+ℹ Unsafe fix
+38 38 | # Positional arguments, string literals with a separator
+39 39 | # Expects:
+40 40 | # - single StringLiteral concatenated with "|"
+41    |-assert True, print("This print", "is not intentional", sep="|")
+   41 |+assert True, "This print|is not intentional"
+42 42 | 
+43 43 | # Positional arguments, string literals with None as separator
+44 44 | # Expects:
+
+RUF030.py:46:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
+   |
+44 | # Expects:
+45 | # - single StringLiteral concatenated with " "
+46 | assert True, print("This print", "is not intentional", sep=None)
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF030
+47 | 
+48 | # Positional arguments, string literals with variable as separator, needs f-string
+   |
+   = help: Remove `print`
+
+ℹ Unsafe fix
+43 43 | # Positional arguments, string literals with None as separator
+44 44 | # Expects:
+45 45 | # - single StringLiteral concatenated with " "
+46    |-assert True, print("This print", "is not intentional", sep=None)
+   46 |+assert True, "This print is not intentional"
+47 47 | 
+48 48 | # Positional arguments, string literals with variable as separator, needs f-string
+49 49 | # Expects:
+
+RUF030.py:51:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
+   |
+49 | # Expects:
+50 | # - single FString concatenated with "{U00A0}"
+51 | assert True, print("This print", "is not intentional", sep=U00A0)
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF030
+52 | 
+53 | # Unnecessary f-string
+   |
+   = help: Remove `print`
+
+ℹ Unsafe fix
+48 48 | # Positional arguments, string literals with variable as separator, needs f-string
+49 49 | # Expects:
+50 50 | # - single FString concatenated with "{U00A0}"
+51    |-assert True, print("This print", "is not intentional", sep=U00A0)
+   51 |+assert True, f"This print{U00A0}is not intentional"
+52 52 | 
+53 53 | # Unnecessary f-string
+54 54 | # Expects:
+
+RUF030.py:56:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
+   |
+54 | # Expects:
+55 | # - single StringLiteral
+56 | assert True, print(f"This f-string is just a literal.")
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF030
+57 | 
+58 | # Positional arguments, string literals and f-strings
+   |
+   = help: Remove `print`
+
+ℹ Unsafe fix
+53 53 | # Unnecessary f-string
+54 54 | # Expects:
+55 55 | # - single StringLiteral
+56    |-assert True, print(f"This f-string is just a literal.")
+   56 |+assert True, "This f-string is just a literal."
+57 57 | 
+58 58 | # Positional arguments, string literals and f-strings
+59 59 | # Expects:
+
+RUF030.py:61:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
+   |
+59 | # Expects:
+60 | # - single FString concatenated with " "
+61 | assert True, print("This print", f"is not {'intentional':s}")
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF030
+62 | 
+63 | # Positional arguments, string literals and f-strings with a separator
+   |
+   = help: Remove `print`
+
+ℹ Unsafe fix
+58 58 | # Positional arguments, string literals and f-strings
+59 59 | # Expects:
+60 60 | # - single FString concatenated with " "
+61    |-assert True, print("This print", f"is not {'intentional':s}")
+   61 |+assert True, f"This print is not {'intentional':s}"
+62 62 | 
+63 63 | # Positional arguments, string literals and f-strings with a separator
+64 64 | # Expects:
+
+RUF030.py:66:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
+   |
+64 | # Expects:
+65 | # - single FString concatenated with "|"
+66 | assert True, print("This print", f"is not {'intentional':s}", sep="|")
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF030
+67 | 
+68 | # A single f-string
+   |
+   = help: Remove `print`
+
+ℹ Unsafe fix
+63 63 | # Positional arguments, string literals and f-strings with a separator
+64 64 | # Expects:
+65 65 | # - single FString concatenated with "|"
+66    |-assert True, print("This print", f"is not {'intentional':s}", sep="|")
+   66 |+assert True, f"This print|is not {'intentional':s}"
+67 67 | 
+68 68 | # A single f-string
+69 69 | # Expects:
+
+RUF030.py:71:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
+   |
+69 | # Expects:
+70 | # - single FString
+71 | assert True, print(f"This print is not {'intentional':s}")
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF030
+72 | 
+73 | # A single f-string with a redundant separator
+   |
+   = help: Remove `print`
+
+ℹ Unsafe fix
+68 68 | # A single f-string
+69 69 | # Expects:
+70 70 | # - single FString
+71    |-assert True, print(f"This print is not {'intentional':s}")
+   71 |+assert True, f"This print is not {'intentional':s}"
+72 72 | 
+73 73 | # A single f-string with a redundant separator
+74 74 | # Expects:
+
+RUF030.py:76:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
+   |
+74 | # Expects:
+75 | # - single FString
+76 | assert True, print(f"This print is not {'intentional':s}", sep="|")
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF030
+77 | 
+78 | # Complex f-string with variable as separator
+   |
+   = help: Remove `print`
+
+ℹ Unsafe fix
+73 73 | # A single f-string with a redundant separator
+74 74 | # Expects:
+75 75 | # - single FString
+76    |-assert True, print(f"This print is not {'intentional':s}", sep="|")
+   76 |+assert True, f"This print is not {'intentional':s}"
+77 77 | 
+78 78 | # Complex f-string with variable as separator
+79 79 | # Expects:
+
+RUF030.py:83:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
+   |
+81 | condition = "True is True"
+82 | maintainer = "John Doe"
+83 | assert True, print("Unreachable due to", condition, f", ask {maintainer} for advice", sep=U00A0)
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF030
+84 | 
+85 | # Empty print
+   |
+   = help: Remove `print`
+
+ℹ Unsafe fix
+80 80 | # - single FString concatenated with "{U00A0}", all placeholders preserved
+81 81 | condition = "True is True"
+82 82 | maintainer = "John Doe"
+83    |-assert True, print("Unreachable due to", condition, f", ask {maintainer} for advice", sep=U00A0)
+   83 |+assert True, f"Unreachable due to{U00A0}{condition}{U00A0}, ask {maintainer} for advice"
+84 84 | 
+85 85 | # Empty print
+86 86 | # Expects:
+
+RUF030.py:88:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
+   |
+86 | # Expects:
+87 | # - `msg` entirely removed from assertion
+88 | assert True, print()
+   |              ^^^^^^^ RUF030
+89 | 
+90 | # Empty print with separator
+   |
+   = help: Remove `print`
+
+ℹ Unsafe fix
+85 85 | # Empty print
+86 86 | # Expects:
+87 87 | # - `msg` entirely removed from assertion
+88    |-assert True, print()
+   88 |+assert True
+89 89 | 
+90 90 | # Empty print with separator
+91 91 | # Expects:
+
+RUF030.py:93:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
+   |
+91 | # Expects:
+92 | # - `msg` entirely removed from assertion
+93 | assert True, print(sep=" ")
+   |              ^^^^^^^^^^^^^^ RUF030
+94 | 
+95 | # Custom print function that actually returns a string
+   |
+   = help: Remove `print`
+
+ℹ Unsafe fix
+90 90 | # Empty print with separator
+91 91 | # Expects:
+92 92 | # - `msg` entirely removed from assertion
+93    |-assert True, print(sep=" ")
+   93 |+assert True
+94 94 | 
+95 95 | # Custom print function that actually returns a string
+96 96 | # Expects:
+
+RUF030.py:108:14: RUF030 [*] `print()` expression in `assert` statement is likely unintentional
+    |
+106 | # Expects:
+107 | # - single StringLiteral
+108 | assert True, builtins.print("This print should be removed.")
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF030
+    |
+    = help: Remove `print`
+
+ℹ Unsafe fix
+105 105 | # Use of `builtins.print`
+106 106 | # Expects:
+107 107 | # - single StringLiteral
+108     |-assert True, builtins.print("This print should be removed.")
+    108 |+assert True, "This print should be removed."

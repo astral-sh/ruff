@@ -10,7 +10,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::docstrings::Docstring;
 use crate::fs::relativize_path;
-use crate::rules::{flake8_annotations, flake8_pyi, pydocstyle, pylint};
+use crate::rules::{flake8_annotations, flake8_pyi, pydoclint, pydocstyle, pylint};
 use crate::{docstrings, warn_user};
 
 /// Run lint rules over all [`Definition`] nodes in the [`SemanticModel`].
@@ -83,12 +83,21 @@ pub(crate) fn definitions(checker: &mut Checker) {
         Rule::UndocumentedPublicNestedClass,
         Rule::UndocumentedPublicPackage,
     ]);
+    let enforce_pydoclint = checker.any_enabled(&[
+        Rule::DocstringMissingReturns,
+        Rule::DocstringExtraneousReturns,
+        Rule::DocstringMissingYields,
+        Rule::DocstringExtraneousYields,
+        Rule::DocstringMissingException,
+        Rule::DocstringExtraneousException,
+    ]);
 
     if !enforce_annotations
         && !enforce_docstrings
         && !enforce_stubs
         && !enforce_stubs_and_runtime
         && !enforce_dunder_method
+        && !enforce_pydoclint
     {
         return;
     }
@@ -163,11 +172,11 @@ pub(crate) fn definitions(checker: &mut Checker) {
             }
         }
 
-        // pydocstyle
-        if enforce_docstrings {
+        // pydocstyle, pydoclint
+        if enforce_docstrings || enforce_pydoclint {
             if pydocstyle::helpers::should_ignore_definition(
                 definition,
-                &checker.settings.pydocstyle.ignore_decorators,
+                &checker.settings.pydocstyle,
                 &checker.semantic,
             ) {
                 continue;
@@ -264,7 +273,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
                 pydocstyle::rules::non_imperative_mood(
                     checker,
                     &docstring,
-                    &checker.settings.pydocstyle.property_decorators,
+                    &checker.settings.pydocstyle,
                 );
             }
             if checker.enabled(Rule::NoSignature) {
@@ -282,7 +291,8 @@ pub(crate) fn definitions(checker: &mut Checker) {
             if checker.enabled(Rule::OverloadWithDocstring) {
                 pydocstyle::rules::if_needed(checker, &docstring);
             }
-            if checker.any_enabled(&[
+
+            let enforce_sections = checker.any_enabled(&[
                 Rule::BlankLineAfterLastSection,
                 Rule::BlankLinesBetweenHeaderAndContent,
                 Rule::CapitalizeSectionName,
@@ -298,12 +308,31 @@ pub(crate) fn definitions(checker: &mut Checker) {
                 Rule::SectionUnderlineMatchesSectionLength,
                 Rule::SectionUnderlineNotOverIndented,
                 Rule::UndocumentedParam,
-            ]) {
-                pydocstyle::rules::sections(
-                    checker,
+            ]);
+            if enforce_sections || enforce_pydoclint {
+                let section_contexts = pydocstyle::helpers::get_section_contexts(
                     &docstring,
-                    checker.settings.pydocstyle.convention.as_ref(),
+                    checker.settings.pydocstyle.convention(),
                 );
+
+                if enforce_sections {
+                    pydocstyle::rules::sections(
+                        checker,
+                        &docstring,
+                        &section_contexts,
+                        checker.settings.pydocstyle.convention(),
+                    );
+                }
+
+                if enforce_pydoclint {
+                    pydoclint::rules::check_docstring(
+                        checker,
+                        definition,
+                        &docstring,
+                        &section_contexts,
+                        checker.settings.pydocstyle.convention(),
+                    );
+                }
             }
         }
     }

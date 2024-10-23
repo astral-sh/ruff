@@ -1,5 +1,6 @@
 //! Access to the Ruff linting API for the LSP
 
+use ruff_python_parser::ParseError;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
@@ -7,7 +8,7 @@ use ruff_diagnostics::{Applicability, Diagnostic, DiagnosticKind, Edit, Fix};
 use ruff_linter::{
     directives::{extract_directives, Flags},
     generate_noqa_edits,
-    linter::{check_path, LinterResult},
+    linter::check_path,
     packaging::detect_package_root,
     registry::AsRule,
     settings::flags,
@@ -18,10 +19,10 @@ use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_source_file::{LineIndex, Locator};
 use ruff_text_size::{Ranged, TextRange};
-use ruff_workspace::resolver::match_any_exclusion;
 
 use crate::{
     edit::{NotebookRange, ToRangeExt},
+    resolve::is_document_excluded,
     session::DocumentQuery,
     PositionEncoding, DIAGNOSTIC_NAME,
 };
@@ -57,9 +58,13 @@ pub(crate) struct DiagnosticFix {
 }
 
 /// A series of diagnostics across a single text document or an arbitrary number of notebook cells.
-pub(crate) type Diagnostics = FxHashMap<lsp_types::Url, Vec<lsp_types::Diagnostic>>;
+pub(crate) type DiagnosticsMap = FxHashMap<lsp_types::Url, Vec<lsp_types::Diagnostic>>;
 
-pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> Diagnostics {
+pub(crate) fn check(
+    query: &DocumentQuery,
+    encoding: PositionEncoding,
+    show_syntax_errors: bool,
+) -> DiagnosticsMap {
     let source_kind = query.make_source_kind();
     let file_resolver_settings = query.settings().file_resolver();
     let linter_settings = query.settings().linter();
@@ -67,19 +72,14 @@ pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> Diagno
 
     // If the document is excluded, return an empty list of diagnostics.
     let package = if let Some(document_path) = document_path.as_ref() {
-        if let Some(exclusion) = match_any_exclusion(
+        if is_document_excluded(
             document_path,
-            &file_resolver_settings.exclude,
-            &file_resolver_settings.extend_exclude,
-            Some(&linter_settings.exclude),
+            file_resolver_settings,
+            Some(linter_settings),
             None,
+            query.text_document_language_id(),
         ) {
-            tracing::debug!(
-                "Ignored path via `{}`: {}",
-                exclusion,
-                document_path.display()
-            );
-            return Diagnostics::default();
+            return DiagnosticsMap::default();
         }
 
         detect_package_root(
@@ -112,7 +112,7 @@ pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> Diagno
     let directives = extract_directives(parsed.tokens(), Flags::all(), &locator, &indexer);
 
     // Generate checks.
-    let LinterResult { data, .. } = check_path(
+    let diagnostics = check_path(
         &query.virtual_file_path(),
         package,
         &locator,
@@ -128,7 +128,7 @@ pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> Diagno
 
     let noqa_edits = generate_noqa_edits(
         &query.virtual_file_path(),
-        data.as_slice(),
+        &diagnostics,
         &locator,
         indexer.comment_ranges(),
         &linter_settings.external,
@@ -136,24 +136,37 @@ pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> Diagno
         stylist.line_ending(),
     );
 
-    let mut diagnostics = Diagnostics::default();
+    let mut diagnostics_map = DiagnosticsMap::default();
 
     // Populates all relevant URLs with an empty diagnostic list.
     // This ensures that documents without diagnostics still get updated.
     if let Some(notebook) = query.as_notebook() {
         for url in notebook.urls() {
-            diagnostics.entry(url.clone()).or_default();
+            diagnostics_map.entry(url.clone()).or_default();
         }
     } else {
-        diagnostics.entry(query.make_key().into_url()).or_default();
+        diagnostics_map
+            .entry(query.make_key().into_url())
+            .or_default();
     }
 
-    let lsp_diagnostics = data
+    let lsp_diagnostics = diagnostics
         .into_iter()
         .zip(noqa_edits)
         .map(|(diagnostic, noqa_edit)| {
             to_lsp_diagnostic(diagnostic, &noqa_edit, &source_kind, &index, encoding)
         });
+
+    let lsp_diagnostics = lsp_diagnostics.chain(
+        show_syntax_errors
+            .then(|| {
+                parsed.errors().iter().map(|parse_error| {
+                    parse_error_to_lsp_diagnostic(parse_error, &source_kind, &index, encoding)
+                })
+            })
+            .into_iter()
+            .flatten(),
+    );
 
     if let Some(notebook) = query.as_notebook() {
         for (index, diagnostic) in lsp_diagnostics {
@@ -161,18 +174,19 @@ pub(crate) fn check(query: &DocumentQuery, encoding: PositionEncoding) -> Diagno
                 tracing::warn!("Unable to find notebook cell at index {index}.");
                 continue;
             };
-            diagnostics.entry(uri.clone()).or_default().push(diagnostic);
-        }
-    } else {
-        for (_, diagnostic) in lsp_diagnostics {
-            diagnostics
-                .entry(query.make_key().into_url())
+            diagnostics_map
+                .entry(uri.clone())
                 .or_default()
                 .push(diagnostic);
         }
+    } else {
+        diagnostics_map
+            .entry(query.make_key().into_url())
+            .or_default()
+            .extend(lsp_diagnostics.map(|(_, diagnostic)| diagnostic));
     }
 
-    diagnostics
+    diagnostics_map
 }
 
 /// Converts LSP diagnostics to a list of `DiagnosticFix`es by deserializing associated data on each diagnostic.
@@ -287,6 +301,45 @@ fn to_lsp_diagnostic(
     )
 }
 
+fn parse_error_to_lsp_diagnostic(
+    parse_error: &ParseError,
+    source_kind: &SourceKind,
+    index: &LineIndex,
+    encoding: PositionEncoding,
+) -> (usize, lsp_types::Diagnostic) {
+    let range: lsp_types::Range;
+    let cell: usize;
+
+    if let Some(notebook_index) = source_kind.as_ipy_notebook().map(Notebook::index) {
+        NotebookRange { cell, range } = parse_error.location.to_notebook_range(
+            source_kind.source_code(),
+            index,
+            notebook_index,
+            encoding,
+        );
+    } else {
+        cell = usize::default();
+        range = parse_error
+            .location
+            .to_range(source_kind.source_code(), index, encoding);
+    }
+
+    (
+        cell,
+        lsp_types::Diagnostic {
+            range,
+            severity: Some(lsp_types::DiagnosticSeverity::ERROR),
+            tags: None,
+            code: None,
+            code_description: None,
+            source: Some(DIAGNOSTIC_NAME.into()),
+            message: format!("SyntaxError: {}", &parse_error.error),
+            related_information: None,
+            data: None,
+        },
+    )
+}
+
 fn diagnostic_edit_range(
     range: TextRange,
     source_kind: &SourceKind,
@@ -306,8 +359,7 @@ fn severity(code: &str) -> lsp_types::DiagnosticSeverity {
     match code {
         // F821: undefined name <name>
         // E902: IOError
-        // E999: SyntaxError
-        "F821" | "E902" | "E999" => lsp_types::DiagnosticSeverity::ERROR,
+        "F821" | "E902" => lsp_types::DiagnosticSeverity::ERROR,
         _ => lsp_types::DiagnosticSeverity::WARNING,
     }
 }

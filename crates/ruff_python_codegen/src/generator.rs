@@ -921,10 +921,10 @@ impl<'a> Generator<'a> {
                     self.unparse_expr(orelse, precedence::IF_EXP);
                 });
             }
-            Expr::Dict(ast::ExprDict { items, range: _ }) => {
+            Expr::Dict(dict) => {
                 self.p("{");
                 let mut first = true;
-                for ast::DictItem { key, value } in items {
+                for ast::DictItem { key, value } in dict {
                     self.p_delim(&mut first, ", ");
                     if let Some(key) = key {
                         self.unparse_expr(key, precedence::COMMA);
@@ -937,15 +937,15 @@ impl<'a> Generator<'a> {
                 }
                 self.p("}");
             }
-            Expr::Set(ast::ExprSet { elts, range: _ }) => {
-                if elts.is_empty() {
+            Expr::Set(set) => {
+                if set.is_empty() {
                     self.p("set()");
                 } else {
                     self.p("{");
                     let mut first = true;
-                    for v in elts {
+                    for item in set {
                         self.p_delim(&mut first, ", ");
-                        self.unparse_expr(v, precedence::COMMA);
+                        self.unparse_expr(item, precedence::COMMA);
                     }
                     self.p("}");
                 }
@@ -1024,7 +1024,7 @@ impl<'a> Generator<'a> {
                 group_if!(precedence::CMP, {
                     let new_lvl = precedence::CMP + 1;
                     self.unparse_expr(left, new_lvl);
-                    for (op, cmp) in ops.iter().zip(&**comparators) {
+                    for (op, cmp) in ops.iter().zip(comparators) {
                         let op = match op {
                             CmpOp::Eq => " == ",
                             CmpOp::NotEq => " != ",
@@ -1164,26 +1164,26 @@ impl<'a> Generator<'a> {
                 self.unparse_expr(value, precedence::MAX);
             }
             Expr::Name(ast::ExprName { id, .. }) => self.p(id.as_str()),
-            Expr::List(ast::ExprList { elts, .. }) => {
+            Expr::List(list) => {
                 self.p("[");
                 let mut first = true;
-                for elt in elts {
+                for item in list {
                     self.p_delim(&mut first, ", ");
-                    self.unparse_expr(elt, precedence::COMMA);
+                    self.unparse_expr(item, precedence::COMMA);
                 }
                 self.p("]");
             }
-            Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                if elts.is_empty() {
+            Expr::Tuple(tuple) => {
+                if tuple.is_empty() {
                     self.p("()");
                 } else {
                     group_if!(precedence::TUPLE, {
                         let mut first = true;
-                        for elt in elts {
+                        for item in tuple {
                             self.p_delim(&mut first, ", ");
-                            self.unparse_expr(elt, precedence::COMMA);
+                            self.unparse_expr(item, precedence::COMMA);
                         }
-                        self.p_if(elts.len() == 1, ",");
+                        self.p_if(tuple.len() == 1, ",");
                     });
                 }
             }

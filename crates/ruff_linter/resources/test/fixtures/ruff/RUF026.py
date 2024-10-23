@@ -110,7 +110,7 @@ def func():
 
 
 def func():
-    defaultdict(dict, defaultdict=list)  # OK
+    defaultdict(dict, default_factory=list)  # OK
 
 
 def func():

@@ -1,12 +1,10 @@
 //! Interface for generating fix edits from higher-level actions (e.g., "remove an argument").
 
-use std::borrow::Cow;
-
 use anyhow::{Context, Result};
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Expr, ExprList, Stmt};
+use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Expr, ExprList, Parameters, Stmt};
 use ruff_python_ast::{AnyNodeRef, ArgOrKeyword};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
@@ -101,11 +99,8 @@ pub(crate) fn delete_comment(range: TextRange, locator: &Locator) -> Edit {
     }
     // Ex) `x = 1  # noqa here`
     else {
-        // Replace `# noqa here` with `# here`.
-        Edit::range_replacement(
-            "# ".to_string(),
-            TextRange::new(range.start(), range.end() + trailing_space_len),
-        )
+        // Remove `# noqa here` and whitespace
+        Edit::deletion(range.start() - leading_space_len, line_range.end())
     }
 }
 
@@ -126,7 +121,7 @@ pub(crate) fn remove_unused_imports<'a>(
 
 /// Edits to make the specified imports explicit, e.g. change `import x` to `import x as x`.
 pub(crate) fn make_redundant_alias<'a>(
-    member_names: impl Iterator<Item = Cow<'a, str>>,
+    member_names: impl Iterator<Item = &'a str>,
     stmt: &Stmt,
 ) -> Vec<Edit> {
     let aliases = match stmt {
@@ -140,7 +135,7 @@ pub(crate) fn make_redundant_alias<'a>(
         .filter_map(|name| {
             aliases
                 .iter()
-                .find(|alias| alias.asname.is_none() && name == alias.name.id)
+                .find(|alias| alias.asname.is_none() && *name == alias.name.id)
                 .map(|alias| Edit::range_replacement(format!("{name} as {name}"), alias.range))
         })
         .collect()
@@ -153,16 +148,15 @@ pub(crate) fn add_to_dunder_all<'a>(
     stylist: &Stylist,
 ) -> Vec<Edit> {
     let (insertion_point, export_prefix_length) = match expr {
-        Expr::List(ExprList { elts, range, .. }) => (
-            elts.last()
-                .map_or(range.end() - "]".text_len(), Ranged::end),
+        Expr::List(ExprList { elts, .. }) => (
+            elts.last().map_or(expr.end() - "]".text_len(), Ranged::end),
             elts.len(),
         ),
         Expr::Tuple(tup) if tup.parenthesized => (
             tup.elts
                 .last()
                 .map_or(tup.end() - ")".text_len(), Ranged::end),
-            tup.elts.len(),
+            tup.len(),
         ),
         Expr::Tuple(tup) if !tup.parenthesized => (
             tup.elts
@@ -170,7 +164,7 @@ pub(crate) fn add_to_dunder_all<'a>(
                 .expect("unparenthesized empty tuple is not possible")
                 .range()
                 .end(),
-            tup.elts.len(),
+            tup.len(),
         ),
         _ => {
             // we don't know how to insert into this expression
@@ -202,11 +196,11 @@ pub(crate) enum Parentheses {
 }
 
 /// Generic function to remove arguments or keyword arguments in function
-/// calls and class definitions. (For classes `args` should be considered
-/// `bases`)
+/// calls and class definitions. (For classes, `args` should be considered
+/// `bases`.)
 ///
 /// Supports the removal of parentheses when this is the only (kw)arg left.
-/// For this behavior, set `remove_parentheses` to `true`.
+/// For this behavior, set `parentheses` to `Parentheses::Remove`.
 pub(crate) fn remove_argument<T: Ranged>(
     argument: &T,
     arguments: &Arguments,
@@ -285,6 +279,59 @@ pub(crate) fn add_argument(
     }
 }
 
+/// Generic function to add a (regular) parameter to a function definition.
+pub(crate) fn add_parameter(parameter: &str, parameters: &Parameters, source: &str) -> Edit {
+    if let Some(last) = parameters
+        .args
+        .iter()
+        .filter(|arg| arg.default.is_none())
+        .last()
+    {
+        // Case 1: at least one regular parameter, so append after the last one.
+        Edit::insertion(format!(", {parameter}"), last.end())
+    } else if parameters.args.first().is_some() {
+        // Case 2: no regular parameters, but at least one keyword parameter, so add before the
+        // first.
+        let pos = parameters.start();
+        let mut tokenizer = SimpleTokenizer::starts_at(pos, source);
+        let name = tokenizer
+            .find(|token| token.kind == SimpleTokenKind::Name)
+            .expect("Unable to find name token");
+        Edit::insertion(format!("{parameter}, "), name.start())
+    } else if let Some(last) = parameters.posonlyargs.last() {
+        // Case 2: no regular parameter, but a positional-only parameter exists, so add after that.
+        // We take care to add it *after* the `/` separator.
+        let pos = last.end();
+        let mut tokenizer = SimpleTokenizer::starts_at(pos, source);
+        let slash = tokenizer
+            .find(|token| token.kind == SimpleTokenKind::Slash)
+            .expect("Unable to find `/` token");
+        // Try to find a comma after the slash.
+        let comma = tokenizer.find(|token| token.kind == SimpleTokenKind::Comma);
+        if let Some(comma) = comma {
+            Edit::insertion(format!(" {parameter},"), comma.start() + TextSize::from(1))
+        } else {
+            Edit::insertion(format!(", {parameter}"), slash.start())
+        }
+    } else if parameters.kwonlyargs.first().is_some() {
+        // Case 3: no regular parameter, but a keyword-only parameter exist, so add parameter before that.
+        // We need to backtrack to before the `*` separator.
+        // We know there is no non-keyword-only params, so we can safely assume that the `*` separator is the first
+        let pos = parameters.start();
+        let mut tokenizer = SimpleTokenizer::starts_at(pos, source);
+        let star = tokenizer
+            .find(|token| token.kind == SimpleTokenKind::Star)
+            .expect("Unable to find `*` token");
+        Edit::insertion(format!("{parameter}, "), star.start())
+    } else {
+        // Case 4: no parameters at all, so add parameter after the opening parenthesis.
+        Edit::insertion(
+            parameter.to_string(),
+            parameters.start() + TextSize::from(1),
+        )
+    }
+}
+
 /// Safely adjust the indentation of the indented block at [`TextRange`].
 ///
 /// The [`TextRange`] is assumed to represent an entire indented block, including the leading
@@ -302,31 +349,46 @@ pub(crate) fn adjust_indentation(
     indexer: &Indexer,
     stylist: &Stylist,
 ) -> Result<String> {
+    let contents = locator.slice(range);
+
     // If the range includes a multi-line string, use LibCST to ensure that we don't adjust the
     // whitespace _within_ the string.
-    if indexer.multiline_ranges().intersects(range) || indexer.fstring_ranges().intersects(range) {
-        let contents = locator.slice(range);
+    let contains_multiline_string =
+        indexer.multiline_ranges().intersects(range) || indexer.fstring_ranges().intersects(range);
 
-        let module_text = format!("def f():{}{contents}", stylist.line_ending().as_str());
+    // If the range has mixed indentation, we will use LibCST as well.
+    let mixed_indentation = contents.universal_newlines().any(|line| {
+        let trimmed = line.trim_whitespace_start();
+        if trimmed.is_empty() {
+            return false;
+        }
 
-        let mut tree = match_statement(&module_text)?;
+        let line_indentation: &str = &line[..line.len() - trimmed.len()];
+        line_indentation.contains('\t') && line_indentation.contains(' ')
+    });
 
-        let embedding = match_function_def(&mut tree)?;
-
-        let indented_block = match_indented_block(&mut embedding.body)?;
-        indented_block.indent = Some(indentation);
-
-        let module_text = indented_block.codegen_stylist(stylist);
-        let module_text = module_text
-            .strip_prefix(stylist.line_ending().as_str())
-            .unwrap()
-            .to_string();
-        Ok(module_text)
-    } else {
-        // Otherwise, we can do a simple adjustment ourselves.
-        let contents = locator.slice(range);
-        Ok(dedent_to(contents, indentation))
+    // For simple cases, try to do a manual dedent.
+    if !contains_multiline_string && !mixed_indentation {
+        if let Some(dedent) = dedent_to(contents, indentation) {
+            return Ok(dedent);
+        }
     }
+
+    let module_text = format!("def f():{}{contents}", stylist.line_ending().as_str());
+
+    let mut tree = match_statement(&module_text)?;
+
+    let embedding = match_function_def(&mut tree)?;
+
+    let indented_block = match_indented_block(&mut embedding.body)?;
+    indented_block.indent = Some(indentation);
+
+    let module_text = indented_block.codegen_stylist(stylist);
+    let module_text = module_text
+        .strip_prefix(stylist.line_ending().as_str())
+        .unwrap()
+        .to_string();
+    Ok(module_text)
 }
 
 /// Determine if a vector contains only one, specific element.
@@ -527,7 +589,6 @@ fn all_lines_fit(
 #[cfg(test)]
 mod tests {
     use anyhow::{anyhow, Result};
-    use std::borrow::Cow;
     use test_case::test_case;
 
     use ruff_diagnostics::{Diagnostic, Edit, Fix};
@@ -619,7 +680,7 @@ x = 1 \
         let contents = "import x, y as y, z as bees";
         let stmt = parse_first_stmt(contents)?;
         assert_eq!(
-            make_redundant_alias(["x"].into_iter().map(Cow::from), &stmt),
+            make_redundant_alias(["x"].into_iter(), &stmt),
             vec![Edit::range_replacement(
                 String::from("x as x"),
                 TextRange::new(TextSize::new(7), TextSize::new(8)),
@@ -627,7 +688,7 @@ x = 1 \
             "make just one item redundant"
         );
         assert_eq!(
-            make_redundant_alias(vec!["x", "y"].into_iter().map(Cow::from), &stmt),
+            make_redundant_alias(vec!["x", "y"].into_iter(), &stmt),
             vec![Edit::range_replacement(
                 String::from("x as x"),
                 TextRange::new(TextSize::new(7), TextSize::new(8)),
@@ -635,7 +696,7 @@ x = 1 \
             "the second item is already a redundant alias"
         );
         assert_eq!(
-            make_redundant_alias(vec!["x", "z"].into_iter().map(Cow::from), &stmt),
+            make_redundant_alias(vec!["x", "z"].into_iter(), &stmt),
             vec![Edit::range_replacement(
                 String::from("x as x"),
                 TextRange::new(TextSize::new(7), TextSize::new(8)),

@@ -1,0 +1,47 @@
+---
+source: crates/ruff_linter/src/rules/flake8_async/mod.rs
+---
+ASYNC110.py:7:5: ASYNC110 Use `trio.Event` instead of awaiting `trio.sleep` in a `while` loop
+  |
+6 |   async def func():
+7 |       while True:
+  |  _____^
+8 | |         await trio.sleep(10)
+  | |____________________________^ ASYNC110
+  |
+
+ASYNC110.py:12:5: ASYNC110 Use `trio.Event` instead of awaiting `trio.sleep` in a `while` loop
+   |
+11 |   async def func():
+12 |       while True:
+   |  _____^
+13 | |         await trio.sleep_until(10)
+   | |__________________________________^ ASYNC110
+   |
+
+ASYNC110.py:22:5: ASYNC110 Use `asyncio.Event` instead of awaiting `asyncio.sleep` in a `while` loop
+   |
+21 |   async def func():
+22 |       while True:
+   |  _____^
+23 | |         await anyio.sleep(10)
+   | |_____________________________^ ASYNC110
+   |
+
+ASYNC110.py:27:5: ASYNC110 Use `asyncio.Event` instead of awaiting `asyncio.sleep` in a `while` loop
+   |
+26 |   async def func():
+27 |       while True:
+   |  _____^
+28 | |         await anyio.sleep_until(10)
+   | |___________________________________^ ASYNC110
+   |
+
+ASYNC110.py:37:5: ASYNC110 Use `anyio.Event` instead of awaiting `anyio.sleep` in a `while` loop
+   |
+36 |   async def func():
+37 |       while True:
+   |  _____^
+38 | |         await asyncio.sleep(10)
+   | |_______________________________^ ASYNC110
+   |

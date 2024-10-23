@@ -3,7 +3,7 @@
 use std::{borrow::Cow, cmp::Ordering, cmp::Reverse};
 
 use natord;
-use unicode_width::UnicodeWidthStr;
+use unicode_width::UnicodeWidthChar;
 
 use ruff_python_stdlib::str;
 
@@ -106,7 +106,11 @@ impl<'a> ModuleKey<'a> {
 
         let maybe_length = (settings.length_sort
             || (settings.length_sort_straight && style == ImportStyle::Straight))
-            .then_some(name.map(str::width).unwrap_or_default() + level as usize);
+            .then_some(
+                name.map(|name| name.chars().map(|c| c.width().unwrap_or(0)).sum::<usize>())
+                    .unwrap_or_default()
+                    + level as usize,
+            );
 
         let distance = match level {
             0 => Distance::None,
@@ -157,7 +161,9 @@ impl<'a> MemberKey<'a> {
         let member_type = settings
             .order_by_type
             .then_some(member_type(name, settings));
-        let maybe_length = settings.length_sort.then_some(name.width());
+        let maybe_length = settings
+            .length_sort
+            .then(|| name.chars().map(|c| c.width().unwrap_or(0)).sum());
         let maybe_lowercase_name =
             (!settings.case_sensitive).then_some(NatOrdStr(maybe_lowercase(name)));
         let module_name = NatOrdStr::from(name);

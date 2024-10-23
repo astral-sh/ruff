@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.4.8"
+version = "0.7.0"
 description = "An extremely fast Python linter and code formatter, written in Rust."
 authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"
@@ -59,7 +59,7 @@ include = [
 
 [tool.ruff]
 extend-exclude = [
-  "crates/red_knot/vendor/",
+  "crates/red_knot_vendored/vendor/",
   "crates/ruff/resources/",
   "crates/ruff_linter/resources/",
   "crates/ruff_python_formatter/resources/",
@@ -75,7 +75,7 @@ ignore = [
 [tool.black]
 force-exclude = '''
 /(
-  | crates/red_knot/vendor
+  | crates/red_knot_vendored/vendor
   | crates/ruff_linter/resources
   | crates/ruff_python_formatter/resources
   | crates/ruff_python_parser/resources
@@ -85,7 +85,6 @@ force-exclude = '''
 [tool.rooster]
 major_labels = []  # Ruff never uses the major version number
 minor_labels = ["breaking"]   # Bump the minor version on breaking changes
-version_tag_prefix = "v"
 
 changelog_ignore_labels = ["internal", "ci", "red-knot"]
 
@@ -109,5 +108,6 @@ version_files = [
   "docs/integrations.md",
   "crates/ruff/Cargo.toml",
   "crates/ruff_linter/Cargo.toml",
+  "crates/ruff_wasm/Cargo.toml",
   "scripts/benchmarks/pyproject.toml",
 ]

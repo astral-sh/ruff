@@ -18,7 +18,7 @@ Module(
                             func: Name(
                                 ExprName {
                                     range: 5..8,
-                                    id: "foo",
+                                    id: Name("foo"),
                                     ctx: Load,
                                 },
                             ),
@@ -48,14 +48,14 @@ Module(
                             expression: Name(
                                 ExprName {
                                     range: 17..17,
-                                    id: "",
+                                    id: Name(""),
                                     ctx: Invalid,
                                 },
                             ),
                         },
                     ],
                     name: Identifier {
-                        id: "foo",
+                        id: Name("foo"),
                         range: 22..25,
                     },
                     type_params: None,
@@ -95,7 +95,7 @@ Module(
                                     left: Name(
                                         ExprName {
                                             range: 34..34,
-                                            id: "",
+                                            id: Name(""),
                                             ctx: Invalid,
                                         },
                                     ),
@@ -103,7 +103,7 @@ Module(
                                     right: Name(
                                         ExprName {
                                             range: 35..35,
-                                            id: "",
+                                            id: Name(""),
                                             ctx: Invalid,
                                         },
                                     ),
@@ -112,7 +112,7 @@ Module(
                         },
                     ],
                     name: Identifier {
-                        id: "foo",
+                        id: Name("foo"),
                         range: 40..43,
                     },
                     type_params: None,

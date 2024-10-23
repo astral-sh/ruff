@@ -14,7 +14,7 @@ Module(
                     range: 0..19,
                     decorator_list: [],
                     name: Identifier {
-                        id: "Test",
+                        id: Name("Test"),
                         range: 6..10,
                     },
                     type_params: None,
@@ -38,7 +38,7 @@ Module(
                     range: 22..80,
                     decorator_list: [],
                     name: Identifier {
-                        id: "Test",
+                        id: Name("Test"),
                         range: 28..32,
                     },
                     type_params: None,
@@ -56,7 +56,7 @@ Module(
                                 is_async: false,
                                 decorator_list: [],
                                 name: Identifier {
-                                    id: "__init__",
+                                    id: Name("__init__"),
                                     range: 48..56,
                                 },
                                 type_params: None,
@@ -69,7 +69,7 @@ Module(
                                             parameter: Parameter {
                                                 range: 57..61,
                                                 name: Identifier {
-                                                    id: "self",
+                                                    id: Name("self"),
                                                     range: 57..61,
                                                 },
                                                 annotation: None,
@@ -99,7 +99,7 @@ Module(
                     range: 83..116,
                     decorator_list: [],
                     name: Identifier {
-                        id: "Test",
+                        id: Name("Test"),
                         range: 89..93,
                     },
                     type_params: None,
@@ -113,7 +113,7 @@ Module(
                                         value: Name(
                                             ExprName {
                                                 range: 100..101,
-                                                id: "A",
+                                                id: Name("A"),
                                                 ctx: Load,
                                             },
                                         ),
@@ -126,7 +126,7 @@ Module(
                                     range: 94..97,
                                     arg: Some(
                                         Identifier {
-                                            id: "a",
+                                            id: Name("a"),
                                             range: 94..95,
                                         },
                                     ),
@@ -145,7 +145,7 @@ Module(
                                     value: Name(
                                         ExprName {
                                             range: 105..106,
-                                            id: "k",
+                                            id: Name("k"),
                                             ctx: Load,
                                         },
                                     ),
@@ -172,7 +172,7 @@ Module(
                     range: 119..168,
                     decorator_list: [],
                     name: Identifier {
-                        id: "Test",
+                        id: Name("Test"),
                         range: 125..129,
                     },
                     type_params: None,
@@ -184,7 +184,7 @@ Module(
                                 is_async: false,
                                 decorator_list: [],
                                 name: Identifier {
-                                    id: "method",
+                                    id: Name("method"),
                                     range: 139..145,
                                 },
                                 type_params: None,
@@ -209,14 +209,14 @@ Module(
                                                             Name(
                                                                 ExprName {
                                                                     range: 157..158,
-                                                                    id: "a",
+                                                                    id: Name("a"),
                                                                     ctx: Store,
                                                                 },
                                                             ),
                                                             Name(
                                                                 ExprName {
                                                                     range: 160..161,
-                                                                    id: "b",
+                                                                    id: Name("b"),
                                                                     ctx: Store,
                                                                 },
                                                             ),
@@ -229,7 +229,7 @@ Module(
                                             value: Name(
                                                 ExprName {
                                                     range: 164..168,
-                                                    id: "data",
+                                                    id: Name("data"),
                                                     ctx: Load,
                                                 },
                                             ),
@@ -246,7 +246,7 @@ Module(
                     range: 171..289,
                     decorator_list: [],
                     name: Identifier {
-                        id: "Test",
+                        id: Name("Test"),
                         range: 177..181,
                     },
                     type_params: None,
@@ -257,14 +257,14 @@ Module(
                                 Name(
                                     ExprName {
                                         range: 182..183,
-                                        id: "A",
+                                        id: Name("A"),
                                         ctx: Load,
                                     },
                                 ),
                                 Name(
                                     ExprName {
                                         range: 185..186,
-                                        id: "B",
+                                        id: Name("B"),
                                         ctx: Load,
                                     },
                                 ),
@@ -279,7 +279,7 @@ Module(
                                 is_async: false,
                                 decorator_list: [],
                                 name: Identifier {
-                                    id: "__init__",
+                                    id: Name("__init__"),
                                     range: 197..205,
                                 },
                                 type_params: None,
@@ -292,7 +292,7 @@ Module(
                                             parameter: Parameter {
                                                 range: 206..210,
                                                 name: Identifier {
-                                                    id: "self",
+                                                    id: Name("self"),
                                                     range: 206..210,
                                                 },
                                                 annotation: None,
@@ -320,7 +320,7 @@ Module(
                                 is_async: false,
                                 decorator_list: [],
                                 name: Identifier {
-                                    id: "method_with_default",
+                                    id: Name("method_with_default"),
                                     range: 235..254,
                                 },
                                 type_params: None,
@@ -333,7 +333,7 @@ Module(
                                             parameter: Parameter {
                                                 range: 255..259,
                                                 name: Identifier {
-                                                    id: "self",
+                                                    id: Name("self"),
                                                     range: 255..259,
                                                 },
                                                 annotation: None,
@@ -345,7 +345,7 @@ Module(
                                             parameter: Parameter {
                                                 range: 261..264,
                                                 name: Identifier {
-                                                    id: "arg",
+                                                    id: Name("arg"),
                                                     range: 261..264,
                                                 },
                                                 annotation: None,
@@ -394,7 +394,7 @@ Module(
                     range: 331..351,
                     decorator_list: [],
                     name: Identifier {
-                        id: "Test",
+                        id: Name("Test"),
                         range: 337..341,
                     },
                     type_params: Some(
@@ -405,7 +405,7 @@ Module(
                                     TypeParamTypeVar {
                                         range: 342..343,
                                         name: Identifier {
-                                            id: "T",
+                                            id: Name("T"),
                                             range: 342..343,
                                         },
                                         bound: None,
@@ -441,7 +441,7 @@ Module(
                     range: 376..402,
                     decorator_list: [],
                     name: Identifier {
-                        id: "Test",
+                        id: Name("Test"),
                         range: 382..386,
                     },
                     type_params: Some(
@@ -452,7 +452,7 @@ Module(
                                     TypeParamTypeVar {
                                         range: 387..394,
                                         name: Identifier {
-                                            id: "T",
+                                            id: Name("T"),
                                             range: 387..388,
                                         },
                                         bound: None,
@@ -460,7 +460,7 @@ Module(
                                             Name(
                                                 ExprName {
                                                     range: 391..394,
-                                                    id: "str",
+                                                    id: Name("str"),
                                                     ctx: Load,
                                                 },
                                             ),
@@ -496,7 +496,7 @@ Module(
                     range: 425..450,
                     decorator_list: [],
                     name: Identifier {
-                        id: "Test",
+                        id: Name("Test"),
                         range: 431..435,
                     },
                     type_params: Some(
@@ -507,14 +507,14 @@ Module(
                                     TypeParamTypeVar {
                                         range: 436..442,
                                         name: Identifier {
-                                            id: "T",
+                                            id: Name("T"),
                                             range: 436..437,
                                         },
                                         bound: Some(
                                             Name(
                                                 ExprName {
                                                     range: 439..442,
-                                                    id: "str",
+                                                    id: Name("str"),
                                                     ctx: Load,
                                                 },
                                             ),
@@ -551,7 +551,7 @@ Module(
                     range: 485..522,
                     decorator_list: [],
                     name: Identifier {
-                        id: "Test",
+                        id: Name("Test"),
                         range: 491..495,
                     },
                     type_params: Some(
@@ -562,7 +562,7 @@ Module(
                                     TypeParamTypeVar {
                                         range: 496..514,
                                         name: Identifier {
-                                            id: "T",
+                                            id: Name("T"),
                                             range: 496..497,
                                         },
                                         bound: Some(
@@ -572,7 +572,7 @@ Module(
                                                     left: Name(
                                                         ExprName {
                                                             range: 499..502,
-                                                            id: "int",
+                                                            id: Name("int"),
                                                             ctx: Load,
                                                         },
                                                     ),
@@ -580,7 +580,7 @@ Module(
                                                     right: Name(
                                                         ExprName {
                                                             range: 505..508,
-                                                            id: "str",
+                                                            id: Name("str"),
                                                             ctx: Load,
                                                         },
                                                     ),
@@ -591,7 +591,7 @@ Module(
                                             Name(
                                                 ExprName {
                                                     range: 511..514,
-                                                    id: "int",
+                                                    id: Name("int"),
                                                     ctx: Load,
                                                 },
                                             ),
@@ -627,7 +627,7 @@ Module(
                     range: 551..585,
                     decorator_list: [],
                     name: Identifier {
-                        id: "Test",
+                        id: Name("Test"),
                         range: 557..561,
                     },
                     type_params: Some(
@@ -638,7 +638,7 @@ Module(
                                     TypeParamTypeVar {
                                         range: 562..577,
                                         name: Identifier {
-                                            id: "T",
+                                            id: Name("T"),
                                             range: 562..563,
                                         },
                                         bound: Some(
@@ -649,14 +649,14 @@ Module(
                                                         Name(
                                                             ExprName {
                                                                 range: 566..569,
-                                                                id: "str",
+                                                                id: Name("str"),
                                                                 ctx: Load,
                                                             },
                                                         ),
                                                         Name(
                                                             ExprName {
                                                                 range: 571..576,
-                                                                id: "bytes",
+                                                                id: Name("bytes"),
                                                                 ctx: Load,
                                                             },
                                                         ),
@@ -698,7 +698,7 @@ Module(
                     range: 606..629,
                     decorator_list: [],
                     name: Identifier {
-                        id: "Test",
+                        id: Name("Test"),
                         range: 612..616,
                     },
                     type_params: Some(
@@ -709,7 +709,7 @@ Module(
                                     TypeParamTypeVar {
                                         range: 617..618,
                                         name: Identifier {
-                                            id: "T",
+                                            id: Name("T"),
                                             range: 617..618,
                                         },
                                         bound: None,
@@ -720,7 +720,7 @@ Module(
                                     TypeParamTypeVar {
                                         range: 620..621,
                                         name: Identifier {
-                                            id: "U",
+                                            id: Name("U"),
                                             range: 620..621,
                                         },
                                         bound: None,
@@ -756,7 +756,7 @@ Module(
                     range: 648..672,
                     decorator_list: [],
                     name: Identifier {
-                        id: "Test",
+                        id: Name("Test"),
                         range: 654..658,
                     },
                     type_params: Some(
@@ -767,7 +767,7 @@ Module(
                                     TypeParamTypeVar {
                                         range: 659..660,
                                         name: Identifier {
-                                            id: "T",
+                                            id: Name("T"),
                                             range: 659..660,
                                         },
                                         bound: None,
@@ -778,7 +778,7 @@ Module(
                                     TypeParamTypeVar {
                                         range: 662..663,
                                         name: Identifier {
-                                            id: "U",
+                                            id: Name("U"),
                                             range: 662..663,
                                         },
                                         bound: None,
@@ -814,7 +814,7 @@ Module(
                     range: 689..711,
                     decorator_list: [],
                     name: Identifier {
-                        id: "Test",
+                        id: Name("Test"),
                         range: 695..699,
                     },
                     type_params: Some(
@@ -825,7 +825,7 @@ Module(
                                     TypeParamTypeVarTuple {
                                         range: 700..703,
                                         name: Identifier {
-                                            id: "Ts",
+                                            id: Name("Ts"),
                                             range: 701..703,
                                         },
                                         default: None,
@@ -860,7 +860,7 @@ Module(
                     range: 741..789,
                     decorator_list: [],
                     name: Identifier {
-                        id: "Test",
+                        id: Name("Test"),
                         range: 747..751,
                     },
                     type_params: Some(
@@ -871,7 +871,7 @@ Module(
                                     TypeParamTypeVarTuple {
                                         range: 752..781,
                                         name: Identifier {
-                                            id: "Ts",
+                                            id: Name("Ts"),
                                             range: 753..755,
                                         },
                                         default: Some(
@@ -881,7 +881,7 @@ Module(
                                                     value: Name(
                                                         ExprName {
                                                             range: 758..764,
-                                                            id: "Unpack",
+                                                            id: Name("Unpack"),
                                                             ctx: Load,
                                                         },
                                                     ),
@@ -891,7 +891,7 @@ Module(
                                                             value: Name(
                                                                 ExprName {
                                                                     range: 765..770,
-                                                                    id: "tuple",
+                                                                    id: Name("tuple"),
                                                                     ctx: Load,
                                                                 },
                                                             ),
@@ -902,14 +902,14 @@ Module(
                                                                         Name(
                                                                             ExprName {
                                                                                 range: 771..774,
-                                                                                id: "int",
+                                                                                id: Name("int"),
                                                                                 ctx: Load,
                                                                             },
                                                                         ),
                                                                         Name(
                                                                             ExprName {
                                                                                 range: 776..779,
-                                                                                id: "str",
+                                                                                id: Name("str"),
                                                                                 ctx: Load,
                                                                             },
                                                                         ),
@@ -956,7 +956,7 @@ Module(
                     range: 827..868,
                     decorator_list: [],
                     name: Identifier {
-                        id: "Test",
+                        id: Name("Test"),
                         range: 833..837,
                     },
                     type_params: Some(
@@ -967,7 +967,7 @@ Module(
                                     TypeParamTypeVarTuple {
                                         range: 838..860,
                                         name: Identifier {
-                                            id: "Ts",
+                                            id: Name("Ts"),
                                             range: 839..841,
                                         },
                                         default: Some(
@@ -980,7 +980,7 @@ Module(
                                                             value: Name(
                                                                 ExprName {
                                                                     range: 845..850,
-                                                                    id: "tuple",
+                                                                    id: Name("tuple"),
                                                                     ctx: Load,
                                                                 },
                                                             ),
@@ -991,14 +991,14 @@ Module(
                                                                         Name(
                                                                             ExprName {
                                                                                 range: 851..854,
-                                                                                id: "int",
+                                                                                id: Name("int"),
                                                                                 ctx: Load,
                                                                             },
                                                                         ),
                                                                         Name(
                                                                             ExprName {
                                                                                 range: 856..859,
-                                                                                id: "str",
+                                                                                id: Name("str"),
                                                                                 ctx: Load,
                                                                             },
                                                                         ),
@@ -1045,7 +1045,7 @@ Module(
                     range: 882..904,
                     decorator_list: [],
                     name: Identifier {
-                        id: "Test",
+                        id: Name("Test"),
                         range: 888..892,
                     },
                     type_params: Some(
@@ -1056,7 +1056,7 @@ Module(
                                     TypeParamParamSpec {
                                         range: 893..896,
                                         name: Identifier {
-                                            id: "P",
+                                            id: Name("P"),
                                             range: 895..896,
                                         },
                                         default: None,
@@ -1091,7 +1091,7 @@ Module(
                     range: 931..966,
                     decorator_list: [],
                     name: Identifier {
-                        id: "Test",
+                        id: Name("Test"),
                         range: 937..941,
                     },
                     type_params: Some(
@@ -1102,7 +1102,7 @@ Module(
                                     TypeParamParamSpec {
                                         range: 942..958,
                                         name: Identifier {
-                                            id: "P",
+                                            id: Name("P"),
                                             range: 944..945,
                                         },
                                         default: Some(
@@ -1113,14 +1113,14 @@ Module(
                                                         Name(
                                                             ExprName {
                                                                 range: 949..952,
-                                                                id: "int",
+                                                                id: Name("int"),
                                                                 ctx: Load,
                                                             },
                                                         ),
                                                         Name(
                                                             ExprName {
                                                                 range: 954..957,
-                                                                id: "str",
+                                                                id: Name("str"),
                                                                 ctx: Load,
                                                             },
                                                         ),
@@ -1160,7 +1160,7 @@ Module(
                     range: 982..1022,
                     decorator_list: [],
                     name: Identifier {
-                        id: "Test",
+                        id: Name("Test"),
                         range: 988..992,
                     },
                     type_params: Some(
@@ -1171,7 +1171,7 @@ Module(
                                     TypeParamTypeVar {
                                         range: 993..994,
                                         name: Identifier {
-                                            id: "X",
+                                            id: Name("X"),
                                             range: 993..994,
                                         },
                                         bound: None,
@@ -1182,14 +1182,14 @@ Module(
                                     TypeParamTypeVar {
                                         range: 996..1002,
                                         name: Identifier {
-                                            id: "Y",
+                                            id: Name("Y"),
                                             range: 996..997,
                                         },
                                         bound: Some(
                                             Name(
                                                 ExprName {
                                                     range: 999..1002,
-                                                    id: "str",
+                                                    id: Name("str"),
                                                     ctx: Load,
                                                 },
                                             ),
@@ -1201,7 +1201,7 @@ Module(
                                     TypeParamTypeVarTuple {
                                         range: 1004..1006,
                                         name: Identifier {
-                                            id: "U",
+                                            id: Name("U"),
                                             range: 1005..1006,
                                         },
                                         default: None,
@@ -1211,7 +1211,7 @@ Module(
                                     TypeParamParamSpec {
                                         range: 1008..1011,
                                         name: Identifier {
-                                            id: "P",
+                                            id: Name("P"),
                                             range: 1010..1011,
                                         },
                                         default: None,

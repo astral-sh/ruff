@@ -34,20 +34,19 @@ use crate::importer::ImportRequest;
 ///
 #[violation]
 pub struct RegexFlagAlias {
-    alias: &'static str,
-    full_name: &'static str,
+    flag: RegexFlag,
 }
 
 impl AlwaysFixableViolation for RegexFlagAlias {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RegexFlagAlias { alias, .. } = self;
-        format!("Use of regular expression alias `re.{alias}`")
+        let RegexFlagAlias { flag } = self;
+        format!("Use of regular expression alias `re.{}`", flag.alias())
     }
 
     fn fix_title(&self) -> String {
-        let RegexFlagAlias { full_name, .. } = self;
-        format!("Replace with `re.{full_name}`")
+        let RegexFlagAlias { flag } = self;
+        format!("Replace with `re.{}`", flag.full_name())
     }
 }
 
@@ -75,13 +74,7 @@ pub(crate) fn regex_flag_alias(checker: &mut Checker, expr: &Expr) {
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(
-        RegexFlagAlias {
-            alias: flag.alias(),
-            full_name: flag.full_name(),
-        },
-        expr.range(),
-    );
+    let mut diagnostic = Diagnostic::new(RegexFlagAlias { flag }, expr.range());
     diagnostic.try_set_fix(|| {
         let (edit, binding) = checker.importer().get_or_import_symbol(
             &ImportRequest::import("re", flag.full_name()),
@@ -109,7 +102,8 @@ enum RegexFlag {
 }
 
 impl RegexFlag {
-    fn alias(self) -> &'static str {
+    #[must_use]
+    const fn alias(self) -> &'static str {
         match self {
             Self::Ascii => "A",
             Self::IgnoreCase => "I",
@@ -122,7 +116,8 @@ impl RegexFlag {
         }
     }
 
-    fn full_name(self) -> &'static str {
+    #[must_use]
+    const fn full_name(self) -> &'static str {
         match self {
             Self::Ascii => "ASCII",
             Self::IgnoreCase => "IGNORECASE",

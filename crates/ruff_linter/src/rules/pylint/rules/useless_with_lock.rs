@@ -6,7 +6,8 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for direct uses of lock objects in `with` statements.
+/// Checks for lock objects that are created and immediately discarded in
+/// `with` statements.
 ///
 /// ## Why is this bad?
 /// Creating a lock (via `threading.Lock` or similar) in a `with` statement

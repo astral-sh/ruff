@@ -87,7 +87,7 @@ pub(crate) fn annotate_imports<'a>(
                     }
 
                     // Capture names.
-                    let aliases = names
+                    let mut aliases: Vec<_> = names
                         .iter()
                         .map(|alias| {
                             // Find comments above.
@@ -112,9 +112,39 @@ pub(crate) fn annotate_imports<'a>(
                                 asname: alias.asname.as_ref().map(|asname| locator.slice(asname)),
                                 atop: alias_atop,
                                 inline: alias_inline,
+                                trailing: vec![],
                             }
                         })
                         .collect();
+
+                    // Capture trailing comments on the _last_ alias, as in:
+                    // ```python
+                    // from foo import (
+                    //     bar,
+                    //     # noqa
+                    // )
+                    // ```
+                    if let Some(last_alias) = aliases.last_mut() {
+                        while let Some(comment) =
+                            comments_iter.next_if(|comment| comment.start() < import.end())
+                        {
+                            last_alias.trailing.push(comment);
+                        }
+                    }
+
+                    // Capture trailing comments, as in:
+                    // ```python
+                    // from foo import (
+                    //     bar,
+                    // )  # noqa
+                    // ```
+                    let mut trailing = vec![];
+                    let import_line_end = locator.line_end(import.end());
+                    while let Some(comment) =
+                        comments_iter.next_if(|comment| comment.start() < import_line_end)
+                    {
+                        trailing.push(comment);
+                    }
 
                     AnnotatedImport::ImportFrom {
                         module: module.as_ref().map(|module| locator.slice(module)),
@@ -127,6 +157,7 @@ pub(crate) fn annotate_imports<'a>(
                         },
                         atop,
                         inline,
+                        trailing,
                     }
                 }
                 _ => panic!("Expected Stmt::Import | Stmt::ImportFrom"),

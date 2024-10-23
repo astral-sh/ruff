@@ -20,14 +20,14 @@ Module(
                                 Name(
                                     ExprName {
                                         range: 0..1,
-                                        id: "x",
+                                        id: Name("x"),
                                         ctx: Load,
                                     },
                                 ),
                                 Name(
                                     ExprName {
                                         range: 5..5,
-                                        id: "",
+                                        id: Name(""),
                                         ctx: Invalid,
                                     },
                                 ),

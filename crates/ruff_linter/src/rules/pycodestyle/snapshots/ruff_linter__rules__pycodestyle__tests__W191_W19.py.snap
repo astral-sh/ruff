@@ -8,6 +8,22 @@ W19.py:1:1: W191 Indentation contains tabs
 2 |     multiline string with tab in it'''
   |
 
+W19.py:1:1: SyntaxError: Unexpected indentation
+  |
+1 |     '''File starts with a tab
+  | ^^^^
+2 |     multiline string with tab in it'''
+  |
+
+W19.py:5:1: SyntaxError: Expected a statement
+  |
+4 | #: W191
+5 | if False:
+  | ^
+6 |     print  # indented with 1 tab
+7 | #:
+  |
+
 W19.py:6:1: W191 Indentation contains tabs
   |
 4 | #: W191
@@ -178,7 +194,7 @@ W19.py:76:1: W191 Indentation contains tabs
    |
 74 |      foo.bar("bop")
 75 |      )):
-76 |     print "yes"
+76 |     print("yes")
    | ^^^^ W191
 77 | #: E101 W191 W504
 78 | # also ok, but starting to look like LISP
@@ -188,7 +204,7 @@ W19.py:81:1: W191 Indentation contains tabs
    |
 79 | if ((foo.bar("baz") and
 80 |      foo.bar("bop"))):
-81 |     print "yes"
+81 |     print("yes")
    | ^^^^ W191
 82 | #: E101 W191 W504
 83 | if (a == 2 or
@@ -364,5 +380,3 @@ W19.py:161:1: W191 Indentation contains tabs
     | ^^^^ W191
 162 | }   <- this tab is fine"""
     |
-
-

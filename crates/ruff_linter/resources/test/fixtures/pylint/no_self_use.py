@@ -83,3 +83,23 @@ class B(A):
     def baz(self):
         if super().foo():
             ...
+
+
+# See: https://github.com/astral-sh/ruff/issues/12568
+from attrs import define, field
+
+
+@define
+class Foo:
+    x: int = field()
+    y: int
+
+    @x.validator
+    def validate_x(self, attribute, value):
+        if value <= 0:
+            raise ValueError("x must be a positive integer")
+
+    @y.validator
+    def validate_y(self, attribute, value):
+        if value <= 0:
+            raise ValueError("y must be a positive integer")

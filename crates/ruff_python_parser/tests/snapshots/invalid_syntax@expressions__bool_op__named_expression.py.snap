@@ -20,14 +20,14 @@ Module(
                                 Name(
                                     ExprName {
                                         range: 0..1,
-                                        id: "x",
+                                        id: Name("x"),
                                         ctx: Load,
                                     },
                                 ),
                                 Name(
                                     ExprName {
                                         range: 6..7,
-                                        id: "a",
+                                        id: Name("a"),
                                         ctx: Load,
                                     },
                                 ),
@@ -42,7 +42,7 @@ Module(
                     value: Name(
                         ExprName {
                             range: 11..12,
-                            id: "b",
+                            id: Name("b"),
                             ctx: Load,
                         },
                     ),
@@ -59,14 +59,14 @@ Module(
                                 Name(
                                     ExprName {
                                         range: 13..14,
-                                        id: "x",
+                                        id: Name("x"),
                                         ctx: Load,
                                     },
                                 ),
                                 Name(
                                     ExprName {
                                         range: 18..19,
-                                        id: "a",
+                                        id: Name("a"),
                                         ctx: Load,
                                     },
                                 ),
@@ -81,7 +81,7 @@ Module(
                     value: Name(
                         ExprName {
                             range: 23..24,
-                            id: "b",
+                            id: Name("b"),
                             ctx: Load,
                         },
                     ),

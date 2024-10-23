@@ -7,7 +7,7 @@ expression: lex_source(source)
 [
     (
         Name(
-            "a_variable",
+            Name("a_variable"),
         ),
         0..10,
     ),

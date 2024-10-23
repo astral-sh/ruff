@@ -1,0 +1,30 @@
+---
+source: crates/ruff_linter/src/rules/pydoclint/mod.rs
+---
+DOC403_numpy.py:24:1: DOC403 Docstring has a "Yields" section but the function doesn't yield anything
+   |
+22 |           A number
+23 |   
+24 | /     Yields
+25 | |     -------
+26 | |     str
+27 | |         A string
+28 | |     """
+   | |____^ DOC403
+29 |       print('test')
+   |
+   = help: Remove the "Yields" section
+
+DOC403_numpy.py:44:1: DOC403 Docstring has a "Yields" section but the function doesn't yield anything
+   |
+42 |               A number
+43 |   
+44 | /         Yields
+45 | |         -------
+46 | |         str
+47 | |             A string
+48 | |         """
+   | |________^ DOC403
+49 |           print('test')
+   |
+   = help: Remove the "Yields" section

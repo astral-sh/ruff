@@ -79,7 +79,7 @@ fn runtime_required_base_class(
     base_classes: &[String],
     semantic: &SemanticModel,
 ) -> bool {
-    analyze::class::any_qualified_name(class_def, semantic, &|qualified_name| {
+    analyze::class::any_qualified_base_class(class_def, semantic, &|qualified_name| {
         base_classes
             .iter()
             .any(|base_class| QualifiedName::from_dotted_name(base_class) == qualified_name)
@@ -126,12 +126,14 @@ pub(crate) fn is_dataclass_meta_annotation(annotation: &Expr, semantic: &Semanti
                     matches!(qualified_name.segments(), ["dataclasses", "dataclass"])
                 })
         }) {
-            // Determine whether the annotation is `typing.ClassVar` or `dataclasses.InitVar`.
+            // Determine whether the annotation is `typing.ClassVar`, `dataclasses.InitVar`, or `dataclasses.KW_ONLY`.
             return semantic
                 .resolve_qualified_name(map_subscript(annotation))
                 .is_some_and(|qualified_name| {
-                    matches!(qualified_name.segments(), ["dataclasses", "InitVar"])
-                        || semantic.match_typing_qualified_name(&qualified_name, "ClassVar")
+                    matches!(
+                        qualified_name.segments(),
+                        ["dataclasses", "InitVar" | "KW_ONLY"]
+                    ) || semantic.match_typing_qualified_name(&qualified_name, "ClassVar")
                 });
         }
     }

@@ -1,0 +1,30 @@
+---
+source: crates/ruff_linter/src/rules/flake8_commas/mod.rs
+---
+COM81_syntax_error.py:3:5: SyntaxError: Starred expression cannot be used here
+  |
+1 | # Check for `flake8-commas` violation for a file containing syntax errors.
+2 | (
+3 |     *args
+  |     ^
+4 | )
+  |
+
+COM81_syntax_error.py:6:9: SyntaxError: Type parameter list cannot be empty
+  |
+4 | )
+5 | 
+6 | def foo[(param1='test', param2='test',):
+  |         ^
+7 |     pass
+  |
+
+COM81_syntax_error.py:6:38: COM819 Trailing comma prohibited
+  |
+4 | )
+5 | 
+6 | def foo[(param1='test', param2='test',):
+  |                                      ^ COM819
+7 |     pass
+  |
+  = help: Remove trailing comma

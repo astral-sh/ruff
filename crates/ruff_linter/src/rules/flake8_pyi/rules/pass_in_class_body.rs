@@ -15,14 +15,14 @@ use crate::fix;
 /// stubs.
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// class MyClass:
 ///     x: int
 ///     pass
 /// ```
 ///
 /// Use instead:
-/// ```python
+/// ```pyi
 /// class MyClass:
 ///     x: int
 /// ```

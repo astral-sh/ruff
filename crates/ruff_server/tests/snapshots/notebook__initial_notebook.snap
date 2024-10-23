@@ -1,0 +1,75 @@
+---
+source: crates/ruff_server/tests/notebook.rs
+expression: notebook_source(&notebook)
+---
+#@title Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+!pip install matplotlib tensorflow tensorflow-hub
+import tensorflow as tf
+import tensorflow_hub as hub
+import matplotlib.pyplot as plt
+print(tf.__version__)
+model = hub.load("https://tfhub.dev/captain-pool/esrgan-tf2/1")
+concrete_func = model.signatures[tf.saved_model.DEFAULT_SERVING_SIGNATURE_DEF_KEY]
+
+@tf.function(input_signature=[tf.TensorSpec(shape=[1, 50, 50, 3], dtype=tf.float32)])
+def f(input):
+  return concrete_func(input);
+
+converter = tf.lite.TFLiteConverter.from_concrete_functions([f.get_concrete_function()], model)
+converter.optimizations = [tf.lite.Optimize.DEFAULT]
+tflite_model = converter.convert()
+
+# Save the TF Lite model.
+with tf.io.gfile.GFile('ESRGAN.tflite', 'wb') as f:
+  f.write(tflite_model)
+
+esrgan_model_path = './ESRGAN.tflite'
+test_img_path = tf.keras.utils.get_file('lr.jpg', 'https://raw.githubusercontent.com/tensorflow/examples/master/lite/examples/super_resolution/android/app/src/main/assets/lr-1.jpg')
+lr = tf.io.read_file(test_img_path)
+lr = tf.image.decode_jpeg(lr)
+lr = tf.expand_dims(lr, axis=0)
+lr = tf.cast(lr, tf.float32)
+
+# Load TFLite model and allocate tensors.
+interpreter = tf.lite.Interpreter(model_path=esrgan_model_path)
+interpreter.allocate_tensors()
+
+# Get input and output tensors.
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
+
+# Run the model
+interpreter.set_tensor(input_details[0]['index'], lr)
+interpreter.invoke()
+
+# Extract the output and postprocess it
+output_data = interpreter.get_tensor(output_details[0]['index'])
+sr = tf.squeeze(output_data, axis=0)
+sr = tf.clip_by_value(sr, 0, 255)
+sr = tf.round(sr)
+sr = tf.cast(sr, tf.uint8)
+lr = tf.cast(tf.squeeze(lr, axis=0), tf.uint8)
+plt.figure(figsize = (1, 1))
+plt.title('LR')
+plt.imshow(lr.numpy());
+
+plt.figure(figsize=(10, 4))
+plt.subplot(1, 2, 1)        
+plt.title(f'ESRGAN (x4)')
+plt.imshow(sr.numpy());
+
+bicubic = tf.image.resize(lr, [200, 200], tf.image.ResizeMethod.BICUBIC)
+bicubic = tf.cast(bicubic, tf.uint8)
+plt.subplot(1, 2, 2)   
+plt.title('Bicubic')
+plt.imshow(bicubic.numpy());

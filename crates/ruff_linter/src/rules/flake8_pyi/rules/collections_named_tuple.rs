@@ -21,16 +21,15 @@ use crate::checkers::ast::Checker;
 /// precisely.
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// from collections import namedtuple
 ///
 /// person = namedtuple("Person", ["name", "age"])
 /// ```
 ///
 /// Use instead:
-/// ```python
+/// ```pyi
 /// from typing import NamedTuple
-///
 ///
 /// class Person(NamedTuple):
 ///     name: str

@@ -118,10 +118,10 @@ pub(crate) fn check_noqa(
             match &line.directive {
                 Directive::All(directive) => {
                     if line.matches.is_empty() {
+                        let edit = delete_comment(directive.range(), locator);
                         let mut diagnostic =
                             Diagnostic::new(UnusedNOQA { codes: None }, directive.range());
-                        diagnostic
-                            .set_fix(Fix::safe_edit(delete_comment(directive.range(), locator)));
+                        diagnostic.set_fix(Fix::safe_edit(edit));
 
                         diagnostics.push(diagnostic);
                     }
@@ -172,6 +172,14 @@ pub(crate) fn check_noqa(
                         && unknown_codes.is_empty()
                         && unmatched_codes.is_empty())
                     {
+                        let edit = if valid_codes.is_empty() {
+                            delete_comment(directive.range(), locator)
+                        } else {
+                            Edit::range_replacement(
+                                format!("# noqa: {}", valid_codes.join(", ")),
+                                directive.range(),
+                            )
+                        };
                         let mut diagnostic = Diagnostic::new(
                             UnusedNOQA {
                                 codes: Some(UnusedCodes {
@@ -195,17 +203,7 @@ pub(crate) fn check_noqa(
                             },
                             directive.range(),
                         );
-                        if valid_codes.is_empty() {
-                            diagnostic.set_fix(Fix::safe_edit(delete_comment(
-                                directive.range(),
-                                locator,
-                            )));
-                        } else {
-                            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                                format!("# noqa: {}", valid_codes.join(", ")),
-                                directive.range(),
-                            )));
-                        }
+                        diagnostic.set_fix(Fix::safe_edit(edit));
                         diagnostics.push(diagnostic);
                     }
                 }

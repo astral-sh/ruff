@@ -1,6 +1,5 @@
 use std::collections::HashMap;
-
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 
 /// Returns the redirect target for the given code.
 pub(crate) fn get_redirect_target(code: &str) -> Option<&'static str> {
@@ -13,7 +12,7 @@ pub(crate) fn get_redirect(code: &str) -> Option<(&'static str, &'static str)> {
     REDIRECTS.get_key_value(code).map(|(k, v)| (*k, *v))
 }
 
-static REDIRECTS: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
+static REDIRECTS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
     HashMap::from_iter([
         // The following are here because we don't yet have the many-to-one mapping enabled.
         ("SIM111", "SIM110"),
@@ -103,6 +102,18 @@ static REDIRECTS: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
         ("TRY200", "B904"),
         ("PGH001", "S307"),
         ("PGH002", "G010"),
+        // flake8-trio and flake8-async merged with name flake8-async
+        ("TRIO", "ASYNC1"),
+        ("TRIO1", "ASYNC1"),
+        ("TRIO10", "ASYNC10"),
+        ("TRIO100", "ASYNC100"),
+        ("TRIO105", "ASYNC105"),
+        ("TRIO109", "ASYNC109"),
+        ("TRIO11", "ASYNC11"),
+        ("TRIO110", "ASYNC110"),
+        ("TRIO115", "ASYNC115"),
+        // Removed in v0.5
+        ("PLR1701", "SIM101"),
         // Test redirect by exact code
         #[cfg(any(feature = "test-rules", test))]
         ("RUF940", "RUF950"),
@@ -111,5 +122,9 @@ static REDIRECTS: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
         ("RUF96", "RUF95"),
         // See: https://github.com/astral-sh/ruff/issues/10791
         ("PLW0117", "PLW0177"),
+        // See: https://github.com/astral-sh/ruff/issues/12110
+        ("RUF025", "C420"),
+        // See: https://github.com/astral-sh/ruff/issues/13492
+        ("TRY302", "TRY203"),
     ])
 });

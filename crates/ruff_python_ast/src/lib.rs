@@ -1,3 +1,4 @@
+use std::ffi::OsStr;
 use std::path::Path;
 
 pub use expression::*;
@@ -11,7 +12,6 @@ mod expression;
 pub mod hashable;
 pub mod helpers;
 pub mod identifier;
-pub mod imports;
 mod int;
 pub mod name;
 mod node;
@@ -68,7 +68,7 @@ pub enum TomlSourceType {
     Unrecognized,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, is_macro::Is)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PySourceType {
     /// The source is a Python file (`.py`).
@@ -80,13 +80,52 @@ pub enum PySourceType {
     Ipynb,
 }
 
+impl PySourceType {
+    /// Infers the source type from the file extension.
+    ///
+    /// Falls back to `Python` if the extension is not recognized.
+    pub fn from_extension(extension: &str) -> Self {
+        Self::try_from_extension(extension).unwrap_or_default()
+    }
+
+    /// Infers the source type from the file extension.
+    pub fn try_from_extension(extension: &str) -> Option<Self> {
+        let ty = match extension {
+            "py" => Self::Python,
+            "pyi" => Self::Stub,
+            "ipynb" => Self::Ipynb,
+            _ => return None,
+        };
+
+        Some(ty)
+    }
+
+    pub fn try_from_path(path: impl AsRef<Path>) -> Option<Self> {
+        path.as_ref()
+            .extension()
+            .and_then(OsStr::to_str)
+            .and_then(Self::try_from_extension)
+    }
+
+    pub const fn is_py_file(self) -> bool {
+        matches!(self, Self::Python)
+    }
+
+    pub const fn is_stub(self) -> bool {
+        matches!(self, Self::Stub)
+    }
+
+    pub const fn is_py_file_or_stub(self) -> bool {
+        matches!(self, Self::Python | Self::Stub)
+    }
+
+    pub const fn is_ipynb(self) -> bool {
+        matches!(self, Self::Ipynb)
+    }
+}
+
 impl<P: AsRef<Path>> From<P> for PySourceType {
     fn from(path: P) -> Self {
-        match path.as_ref().extension() {
-            Some(ext) if ext == "py" => PySourceType::Python,
-            Some(ext) if ext == "pyi" => PySourceType::Stub,
-            Some(ext) if ext == "ipynb" => PySourceType::Ipynb,
-            _ => PySourceType::Python,
-        }
+        Self::try_from_path(path).unwrap_or_default()
     }
 }

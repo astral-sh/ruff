@@ -98,36 +98,49 @@ pub fn find_settings_toml<P: AsRef<Path>>(path: P) -> Result<Option<PathBuf>> {
 
 /// Find the path to the user-specific `pyproject.toml` or `ruff.toml`, if it
 /// exists.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn find_user_settings_toml() -> Option<PathBuf> {
-    // Search for a user-specific `.ruff.toml`.
-    let mut path = dirs::config_dir()?;
-    path.push("ruff");
-    path.push(".ruff.toml");
-    if path.is_file() {
-        return Some(path);
+    use etcetera::BaseStrategy;
+    use ruff_linter::warn_user_once;
+
+    let strategy = etcetera::base_strategy::choose_base_strategy().ok()?;
+    let config_dir = strategy.config_dir().join("ruff");
+
+    // Search for a user-specific `.ruff.toml`, then a `ruff.toml`, then a `pyproject.toml`.
+    for filename in [".ruff.toml", "ruff.toml", "pyproject.toml"] {
+        let path = config_dir.join(filename);
+        if path.is_file() {
+            return Some(path);
+        }
     }
 
-    // Search for a user-specific `ruff.toml`.
-    let mut path = dirs::config_dir()?;
-    path.push("ruff");
-    path.push("ruff.toml");
-    if path.is_file() {
-        return Some(path);
-    }
+    // On macOS, we used to support reading from `/Users/Alice/Library/Application Support`.
+    if cfg!(target_os = "macos") {
+        let strategy = etcetera::base_strategy::Apple::new().ok()?;
+        let deprecated_config_dir = strategy.data_dir().join("ruff");
 
-    // Search for a user-specific `pyproject.toml`.
-    let mut path = dirs::config_dir()?;
-    path.push("ruff");
-    path.push("pyproject.toml");
-    if path.is_file() {
-        return Some(path);
+        for file in [".ruff.toml", "ruff.toml", "pyproject.toml"] {
+            let path = deprecated_config_dir.join(file);
+            if path.is_file() {
+                warn_user_once!(
+                    "Reading configuration from `~/Library/Application Support` is deprecated. Please move your configuration to `{}/{file}`.",
+                    config_dir.display(),
+                );
+                return Some(path);
+            }
+        }
     }
 
     None
 }
 
+#[cfg(target_arch = "wasm32")]
+pub fn find_user_settings_toml() -> Option<PathBuf> {
+    None
+}
+
 /// Load `Options` from a `pyproject.toml` or `ruff.toml` file.
-pub fn load_options<P: AsRef<Path>>(path: P) -> Result<Options> {
+pub(super) fn load_options<P: AsRef<Path>>(path: P) -> Result<Options> {
     if path.as_ref().ends_with("pyproject.toml") {
         let pyproject = parse_pyproject_toml(&path)?;
         let mut ruff = pyproject

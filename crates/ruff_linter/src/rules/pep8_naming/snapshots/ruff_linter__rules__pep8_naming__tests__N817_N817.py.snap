@@ -15,4 +15,9 @@ N817.py:2:17: N817 CamelCase `CamelCase` imported as acronym `CC`
   |                 ^^^^^^^^^^^^^^^ N817
   |
 
-
+N817.py:10:26: N817 CamelCase `ElementTree` imported as acronym `ET`
+   |
+ 9 | # Always an error (relative import)
+10 | from ..xml.eltree import ElementTree as ET
+   |                          ^^^^^^^^^^^^^^^^^ N817
+   |

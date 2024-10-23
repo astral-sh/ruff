@@ -22,7 +22,7 @@ Module(
                                         value: Name(
                                             ExprName {
                                                 range: 45..46,
-                                                id: "x",
+                                                id: Name("x"),
                                                 ctx: Load,
                                             },
                                         ),
@@ -56,14 +56,14 @@ Module(
                                                                 Name(
                                                                     ExprName {
                                                                         range: 56..57,
-                                                                        id: "x",
+                                                                        id: Name("x"),
                                                                         ctx: Load,
                                                                     },
                                                                 ),
                                                                 Name(
                                                                     ExprName {
                                                                         range: 62..63,
-                                                                        id: "y",
+                                                                        id: Name("y"),
                                                                         ctx: Load,
                                                                     },
                                                                 ),
@@ -76,7 +76,7 @@ Module(
                                             Name(
                                                 ExprName {
                                                     range: 65..66,
-                                                    id: "z",
+                                                    id: Name("z"),
                                                     ctx: Load,
                                                 },
                                             ),

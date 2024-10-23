@@ -2,6 +2,8 @@ use anyhow::{bail, Result};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::helpers::any_over_expr;
+use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -122,13 +124,29 @@ pub(crate) fn reimplemented_starmap(checker: &mut Checker, target: &StarmapCandi
             if ComparableExpr::from(value.as_ref()) != ComparableExpr::from(name) {
                 return;
             }
+
+            // If the argument is used outside the function call, we can't replace it.
+            if any_over_expr(func, &|expr| {
+                expr.as_name_expr().is_some_and(|expr| expr.id == name.id)
+            }) {
+                return;
+            }
         }
         // Ex) `f(x, y, z) for x, y, z in iter`
         ComprehensionTarget::Tuple(tuple) => {
-            if tuple.elts.len() != args.len()
-                || !std::iter::zip(&tuple.elts, args)
-                    .all(|(x, y)| ComparableExpr::from(x) == ComparableExpr::from(y))
+            if tuple.len() != args.len()
+                || std::iter::zip(tuple, args)
+                    .any(|(x, y)| ComparableExpr::from(x) != ComparableExpr::from(y))
             {
+                return;
+            }
+
+            // If any of the members are used outside the function call, we can't replace it.
+            if any_over_expr(func, &|expr| {
+                tuple
+                    .iter()
+                    .any(|elem| ComparableExpr::from(expr) == ComparableExpr::from(elem))
+            }) {
                 return;
             }
         }
@@ -136,23 +154,23 @@ pub(crate) fn reimplemented_starmap(checker: &mut Checker, target: &StarmapCandi
 
     let mut diagnostic = Diagnostic::new(ReimplementedStarmap, target.range());
     diagnostic.try_set_fix(|| {
-        // Try importing `starmap` from `itertools`.
-        //
-        // It is not required to be `itertools.starmap`, though. The user might've already
-        // imported it. Maybe even under a different name. So, we should use that name
-        // for fix construction.
+        // Import `starmap` from `itertools`.
         let (import_edit, starmap_name) = checker.importer().get_or_import_symbol(
             &ImportRequest::import_from("itertools", "starmap"),
             target.start(),
             checker.semantic(),
         )?;
-        // The actual fix suggestion depends on what type of expression we were looking at.
-        //
+        // The actual fix suggestion depends on what type of expression we were looking at:
         // - For generator expressions, we use `starmap` call directly.
         // - For list and set comprehensions, we'd want to wrap it with `list` and `set`
         //   correspondingly.
         let main_edit = Edit::range_replacement(
-            target.try_make_suggestion(starmap_name, &comprehension.iter, func, checker)?,
+            target.try_make_suggestion(
+                Name::from(starmap_name),
+                &comprehension.iter,
+                func,
+                checker,
+            )?,
             target.range(),
         );
         Ok(Fix::safe_edits(import_edit, [main_edit]))
@@ -218,7 +236,7 @@ impl StarmapCandidate<'_> {
     /// Try to produce a fix suggestion transforming this node into a call to `starmap`.
     pub(crate) fn try_make_suggestion(
         &self,
-        name: String,
+        name: Name,
         iter: &Expr,
         func: &Expr,
         checker: &Checker,
@@ -247,7 +265,7 @@ impl StarmapCandidate<'_> {
                 // ```python
                 // list(itertools.starmap(foo, iter))
                 // ```
-                try_construct_call(name, iter, func, "list", checker)
+                try_construct_call(name, iter, func, Name::new_static("list"), checker)
             }
             Self::SetComp(_) => {
                 // For set comprehensions, we replace:
@@ -259,7 +277,7 @@ impl StarmapCandidate<'_> {
                 // ```python
                 // set(itertools.starmap(foo, iter))
                 // ```
-                try_construct_call(name, iter, func, "set", checker)
+                try_construct_call(name, iter, func, Name::new_static("set"), checker)
             }
         }
     }
@@ -267,15 +285,15 @@ impl StarmapCandidate<'_> {
 
 /// Try constructing the call to `itertools.starmap` and wrapping it with the given builtin.
 fn try_construct_call(
-    name: String,
+    name: Name,
     iter: &Expr,
     func: &Expr,
-    builtin: &str,
+    builtin: Name,
     checker: &Checker,
 ) -> Result<String> {
     // We can only do our fix if `builtin` identifier is still bound to
     // the built-in type.
-    if !checker.semantic().has_builtin_binding(builtin) {
+    if !checker.semantic().has_builtin_binding(&builtin) {
         bail!("Can't use built-in `{builtin}` constructor")
     }
 
@@ -295,7 +313,7 @@ fn try_construct_call(
 }
 
 /// Construct the call to `itertools.starmap` for suggestion.
-fn construct_starmap_call(starmap_binding: String, iter: &Expr, func: &Expr) -> ast::ExprCall {
+fn construct_starmap_call(starmap_binding: Name, iter: &Expr, func: &Expr) -> ast::ExprCall {
     let starmap = ast::ExprName {
         id: starmap_binding,
         ctx: ast::ExprContext::Load,
@@ -313,9 +331,9 @@ fn construct_starmap_call(starmap_binding: String, iter: &Expr, func: &Expr) -> 
 }
 
 /// Wrap given function call with yet another call.
-fn wrap_with_call_to(call: ast::ExprCall, func_name: &str) -> ast::ExprCall {
+fn wrap_with_call_to(call: ast::ExprCall, func_name: Name) -> ast::ExprCall {
     let name = ast::ExprName {
-        id: func_name.to_string(),
+        id: func_name,
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
     };

@@ -1,12 +1,14 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{comparable::ComparableExpr, Expr};
 use ruff_text_size::Ranged;
+use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for iterations over `set` literals.
+/// Checks for iteration over a `set` literal where each element in the set is
+/// itself a literal value.
 ///
 /// ## Why is this bad?
 /// Iterating over a `set` is less efficient than iterating over a sequence
@@ -42,17 +44,27 @@ impl AlwaysFixableViolation for IterationOverSet {
 
 /// PLC0208
 pub(crate) fn iteration_over_set(checker: &mut Checker, expr: &Expr) {
-    let Expr::Set(ast::ExprSet { elts, .. }) = expr else {
+    let Expr::Set(set) = expr else {
         return;
     };
 
-    if elts.iter().any(Expr::is_starred_expr) {
+    if set.iter().any(|value| !value.is_literal_expr()) {
         return;
+    }
+
+    let mut seen_values = FxHashSet::with_capacity_and_hasher(set.len(), FxBuildHasher);
+    for value in set {
+        let comparable_value = ComparableExpr::from(value);
+        if !seen_values.insert(comparable_value) {
+            // if the set contains a duplicate literal value, early exit.
+            // rule `B033` can catch that.
+            return;
+        }
     }
 
     let mut diagnostic = Diagnostic::new(IterationOverSet, expr.range());
 
-    let tuple = if let [elt] = elts.as_slice() {
+    let tuple = if let [elt] = set.elts.as_slice() {
         let elt = checker.locator().slice(elt);
         format!("({elt},)")
     } else {

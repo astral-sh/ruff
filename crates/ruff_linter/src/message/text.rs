@@ -15,7 +15,6 @@ use crate::fs::relativize_path;
 use crate::line_width::{IndentWidth, LineWidthBuilder};
 use crate::message::diff::Diff;
 use crate::message::{Emitter, EmitterContext, Message};
-use crate::registry::AsRule;
 use crate::settings::types::UnsafeFixes;
 use crate::text_helpers::ShowNonprinting;
 
@@ -117,14 +116,17 @@ impl Emitter for TextEmitter {
             )?;
 
             if self.flags.intersects(EmitterFlags::SHOW_SOURCE) {
-                writeln!(
-                    writer,
-                    "{}",
-                    MessageCodeFrame {
-                        message,
-                        notebook_index
-                    }
-                )?;
+                // The `0..0` range is used to highlight file-level diagnostics.
+                if message.range() != TextRange::default() {
+                    writeln!(
+                        writer,
+                        "{}",
+                        MessageCodeFrame {
+                            message,
+                            notebook_index
+                        }
+                    )?;
+                }
             }
 
             if self.flags.intersects(EmitterFlags::SHOW_FIX_DIFF) {
@@ -146,28 +148,33 @@ pub(super) struct RuleCodeAndBody<'a> {
 
 impl Display for RuleCodeAndBody<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let kind = &self.message.kind;
         if self.show_fix_status {
-            if let Some(fix) = self.message.fix.as_ref() {
-                // Do not display an indicator for unapplicable fixes
+            if let Some(fix) = self.message.fix() {
+                // Do not display an indicator for inapplicable fixes
                 if fix.applies(self.unsafe_fixes.required_applicability()) {
+                    if let Some(rule) = self.message.rule() {
+                        write!(f, "{} ", rule.noqa_code().to_string().red().bold())?;
+                    }
                     return write!(
                         f,
-                        "{code} {fix}{body}",
-                        code = kind.rule().noqa_code().to_string().red().bold(),
+                        "{fix}{body}",
                         fix = format_args!("[{}] ", "*".cyan()),
-                        body = kind.body,
+                        body = self.message.body(),
                     );
                 }
             }
         };
 
-        write!(
-            f,
-            "{code} {body}",
-            code = kind.rule().noqa_code().to_string().red().bold(),
-            body = kind.body,
-        )
+        if let Some(rule) = self.message.rule() {
+            write!(
+                f,
+                "{code} {body}",
+                code = rule.noqa_code().to_string().red().bold(),
+                body = self.message.body(),
+            )
+        } else {
+            f.write_str(self.message.body())
+        }
     }
 }
 
@@ -178,11 +185,7 @@ pub(super) struct MessageCodeFrame<'a> {
 
 impl Display for MessageCodeFrame<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let Message {
-            kind, file, range, ..
-        } = self.message;
-
-        let suggestion = kind.suggestion.as_deref();
+        let suggestion = self.message.suggestion();
         let footer = if suggestion.is_some() {
             vec![Annotation {
                 id: None,
@@ -193,9 +196,9 @@ impl Display for MessageCodeFrame<'_> {
             Vec::new()
         };
 
-        let source_code = file.to_source_code();
+        let source_code = self.message.source_file().to_source_code();
 
-        let content_start_index = source_code.line_index(range.start());
+        let content_start_index = source_code.line_index(self.message.start());
         let mut start_index = content_start_index.saturating_sub(2);
 
         // If we're working with a Jupyter Notebook, skip the lines which are
@@ -218,7 +221,7 @@ impl Display for MessageCodeFrame<'_> {
             start_index = start_index.saturating_add(1);
         }
 
-        let content_end_index = source_code.line_index(range.end());
+        let content_end_index = source_code.line_index(self.message.end());
         let mut end_index = content_end_index
             .saturating_add(2)
             .min(OneIndexed::from_zero_indexed(source_code.line_count()));
@@ -249,7 +252,7 @@ impl Display for MessageCodeFrame<'_> {
 
         let source = replace_whitespace(
             source_code.slice(TextRange::new(start_offset, end_offset)),
-            range - start_offset,
+            self.message.range() - start_offset,
         );
 
         let source_text = source.text.show_nonprinting();
@@ -260,7 +263,10 @@ impl Display for MessageCodeFrame<'_> {
 
         let char_length = source.text[source.annotation_range].chars().count();
 
-        let label = kind.rule().noqa_code().to_string();
+        let label = self
+            .message
+            .rule()
+            .map_or_else(String::new, |rule| rule.noqa_code().to_string());
 
         let snippet = Snippet {
             title: None,
@@ -356,7 +362,7 @@ mod tests {
 
     use crate::message::tests::{
         capture_emitter_notebook_output, capture_emitter_output, create_messages,
-        create_notebook_messages,
+        create_notebook_messages, create_syntax_error_messages,
     };
     use crate::message::TextEmitter;
     use crate::settings::types::UnsafeFixes;
@@ -398,6 +404,14 @@ mod tests {
             .with_unsafe_fixes(UnsafeFixes::Enabled);
         let (messages, notebook_indexes) = create_notebook_messages();
         let content = capture_emitter_notebook_output(&mut emitter, &messages, &notebook_indexes);
+
+        assert_snapshot!(content);
+    }
+
+    #[test]
+    fn syntax_errors() {
+        let mut emitter = TextEmitter::default().with_show_source(true);
+        let content = capture_emitter_output(&mut emitter, &create_syntax_error_messages());
 
         assert_snapshot!(content);
     }

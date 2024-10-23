@@ -1,8 +1,6 @@
-use std::slice::Iter;
-
 use ruff_notebook::CellOffsets;
 use ruff_python_ast::PySourceType;
-use ruff_python_parser::{Token, TokenKind, Tokens};
+use ruff_python_parser::{TokenIterWithContext, TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextSize};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
@@ -127,14 +125,11 @@ pub(crate) fn compound_statements(
     // This is used to allow `class C: ...`-style definitions in stubs.
     let mut allow_ellipsis = false;
 
-    // Track the nesting level.
-    let mut nesting = 0u32;
-
     // Track indentation.
     let mut indent = 0u32;
 
     // Use an iterator to allow passing it around.
-    let mut token_iter = tokens.up_to_first_unknown().iter();
+    let mut token_iter = tokens.iter_with_context();
 
     loop {
         let Some(token) = token_iter.next() else {
@@ -142,12 +137,6 @@ pub(crate) fn compound_statements(
         };
 
         match token.kind() {
-            TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Lbrace => {
-                nesting = nesting.saturating_add(1);
-            }
-            TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace => {
-                nesting = nesting.saturating_sub(1);
-            }
             TokenKind::Ellipsis => {
                 if allow_ellipsis {
                     allow_ellipsis = false;
@@ -163,7 +152,7 @@ pub(crate) fn compound_statements(
             _ => {}
         }
 
-        if nesting > 0 {
+        if token_iter.in_parenthesized_context() {
             continue;
         }
 
@@ -324,8 +313,8 @@ pub(crate) fn compound_statements(
 
 /// Returns `true` if there are any non-trivia tokens from the given token
 /// iterator till the given end offset.
-fn has_non_trivia_tokens_till(tokens: Iter<'_, Token>, cell_end: TextSize) -> bool {
-    for token in tokens {
+fn has_non_trivia_tokens_till(token_iter: TokenIterWithContext<'_>, cell_end: TextSize) -> bool {
+    for token in token_iter {
         if token.start() >= cell_end {
             return false;
         }

@@ -26,29 +26,29 @@
 //! represents the lint-rule analysis phase. In the future, these steps may be separated into
 //! distinct passes over the AST.
 
+use std::cell::RefCell;
 use std::path::Path;
 
 use itertools::Itertools;
 use log::debug;
+use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, IsolationLevel};
 use ruff_notebook::{CellOffsets, NotebookIndex};
-use ruff_python_ast::helpers::{
-    collect_import_from_member, extract_handled_exceptions, is_docstring_stmt, to_module_path,
-};
+use ruff_python_ast::helpers::{collect_import_from_member, is_docstring_stmt, to_module_path};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::visitor::{walk_except_handler, walk_pattern, Visitor};
 use ruff_python_ast::{
     self as ast, AnyParameterRef, Comprehension, ElifElseClause, ExceptHandler, Expr, ExprContext,
-    FStringElement, Keyword, MatchCase, ModExpression, ModModule, Parameter, Parameters, Pattern,
-    Stmt, Suite, UnaryOp,
+    FStringElement, Keyword, MatchCase, ModModule, Parameter, Parameters, Pattern, Stmt, Suite,
+    UnaryOp,
 };
 use ruff_python_ast::{helpers, str, visitor, PySourceType};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
-use ruff_python_parser::typing::{parse_type_annotation, AnnotationKind};
+use ruff_python_parser::typing::{parse_type_annotation, AnnotationKind, ParsedAnnotation};
 use ruff_python_parser::{Parsed, Tokens};
 use ruff_python_semantic::all::{DunderAllDefinition, DunderAllFlags};
 use ruff_python_semantic::analyze::{imports, typing};
@@ -57,7 +57,7 @@ use ruff_python_semantic::{
     ModuleKind, ModuleSource, NodeId, ScopeId, ScopeKind, SemanticModel, SemanticModelFlags,
     StarImport, SubmoduleImport,
 };
-use ruff_python_stdlib::builtins::{IPYTHON_BUILTINS, MAGIC_GLOBALS, PYTHON_BUILTINS};
+use ruff_python_stdlib::builtins::{python_builtins, MAGIC_GLOBALS};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::{Locator, OneIndexed, SourceRow};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -179,8 +179,10 @@ impl ExpectedDocstringKind {
 pub(crate) struct Checker<'a> {
     /// The [`Parsed`] output for the source code.
     parsed: &'a Parsed<ModModule>,
+    /// An internal cache for parsed string annotations
+    parsed_annotations_cache: ParsedAnnotationsCache<'a>,
     /// The [`Parsed`] output for the type annotation the checker is currently in.
-    parsed_type_annotation: Option<&'a Parsed<ModExpression>>,
+    parsed_type_annotation: Option<&'a ParsedAnnotation>,
     /// The [`Path`] to the file under analysis.
     path: &'a Path,
     /// The [`Path`] to the package containing the current file.
@@ -231,6 +233,7 @@ impl<'a> Checker<'a> {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         parsed: &'a Parsed<ModModule>,
+        parsed_annotations_arena: &'a typed_arena::Arena<ParsedAnnotation>,
         settings: &'a LinterSettings,
         noqa_line_for: &'a NoqaMapping,
         noqa: flags::Noqa,
@@ -247,6 +250,7 @@ impl<'a> Checker<'a> {
         Checker {
             parsed,
             parsed_type_annotation: None,
+            parsed_annotations_cache: ParsedAnnotationsCache::new(parsed_annotations_arena),
             settings,
             noqa_line_for,
             noqa,
@@ -335,8 +339,8 @@ impl<'a> Checker<'a> {
     /// Returns the [`Tokens`] for the parsed type annotation if the checker is in a typing context
     /// or the parsed source code.
     pub(crate) fn tokens(&self) -> &'a Tokens {
-        if let Some(parsed_type_annotation) = self.parsed_type_annotation {
-            parsed_type_annotation.tokens()
+        if let Some(type_annotation) = self.parsed_type_annotation {
+            type_annotation.parsed().tokens()
         } else {
             self.parsed.tokens()
         }
@@ -407,6 +411,39 @@ impl<'a> Checker<'a> {
             .map(|node_id| IsolationLevel::Group(node_id.into()))
             .unwrap_or_default()
     }
+
+    /// Parse a stringified type annotation as an AST expression,
+    /// e.g. `"List[str]"` in `x: "List[str]"`
+    ///
+    /// This method is a wrapper around [`ruff_python_parser::typing::parse_type_annotation`]
+    /// that adds caching.
+    pub(crate) fn parse_type_annotation(
+        &self,
+        annotation: &ast::ExprStringLiteral,
+    ) -> Option<&'a ParsedAnnotation> {
+        self.parsed_annotations_cache
+            .lookup_or_parse(annotation, self.locator.contents())
+    }
+
+    /// Apply a test to an annotation expression,
+    /// abstracting over the fact that the annotation expression might be "stringized".
+    ///
+    /// A stringized annotation is one enclosed in string quotes:
+    /// `foo: "typing.Any"` means the same thing to a type checker as `foo: typing.Any`.
+    pub(crate) fn match_maybe_stringized_annotation(
+        &self,
+        expr: &ast::Expr,
+        match_fn: impl FnOnce(&ast::Expr) -> bool,
+    ) -> bool {
+        if let ast::Expr::StringLiteral(string_annotation) = expr {
+            let Some(parsed_annotation) = self.parse_type_annotation(string_annotation) else {
+                return false;
+            };
+            match_fn(parsed_annotation.expression())
+        } else {
+            match_fn(expr)
+        }
+    }
 }
 
 impl<'a> Visitor<'a> for Checker<'a> {
@@ -462,8 +499,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     || helpers::in_nested_block(self.semantic.current_statements())
                     || imports::is_matplotlib_activation(stmt, self.semantic())
                     || imports::is_sys_path_modification(stmt, self.semantic())
-                    || (self.settings.preview.is_enabled()
-                        && imports::is_os_environ_modification(stmt, self.semantic())))
+                    || imports::is_os_environ_modification(stmt, self.semantic()))
                 {
                     self.semantic.flags |= SemanticModelFlags::IMPORT_BOUNDARY;
                 }
@@ -694,13 +730,21 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         self.semantic(),
                     );
 
+                // The default values of the parameters needs to be evaluated in the enclosing
+                // scope.
+                for parameter in parameters {
+                    if let Some(expr) = parameter.default() {
+                        self.visit_expr(expr);
+                    }
+                }
+
                 self.semantic.push_scope(ScopeKind::Type);
 
                 if let Some(type_params) = type_params {
                     self.visit_type_params(type_params);
                 }
 
-                for parameter in &**parameters {
+                for parameter in parameters {
                     if let Some(expr) = parameter.annotation() {
                         if singledispatch && !parameter.is_variadic() {
                             self.visit_runtime_required_annotation(expr);
@@ -718,11 +762,8 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             }
                         }
                     }
-                    if let Some(expr) = parameter.default() {
-                        self.visit_expr(expr);
-                    }
                 }
-                for expr in returns {
+                if let Some(expr) = returns {
                     match annotation {
                         AnnotationContext::RuntimeRequired => {
                             self.visit_runtime_required_annotation(expr);
@@ -835,32 +876,22 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.semantic.pop_scope();
                 self.visit_expr(name);
             }
-            Stmt::Try(ast::StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                ..
-            }) => {
-                let mut handled_exceptions = Exceptions::empty();
-                for type_ in extract_handled_exceptions(handlers) {
-                    if let Some(builtins_name) = self.semantic.resolve_builtin_symbol(type_) {
-                        match builtins_name {
-                            "NameError" => handled_exceptions |= Exceptions::NAME_ERROR,
-                            "ModuleNotFoundError" => {
-                                handled_exceptions |= Exceptions::MODULE_NOT_FOUND_ERROR;
-                            }
-                            "ImportError" => handled_exceptions |= Exceptions::IMPORT_ERROR,
-                            _ => {}
-                        }
-                    }
-                }
-
+            Stmt::Try(
+                try_node @ ast::StmtTry {
+                    body,
+                    handlers,
+                    orelse,
+                    finalbody,
+                    ..
+                },
+            ) => {
                 // Iterate over the `body`, then the `handlers`, then the `orelse`, then the
                 // `finalbody`, but treat the body and the `orelse` as a single branch for
                 // flow analysis purposes.
                 let branch = self.semantic.push_branch();
-                self.semantic.handled_exceptions.push(handled_exceptions);
+                self.semantic
+                    .handled_exceptions
+                    .push(Exceptions::from_try_stmt(try_node, &self.semantic));
                 self.visit_body(body);
                 self.semantic.handled_exceptions.pop();
                 self.semantic.pop_branch();
@@ -928,6 +959,19 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 if let Some(expr) = msg {
                     self.visit_expr(expr);
                 }
+            }
+            Stmt::With(ast::StmtWith {
+                items,
+                body,
+                is_async: _,
+                range: _,
+            }) => {
+                for item in items {
+                    self.visit_with_item(item);
+                }
+                self.semantic.push_branch();
+                self.visit_body(body);
+                self.semantic.pop_branch();
             }
             Stmt::While(ast::StmtWhile {
                 test,
@@ -1141,6 +1185,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.visit_expr(body);
                 self.visit_expr(orelse);
             }
+            Expr::UnaryOp(ast::ExprUnaryOp {
+                op: UnaryOp::Not,
+                operand,
+                range: _,
+            }) => {
+                self.visit_boolean_test(operand);
+            }
             Expr::Call(ast::ExprCall {
                 func,
                 arguments,
@@ -1233,7 +1284,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         for arg in args {
                             self.visit_type_definition(arg);
                         }
-                        for keyword in arguments.keywords.iter() {
+                        for keyword in &*arguments.keywords {
                             let Keyword {
                                 arg,
                                 value,
@@ -1279,12 +1330,12 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             }
                         }
 
-                        for keyword in arguments.keywords.iter() {
+                        for keyword in &*arguments.keywords {
                             let Keyword { arg, value, .. } = keyword;
                             match (arg.as_ref(), value) {
                                 // Ex) NamedTuple("a", **{"a": int})
-                                (None, Expr::Dict(ast::ExprDict { items, .. })) => {
-                                    for ast::DictItem { key, value } in items {
+                                (None, Expr::Dict(dict)) => {
+                                    for ast::DictItem { key, value } in dict {
                                         if let Some(key) = key.as_ref() {
                                             self.visit_non_type_definition(key);
                                             self.visit_type_definition(value);
@@ -1324,7 +1375,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         }
 
                         // Ex) TypedDict("a", a=int)
-                        for keyword in arguments.keywords.iter() {
+                        for keyword in &*arguments.keywords {
                             let Keyword { value, .. } = keyword;
                             self.visit_type_definition(value);
                         }
@@ -1338,13 +1389,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             for arg in args {
                                 self.visit_non_type_definition(arg);
                             }
-                            for keyword in arguments.keywords.iter() {
+                            for keyword in &*arguments.keywords {
                                 let Keyword { value, .. } = keyword;
                                 self.visit_non_type_definition(value);
                             }
                         } else {
                             // Ex) DefaultNamedArg(type="bool", name="some_prop_name")
-                            for keyword in arguments.keywords.iter() {
+                            for keyword in &*arguments.keywords {
                                 let Keyword {
                                     value,
                                     arg,
@@ -1362,10 +1413,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         // If we're in a type definition, we need to treat the arguments to any
                         // other callables as non-type definitions (i.e., we don't want to treat
                         // any strings as deferred type definitions).
-                        for arg in arguments.args.iter() {
+                        for arg in &*arguments.args {
                             self.visit_non_type_definition(arg);
                         }
-                        for keyword in arguments.keywords.iter() {
+                        for keyword in &*arguments.keywords {
                             let Keyword { value, .. } = keyword;
                             self.visit_non_type_definition(value);
                         }
@@ -1818,7 +1869,7 @@ impl<'a> Checker<'a> {
         name: &'a str,
         range: TextRange,
         kind: BindingKind<'a>,
-        flags: BindingFlags,
+        mut flags: BindingFlags,
     ) -> BindingId {
         // Determine the scope to which the binding belongs.
         // Per [PEP 572](https://peps.python.org/pep-0572/#scope-of-the-target), named
@@ -1833,6 +1884,10 @@ impl<'a> Checker<'a> {
         } else {
             self.semantic.scope_id
         };
+
+        if self.semantic.in_exception_handler() {
+            flags |= BindingFlags::IN_EXCEPT_HANDLER;
+        }
 
         // Create the `Binding`.
         let binding_id = self.semantic.push_binding(range, kind, flags);
@@ -1896,23 +1951,25 @@ impl<'a> Checker<'a> {
     }
 
     fn bind_builtins(&mut self) {
-        for builtin in PYTHON_BUILTINS
-            .iter()
-            .chain(MAGIC_GLOBALS.iter())
-            .chain(
-                self.source_type
-                    .is_ipynb()
-                    .then_some(IPYTHON_BUILTINS)
-                    .into_iter()
-                    .flatten(),
-            )
-            .copied()
-            .chain(self.settings.builtins.iter().map(String::as_str))
-        {
+        let mut bind_builtin = |builtin| {
             // Add the builtin to the scope.
             let binding_id = self.semantic.push_builtin();
             let scope = self.semantic.global_scope_mut();
             scope.add(builtin, binding_id);
+        };
+
+        let standard_builtins = python_builtins(
+            self.settings.target_version.minor(),
+            self.source_type.is_ipynb(),
+        );
+        for builtin in standard_builtins {
+            bind_builtin(builtin);
+        }
+        for builtin in MAGIC_GLOBALS {
+            bind_builtin(builtin);
+        }
+        for builtin in &self.settings.builtins {
+            bind_builtin(builtin);
         }
     }
 
@@ -1929,38 +1986,6 @@ impl<'a> Checker<'a> {
         let mut flags = BindingFlags::empty();
         if helpers::is_unpacking_assignment(parent, expr) {
             flags.insert(BindingFlags::UNPACKED_ASSIGNMENT);
-        }
-
-        // Match the left-hand side of an annotated assignment without a value,
-        // like `x` in `x: int`. N.B. In stub files, these should be viewed
-        // as assignments on par with statements such as `x: int = 5`.
-        if matches!(
-            parent,
-            Stmt::AnnAssign(ast::StmtAnnAssign { value: None, .. })
-        ) && !self.semantic.in_annotation()
-        {
-            self.add_binding(id, expr.range(), BindingKind::Annotation, flags);
-            return;
-        }
-
-        // A binding within a `for` must be a loop variable, as in:
-        // ```python
-        // for x in range(10):
-        //     ...
-        // ```
-        if parent.is_for_stmt() {
-            self.add_binding(id, expr.range(), BindingKind::LoopVar, flags);
-            return;
-        }
-
-        // A binding within a `with` must be an item, as in:
-        // ```python
-        // with open("file.txt") as fp:
-        //     ...
-        // ```
-        if parent.is_with_stmt() {
-            self.add_binding(id, expr.range(), BindingKind::WithItemVar, flags);
-            return;
         }
 
         let scope = self.semantic.current_scope();
@@ -2022,13 +2047,35 @@ impl<'a> Checker<'a> {
             return;
         }
 
-        // If the expression is part of a comprehension target, then it's a comprehension variable
-        // assignment, as in:
+        // Match the left-hand side of an annotated assignment without a value,
+        // like `x` in `x: int`. N.B. In stub files, these should be viewed
+        // as assignments on par with statements such as `x: int = 5`.
+        if matches!(
+            parent,
+            Stmt::AnnAssign(ast::StmtAnnAssign { value: None, .. })
+        ) && !self.semantic.in_annotation()
+        {
+            self.add_binding(id, expr.range(), BindingKind::Annotation, flags);
+            return;
+        }
+
+        // A binding within a `for` must be a loop variable, as in:
         // ```python
-        // [x for x in range(10)]
+        // for x in range(10):
+        //     ...
         // ```
-        if self.semantic.in_comprehension_assignment() {
-            self.add_binding(id, expr.range(), BindingKind::ComprehensionVar, flags);
+        if parent.is_for_stmt() {
+            self.add_binding(id, expr.range(), BindingKind::LoopVar, flags);
+            return;
+        }
+
+        // A binding within a `with` must be an item, as in:
+        // ```python
+        // with open("file.txt") as fp:
+        //     ...
+        // ```
+        if parent.is_with_stmt() {
+            self.add_binding(id, expr.range(), BindingKind::WithItemVar, flags);
             return;
         }
 
@@ -2162,18 +2209,13 @@ impl<'a> Checker<'a> {
     ///
     /// class Bar: pass
     /// ```
-    fn visit_deferred_string_type_definitions(
-        &mut self,
-        allocator: &'a typed_arena::Arena<Parsed<ModExpression>>,
-    ) {
+    fn visit_deferred_string_type_definitions(&mut self) {
         let snapshot = self.semantic.snapshot();
         while !self.visit.string_type_definitions.is_empty() {
             let type_definitions = std::mem::take(&mut self.visit.string_type_definitions);
             for (string_expr, snapshot) in type_definitions {
-                if let Ok((parsed_annotation, kind)) =
-                    parse_type_annotation(string_expr, self.locator.contents())
-                {
-                    let parsed_annotation = allocator.alloc(parsed_annotation);
+                let annotation_parse_result = self.parse_type_annotation(string_expr);
+                if let Some(parsed_annotation) = annotation_parse_result {
                     self.parsed_type_annotation = Some(parsed_annotation);
 
                     let annotation = string_expr.value.to_str();
@@ -2192,7 +2234,7 @@ impl<'a> Checker<'a> {
                         }
                     }
 
-                    let type_definition_flag = match kind {
+                    let type_definition_flag = match parsed_annotation.kind() {
                         AnnotationKind::Simple => SemanticModelFlags::SIMPLE_STRING_TYPE_DEFINITION,
                         AnnotationKind::Complex => {
                             SemanticModelFlags::COMPLEX_STRING_TYPE_DEFINITION
@@ -2201,7 +2243,7 @@ impl<'a> Checker<'a> {
 
                     self.semantic.flags |=
                         SemanticModelFlags::TYPE_DEFINITION | type_definition_flag;
-                    self.visit_expr(parsed_annotation.expr());
+                    self.visit_expr(parsed_annotation.expression());
                     self.parsed_type_annotation = None;
                 } else {
                     if self.enabled(Rule::ForwardAnnotationSyntaxError) {
@@ -2214,6 +2256,35 @@ impl<'a> Checker<'a> {
                     }
                 }
             }
+
+            // If we're parsing string annotations inside string annotations
+            // (which is the only reason we might enter a second iteration of this loop),
+            // the cache is no longer valid. We must invalidate it to avoid an infinite loop.
+            //
+            // For example, consider the following annotation:
+            // ```python
+            // x: "list['str']"
+            // ```
+            //
+            // The first time we visit the AST, we see `"list['str']"`
+            // and identify it as a stringified annotation.
+            // We store it in `self.visit.string_type_definitions` to be analyzed later.
+            //
+            // After the entire tree has been visited, we look through
+            // `self.visit.string_type_definitions` and find `"list['str']"`.
+            // We parse it, and it becomes `list['str']`.
+            // After parsing it, we call `self.visit_expr()` on the `list['str']` node,
+            // and that `visit_expr` call is going to find `'str'` inside that node and
+            // identify it as a string type definition, appending it to
+            // `self.visit.string_type_definitions`, ensuring that there will be one
+            // more iteration of this loop.
+            //
+            // Unfortunately, the `TextRange` of `'str'`
+            // here will be *relative to the parsed `list['str']` node* rather than
+            // *relative to the original module*, meaning the cache
+            // (which uses `TextSize` as the key) becomes invalid on the second
+            // iteration of this loop.
+            self.parsed_annotations_cache.clear();
         }
         self.semantic.restore(snapshot);
     }
@@ -2277,14 +2348,14 @@ impl<'a> Checker<'a> {
     /// After initial traversal of the source tree has been completed,
     /// recursively visit all AST nodes that were deferred on the first pass.
     /// This includes lambdas, functions, type parameters, and type annotations.
-    fn visit_deferred(&mut self, allocator: &'a typed_arena::Arena<Parsed<ModExpression>>) {
+    fn visit_deferred(&mut self) {
         while !self.visit.is_empty() {
             self.visit_deferred_class_bases();
             self.visit_deferred_functions();
             self.visit_deferred_type_param_definitions();
             self.visit_deferred_lambdas();
             self.visit_deferred_future_type_definitions();
-            self.visit_deferred_string_type_definitions(allocator);
+            self.visit_deferred_string_type_definitions();
         }
     }
 
@@ -2352,6 +2423,42 @@ impl<'a> Checker<'a> {
     }
 }
 
+struct ParsedAnnotationsCache<'a> {
+    arena: &'a typed_arena::Arena<ParsedAnnotation>,
+    by_offset: RefCell<FxHashMap<TextSize, Option<&'a ParsedAnnotation>>>,
+}
+
+impl<'a> ParsedAnnotationsCache<'a> {
+    fn new(arena: &'a typed_arena::Arena<ParsedAnnotation>) -> Self {
+        Self {
+            arena,
+            by_offset: RefCell::default(),
+        }
+    }
+
+    fn lookup_or_parse(
+        &self,
+        annotation: &ast::ExprStringLiteral,
+        source: &str,
+    ) -> Option<&'a ParsedAnnotation> {
+        *self
+            .by_offset
+            .borrow_mut()
+            .entry(annotation.start())
+            .or_insert_with(|| {
+                if let Ok(annotation) = parse_type_annotation(annotation, source) {
+                    Some(self.arena.alloc(annotation))
+                } else {
+                    None
+                }
+            })
+    }
+
+    fn clear(&self) {
+        self.by_offset.borrow_mut().clear();
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn check_ast(
     parsed: &Parsed<ModModule>,
@@ -2387,8 +2494,10 @@ pub(crate) fn check_ast(
         python_ast: parsed.suite(),
     };
 
+    let allocator = typed_arena::Arena::new();
     let mut checker = Checker::new(
         parsed,
+        &allocator,
         settings,
         noqa_line_for,
         noqa,
@@ -2411,8 +2520,7 @@ pub(crate) fn check_ast(
     // Visit any deferred syntax nodes. Take care to visit in order, such that we avoid adding
     // new deferred nodes after visiting nodes of that kind. For example, visiting a deferred
     // function can add a deferred lambda, but the opposite is not true.
-    let allocator = typed_arena::Arena::new();
-    checker.visit_deferred(&allocator);
+    checker.visit_deferred();
     checker.visit_exports();
 
     // Check docstrings, bindings, and unresolved references.

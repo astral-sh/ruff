@@ -2,6 +2,7 @@ use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::name::Name;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -42,17 +43,17 @@ impl Violation for RedeclaredAssignedName {
 
 /// PLW0128
 pub(crate) fn redeclared_assigned_name(checker: &mut Checker, targets: &Vec<Expr>) {
-    let mut names: Vec<String> = Vec::new();
+    let mut names: Vec<Name> = Vec::new();
 
     for target in targets {
         check_expr(checker, target, &mut names);
     }
 }
 
-fn check_expr(checker: &mut Checker, expr: &Expr, names: &mut Vec<String>) {
+fn check_expr(checker: &mut Checker, expr: &Expr, names: &mut Vec<Name>) {
     match expr {
-        Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-            for target in elts {
+        Expr::Tuple(tuple) => {
+            for target in tuple {
                 check_expr(checker, target, names);
             }
         }
@@ -69,7 +70,7 @@ fn check_expr(checker: &mut Checker, expr: &Expr, names: &mut Vec<String>) {
                     expr.range(),
                 ));
             }
-            names.push(id.to_string());
+            names.push(id.clone());
         }
         _ => {}
     }

@@ -91,37 +91,41 @@ Black 24 and newer parenthesizes long conditional expressions and type annotatio
     ),
 ]
 
+
 def foo(
-  i: int,
-  x: (
-    Loooooooooooooooooooooooong
-    | Looooooooooooooooong
-    | Looooooooooooooooooooong
-    | Looooooong
-  ),
-  *,
-  s: str,
+    i: int,
+    x: (
+        Loooooooooooooooooooooooong
+        | Looooooooooooooooong
+        | Looooooooooooooooooooong
+        | Looooooong
+    ),
+    *,
+    s: str,
 ) -> None:
-  pass
+    pass
 
 # Ruff
 [
-  "____________________________",
-  "foo",
-  "bar",
-  "baz" if some_really_looooooooong_variable else "some other looooooooooooooong value"
+    "____________________________",
+    "foo",
+    "bar",
+    "baz"
+    if some_really_looooooooong_variable
+    else "some other looooooooooooooong value",
 ]
 
+
 def foo(
-  i: int,
-  x: Loooooooooooooooooooooooong
-     | Looooooooooooooooong
-     | Looooooooooooooooooooong
-     | Looooooong,
-  *,
-  s: str,
+    i: int,
+    x: Loooooooooooooooooooooooong
+    | Looooooooooooooooong
+    | Looooooooooooooooooooong
+    | Looooooong,
+    *,
+    s: str,
 ) -> None:
-  pass
+    pass
 ```
 
 We agree that Ruff's formatting (that matches Black's 23) is hard to read and needs improvement. But we aren't convinced that parenthesizing long nested expressions is the best solution, especially when considering expression formatting holistically. That's why we want to defer the decision until we've explored alternative nested expression formatting styles. See [psf/Black#4123](https://github.com/psf/black/issues/4123) for an in-depth explanation of our concerns and an outline of possible alternatives.
@@ -454,19 +458,21 @@ parentheses:
 
 ```python
 # Input
-for a, f(b,) in c:
+for a, [b, d,] in c:
     pass
 
 # Black
-for a, f(
+for a, [
     b,
-) in c:
+    d,
+] in c:
     pass
 
 # Ruff
-for a, f(
+for a, [
     b,
-) in c:
+    d,
+] in c:
     pass
 ```
 

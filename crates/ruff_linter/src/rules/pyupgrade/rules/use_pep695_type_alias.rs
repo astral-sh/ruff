@@ -2,6 +2,7 @@ use itertools::Itertools;
 
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::name::Name;
 use ruff_python_ast::{
     self as ast,
     visitor::{self, Visitor},
@@ -104,7 +105,7 @@ pub(crate) fn non_pep695_type_alias_type(checker: &mut Checker, stmt: &StmtAssig
         return;
     };
 
-    if name.value.to_str() != target_name.id {
+    if &name.value != target_name.id.as_str() {
         return;
     }
 
@@ -143,7 +144,7 @@ pub(crate) fn non_pep695_type_alias_type(checker: &mut Checker, stmt: &StmtAssig
     checker.diagnostics.push(create_diagnostic(
         checker.generator(),
         stmt.range(),
-        &target_name.id,
+        target_name.id.clone(),
         value,
         &vars,
         Applicability::Safe,
@@ -199,7 +200,7 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
     checker.diagnostics.push(create_diagnostic(
         checker.generator(),
         stmt.range(),
-        name,
+        name.clone(),
         value,
         &vars,
         // The fix is only safe in a type stub because new-style aliases have different runtime behavior
@@ -217,7 +218,7 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
 fn create_diagnostic(
     generator: Generator,
     stmt_range: TextRange,
-    name: &str,
+    name: Name,
     value: &Expr,
     vars: &[TypeVar],
     applicability: Applicability,
@@ -270,7 +271,7 @@ fn create_diagnostic(
                 range: TextRange::default(),
                 name: Box::new(Expr::Name(ExprName {
                     range: TextRange::default(),
-                    id: name.to_string(),
+                    id: name,
                     ctx: ast::ExprContext::Load,
                 })),
                 type_params,

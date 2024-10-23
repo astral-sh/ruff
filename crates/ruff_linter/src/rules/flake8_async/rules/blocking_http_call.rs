@@ -45,6 +45,7 @@ fn is_blocking_http_call(qualified_name: &QualifiedName) -> bool {
     matches!(
         qualified_name.segments(),
         ["urllib", "request", "urlopen"]
+            | ["urllib3", "request"]
             | [
                 "httpx" | "requests",
                 "get"
@@ -60,7 +61,7 @@ fn is_blocking_http_call(qualified_name: &QualifiedName) -> bool {
     )
 }
 
-/// ASYNC100
+/// ASYNC210
 pub(crate) fn blocking_http_call(checker: &mut Checker, call: &ExprCall) {
     if checker.semantic().in_async_context() {
         if checker

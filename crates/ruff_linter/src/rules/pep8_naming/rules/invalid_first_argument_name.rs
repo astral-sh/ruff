@@ -5,6 +5,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::ParameterWithDefault;
 use ruff_python_codegen::Stylist;
+use ruff_python_semantic::analyze::class::is_metaclass;
 use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::{Scope, ScopeKind, SemanticModel};
 use ruff_text_size::Ranged;
@@ -33,17 +34,17 @@ use crate::renamer::Renamer;
 /// the [`lint.pep8-naming.extend-ignore-names`] option to `["this"]`.
 ///
 /// ## Example
+///
 /// ```python
 /// class Example:
-///     def function(cls, data):
-///         ...
+///     def function(cls, data): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// class Example:
-///     def function(self, data):
-///         ...
+///     def function(self, data): ...
 /// ```
 ///
 /// ## Fix safety
@@ -97,19 +98,19 @@ impl Violation for InvalidFirstArgumentNameForMethod {
 /// the [`lint.pep8-naming.extend-ignore-names`] option to `["klass"]`.
 ///
 /// ## Example
+///
 /// ```python
 /// class Example:
 ///     @classmethod
-///     def function(self, data):
-///         ...
+///     def function(self, data): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// class Example:
 ///     @classmethod
-///     def function(cls, data):
-///         ...
+///     def function(cls, data): ...
 /// ```
 ///
 /// ## Fix safety
@@ -190,27 +191,37 @@ pub(crate) fn invalid_first_argument_name(
         panic!("Expected ScopeKind::Function")
     };
 
-    let Some(parent) = checker.semantic().first_non_type_parent_scope(scope) else {
+    let semantic = checker.semantic();
+
+    let Some(parent_scope) = semantic.first_non_type_parent_scope(scope) else {
+        return;
+    };
+
+    let ScopeKind::Class(parent) = parent_scope.kind else {
         return;
     };
 
     let function_type = match function_type::classify(
         name,
         decorator_list,
-        parent,
-        checker.semantic(),
+        parent_scope,
+        semantic,
         &checker.settings.pep8_naming.classmethod_decorators,
         &checker.settings.pep8_naming.staticmethod_decorators,
     ) {
         function_type::FunctionType::Function | function_type::FunctionType::StaticMethod => {
             return;
         }
-        function_type::FunctionType::Method => FunctionType::Method,
+        function_type::FunctionType::Method => {
+            if is_metaclass(parent, semantic) {
+                FunctionType::ClassMethod
+            } else {
+                FunctionType::Method
+            }
+        }
         function_type::FunctionType::ClassMethod => FunctionType::ClassMethod,
     };
-    if !checker.enabled(function_type.rule())
-        || checker.settings.pep8_naming.ignore_names.matches(name)
-    {
+    if !checker.enabled(function_type.rule()) {
         return;
     }
 
@@ -225,7 +236,13 @@ pub(crate) fn invalid_first_argument_name(
         return;
     };
 
-    if &self_or_cls.name == function_type.valid_first_argument_name() {
+    if &self_or_cls.name == function_type.valid_first_argument_name()
+        || checker
+            .settings
+            .pep8_naming
+            .ignore_names
+            .matches(&self_or_cls.name)
+    {
         return;
     }
 

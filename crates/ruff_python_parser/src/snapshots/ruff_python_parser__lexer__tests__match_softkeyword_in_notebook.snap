@@ -11,7 +11,7 @@ expression: lex_jupyter_source(source)
     ),
     (
         Name(
-            "foo",
+            Name("foo"),
         ),
         6..9,
     ),
@@ -33,7 +33,7 @@ expression: lex_jupyter_source(source)
     ),
     (
         Name(
-            "bar",
+            Name("bar"),
         ),
         20..23,
     ),

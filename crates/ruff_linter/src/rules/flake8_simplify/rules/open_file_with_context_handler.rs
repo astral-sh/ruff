@@ -8,13 +8,15 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for uses of the builtin `open()` function without an associated context
-/// manager.
+/// Checks for cases where files are opened (e.g., using the builtin `open()` function)
+/// without using a context manager.
 ///
 /// ## Why is this bad?
 /// If a file is opened without a context manager, it is not guaranteed that
 /// the file will be closed (e.g., if an exception is raised), which can cause
-/// resource leaks.
+/// resource leaks. The rule detects a wide array of IO calls where context managers
+/// could be used, such as `open`, `pathlib.Path(...).open()`, `tempfile.TemporaryFile()`
+/// or`tarfile.TarFile(...).gzopen()`.
 ///
 /// ## Example
 /// ```python
@@ -37,7 +39,7 @@ pub struct OpenFileWithContextHandler;
 impl Violation for OpenFileWithContextHandler {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use context handler for opening files")
+        format!("Use a context manager for opening files")
     }
 }
 
@@ -112,11 +114,36 @@ fn match_exit_stack(semantic: &SemanticModel) -> bool {
     false
 }
 
-/// Return `true` if `func` is the builtin `open` or `pathlib.Path(...).open`.
-fn is_open(semantic: &SemanticModel, func: &Expr) -> bool {
+/// Return `true` if the expression is a call to `open()`,
+/// or a call to some other standard-library function that opens a file.
+fn is_open_call(semantic: &SemanticModel, call: &ast::ExprCall) -> bool {
+    let func = &*call.func;
+
     // Ex) `open(...)`
-    if semantic.match_builtin_expr(func, "open") {
-        return true;
+    if let Some(qualified_name) = semantic.resolve_qualified_name(func) {
+        return matches!(
+            qualified_name.segments(),
+            [
+                "" | "builtins"
+                    | "bz2"
+                    | "codecs"
+                    | "dbm"
+                    | "gzip"
+                    | "tarfile"
+                    | "shelve"
+                    | "tokenize"
+                    | "wave",
+                "open"
+            ] | ["dbm", "gnu" | "ndbm" | "dumb" | "sqlite3", "open"]
+                | ["fileinput", "FileInput" | "input"]
+                | ["io", "open" | "open_code"]
+                | ["lzma", "LZMAFile" | "open"]
+                | ["tarfile", "TarFile", "taropen"]
+                | [
+                    "tempfile",
+                    "TemporaryFile" | "NamedTemporaryFile" | "SpooledTemporaryFile"
+                ]
+        );
     }
 
     // Ex) `pathlib.Path(...).open()`
@@ -124,24 +151,29 @@ fn is_open(semantic: &SemanticModel, func: &Expr) -> bool {
         return false;
     };
 
-    if attr != "open" {
-        return false;
-    }
-
-    let Expr::Call(ast::ExprCall {
-        func: value_func, ..
-    }) = &**value
-    else {
+    let Expr::Call(ast::ExprCall { func, .. }) = &**value else {
         return false;
     };
 
-    semantic
-        .resolve_qualified_name(value_func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pathlib", "Path"]))
+    // E.g. for `pathlib.Path(...).open()`, `qualified_name_of_instance.segments() == ["pathlib", "Path"]`
+    let Some(qualified_name_of_instance) = semantic.resolve_qualified_name(func) else {
+        return false;
+    };
+
+    matches!(
+        (qualified_name_of_instance.segments(), &**attr),
+        (
+            ["pathlib", "Path"] | ["zipfile", "ZipFile"] | ["lzma", "LZMAFile"],
+            "open"
+        ) | (
+            ["tarfile", "TarFile"],
+            "open" | "taropen" | "gzopen" | "bz2open" | "xzopen"
+        )
+    )
 }
 
-/// Return `true` if the current expression is followed by a `close` call.
-fn is_closed(semantic: &SemanticModel) -> bool {
+/// Return `true` if the current expression is immediately followed by a `.close()` call.
+fn is_immediately_closed(semantic: &SemanticModel) -> bool {
     let Some(expr) = semantic.current_expression_grandparent() else {
         return false;
     };
@@ -165,15 +197,15 @@ fn is_closed(semantic: &SemanticModel) -> bool {
 }
 
 /// SIM115
-pub(crate) fn open_file_with_context_handler(checker: &mut Checker, func: &Expr) {
+pub(crate) fn open_file_with_context_handler(checker: &mut Checker, call: &ast::ExprCall) {
     let semantic = checker.semantic();
 
-    if !is_open(semantic, func) {
+    if !is_open_call(semantic, call) {
         return;
     }
 
     // Ex) `open("foo.txt").close()`
-    if is_closed(semantic) {
+    if is_immediately_closed(semantic) {
         return;
     }
 
@@ -201,7 +233,8 @@ pub(crate) fn open_file_with_context_handler(checker: &mut Checker, func: &Expr)
         }
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(OpenFileWithContextHandler, func.range()));
+    checker.diagnostics.push(Diagnostic::new(
+        OpenFileWithContextHandler,
+        call.func.range(),
+    ));
 }

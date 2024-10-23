@@ -28,16 +28,16 @@ use crate::registry::Rule;
 /// that format for consistency.
 ///
 /// ## Example
+///
 /// ```python
-/// class FasterThanLightError(ZeroDivisionError):
-///     ...
+/// class FasterThanLightError(ZeroDivisionError): ...
 ///
 ///
-/// def calculate_speed(distance: float, time: float) -> float:
-///     ...
+/// def calculate_speed(distance: float, time: float) -> float: ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// """Utility functions and classes for calculating speed.
 ///
@@ -47,13 +47,14 @@ use crate::registry::Rule;
 /// """
 ///
 ///
-/// class FasterThanLightError(ZeroDivisionError):
-///     ...
+/// class FasterThanLightError(ZeroDivisionError): ...
 ///
 ///
-/// def calculate_speed(distance: float, time: float) -> float:
-///     ...
+/// def calculate_speed(distance: float, time: float) -> float: ...
 /// ```
+///
+/// ## Notebook behavior
+/// This rule is ignored for Jupyter Notebooks.
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -217,6 +218,9 @@ impl Violation for UndocumentedPublicClass {
 ///             raise ValueError("Tried to greet an unhappy cat.")
 /// ```
 ///
+/// ## Options
+/// - `lint.pydocstyle.ignore-decorators`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
@@ -303,6 +307,9 @@ impl Violation for UndocumentedPublicMethod {
 ///     except ZeroDivisionError as exc:
 ///         raise FasterThanLightError from exc
 /// ```
+///
+/// ## Options
+/// - `lint.pydocstyle.ignore-decorators`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -401,6 +408,9 @@ impl Violation for UndocumentedPublicPackage {
 /// print(cat)  # "Cat: Dusty"
 /// ```
 ///
+/// ## Options
+/// - `lint.pydocstyle.ignore-decorators`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
@@ -430,12 +440,12 @@ impl Violation for UndocumentedMagicMethod {
 /// that format for consistency.
 ///
 /// ## Example
+///
 /// ```python
 /// class Foo:
 ///     """Class Foo."""
 ///
-///     class Bar:
-///         ...
+///     class Bar: ...
 ///
 ///
 /// bar = Foo.Bar()
@@ -443,6 +453,7 @@ impl Violation for UndocumentedMagicMethod {
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// class Foo:
 ///     """Class Foo."""
@@ -499,6 +510,9 @@ impl Violation for UndocumentedPublicNestedClass {
 ///         self.name: str = name
 ///         self.population: int = population
 /// ```
+///
+/// ## Options
+/// - `lint.pydocstyle.ignore-decorators`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)

@@ -7,7 +7,7 @@ expression: newline_in_brackets_eol(MAC_EOL)
 [
     (
         Name(
-            "x",
+            Name("x"),
         ),
         0..1,
     ),

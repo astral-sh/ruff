@@ -80,4 +80,11 @@ B019.py:106:5: B019 Use of `functools.lru_cache` or `functools.cache` on methods
 108 |         ...
     |
 
-
+B019.py:124:5: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
+    |
+123 | class Metaclass(type):
+124 |     @functools.lru_cache
+    |     ^^^^^^^^^^^^^^^^^^^^ B019
+125 |     def lru_cached_instance_method_on_metaclass(cls, x: int):
+126 |         ...
+    |

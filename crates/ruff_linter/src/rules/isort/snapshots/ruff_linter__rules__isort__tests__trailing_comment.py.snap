@@ -1,0 +1,148 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+---
+trailing_comment.py:8:1: I001 [*] Import block is un-sorted or un-formatted
+   |
+ 6 |   pass
+ 7 |   
+ 8 | / from mylib import (
+ 9 | |     MyClient,
+10 | |     MyMgmtClient,
+11 | | ); from foo import (
+12 | |     bar
+13 | | )# some comment
+14 | | 
+15 | | pass
+   | |_^ I001
+16 |   
+17 |   from foo import (
+   |
+   = help: Organize imports
+
+ℹ Safe fix
+5  5  | 
+6  6  | pass
+7  7  | 
+   8  |+from foo import bar  # some comment
+8  9  | from mylib import (
+9  10 |     MyClient,
+10 11 |     MyMgmtClient,
+11    |-); from foo import (
+12    |-    bar
+13    |-)# some comment
+   12 |+)
+14 13 | 
+15 14 | pass
+16 15 | 
+
+trailing_comment.py:17:1: I001 [*] Import block is un-sorted or un-formatted
+   |
+15 |   pass
+16 |   
+17 | / from foo import (
+18 | |     bar
+19 | | )
+20 | | from mylib import (
+21 | |     MyClient,
+22 | |     MyMgmtClient,
+23 | |     # some comment
+24 | | )
+25 | | 
+26 | | pass
+   | |_^ I001
+27 |   
+28 |   from mylib import (
+   |
+   = help: Organize imports
+
+ℹ Safe fix
+14 14 | 
+15 15 | pass
+16 16 | 
+17    |-from foo import (
+18    |-    bar
+19    |-)
+   17 |+from foo import bar
+20 18 | from mylib import (
+21 19 |     MyClient,
+22 20 |     MyMgmtClient,
+
+trailing_comment.py:35:1: I001 [*] Import block is un-sorted or un-formatted
+   |
+33 |   pass
+34 |   
+35 | / from mylib import (
+36 | |     MyClient
+37 | |     # some comment
+38 | | )
+39 | | 
+40 | | pass
+   | |_^ I001
+41 |   
+42 |   from mylib import (
+   |
+   = help: Organize imports
+
+ℹ Safe fix
+32 32 | 
+33 33 | pass
+34 34 | 
+35    |-from mylib import (
+36    |-    MyClient
+37    |-    # some comment
+38    |-)
+   35 |+from mylib import MyClient  # some comment
+39 36 | 
+40 37 | pass
+41 38 | 
+
+trailing_comment.py:42:1: I001 [*] Import block is un-sorted or un-formatted
+   |
+40 |   pass
+41 |   
+42 | / from mylib import (
+43 | |     # some comment
+44 | |     MyClient
+45 | | )
+46 | | 
+47 | | pass
+   | |_^ I001
+48 |   
+49 |   # a
+   |
+   = help: Organize imports
+
+ℹ Safe fix
+39 39 | 
+40 40 | pass
+41 41 | 
+42    |-from mylib import (
+43    |-    # some comment
+44    |-    MyClient
+45    |-)
+   42 |+from mylib import MyClient  # some comment
+46 43 | 
+47 44 | pass
+48 45 | 
+
+trailing_comment.py:50:1: I001 [*] Import block is un-sorted or un-formatted
+   |
+49 |   # a
+50 | / from mylib import ( # b
+51 | |     # c
+52 | |     MyClient # d
+53 | |     # e
+54 | | ) # f
+   |
+   = help: Organize imports
+
+ℹ Safe fix
+47 47 | pass
+48 48 | 
+49 49 | # a
+50    |-from mylib import ( # b
+51    |-    # c
+52    |-    MyClient # d
+53    |-    # e
+54    |-) # f
+   50 |+from mylib import MyClient  # b  # c  # d  # e  # f

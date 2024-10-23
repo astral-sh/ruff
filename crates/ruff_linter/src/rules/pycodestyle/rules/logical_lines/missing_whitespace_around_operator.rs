@@ -4,6 +4,7 @@ use ruff_python_parser::TokenKind;
 use ruff_text_size::Ranged;
 
 use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::rules::pycodestyle::helpers::is_non_logical_token;
 use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 
 /// ## What it does
@@ -146,7 +147,9 @@ pub(crate) fn missing_whitespace_around_operator(
     context: &mut LogicalLinesContext,
 ) {
     let mut tokens = line.tokens().iter().peekable();
-    let first_token = tokens.by_ref().find(|token| !token.kind().is_trivia());
+    let first_token = tokens
+        .by_ref()
+        .find(|token| !is_non_logical_token(token.kind()));
     let Some(mut prev_token) = first_token else {
         return;
     };
@@ -159,7 +162,7 @@ pub(crate) fn missing_whitespace_around_operator(
     while let Some(token) = tokens.next() {
         let kind = token.kind();
 
-        if kind.is_trivia() {
+        if is_non_logical_token(kind) {
             continue;
         }
 
@@ -234,10 +237,10 @@ pub(crate) fn missing_whitespace_around_operator(
 
         if needs_space != NeedsSpace::No {
             let has_leading_trivia =
-                prev_token.end() < token.start() || prev_token.kind().is_trivia();
+                prev_token.end() < token.start() || is_non_logical_token(prev_token.kind());
 
             let has_trailing_trivia = tokens.peek().map_or(true, |next| {
-                token.end() < next.start() || next.kind().is_trivia()
+                token.end() < next.start() || is_non_logical_token(next.kind())
             });
 
             match (has_leading_trivia, has_trailing_trivia) {

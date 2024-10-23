@@ -14,12 +14,17 @@ pub use json_lines::JsonLinesEmitter;
 pub use junit::JunitEmitter;
 pub use pylint::PylintEmitter;
 pub use rdjson::RdjsonEmitter;
-use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
-use ruff_notebook::NotebookIndex;
-use ruff_source_file::{SourceFile, SourceLocation};
-use ruff_text_size::{Ranged, TextRange, TextSize};
 pub use sarif::SarifEmitter;
 pub use text::TextEmitter;
+
+use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
+use ruff_notebook::NotebookIndex;
+use ruff_python_parser::ParseError;
+use ruff_source_file::{Locator, SourceFile, SourceLocation};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+
+use crate::logging::DisplayParseErrorType;
+use crate::registry::{AsRule, Rule};
 
 mod azure;
 mod diff;
@@ -34,8 +39,17 @@ mod rdjson;
 mod sarif;
 mod text;
 
+/// Message represents either a diagnostic message corresponding to a rule violation or a syntax
+/// error message raised by the parser.
 #[derive(Debug, PartialEq, Eq)]
-pub struct Message {
+pub enum Message {
+    Diagnostic(DiagnosticMessage),
+    SyntaxError(SyntaxErrorMessage),
+}
+
+/// A diagnostic message corresponding to a rule violation.
+#[derive(Debug, PartialEq, Eq)]
+pub struct DiagnosticMessage {
     pub kind: DiagnosticKind,
     pub range: TextRange,
     pub fix: Option<Fix>,
@@ -43,37 +57,174 @@ pub struct Message {
     pub noqa_offset: TextSize,
 }
 
+/// A syntax error message raised by the parser.
+#[derive(Debug, PartialEq, Eq)]
+pub struct SyntaxErrorMessage {
+    pub message: String,
+    pub range: TextRange,
+    pub file: SourceFile,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum MessageKind {
+    Diagnostic(Rule),
+    SyntaxError,
+}
+
+impl MessageKind {
+    pub fn as_str(&self) -> &str {
+        match self {
+            MessageKind::Diagnostic(rule) => rule.as_ref(),
+            MessageKind::SyntaxError => "syntax-error",
+        }
+    }
+}
+
 impl Message {
+    /// Create a [`Message`] from the given [`Diagnostic`] corresponding to a rule violation.
     pub fn from_diagnostic(
         diagnostic: Diagnostic,
         file: SourceFile,
         noqa_offset: TextSize,
-    ) -> Self {
-        Self {
+    ) -> Message {
+        Message::Diagnostic(DiagnosticMessage {
             range: diagnostic.range(),
             kind: diagnostic.kind,
             fix: diagnostic.fix,
             file,
             noqa_offset,
+        })
+    }
+
+    /// Create a [`Message`] from the given [`ParseError`].
+    pub fn from_parse_error(
+        parse_error: &ParseError,
+        locator: &Locator,
+        file: SourceFile,
+    ) -> Message {
+        // Try to create a non-empty range so that the diagnostic can print a caret at the right
+        // position. This requires that we retrieve the next character, if any, and take its length
+        // to maintain char-boundaries.
+        let len = locator
+            .after(parse_error.location.start())
+            .chars()
+            .next()
+            .map_or(TextSize::new(0), TextLen::text_len);
+
+        Message::SyntaxError(SyntaxErrorMessage {
+            message: format!(
+                "SyntaxError: {}",
+                DisplayParseErrorType::new(&parse_error.error)
+            ),
+            range: TextRange::at(parse_error.location.start(), len),
+            file,
+        })
+    }
+
+    pub const fn as_diagnostic_message(&self) -> Option<&DiagnosticMessage> {
+        match self {
+            Message::Diagnostic(m) => Some(m),
+            Message::SyntaxError(_) => None,
         }
     }
 
+    /// Returns `true` if `self` is a syntax error message.
+    pub const fn is_syntax_error(&self) -> bool {
+        matches!(self, Message::SyntaxError(_))
+    }
+
+    /// Returns a message kind.
+    pub fn kind(&self) -> MessageKind {
+        match self {
+            Message::Diagnostic(m) => MessageKind::Diagnostic(m.kind.rule()),
+            Message::SyntaxError(_) => MessageKind::SyntaxError,
+        }
+    }
+
+    /// Returns the name used to represent the diagnostic.
+    pub fn name(&self) -> &str {
+        match self {
+            Message::Diagnostic(m) => &m.kind.name,
+            Message::SyntaxError(_) => "SyntaxError",
+        }
+    }
+
+    /// Returns the message body to display to the user.
+    pub fn body(&self) -> &str {
+        match self {
+            Message::Diagnostic(m) => &m.kind.body,
+            Message::SyntaxError(m) => &m.message,
+        }
+    }
+
+    /// Returns the fix suggestion for the violation.
+    pub fn suggestion(&self) -> Option<&str> {
+        match self {
+            Message::Diagnostic(m) => m.kind.suggestion.as_deref(),
+            Message::SyntaxError(_) => None,
+        }
+    }
+
+    /// Returns the offset at which the `noqa` comment will be placed if it's a diagnostic message.
+    pub fn noqa_offset(&self) -> Option<TextSize> {
+        match self {
+            Message::Diagnostic(m) => Some(m.noqa_offset),
+            Message::SyntaxError(_) => None,
+        }
+    }
+
+    /// Returns the [`Fix`] for the message, if there is any.
+    pub fn fix(&self) -> Option<&Fix> {
+        match self {
+            Message::Diagnostic(m) => m.fix.as_ref(),
+            Message::SyntaxError(_) => None,
+        }
+    }
+
+    /// Returns `true` if the message contains a [`Fix`].
+    pub fn fixable(&self) -> bool {
+        self.fix().is_some()
+    }
+
+    /// Returns the [`Rule`] corresponding to the diagnostic message.
+    pub fn rule(&self) -> Option<Rule> {
+        match self {
+            Message::Diagnostic(m) => Some(m.kind.rule()),
+            Message::SyntaxError(_) => None,
+        }
+    }
+
+    /// Returns the filename for the message.
     pub fn filename(&self) -> &str {
-        self.file.name()
+        self.source_file().name()
     }
 
+    /// Computes the start source location for the message.
     pub fn compute_start_location(&self) -> SourceLocation {
-        self.file.to_source_code().source_location(self.start())
+        self.source_file()
+            .to_source_code()
+            .source_location(self.start())
     }
 
+    /// Computes the end source location for the message.
     pub fn compute_end_location(&self) -> SourceLocation {
-        self.file.to_source_code().source_location(self.end())
+        self.source_file()
+            .to_source_code()
+            .source_location(self.end())
+    }
+
+    /// Returns the [`SourceFile`] which the message belongs to.
+    pub fn source_file(&self) -> &SourceFile {
+        match self {
+            Message::Diagnostic(m) => &m.file,
+            Message::SyntaxError(m) => &m.file,
+        }
     }
 }
 
 impl Ord for Message {
     fn cmp(&self, other: &Self) -> Ordering {
-        (&self.file, self.start()).cmp(&(&other.file, other.start()))
+        (self.source_file(), self.start()).cmp(&(other.source_file(), other.start()))
     }
 }
 
@@ -85,7 +236,10 @@ impl PartialOrd for Message {
 
 impl Ranged for Message {
     fn range(&self) -> TextRange {
-        self.range
+        match self {
+            Message::Diagnostic(m) => m.range,
+            Message::SyntaxError(m) => m.range,
+        }
     }
 }
 
@@ -155,10 +309,29 @@ mod tests {
 
     use ruff_diagnostics::{Diagnostic, DiagnosticKind, Edit, Fix};
     use ruff_notebook::NotebookIndex;
-    use ruff_source_file::{OneIndexed, SourceFileBuilder};
+    use ruff_python_parser::{parse_unchecked, Mode};
+    use ruff_source_file::{Locator, OneIndexed, SourceFileBuilder};
     use ruff_text_size::{Ranged, TextRange, TextSize};
 
     use crate::message::{Emitter, EmitterContext, Message};
+
+    pub(super) fn create_syntax_error_messages() -> Vec<Message> {
+        let source = r"from os import
+
+if call(foo
+    def bar():
+        pass
+";
+        let locator = Locator::new(source);
+        let source_file = SourceFileBuilder::new("syntax_errors.py", source).finish();
+        parse_unchecked(source, Mode::Module)
+            .errors()
+            .iter()
+            .map(|parse_error| {
+                Message::from_parse_error(parse_error, &locator, source_file.clone())
+            })
+            .collect()
+    }
 
     pub(super) fn create_messages() -> Vec<Message> {
         let fib = r#"import os

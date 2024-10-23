@@ -9,22 +9,20 @@
 use std::cmp::Ordering;
 use std::str::FromStr;
 
-use bitflags::bitflags;
 use unicode_ident::{is_xid_continue, is_xid_start};
 use unicode_normalization::UnicodeNormalization;
 
-use ruff_python_ast::str::Quote;
-use ruff_python_ast::str_prefix::{
-    AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix,
-};
-use ruff_python_ast::{AnyStringFlags, Int, IpyEscapeKind, StringFlags};
-use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+use ruff_python_ast::name::Name;
+use ruff_python_ast::{Int, IpyEscapeKind, StringFlags};
+use ruff_python_trivia::is_python_whitespace;
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
-use crate::error::FStringErrorType;
+use crate::error::{FStringErrorType, LexicalError, LexicalErrorType};
 use crate::lexer::cursor::{Cursor, EOF_CHAR};
 use crate::lexer::fstring::{FStringContext, FStrings, FStringsCheckpoint};
 use crate::lexer::indentation::{Indentation, Indentations, IndentationsCheckpoint};
-use crate::{Mode, TokenKind};
+use crate::token::{TokenFlags, TokenKind, TokenValue};
+use crate::Mode;
 
 mod cursor;
 mod fstring;
@@ -136,13 +134,24 @@ impl<'src> Lexer<'src> {
         std::mem::take(&mut self.current_value)
     }
 
+    /// Helper function to push the given error, updating the current range with the error location
+    /// and return the [`TokenKind::Unknown`] token.
+    fn push_error(&mut self, error: LexicalError) -> TokenKind {
+        self.current_range = error.location();
+        self.errors.push(error);
+        TokenKind::Unknown
+    }
+
     /// Lex the next token.
     pub fn next_token(&mut self) -> TokenKind {
         self.cursor.start_token();
         self.current_value = TokenValue::None;
         self.current_flags = TokenFlags::empty();
         self.current_kind = self.lex_token();
-        self.current_range = self.token_range();
+        // For `Unknown` token, the `push_error` method updates the current range.
+        if !matches!(self.current_kind, TokenKind::Unknown) {
+            self.current_range = self.token_range();
+        }
         self.current_kind
     }
 
@@ -239,7 +248,7 @@ impl<'src> Lexer<'src> {
                     } else if !self.cursor.eat_char('\n') {
                         return Some(self.push_error(LexicalError::new(
                             LexicalErrorType::LineContinuationError,
-                            self.token_range(),
+                            TextRange::at(self.offset() - '\\'.text_len(), '\\'.text_len()),
                         )));
                     }
                     indentation = Indentation::root();
@@ -331,7 +340,7 @@ impl<'src> Lexer<'src> {
                     } else if !self.cursor.eat_char('\n') {
                         return Err(LexicalError::new(
                             LexicalErrorType::LineContinuationError,
-                            self.token_range(),
+                            TextRange::at(self.offset() - '\\'.text_len(), '\\'.text_len()),
                         ));
                     }
                 }
@@ -635,7 +644,15 @@ impl<'src> Lexer<'src> {
         let text = self.token_text();
 
         if !is_ascii {
-            self.current_value = TokenValue::Name(text.nfkc().collect::<String>().into_boxed_str());
+            self.current_value = TokenValue::Name(text.nfkc().collect::<Name>());
+            return TokenKind::Name;
+        }
+
+        // Short circuit for names that are longer than any known keyword.
+        // It helps Rust to predict that the Name::new call in the keyword match's default branch
+        // is guaranteed to fit into a stack allocated (inline) Name.
+        if text.len() > 8 {
+            self.current_value = TokenValue::Name(Name::new(text));
             return TokenKind::Name;
         }
 
@@ -679,7 +696,7 @@ impl<'src> Lexer<'src> {
             "with" => TokenKind::With,
             "yield" => TokenKind::Yield,
             _ => {
-                self.current_value = TokenValue::Name(text.to_string().into_boxed_str());
+                self.current_value = TokenValue::Name(Name::new(text));
                 TokenKind::Name
             }
         }
@@ -954,25 +971,30 @@ impl<'src> Lexer<'src> {
 
                 // Skip up to the current character.
                 self.cursor.skip_bytes(index);
-                let ch = self.cursor.bump();
+
+                // Lookahead because we want to bump only if it's a quote or being escaped.
+                let quote_or_newline = self.cursor.first();
 
                 // If the character is escaped, continue scanning.
                 if num_backslashes % 2 == 1 {
-                    if ch == Some('\r') {
+                    self.cursor.bump();
+                    if quote_or_newline == '\r' {
                         self.cursor.eat_char('\n');
                     }
                     continue;
                 }
 
-                match ch {
-                    Some('\r' | '\n') => {
+                match quote_or_newline {
+                    '\r' | '\n' => {
                         return self.push_error(LexicalError::new(
                             LexicalErrorType::UnclosedStringError,
                             self.token_range(),
                         ));
                     }
-                    Some(ch) if ch == quote => {
-                        break self.offset() - TextSize::new(1);
+                    ch if ch == quote => {
+                        let value_end = self.offset();
+                        self.cursor.bump();
+                        break value_end;
                     }
                     _ => unreachable!("memchr2 returned an index that is not a quote or a newline"),
                 }
@@ -1306,6 +1328,110 @@ impl<'src> Lexer<'src> {
         }
     }
 
+    /// Re-lex the [`NonLogicalNewline`] token at the given position in the context of a logical
+    /// line.
+    ///
+    /// Returns a boolean indicating whether the lexer's position has changed. This could result
+    /// into the new current token being different than the previous current token but is not
+    /// necessarily true. If the return value is `true` then the caller is responsible for updating
+    /// it's state accordingly.
+    ///
+    /// This method is a no-op if the lexer isn't in a parenthesized context.
+    ///
+    /// ## Explanation
+    ///
+    /// The lexer emits two different kinds of newline token based on the context. If it's in a
+    /// parenthesized context, it'll emit a [`NonLogicalNewline`] token otherwise it'll emit a
+    /// regular [`Newline`] token. Based on the type of newline token, the lexer will consume and
+    /// emit the indentation tokens appropriately which affects the structure of the code.
+    ///
+    /// For example:
+    /// ```py
+    /// if call(foo
+    ///     def bar():
+    ///         pass
+    /// ```
+    ///
+    /// Here, the lexer emits a [`NonLogicalNewline`] token after `foo` which means that the lexer
+    /// doesn't emit an `Indent` token before the `def` keyword. This leads to an AST which
+    /// considers the function `bar` as part of the module block and the `if` block remains empty.
+    ///
+    /// This method is to facilitate the parser if it recovers from these kind of scenarios so that
+    /// the lexer can then re-lex a [`NonLogicalNewline`] token to a [`Newline`] token which in
+    /// turn helps the parser to build the correct AST.
+    ///
+    /// In the above snippet, it would mean that this method would move the lexer back to the
+    /// newline character after the `foo` token and emit it as a [`Newline`] token instead of
+    /// [`NonLogicalNewline`]. This means that the next token emitted by the lexer would be an
+    /// `Indent` token.
+    ///
+    /// There are cases where the lexer's position will change but the re-lexed token will remain
+    /// the same. This is to help the parser to add the error message at an appropriate location.
+    /// Consider the following example:
+    ///
+    /// ```py
+    /// if call(foo, [a, b
+    ///     def bar():
+    ///         pass
+    /// ```
+    ///
+    /// Here, the parser recovers from two unclosed parenthesis. The inner unclosed `[` will call
+    /// into the re-lexing logic and reduce the nesting level from 2 to 1. And, the re-lexing logic
+    /// will move the lexer at the newline after `b` but still emit a [`NonLogicalNewline`] token.
+    /// Only after the parser recovers from the outer unclosed `(` does the re-lexing logic emit
+    /// the [`Newline`] token.
+    ///
+    /// [`Newline`]: TokenKind::Newline
+    /// [`NonLogicalNewline`]: TokenKind::NonLogicalNewline
+    pub(crate) fn re_lex_logical_token(
+        &mut self,
+        non_logical_newline_start: Option<TextSize>,
+    ) -> bool {
+        if self.nesting == 0 {
+            return false;
+        }
+
+        // Reduce the nesting level because the parser recovered from an error inside list parsing
+        // i.e., it recovered from an unclosed parenthesis (`(`, `[`, or `{`).
+        self.nesting -= 1;
+
+        // The lexer can't be moved back for a triple-quoted f-string because the newlines are
+        // part of the f-string itself, so there is no newline token to be emitted.
+        if self.current_flags.is_triple_quoted_fstring() {
+            return false;
+        }
+
+        let Some(new_position) = non_logical_newline_start else {
+            return false;
+        };
+
+        // Earlier we reduced the nesting level unconditionally. Now that we know the lexer's
+        // position is going to be moved back, the lexer needs to be put back into a
+        // parenthesized context if the current token is a closing parenthesis.
+        //
+        // ```py
+        // (a, [b,
+        //     c
+        // )
+        // ```
+        //
+        // Here, the parser would request to re-lex the token when it's at `)` and can recover
+        // from an unclosed `[`. This method will move the lexer back to the newline character
+        // after `c` which means it goes back into parenthesized context.
+        if matches!(
+            self.current_kind,
+            TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace
+        ) {
+            self.nesting += 1;
+        }
+
+        self.cursor = Cursor::new(self.source);
+        self.cursor.skip_bytes(new_position.to_usize());
+        self.state = State::Other;
+        self.next_token();
+        true
+    }
+
     #[inline]
     fn token_range(&self) -> TextRange {
         let end = self.offset();
@@ -1330,12 +1456,6 @@ impl<'src> Lexer<'src> {
     #[inline]
     fn token_start(&self) -> TextSize {
         self.token_range().start()
-    }
-
-    /// Helper function to push the given error and return the [`TokenKind::Unknown`] token.
-    fn push_error(&mut self, error: LexicalError) -> TokenKind {
-        self.errors.push(error);
-        TokenKind::Unknown
     }
 
     /// Creates a checkpoint to which the lexer can later return to using [`Self::rewind`].
@@ -1391,318 +1511,6 @@ impl<'src> Lexer<'src> {
     pub fn finish(self) -> Vec<LexicalError> {
         self.errors
     }
-}
-
-bitflags! {
-    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-    pub(crate) struct TokenFlags: u8 {
-        /// The token is a string with double quotes (`"`).
-        const DOUBLE_QUOTES = 1 << 0;
-        /// The token is a triple-quoted string i.e., it starts and ends with three consecutive
-        /// quote characters (`"""` or `'''`).
-        const TRIPLE_QUOTED_STRING = 1 << 1;
-
-        /// The token is a unicode string i.e., prefixed with `u` or `U`
-        const UNICODE_STRING = 1 << 2;
-        /// The token is a byte string i.e., prefixed with `b` or `B`
-        const BYTE_STRING = 1 << 3;
-        /// The token is an f-string i.e., prefixed with `f` or `F`
-        const F_STRING = 1 << 4;
-        /// The token is a raw string and the prefix character is in lowercase.
-        const RAW_STRING_LOWERCASE = 1 << 5;
-        /// The token is a raw string and the prefix character is in uppercase.
-        const RAW_STRING_UPPERCASE = 1 << 6;
-
-        /// The token is a raw string i.e., prefixed with `r` or `R`
-        const RAW_STRING = Self::RAW_STRING_LOWERCASE.bits() | Self::RAW_STRING_UPPERCASE.bits();
-    }
-}
-
-impl StringFlags for TokenFlags {
-    fn quote_style(self) -> Quote {
-        if self.intersects(TokenFlags::DOUBLE_QUOTES) {
-            Quote::Double
-        } else {
-            Quote::Single
-        }
-    }
-
-    fn is_triple_quoted(self) -> bool {
-        self.intersects(TokenFlags::TRIPLE_QUOTED_STRING)
-    }
-
-    fn prefix(self) -> AnyStringPrefix {
-        if self.intersects(TokenFlags::F_STRING) {
-            if self.intersects(TokenFlags::RAW_STRING_LOWERCASE) {
-                AnyStringPrefix::Format(FStringPrefix::Raw { uppercase_r: false })
-            } else if self.intersects(TokenFlags::RAW_STRING_UPPERCASE) {
-                AnyStringPrefix::Format(FStringPrefix::Raw { uppercase_r: true })
-            } else {
-                AnyStringPrefix::Format(FStringPrefix::Regular)
-            }
-        } else if self.intersects(TokenFlags::BYTE_STRING) {
-            if self.intersects(TokenFlags::RAW_STRING_LOWERCASE) {
-                AnyStringPrefix::Bytes(ByteStringPrefix::Raw { uppercase_r: false })
-            } else if self.intersects(TokenFlags::RAW_STRING_UPPERCASE) {
-                AnyStringPrefix::Bytes(ByteStringPrefix::Raw { uppercase_r: true })
-            } else {
-                AnyStringPrefix::Bytes(ByteStringPrefix::Regular)
-            }
-        } else if self.intersects(TokenFlags::RAW_STRING_LOWERCASE) {
-            AnyStringPrefix::Regular(StringLiteralPrefix::Raw { uppercase: false })
-        } else if self.intersects(TokenFlags::RAW_STRING_UPPERCASE) {
-            AnyStringPrefix::Regular(StringLiteralPrefix::Raw { uppercase: true })
-        } else if self.intersects(TokenFlags::UNICODE_STRING) {
-            AnyStringPrefix::Regular(StringLiteralPrefix::Unicode)
-        } else {
-            AnyStringPrefix::Regular(StringLiteralPrefix::Empty)
-        }
-    }
-}
-
-impl TokenFlags {
-    /// Returns `true` if the token is an f-string.
-    const fn is_f_string(self) -> bool {
-        self.intersects(TokenFlags::F_STRING)
-    }
-
-    /// Returns `true` if the token is a raw string.
-    const fn is_raw_string(self) -> bool {
-        self.intersects(TokenFlags::RAW_STRING)
-    }
-
-    pub(crate) fn as_any_string_flags(self) -> AnyStringFlags {
-        AnyStringFlags::new(self.prefix(), self.quote_style(), self.is_triple_quoted())
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Token {
-    /// The kind of the token.
-    kind: TokenKind,
-    /// The range of the token.
-    range: TextRange,
-    /// The set of flags describing this token.
-    flags: TokenFlags,
-}
-
-impl Token {
-    pub(crate) fn new(kind: TokenKind, range: TextRange, flags: TokenFlags) -> Token {
-        Self { kind, range, flags }
-    }
-
-    /// Returns the token kind.
-    #[inline]
-    pub const fn kind(&self) -> TokenKind {
-        self.kind
-    }
-
-    /// Returns the token as a tuple of (kind, range).
-    #[inline]
-    pub const fn as_tuple(&self) -> (TokenKind, TextRange) {
-        (self.kind, self.range)
-    }
-
-    /// Returns `true` if this is a trivia token.
-    #[inline]
-    pub const fn is_trivia(self) -> bool {
-        matches!(self.kind, TokenKind::Comment | TokenKind::NonLogicalNewline)
-    }
-
-    /// Returns `true` if this is any kind of string token.
-    const fn is_any_string(self) -> bool {
-        matches!(
-            self.kind,
-            TokenKind::String
-                | TokenKind::FStringStart
-                | TokenKind::FStringMiddle
-                | TokenKind::FStringEnd
-        )
-    }
-
-    /// Returns `true` if the current token is a triple-quoted string of any kind.
-    ///
-    /// # Panics
-    ///
-    /// If it isn't a string or any f-string tokens.
-    pub fn is_triple_quoted_string(self) -> bool {
-        assert!(self.is_any_string());
-        self.flags.is_triple_quoted()
-    }
-
-    /// Returns the [`Quote`] style for the current string token of any kind.
-    ///
-    /// # Panics
-    ///
-    /// If it isn't a string or any f-string tokens.
-    pub fn string_quote_style(self) -> Quote {
-        assert!(self.is_any_string());
-        self.flags.quote_style()
-    }
-}
-
-impl Ranged for Token {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-
-/// Represents an error that occur during lexing and are
-/// returned by the `parse_*` functions in the iterator in the
-/// [lexer] implementation.
-///
-/// [lexer]: crate::lexer
-#[derive(Debug, Clone, PartialEq)]
-pub struct LexicalError {
-    /// The type of error that occurred.
-    error: LexicalErrorType,
-    /// The location of the error.
-    location: TextRange,
-}
-
-impl LexicalError {
-    /// Creates a new `LexicalError` with the given error type and location.
-    pub fn new(error: LexicalErrorType, location: TextRange) -> Self {
-        Self { error, location }
-    }
-
-    pub fn error(&self) -> &LexicalErrorType {
-        &self.error
-    }
-
-    pub fn into_error(self) -> LexicalErrorType {
-        self.error
-    }
-
-    pub fn location(&self) -> TextRange {
-        self.location
-    }
-}
-
-impl std::ops::Deref for LexicalError {
-    type Target = LexicalErrorType;
-
-    fn deref(&self) -> &Self::Target {
-        self.error()
-    }
-}
-
-impl std::error::Error for LexicalError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        Some(self.error())
-    }
-}
-
-impl std::fmt::Display for LexicalError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "{} at byte offset {}",
-            self.error(),
-            u32::from(self.location().start())
-        )
-    }
-}
-
-/// Represents the different types of errors that can occur during lexing.
-#[derive(Debug, Clone, PartialEq)]
-pub enum LexicalErrorType {
-    // TODO: Can probably be removed, the places it is used seem to be able
-    // to use the `UnicodeError` variant instead.
-    #[doc(hidden)]
-    StringError,
-    /// A string literal without the closing quote.
-    UnclosedStringError,
-    /// Decoding of a unicode escape sequence in a string literal failed.
-    UnicodeError,
-    /// Missing the `{` for unicode escape sequence.
-    MissingUnicodeLbrace,
-    /// Missing the `}` for unicode escape sequence.
-    MissingUnicodeRbrace,
-    /// The indentation is not consistent.
-    IndentationError,
-    /// An unrecognized token was encountered.
-    UnrecognizedToken { tok: char },
-    /// An f-string error containing the [`FStringErrorType`].
-    FStringError(FStringErrorType),
-    /// Invalid character encountered in a byte literal.
-    InvalidByteLiteral,
-    /// An unexpected character was encountered after a line continuation.
-    LineContinuationError,
-    /// An unexpected end of file was encountered.
-    Eof,
-    /// An unexpected error occurred.
-    OtherError(Box<str>),
-}
-
-impl std::error::Error for LexicalErrorType {}
-
-impl std::fmt::Display for LexicalErrorType {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            LexicalErrorType::StringError => write!(f, "Got unexpected string"),
-            LexicalErrorType::FStringError(error) => write!(f, "f-string: {error}"),
-            LexicalErrorType::InvalidByteLiteral => {
-                write!(f, "bytes can only contain ASCII literal characters")
-            }
-            LexicalErrorType::UnicodeError => write!(f, "Got unexpected unicode"),
-            LexicalErrorType::IndentationError => {
-                write!(f, "unindent does not match any outer indentation level")
-            }
-            LexicalErrorType::UnrecognizedToken { tok } => {
-                write!(f, "Got unexpected token {tok}")
-            }
-            LexicalErrorType::LineContinuationError => {
-                write!(f, "unexpected character after line continuation character")
-            }
-            LexicalErrorType::Eof => write!(f, "unexpected EOF while parsing"),
-            LexicalErrorType::OtherError(msg) => write!(f, "{msg}"),
-            LexicalErrorType::UnclosedStringError => {
-                write!(f, "missing closing quote in string literal")
-            }
-            LexicalErrorType::MissingUnicodeLbrace => {
-                write!(f, "Missing `{{` in Unicode escape sequence")
-            }
-            LexicalErrorType::MissingUnicodeRbrace => {
-                write!(f, "Missing `}}` in Unicode escape sequence")
-            }
-        }
-    }
-}
-
-#[derive(Clone, Debug, Default)]
-pub(crate) enum TokenValue {
-    #[default]
-    None,
-    /// Token value for a name, commonly known as an identifier.
-    ///
-    /// Unicode names are NFKC-normalized by the lexer,
-    /// matching [the behaviour of Python's lexer](https://docs.python.org/3/reference/lexical_analysis.html#identifiers)
-    Name(Box<str>),
-    /// Token value for an integer.
-    Int(Int),
-    /// Token value for a floating point number.
-    Float(f64),
-    /// Token value for a complex number.
-    Complex {
-        /// The real part of the complex number.
-        real: f64,
-        /// The imaginary part of the complex number.
-        imag: f64,
-    },
-    /// Token value for a string.
-    String(Box<str>),
-    /// Token value that includes the portion of text inside the f-string that's not
-    /// part of the expression part and isn't an opening or closing brace.
-    FStringMiddle(Box<str>),
-    /// Token value for IPython escape commands. These are recognized by the lexer
-    /// only when the mode is [`Mode::Ipython`].
-    IpyEscapeCommand {
-        /// The magic command value.
-        value: Box<str>,
-        /// The kind of magic command.
-        kind: IpyEscapeKind,
-    },
 }
 
 pub(crate) struct LexerCheckpoint {
@@ -1805,20 +1613,6 @@ fn is_identifier_continuation(c: char, identifier_is_ascii_only: &mut bool) -> b
         *identifier_is_ascii_only = false;
         is_xid_continue(c)
     }
-}
-
-/// Returns `true` for [whitespace](https://docs.python.org/3/reference/lexical_analysis.html#whitespace-between-tokens)
-/// characters.
-///
-/// This is the same as `ruff_python_trivia::is_python_whitespace` and is copied
-/// here to avoid a circular dependency as `ruff_python_trivia` has a dev-dependency
-/// on `ruff_python_lexer`.
-const fn is_python_whitespace(c: char) -> bool {
-    matches!(
-        c,
-        // Space, tab, or form-feed
-        ' ' | '\t' | '\x0C'
-    )
 }
 
 enum LexedText<'a> {

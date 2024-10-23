@@ -1,0 +1,53 @@
+---
+source: crates/ruff_linter/src/message/rdjson.rs
+expression: content
+---
+{
+  "diagnostics": [
+    {
+      "code": {
+        "url": null,
+        "value": null
+      },
+      "location": {
+        "path": "syntax_errors.py",
+        "range": {
+          "end": {
+            "column": 1,
+            "line": 2
+          },
+          "start": {
+            "column": 15,
+            "line": 1
+          }
+        }
+      },
+      "message": "SyntaxError: Expected one or more symbol names after import"
+    },
+    {
+      "code": {
+        "url": null,
+        "value": null
+      },
+      "location": {
+        "path": "syntax_errors.py",
+        "range": {
+          "end": {
+            "column": 1,
+            "line": 4
+          },
+          "start": {
+            "column": 12,
+            "line": 3
+          }
+        }
+      },
+      "message": "SyntaxError: Expected ')', found newline"
+    }
+  ],
+  "severity": "warning",
+  "source": {
+    "name": "ruff",
+    "url": "https://docs.astral.sh/ruff"
+  }
+}

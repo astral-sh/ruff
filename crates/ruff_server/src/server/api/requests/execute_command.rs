@@ -2,21 +2,14 @@ use std::str::FromStr;
 
 use crate::edit::WorkspaceEditTracker;
 use crate::server::api::LSPResult;
-use crate::server::client;
 use crate::server::schedule::Task;
+use crate::server::{client, SupportedCommand};
 use crate::session::Session;
 use crate::DIAGNOSTIC_NAME;
 use crate::{edit::DocumentVersion, server};
 use lsp_server::ErrorCode;
 use lsp_types::{self as types, request as req};
 use serde::Deserialize;
-
-#[derive(Debug)]
-enum Command {
-    Format,
-    FixAll,
-    OrganizeImports,
-}
 
 pub(crate) struct ExecuteCommand;
 
@@ -33,12 +26,23 @@ impl super::RequestHandler for ExecuteCommand {
 impl super::SyncRequestHandler for ExecuteCommand {
     fn run(
         session: &mut Session,
-        _notifier: client::Notifier,
+        notifier: client::Notifier,
         requester: &mut client::Requester,
         params: types::ExecuteCommandParams,
     ) -> server::Result<Option<serde_json::Value>> {
-        let command =
-            Command::from_str(&params.command).with_failure_code(ErrorCode::InvalidParams)?;
+        let command = SupportedCommand::from_str(&params.command)
+            .with_failure_code(ErrorCode::InvalidParams)?;
+
+        if command == SupportedCommand::Debug {
+            let output = debug_information(session);
+            notifier
+                .notify::<types::notification::LogMessage>(types::LogMessageParams {
+                    message: output,
+                    typ: types::MessageType::INFO,
+                })
+                .with_failure_code(ErrorCode::InternalError)?;
+            return Ok(None);
+        }
 
         // check if we can apply a workspace edit
         if !session.resolved_client_capabilities().apply_edit {
@@ -56,12 +60,13 @@ impl super::SyncRequestHandler for ExecuteCommand {
 
         let mut edit_tracker = WorkspaceEditTracker::new(session.resolved_client_capabilities());
         for Argument { uri, version } in arguments {
-            let snapshot = session
-                .take_snapshot(uri.clone())
-                .ok_or(anyhow::anyhow!("Document snapshot not available for {uri}",))
-                .with_failure_code(ErrorCode::InternalError)?;
+            let Some(snapshot) = session.take_snapshot(uri.clone()) else {
+                tracing::error!("Document at {uri} could not be opened");
+                show_err_msg!("Ruff does not recognize this file");
+                return Ok(None);
+            };
             match command {
-                Command::FixAll => {
+                SupportedCommand::FixAll => {
                     let fixes = super::code_action_resolve::fix_all_edit(
                         snapshot.query(),
                         snapshot.encoding(),
@@ -71,13 +76,13 @@ impl super::SyncRequestHandler for ExecuteCommand {
                         .set_fixes_for_document(fixes, snapshot.query().version())
                         .with_failure_code(ErrorCode::InternalError)?;
                 }
-                Command::Format => {
+                SupportedCommand::Format => {
                     let fixes = super::format::format_full_document(&snapshot)?;
                     edit_tracker
                         .set_fixes_for_document(fixes, version)
                         .with_failure_code(ErrorCode::InternalError)?;
                 }
-                Command::OrganizeImports => {
+                SupportedCommand::OrganizeImports => {
                     let fixes = super::code_action_resolve::organize_imports_edit(
                         snapshot.query(),
                         snapshot.encoding(),
@@ -86,6 +91,9 @@ impl super::SyncRequestHandler for ExecuteCommand {
                     edit_tracker
                         .set_fixes_for_document(fixes, snapshot.query().version())
                         .with_failure_code(ErrorCode::InternalError)?;
+                }
+                SupportedCommand::Debug => {
+                    unreachable!("The debug command should have already been handled")
                 }
             }
         }
@@ -100,29 +108,6 @@ impl super::SyncRequestHandler for ExecuteCommand {
         }
 
         Ok(None)
-    }
-}
-
-impl Command {
-    fn label(&self) -> &str {
-        match self {
-            Self::FixAll => "Fix all auto-fixable problems",
-            Self::Format => "Format document",
-            Self::OrganizeImports => "Format imports",
-        }
-    }
-}
-
-impl FromStr for Command {
-    type Err = anyhow::Error;
-
-    fn from_str(name: &str) -> Result<Self, Self::Err> {
-        Ok(match name {
-            "ruff.applyAutofix" => Self::FixAll,
-            "ruff.applyFormat" => Self::Format,
-            "ruff.applyOrganizeImports" => Self::OrganizeImports,
-            _ => return Err(anyhow::anyhow!("Invalid command `{name}`")),
-        })
     }
 }
 
@@ -146,5 +131,26 @@ fn apply_edit(
             }
             Task::nothing()
         },
+    )
+}
+
+fn debug_information(session: &Session) -> String {
+    let executable = std::env::current_exe()
+        .map(|path| format!("{}", path.display()))
+        .unwrap_or_else(|_| "<unavailable>".to_string());
+    format!(
+        "executable = {executable}
+version = {version}
+encoding = {encoding:?}
+open_document_count = {doc_count}
+active_workspace_count = {workspace_count}
+configuration_files = {config_files:?}
+{client_capabilities}",
+        version = crate::version(),
+        encoding = session.encoding(),
+        client_capabilities = session.resolved_client_capabilities(),
+        doc_count = session.num_documents(),
+        workspace_count = session.num_workspaces(),
+        config_files = session.list_config_files()
     )
 }

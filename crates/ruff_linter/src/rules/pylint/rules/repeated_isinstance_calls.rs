@@ -1,18 +1,11 @@
-use itertools::Itertools;
-use ruff_python_ast::{self as ast, Arguments, BoolOp, Expr};
-use rustc_hash::{FxHashMap, FxHashSet};
-
-use crate::fix::edits::pad;
-use crate::fix::snippet::SourceCodeSnippet;
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
+use ruff_diagnostics::AlwaysFixableViolation;
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::hashable::HashableExpr;
-use ruff_text_size::Ranged;
 
-use crate::checkers::ast::Checker;
+use crate::fix::snippet::SourceCodeSnippet;
 
-use crate::settings::types::PythonVersion;
-
+/// ## Removed
+/// This rule is identical to [SIM101] which should be used instead.
+///
 /// ## What it does
 /// Checks for repeated `isinstance` calls on the same object.
 ///
@@ -53,11 +46,14 @@ use crate::settings::types::PythonVersion;
 ///
 /// ## References
 /// - [Python documentation: `isinstance`](https://docs.python.org/3/library/functions.html#isinstance)
+///
+/// [SIM101]: https://docs.astral.sh/ruff/rules/duplicate-isinstance-call/
 #[violation]
 pub struct RepeatedIsinstanceCalls {
     expression: SourceCodeSnippet,
 }
 
+/// PLR1701
 impl AlwaysFixableViolation for RepeatedIsinstanceCalls {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -76,90 +72,5 @@ impl AlwaysFixableViolation for RepeatedIsinstanceCalls {
         } else {
             format!("Replace with merged `isinstance` call")
         }
-    }
-}
-
-/// PLR1701
-pub(crate) fn repeated_isinstance_calls(
-    checker: &mut Checker,
-    expr: &Expr,
-    op: BoolOp,
-    values: &[Expr],
-) {
-    if !op.is_or() {
-        return;
-    }
-
-    let mut obj_to_types: FxHashMap<HashableExpr, (usize, FxHashSet<HashableExpr>)> =
-        FxHashMap::default();
-    for value in values {
-        let Expr::Call(ast::ExprCall {
-            func,
-            arguments: Arguments { args, .. },
-            ..
-        }) = value
-        else {
-            continue;
-        };
-        let [obj, types] = &args[..] else {
-            continue;
-        };
-        if !checker.semantic().match_builtin_expr(func, "isinstance") {
-            continue;
-        }
-        let (num_calls, matches) = obj_to_types
-            .entry(obj.into())
-            .or_insert_with(|| (0, FxHashSet::default()));
-
-        *num_calls += 1;
-        matches.extend(match types {
-            Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                elts.iter().map(HashableExpr::from_expr).collect()
-            }
-            _ => {
-                vec![types.into()]
-            }
-        });
-    }
-
-    for (obj, (num_calls, types)) in obj_to_types {
-        if num_calls > 1 && types.len() > 1 {
-            let call = merged_isinstance_call(
-                &checker.generator().expr(obj.as_expr()),
-                types
-                    .iter()
-                    .map(HashableExpr::as_expr)
-                    .map(|expr| checker.generator().expr(expr))
-                    .sorted(),
-                checker.settings.target_version,
-            );
-            let mut diagnostic = Diagnostic::new(
-                RepeatedIsinstanceCalls {
-                    expression: SourceCodeSnippet::new(call.clone()),
-                },
-                expr.range(),
-            );
-            diagnostic.set_fix(Fix::applicable_edit(
-                Edit::range_replacement(pad(call, expr.range(), checker.locator()), expr.range()),
-                if checker.settings.target_version >= PythonVersion::Py310 {
-                    Applicability::Unsafe
-                } else {
-                    Applicability::Safe
-                },
-            ));
-            checker.diagnostics.push(diagnostic);
-        }
-    }
-}
-
-fn merged_isinstance_call(
-    obj: &str,
-    types: impl IntoIterator<Item = String>,
-    target_version: PythonVersion,
-) -> String {
-    if target_version >= PythonVersion::Py310 {
-        format!("isinstance({}, {})", obj, types.into_iter().join(" | "))
-    } else {
-        format!("isinstance({}, ({}))", obj, types.into_iter().join(", "))
     }
 }

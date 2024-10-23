@@ -8,6 +8,7 @@ mod did_close;
 mod did_close_notebook;
 mod did_open;
 mod did_open_notebook;
+mod set_trace;
 
 use super::traits::{NotificationHandler, SyncNotificationHandler};
 pub(super) use cancel::Cancel;
@@ -20,3 +21,4 @@ pub(super) use did_close::DidClose;
 pub(super) use did_close_notebook::DidCloseNotebook;
 pub(super) use did_open::DidOpen;
 pub(super) use did_open_notebook::DidOpenNotebook;
+pub(super) use set_trace::SetTrace;

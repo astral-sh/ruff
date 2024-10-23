@@ -3,9 +3,8 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::{Decorator, Expr, Parameters, TypeParam, TypeParams};
-use ruff_python_semantic::analyze::visibility::{
-    is_abstract, is_classmethod, is_new, is_overload, is_staticmethod,
-};
+use ruff_python_semantic::analyze::function_type::{self, FunctionType};
+use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -24,34 +23,25 @@ use crate::checkers::ast::Checker;
 /// methods that return an instance of `cls`, and `__new__` methods.
 ///
 /// ## Example
-/// ```python
+///
+/// ```pyi
 /// class Foo:
-///     def __new__(cls: type[_S], *args: str, **kwargs: int) -> _S:
-///         ...
-///
-///     def foo(self: _S, arg: bytes) -> _S:
-///         ...
-///
+///     def __new__(cls: type[_S], *args: str, **kwargs: int) -> _S: ...
+///     def foo(self: _S, arg: bytes) -> _S: ...
 ///     @classmethod
-///     def bar(cls: type[_S], arg: int) -> _S:
-///         ...
+///     def bar(cls: type[_S], arg: int) -> _S: ...
 /// ```
 ///
 /// Use instead:
-/// ```python
+///
+/// ```pyi
 /// from typing import Self
 ///
-///
 /// class Foo:
-///     def __new__(cls, *args: str, **kwargs: int) -> Self:
-///         ...
-///
-///     def foo(self, arg: bytes) -> Self:
-///         ...
-///
+///     def __new__(cls, *args: str, **kwargs: int) -> Self: ...
+///     def foo(self, arg: bytes) -> Self: ...
 ///     @classmethod
-///     def bar(cls, arg: int) -> Self:
-///         ...
+///     def bar(cls, arg: int) -> Self: ...
 /// ```
 ///
 /// [PEP 673]: https://peps.python.org/pep-0673/#motivation
@@ -80,7 +70,7 @@ pub(crate) fn custom_type_var_return_type(
     type_params: Option<&TypeParams>,
 ) {
     // Given, e.g., `def foo(self: _S, arg: bytes) -> _T`, extract `_T`.
-    let Some(return_annotation) = returns else {
+    let Some(returns) = returns else {
         return;
     };
 
@@ -88,105 +78,139 @@ pub(crate) fn custom_type_var_return_type(
     let Some(self_or_cls_annotation) = args
         .posonlyargs
         .iter()
-        .chain(args.args.iter())
+        .chain(&args.args)
         .next()
         .and_then(|parameter_with_default| parameter_with_default.parameter.annotation.as_ref())
     else {
         return;
     };
 
-    if !checker.semantic().current_scope().kind.is_class() {
-        return;
-    };
+    let semantic = checker.semantic();
 
     // Skip any abstract, static, and overloaded methods.
-    if is_abstract(decorator_list, checker.semantic())
-        || is_overload(decorator_list, checker.semantic())
-        || is_staticmethod(decorator_list, checker.semantic())
-    {
+    if is_abstract(decorator_list, semantic) || is_overload(decorator_list, semantic) {
         return;
     }
 
-    let uses_custom_var: bool =
-        if is_classmethod(decorator_list, checker.semantic()) || is_new(name) {
-            class_method(self_or_cls_annotation, return_annotation, type_params)
-        } else {
-            // If not static, or a class method or __new__ we know it is an instance method
-            instance_method(self_or_cls_annotation, return_annotation, type_params)
-        };
+    let method = match function_type::classify(
+        name,
+        decorator_list,
+        semantic.current_scope(),
+        semantic,
+        &checker.settings.pep8_naming.classmethod_decorators,
+        &checker.settings.pep8_naming.staticmethod_decorators,
+    ) {
+        FunctionType::Function => return,
+        FunctionType::StaticMethod => return,
+        FunctionType::ClassMethod => Method::Class(ClassMethod {
+            cls_annotation: self_or_cls_annotation,
+            returns,
+            type_params,
+        }),
+        FunctionType::Method => Method::Instance(InstanceMethod {
+            self_annotation: self_or_cls_annotation,
+            returns,
+            type_params,
+        }),
+    };
 
-    if uses_custom_var {
+    if method.uses_custom_var() {
         checker.diagnostics.push(Diagnostic::new(
             CustomTypeVarReturnType {
                 method_name: name.to_string(),
             },
-            return_annotation.range(),
+            returns.range(),
         ));
     }
 }
 
-/// Returns `true` if the class method is annotated with a custom `TypeVar` that is likely
-/// private.
-fn class_method(
-    cls_annotation: &Expr,
-    return_annotation: &Expr,
-    type_params: Option<&TypeParams>,
-) -> bool {
-    let Expr::Subscript(ast::ExprSubscript { slice, value, .. }) = cls_annotation else {
-        return false;
-    };
-
-    let Expr::Name(value) = value.as_ref() else {
-        return false;
-    };
-
-    // Don't error if the first argument is annotated with typing.Type[T].
-    // These are edge cases, and it's hard to give good error messages for them.
-    if value.id != "type" {
-        return false;
-    };
-
-    let Expr::Name(slice) = slice.as_ref() else {
-        return false;
-    };
-
-    let Expr::Name(return_annotation) = map_subscript(return_annotation) else {
-        return false;
-    };
-
-    if slice.id != return_annotation.id {
-        return false;
-    }
-
-    is_likely_private_typevar(&slice.id, type_params)
+#[derive(Debug)]
+enum Method<'a> {
+    Class(ClassMethod<'a>),
+    Instance(InstanceMethod<'a>),
 }
 
-/// Returns `true` if the instance method is annotated with a custom `TypeVar` that is likely
-/// private.
-fn instance_method(
-    self_annotation: &Expr,
-    return_annotation: &Expr,
-    type_params: Option<&TypeParams>,
-) -> bool {
-    let Expr::Name(ast::ExprName {
-        id: first_arg_type, ..
-    }) = self_annotation
-    else {
-        return false;
-    };
-
-    let Expr::Name(ast::ExprName {
-        id: return_type, ..
-    }) = map_subscript(return_annotation)
-    else {
-        return false;
-    };
-
-    if first_arg_type != return_type {
-        return false;
+impl<'a> Method<'a> {
+    fn uses_custom_var(&self) -> bool {
+        match self {
+            Self::Class(class_method) => class_method.uses_custom_var(),
+            Self::Instance(instance_method) => instance_method.uses_custom_var(),
+        }
     }
+}
 
-    is_likely_private_typevar(first_arg_type, type_params)
+#[derive(Debug)]
+struct ClassMethod<'a> {
+    cls_annotation: &'a Expr,
+    returns: &'a Expr,
+    type_params: Option<&'a TypeParams>,
+}
+
+impl<'a> ClassMethod<'a> {
+    /// Returns `true` if the class method is annotated with a custom `TypeVar` that is likely
+    /// private.
+    fn uses_custom_var(&self) -> bool {
+        let Expr::Subscript(ast::ExprSubscript { slice, value, .. }) = self.cls_annotation else {
+            return false;
+        };
+
+        let Expr::Name(value) = value.as_ref() else {
+            return false;
+        };
+
+        // Don't error if the first argument is annotated with typing.Type[T].
+        // These are edge cases, and it's hard to give good error messages for them.
+        if value.id != "type" {
+            return false;
+        };
+
+        let Expr::Name(slice) = slice.as_ref() else {
+            return false;
+        };
+
+        let Expr::Name(return_annotation) = map_subscript(self.returns) else {
+            return false;
+        };
+
+        if slice.id != return_annotation.id {
+            return false;
+        }
+
+        is_likely_private_typevar(&slice.id, self.type_params)
+    }
+}
+
+#[derive(Debug)]
+struct InstanceMethod<'a> {
+    self_annotation: &'a Expr,
+    returns: &'a Expr,
+    type_params: Option<&'a TypeParams>,
+}
+
+impl<'a> InstanceMethod<'a> {
+    /// Returns `true` if the instance method is annotated with a custom `TypeVar` that is likely
+    /// private.
+    fn uses_custom_var(&self) -> bool {
+        let Expr::Name(ast::ExprName {
+            id: first_arg_type, ..
+        }) = self.self_annotation
+        else {
+            return false;
+        };
+
+        let Expr::Name(ast::ExprName {
+            id: return_type, ..
+        }) = map_subscript(self.returns)
+        else {
+            return false;
+        };
+
+        if first_arg_type != return_type {
+            return false;
+        }
+
+        is_likely_private_typevar(first_arg_type, self.type_params)
+    }
 }
 
 /// Returns `true` if the type variable is likely private.

@@ -136,6 +136,13 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                     if !shadowed.kind.is_argument() {
                         continue;
                     }
+                    if checker.settings.dummy_variable_rgx.is_match(name) {
+                        continue;
+                    }
+                    let scope = &checker.semantic.scopes[binding.scope];
+                    if scope.kind.is_generator() {
+                        continue;
+                    }
                     checker.diagnostics.push(Diagnostic::new(
                         pylint::rules::RedefinedArgumentFromLocal {
                             name: name.to_string(),

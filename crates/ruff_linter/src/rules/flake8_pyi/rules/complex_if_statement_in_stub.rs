@@ -16,19 +16,17 @@ use crate::checkers::ast::Checker;
 /// analyze your code.
 ///
 /// ## Example
-/// ```python
+/// ```pyi
 /// import sys
 ///
-/// if (3, 10) <= sys.version_info < (3, 12):
-///     ...
+/// if (3, 10) <= sys.version_info < (3, 12): ...
 /// ```
 ///
 /// Use instead:
-/// ```python
+/// ```pyi
 /// import sys
 ///
-/// if sys.version_info >= (3, 10) and sys.version_info < (3, 12):
-///     ...
+/// if sys.version_info >= (3, 10) and sys.version_info < (3, 12): ...
 /// ```
 ///
 /// ## References

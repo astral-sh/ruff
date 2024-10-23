@@ -24,7 +24,7 @@ pub(crate) struct DocLines<'a> {
 impl<'a> DocLines<'a> {
     fn new(tokens: &'a Tokens) -> Self {
         Self {
-            inner: tokens.up_to_first_unknown().iter(),
+            inner: tokens.iter(),
             prev: TextSize::default(),
         }
     }

@@ -7,6 +7,7 @@ use std::fmt::{Display, Formatter};
 #[derive(Debug, Clone, Default, CacheKey)]
 pub struct Settings {
     pub builtins_ignorelist: Vec<String>,
+    pub builtins_allowed_modules: Vec<String>,
 }
 
 impl Display for Settings {
@@ -15,7 +16,8 @@ impl Display for Settings {
             formatter = f,
             namespace = "linter.flake8_builtins",
             fields = [
-                self.builtins_ignorelist | array
+                self.builtins_allowed_modules | array,
+                self.builtins_ignorelist | array,
             ]
         }
         Ok(())

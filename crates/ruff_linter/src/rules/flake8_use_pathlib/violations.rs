@@ -724,7 +724,7 @@ impl Violation for OsReadlink {
 /// ```
 ///
 /// ## References
-/// - [Python documentation: `Path.stat`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.group)
+/// - [Python documentation: `Path.stat`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.stat)
 /// - [Python documentation: `Path.group`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.group)
 /// - [Python documentation: `Path.owner`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.owner)
 /// - [Python documentation: `os.stat`](https://docs.python.org/3/library/os.html#os.stat)

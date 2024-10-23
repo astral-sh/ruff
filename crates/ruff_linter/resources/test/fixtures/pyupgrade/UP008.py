@@ -63,3 +63,19 @@ class MyClass(BaseClass):
         InnerClass().method()
 
     defined_outside = defined_outside
+
+
+from dataclasses import dataclass
+
+
+@dataclass
+class DataClass:
+    def normal(self):
+        super(DataClass, self).f()  # Error
+        super().f()  # OK
+
+
+@dataclass(slots=True)
+def normal(self):
+    super(DataClass, self).f()  # OK
+    super().f()  # OK (`TypeError` in practice)

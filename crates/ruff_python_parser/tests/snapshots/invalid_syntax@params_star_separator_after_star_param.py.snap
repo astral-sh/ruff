@@ -15,7 +15,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "foo",
+                        id: Name("foo"),
                         range: 4..7,
                     },
                     type_params: None,
@@ -28,7 +28,7 @@ Module(
                                 parameter: Parameter {
                                     range: 8..9,
                                     name: Identifier {
-                                        id: "a",
+                                        id: Name("a"),
                                         range: 8..9,
                                     },
                                     annotation: None,
@@ -40,7 +40,7 @@ Module(
                             Parameter {
                                 range: 11..16,
                                 name: Identifier {
-                                    id: "args",
+                                    id: Name("args"),
                                     range: 12..16,
                                 },
                                 annotation: None,
@@ -52,7 +52,7 @@ Module(
                                 parameter: Parameter {
                                     range: 21..22,
                                     name: Identifier {
-                                        id: "b",
+                                        id: Name("b"),
                                         range: 21..22,
                                     },
                                     annotation: None,
@@ -83,7 +83,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "foo",
+                        id: Name("foo"),
                         range: 33..36,
                     },
                     type_params: None,
@@ -96,7 +96,7 @@ Module(
                                 parameter: Parameter {
                                     range: 37..38,
                                     name: Identifier {
-                                        id: "a",
+                                        id: Name("a"),
                                         range: 37..38,
                                     },
                                     annotation: None,
@@ -108,7 +108,7 @@ Module(
                             Parameter {
                                 range: 40..45,
                                 name: Identifier {
-                                    id: "args",
+                                    id: Name("args"),
                                     range: 41..45,
                                 },
                                 annotation: None,
@@ -120,7 +120,7 @@ Module(
                                 parameter: Parameter {
                                     range: 47..48,
                                     name: Identifier {
-                                        id: "b",
+                                        id: Name("b"),
                                         range: 47..48,
                                     },
                                     annotation: None,
@@ -132,7 +132,7 @@ Module(
                                 parameter: Parameter {
                                     range: 50..51,
                                     name: Identifier {
-                                        id: "c",
+                                        id: Name("c"),
                                         range: 50..51,
                                     },
                                     annotation: None,

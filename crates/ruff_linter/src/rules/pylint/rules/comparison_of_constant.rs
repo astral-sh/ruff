@@ -6,7 +6,6 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::rules::pylint::helpers::CmpOpExt;
 
 /// ## What it does
 /// Checks for comparisons between constants.
@@ -45,8 +44,7 @@ impl Violation for ComparisonOfConstant {
         } = self;
 
         format!(
-            "Two constants compared in a comparison, consider replacing `{left_constant} {} {right_constant}`",
-            CmpOpExt::from(op)
+            "Two constants compared in a comparison, consider replacing `{left_constant} {op} {right_constant}`",
         )
     }
 }
@@ -59,7 +57,7 @@ pub(crate) fn comparison_of_constant(
     comparators: &[Expr],
 ) {
     for ((left, right), op) in std::iter::once(left)
-        .chain(comparators.iter())
+        .chain(comparators)
         .tuple_windows()
         .zip(ops)
     {

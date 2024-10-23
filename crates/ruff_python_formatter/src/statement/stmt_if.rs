@@ -1,12 +1,12 @@
 use ruff_formatter::{format_args, write};
-use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::{ElifElseClause, StmtIf};
+use ruff_python_ast::{AnyNodeRef, ElifElseClause, StmtIf};
 use ruff_text_size::Ranged;
 
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
 use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
+use crate::statement::suite::SuiteKind;
 
 #[derive(Default)]
 pub struct FormatStmtIf;
@@ -35,13 +35,22 @@ impl FormatNodeRule<StmtIf> for FormatStmtIf {
                         maybe_parenthesize_expression(test, item, Parenthesize::IfBreaks),
                     ],
                 ),
-                clause_body(body, trailing_colon_comment),
+                clause_body(
+                    body,
+                    SuiteKind::other(elif_else_clauses.is_empty()),
+                    trailing_colon_comment
+                ),
             ]
         )?;
 
         let mut last_node = body.last().unwrap().into();
         for clause in elif_else_clauses {
-            format_elif_else_clause(clause, f, Some(last_node))?;
+            format_elif_else_clause(
+                clause,
+                f,
+                Some(last_node),
+                SuiteKind::other(clause == elif_else_clauses.last().unwrap()),
+            )?;
             last_node = clause.body.last().unwrap().into();
         }
 
@@ -55,6 +64,7 @@ pub(crate) fn format_elif_else_clause(
     item: &ElifElseClause,
     f: &mut PyFormatter,
     last_node: Option<AnyNodeRef>,
+    suite_kind: SuiteKind,
 ) -> FormatResult<()> {
     let ElifElseClause {
         range: _,
@@ -93,7 +103,7 @@ pub(crate) fn format_elif_else_clause(
                 }),
             )
             .with_leading_comments(leading_comments, last_node),
-            clause_body(body, trailing_colon_comment),
+            clause_body(body, suite_kind, trailing_colon_comment),
             f.options()
                 .source_map_generation()
                 .is_enabled()

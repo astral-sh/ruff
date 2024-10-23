@@ -36,6 +36,14 @@ use crate::checkers::ast::Checker;
 /// l.reverse()
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as calling `.reverse()` on a list
+/// will mutate the list in-place, unlike `reversed`, which creates a new list
+/// and leaves the original list unchanged.
+///
+/// If the list is referenced elsewhere, this could lead to unexpected
+/// behavior.
+///
 /// ## References
 /// - [Python documentation: More on Lists](https://docs.python.org/3/tutorial/datastructures.html#more-on-lists)
 #[violation]
@@ -88,7 +96,7 @@ pub(crate) fn list_assign_reversed(checker: &mut Checker, assign: &StmtAssign) {
             },
             assign.range(),
         )
-        .with_fix(Fix::safe_edit(Edit::range_replacement(
+        .with_fix(Fix::unsafe_edit(Edit::range_replacement(
             format!("{}.reverse()", target_expr.id),
             assign.range(),
         ))),

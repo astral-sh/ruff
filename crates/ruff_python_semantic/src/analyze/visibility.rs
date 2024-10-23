@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Decorator};
+use ruff_python_ast::{self as ast, Decorator, Expr};
 
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
@@ -28,23 +28,23 @@ pub fn is_classmethod(decorator_list: &[Decorator], semantic: &SemanticModel) ->
 
 /// Returns `true` if a function definition is an `@overload`.
 pub fn is_overload(decorator_list: &[Decorator], semantic: &SemanticModel) -> bool {
-    decorator_list.iter().any(|decorator| {
-        semantic.match_typing_expr(map_callable(&decorator.expression), "overload")
-    })
+    decorator_list
+        .iter()
+        .any(|decorator| semantic.match_typing_expr(&decorator.expression, "overload"))
 }
 
 /// Returns `true` if a function definition is an `@override` (PEP 698).
 pub fn is_override(decorator_list: &[Decorator], semantic: &SemanticModel) -> bool {
-    decorator_list.iter().any(|decorator| {
-        semantic.match_typing_expr(map_callable(&decorator.expression), "override")
-    })
+    decorator_list
+        .iter()
+        .any(|decorator| semantic.match_typing_expr(&decorator.expression, "override"))
 }
 
 /// Returns `true` if a function definition is an abstract method based on its decorators.
 pub fn is_abstract(decorator_list: &[Decorator], semantic: &SemanticModel) -> bool {
     decorator_list.iter().any(|decorator| {
         semantic
-            .resolve_qualified_name(map_callable(&decorator.expression))
+            .resolve_qualified_name(&decorator.expression)
             .is_some_and(|qualified_name| {
                 matches!(
                     qualified_name.segments(),
@@ -63,22 +63,51 @@ pub fn is_abstract(decorator_list: &[Decorator], semantic: &SemanticModel) -> bo
 /// Returns `true` if a function definition is a `@property`.
 /// `extra_properties` can be used to check additional non-standard
 /// `@property`-like decorators.
-pub fn is_property(
+pub fn is_property<'a, P, I>(
     decorator_list: &[Decorator],
-    extra_properties: &[QualifiedName],
+    extra_properties: P,
     semantic: &SemanticModel,
-) -> bool {
+) -> bool
+where
+    P: IntoIterator<IntoIter = I>,
+    I: Iterator<Item = QualifiedName<'a>> + Clone,
+{
+    let extra_properties = extra_properties.into_iter();
     decorator_list.iter().any(|decorator| {
         semantic
             .resolve_qualified_name(map_callable(&decorator.expression))
             .is_some_and(|qualified_name| {
                 matches!(
                     qualified_name.segments(),
-                    ["" | "builtins", "property"] | ["functools", "cached_property"]
+                    ["" | "builtins" | "enum", "property"]
+                        | ["functools", "cached_property"]
+                        | ["abc", "abstractproperty"]
+                        | ["types", "DynamicClassAttribute"]
                 ) || extra_properties
-                    .iter()
-                    .any(|extra_property| extra_property.segments() == qualified_name.segments())
+                    .clone()
+                    .any(|extra_property| extra_property == qualified_name)
             })
+    })
+}
+
+/// Returns `true` if a function definition is an `attrs`-like validator based on its decorators.
+pub fn is_validator(decorator_list: &[Decorator], semantic: &SemanticModel) -> bool {
+    decorator_list.iter().any(|decorator| {
+        let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = &decorator.expression else {
+            return false;
+        };
+
+        if attr.as_str() != "validator" {
+            return false;
+        }
+
+        let Expr::Name(value) = value.as_ref() else {
+            return false;
+        };
+
+        semantic
+            .resolve_name(value)
+            .is_some_and(|id| semantic.binding(id).kind.is_assignment())
     })
 }
 
@@ -86,7 +115,7 @@ pub fn is_property(
 pub fn is_final(decorator_list: &[Decorator], semantic: &SemanticModel) -> bool {
     decorator_list
         .iter()
-        .any(|decorator| semantic.match_typing_expr(map_callable(&decorator.expression), "final"))
+        .any(|decorator| semantic.match_typing_expr(&decorator.expression, "final"))
 }
 
 /// Returns `true` if a function is a "magic method".

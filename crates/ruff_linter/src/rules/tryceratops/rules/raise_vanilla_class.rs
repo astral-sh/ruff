@@ -1,4 +1,5 @@
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::helpers::map_callable;
+use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -7,12 +8,12 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for code that raises `Exception` directly.
+/// Checks for code that raises `Exception` or `BaseException` directly.
 ///
 /// ## Why is this bad?
-/// Handling such exceptions requires the use of `except Exception`, which
-/// captures _any_ raised exception, including failed assertions,
-/// division by zero, and more.
+/// Handling such exceptions requires the use of `except Exception` or
+/// `except BaseException`. These will capture almost _any_ raised exception,
+/// including failed assertions, division by zero, and more.
 ///
 /// Prefer to raise your own exception, or a more specific built-in
 /// exception, so that you can avoid over-capturing exceptions that you
@@ -63,12 +64,16 @@ impl Violation for RaiseVanillaClass {
 
 /// TRY002
 pub(crate) fn raise_vanilla_class(checker: &mut Checker, expr: &Expr) {
-    let node = if let Expr::Call(ast::ExprCall { func, .. }) = expr {
-        func
-    } else {
-        expr
-    };
-    if checker.semantic().match_builtin_expr(node, "Exception") {
+    if checker
+        .semantic()
+        .resolve_qualified_name(map_callable(expr))
+        .is_some_and(|qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                ["" | "builtins", "Exception" | "BaseException"]
+            )
+        })
+    {
         checker
             .diagnostics
             .push(Diagnostic::new(RaiseVanillaClass, expr.range()));

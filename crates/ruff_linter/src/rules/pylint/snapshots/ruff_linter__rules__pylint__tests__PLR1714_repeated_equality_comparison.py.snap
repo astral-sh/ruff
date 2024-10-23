@@ -245,7 +245,7 @@ repeated_equality_comparison.py:24:1: PLR1714 [*] Consider merging multiple comp
 22 22 | foo != "a" and "b" != foo and foo != "c"
 23 23 | 
 24    |-foo == "a" or foo == "b" or "c" == bar or "d" == bar  # Multiple targets
-   24 |+foo in ("a", "b")  # Multiple targets
+   24 |+foo in ("a", "b") or "c" == bar or "d" == bar  # Multiple targets
 25 25 | 
 26 26 | foo.bar == "a" or foo.bar == "b"  # Attributes.
 27 27 | 
@@ -266,7 +266,7 @@ repeated_equality_comparison.py:24:1: PLR1714 [*] Consider merging multiple comp
 22 22 | foo != "a" and "b" != foo and foo != "c"
 23 23 | 
 24    |-foo == "a" or foo == "b" or "c" == bar or "d" == bar  # Multiple targets
-   24 |+bar in ("c", "d")  # Multiple targets
+   24 |+foo == "a" or foo == "b" or bar in ("c", "d")  # Multiple targets
 25 25 | 
 26 26 | foo.bar == "a" or foo.bar == "b"  # Attributes.
 27 27 | 
@@ -292,4 +292,85 @@ repeated_equality_comparison.py:26:1: PLR1714 [*] Consider merging multiple comp
 28 28 | # OK
 29 29 | foo == "a" and foo == "b" and foo == "c"  # `and` mixed with `==`.
 
+repeated_equality_comparison.py:61:16: PLR1714 [*] Consider merging multiple comparisons: `bar in ("c", "d")`. Use a `set` if the elements are hashable.
+   |
+59 | foo == "a" or "c" == bar or foo == "b" or "d" == bar  # Multiple targets
+60 | 
+61 | foo == "a" or ("c" == bar or "d" == bar) or foo == "b"  # Multiple targets
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^ PLR1714
+62 | 
+63 | foo == "a" or foo == "b" or "c" != bar and "d" != bar  # Multiple targets
+   |
+   = help: Merge multiple comparisons
 
+ℹ Unsafe fix
+58 58 | 
+59 59 | foo == "a" or "c" == bar or foo == "b" or "d" == bar  # Multiple targets
+60 60 | 
+61    |-foo == "a" or ("c" == bar or "d" == bar) or foo == "b"  # Multiple targets
+   61 |+foo == "a" or (bar in ("c", "d")) or foo == "b"  # Multiple targets
+62 62 | 
+63 63 | foo == "a" or foo == "b" or "c" != bar and "d" != bar  # Multiple targets
+64 64 | 
+
+repeated_equality_comparison.py:63:1: PLR1714 [*] Consider merging multiple comparisons: `foo in ("a", "b")`. Use a `set` if the elements are hashable.
+   |
+61 | foo == "a" or ("c" == bar or "d" == bar) or foo == "b"  # Multiple targets
+62 | 
+63 | foo == "a" or foo == "b" or "c" != bar and "d" != bar  # Multiple targets
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR1714
+64 | 
+65 | foo == "a" or ("c" != bar and "d" != bar) or foo == "b"  # Multiple targets
+   |
+   = help: Merge multiple comparisons
+
+ℹ Unsafe fix
+60 60 | 
+61 61 | foo == "a" or ("c" == bar or "d" == bar) or foo == "b"  # Multiple targets
+62 62 | 
+63    |-foo == "a" or foo == "b" or "c" != bar and "d" != bar  # Multiple targets
+   63 |+foo in ("a", "b") or "c" != bar and "d" != bar  # Multiple targets
+64 64 | 
+65 65 | foo == "a" or ("c" != bar and "d" != bar) or foo == "b"  # Multiple targets
+66 66 | 
+
+repeated_equality_comparison.py:63:29: PLR1714 [*] Consider merging multiple comparisons: `bar not in ("c", "d")`. Use a `set` if the elements are hashable.
+   |
+61 | foo == "a" or ("c" == bar or "d" == bar) or foo == "b"  # Multiple targets
+62 | 
+63 | foo == "a" or foo == "b" or "c" != bar and "d" != bar  # Multiple targets
+   |                             ^^^^^^^^^^^^^^^^^^^^^^^^^ PLR1714
+64 | 
+65 | foo == "a" or ("c" != bar and "d" != bar) or foo == "b"  # Multiple targets
+   |
+   = help: Merge multiple comparisons
+
+ℹ Unsafe fix
+60 60 | 
+61 61 | foo == "a" or ("c" == bar or "d" == bar) or foo == "b"  # Multiple targets
+62 62 | 
+63    |-foo == "a" or foo == "b" or "c" != bar and "d" != bar  # Multiple targets
+   63 |+foo == "a" or foo == "b" or bar not in ("c", "d")  # Multiple targets
+64 64 | 
+65 65 | foo == "a" or ("c" != bar and "d" != bar) or foo == "b"  # Multiple targets
+66 66 | 
+
+repeated_equality_comparison.py:65:16: PLR1714 [*] Consider merging multiple comparisons: `bar not in ("c", "d")`. Use a `set` if the elements are hashable.
+   |
+63 | foo == "a" or foo == "b" or "c" != bar and "d" != bar  # Multiple targets
+64 | 
+65 | foo == "a" or ("c" != bar and "d" != bar) or foo == "b"  # Multiple targets
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^ PLR1714
+66 | 
+67 | foo == "a" and "c" != bar or foo == "b" and "d" != bar  # Multiple targets
+   |
+   = help: Merge multiple comparisons
+
+ℹ Unsafe fix
+62 62 | 
+63 63 | foo == "a" or foo == "b" or "c" != bar and "d" != bar  # Multiple targets
+64 64 | 
+65    |-foo == "a" or ("c" != bar and "d" != bar) or foo == "b"  # Multiple targets
+   65 |+foo == "a" or (bar not in ("c", "d")) or foo == "b"  # Multiple targets
+66 66 | 
+67 67 | foo == "a" and "c" != bar or foo == "b" and "d" != bar  # Multiple targets

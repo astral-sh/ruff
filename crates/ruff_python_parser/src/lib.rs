@@ -64,11 +64,11 @@
 //! [parsing]: https://en.wikipedia.org/wiki/Parsing
 //! [lexer]: crate::lexer
 
+use std::iter::FusedIterator;
 use std::ops::Deref;
 
-pub use crate::error::{FStringErrorType, ParseError, ParseErrorType};
-pub use crate::lexer::Token;
-pub use crate::token::TokenKind;
+pub use crate::error::{FStringErrorType, LexicalErrorType, ParseError, ParseErrorType};
+pub use crate::token::{Token, TokenKind};
 
 use crate::parser::Parser;
 
@@ -234,7 +234,7 @@ pub fn parse_unchecked_source(source: &str, source_type: PySourceType) -> Parsed
 }
 
 /// Represents the parsed source code.
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Parsed<T> {
     syntax: T,
     tokens: Tokens,
@@ -274,11 +274,11 @@ impl<T> Parsed<T> {
 
     /// Returns the [`Parsed`] output as a [`Result`], returning [`Ok`] if it has no syntax errors,
     /// or [`Err`] containing the first [`ParseError`] encountered.
-    pub fn as_result(&self) -> Result<&Parsed<T>, &ParseError> {
-        if let [error, ..] = self.errors() {
-            Err(error)
-        } else {
+    pub fn as_result(&self) -> Result<&Parsed<T>, &[ParseError]> {
+        if self.is_valid() {
             Ok(self)
+        } else {
+            Err(&self.errors)
         }
     }
 
@@ -361,32 +361,19 @@ impl Parsed<ModExpression> {
 }
 
 /// Tokens represents a vector of lexed [`Token`].
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Tokens {
     raw: Vec<Token>,
-
-    /// Index of the first [`TokenKind::Unknown`] token or the length of the token vector.
-    first_unknown_or_len: std::sync::OnceLock<usize>,
 }
 
 impl Tokens {
     pub(crate) fn new(tokens: Vec<Token>) -> Tokens {
-        Tokens {
-            raw: tokens,
-            first_unknown_or_len: std::sync::OnceLock::new(),
-        }
+        Tokens { raw: tokens }
     }
 
-    /// Returns a slice of tokens up to (and excluding) the first [`TokenKind::Unknown`] token or
-    /// all the tokens if there is none.
-    pub fn up_to_first_unknown(&self) -> &[Token] {
-        let end = *self.first_unknown_or_len.get_or_init(|| {
-            self.raw
-                .iter()
-                .position(|token| token.kind() == TokenKind::Unknown)
-                .unwrap_or(self.raw.len())
-        });
-        &self.raw[..end]
+    /// Returns an iterator over all the tokens that provides context.
+    pub fn iter_with_context(&self) -> TokenIterWithContext {
+        TokenIterWithContext::new(&self.raw)
     }
 
     /// Returns a slice of [`Token`] that are within the given `range`.
@@ -522,6 +509,68 @@ impl From<&Tokens> for CommentRanges {
     }
 }
 
+/// An iterator over the [`Token`]s with context.
+///
+/// This struct is created by the [`iter_with_context`] method on [`Tokens`]. Refer to its
+/// documentation for more details.
+///
+/// [`iter_with_context`]: Tokens::iter_with_context
+#[derive(Debug, Clone)]
+pub struct TokenIterWithContext<'a> {
+    inner: std::slice::Iter<'a, Token>,
+    nesting: u32,
+}
+
+impl<'a> TokenIterWithContext<'a> {
+    fn new(tokens: &'a [Token]) -> TokenIterWithContext<'a> {
+        TokenIterWithContext {
+            inner: tokens.iter(),
+            nesting: 0,
+        }
+    }
+
+    /// Return the nesting level the iterator is currently in.
+    pub const fn nesting(&self) -> u32 {
+        self.nesting
+    }
+
+    /// Returns `true` if the iterator is within a parenthesized context.
+    pub const fn in_parenthesized_context(&self) -> bool {
+        self.nesting > 0
+    }
+
+    /// Returns the next [`Token`] in the iterator without consuming it.
+    pub fn peek(&self) -> Option<&'a Token> {
+        self.clone().next()
+    }
+}
+
+impl<'a> Iterator for TokenIterWithContext<'a> {
+    type Item = &'a Token;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let token = self.inner.next()?;
+
+        match token.kind() {
+            TokenKind::Lpar | TokenKind::Lbrace | TokenKind::Lsqb => self.nesting += 1,
+            TokenKind::Rpar | TokenKind::Rbrace | TokenKind::Rsqb => {
+                self.nesting = self.nesting.saturating_sub(1);
+            }
+            // This mimics the behavior of re-lexing which reduces the nesting level on the lexer.
+            // We don't need to reduce it by 1 because unlike the lexer we see the final token
+            // after recovering from every unclosed parenthesis.
+            TokenKind::Newline if self.nesting > 0 => {
+                self.nesting = 0;
+            }
+            _ => {}
+        }
+
+        Some(token)
+    }
+}
+
+impl FusedIterator for TokenIterWithContext<'_> {}
+
 /// Control in the different modes by which a source file can be parsed.
 ///
 /// The mode argument specifies in what way code must be parsed.
@@ -592,7 +641,7 @@ impl std::fmt::Display for ModeParseError {
 mod tests {
     use std::ops::Range;
 
-    use crate::lexer::TokenFlags;
+    use crate::token::TokenFlags;
 
     use super::*;
 
@@ -614,18 +663,6 @@ mod tests {
         // No newline at the end to keep the token set full of unique tokens
     ];
 
-    /// Test case containing [`TokenKind::Unknown`] token.
-    ///
-    /// Code: <https://play.ruff.rs/ea722760-9bf5-4d00-be9f-dc441793f88e>
-    const TEST_CASE_WITH_UNKNOWN: [(TokenKind, Range<u32>); 5] = [
-        (TokenKind::Name, 0..1),
-        (TokenKind::Equal, 2..3),
-        (TokenKind::Unknown, 4..11),
-        (TokenKind::Plus, 11..12),
-        (TokenKind::Int, 13..14),
-        // No newline at the end to keep the token set full of unique tokens
-    ];
-
     /// Helper function to create [`Tokens`] from an iterator of (kind, range).
     fn new_tokens(tokens: impl Iterator<Item = (TokenKind, Range<u32>)>) -> Tokens {
         Tokens::new(
@@ -639,26 +676,6 @@ mod tests {
                 })
                 .collect(),
         )
-    }
-
-    #[test]
-    fn tokens_up_to_first_unknown_empty() {
-        let tokens = Tokens::new(vec![]);
-        assert_eq!(tokens.up_to_first_unknown(), &[]);
-    }
-
-    #[test]
-    fn tokens_up_to_first_unknown_noop() {
-        let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
-        let up_to_first_unknown = tokens.up_to_first_unknown();
-        assert_eq!(up_to_first_unknown.len(), tokens.len());
-    }
-
-    #[test]
-    fn tokens_up_to_first_unknown() {
-        let tokens = new_tokens(TEST_CASE_WITH_UNKNOWN.into_iter());
-        let up_to_first_unknown = tokens.up_to_first_unknown();
-        assert_eq!(up_to_first_unknown.len(), 2);
     }
 
     #[test]

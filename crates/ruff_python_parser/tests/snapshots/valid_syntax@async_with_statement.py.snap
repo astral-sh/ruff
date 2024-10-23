@@ -19,7 +19,7 @@ Module(
                             context_expr: Name(
                                 ExprName {
                                     range: 11..15,
-                                    id: "item",
+                                    id: Name("item"),
                                     ctx: Load,
                                 },
                             ),

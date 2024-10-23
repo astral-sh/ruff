@@ -27,4 +27,11 @@ no_self_use.py:13:9: PLR6301 Method `greeting_2` could be a function, class meth
 14 |         print("Hi!")
    |
 
-
+no_self_use.py:103:9: PLR6301 Method `validate_y` could be a function, class method, or static method
+    |
+102 |     @y.validator
+103 |     def validate_y(self, attribute, value):
+    |         ^^^^^^^^^^ PLR6301
+104 |         if value <= 0:
+105 |             raise ValueError("y must be a positive integer")
+    |

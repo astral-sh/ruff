@@ -41,6 +41,7 @@ pub(crate) struct AnnotatedAliasData<'a> {
     pub(crate) asname: Option<&'a str>,
     pub(crate) atop: Vec<Comment<'a>>,
     pub(crate) inline: Vec<Comment<'a>>,
+    pub(crate) trailing: Vec<Comment<'a>>,
 }
 
 #[derive(Debug)]
@@ -56,6 +57,7 @@ pub(crate) enum AnnotatedImport<'a> {
         level: u32,
         atop: Vec<Comment<'a>>,
         inline: Vec<Comment<'a>>,
+        trailing: Vec<Comment<'a>>,
         trailing_comma: TrailingComma,
     },
 }
@@ -280,10 +282,10 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use ruff_python_semantic::{MemberNameImport, ModuleNameImport, NameImport};
+    use ruff_text_size::Ranged;
     use rustc_hash::{FxHashMap, FxHashSet};
     use test_case::test_case;
-
-    use ruff_text_size::Ranged;
 
     use crate::assert_messages;
     use crate::registry::Rule;
@@ -342,6 +344,7 @@ mod tests {
     #[test_case(Path::new("sort_similar_imports.py"))]
     #[test_case(Path::new("split.py"))]
     #[test_case(Path::new("star_before_others.py"))]
+    #[test_case(Path::new("trailing_comment.py"))]
     #[test_case(Path::new("trailing_suffix.py"))]
     #[test_case(Path::new("two_space.py"))]
     #[test_case(Path::new("type_comments.py"))]
@@ -801,9 +804,12 @@ mod tests {
             &LinterSettings {
                 src: vec![test_resource_path("fixtures/isort")],
                 isort: super::settings::Settings {
-                    required_imports: BTreeSet::from_iter([
-                        "from __future__ import annotations".to_string()
-                    ]),
+                    required_imports: BTreeSet::from_iter([NameImport::ImportFrom(
+                        MemberNameImport::member(
+                            "__future__".to_string(),
+                            "annotations".to_string(),
+                        ),
+                    )]),
                     ..super::settings::Settings::default()
                 },
                 ..LinterSettings::for_rule(Rule::MissingRequiredImport)
@@ -831,9 +837,13 @@ mod tests {
             &LinterSettings {
                 src: vec![test_resource_path("fixtures/isort")],
                 isort: super::settings::Settings {
-                    required_imports: BTreeSet::from_iter([
-                        "from __future__ import annotations as _annotations".to_string(),
-                    ]),
+                    required_imports: BTreeSet::from_iter([NameImport::ImportFrom(
+                        MemberNameImport::alias(
+                            "__future__".to_string(),
+                            "annotations".to_string(),
+                            "_annotations".to_string(),
+                        ),
+                    )]),
                     ..super::settings::Settings::default()
                 },
                 ..LinterSettings::for_rule(Rule::MissingRequiredImport)
@@ -855,32 +865,15 @@ mod tests {
                 src: vec![test_resource_path("fixtures/isort")],
                 isort: super::settings::Settings {
                     required_imports: BTreeSet::from_iter([
-                        "from __future__ import annotations".to_string(),
-                        "from __future__ import generator_stop".to_string(),
+                        NameImport::ImportFrom(MemberNameImport::member(
+                            "__future__".to_string(),
+                            "annotations".to_string(),
+                        )),
+                        NameImport::ImportFrom(MemberNameImport::member(
+                            "__future__".to_string(),
+                            "generator_stop".to_string(),
+                        )),
                     ]),
-                    ..super::settings::Settings::default()
-                },
-                ..LinterSettings::for_rule(Rule::MissingRequiredImport)
-            },
-        )?;
-        assert_messages!(snapshot, diagnostics);
-        Ok(())
-    }
-
-    #[test_case(Path::new("docstring.py"))]
-    #[test_case(Path::new("docstring.pyi"))]
-    #[test_case(Path::new("docstring_only.py"))]
-    #[test_case(Path::new("empty.py"))]
-    fn combined_required_imports(path: &Path) -> Result<()> {
-        let snapshot = format!("combined_required_imports_{}", path.to_string_lossy());
-        let diagnostics = test_path(
-            Path::new("isort/required_imports").join(path).as_path(),
-            &LinterSettings {
-                src: vec![test_resource_path("fixtures/isort")],
-                isort: super::settings::Settings {
-                    required_imports: BTreeSet::from_iter(["from __future__ import annotations, \
-                                                       generator_stop"
-                        .to_string()]),
                     ..super::settings::Settings::default()
                 },
                 ..LinterSettings::for_rule(Rule::MissingRequiredImport)
@@ -901,10 +894,46 @@ mod tests {
             &LinterSettings {
                 src: vec![test_resource_path("fixtures/isort")],
                 isort: super::settings::Settings {
-                    required_imports: BTreeSet::from_iter(["import os".to_string()]),
+                    required_imports: BTreeSet::from_iter([NameImport::Import(
+                        ModuleNameImport::module("os".to_string()),
+                    )]),
                     ..super::settings::Settings::default()
                 },
                 ..LinterSettings::for_rule(Rule::MissingRequiredImport)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("unused.py"))]
+    fn required_import_unused(path: &Path) -> Result<()> {
+        let snapshot = format!("required_import_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort/required_imports").join(path).as_path(),
+            &LinterSettings {
+                src: vec![test_resource_path("fixtures/isort")],
+                isort: super::settings::Settings {
+                    required_imports: BTreeSet::from_iter([
+                        NameImport::Import(ModuleNameImport::module("os".to_string())),
+                        NameImport::Import(ModuleNameImport::alias(
+                            "shelve".to_string(),
+                            "alias".to_string(),
+                        )),
+                        NameImport::ImportFrom(MemberNameImport::member(
+                            "typing".to_string(),
+                            "List".to_string(),
+                        )),
+                        NameImport::ImportFrom(MemberNameImport::alias(
+                            "typing".to_string(),
+                            "Set".to_string(),
+                            "SetAlias".to_string(),
+                        )),
+                        NameImport::Import(ModuleNameImport::module("urllib.parse".to_string())),
+                    ]),
+                    ..super::settings::Settings::default()
+                },
+                ..LinterSettings::for_rules([Rule::MissingRequiredImport, Rule::UnusedImport])
             },
         )?;
         assert_messages!(snapshot, diagnostics);

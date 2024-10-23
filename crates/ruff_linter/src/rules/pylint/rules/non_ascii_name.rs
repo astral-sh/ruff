@@ -34,7 +34,11 @@ impl Violation for NonAsciiName {
     #[derive_message_formats]
     fn message(&self) -> String {
         let Self { name, kind } = self;
-        format!("{kind} name `{name}` contains a non-ASCII character, consider renaming it")
+        format!("{kind} name `{name}` contains a non-ASCII character")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Rename the variable using ASCII characters".to_string())
     }
 }
 
@@ -52,7 +56,6 @@ pub(crate) fn non_ascii_name(binding: &Binding, locator: &Locator) -> Option<Dia
         BindingKind::Assignment => Kind::Assignment,
         BindingKind::TypeParam => Kind::TypeParam,
         BindingKind::LoopVar => Kind::LoopVar,
-        BindingKind::ComprehensionVar => Kind::ComprenhensionVar,
         BindingKind::WithItemVar => Kind::WithItemVar,
         BindingKind::Global(_) => Kind::Global,
         BindingKind::Nonlocal(_, _) => Kind::Nonlocal,
@@ -82,7 +85,7 @@ pub(crate) fn non_ascii_name(binding: &Binding, locator: &Locator) -> Option<Dia
     ))
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum Kind {
     Annotation,
     Argument,
@@ -90,7 +93,6 @@ enum Kind {
     Assignment,
     TypeParam,
     LoopVar,
-    ComprenhensionVar,
     WithItemVar,
     Global,
     Nonlocal,
@@ -108,7 +110,6 @@ impl fmt::Display for Kind {
             Kind::Assignment => f.write_str("Variable"),
             Kind::TypeParam => f.write_str("Type parameter"),
             Kind::LoopVar => f.write_str("Variable"),
-            Kind::ComprenhensionVar => f.write_str("Variable"),
             Kind::WithItemVar => f.write_str("Variable"),
             Kind::Global => f.write_str("Global"),
             Kind::Nonlocal => f.write_str("Nonlocal"),

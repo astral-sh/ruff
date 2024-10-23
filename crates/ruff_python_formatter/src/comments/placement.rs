@@ -2,10 +2,12 @@ use std::cmp::Ordering;
 
 use ast::helpers::comment_indentation_after;
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::{self as ast, AnyNodeRef, Comprehension, Expr, ModModule, Parameters};
+use ruff_python_ast::{
+    self as ast, AnyNodeRef, Comprehension, Expr, ModModule, Parameter, Parameters,
+};
 use ruff_python_trivia::{
-    find_only_token_in_range, indentation_at_offset, BackwardsTokenizer, CommentRanges,
-    SimpleToken, SimpleTokenKind, SimpleTokenizer,
+    find_only_token_in_range, first_non_trivia_token, indentation_at_offset, BackwardsTokenizer,
+    CommentRanges, SimpleToken, SimpleTokenKind, SimpleTokenizer,
 };
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextLen, TextRange};
@@ -202,14 +204,7 @@ fn handle_enclosed_comment<'a>(
                 }
             })
         }
-        AnyNodeRef::Parameter(parameter) => {
-            // E.g. a comment between the `*` or `**` and the parameter name.
-            if comment.preceding_node().is_none() || comment.following_node().is_none() {
-                CommentPlacement::leading(parameter, comment)
-            } else {
-                CommentPlacement::Default(comment)
-            }
-        }
+        AnyNodeRef::Parameter(parameter) => handle_parameter_comment(comment, parameter, locator),
         AnyNodeRef::Arguments(_) | AnyNodeRef::TypeParams(_) | AnyNodeRef::PatternArguments(_) => {
             handle_bracketed_end_of_line_comment(comment, locator)
         }
@@ -760,6 +755,41 @@ fn handle_parameters_separator_comment<'a>(
     CommentPlacement::Default(comment)
 }
 
+/// Associate comments that come before the `:` starting the type annotation or before the
+/// parameter's name for unannotated parameters as leading parameter-comments.
+///
+/// The parameter's name isn't a node to which comments can be associated.
+/// That's why we pull out all comments that come before the expression name or the type annotation
+/// and make them leading parameter comments. For example:
+/// * `* # comment\nargs`
+/// * `arg # comment\n : int`
+///
+/// Associate comments with the type annotation when possible.
+fn handle_parameter_comment<'a>(
+    comment: DecoratedComment<'a>,
+    parameter: &'a Parameter,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    if parameter.annotation.as_deref().is_some() {
+        let colon = first_non_trivia_token(parameter.name.end(), locator.contents()).expect(
+            "A annotated parameter should have a colon following its name when it is valid syntax.",
+        );
+
+        assert_eq!(colon.kind(), SimpleTokenKind::Colon);
+
+        if comment.start() < colon.start() {
+            // The comment is before the colon, pull it out and make it a leading comment of the parameter.
+            CommentPlacement::leading(parameter, comment)
+        } else {
+            CommentPlacement::Default(comment)
+        }
+    } else if comment.start() < parameter.name.start() {
+        CommentPlacement::leading(parameter, comment)
+    } else {
+        CommentPlacement::Default(comment)
+    }
+}
+
 /// Handles comments between the left side and the operator of a binary expression (trailing comments of the left),
 /// and trailing end-of-line comments that are on the same line as the operator.
 ///
@@ -1076,7 +1106,7 @@ fn handle_leading_function_with_decorators_comment(comment: DecoratedComment) ->
 
     let is_following_parameters = comment
         .following_node()
-        .is_some_and(|node| node.is_parameters());
+        .is_some_and(|node| node.is_parameters() || node.is_type_params());
 
     if comment.line_position().is_own_line() && is_preceding_decorator && is_following_parameters {
         CommentPlacement::dangling(comment.enclosing_node(), comment)

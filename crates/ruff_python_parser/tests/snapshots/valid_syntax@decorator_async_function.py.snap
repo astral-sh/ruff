@@ -19,14 +19,14 @@ Module(
                             expression: Name(
                                 ExprName {
                                     range: 1..10,
-                                    id: "decorator",
+                                    id: Name("decorator"),
                                     ctx: Load,
                                 },
                             ),
                         },
                     ],
                     name: Identifier {
-                        id: "foo",
+                        id: Name("foo"),
                         range: 21..24,
                     },
                     type_params: None,

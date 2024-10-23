@@ -24,7 +24,7 @@ Module(
                     iter: Name(
                         ExprName {
                             range: 9..10,
-                            id: "x",
+                            id: Name("x"),
                             ctx: Load,
                         },
                     ),
@@ -68,7 +68,7 @@ Module(
                     iter: Name(
                         ExprName {
                             range: 27..28,
-                            id: "x",
+                            id: Name("x"),
                             ctx: Load,
                         },
                     ),
@@ -102,14 +102,14 @@ Module(
                                         Name(
                                             ExprName {
                                                 range: 39..40,
-                                                id: "x",
+                                                id: Name("x"),
                                                 ctx: Load,
                                             },
                                         ),
                                         Name(
                                             ExprName {
                                                 range: 45..46,
-                                                id: "y",
+                                                id: Name("y"),
                                                 ctx: Load,
                                             },
                                         ),
@@ -122,7 +122,7 @@ Module(
                     iter: Name(
                         ExprName {
                             range: 50..51,
-                            id: "z",
+                            id: Name("z"),
                             ctx: Load,
                         },
                     ),
@@ -154,7 +154,7 @@ Module(
                                     left: Name(
                                         ExprName {
                                             range: 62..63,
-                                            id: "x",
+                                            id: Name("x"),
                                             ctx: Load,
                                         },
                                     ),
@@ -162,7 +162,7 @@ Module(
                                     right: Name(
                                         ExprName {
                                             range: 66..67,
-                                            id: "y",
+                                            id: Name("y"),
                                             ctx: Load,
                                         },
                                     ),
@@ -174,7 +174,7 @@ Module(
                     iter: Name(
                         ExprName {
                             range: 71..72,
-                            id: "z",
+                            id: Name("z"),
                             ctx: Load,
                         },
                     ),
@@ -203,7 +203,7 @@ Module(
                             value: Name(
                                 ExprName {
                                     range: 88..89,
-                                    id: "x",
+                                    id: Name("x"),
                                     ctx: Load,
                                 },
                             ),
@@ -212,7 +212,7 @@ Module(
                     iter: Name(
                         ExprName {
                             range: 93..94,
-                            id: "z",
+                            id: Name("z"),
                             ctx: Load,
                         },
                     ),
@@ -245,7 +245,7 @@ Module(
                                         left: Name(
                                             ExprName {
                                                 range: 110..111,
-                                                id: "x",
+                                                id: Name("x"),
                                                 ctx: Load,
                                             },
                                         ),
@@ -256,7 +256,7 @@ Module(
                                             Name(
                                                 ExprName {
                                                     range: 115..116,
-                                                    id: "y",
+                                                    id: Name("y"),
                                                     ctx: Load,
                                                 },
                                             ),
@@ -269,7 +269,7 @@ Module(
                     iter: Name(
                         ExprName {
                             range: 116..116,
-                            id: "",
+                            id: Name(""),
                             ctx: Invalid,
                         },
                     ),
@@ -299,7 +299,7 @@ Module(
                                 Name(
                                     ExprName {
                                         range: 127..128,
-                                        id: "x",
+                                        id: Name("x"),
                                         ctx: Store,
                                     },
                                 ),
@@ -314,7 +314,7 @@ Module(
                                 Name(
                                     ExprName {
                                         range: 133..134,
-                                        id: "y",
+                                        id: Name("y"),
                                         ctx: Store,
                                     },
                                 ),
@@ -357,7 +357,7 @@ Module(
                     iter: Name(
                         ExprName {
                             range: 147..148,
-                            id: "z",
+                            id: Name("z"),
                             ctx: Load,
                         },
                     ),

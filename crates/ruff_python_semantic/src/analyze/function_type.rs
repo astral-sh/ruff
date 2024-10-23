@@ -3,7 +3,7 @@ use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_ast::{Decorator, Expr, Stmt, StmtExpr, StmtFunctionDef, StmtRaise};
 
 use crate::model::SemanticModel;
-use crate::scope::{Scope, ScopeKind};
+use crate::scope::Scope;
 
 #[derive(Debug, Copy, Clone)]
 pub enum FunctionType {
@@ -17,12 +17,12 @@ pub enum FunctionType {
 pub fn classify(
     name: &str,
     decorator_list: &[Decorator],
-    scope: &Scope,
+    parent_scope: &Scope,
     semantic: &SemanticModel,
     classmethod_decorators: &[String],
     staticmethod_decorators: &[String],
 ) -> FunctionType {
-    let ScopeKind::Class(class_def) = &scope.kind else {
+    if !parent_scope.kind.is_class() {
         return FunctionType::Function;
     };
     if decorator_list
@@ -30,16 +30,7 @@ pub fn classify(
         .any(|decorator| is_static_method(decorator, semantic, staticmethod_decorators))
     {
         FunctionType::StaticMethod
-    } else if matches!(name, "__new__" | "__init_subclass__" | "__class_getitem__")
-    // Special-case class method, like `__new__`.
-        || class_def.bases().iter().any(|expr| {
-            // The class itself extends a known metaclass, so all methods are class methods.
-            semantic
-                .resolve_qualified_name(map_callable(expr))
-                .is_some_and( |qualified_name| {
-                    matches!(qualified_name.segments(), ["" | "builtins", "type"] | ["abc", "ABCMeta"])
-                })
-        })
+    } else if matches!(name, "__new__" | "__init_subclass__" | "__class_getitem__")  // Special-case class method, like `__new__`.
         || decorator_list.iter().any(|decorator| is_class_method(decorator, semantic, classmethod_decorators))
     {
         FunctionType::ClassMethod

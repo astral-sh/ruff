@@ -24,7 +24,7 @@ pub struct PotentialIndexError;
 impl Violation for PotentialIndexError {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Potential IndexError")
+        format!("Expression is likely to raise `IndexError`")
     }
 }
 

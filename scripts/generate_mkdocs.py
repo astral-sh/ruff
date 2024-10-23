@@ -7,6 +7,7 @@ import json
 import re
 import shutil
 import subprocess
+from collections.abc import Sequence
 from pathlib import Path
 from typing import NamedTuple
 
@@ -22,6 +23,8 @@ class Section(NamedTuple):
     title: str
     filename: str
     generated: bool
+    # If subsections is present, the `filename` and `generated` value is unused.
+    subsections: Sequence[Section] | None = None
 
 
 SECTIONS: list[Section] = [
@@ -30,6 +33,18 @@ SECTIONS: list[Section] = [
     Section("Installing Ruff", "installation.md", generated=False),
     Section("The Ruff Linter", "linter.md", generated=False),
     Section("The Ruff Formatter", "formatter.md", generated=False),
+    Section(
+        "Editors",
+        "",
+        generated=False,
+        subsections=[
+            Section("Editor Integration", "editors/index.md", generated=False),
+            Section("Setup", "editors/setup.md", generated=False),
+            Section("Features", "editors/features.md", generated=False),
+            Section("Settings", "editors/settings.md", generated=False),
+            Section("Migrating from ruff-lsp", "editors/migration.md", generated=False),
+        ],
+    ),
     Section("Configuring Ruff", "configuration.md", generated=False),
     Section("Preview", "preview.md", generated=False),
     Section("Rules", "rules.md", generated=True),
@@ -44,13 +59,17 @@ SECTIONS: list[Section] = [
 LINK_REWRITES: dict[str, str] = {
     "https://docs.astral.sh/ruff/": "index.md",
     "https://docs.astral.sh/ruff/configuration/": "configuration.md",
-    "https://docs.astral.sh/ruff/configuration/#pyprojecttoml-discovery": (
-        "configuration.md#pyprojecttoml-discovery"
+    "https://docs.astral.sh/ruff/configuration/#config-file-discovery": (
+        "configuration.md#config-file-discovery"
     ),
     "https://docs.astral.sh/ruff/contributing/": "contributing.md",
+    "https://docs.astral.sh/ruff/editors/setup": "editors/setup.md",
     "https://docs.astral.sh/ruff/integrations/": "integrations.md",
-    "https://docs.astral.sh/ruff/faq/#how-does-ruff-compare-to-flake8": (
-        "faq.md#how-does-ruff-compare-to-flake8"
+    "https://docs.astral.sh/ruff/faq/#how-does-ruffs-linter-compare-to-flake8": (
+        "faq.md#how-does-ruffs-linter-compare-to-flake8"
+    ),
+    "https://docs.astral.sh/ruff/faq/#how-does-ruffs-formatter-compare-to-black": (
+        "faq.md#how-does-ruffs-formatter-compare-to-black"
     ),
     "https://docs.astral.sh/ruff/installation/": "installation.md",
     "https://docs.astral.sh/ruff/rules/": "rules.md",
@@ -85,6 +104,34 @@ def clean_file_content(content: str, title: str) -> str:
     return f"# {title}\n\n" + content
 
 
+def add_meta_description(rule_doc: Path) -> str:
+    """Add a meta description to the rule doc."""
+    # Read the rule doc into lines
+    with rule_doc.open("r", encoding="utf-8") as f:
+        lines = f.readlines()
+
+    # Get the description from the rule doc lines
+    what_it_does_found = False
+    for line in lines:
+        if line == "\n":
+            continue
+
+        if line.startswith("## What it does"):
+            what_it_does_found = True
+            continue  # Skip the '## What it does' line
+
+        if what_it_does_found:
+            description = line.removesuffix("\n")
+            break
+    else:
+        if not what_it_does_found:
+            raise ValueError(f"Missing '## What it does' in {rule_doc}")
+
+    with rule_doc.open("w", encoding="utf-8") as f:
+        f.writelines("\n".join(["---", f"description: {description}", "---", "", ""]))
+        f.writelines(lines)
+
+
 def main() -> None:
     """Generate an MkDocs-compatible `docs` and `mkdocs.yml`."""
     subprocess.run(["cargo", "dev", "generate-docs"], check=True)
@@ -108,7 +155,7 @@ def main() -> None:
     Path("docs").mkdir(parents=True, exist_ok=True)
 
     # Split the README.md into sections.
-    for title, filename, generated in SECTIONS:
+    for title, filename, generated, _ in SECTIONS:
         if not generated:
             continue
 
@@ -144,10 +191,14 @@ def main() -> None:
 
             f.write(clean_file_content(file_content, title))
 
-    # Format rules docs
     add_no_escape_text_plugin()
     for rule_doc in Path("docs/rules").glob("*.md"):
-        mdformat.file(rule_doc, extensions=["mkdocs", "admonition", "no-escape-text"])
+        # Format rules docs. This has to be completed before adding the meta description
+        # otherwise the meta description will be formatted in a way that mkdocs does not
+        # support.
+        mdformat.file(rule_doc, extensions=["mkdocs", "admon", "no-escape-text"])
+
+        add_meta_description(rule_doc)
 
     with Path("mkdocs.template.yml").open(encoding="utf8") as fp:
         config = yaml.safe_load(fp)
@@ -180,7 +231,19 @@ def main() -> None:
     )
 
     # Add the nav section to mkdocs.yml.
-    config["nav"] = [{section.title: section.filename} for section in SECTIONS]
+    config["nav"] = []
+    for section in SECTIONS:
+        if section.subsections is None:
+            config["nav"].append({section.title: section.filename})
+        else:
+            config["nav"].append(
+                {
+                    section.title: [
+                        {subsection.title: subsection.filename}
+                        for subsection in section.subsections
+                    ]
+                }
+            )
 
     with Path("mkdocs.generated.yml").open("w+", encoding="utf8") as fp:
         yaml.safe_dump(config, fp)

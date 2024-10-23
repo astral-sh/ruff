@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_python_parser/src/string.rs
-expression: parse_ast
+expression: suite
 ---
 [
     Expr(
@@ -27,7 +27,7 @@ expression: parse_ast
                                                 expression: Name(
                                                     ExprName {
                                                         range: 6..9,
-                                                        id: "bbb",
+                                                        id: Name("bbb"),
                                                         ctx: Load,
                                                     },
                                                 ),
@@ -48,7 +48,7 @@ expression: parse_ast
                                                 expression: Name(
                                                     ExprName {
                                                         range: 14..17,
-                                                        id: "ddd",
+                                                        id: Name("ddd"),
                                                         ctx: Load,
                                                     },
                                                 ),

@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::any_over_expr;
+use ruff_python_ast::name::Name;
 use ruff_python_ast::traversal;
 use ruff_python_ast::{
     self as ast, Arguments, CmpOp, Comprehension, Expr, ExprContext, Stmt, UnaryOp,
@@ -17,8 +18,7 @@ use crate::line_width::LineWidthBuilder;
 /// `any` or `all`.
 ///
 /// ## Why is this bad?
-/// Using a builtin function is more concise and readable. Builtins are also
-/// more efficient than `for` loops.
+/// Using a builtin function is more concise and readable.
 ///
 /// ## Example
 /// ```python
@@ -89,7 +89,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
         // Replace with `any`.
         (true, false) => {
             let contents = return_stmt(
-                "any",
+                Name::new_static("any"),
                 loop_.test,
                 loop_.target,
                 loop_.iter,
@@ -177,7 +177,13 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                     node.into()
                 }
             };
-            let contents = return_stmt("all", &test, loop_.target, loop_.iter, checker.generator());
+            let contents = return_stmt(
+                Name::new_static("all"),
+                &test,
+                loop_.target,
+                loop_.iter,
+                checker.generator(),
+            );
 
             // Don't flag if the resulting expression would exceed the maximum line length.
             let line_start = checker.locator().line_start(stmt.start());
@@ -372,7 +378,7 @@ fn match_sibling_return<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<Termina
 }
 
 /// Generate a return statement for an `any` or `all` builtin comprehension.
-fn return_stmt(id: &str, test: &Expr, target: &Expr, iter: &Expr, generator: Generator) -> String {
+fn return_stmt(id: Name, test: &Expr, target: &Expr, iter: &Expr, generator: Generator) -> String {
     let node = ast::ExprGenerator {
         elt: Box::new(test.clone()),
         generators: vec![Comprehension {
@@ -386,7 +392,7 @@ fn return_stmt(id: &str, test: &Expr, target: &Expr, iter: &Expr, generator: Gen
         parenthesized: false,
     };
     let node1 = ast::ExprName {
-        id: id.into(),
+        id,
         ctx: ExprContext::Load,
         range: TextRange::default(),
     };

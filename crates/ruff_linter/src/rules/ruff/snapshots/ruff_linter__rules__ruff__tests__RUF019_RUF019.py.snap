@@ -77,6 +77,46 @@ RUF019.py:13:4: RUF019 [*] Unnecessary key check before dictionary access
    13 |+if d.get((k)):
 14 14 |     pass
 15 15 | 
-16 16 | # OK
+16 16 | not ("key" in dct and dct["key"])
 
+RUF019.py:16:6: RUF019 [*] Unnecessary key check before dictionary access
+   |
+14 |     pass
+15 | 
+16 | not ("key" in dct and dct["key"])
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF019
+17 | 
+18 | bool("key" in dct and dct["key"])
+   |
+   = help: Replace with `dict.get`
 
+ℹ Safe fix
+13 13 | if k in d and d[(k)]:
+14 14 |     pass
+15 15 | 
+16    |-not ("key" in dct and dct["key"])
+   16 |+not (dct.get("key"))
+17 17 | 
+18 18 | bool("key" in dct and dct["key"])
+19 19 | 
+
+RUF019.py:18:6: RUF019 [*] Unnecessary key check before dictionary access
+   |
+16 | not ("key" in dct and dct["key"])
+17 | 
+18 | bool("key" in dct and dct["key"])
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF019
+19 | 
+20 | # OK
+   |
+   = help: Replace with `dict.get`
+
+ℹ Safe fix
+15 15 | 
+16 16 | not ("key" in dct and dct["key"])
+17 17 | 
+18    |-bool("key" in dct and dct["key"])
+   18 |+bool(dct.get("key"))
+19 19 | 
+20 20 | # OK
+21 21 | v = "k" in d and d["k"]

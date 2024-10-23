@@ -152,9 +152,30 @@ for elem in some_list:
     else:
         break
 
-# should not error
+# should error
 for elem in some_list:
     del some_list[elem]
-    some_list[elem] = 1
     some_list.remove(elem)
     some_list.discard(elem)
+
+# should not error
+for elem in some_list:
+    some_list[elem] = 1
+
+# should error
+for i, elem in enumerate(some_list):
+    some_list.pop(0)
+
+# should not error (list)
+for i, elem in enumerate(some_list):
+    some_list[i] = 1
+
+# should not error (dict)
+for i, elem in enumerate(some_list):
+    some_list[elem] = 1
+
+# should not error
+def func():
+    for elem in some_list:
+        if some_list.pop() == 2:
+            return

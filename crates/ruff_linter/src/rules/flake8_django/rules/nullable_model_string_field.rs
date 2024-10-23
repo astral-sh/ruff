@@ -88,7 +88,7 @@ fn is_nullable_field<'a>(value: &'a Expr, semantic: &'a SemanticModel) -> Option
     let mut null_key = false;
     let mut blank_key = false;
     let mut unique_key = false;
-    for keyword in call.arguments.keywords.iter() {
+    for keyword in &*call.arguments.keywords {
         let Some(argument) = &keyword.arg else {
             continue;
         };

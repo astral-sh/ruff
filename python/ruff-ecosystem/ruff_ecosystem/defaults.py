@@ -4,7 +4,6 @@ Default projects for ecosystem checks
 
 from ruff_ecosystem.projects import (
     CheckOptions,
-    FormatOptions,
     Project,
     Repository,
 )
@@ -24,25 +23,35 @@ DEFAULT_TARGETS = [
         repo=Repository(owner="apache", name="airflow", ref="main"),
         check_options=CheckOptions(select="ALL"),
     ),
+    Project(
+        repo=Repository(owner="apache", name="superset", ref="master"),
+        check_options=CheckOptions(select="ALL"),
+    ),
     Project(repo=Repository(owner="aws", name="aws-sam-cli", ref="develop")),
+    Project(repo=Repository(owner="binary-husky", name="gpt_academic", ref="master")),
     Project(repo=Repository(owner="bloomberg", name="pytest-memray", ref="main")),
     Project(
         repo=Repository(owner="bokeh", name="bokeh", ref="branch-3.3"),
         check_options=CheckOptions(select="ALL"),
     ),
-    Project(
-        repo=Repository(owner="demisto", name="content", ref="master"),
-        format_options=FormatOptions(
-            # Syntax errors in this file
-            exclude="Packs/ThreatQ/Integrations/ThreatQ/ThreatQ.py"
-        ),
-    ),
+    # Disabled due to use of explicit `select` with `E999`, which is no longer
+    # supported in `--preview`.
+    # See: https://github.com/astral-sh/ruff/pull/12129
+    # Project(
+    #     repo=Repository(owner="demisto", name="content", ref="master"),
+    #     format_options=FormatOptions(
+    #         # Syntax errors in this file
+    #         exclude="Packs/ThreatQ/Integrations/ThreatQ/ThreatQ.py"
+    #     ),
+    # ),
     Project(repo=Repository(owner="docker", name="docker-py", ref="main")),
+    Project(repo=Repository(owner="facebookresearch", name="chameleon", ref="main")),
     Project(repo=Repository(owner="freedomofpress", name="securedrop", ref="develop")),
     Project(repo=Repository(owner="fronzbot", name="blinkpy", ref="dev")),
     Project(repo=Repository(owner="ibis-project", name="ibis", ref="main")),
     Project(repo=Repository(owner="ing-bank", name="probatus", ref="main")),
     Project(repo=Repository(owner="jrnl-org", name="jrnl", ref="develop")),
+    Project(repo=Repository(owner="langchain-ai", name="langchain", ref="master")),
     Project(repo=Repository(owner="latchbio", name="latch", ref="main")),
     Project(repo=Repository(owner="lnbits", name="lnbits", ref="main")),
     Project(repo=Repository(owner="milvus-io", name="pymilvus", ref="master")),
@@ -66,6 +75,7 @@ DEFAULT_TARGETS = [
         check_options=CheckOptions(select="E,F,FA,I,PYI,RUF,UP,W"),
     ),
     Project(repo=Repository(owner="python-poetry", name="poetry", ref="master")),
+    Project(repo=Repository(owner="qdrant", name="qdrant-client", ref="master")),
     Project(repo=Repository(owner="reflex-dev", name="reflex", ref="main")),
     Project(repo=Repository(owner="rotki", name="rotki", ref="develop")),
     Project(repo=Repository(owner="scikit-build", name="scikit-build", ref="main")),
@@ -109,15 +119,18 @@ DEFAULT_TARGETS = [
         check_options=CheckOptions(select=JUPYTER_NOTEBOOK_SELECT),
         config_overrides={
             "include": ["*.ipynb"],
-            # TODO(charlie): Re-enable after fixing typo.
+            # These notebooks contain syntax errors because certain plain text / markdown
+            # cells are marked as code cells.
             "exclude": [
-                "examples/dalle/Image_generations_edits_and_variations_with_DALL-E.ipynb",
-                "examples/How_to_handle_rate_limits.ipynb",
+                "examples/Chat_finetuning_data_prep.ipynb",
+                "examples/chatgpt/gpt_actions_library/gpt_action_google_drive.ipynb",
+                "examples/chatgpt/gpt_actions_library/gpt_action_redshift.ipynb",
+                "examples/chatgpt/gpt_actions_library/gpt_action_salesforce.ipynb",
             ],
         },
     ),
     Project(repo=Repository(owner="agronholm", name="anyio", ref="master")),
-    Project(repo=Repository(owner="python-trio", name="trio", ref="master")),
+    Project(repo=Repository(owner="python-trio", name="trio", ref="main")),
     Project(repo=Repository(owner="wntrblm", name="nox", ref="main")),
     Project(repo=Repository(owner="pytest-dev", name="pytest", ref="main")),
     Project(repo=Repository(owner="encode", name="httpx", ref="master")),

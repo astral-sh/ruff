@@ -71,13 +71,10 @@ pub(crate) fn self_annotated_assignment(checker: &mut Checker, assign: &ast::Stm
 
 fn visit_assignments(left: &Expr, right: &Expr, diagnostics: &mut Vec<Diagnostic>) {
     match (left, right) {
-        (
-            Expr::Tuple(ast::ExprTuple { elts: lhs_elts, .. }),
-            Expr::Tuple(ast::ExprTuple { elts: rhs_elts, .. }),
-        ) if lhs_elts.len() == rhs_elts.len() => lhs_elts
+        (Expr::Tuple(lhs), Expr::Tuple(rhs)) if lhs.len() == rhs.len() => lhs
             .iter()
-            .zip(rhs_elts.iter())
-            .for_each(|(lhs, rhs)| visit_assignments(lhs, rhs, diagnostics)),
+            .zip(rhs)
+            .for_each(|(lhs_elem, rhs_elem)| visit_assignments(lhs_elem, rhs_elem, diagnostics)),
         (
             Expr::Name(ast::ExprName { id: lhs_name, .. }),
             Expr::Name(ast::ExprName { id: rhs_name, .. }),

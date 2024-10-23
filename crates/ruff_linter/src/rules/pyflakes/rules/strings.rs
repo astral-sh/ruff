@@ -4,7 +4,8 @@ use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr, Identifier, Keyword};
+use ruff_python_ast::name::Name;
+use ruff_python_ast::{self as ast, Expr, Keyword};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -382,7 +383,7 @@ impl Violation for StringDotFormatInvalidFormat {
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[violation]
 pub struct StringDotFormatExtraNamedArguments {
-    missing: Vec<String>,
+    missing: Vec<Name>,
 }
 
 impl Violation for StringDotFormatExtraNamedArguments {
@@ -689,10 +690,10 @@ pub(crate) fn percent_format_positional_count_mismatch(
         return;
     }
 
-    if let Expr::Tuple(ast::ExprTuple { elts, .. }) = right {
+    if let Expr::Tuple(tuple) = right {
         let mut found = 0;
-        for elt in elts {
-            if elt.is_starred_expr() {
+        for element in tuple {
+            if element.is_starred_expr() {
                 return;
             }
             found += 1;
@@ -743,13 +744,13 @@ pub(crate) fn string_dot_format_extra_named_arguments(
         .iter()
         .filter_map(|Keyword { arg, .. }| arg.as_ref());
 
-    let missing: Vec<(usize, &str)> = keywords
+    let missing: Vec<(usize, &Name)> = keywords
         .enumerate()
         .filter_map(|(index, keyword)| {
-            if summary.keywords.contains(keyword.as_ref()) {
+            if summary.keywords.contains(keyword.id()) {
                 None
             } else {
-                Some((index, keyword.as_str()))
+                Some((index, &keyword.id))
             }
         })
         .collect();
@@ -758,10 +759,7 @@ pub(crate) fn string_dot_format_extra_named_arguments(
         return;
     }
 
-    let names: Vec<String> = missing
-        .iter()
-        .map(|(_, name)| (*name).to_string())
-        .collect();
+    let names: Vec<Name> = missing.iter().map(|(_, name)| (*name).clone()).collect();
     let mut diagnostic = Diagnostic::new(
         StringDotFormatExtraNamedArguments { missing: names },
         call.range(),
@@ -865,22 +863,22 @@ pub(crate) fn string_dot_format_missing_argument(
         .iter()
         .filter_map(|k| {
             let Keyword { arg, .. } = &k;
-            arg.as_ref().map(Identifier::as_str)
+            arg.as_ref().map(ruff_python_ast::Identifier::id)
         })
         .collect();
 
     let missing: Vec<String> = summary
         .autos
         .iter()
-        .chain(summary.indices.iter())
+        .chain(&summary.indices)
         .filter(|&&i| i >= args.len())
         .map(ToString::to_string)
         .chain(
             summary
                 .keywords
                 .iter()
-                .filter(|k| !keywords.contains(k.as_str()))
-                .cloned(),
+                .filter(|k| !keywords.contains(*k))
+                .map(ToString::to_string),
         )
         .collect();
 

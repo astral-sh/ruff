@@ -1,5 +1,3 @@
-use std::fmt;
-
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -20,6 +18,7 @@ use crate::registry::Rule;
 
 use super::helpers::{
     get_mark_decorators, is_pytest_fixture, is_pytest_yield_fixture, keyword_is_literal,
+    Parentheses,
 };
 
 /// ## What it does
@@ -32,26 +31,28 @@ use super::helpers::{
 /// optional.
 ///
 /// Either removing those unnecessary parentheses _or_ requiring them for all
-/// fixtures is fine, but it's best to be consistent.
+/// fixtures is fine, but it's best to be consistent. The rule defaults to
+/// removing unnecessary parentheses, to match the documentation of the
+/// official pytest projects.
 ///
 /// ## Example
-/// ```python
-/// import pytest
 ///
-///
-/// @pytest.fixture
-/// def my_fixture():
-///     ...
-/// ```
-///
-/// Use instead:
 /// ```python
 /// import pytest
 ///
 ///
 /// @pytest.fixture()
-/// def my_fixture():
-///     ...
+/// def my_fixture(): ...
+/// ```
+///
+/// Use instead:
+///
+/// ```python
+/// import pytest
+///
+///
+/// @pytest.fixture
+/// def my_fixture(): ...
 /// ```
 ///
 /// ## Options
@@ -89,23 +90,23 @@ impl AlwaysFixableViolation for PytestFixtureIncorrectParenthesesStyle {
 /// fixture configuration.
 ///
 /// ## Example
+///
 /// ```python
 /// import pytest
 ///
 ///
 /// @pytest.fixture("module")
-/// def my_fixture():
-///     ...
+/// def my_fixture(): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// import pytest
 ///
 ///
 /// @pytest.fixture(scope="module")
-/// def my_fixture():
-///     ...
+/// def my_fixture(): ...
 /// ```
 ///
 /// ## References
@@ -130,23 +131,23 @@ impl Violation for PytestFixturePositionalArgs {
 /// `scope="function"` can be omitted, as it is the default.
 ///
 /// ## Example
+///
 /// ```python
 /// import pytest
 ///
 ///
 /// @pytest.fixture(scope="function")
-/// def my_fixture():
-///     ...
+/// def my_fixture(): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// import pytest
 ///
 ///
 /// @pytest.fixture()
-/// def my_fixture():
-///     ...
+/// def my_fixture(): ...
 /// ```
 ///
 /// ## References
@@ -165,6 +166,10 @@ impl AlwaysFixableViolation for PytestExtraneousScopeFunction {
     }
 }
 
+/// ## Deprecation
+/// Marking fixtures that do not return a value with an underscore
+/// isn't a practice recommended by the pytest community.
+///
 /// ## What it does
 /// Checks for `pytest` fixtures that do not return a value, but are not named
 /// with a leading underscore.
@@ -222,6 +227,10 @@ impl Violation for PytestMissingFixtureNameUnderscore {
     }
 }
 
+/// ## Deprecation
+/// Marking fixtures that do not return a value with an underscore
+/// isn't a practice recommended by the pytest community.
+///
 /// ## What it does
 /// Checks for `pytest` fixtures that return a value, but are named with a
 /// leading underscore.
@@ -298,32 +307,30 @@ impl Violation for PytestIncorrectFixtureNameUnderscore {
 /// and avoid the confusion caused by unused arguments.
 ///
 /// ## Example
+///
 /// ```python
 /// import pytest
 ///
 ///
 /// @pytest.fixture
-/// def _patch_something():
-///     ...
+/// def _patch_something(): ...
 ///
 ///
-/// def test_foo(_patch_something):
-///     ...
+/// def test_foo(_patch_something): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// import pytest
 ///
 ///
 /// @pytest.fixture
-/// def _patch_something():
-///     ...
+/// def _patch_something(): ...
 ///
 ///
 /// @pytest.mark.usefixtures("_patch_something")
-/// def test_foo():
-///     ...
+/// def test_foo(): ...
 /// ```
 ///
 /// ## References
@@ -594,21 +601,6 @@ impl AlwaysFixableViolation for PytestUnnecessaryAsyncioMarkOnFixture {
 
     fn fix_title(&self) -> String {
         "Remove `pytest.mark.asyncio`".to_string()
-    }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-enum Parentheses {
-    None,
-    Empty,
-}
-
-impl fmt::Display for Parentheses {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Parentheses::None => fmt.write_str(""),
-            Parentheses::Empty => fmt.write_str("()"),
-        }
     }
 }
 
@@ -927,9 +919,7 @@ pub(crate) fn fixture(
             check_fixture_decorator(checker, name, decorator);
         }
 
-        if checker.enabled(Rule::PytestDeprecatedYieldFixture)
-            && checker.settings.flake8_pytest_style.fixture_parentheses
-        {
+        if checker.enabled(Rule::PytestDeprecatedYieldFixture) {
             check_fixture_decorator_name(checker, decorator);
         }
 

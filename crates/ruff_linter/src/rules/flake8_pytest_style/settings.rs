@@ -38,13 +38,13 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            fixture_parentheses: true,
+            fixture_parentheses: false,
             parametrize_names_type: types::ParametrizeNameType::default(),
             parametrize_values_type: types::ParametrizeValuesType::default(),
             parametrize_values_row_type: types::ParametrizeValuesRowType::default(),
             raises_require_match_for: default_broad_exceptions(),
             raises_extend_require_match_for: vec![],
-            mark_parentheses: true,
+            mark_parentheses: false,
         }
     }
 }

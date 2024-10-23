@@ -7,7 +7,6 @@ use ruff_python_ast::{CmpOp, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::rules::pylint::helpers::CmpOpExt;
 
 /// ## What it does
 /// Checks for operations that compare a name to itself.
@@ -56,7 +55,7 @@ pub(crate) fn comparison_with_itself(
     comparators: &[Expr],
 ) {
     for ((left, right), op) in std::iter::once(left)
-        .chain(comparators.iter())
+        .chain(comparators)
         .tuple_windows()
         .zip(ops)
     {
@@ -66,7 +65,7 @@ pub(crate) fn comparison_with_itself(
                 let actual = format!(
                     "{} {} {}",
                     checker.locator().slice(left),
-                    CmpOpExt::from(op),
+                    op,
                     checker.locator().slice(right)
                 );
                 checker.diagnostics.push(Diagnostic::new(
@@ -114,7 +113,7 @@ pub(crate) fn comparison_with_itself(
                     let actual = format!(
                         "{} {} {}",
                         checker.locator().slice(left),
-                        CmpOpExt::from(op),
+                        op,
                         checker.locator().slice(right)
                     );
                     checker.diagnostics.push(Diagnostic::new(

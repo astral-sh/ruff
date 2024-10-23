@@ -66,7 +66,11 @@ use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
 ///
 ///
 /// def round_number(value, method):
-///     ...
+///     return ceil(number) if method is RoundingMethod.UP else floor(number)
+///
+///
+/// round_number(1.5, RoundingMethod.UP)
+/// round_number(1.5, RoundingMethod.DOWN)
 /// ```
 ///
 /// Or, make the argument a keyword-only argument:

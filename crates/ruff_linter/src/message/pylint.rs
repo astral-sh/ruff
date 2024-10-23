@@ -4,7 +4,6 @@ use ruff_source_file::OneIndexed;
 
 use crate::fs::relativize_path;
 use crate::message::{Emitter, EmitterContext, Message};
-use crate::registry::AsRule;
 
 /// Generate violations in Pylint format.
 /// See: [Flake8 documentation](https://flake8.pycqa.org/en/latest/internal/formatters.html#pylint-formatter)
@@ -27,12 +26,20 @@ impl Emitter for PylintEmitter {
                 message.compute_start_location().row
             };
 
+            let body = if let Some(rule) = message.rule() {
+                format!(
+                    "[{code}] {body}",
+                    code = rule.noqa_code(),
+                    body = message.body()
+                )
+            } else {
+                message.body().to_string()
+            };
+
             writeln!(
                 writer,
-                "{path}:{row}: [{code}] {body}",
+                "{path}:{row}: {body}",
                 path = relativize_path(message.filename()),
-                code = message.kind.rule().noqa_code(),
-                body = message.kind.body,
             )?;
         }
 
@@ -44,13 +51,23 @@ impl Emitter for PylintEmitter {
 mod tests {
     use insta::assert_snapshot;
 
-    use crate::message::tests::{capture_emitter_output, create_messages};
+    use crate::message::tests::{
+        capture_emitter_output, create_messages, create_syntax_error_messages,
+    };
     use crate::message::PylintEmitter;
 
     #[test]
     fn output() {
         let mut emitter = PylintEmitter;
         let content = capture_emitter_output(&mut emitter, &create_messages());
+
+        assert_snapshot!(content);
+    }
+
+    #[test]
+    fn syntax_errors() {
+        let mut emitter = PylintEmitter;
+        let content = capture_emitter_output(&mut emitter, &create_syntax_error_messages());
 
         assert_snapshot!(content);
     }

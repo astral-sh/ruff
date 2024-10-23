@@ -4,6 +4,7 @@ use ruff_python_ast as ast;
 use ruff_python_ast::helpers;
 use ruff_python_ast::helpers::{NameFinder, StoredNameFinder};
 use ruff_python_ast::visitor::Visitor;
+use ruff_python_semantic::Binding;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -137,7 +138,7 @@ pub(crate) fn unused_loop_control_variable(checker: &mut Checker, stmt_for: &ast
                     .get_all(name)
                     .map(|binding_id| checker.semantic().binding(binding_id))
                     .filter(|binding| binding.start() >= expr.start())
-                    .all(|binding| !binding.is_used())
+                    .all(Binding::is_unused)
                 {
                     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                         rename,

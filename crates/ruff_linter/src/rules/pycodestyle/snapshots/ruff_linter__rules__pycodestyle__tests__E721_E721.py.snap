@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E721.py:2:4: E721 Do not compare types, use `isinstance()`
+E721.py:2:4: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
   |
 1 | #: E721
 2 | if type(res) == type(42):
@@ -10,7 +10,7 @@ E721.py:2:4: E721 Do not compare types, use `isinstance()`
 4 | #: E721
   |
 
-E721.py:5:4: E721 Do not compare types, use `isinstance()`
+E721.py:5:4: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
   |
 3 |     pass
 4 | #: E721
@@ -20,7 +20,7 @@ E721.py:5:4: E721 Do not compare types, use `isinstance()`
 7 | #: E721
   |
 
-E721.py:8:4: E721 Do not compare types, use `isinstance()`
+E721.py:8:4: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
    |
  6 |     pass
  7 | #: E721
@@ -30,17 +30,7 @@ E721.py:8:4: E721 Do not compare types, use `isinstance()`
 10 | #: Okay
    |
 
-E721.py:18:4: E721 Do not compare types, use `isinstance()`
-   |
-16 | import types
-17 | 
-18 | if type(res) is not types.ListType:
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E721
-19 |     pass
-20 | #: E721
-   |
-
-E721.py:21:8: E721 Do not compare types, use `isinstance()`
+E721.py:21:8: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
    |
 19 |     pass
 20 | #: E721
@@ -50,7 +40,17 @@ E721.py:21:8: E721 Do not compare types, use `isinstance()`
 23 | assert type(res) == type([])
    |
 
-E721.py:23:8: E721 Do not compare types, use `isinstance()`
+E721.py:21:36: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
+   |
+19 |     pass
+20 | #: E721
+21 | assert type(res) == type(False) or type(res) == type(None)
+   |                                    ^^^^^^^^^^^^^^^^^^^^^^^ E721
+22 | #: E721
+23 | assert type(res) == type([])
+   |
+
+E721.py:23:8: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
    |
 21 | assert type(res) == type(False) or type(res) == type(None)
 22 | #: E721
@@ -60,7 +60,7 @@ E721.py:23:8: E721 Do not compare types, use `isinstance()`
 25 | assert type(res) == type(())
    |
 
-E721.py:25:8: E721 Do not compare types, use `isinstance()`
+E721.py:25:8: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
    |
 23 | assert type(res) == type([])
 24 | #: E721
@@ -70,7 +70,7 @@ E721.py:25:8: E721 Do not compare types, use `isinstance()`
 27 | assert type(res) == type((0,))
    |
 
-E721.py:27:8: E721 Do not compare types, use `isinstance()`
+E721.py:27:8: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
    |
 25 | assert type(res) == type(())
 26 | #: E721
@@ -80,7 +80,7 @@ E721.py:27:8: E721 Do not compare types, use `isinstance()`
 29 | assert type(res) == type((0))
    |
 
-E721.py:29:8: E721 Do not compare types, use `isinstance()`
+E721.py:29:8: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
    |
 27 | assert type(res) == type((0,))
 28 | #: E721
@@ -90,7 +90,7 @@ E721.py:29:8: E721 Do not compare types, use `isinstance()`
 31 | assert type(res) != type((1, ))
    |
 
-E721.py:31:8: E721 Do not compare types, use `isinstance()`
+E721.py:31:8: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
    |
 29 | assert type(res) == type((0))
 30 | #: E721
@@ -100,27 +100,7 @@ E721.py:31:8: E721 Do not compare types, use `isinstance()`
 33 | assert type(res) is type((1, ))
    |
 
-E721.py:33:8: E721 Do not compare types, use `isinstance()`
-   |
-31 | assert type(res) != type((1, ))
-32 | #: Okay
-33 | assert type(res) is type((1, ))
-   |        ^^^^^^^^^^^^^^^^^^^^^^^^ E721
-34 | #: Okay
-35 | assert type(res) is not type((1, ))
-   |
-
-E721.py:35:8: E721 Do not compare types, use `isinstance()`
-   |
-33 | assert type(res) is type((1, ))
-34 | #: Okay
-35 | assert type(res) is not type((1, ))
-   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E721
-36 | #: E211 E721
-37 | assert type(res) == type ([2, ])
-   |
-
-E721.py:37:8: E721 Do not compare types, use `isinstance()`
+E721.py:37:8: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
    |
 35 | assert type(res) is not type((1, ))
 36 | #: E211 E721
@@ -130,7 +110,7 @@ E721.py:37:8: E721 Do not compare types, use `isinstance()`
 39 | assert type(res) == type( ( ) )
    |
 
-E721.py:39:8: E721 Do not compare types, use `isinstance()`
+E721.py:39:8: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
    |
 37 | assert type(res) == type ([2, ])
 38 | #: E201 E201 E202 E721
@@ -140,7 +120,7 @@ E721.py:39:8: E721 Do not compare types, use `isinstance()`
 41 | assert type(res) == type( (0, ) )
    |
 
-E721.py:41:8: E721 Do not compare types, use `isinstance()`
+E721.py:41:8: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
    |
 39 | assert type(res) == type( ( ) )
 40 | #: E201 E202 E721
@@ -149,25 +129,26 @@ E721.py:41:8: E721 Do not compare types, use `isinstance()`
 42 | #:
    |
 
-E721.py:107:12: E721 Do not compare types, use `isinstance()`
+E721.py:59:4: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
+   |
+57 |     pass
+58 | #: E721
+59 | if type(res) == type:
+   |    ^^^^^^^^^^^^^^^^^ E721
+60 |     pass
+61 | #: Okay
+   |
+
+E721.py:140:1: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
     |
-105 |     def asdf(self, value: str | None):
-106 |         #: E721
-107 |         if type(value) is str:
-    |            ^^^^^^^^^^^^^^^^^^ E721
-108 |             ...
+139 | #: E721
+140 | dtype == float
+    | ^^^^^^^^^^^^^^ E721
+141 | 
+142 | import builtins
     |
 
-E721.py:117:12: E721 Do not compare types, use `isinstance()`
-    |
-115 |     def asdf(self, value: str | None):
-116 |         #: E721
-117 |         if type(value) is str:
-    |            ^^^^^^^^^^^^^^^^^^ E721
-118 |             ...
-    |
-
-E721.py:144:4: E721 Do not compare types, use `isinstance()`
+E721.py:144:4: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
     |
 142 | import builtins
 143 | 

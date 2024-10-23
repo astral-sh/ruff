@@ -130,7 +130,7 @@ pub fn walk_stmt<V: Transformer + ?Sized>(visitor: &V, stmt: &mut Stmt) {
                 visitor.visit_type_params(type_params);
             }
             visitor.visit_parameters(parameters);
-            for expr in returns {
+            if let Some(expr) = returns {
                 visitor.visit_annotation(expr);
             }
             visitor.visit_body(body);
@@ -579,10 +579,10 @@ pub fn walk_arguments<V: Transformer + ?Sized>(visitor: &V, arguments: &mut Argu
     // Note that the there might be keywords before the last arg, e.g. in
     // f(*args, a=2, *args2, **kwargs)`, but we follow Python in evaluating first `args` and then
     // `keywords`. See also [Arguments::arguments_source_order`].
-    for arg in arguments.args.iter_mut() {
+    for arg in &mut *arguments.args {
         visitor.visit_expr(arg);
     }
-    for keyword in arguments.keywords.iter_mut() {
+    for keyword in &mut *arguments.keywords {
         visitor.visit_keyword(keyword);
     }
 }

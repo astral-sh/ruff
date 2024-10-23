@@ -176,6 +176,7 @@ pub(crate) fn format(
         duration
     );
 
+    // Store the caches.
     caches.persist()?;
 
     // Report on any errors.
@@ -794,6 +795,8 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
             //     pass
             // ```
             Rule::MissingTrailingComma,
+            // The formatter always removes blank lines before the docstring.
+            Rule::OneBlankLineBeforeClass,
         ] {
             if setting.linter.rules.enabled(rule) {
                 incompatible_rules.insert(rule);
@@ -807,7 +810,11 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
             .map(|rule| format!("`{}`", rule.noqa_code()))
             .collect();
         rule_names.sort();
-        warn_user_once!("The following rules may cause conflicts when used with the formatter: {}. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding them to the `ignore` configuration.", rule_names.join(", "));
+        if let [rule] = rule_names.as_slice() {
+            warn_user_once!("The following rule may cause conflicts when used with the formatter: {rule}. To avoid unexpected behavior, we recommend disabling this rule, either by removing it from the `select` or `extend-select` configuration, or adding it to the `ignore` configuration.");
+        } else {
+            warn_user_once!("The following rules may cause conflicts when used with the formatter: {}. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding them to the `ignore` configuration.", rule_names.join(", "));
+        }
     }
 
     // Next, validate settings-specific incompatibilities.

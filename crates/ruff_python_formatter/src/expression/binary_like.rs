@@ -5,7 +5,7 @@ use smallvec::SmallVec;
 
 use ruff_formatter::write;
 use ruff_python_ast::{
-    Expr, ExprAttribute, ExprBinOp, ExprBoolOp, ExprCompare, ExprUnaryOp, UnaryOp,
+    Expr, ExprAttribute, ExprBinOp, ExprBoolOp, ExprCompare, ExprUnaryOp, StringLike, UnaryOp,
 };
 use ruff_python_trivia::CommentRanges;
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
@@ -20,7 +20,7 @@ use crate::expression::parentheses::{
 };
 use crate::expression::OperatorPrecedence;
 use crate::prelude::*;
-use crate::string::{AnyString, FormatStringContinuation};
+use crate::string::FormatImplicitConcatenatedString;
 
 #[derive(Copy, Clone, Debug)]
 pub(super) enum BinaryLike<'a> {
@@ -293,7 +293,8 @@ impl Format<PyFormatContext<'_>> for BinaryLike<'_> {
         let mut string_operands = flat_binary
             .operands()
             .filter_map(|(index, operand)| {
-                AnyString::from_expression(operand.expression())
+                StringLike::try_from(operand.expression())
+                    .ok()
                     .filter(|string| {
                         string.is_implicit_concatenated()
                             && !is_expression_parenthesized(
@@ -394,10 +395,10 @@ impl Format<PyFormatContext<'_>> for BinaryLike<'_> {
                             [
                                 operand.leading_binary_comments().map(leading_comments),
                                 leading_comments(comments.leading(string_constant)),
-                                // Call `FormatStringContinuation` directly to avoid formatting
+                                // Call `FormatImplicitConcatenatedString` directly to avoid formatting
                                 // the implicitly concatenated string with the enclosing group
                                 // because the group is added by the binary like formatting.
-                                FormatStringContinuation::new(&string_constant),
+                                FormatImplicitConcatenatedString::new(string_constant),
                                 trailing_comments(comments.trailing(string_constant)),
                                 operand.trailing_binary_comments().map(trailing_comments),
                                 line_suffix_boundary(),
@@ -413,10 +414,10 @@ impl Format<PyFormatContext<'_>> for BinaryLike<'_> {
                             f,
                             [
                                 leading_comments(comments.leading(string_constant)),
-                                // Call `FormatStringContinuation` directly to avoid formatting
+                                // Call `FormatImplicitConcatenatedString` directly to avoid formatting
                                 // the implicitly concatenated string with the enclosing group
                                 // because the group is added by the binary like formatting.
-                                FormatStringContinuation::new(&string_constant),
+                                FormatImplicitConcatenatedString::new(string_constant),
                                 trailing_comments(comments.trailing(string_constant)),
                             ]
                         )?;
@@ -573,7 +574,8 @@ impl<'a> FlatBinaryExpressionSlice<'a> {
         #[allow(unsafe_code)]
         unsafe {
             // SAFETY: `BinaryChainSlice` has the same layout as a slice because it uses `repr(transparent)`
-            &*(slice as *const [OperandOrOperator<'a>] as *const FlatBinaryExpressionSlice<'a>)
+            &*(std::ptr::from_ref::<[OperandOrOperator<'a>]>(slice)
+                as *const FlatBinaryExpressionSlice<'a>)
         }
     }
 

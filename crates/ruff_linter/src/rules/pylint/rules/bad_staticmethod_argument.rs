@@ -91,13 +91,18 @@ pub(crate) fn bad_staticmethod_argument(
         return;
     };
 
-    if matches!(self_or_cls.name.as_str(), "self" | "cls") {
-        let diagnostic = Diagnostic::new(
-            BadStaticmethodArgument {
-                argument_name: self_or_cls.name.to_string(),
-            },
-            self_or_cls.range(),
-        );
-        diagnostics.push(diagnostic);
+    match (name.as_str(), self_or_cls.name.as_str()) {
+        ("__new__", "cls") => {
+            return;
+        }
+        (_, "self" | "cls") => {}
+        _ => return,
     }
+
+    diagnostics.push(Diagnostic::new(
+        BadStaticmethodArgument {
+            argument_name: self_or_cls.name.to_string(),
+        },
+        self_or_cls.range(),
+    ));
 }

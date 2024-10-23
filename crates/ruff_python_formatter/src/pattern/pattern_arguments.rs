@@ -48,7 +48,7 @@ impl FormatNodeRule<PatternArguments> for FormatPatternArguments {
                                 pattern.format().with_options(Parentheses::Preserve),
                             )
                         }))
-                        .nodes(item.keywords.iter());
+                        .nodes(&item.keywords);
                 }
             }
 

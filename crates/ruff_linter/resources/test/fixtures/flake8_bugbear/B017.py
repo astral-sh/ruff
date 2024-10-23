@@ -53,3 +53,6 @@ def test_pytest_raises():
 
     with pytest.raises(Exception, match="hello"):
         raise ValueError("This is also fine")
+
+    with contextlib.nullcontext(), pytest.raises(Exception):
+        raise ValueError("Multiple context managers")

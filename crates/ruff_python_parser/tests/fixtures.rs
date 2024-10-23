@@ -8,7 +8,7 @@ use annotate_snippets::snippet::{AnnotationType, Slice, Snippet, SourceAnnotatio
 
 use ruff_python_ast::visitor::source_order::{walk_module, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, Mod};
-use ruff_python_parser::{parse_unchecked, Mode, ParseErrorType};
+use ruff_python_parser::{parse_unchecked, Mode, ParseErrorType, Token};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -60,6 +60,7 @@ fn test_valid_syntax(input_path: &Path) {
         panic!("{input_path:?}: {message}");
     }
 
+    validate_tokens(parsed.tokens(), source.text_len(), input_path);
     validate_ast(parsed.syntax(), source.text_len(), input_path);
 
     let mut output = String::new();
@@ -86,6 +87,7 @@ fn test_invalid_syntax(input_path: &Path) {
         "{input_path:?}: Expected parser to generate at least one syntax error for a program containing syntax errors."
     );
 
+    validate_tokens(parsed.tokens(), source.text_len(), input_path);
     validate_ast(parsed.syntax(), source.text_len(), input_path);
 
     let mut output = String::new();
@@ -126,8 +128,8 @@ fn test_invalid_syntax(input_path: &Path) {
 #[allow(clippy::print_stdout)]
 fn parser_quick_test() {
     let source = "\
-def foo()
-    pass
+f'{'
+f'{foo!r'
 ";
 
     let parsed = parse_unchecked(source, Mode::Module);
@@ -228,6 +230,36 @@ impl std::fmt::Display for CodeFrame<'_> {
         };
 
         writeln!(f, "{message}", message = DisplayList::from(snippet))
+    }
+}
+
+/// Verifies that:
+/// * the ranges are strictly increasing when loop the tokens in insertion order
+/// * all ranges are within the length of the source code
+fn validate_tokens(tokens: &[Token], source_length: TextSize, test_path: &Path) {
+    let mut previous: Option<&Token> = None;
+
+    for token in tokens {
+        assert!(
+            token.end() <= source_length,
+            "{path}: Token range exceeds the source code length. Token: {token:#?}",
+            path = test_path.display()
+        );
+
+        if let Some(previous) = previous {
+            assert_eq!(
+                previous.range().ordering(token.range()),
+                Ordering::Less,
+                "{path}: Token ranges are not in increasing order
+Previous token: {previous:#?}
+Current token: {token:#?}
+Tokens: {tokens:#?}
+",
+                path = test_path.display(),
+            );
+        }
+
+        previous = Some(token);
     }
 }
 

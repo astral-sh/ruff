@@ -27,24 +27,24 @@ fn do_fuzz(case: &[u8]) -> Corpus {
     let linter_settings = SETTINGS.get_or_init(LinterSettings::default);
     let format_options = PyFormatOptions::default();
 
-    let linter_results = ruff_linter::linter::lint_only(
+    let linter_result = ruff_linter::linter::lint_only(
         "fuzzed-source.py".as_ref(),
         None,
-        &linter_settings,
+        linter_settings,
         Noqa::Enabled,
         &SourceKind::Python(code.to_string()),
         PySourceType::Python,
         ParseSource::None,
     );
 
-    if linter_results.error.is_some() {
+    if linter_result.has_syntax_error {
         return Corpus::Keep; // keep, but don't continue
     }
 
     let mut warnings = HashMap::new();
 
-    for msg in linter_results.data {
-        let count: &mut usize = warnings.entry(msg.kind.name).or_default();
+    for msg in &linter_result.messages {
+        let count: &mut usize = warnings.entry(msg.name()).or_default();
         *count += 1;
     }
 
@@ -52,10 +52,10 @@ fn do_fuzz(case: &[u8]) -> Corpus {
     if let Ok(formatted) = format_module_source(code, format_options.clone()) {
         let formatted = formatted.as_code().to_string();
 
-        let linter_results = ruff_linter::linter::lint_only(
+        let linter_result = ruff_linter::linter::lint_only(
             "fuzzed-source.py".as_ref(),
             None,
-            &linter_settings,
+            linter_settings,
             Noqa::Enabled,
             &SourceKind::Python(formatted.clone()),
             PySourceType::Python,
@@ -63,12 +63,12 @@ fn do_fuzz(case: &[u8]) -> Corpus {
         );
 
         assert!(
-            linter_results.error.is_none(),
+            !linter_result.has_syntax_error,
             "formatter introduced a parse error"
         );
 
-        for msg in linter_results.data {
-            if let Some(count) = warnings.get_mut(&msg.kind.name) {
+        for msg in &linter_result.messages {
+            if let Some(count) = warnings.get_mut(msg.name()) {
                 if let Some(decremented) = count.checked_sub(1) {
                     *count = decremented;
                 } else {
@@ -77,7 +77,6 @@ fn do_fuzz(case: &[u8]) -> Corpus {
                         TextDiff::from_lines(code, &formatted)
                             .unified_diff()
                             .header("Unformatted", "Formatted")
-                            .to_string()
                     );
                 }
             } else {
@@ -86,7 +85,6 @@ fn do_fuzz(case: &[u8]) -> Corpus {
                     TextDiff::from_lines(code, &formatted)
                         .unified_diff()
                         .header("Unformatted", "Formatted")
-                        .to_string()
                 );
             }
         }

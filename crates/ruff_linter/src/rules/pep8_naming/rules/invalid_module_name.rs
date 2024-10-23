@@ -3,7 +3,9 @@ use std::path::Path;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::PySourceType;
 use ruff_python_stdlib::identifiers::{is_migration_name, is_module_name};
+use ruff_python_stdlib::path::is_module_file;
 use ruff_text_size::TextRange;
 
 use crate::rules::pep8_naming::settings::IgnoreNames;
@@ -52,10 +54,7 @@ pub(crate) fn invalid_module_name(
     package: Option<&Path>,
     ignore_names: &IgnoreNames,
 ) -> Option<Diagnostic> {
-    if !path
-        .extension()
-        .is_some_and(|ext| ext == "py" || ext == "pyi")
-    {
+    if !PySourceType::try_from_path(path).is_some_and(PySourceType::is_py_file_or_stub) {
         return None;
     }
 
@@ -90,16 +89,6 @@ pub(crate) fn invalid_module_name(
     }
 
     None
-}
-
-/// Return `true` if a [`Path`] should use the name of its parent directory as its module name.
-fn is_module_file(path: &Path) -> bool {
-    path.file_name().is_some_and(|file_name| {
-        file_name == "__init__.py"
-            || file_name == "__init__.pyi"
-            || file_name == "__main__.py"
-            || file_name == "__main__.pyi"
-    })
 }
 
 /// Return `true` if a [`Path`] refers to a migration file.

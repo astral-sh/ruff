@@ -36,4 +36,34 @@ too_many_arguments.py:33:5: PLR0913 Too many arguments in function definition (9
 34 |     pass
    |
 
+too_many_arguments.py:51:9: PLR0913 Too many arguments in function definition (8 > 5)
+   |
+50 | class C:
+51 |     def f(self, y, z, a, b, c, *, u, v, w):  # Too many arguments (8/5)
+   |         ^ PLR0913
+52 |         pass
+   |
 
+too_many_arguments.py:58:9: PLR0913 Too many arguments in function definition (8 > 5)
+   |
+57 |     @classmethod
+58 |     def f(cls, y, z, a, b, c, *, u, v, w):  # Too many arguments (8/5)
+   |         ^ PLR0913
+59 |         pass
+   |
+
+too_many_arguments.py:66:9: PLR0913 Too many arguments in function definition (8 > 5)
+   |
+65 |     @staticmethod
+66 |     def f(y, z, a, b, c, *, u, v, w):  # Too many arguments (8/5)
+   |         ^ PLR0913
+67 |         pass
+   |
+
+too_many_arguments.py:70:9: PLR0913 Too many arguments in function definition (6 > 5)
+   |
+69 |     @staticmethod
+70 |     def f(y, z, a, b, c, d):  # OK
+   |         ^ PLR0913
+71 |         pass
+   |

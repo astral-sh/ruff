@@ -114,14 +114,14 @@ Module(
                     target: Name(
                         ExprName {
                             range: 90..91,
-                            id: "x",
+                            id: Name("x"),
                             ctx: Store,
                         },
                     ),
                     iter: Name(
                         ExprName {
                             range: 95..99,
-                            id: "iter",
+                            id: Name("iter"),
                             ctx: Load,
                         },
                     ),
@@ -148,14 +148,14 @@ Module(
                     target: Name(
                         ExprName {
                             range: 122..123,
-                            id: "x",
+                            id: Name("x"),
                             ctx: Store,
                         },
                     ),
                     iter: Name(
                         ExprName {
                             range: 127..131,
-                            id: "iter",
+                            id: Name("iter"),
                             ctx: Load,
                         },
                     ),
@@ -193,7 +193,7 @@ Module(
                                     Name(
                                         ExprName {
                                             range: 168..171,
-                                            id: "exc",
+                                            id: Name("exc"),
                                             ctx: Load,
                                         },
                                     ),
@@ -244,7 +244,7 @@ Module(
                                     Name(
                                         ExprName {
                                             range: 221..224,
-                                            id: "exc",
+                                            id: Name("exc"),
                                             ctx: Load,
                                         },
                                     ),

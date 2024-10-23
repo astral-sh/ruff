@@ -18,7 +18,7 @@ Module(
                             func: Name(
                                 ExprName {
                                     range: 0..4,
-                                    id: "call",
+                                    id: Name("call"),
                                     ctx: Load,
                                 },
                             ),
@@ -28,7 +28,7 @@ Module(
                                     Name(
                                         ExprName {
                                             range: 5..6,
-                                            id: "x",
+                                            id: Name("x"),
                                             ctx: Load,
                                         },
                                     ),
@@ -45,7 +45,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "foo",
+                        id: Name("foo"),
                         range: 12..15,
                     },
                     type_params: None,
@@ -75,15 +75,8 @@ Module(
 
   |
 1 | call(x
+  |       ^ Syntax Error: Expected ')', found newline
 2 | 
 3 | def foo():
-  | ^^^ Syntax Error: Expected ',', found 'def'
 4 |     pass
-  |
-
-
-  |
-3 | def foo():
-4 |     pass
-  |          Syntax Error: unexpected EOF while parsing
   |

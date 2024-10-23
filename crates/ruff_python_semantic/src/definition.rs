@@ -6,13 +6,16 @@ use std::ops::Deref;
 use std::path::Path;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
-use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_ast::name::QualifiedName;
+use ruff_python_ast::{self as ast, Stmt, StmtFunctionDef};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::analyze::visibility::{
-    class_visibility, function_visibility, method_visibility, module_visibility, Visibility,
+    class_visibility, function_visibility, is_property, method_visibility, module_visibility,
+    Visibility,
 };
 use crate::model::all::DunderAllName;
+use crate::SemanticModel;
 
 /// Id uniquely identifying a definition in a program.
 #[newtype_index]
@@ -146,6 +149,17 @@ impl<'a> Definition<'a> {
                 ..
             })
         )
+    }
+
+    pub fn is_property<P, I>(&self, extra_properties: P, semantic: &SemanticModel) -> bool
+    where
+        P: IntoIterator<IntoIter = I>,
+        I: Iterator<Item = QualifiedName<'a>> + Clone,
+    {
+        self.as_function_def()
+            .is_some_and(|StmtFunctionDef { decorator_list, .. }| {
+                is_property(decorator_list, extra_properties, semantic)
+            })
     }
 
     /// Return the name of the definition.

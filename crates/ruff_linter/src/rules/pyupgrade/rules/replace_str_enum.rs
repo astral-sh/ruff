@@ -20,8 +20,7 @@ use crate::importer::ImportRequest;
 /// import enum
 ///
 ///
-/// class Foo(str, enum.Enum):
-///     ...
+/// class Foo(str, enum.Enum): ...
 /// ```
 ///
 /// Use instead:
@@ -30,8 +29,7 @@ use crate::importer::ImportRequest;
 /// import enum
 ///
 ///
-/// class Foo(enum.StrEnum):
-///     ...
+/// class Foo(enum.StrEnum): ...
 /// ```
 ///
 /// ## Fix safety
@@ -108,7 +106,7 @@ pub(crate) fn replace_str_enum(checker: &mut Checker, class_def: &ast::StmtClass
     // Determine whether the class inherits from both `str` and `enum.Enum`.
     let mut inherits_str = false;
     let mut inherits_enum = false;
-    for base in arguments.args.iter() {
+    for base in &*arguments.args {
         if let Some(qualified_name) = checker.semantic().resolve_qualified_name(base) {
             match qualified_name.segments() {
                 ["" | "builtins", "str"] => inherits_str = true,

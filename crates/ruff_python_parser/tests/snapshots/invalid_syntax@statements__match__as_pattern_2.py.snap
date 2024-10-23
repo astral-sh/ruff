@@ -15,7 +15,7 @@ Module(
                     subject: Name(
                         ExprName {
                             range: 6..13,
-                            id: "subject",
+                            id: Name("subject"),
                             ctx: Load,
                         },
                     ),
@@ -32,7 +32,7 @@ Module(
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
-                                                        id: "x",
+                                                        id: Name("x"),
                                                         range: 164..165,
                                                     },
                                                 ),
@@ -41,7 +41,7 @@ Module(
                                     ),
                                     name: Some(
                                         Identifier {
-                                            id: "y",
+                                            id: Name("y"),
                                             range: 169..170,
                                         },
                                     ),
@@ -70,7 +70,7 @@ Module(
                                         annotation: Name(
                                             ExprName {
                                                 range: 176..176,
-                                                id: "",
+                                                id: Name(""),
                                                 ctx: Invalid,
                                             },
                                         ),

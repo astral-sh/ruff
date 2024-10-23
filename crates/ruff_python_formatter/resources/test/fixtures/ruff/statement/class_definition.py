@@ -224,3 +224,25 @@ class QuerySet(AltersData):
 
     as_manager.queryset_only = True
     as_manager = classmethod(as_manager)
+
+
+# Decorators
+@decorator
+# comment
+class Foo1: ...
+
+@decorator
+# comment
+class Foo2(Foo1): ...
+
+@decorator
+# comment
+class Foo3[T]: ...
+
+@decorator  # comment
+class Foo4: ...
+
+@decorator
+# comment
+@decorato2
+class Foo5: ...

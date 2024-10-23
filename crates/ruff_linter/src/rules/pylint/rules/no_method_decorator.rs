@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, DiagnosticKind, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_trivia::indentation_at_offset;
 use ruff_text_size::{Ranged, TextRange};
@@ -16,20 +17,20 @@ use crate::fix;
 /// When it comes to consistency and readability, it's preferred to use the decorator.
 ///
 /// ## Example
+///
 /// ```python
 /// class Foo:
-///     def bar(cls):
-///         ...
+///     def bar(cls): ...
 ///
 ///     bar = classmethod(bar)
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// class Foo:
 ///     @classmethod
-///     def bar(cls):
-///         ...
+///     def bar(cls): ...
 /// ```
 #[violation]
 pub struct NoClassmethodDecorator;
@@ -52,20 +53,20 @@ impl AlwaysFixableViolation for NoClassmethodDecorator {
 /// When it comes to consistency and readability, it's preferred to use the decorator.
 ///
 /// ## Example
+///
 /// ```python
 /// class Foo:
-///     def bar(arg1, arg2):
-///         ...
+///     def bar(arg1, arg2): ...
 ///
 ///     bar = staticmethod(bar)
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// class Foo:
 ///     @staticmethod
-///     def bar(arg1, arg2):
-///         ...
+///     def bar(arg1, arg2): ...
 /// ```
 #[violation]
 pub struct NoStaticmethodDecorator;
@@ -101,7 +102,7 @@ fn get_undecorated_methods(checker: &mut Checker, class_stmt: &Stmt, method_type
         return;
     };
 
-    let mut explicit_decorator_calls: HashMap<String, &Stmt> = HashMap::default();
+    let mut explicit_decorator_calls: HashMap<Name, &Stmt> = HashMap::default();
 
     let (method_name, diagnostic_type): (&str, DiagnosticKind) = match method_type {
         MethodType::Classmethod => ("classmethod", NoClassmethodDecorator.into()),
@@ -152,7 +153,7 @@ fn get_undecorated_methods(checker: &mut Checker, class_stmt: &Stmt, method_type
             ..
         }) = stmt
         {
-            let Some(decorator_call_statement) = explicit_decorator_calls.get(name.as_str()) else {
+            let Some(decorator_call_statement) = explicit_decorator_calls.get(name.id()) else {
                 continue;
             };
 

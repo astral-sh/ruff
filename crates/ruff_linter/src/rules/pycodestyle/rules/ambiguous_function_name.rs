@@ -14,15 +14,15 @@ use crate::rules::pycodestyle::helpers::is_ambiguous_name;
 /// numerals one and zero. When tempted to use 'l', use 'L' instead.
 ///
 /// ## Example
+///
 /// ```python
-/// def l(x):
-///     ...
+/// def l(x): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// def long_name(x):
-///     ...
+/// def long_name(x): ...
 /// ```
 #[violation]
 pub struct AmbiguousFunctionName(pub String);

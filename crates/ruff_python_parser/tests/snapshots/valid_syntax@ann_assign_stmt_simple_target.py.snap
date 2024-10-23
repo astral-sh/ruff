@@ -15,14 +15,14 @@ Module(
                     target: Name(
                         ExprName {
                             range: 0..1,
-                            id: "a",
+                            id: Name("a"),
                             ctx: Store,
                         },
                     ),
                     annotation: Name(
                         ExprName {
                             range: 3..6,
-                            id: "int",
+                            id: Name("int"),
                             ctx: Load,
                         },
                     ),
@@ -36,14 +36,14 @@ Module(
                     target: Name(
                         ExprName {
                             range: 18..19,
-                            id: "a",
+                            id: Name("a"),
                             ctx: Store,
                         },
                     ),
                     annotation: Name(
                         ExprName {
                             range: 22..25,
-                            id: "int",
+                            id: Name("int"),
                             ctx: Load,
                         },
                     ),
@@ -60,12 +60,12 @@ Module(
                             value: Name(
                                 ExprName {
                                     range: 26..27,
-                                    id: "a",
+                                    id: Name("a"),
                                     ctx: Load,
                                 },
                             ),
                             attr: Identifier {
-                                id: "b",
+                                id: Name("b"),
                                 range: 28..29,
                             },
                             ctx: Store,
@@ -74,7 +74,7 @@ Module(
                     annotation: Name(
                         ExprName {
                             range: 31..34,
-                            id: "int",
+                            id: Name("int"),
                             ctx: Load,
                         },
                     ),
@@ -91,7 +91,7 @@ Module(
                             value: Name(
                                 ExprName {
                                     range: 35..36,
-                                    id: "a",
+                                    id: Name("a"),
                                     ctx: Load,
                                 },
                             ),
@@ -109,7 +109,7 @@ Module(
                     annotation: Name(
                         ExprName {
                             range: 41..44,
-                            id: "int",
+                            id: Name("int"),
                             ctx: Load,
                         },
                     ),

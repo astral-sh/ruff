@@ -189,13 +189,13 @@ As an example, the following would configure Ruff to:
     # 3. Avoid trying to fix flake8-bugbear (`B`) violations.
     unfixable = ["B"]
 
-    # 4. Ignore `E402` (import violations) in all `__init__.py` files, and in select subdirectories.
+    # 4. Ignore `E402` (import violations) in all `__init__.py` files, and in selected subdirectories.
     [tool.ruff.lint.per-file-ignores]
     "__init__.py" = ["E402"]
     "**/{tests,docs,tools}/*" = ["E402"]
 
     [tool.ruff.format]
-    # 5. Use single quotes for non-triple-quoted strings.
+    # 5. Use single quotes in `ruff format`.
     quote-style = "single"
     ```
 
@@ -212,13 +212,13 @@ As an example, the following would configure Ruff to:
     # 3. Avoid trying to fix flake8-bugbear (`B`) violations.
     unfixable = ["B"]
 
-    # 4. Ignore `E402` (import violations) in all `__init__.py` files, and in select subdirectories.
+    # 4. Ignore `E402` (import violations) in all `__init__.py` files, and in selected subdirectories.
     [lint.per-file-ignores]
     "__init__.py" = ["E402"]
     "**/{tests,docs,tools}/*" = ["E402"]
 
     [format]
-    # 5. Use single quotes for non-triple-quoted strings.
+    # 5. Use single quotes in `ruff format`.
     quote-style = "single"
     ```
 
@@ -254,7 +254,7 @@ For a complete enumeration of the available configuration options, see [_Setting
 
 ## Config file discovery
 
-Similar to [ESLint](https://eslint.org/docs/latest/user-guide/configuring/configuration-files#cascading-and-hierarchy),
+Similar to [ESLint](https://eslint.org/docs/latest/use/configure/configuration-files#cascading-configuration-objects),
 Ruff supports hierarchical configuration, such that the "closest" config file in the
 directory hierarchy is used for every individual file, with all paths in the config file
 (e.g., `exclude` globs, `src` paths) being resolved relative to the directory containing that
@@ -270,12 +270,12 @@ There are a few exceptions to these rules:
 1. If no config file is found in the filesystem hierarchy, Ruff will fall back to using
     a default configuration. If a user-specific configuration file exists
     at `${config_dir}/ruff/pyproject.toml`, that file will be used instead of the default
-    configuration, with `${config_dir}` being determined via the [`dirs`](https://docs.rs/dirs/4.0.0/dirs/fn.config_dir.html)
-    crate, and all relative paths being again resolved relative to the _current working directory_.
+    configuration, with `${config_dir}` being determined via [`etcetera`'s native strategy](https://docs.rs/etcetera/latest/etcetera/#native-strategy),
+    and all relative paths being again resolved relative to the _current working directory_.
 1. Any config-file-supported settings that are provided on the command-line (e.g., via
     `--select`) will override the settings in _every_ resolved configuration file.
 
-Unlike [ESLint](https://eslint.org/docs/latest/user-guide/configuring/configuration-files#cascading-and-hierarchy),
+Unlike [ESLint](https://eslint.org/docs/latest/use/configure/configuration-files#cascading-configuration-objects),
 Ruff does not merge settings across configuration files; instead, the "closest" configuration file
 is used, and any parent configuration files are ignored. In lieu of this implicit cascade, Ruff
 supports an [`extend`](settings.md#extend) field, which allows you to inherit the settings from another
@@ -339,23 +339,9 @@ For example, `ruff check /path/to/excluded/file.py` will always lint `file.py`.
 
 ### Default inclusions
 
-By default, Ruff will discover files matching `*.py`, `*.ipy`, or `pyproject.toml`.
+By default, Ruff will discover files matching `*.py`, `*.pyi`, `*.ipynb`, or `pyproject.toml`.
 
 To lint or format files with additional file extensions, use the [`extend-include`](settings.md#extend-include) setting.
-
-=== "pyproject.toml"
-
-    ```toml
-    [tool.ruff]
-    extend-include = ["*.ipynb"]
-    ```
-
-=== "ruff.toml"
-
-    ```toml
-    extend-include = ["*.ipynb"]
-    ```
-
 You can also change the default selection using the [`include`](settings.md#include) setting.
 
 
@@ -378,37 +364,16 @@ You can also change the default selection using the [`include`](settings.md#incl
 
 ## Jupyter Notebook discovery
 
-Ruff has built-in support for [Jupyter Notebooks](https://jupyter.org/).
-
-To opt in to linting and formatting Jupyter Notebook (`.ipynb`) files, add the `*.ipynb` pattern to
-your [`extend-include`](settings.md#extend-include) setting, like so:
-
-=== "pyproject.toml"
-
-    ```toml
-    [tool.ruff]
-    extend-include = ["*.ipynb"]
-    ```
-
-=== "ruff.toml"
-
-    ```toml
-    extend-include = ["*.ipynb"]
-    ```
-
-This will prompt Ruff to discover Jupyter Notebook (`.ipynb`) files in any specified
-directories, then lint and format them accordingly.
+Ruff has built-in support for linting and formatting [Jupyter Notebooks](https://jupyter.org/),
+which are linted and formatted by default on version `0.6.0` and higher.
 
 If you'd prefer to either only lint or only format Jupyter Notebook files, you can use the
-section specific `exclude` option to do so. For example, the following would only lint Jupyter
+section-specific `exclude` option to do so. For example, the following would only lint Jupyter
 Notebook files and not format them:
 
 === "pyproject.toml"
 
     ```toml
-    [tool.ruff]
-    extend-include = ["*.ipynb"]
-
     [tool.ruff.format]
     exclude = ["*.ipynb"]
     ```
@@ -416,8 +381,6 @@ Notebook files and not format them:
 === "ruff.toml"
 
     ```toml
-    extend-include = ["*.ipynb"]
-
     [format]
     exclude = ["*.ipynb"]
     ```
@@ -427,9 +390,6 @@ And, conversely, the following would only format Jupyter Notebook files and not 
 === "pyproject.toml"
 
     ```toml
-    [tool.ruff]
-    extend-include = ["*.ipynb"]
-
     [tool.ruff.lint]
     exclude = ["*.ipynb"]
     ```
@@ -437,15 +397,49 @@ And, conversely, the following would only format Jupyter Notebook files and not 
 === "ruff.toml"
 
     ```toml
-    extend-include = ["*.ipynb"]
-
     [lint]
     exclude = ["*.ipynb"]
     ```
 
-Alternatively, pass the notebook file(s) to `ruff` on the command-line directly. For example,
-`ruff check /path/to/notebook.ipynb` will always lint `notebook.ipynb`. Similarly,
-`ruff format /path/to/notebook.ipynb` will always format `notebook.ipynb`.
+You can completely disable Jupyter Notebook support by updating the
+[`extend-exclude`](settings.md#extend-exclude) setting:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff]
+    extend-exclude = ["*.ipynb"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    extend-exclude = ["*.ipynb"]
+    ```
+
+If you'd like to ignore certain rules specifically for Jupyter Notebook files, you can do so by
+using the [`per-file-ignores`](settings.md#per-file-ignores) setting:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff.lint.per-file-ignores]
+    "*.ipynb" = ["T20"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    [lint.per-file-ignores]
+    "*.ipynb" = ["T20"]
+    ```
+
+Some rules have different behavior when applied to Jupyter Notebook files. For
+example, when applied to `.py` files the
+[`module-import-not-at-top-of-file` (`E402`)](rules/module-import-not-at-top-of-file.md)
+rule detect imports at the top of a file, but for notebooks it detects imports at the top of a
+**cell**. For a given rule, the rule's documentation will always specify if it has different
+behavior when applied to Jupyter Notebook files.
 
 ## Command-line interface
 
@@ -453,8 +447,8 @@ Some configuration options can be provided or overridden via dedicated flags on 
 This includes those related to rule enablement and disablement,
 file discovery, logging level, and more:
 
-```shell
-ruff check path/to/code/ --select F401 --select F403 --quiet
+```console
+$ ruff check path/to/code/ --select F401 --select F403 --quiet
 ```
 
 All other configuration options can be set via the command line
@@ -465,8 +459,8 @@ using the `--config` flag, detailed below.
 The `--config` flag has two uses. It is most often used to point to the
 configuration file that you would like Ruff to use, for example:
 
-```shell
-ruff check path/to/directory --config path/to/ruff.toml
+```console
+$ ruff check path/to/directory --config path/to/ruff.toml
 ```
 
 However, the `--config` flag can also be used to provide arbitrary
@@ -480,8 +474,8 @@ since this setting has no dedicated CLI flag. The `per-file-ignores` setting
 could also have been overridden via the `--per-file-ignores` dedicated flag,
 but using `--config` to override the setting is also fine:
 
-```shell
-ruff check path/to/file --config path/to/ruff.toml --config "lint.dummy-variable-rgx = '__.*'" --config "lint.per-file-ignores = {'some_file.py' = ['F841']}"
+```console
+$ ruff check path/to/file --config path/to/ruff.toml --config "lint.dummy-variable-rgx = '__.*'" --config "lint.per-file-ignores = {'some_file.py' = ['F841']}"
 ```
 
 Configuration options passed to `--config` are parsed in the same way
@@ -496,8 +490,8 @@ a dedicated flag and by the `--config` flag, the dedicated flag
 takes priority. In this example, the maximum permitted line length
 will be set to 90, not 100:
 
-```shell
-ruff format path/to/file --line-length=90 --config "line-length=100"
+```console
+$ ruff format path/to/file --line-length=90 --config "line-length=100"
 ```
 
 Specifying `--config "line-length=90"` will override the `line-length`
@@ -516,7 +510,7 @@ See `ruff help` for the full list of Ruff's top-level commands:
 <!-- Begin auto-generated command help. -->
 
 ```text
-Ruff: An extremely fast Python linter.
+Ruff: An extremely fast Python linter and code formatter.
 
 Usage: ruff [OPTIONS] <COMMAND>
 
@@ -528,6 +522,7 @@ Commands:
   clean    Clear any caches in the current directory and any subdirectories
   format   Run the Ruff formatter on the given files or directories
   server   Run the language server
+  analyze  Run analysis over Python source code
   version  Display Ruff's version
   help     Print this message or the help of the given subcommand(s)
 
@@ -576,28 +571,25 @@ Options:
       --unsafe-fixes
           Include fixes that may not retain the original intent of the code.
           Use `--no-unsafe-fixes` to disable
-      --show-source
-          Show violations with source code. Use `--no-show-source` to disable.
-          (Deprecated: use `--output-format=full` or `--output-format=concise`
-          instead of `--show-source` and `--no-show-source`, respectively)
       --show-fixes
           Show an enumeration of all fixed lint violations. Use
           `--no-show-fixes` to disable
       --diff
           Avoid writing any fixed files back; instead, output a diff for each
-          changed file to stdout. Implies `--fix-only`
+          changed file to stdout, and exit 0 if there are no diffs. Implies
+          `--fix-only`
   -w, --watch
           Run in watch mode by re-running whenever files change
       --fix-only
-          Apply fixes to resolve lint violations, but don't report on leftover
-          violations. Implies `--fix`. Use `--no-fix-only` to disable or
-          `--unsafe-fixes` to include unsafe fixes
+          Apply fixes to resolve lint violations, but don't report on, or exit
+          non-zero for, leftover violations. Implies `--fix`. Use
+          `--no-fix-only` to disable or `--unsafe-fixes` to include unsafe
+          fixes
       --ignore-noqa
           Ignore any `# noqa` comments
       --output-format <OUTPUT_FORMAT>
           Output serialization format for violations. The default serialization
-          format is "concise". In preview mode, the default serialization
-          format is "full" [env: RUFF_OUTPUT_FORMAT=] [possible values: text,
+          format is "full" [env: RUFF_OUTPUT_FORMAT=] [possible values:
           concise, full, json, json-lines, junit, grouped, github, gitlab,
           pylint, rdjson, azure, sarif]
   -o, --output-file <OUTPUT_FILE>

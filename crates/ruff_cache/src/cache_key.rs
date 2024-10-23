@@ -350,7 +350,9 @@ impl<K: CacheKey + Ord, V: CacheKey> CacheKey for BTreeMap<K, V> {
 impl CacheKey for Path {
     #[inline]
     fn cache_key(&self, state: &mut CacheKeyHasher) {
-        self.hash(&mut *state);
+        for component in self.components() {
+            component.hash(&mut *state);
+        }
     }
 }
 

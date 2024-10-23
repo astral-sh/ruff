@@ -463,5 +463,31 @@ SIM114.py:148:1: SIM114 [*] Combine `if` branches using logical `or` operator
 149     |-elif(100 < x and x < 200 and 300 < y and y < 800):
 150     |-	pass
     148 |+if(x > 200) or (100 < x and x < 200 and 300 < y and y < 800): pass
+151 149 | 
+152 150 | 
+153 151 | # See: https://github.com/astral-sh/ruff/issues/12732
 
+SIM114.py:154:1: SIM114 [*] Combine `if` branches using logical `or` operator
+    |
+153 |   # See: https://github.com/astral-sh/ruff/issues/12732
+154 | / if False if True else False:
+155 | |     print(1)
+156 | | elif True:
+157 | |     print(1)
+    | |____________^ SIM114
+158 |   else:
+159 |       print(2)
+    |
+    = help: Combine `if` branches
 
+ℹ Safe fix
+151 151 | 
+152 152 | 
+153 153 | # See: https://github.com/astral-sh/ruff/issues/12732
+154     |-if False if True else False:
+155     |-    print(1)
+156     |-elif True:
+    154 |+if (False if True else False) or True:
+157 155 |     print(1)
+158 156 | else:
+159 157 |     print(2)

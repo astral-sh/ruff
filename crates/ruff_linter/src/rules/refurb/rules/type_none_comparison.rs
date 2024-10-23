@@ -1,5 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
@@ -33,7 +34,7 @@ use crate::rules::refurb::helpers::generate_none_identity_comparison;
 /// - [Python documentation: Identity comparisons](https://docs.python.org/3/reference/expressions.html#is-not)
 #[violation]
 pub struct TypeNoneComparison {
-    object: String,
+    object: Name,
     comparison: Comparison,
 }
 
@@ -94,14 +95,14 @@ pub(crate) fn type_none_comparison(checker: &mut Checker, compare: &ast::ExprCom
 
     // Get the name of the other object (or `None` if both were `None`).
     let other_arg_name = match other_arg {
-        Expr::Name(ast::ExprName { id, .. }) => id.as_str(),
-        Expr::NoneLiteral { .. } => "None",
+        Expr::Name(ast::ExprName { id, .. }) => id.clone(),
+        Expr::NoneLiteral { .. } => Name::new_static("None"),
         _ => return,
     };
 
     let mut diagnostic = Diagnostic::new(
         TypeNoneComparison {
-            object: other_arg_name.to_string(),
+            object: other_arg_name.clone(),
             comparison,
         },
         compare.range(),

@@ -63,7 +63,7 @@ pub(crate) fn check_tokens(
             ruff::rules::ambiguous_unicode_character_comment(
                 &mut diagnostics,
                 locator,
-                *range,
+                range,
                 settings,
             );
         }
@@ -93,7 +93,7 @@ pub(crate) fn check_tokens(
         Rule::InvalidCharacterNul,
         Rule::InvalidCharacterZeroWidthSpace,
     ]) {
-        for token in tokens.up_to_first_unknown() {
+        for token in tokens {
             pylint::rules::invalid_string_characters(
                 &mut diagnostics,
                 token.kind(),
@@ -125,9 +125,9 @@ pub(crate) fn check_tokens(
         flake8_implicit_str_concat::rules::implicit(
             &mut diagnostics,
             tokens,
-            settings,
             locator,
             indexer,
+            settings,
         );
     }
 
@@ -154,7 +154,13 @@ pub(crate) fn check_tokens(
         Rule::ShebangNotFirstLine,
         Rule::ShebangMissingPython,
     ]) {
-        flake8_executable::rules::from_tokens(&mut diagnostics, path, locator, comment_ranges);
+        flake8_executable::rules::from_tokens(
+            &mut diagnostics,
+            path,
+            locator,
+            comment_ranges,
+            settings,
+        );
     }
 
     if settings.rules.any_enabled(&[

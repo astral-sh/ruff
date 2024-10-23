@@ -7,13 +7,13 @@ mod tests {
     use std::convert::AsRef;
     use std::path::Path;
 
-    use anyhow::Result;
-    use test_case::test_case;
-
     use crate::registry::Rule;
     use crate::rules::flake8_self;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
+    use anyhow::Result;
+    use ruff_python_ast::name::Name;
+    use test_case::test_case;
 
     #[test_case(Rule::PrivateMemberAccess, Path::new("SLF001.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
@@ -32,7 +32,7 @@ mod tests {
             Path::new("flake8_self/SLF001_extended.py"),
             &settings::LinterSettings {
                 flake8_self: flake8_self::settings::Settings {
-                    ignore_names: vec!["_meta".to_string()],
+                    ignore_names: vec![Name::new_static("_meta")],
                 },
                 ..settings::LinterSettings::for_rule(Rule::PrivateMemberAccess)
             },

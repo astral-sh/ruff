@@ -14,7 +14,7 @@ Module(
                     range: 0..10,
                     names: [
                         Identifier {
-                            id: "x",
+                            id: Name("x"),
                             range: 9..10,
                         },
                     ],
@@ -47,5 +47,5 @@ Module(
 
   |
 1 | nonlocal x + 1
-  |            ^ Syntax Error: Expected ',', found '+'
+  |            ^ Syntax Error: Simple statements must be separated by newlines or semicolons
   |

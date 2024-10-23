@@ -1,8 +1,7 @@
 //! Detect code style from Python source code.
 
+use std::cell::OnceCell;
 use std::ops::Deref;
-
-use once_cell::unsync::OnceCell;
 
 use ruff_python_ast::str::Quote;
 use ruff_python_parser::{Token, TokenKind, Tokens};
@@ -36,12 +35,12 @@ impl<'a> Stylist<'a> {
     }
 
     pub fn from_tokens(tokens: &Tokens, locator: &'a Locator<'a>) -> Self {
-        let indentation = detect_indention(tokens.up_to_first_unknown(), locator);
+        let indentation = detect_indentation(tokens, locator);
 
         Self {
             locator,
             indentation,
-            quote: detect_quote(tokens.up_to_first_unknown()),
+            quote: detect_quote(tokens),
             line_ending: OnceCell::default(),
         }
     }
@@ -60,7 +59,7 @@ fn detect_quote(tokens: &[Token]) -> Quote {
     Quote::default()
 }
 
-fn detect_indention(tokens: &[Token], locator: &Locator) -> Indentation {
+fn detect_indentation(tokens: &[Token], locator: &Locator) -> Indentation {
     let indent_range = tokens.iter().find_map(|token| {
         if matches!(token.kind(), TokenKind::Indent) {
             Some(token.range())
@@ -97,26 +96,16 @@ fn detect_indention(tokens: &[Token], locator: &Locator) -> Indentation {
         //   cos,
         // )
         // ```
-        let mut depth = 0usize;
         for token in tokens {
-            match token.kind() {
-                TokenKind::Lpar | TokenKind::Lbrace | TokenKind::Lsqb => {
-                    depth = depth.saturating_add(1);
-                }
-                TokenKind::Rpar | TokenKind::Rbrace | TokenKind::Rsqb => {
-                    depth = depth.saturating_sub(1);
-                }
-                TokenKind::NonLogicalNewline => {
-                    let line = locator.line(token.end());
-                    let indent_index = line.find(|c: char| !c.is_whitespace());
-                    if let Some(indent_index) = indent_index {
-                        if indent_index > 0 {
-                            let whitespace = &line[..indent_index];
-                            return Indentation(whitespace.to_string());
-                        }
+            if token.kind() == TokenKind::NonLogicalNewline {
+                let line = locator.line(token.end());
+                let indent_index = line.find(|c: char| !c.is_whitespace());
+                if let Some(indent_index) = indent_index {
+                    if indent_index > 0 {
+                        let whitespace = &line[..indent_index];
+                        return Indentation(whitespace.to_string());
                     }
                 }
-                _ => {}
             }
         }
 
@@ -214,7 +203,7 @@ x = (
         let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
         assert_eq!(stylist.indentation(), &Indentation("  ".to_string()));
 
-        // formfeed indent, see `detect_indention` comment.
+        // formfeed indent, see `detect_indentation` comment.
         let contents = r"
 class FormFeedIndent:
    def __init__(self, a=[]):

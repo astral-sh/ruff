@@ -1,24 +1,28 @@
-use globset::Candidate;
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+
+use anyhow::Context;
+use ignore::{WalkBuilder, WalkState};
+
 use ruff_linter::{
     display_settings, fs::normalize_path_to, settings::types::FilePattern,
     settings::types::PreviewMode,
 };
-use ruff_workspace::resolver::match_candidate_exclusion;
+use ruff_workspace::resolver::match_exclusion;
 use ruff_workspace::{
     configuration::{Configuration, FormatConfiguration, LintConfiguration, RuleSelection},
     pyproject::{find_user_settings_toml, settings_toml},
     resolver::{ConfigurationTransformer, Relativity},
 };
-use std::{
-    collections::BTreeMap,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
-use walkdir::WalkDir;
 
 use crate::session::settings::{ConfigurationPreference, ResolvedEditorSettings};
 
-pub(crate) struct RuffSettings {
+pub struct RuffSettings {
+    /// The path to this configuration file, used for debugging.
+    /// The default fallback configuration does not have a file path.
+    path: Option<PathBuf>,
     /// Settings used to manage file inclusion and exclusion.
     file_resolver: ruff_workspace::FileResolverSettings,
     /// Settings to pass into the Ruff linter.
@@ -28,7 +32,7 @@ pub(crate) struct RuffSettings {
 }
 
 pub(super) struct RuffSettingsIndex {
-    /// Index from folder to the resoled ruff settings.
+    /// Index from folder to the resolved ruff settings.
     index: BTreeMap<PathBuf, Arc<RuffSettings>>,
     fallback: Arc<RuffSettings>,
 }
@@ -38,6 +42,7 @@ impl std::fmt::Display for RuffSettings {
         display_settings! {
             formatter = f,
             fields = [
+                self.file_resolver,
                 self.linter,
                 self.formatter
             ]
@@ -48,14 +53,17 @@ impl std::fmt::Display for RuffSettings {
 
 impl RuffSettings {
     pub(crate) fn fallback(editor_settings: &ResolvedEditorSettings, root: &Path) -> RuffSettings {
+        let mut path = None;
         let fallback = find_user_settings_toml()
             .and_then(|user_settings| {
-                ruff_workspace::resolver::resolve_root_settings(
+                let settings = ruff_workspace::resolver::resolve_root_settings(
                     &user_settings,
                     Relativity::Cwd,
                     &EditorConfigurationTransformer(editor_settings, root),
                 )
-                .ok()
+                .ok();
+                path = Some(user_settings);
+                settings
             })
             .unwrap_or_else(|| {
                 let default_configuration = Configuration::default();
@@ -68,6 +76,7 @@ impl RuffSettings {
             });
 
         RuffSettings {
+            path,
             file_resolver: fallback.file_resolver,
             formatter: fallback.formatter,
             linter: fallback.linter,
@@ -91,102 +100,216 @@ impl RuffSettings {
 }
 
 impl RuffSettingsIndex {
-    pub(super) fn new(root: &Path, editor_settings: &ResolvedEditorSettings) -> Self {
+    /// Create the settings index for the given workspace root.
+    ///
+    /// This will create the index in the following order:
+    /// 1. Resolve any settings from above the workspace root
+    /// 2. Resolve any settings from the workspace root itself
+    /// 3. Resolve any settings from within the workspace directory tree
+    ///
+    /// If this is the default workspace i.e., the client did not specify any workspace and so the
+    /// server will be running in a single file mode, then only (1) and (2) will be resolved,
+    /// skipping (3).
+    pub(super) fn new(
+        root: &Path,
+        editor_settings: &ResolvedEditorSettings,
+        is_default_workspace: bool,
+    ) -> Self {
+        let mut has_error = false;
         let mut index = BTreeMap::default();
+        let mut respect_gitignore = None;
 
-        // Add any settings from above the workspace root.
-        for directory in root.ancestors() {
-            if let Some(pyproject) = settings_toml(directory).ok().flatten() {
-                let Ok(settings) = ruff_workspace::resolver::resolve_root_settings(
-                    &pyproject,
-                    Relativity::Parent,
-                    &EditorConfigurationTransformer(editor_settings, root),
-                ) else {
+        // If this is *not* the default workspace, then we should skip the workspace root itself
+        // because it will be resolved when walking the workspace directory tree. This is done by
+        // the `WalkBuilder` below.
+        let should_skip_workspace = usize::from(!is_default_workspace);
+
+        // Add any settings from above the workspace root, skipping the workspace root itself if
+        // this is *not* the default workspace.
+        for directory in root.ancestors().skip(should_skip_workspace) {
+            match settings_toml(directory) {
+                Ok(Some(pyproject)) => {
+                    match ruff_workspace::resolver::resolve_root_settings(
+                        &pyproject,
+                        Relativity::Parent,
+                        &EditorConfigurationTransformer(editor_settings, root),
+                    ) {
+                        Ok(settings) => {
+                            respect_gitignore = Some(settings.file_resolver.respect_gitignore);
+
+                            index.insert(
+                                directory.to_path_buf(),
+                                Arc::new(RuffSettings {
+                                    path: Some(pyproject),
+                                    file_resolver: settings.file_resolver,
+                                    linter: settings.linter,
+                                    formatter: settings.formatter,
+                                }),
+                            );
+                            break;
+                        }
+                        error => {
+                            tracing::error!(
+                                "{:#}",
+                                error
+                                    .with_context(|| {
+                                        format!(
+                                            "Failed to resolve settings for {}",
+                                            pyproject.display()
+                                        )
+                                    })
+                                    .unwrap_err()
+                            );
+                            has_error = true;
+                            continue;
+                        }
+                    }
+                }
+                Ok(None) => continue,
+                Err(err) => {
+                    tracing::error!("{err:#}");
+                    has_error = true;
                     continue;
-                };
-
-                index.insert(
-                    directory.to_path_buf(),
-                    Arc::new(RuffSettings {
-                        file_resolver: settings.file_resolver,
-                        linter: settings.linter,
-                        formatter: settings.formatter,
-                    }),
-                );
-                break;
+                }
             }
         }
 
-        // Add any settings within the workspace itself
-        let mut walker = WalkDir::new(root).into_iter();
+        let fallback = Arc::new(RuffSettings::fallback(editor_settings, root));
 
-        while let Some(entry) = walker.next() {
-            let Ok(entry) = entry else {
-                continue;
-            };
-
-            // Skip non-directories.
-            if !entry.file_type().is_dir() {
-                continue;
+        // If this is the default workspace, the server is running in single-file mode. What this
+        // means is that the user opened a file directly (not the folder) in the editor and the
+        // server didn't receive a workspace folder during initialization. In this case, we default
+        // to the current working directory and skip walking the workspace directory tree for any
+        // settings.
+        //
+        // Refer to https://github.com/astral-sh/ruff/pull/13770 to understand what this behavior
+        // means for different editors.
+        if is_default_workspace {
+            if has_error {
+                let root = root.display();
+                show_err_msg!(
+                    "Error while resolving settings from workspace {root}. \
+                    Please refer to the logs for more details.",
+                );
             }
 
-            let directory = entry.into_path();
+            return RuffSettingsIndex { index, fallback };
+        }
 
-            // If the directory is excluded from the workspace, skip it.
-            if let Some(file_name) = directory.file_name() {
-                if let Some((_, settings)) = index
-                    .range(..directory.clone())
-                    .rfind(|(path, _)| directory.starts_with(path))
+        // Add any settings within the workspace itself
+        let mut builder = WalkBuilder::new(root);
+        builder.standard_filters(
+            respect_gitignore.unwrap_or_else(|| fallback.file_resolver().respect_gitignore),
+        );
+        builder.hidden(false);
+        builder.threads(
+            std::thread::available_parallelism()
+                .map_or(1, std::num::NonZeroUsize::get)
+                .min(12),
+        );
+        let walker = builder.build_parallel();
+
+        let index = std::sync::RwLock::new(index);
+        let has_error = AtomicBool::new(has_error);
+
+        walker.run(|| {
+            Box::new(|result| {
+                let Ok(entry) = result else {
+                    return WalkState::Continue;
+                };
+
+                // Skip non-directories.
+                if !entry
+                    .file_type()
+                    .is_some_and(|file_type| file_type.is_dir())
                 {
-                    let candidate = Candidate::new(&directory);
-                    let basename = Candidate::new(file_name);
-                    if match_candidate_exclusion(
-                        &candidate,
-                        &basename,
-                        &settings.file_resolver.exclude,
-                    ) {
-                        tracing::debug!("Ignored path via `exclude`: {}", directory.display());
+                    return WalkState::Continue;
+                }
 
-                        walker.skip_current_dir();
-                        continue;
-                    } else if match_candidate_exclusion(
-                        &candidate,
-                        &basename,
+                let directory = entry.into_path();
+
+                // If the directory is excluded from the workspace, skip it.
+                if let Some(file_name) = directory.file_name() {
+                    let settings = index
+                        .read()
+                        .unwrap()
+                        .range(..directory.clone())
+                        .rfind(|(path, _)| directory.starts_with(path))
+                        .map(|(_, settings)| settings.clone())
+                        .unwrap_or_else(|| fallback.clone());
+
+                    if match_exclusion(&directory, file_name, &settings.file_resolver.exclude) {
+                        tracing::debug!("Ignored path via `exclude`: {}", directory.display());
+                        return WalkState::Skip;
+                    } else if match_exclusion(
+                        &directory,
+                        file_name,
                         &settings.file_resolver.extend_exclude,
                     ) {
                         tracing::debug!(
                             "Ignored path via `extend-exclude`: {}",
                             directory.display()
                         );
-
-                        walker.skip_current_dir();
-                        continue;
+                        return WalkState::Skip;
                     }
                 }
-            }
 
-            if let Some(pyproject) = settings_toml(&directory).ok().flatten() {
-                let Ok(settings) = ruff_workspace::resolver::resolve_root_settings(
-                    &pyproject,
-                    Relativity::Parent,
-                    &EditorConfigurationTransformer(editor_settings, root),
-                ) else {
-                    continue;
-                };
-                index.insert(
-                    directory,
-                    Arc::new(RuffSettings {
-                        file_resolver: settings.file_resolver,
-                        linter: settings.linter,
-                        formatter: settings.formatter,
-                    }),
-                );
-            }
+                match settings_toml(&directory) {
+                    Ok(Some(pyproject)) => {
+                        match ruff_workspace::resolver::resolve_root_settings(
+                            &pyproject,
+                            Relativity::Parent,
+                            &EditorConfigurationTransformer(editor_settings, root),
+                        ) {
+                            Ok(settings) => {
+                                index.write().unwrap().insert(
+                                    directory,
+                                    Arc::new(RuffSettings {
+                                        path: Some(pyproject),
+                                        file_resolver: settings.file_resolver,
+                                        linter: settings.linter,
+                                        formatter: settings.formatter,
+                                    }),
+                                );
+                            }
+                            error => {
+                                tracing::error!(
+                                    "{:#}",
+                                    error
+                                        .with_context(|| {
+                                            format!(
+                                                "Failed to resolve settings for {}",
+                                                pyproject.display()
+                                            )
+                                        })
+                                        .unwrap_err()
+                                );
+                                has_error.store(true, Ordering::Relaxed);
+                            }
+                        }
+                    }
+                    Ok(None) => {}
+                    Err(err) => {
+                        tracing::error!("{err:#}");
+                        has_error.store(true, Ordering::Relaxed);
+                    }
+                }
+
+                WalkState::Continue
+            })
+        });
+
+        if has_error.load(Ordering::Relaxed) {
+            let root = root.display();
+            show_err_msg!(
+                "Error while resolving settings from workspace {root}. Please refer to the logs for more details.",
+            );
         }
 
-        let fallback = Arc::new(RuffSettings::fallback(editor_settings, root));
-
-        Self { index, fallback }
+        RuffSettingsIndex {
+            index: index.into_inner().unwrap(),
+            fallback,
+        }
     }
 
     pub(super) fn get(&self, document_path: &Path) -> Arc<RuffSettings> {
@@ -196,6 +319,12 @@ impl RuffSettingsIndex {
             .map(|(_, settings)| settings)
             .unwrap_or_else(|| &self.fallback)
             .clone()
+    }
+
+    pub(crate) fn list_files(&self) -> impl Iterator<Item = &Path> {
+        self.index
+            .values()
+            .filter_map(|settings| settings.path.as_deref())
     }
 
     pub(super) fn fallback(&self) -> Arc<RuffSettings> {
@@ -251,7 +380,7 @@ impl<'a> ConfigurationTransformer for EditorConfigurationTransformer<'a> {
 
         // Merge in the editor-specified configuration file, if it exists.
         let editor_configuration = if let Some(config_file_path) = configuration {
-            match open_configuration_file(&config_file_path, project_root) {
+            match open_configuration_file(&config_file_path) {
                 Ok(config_from_file) => editor_configuration.combine(config_from_file),
                 Err(err) => {
                     tracing::error!("Unable to find editor-specified configuration file: {err}");
@@ -274,11 +403,18 @@ impl<'a> ConfigurationTransformer for EditorConfigurationTransformer<'a> {
     }
 }
 
-fn open_configuration_file(
-    config_path: &Path,
-    project_root: &Path,
-) -> crate::Result<Configuration> {
-    let options = ruff_workspace::pyproject::load_options(config_path)?;
+fn open_configuration_file(config_path: &Path) -> crate::Result<Configuration> {
+    ruff_workspace::resolver::resolve_configuration(
+        config_path,
+        Relativity::Parent,
+        &IdentityTransformer,
+    )
+}
 
-    Configuration::from_options(options, Some(config_path), project_root)
+struct IdentityTransformer;
+
+impl ConfigurationTransformer for IdentityTransformer {
+    fn transform(&self, config: Configuration) -> Configuration {
+        config
+    }
 }

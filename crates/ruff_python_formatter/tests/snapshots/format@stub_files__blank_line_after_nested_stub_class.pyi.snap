@@ -414,6 +414,3 @@ class Eof:
     class Nested:
         pass
 ```
-
-
-

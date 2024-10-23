@@ -15,7 +15,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "foo",
+                        id: Name("foo"),
                         range: 4..7,
                     },
                     type_params: None,
@@ -28,7 +28,7 @@ Module(
                                 parameter: Parameter {
                                     range: 8..9,
                                     name: Identifier {
-                                        id: "a",
+                                        id: Name("a"),
                                         range: 8..9,
                                     },
                                     annotation: None,
@@ -49,7 +49,7 @@ Module(
                                 parameter: Parameter {
                                     range: 14..15,
                                     name: Identifier {
-                                        id: "b",
+                                        id: Name("b"),
                                         range: 14..15,
                                     },
                                     annotation: None,
@@ -61,14 +61,14 @@ Module(
                                 parameter: Parameter {
                                     range: 17..23,
                                     name: Identifier {
-                                        id: "c",
+                                        id: Name("c"),
                                         range: 17..18,
                                     },
                                     annotation: Some(
                                         Name(
                                             ExprName {
                                                 range: 20..23,
-                                                id: "int",
+                                                id: Name("int"),
                                                 ctx: Load,
                                             },
                                         ),

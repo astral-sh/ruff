@@ -18,7 +18,7 @@ Module(
                             left: Name(
                                 ExprName {
                                     range: 0..5,
-                                    id: "match",
+                                    id: Name("match"),
                                     ctx: Load,
                                 },
                             ),
@@ -29,7 +29,7 @@ Module(
                                 Name(
                                     ExprName {
                                         range: 13..17,
-                                        id: "case",
+                                        id: Name("case"),
                                         ctx: Load,
                                     },
                                 ),

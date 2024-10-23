@@ -1,0 +1,213 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/args_unparenthesized_generator.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..65,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..28,
+                    value: Call(
+                        ExprCall {
+                            range: 0..28,
+                            func: Name(
+                                ExprName {
+                                    range: 0..3,
+                                    id: Name("sum"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 3..28,
+                                args: [
+                                    Generator(
+                                        ExprGenerator {
+                                            range: 4..24,
+                                            elt: Name(
+                                                ExprName {
+                                                    range: 4..5,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            generators: [
+                                                Comprehension {
+                                                    range: 6..24,
+                                                    target: Name(
+                                                        ExprName {
+                                                            range: 10..11,
+                                                            id: Name("x"),
+                                                            ctx: Store,
+                                                        },
+                                                    ),
+                                                    iter: Call(
+                                                        ExprCall {
+                                                            range: 15..24,
+                                                            func: Name(
+                                                                ExprName {
+                                                                    range: 15..20,
+                                                                    id: Name("range"),
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                            arguments: Arguments {
+                                                                range: 20..24,
+                                                                args: [
+                                                                    NumberLiteral(
+                                                                        ExprNumberLiteral {
+                                                                            range: 21..23,
+                                                                            value: Int(
+                                                                                10,
+                                                                            ),
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                                keywords: [],
+                                                            },
+                                                        },
+                                                    ),
+                                                    ifs: [],
+                                                    is_async: false,
+                                                },
+                                            ],
+                                            parenthesized: false,
+                                        },
+                                    ),
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 26..27,
+                                            value: Int(
+                                                5,
+                                            ),
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 29..64,
+                    value: Call(
+                        ExprCall {
+                            range: 29..64,
+                            func: Name(
+                                ExprName {
+                                    range: 29..34,
+                                    id: Name("total"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 34..64,
+                                args: [
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 35..36,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 38..39,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                    Generator(
+                                        ExprGenerator {
+                                            range: 41..60,
+                                            elt: Name(
+                                                ExprName {
+                                                    range: 41..42,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            generators: [
+                                                Comprehension {
+                                                    range: 43..60,
+                                                    target: Name(
+                                                        ExprName {
+                                                            range: 47..48,
+                                                            id: Name("x"),
+                                                            ctx: Store,
+                                                        },
+                                                    ),
+                                                    iter: Call(
+                                                        ExprCall {
+                                                            range: 52..60,
+                                                            func: Name(
+                                                                ExprName {
+                                                                    range: 52..57,
+                                                                    id: Name("range"),
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                            arguments: Arguments {
+                                                                range: 57..60,
+                                                                args: [
+                                                                    NumberLiteral(
+                                                                        ExprNumberLiteral {
+                                                                            range: 58..59,
+                                                                            value: Int(
+                                                                                5,
+                                                                            ),
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                                keywords: [],
+                                                            },
+                                                        },
+                                                    ),
+                                                    ifs: [],
+                                                    is_async: false,
+                                                },
+                                            ],
+                                            parenthesized: false,
+                                        },
+                                    ),
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 62..63,
+                                            value: Int(
+                                                6,
+                                            ),
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | sum(x for x in range(10), 5)
+  |     ^^^^^^^^^^^^^^^^^^^^ Syntax Error: Unparenthesized generator expression cannot be used here
+2 | total(1, 2, x for x in range(5), 6)
+  |
+
+
+  |
+1 | sum(x for x in range(10), 5)
+2 | total(1, 2, x for x in range(5), 6)
+  |             ^^^^^^^^^^^^^^^^^^^ Syntax Error: Unparenthesized generator expression cannot be used here
+  |

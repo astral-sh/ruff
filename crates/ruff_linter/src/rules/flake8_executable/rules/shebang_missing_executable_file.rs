@@ -22,10 +22,16 @@ use crate::rules::flake8_executable::helpers::is_executable;
 /// If a `.py` file is executable, but does not have a shebang, it may be run
 /// with the wrong interpreter, or fail to run at all.
 ///
-/// If the file is meant to be executable, add a shebang; otherwise, remove the
-/// executable bit from the file.
+/// If the file is meant to be executable, add a shebang, as in:
+/// ```python
+/// #!/usr/bin/env python
+/// ```
 ///
-/// _This rule is only available on Unix-like systems._
+/// Otherwise, remove the executable bit from the file (e.g., `chmod -x __main__.py`).
+///
+/// A file is considered executable if it has the executable bit set (i.e., its
+/// permissions mode intersects with `0o111`). As such, _this rule is only
+/// available on Unix-like systems_, and is not enforced on Windows or WSL.
 ///
 /// ## References
 /// - [Python documentation: Executable Python Scripts](https://docs.python.org/3/tutorial/appendix.html#executable-python-scripts)

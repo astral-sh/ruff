@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-bad_dunder_method_name.py:5:9: PLW3201 Bad or misspelled dunder method name `_init_`
+bad_dunder_method_name.py:5:9: PLW3201 Dunder method `_init_` has no special meaning in Python 3
   |
 4 | class Apples:
 5 |     def _init_(self):  # [bad-dunder-name]
@@ -9,7 +9,7 @@ bad_dunder_method_name.py:5:9: PLW3201 Bad or misspelled dunder method name `_in
 6 |         pass
   |
 
-bad_dunder_method_name.py:8:9: PLW3201 Bad or misspelled dunder method name `__hello__`
+bad_dunder_method_name.py:8:9: PLW3201 Dunder method `__hello__` has no special meaning in Python 3
   |
 6 |         pass
 7 | 
@@ -18,7 +18,7 @@ bad_dunder_method_name.py:8:9: PLW3201 Bad or misspelled dunder method name `__h
 9 |         print("hello")
   |
 
-bad_dunder_method_name.py:11:9: PLW3201 Bad or misspelled dunder method name `__init_`
+bad_dunder_method_name.py:11:9: PLW3201 Dunder method `__init_` has no special meaning in Python 3
    |
  9 |         print("hello")
 10 | 
@@ -28,7 +28,7 @@ bad_dunder_method_name.py:11:9: PLW3201 Bad or misspelled dunder method name `__
 13 |         pass
    |
 
-bad_dunder_method_name.py:15:9: PLW3201 Bad or misspelled dunder method name `_init_`
+bad_dunder_method_name.py:15:9: PLW3201 Dunder method `_init_` has no special meaning in Python 3
    |
 13 |         pass
 14 | 
@@ -38,7 +38,7 @@ bad_dunder_method_name.py:15:9: PLW3201 Bad or misspelled dunder method name `_i
 17 |         pass
    |
 
-bad_dunder_method_name.py:19:9: PLW3201 Bad or misspelled dunder method name `___neg__`
+bad_dunder_method_name.py:19:9: PLW3201 Dunder method `___neg__` has no special meaning in Python 3
    |
 17 |         pass
 18 | 
@@ -48,7 +48,7 @@ bad_dunder_method_name.py:19:9: PLW3201 Bad or misspelled dunder method name `__
 21 |         pass
    |
 
-bad_dunder_method_name.py:23:9: PLW3201 Bad or misspelled dunder method name `__inv__`
+bad_dunder_method_name.py:23:9: PLW3201 Dunder method `__inv__` has no special meaning in Python 3
    |
 21 |         pass
 22 | 
@@ -58,4 +58,10 @@ bad_dunder_method_name.py:23:9: PLW3201 Bad or misspelled dunder method name `__
 25 |         pass
    |
 
-
+bad_dunder_method_name.py:98:9: PLW3201 Dunder method `__unicode__` has no special meaning in Python 3
+   |
+97 |     # Removed with Python 3
+98 |     def __unicode__(self):
+   |         ^^^^^^^^^^^ PLW3201
+99 |         pass
+   |

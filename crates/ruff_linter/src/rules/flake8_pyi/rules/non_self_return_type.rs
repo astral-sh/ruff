@@ -50,38 +50,25 @@ use crate::checkers::ast::Checker;
 ///    inheriting directly from `AsyncIterator`.
 ///
 /// ## Example
-/// ```python
+///
+/// ```pyi
 /// class Foo:
-///     def __new__(cls, *args: Any, **kwargs: Any) -> Foo:
-///         ...
-///
-///     def __enter__(self) -> Foo:
-///         ...
-///
-///     async def __aenter__(self) -> Foo:
-///         ...
-///
-///     def __iadd__(self, other: Foo) -> Foo:
-///         ...
+///     def __new__(cls, *args: Any, **kwargs: Any) -> Foo: ...
+///     def __enter__(self) -> Foo: ...
+///     async def __aenter__(self) -> Foo: ...
+///     def __iadd__(self, other: Foo) -> Foo: ...
 /// ```
 ///
 /// Use instead:
-/// ```python
+///
+/// ```pyi
 /// from typing_extensions import Self
 ///
-///
 /// class Foo:
-///     def __new__(cls, *args: Any, **kwargs: Any) -> Self:
-///         ...
-///
-///     def __enter__(self) -> Self:
-///         ...
-///
-///     async def __aenter__(self) -> Self:
-///         ...
-///
-///     def __iadd__(self, other: Foo) -> Self:
-///         ...
+///     def __new__(cls, *args: Any, **kwargs: Any) -> Self: ...
+///     def __enter__(self) -> Self: ...
+///     async def __aenter__(self) -> Self: ...
+///     def __iadd__(self, other: Foo) -> Self: ...
 /// ```
 /// ## References
 /// - [`typing.Self` documentation](https://docs.python.org/3/library/typing.html#typing.Self)
@@ -135,7 +122,7 @@ pub(crate) fn non_self_return_type(
     };
 
     // PEP 673 forbids the use of `typing(_extensions).Self` in metaclasses.
-    if is_metaclass(class_def, semantic) {
+    if analyze::class::is_metaclass(class_def, semantic) {
         return;
     }
 
@@ -162,7 +149,7 @@ pub(crate) fn non_self_return_type(
 
     // In-place methods that are expected to return `Self`.
     if is_inplace_bin_op(name) {
-        if !is_self(returns, semantic) {
+        if !is_self(returns, checker) {
             checker.diagnostics.push(Diagnostic::new(
                 NonSelfReturnType {
                     class_name: class_def.name.to_string(),
@@ -219,16 +206,6 @@ pub(crate) fn non_self_return_type(
     }
 }
 
-/// Returns `true` if the given class is a metaclass.
-fn is_metaclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
-    analyze::class::any_qualified_name(class_def, semantic, &|qualified_name| {
-        matches!(
-            qualified_name.segments(),
-            ["" | "builtins", "type"] | ["abc", "ABCMeta"] | ["enum", "EnumMeta" | "EnumType"]
-        )
-    })
-}
-
 /// Returns `true` if the method is an in-place binary operator.
 fn is_inplace_bin_op(name: &str) -> bool {
     matches!(
@@ -258,13 +235,15 @@ fn is_name(expr: &Expr, name: &str) -> bool {
 }
 
 /// Return `true` if the given expression resolves to `typing.Self`.
-fn is_self(expr: &Expr, semantic: &SemanticModel) -> bool {
-    semantic.match_typing_expr(expr, "Self")
+fn is_self(expr: &Expr, checker: &Checker) -> bool {
+    checker.match_maybe_stringized_annotation(expr, |expr| {
+        checker.semantic().match_typing_expr(expr, "Self")
+    })
 }
 
 /// Return `true` if the given class extends `collections.abc.Iterator`.
 fn subclasses_iterator(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
-    analyze::class::any_qualified_name(class_def, semantic, &|qualified_name| {
+    analyze::class::any_qualified_base_class(class_def, semantic, &|qualified_name| {
         matches!(
             qualified_name.segments(),
             ["typing", "Iterator"] | ["collections", "abc", "Iterator"]
@@ -287,7 +266,7 @@ fn is_iterable_or_iterator(expr: &Expr, semantic: &SemanticModel) -> bool {
 
 /// Return `true` if the given class extends `collections.abc.AsyncIterator`.
 fn subclasses_async_iterator(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
-    analyze::class::any_qualified_name(class_def, semantic, &|qualified_name| {
+    analyze::class::any_qualified_base_class(class_def, semantic, &|qualified_name| {
         matches!(
             qualified_name.segments(),
             ["typing", "AsyncIterator"] | ["collections", "abc", "AsyncIterator"]

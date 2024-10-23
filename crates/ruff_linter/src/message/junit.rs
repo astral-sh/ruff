@@ -1,14 +1,13 @@
 use std::io::Write;
 use std::path::Path;
 
-use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite};
+use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite, XmlString};
 
 use ruff_source_file::SourceLocation;
 
 use crate::message::{
     group_messages_by_filename, Emitter, EmitterContext, Message, MessageWithLocation,
 };
-use crate::registry::AsRule;
 
 #[derive(Default)]
 pub struct JunitEmitter;
@@ -26,7 +25,7 @@ impl Emitter for JunitEmitter {
             let mut test_suite = TestSuite::new("ruff");
             test_suite
                 .extra
-                .insert("package".to_string(), "org.ruff".to_string());
+                .insert(XmlString::new("package"), XmlString::new("org.ruff"));
             let mut case = TestCase::new("No errors found", TestCaseStatus::success());
             case.set_classname("ruff");
             test_suite.add_test_case(case);
@@ -36,7 +35,7 @@ impl Emitter for JunitEmitter {
                 let mut test_suite = TestSuite::new(filename);
                 test_suite
                     .extra
-                    .insert("package".to_string(), "org.ruff".to_string());
+                    .insert(XmlString::new("package"), XmlString::new("org.ruff"));
 
                 for message in messages {
                     let MessageWithLocation {
@@ -44,7 +43,7 @@ impl Emitter for JunitEmitter {
                         start_location,
                     } = message;
                     let mut status = TestCaseStatus::non_success(NonSuccessKind::Failure);
-                    status.set_message(message.kind.body.clone());
+                    status.set_message(message.body());
                     let location = if context.is_notebook(message.filename()) {
                         // We can't give a reasonable location for the structured formats,
                         // so we show one that's clearly a fallback
@@ -57,20 +56,28 @@ impl Emitter for JunitEmitter {
                         "line {row}, col {col}, {body}",
                         row = location.row,
                         col = location.column,
-                        body = message.kind.body
+                        body = message.body()
                     ));
                     let mut case = TestCase::new(
-                        format!("org.ruff.{}", message.kind.rule().noqa_code()),
+                        if let Some(rule) = message.rule() {
+                            format!("org.ruff.{}", rule.noqa_code())
+                        } else {
+                            "org.ruff".to_string()
+                        },
                         status,
                     );
                     let file_path = Path::new(filename);
                     let file_stem = file_path.file_stem().unwrap().to_str().unwrap();
                     let classname = file_path.parent().unwrap().join(file_stem);
                     case.set_classname(classname.to_str().unwrap());
-                    case.extra
-                        .insert("line".to_string(), location.row.to_string());
-                    case.extra
-                        .insert("column".to_string(), location.column.to_string());
+                    case.extra.insert(
+                        XmlString::new("line"),
+                        XmlString::new(location.row.to_string()),
+                    );
+                    case.extra.insert(
+                        XmlString::new("column"),
+                        XmlString::new(location.column.to_string()),
+                    );
 
                     test_suite.add_test_case(case);
                 }
@@ -88,13 +95,23 @@ impl Emitter for JunitEmitter {
 mod tests {
     use insta::assert_snapshot;
 
-    use crate::message::tests::{capture_emitter_output, create_messages};
+    use crate::message::tests::{
+        capture_emitter_output, create_messages, create_syntax_error_messages,
+    };
     use crate::message::JunitEmitter;
 
     #[test]
     fn output() {
         let mut emitter = JunitEmitter;
         let content = capture_emitter_output(&mut emitter, &create_messages());
+
+        assert_snapshot!(content);
+    }
+
+    #[test]
+    fn syntax_errors() {
+        let mut emitter = JunitEmitter;
+        let content = capture_emitter_output(&mut emitter, &create_syntax_error_messages());
 
         assert_snapshot!(content);
     }

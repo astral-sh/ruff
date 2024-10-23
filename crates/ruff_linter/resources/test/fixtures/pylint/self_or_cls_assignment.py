@@ -3,7 +3,7 @@ class Fruit:
     def list_fruits(cls) -> None:
         cls = "apple"  # PLW0642
         cls: Fruit = "apple"  # PLW0642
-        cls += "orange"  # PLW0642
+        cls += "orange"  # OK, augmented assignments are ignored
         *cls = "banana"  # PLW0642
         cls, blah = "apple", "orange"  # PLW0642
         blah, (cls, blah2) = "apple", ("orange", "banana")  # PLW0642
@@ -16,7 +16,7 @@ class Fruit:
     def print_color(self) -> None:
         self = "red"  # PLW0642
         self: Self = "red"  # PLW0642
-        self += "blue"  # PLW0642
+        self += "blue"  # OK, augmented assignments are ignored
         *self = "blue"  # PLW0642
         self, blah = "red", "blue"  # PLW0642
         blah, (self, blah2) = "apple", ("orange", "banana")  # PLW0642

@@ -1,6 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
+E11.py:9:1: SyntaxError: Expected an indented block after `if` statement
+   |
+ 7 | #: E112
+ 8 | if False:
+ 9 | print()
+   | ^
+10 | #: E113
+11 | print()
+   |
+
 E11.py:12:1: E113 Unexpected indentation
    |
 10 | #: E113
@@ -11,4 +21,32 @@ E11.py:12:1: E113 Unexpected indentation
 14 | mimetype = 'application/x-directory'
    |
 
+E11.py:12:1: SyntaxError: Unexpected indentation
+   |
+10 | #: E113
+11 | print()
+12 |     print()
+   | ^
+13 | #: E114 E116
+14 | mimetype = 'application/x-directory'
+   |
 
+E11.py:14:1: SyntaxError: Expected a statement
+   |
+12 |     print()
+13 | #: E114 E116
+14 | mimetype = 'application/x-directory'
+   | ^
+15 |      # 'httpd/unix-directory'
+16 | create_date = False
+   |
+
+E11.py:45:1: SyntaxError: Expected an indented block after `if` statement
+   |
+43 | #: E112
+44 | if False:  #
+45 | print()
+   | ^
+46 | #:
+47 | if False:
+   |

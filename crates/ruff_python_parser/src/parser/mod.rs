@@ -5,9 +5,9 @@ use bitflags::bitflags;
 use ruff_python_ast::{Mod, ModExpression, ModModule};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::lexer::TokenValue;
 use crate::parser::expression::ExpressionContext;
 use crate::parser::progress::{ParserProgress, TokenId};
+use crate::token::TokenValue;
 use crate::token_set::TokenSet;
 use crate::token_source::{TokenSource, TokenSourceCheckpoint};
 use crate::{Mode, ParseError, ParseErrorType, TokenKind};
@@ -473,27 +473,23 @@ impl<'src> Parser<'src> {
         loop {
             progress.assert_progressing(self);
 
-            // The end of file marker ends all lists.
-            if self.at(TokenKind::EndOfFile) {
-                break;
-            }
-
             if recovery_context_kind.is_list_element(self) {
                 parse_element(self);
-            } else if recovery_context_kind.is_list_terminator(self) {
+            } else if recovery_context_kind.is_regular_list_terminator(self) {
                 break;
             } else {
-                // Not a recognised element. Add an error and either skip the token or break
-                // parsing the list if the token is recognised as an element or terminator of an
-                // enclosing list.
-                let error = recovery_context_kind.create_error(self);
-                self.add_error(error, self.current_token_range());
-
-                // Run the error recovery: This also handles the case when an element is missing
-                // between two commas: `a,,b`
+                // Run the error recovery: If the token is recognised as an element or terminator
+                // of an enclosing list, then we try to re-lex in the context of a logical line and
+                // break out of list parsing.
                 if self.is_enclosing_list_element_or_terminator() {
+                    self.tokens.re_lex_logical_token();
                     break;
                 }
+
+                self.add_error(
+                    recovery_context_kind.create_error(self),
+                    self.current_token_range(),
+                );
 
                 self.bump_any();
             }
@@ -533,18 +529,20 @@ impl<'src> Parser<'src> {
             .recovery_context
             .union(RecoveryContext::from_kind(recovery_context_kind));
 
+        let mut first_element = true;
         let mut trailing_comma_range: Option<TextRange> = None;
 
         loop {
             progress.assert_progressing(self);
 
-            // The end of file marker ends all lists.
-            if self.at(TokenKind::EndOfFile) {
-                break;
-            }
-
             if recovery_context_kind.is_list_element(self) {
                 parse_element(self);
+
+                // Only unset this when we've completely parsed a single element. This is mainly to
+                // raise the correct error in case the first element isn't valid and the current
+                // token isn't a comma. Without this knowledge, the parser would later expect a
+                // comma instead of raising the context error.
+                first_element = false;
 
                 let maybe_comma_range = self.current_token_range();
                 if self.eat(TokenKind::Comma) {
@@ -552,35 +550,75 @@ impl<'src> Parser<'src> {
                     continue;
                 }
                 trailing_comma_range = None;
-
-                if recovery_context_kind.is_list_terminator(self) {
-                    break;
-                }
-
-                self.expect(TokenKind::Comma);
-            } else if recovery_context_kind.is_list_terminator(self) {
-                break;
-            } else {
-                // Not a recognised element. Add an error and either skip the token or break
-                // parsing the list if the token is recognised as an element or terminator of an
-                // enclosing list.
-                let error = recovery_context_kind.create_error(self);
-                self.add_error(error, self.current_token_range());
-
-                // Run the error recovery: This also handles the case when an element is missing
-                // between two commas: `a,,b`
-                if self.is_enclosing_list_element_or_terminator() {
-                    break;
-                }
-
-                if self.at(TokenKind::Comma) {
-                    trailing_comma_range = Some(self.current_token_range());
-                } else {
-                    trailing_comma_range = None;
-                }
-
-                self.bump_any();
             }
+
+            // test_ok comma_separated_regular_list_terminator
+            // # The first element is parsed by `parse_list_like_expression` and the comma after
+            // # the first element is expected by `parse_list_expression`
+            // [0]
+            // [0, 1]
+            // [0, 1,]
+            // [0, 1, 2]
+            // [0, 1, 2,]
+            if recovery_context_kind.is_regular_list_terminator(self) {
+                break;
+            }
+
+            // test_err comma_separated_missing_comma_between_elements
+            // # The comma between the first two elements is expected in `parse_list_expression`.
+            // [0, 1 2]
+            if recovery_context_kind.is_list_element(self) {
+                // This is a special case to expect a comma between two elements and should be
+                // checked before running the error recovery. This is because the error recovery
+                // will always run as the parser is currently at a list element.
+                self.expect(TokenKind::Comma);
+                continue;
+            }
+
+            // Run the error recovery: If the token is recognised as an element or terminator of an
+            // enclosing list, then we try to re-lex in the context of a logical line and break out
+            // of list parsing.
+            if self.is_enclosing_list_element_or_terminator() {
+                self.tokens.re_lex_logical_token();
+                break;
+            }
+
+            if first_element || self.at(TokenKind::Comma) {
+                // There are two conditions when we need to add the recovery context error:
+                //
+                // 1. If the parser is at a comma which means that there's a missing element
+                //    otherwise the comma would've been consumed by the first `eat` call above.
+                //    And, the parser doesn't take the re-lexing route on a comma token.
+                // 2. If it's the first element and the current token is not a comma which means
+                //    that it's an invalid element.
+
+                // test_err comma_separated_missing_element_between_commas
+                // [0, 1, , 2]
+
+                // test_err comma_separated_missing_first_element
+                // call(= 1)
+                self.add_error(
+                    recovery_context_kind.create_error(self),
+                    self.current_token_range(),
+                );
+
+                trailing_comma_range = if self.at(TokenKind::Comma) {
+                    Some(self.current_token_range())
+                } else {
+                    None
+                };
+            } else {
+                // Otherwise, there should've been a comma at this position. This could be because
+                // the element isn't consumed completely by `parse_element`.
+
+                // test_err comma_separated_missing_comma
+                // call(**x := 1)
+                self.expect(TokenKind::Comma);
+
+                trailing_comma_range = None;
+            }
+
+            self.bump_any();
         }
 
         if let Some(trailing_comma_range) = trailing_comma_range {
@@ -723,6 +761,37 @@ impl WithItemKind {
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
+enum FStringElementsKind {
+    /// The regular f-string elements.
+    ///
+    /// For example, the `"hello "`, `x`, and `" world"` elements in:
+    /// ```py
+    /// f"hello {x:.2f} world"
+    /// ```
+    Regular,
+
+    /// The f-string elements are part of the format specifier.
+    ///
+    /// For example, the `.2f` in:
+    /// ```py
+    /// f"hello {x:.2f} world"
+    /// ```
+    FormatSpec,
+}
+
+impl FStringElementsKind {
+    const fn list_terminator(self) -> TokenKind {
+        match self {
+            FStringElementsKind::Regular => TokenKind::FStringEnd,
+            // test_ok fstring_format_spec_terminator
+            // f"hello {x:} world"
+            // f"hello {x:.3f} world"
+            FStringElementsKind::FormatSpec => TokenKind::Rbrace,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Copy, Clone)]
 enum Parenthesized {
     /// The elements are parenthesized, e.g., `(a, b)`.
     Yes,
@@ -745,6 +814,14 @@ impl Parenthesized {
     const fn is_yes(self) -> bool {
         matches!(self, Parenthesized::Yes)
     }
+}
+
+#[derive(Copy, Clone, Debug)]
+enum ListTerminatorKind {
+    /// The current token terminates the list.
+    Regular,
+    /// The current token doesn't terminate the list, but is useful for better error recovery.
+    ErrorRecovery,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -819,7 +896,7 @@ enum RecoveryContextKind {
 
     /// When parsing a list of f-string elements which are either literal elements
     /// or expressions.
-    FStringElements,
+    FStringElements(FStringElementsKind),
 }
 
 impl RecoveryContextKind {
@@ -845,15 +922,46 @@ impl RecoveryContextKind {
         )
     }
 
+    /// Returns `true` if the parser is at a token that terminates the list as per the context.
+    ///
+    /// This token could either end the list or is only present for better error recovery. Refer to
+    /// [`is_regular_list_terminator`] to only check against the former.
+    ///
+    /// [`is_regular_list_terminator`]: RecoveryContextKind::is_regular_list_terminator
     fn is_list_terminator(self, p: &Parser) -> bool {
+        self.list_terminator_kind(p).is_some()
+    }
+
+    /// Returns `true` if the parser is at a token that terminates the list as per the context but
+    /// the token isn't part of the error recovery set.
+    fn is_regular_list_terminator(self, p: &Parser) -> bool {
+        matches!(
+            self.list_terminator_kind(p),
+            Some(ListTerminatorKind::Regular)
+        )
+    }
+
+    /// Checks the current token the parser is at and returns the list terminator kind if the token
+    /// terminates the list as per the context.
+    fn list_terminator_kind(self, p: &Parser) -> Option<ListTerminatorKind> {
+        // The end of file marker ends all lists.
+        if p.at(TokenKind::EndOfFile) {
+            return Some(ListTerminatorKind::Regular);
+        }
+
         match self {
             // The parser must consume all tokens until the end
-            RecoveryContextKind::ModuleStatements => false,
-            RecoveryContextKind::BlockStatements => p.at(TokenKind::Dedent),
+            RecoveryContextKind::ModuleStatements => None,
+            RecoveryContextKind::BlockStatements => p
+                .at(TokenKind::Dedent)
+                .then_some(ListTerminatorKind::Regular),
 
-            RecoveryContextKind::Elif => p.at(TokenKind::Else),
+            RecoveryContextKind::Elif => {
+                p.at(TokenKind::Else).then_some(ListTerminatorKind::Regular)
+            }
             RecoveryContextKind::Except => {
                 matches!(p.current_token_kind(), TokenKind::Finally | TokenKind::Else)
+                    .then_some(ListTerminatorKind::Regular)
             }
             RecoveryContextKind::AssignmentTargets => {
                 // test_ok assign_targets_terminator
@@ -861,19 +969,21 @@ impl RecoveryContextKind {
                 // x = y = z = 1
                 // a, b
                 matches!(p.current_token_kind(), TokenKind::Newline | TokenKind::Semi)
+                    .then_some(ListTerminatorKind::Regular)
             }
 
             // Tokens other than `]` are for better error recovery. For example, recover when we
             // find the `:` of a clause header or the equal of a type assignment.
             RecoveryContextKind::TypeParams => {
-                matches!(
-                    p.current_token_kind(),
-                    TokenKind::Rsqb
-                        | TokenKind::Newline
-                        | TokenKind::Colon
-                        | TokenKind::Equal
-                        | TokenKind::Lpar
-                )
+                if p.at(TokenKind::Rsqb) {
+                    Some(ListTerminatorKind::Regular)
+                } else {
+                    matches!(
+                        p.current_token_kind(),
+                        TokenKind::Newline | TokenKind::Colon | TokenKind::Equal | TokenKind::Lpar
+                    )
+                    .then_some(ListTerminatorKind::ErrorRecovery)
+                }
             }
             // The names of an import statement cannot be parenthesized, so `)` is not a
             // terminator.
@@ -883,6 +993,7 @@ impl RecoveryContextKind {
                 // import a, b
                 // c, d
                 matches!(p.current_token_kind(), TokenKind::Semi | TokenKind::Newline)
+                    .then_some(ListTerminatorKind::Regular)
             }
             RecoveryContextKind::ImportFromAsNames(_) => {
                 // test_ok from_import_stmt_terminator
@@ -895,20 +1006,21 @@ impl RecoveryContextKind {
                     p.current_token_kind(),
                     TokenKind::Rpar | TokenKind::Semi | TokenKind::Newline
                 )
+                .then_some(ListTerminatorKind::Regular)
             }
             // The elements in a container expression cannot end with a newline
             // as all of them are actually non-logical newlines.
             RecoveryContextKind::Slices | RecoveryContextKind::ListElements => {
-                p.at(TokenKind::Rsqb)
+                p.at(TokenKind::Rsqb).then_some(ListTerminatorKind::Regular)
             }
-            RecoveryContextKind::SetElements | RecoveryContextKind::DictElements => {
-                p.at(TokenKind::Rbrace)
-            }
+            RecoveryContextKind::SetElements | RecoveryContextKind::DictElements => p
+                .at(TokenKind::Rbrace)
+                .then_some(ListTerminatorKind::Regular),
             RecoveryContextKind::TupleElements(parenthesized) => {
                 if parenthesized.is_yes() {
-                    p.at(TokenKind::Rpar)
+                    p.at(TokenKind::Rpar).then_some(ListTerminatorKind::Regular)
                 } else {
-                    p.at_sequence_end()
+                    p.at_sequence_end().then_some(ListTerminatorKind::Regular)
                 }
             }
             RecoveryContextKind::SequenceMatchPattern(parentheses) => match parentheses {
@@ -920,6 +1032,7 @@ impl RecoveryContextKind {
                     //     case a, b: ...
                     //     case a, b if x: ...
                     matches!(p.current_token_kind(), TokenKind::Colon | TokenKind::If)
+                        .then_some(ListTerminatorKind::Regular)
                 }
                 Some(parentheses) => {
                     // test_ok match_sequence_pattern_parentheses_terminator
@@ -927,37 +1040,50 @@ impl RecoveryContextKind {
                     //     case [a, b]: ...
                     //     case (a, b): ...
                     p.at(parentheses.closing_kind())
+                        .then_some(ListTerminatorKind::Regular)
                 }
             },
-            RecoveryContextKind::MatchPatternMapping => p.at(TokenKind::Rbrace),
-            RecoveryContextKind::MatchPatternClassArguments => p.at(TokenKind::Rpar),
-            RecoveryContextKind::Arguments => p.at(TokenKind::Rpar),
+            RecoveryContextKind::MatchPatternMapping => p
+                .at(TokenKind::Rbrace)
+                .then_some(ListTerminatorKind::Regular),
+            RecoveryContextKind::MatchPatternClassArguments => {
+                p.at(TokenKind::Rpar).then_some(ListTerminatorKind::Regular)
+            }
+            RecoveryContextKind::Arguments => {
+                p.at(TokenKind::Rpar).then_some(ListTerminatorKind::Regular)
+            }
             RecoveryContextKind::DeleteTargets | RecoveryContextKind::Identifiers => {
                 // test_ok del_targets_terminator
                 // del a, b; c, d
                 // del a, b
                 // c, d
                 matches!(p.current_token_kind(), TokenKind::Semi | TokenKind::Newline)
+                    .then_some(ListTerminatorKind::Regular)
             }
             RecoveryContextKind::Parameters(function_kind) => {
                 // `lambda x, y: ...` or `def f(x, y): ...`
-                p.at(function_kind.list_terminator())
+                if p.at(function_kind.list_terminator()) {
+                    Some(ListTerminatorKind::Regular)
+                } else {
                     // To recover from missing closing parentheses
-                    || p.at(TokenKind::Rarrow)
-                    || p.at_compound_stmt()
+                    (p.at(TokenKind::Rarrow) || p.at_compound_stmt())
+                        .then_some(ListTerminatorKind::ErrorRecovery)
+                }
             }
             RecoveryContextKind::WithItems(with_item_kind) => match with_item_kind {
-                WithItemKind::Parenthesized => {
-                    matches!(p.current_token_kind(), TokenKind::Rpar | TokenKind::Colon)
-                }
-                WithItemKind::Unparenthesized | WithItemKind::ParenthesizedExpression => {
-                    p.at(TokenKind::Colon)
-                }
+                WithItemKind::Parenthesized => match p.current_token_kind() {
+                    TokenKind::Rpar => Some(ListTerminatorKind::Regular),
+                    TokenKind::Colon => Some(ListTerminatorKind::ErrorRecovery),
+                    _ => None,
+                },
+                WithItemKind::Unparenthesized | WithItemKind::ParenthesizedExpression => p
+                    .at(TokenKind::Colon)
+                    .then_some(ListTerminatorKind::Regular),
             },
-            RecoveryContextKind::FStringElements => {
-                // Tokens other than `FStringEnd` and `}` are for better error recovery
-                p.at_ts(TokenSet::new([
-                    TokenKind::FStringEnd,
+            RecoveryContextKind::FStringElements(kind) => {
+                if p.at(kind.list_terminator()) {
+                    Some(ListTerminatorKind::Regular)
+                } else {
                     // test_err unterminated_fstring_newline_recovery
                     // f"hello
                     // 1 + 1
@@ -967,15 +1093,9 @@ impl RecoveryContextKind {
                     // 3 + 3
                     // f"hello {x}
                     // 4 + 4
-                    TokenKind::Newline,
-                    // When the parser is parsing f-string elements inside format spec,
-                    // the terminator would be `}`.
-
-                    // test_ok fstring_format_spec_terminator
-                    // f"hello {x:} world"
-                    // f"hello {x:.3f} world"
-                    TokenKind::Rbrace,
-                ]))
+                    p.at(TokenKind::Newline)
+                        .then_some(ListTerminatorKind::ErrorRecovery)
+                }
             }
         }
     }
@@ -1017,7 +1137,7 @@ impl RecoveryContextKind {
                 ) || p.at_name_or_soft_keyword()
             }
             RecoveryContextKind::WithItems(_) => p.at_expr(),
-            RecoveryContextKind::FStringElements => matches!(
+            RecoveryContextKind::FStringElements(_) => matches!(
                 p.current_token_kind(),
                 // Literal element
                 TokenKind::FStringMiddle
@@ -1111,9 +1231,14 @@ impl RecoveryContextKind {
                     "Expected an expression or the end of the with item list".to_string(),
                 ),
             },
-            RecoveryContextKind::FStringElements => ParseErrorType::OtherError(
-                "Expected an f-string element or the end of the f-string".to_string(),
-            ),
+            RecoveryContextKind::FStringElements(kind) => match kind {
+                FStringElementsKind::Regular => ParseErrorType::OtherError(
+                    "Expected an f-string element or the end of the f-string".to_string(),
+                ),
+                FStringElementsKind::FormatSpec => {
+                    ParseErrorType::OtherError("Expected an f-string element or a '}'".to_string())
+                }
+            },
         }
     }
 }
@@ -1152,6 +1277,7 @@ bitflags! {
         const WITH_ITEMS_PARENTHESIZED_EXPRESSION = 1 << 26;
         const WITH_ITEMS_UNPARENTHESIZED = 1 << 28;
         const F_STRING_ELEMENTS = 1 << 29;
+        const F_STRING_ELEMENTS_IN_FORMAT_SPEC = 1 << 30;
     }
 }
 
@@ -1204,7 +1330,12 @@ impl RecoveryContext {
                 }
                 WithItemKind::Unparenthesized => RecoveryContext::WITH_ITEMS_UNPARENTHESIZED,
             },
-            RecoveryContextKind::FStringElements => RecoveryContext::F_STRING_ELEMENTS,
+            RecoveryContextKind::FStringElements(kind) => match kind {
+                FStringElementsKind::Regular => RecoveryContext::F_STRING_ELEMENTS,
+                FStringElementsKind::FormatSpec => {
+                    RecoveryContext::F_STRING_ELEMENTS_IN_FORMAT_SPEC
+                }
+            },
         }
     }
 
@@ -1271,7 +1402,12 @@ impl RecoveryContext {
             RecoveryContext::WITH_ITEMS_UNPARENTHESIZED => {
                 RecoveryContextKind::WithItems(WithItemKind::Unparenthesized)
             }
-            RecoveryContext::F_STRING_ELEMENTS => RecoveryContextKind::FStringElements,
+            RecoveryContext::F_STRING_ELEMENTS => {
+                RecoveryContextKind::FStringElements(FStringElementsKind::Regular)
+            }
+            RecoveryContext::F_STRING_ELEMENTS_IN_FORMAT_SPEC => {
+                RecoveryContextKind::FStringElements(FStringElementsKind::FormatSpec)
+            }
             _ => return None,
         })
     }

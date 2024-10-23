@@ -12,7 +12,7 @@ use crate::checkers::ast::Checker;
 /// PEP 563.
 ///
 /// ## Why is this bad?
-/// PEP 563 enabled the use of a number of convenient type annotations, such as
+/// PEP 585 enabled the use of a number of convenient type annotations, such as
 /// `list[str]` instead of `List[str]`. However, these annotations are only
 /// available on Python 3.9 and higher, _unless_ the `from __future__ import annotations`
 /// import is present.
@@ -33,32 +33,32 @@ use crate::checkers::ast::Checker;
 /// flag such usages if your project targets Python 3.9 or below.
 ///
 /// ## Example
+///
 /// ```python
 /// from typing import List, Dict, Optional
 ///
 ///
-/// def func(obj: Dict[str, Optional[int]]) -> None:
-///     ...
+/// def func(obj: Dict[str, Optional[int]]) -> None: ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// from __future__ import annotations
 ///
 /// from typing import List, Dict, Optional
 ///
 ///
-/// def func(obj: Dict[str, Optional[int]]) -> None:
-///     ...
+/// def func(obj: Dict[str, Optional[int]]) -> None: ...
 /// ```
 ///
 /// After running the additional pyupgrade rules:
+///
 /// ```python
 /// from __future__ import annotations
 ///
 ///
-/// def func(obj: dict[str, int | None]) -> None:
-///     ...
+/// def func(obj: dict[str, int | None]) -> None: ...
 /// ```
 ///
 /// ## Options

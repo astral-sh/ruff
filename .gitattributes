@@ -8,6 +8,10 @@ crates/ruff_linter/resources/test/fixtures/pycodestyle/W391_3.py text eol=crlf
 crates/ruff_python_formatter/resources/test/fixtures/ruff/docstring_code_examples_crlf.py text eol=crlf
 crates/ruff_python_formatter/tests/snapshots/format@docstring_code_examples_crlf.py.snap text eol=crlf
 
+crates/ruff_python_parser/resources/invalid/re_lexing/line_continuation_windows_eol.py text eol=crlf
+crates/ruff_python_parser/resources/invalid/re_lex_logical_token_windows_eol.py text eol=crlf
+crates/ruff_python_parser/resources/invalid/re_lex_logical_token_mac_eol.py text eol=cr
+
 crates/ruff_python_parser/resources/inline linguist-generated=true
 
 ruff.schema.json linguist-generated=true text=auto eol=lf

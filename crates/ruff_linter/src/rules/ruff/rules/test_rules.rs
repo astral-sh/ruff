@@ -21,7 +21,7 @@ use ruff_text_size::TextSize;
 
 use crate::registry::Rule;
 
-/// Check if a comment exists anywhere in a the given file
+/// Check if a comment exists anywhere in a given file
 fn comment_exists(text: &str, locator: &Locator, comment_ranges: &CommentRanges) -> bool {
     for range in comment_ranges {
         let comment_text = locator.slice(range);
@@ -38,7 +38,6 @@ pub(crate) const TEST_RULES: &[Rule] = &[
     Rule::StableTestRuleUnsafeFix,
     Rule::StableTestRuleDisplayOnlyFix,
     Rule::PreviewTestRule,
-    Rule::NurseryTestRule,
     Rule::DeprecatedTestRule,
     Rule::AnotherDeprecatedTestRule,
     Rule::RemovedTestRule,
@@ -257,42 +256,6 @@ impl TestRule for PreviewTestRule {
     fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges) -> Option<Diagnostic> {
         Some(Diagnostic::new(
             PreviewTestRule,
-            ruff_text_size::TextRange::default(),
-        ))
-    }
-}
-
-/// ## What it does
-/// Fake rule for testing.
-///
-/// ## Why is this bad?
-/// Tests must pass!
-///
-/// ## Example
-/// ```python
-/// foo
-/// ```
-///
-/// Use instead:
-/// ```python
-/// bar
-/// ```
-#[violation]
-pub struct NurseryTestRule;
-
-impl Violation for NurseryTestRule {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
-
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Hey this is a nursery test rule.")
-    }
-}
-
-impl TestRule for NurseryTestRule {
-    fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges) -> Option<Diagnostic> {
-        Some(Diagnostic::new(
-            NurseryTestRule,
             ruff_text_size::TextRange::default(),
         ))
     }

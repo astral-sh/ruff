@@ -1,0 +1,52 @@
+[package]
+name = "red_knot_python_semantic"
+version = "0.0.0"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+ruff_db = { workspace = true }
+ruff_index = { workspace = true }
+ruff_python_ast = { workspace = true }
+ruff_python_stdlib = { workspace = true }
+ruff_source_file = { workspace = true }
+ruff_text_size = { workspace = true }
+ruff_python_literal = { workspace = true }
+
+anyhow = { workspace = true }
+bitflags = { workspace = true }
+camino = { workspace = true }
+compact_str = { workspace = true }
+countme = { workspace = true }
+itertools = { workspace = true}
+ordermap = { workspace = true }
+salsa = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+rustc-hash = { workspace = true }
+hashbrown = { workspace = true }
+smallvec = { workspace = true }
+static_assertions = { workspace = true }
+test-case = { workspace = true }
+memchr = { workspace = true }
+
+[dev-dependencies]
+ruff_db = { workspace = true, features = ["os", "testing"] }
+ruff_python_parser = { workspace = true }
+red_knot_test = { workspace = true }
+red_knot_vendored = { workspace = true }
+
+anyhow = { workspace = true }
+dir-test = {workspace = true}
+insta = { workspace = true }
+tempfile = { workspace = true }
+
+[lints]
+workspace = true
+

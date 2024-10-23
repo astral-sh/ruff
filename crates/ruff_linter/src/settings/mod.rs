@@ -2,13 +2,12 @@
 //! command-line options. Structure is optimized for internal usage, as opposed
 //! to external visibility or parsing.
 
-use std::fmt::{Display, Formatter};
-use std::path::{Path, PathBuf};
-
-use once_cell::sync::Lazy;
 use path_absolutize::path_dedot;
 use regex::Regex;
 use rustc_hash::FxHashSet;
+use std::fmt::{Display, Formatter};
+use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 
 use crate::codes::RuleCodePrefix;
 use ruff_macros::CacheKey;
@@ -20,7 +19,7 @@ use crate::rules::{
     flake8_comprehensions, flake8_copyright, flake8_errmsg, flake8_gettext,
     flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style, flake8_quotes,
     flake8_self, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe,
-    pep8_naming, pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
+    pep8_naming, pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
 };
 use crate::settings::types::{
     CompiledPerFileIgnoreList, ExtensionMapping, FilePatternSet, PythonVersion,
@@ -265,6 +264,7 @@ pub struct LinterSettings {
     pub pyflakes: pyflakes::settings::Settings,
     pub pylint: pylint::settings::Settings,
     pub pyupgrade: pyupgrade::settings::Settings,
+    pub ruff: ruff::settings::Settings,
 }
 
 impl Display for LinterSettings {
@@ -284,7 +284,7 @@ impl Display for LinterSettings {
                 self.target_version | debug,
                 self.preview,
                 self.explicit_preview_rules,
-                self.extension | nested,
+                self.extension | debug,
 
                 self.allowed_confusables | array,
                 self.builtins | array,
@@ -328,6 +328,7 @@ impl Display for LinterSettings {
                 self.pyflakes | nested,
                 self.pylint | nested,
                 self.pyupgrade | nested,
+                self.ruff | nested,
             ]
         }
         Ok(())
@@ -353,8 +354,8 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
 
 pub const TASK_TAGS: &[&str] = &["TODO", "FIXME", "XXX"];
 
-pub static DUMMY_VARIABLE_RGX: Lazy<Regex> =
-    Lazy::new(|| Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap());
+pub static DUMMY_VARIABLE_RGX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap());
 
 impl LinterSettings {
     pub fn for_rule(rule_code: Rule) -> Self {
@@ -396,7 +397,7 @@ impl LinterSettings {
             per_file_ignores: CompiledPerFileIgnoreList::default(),
             fix_safety: FixSafetyTable::default(),
 
-            src: vec![path_dedot::CWD.clone()],
+            src: vec![path_dedot::CWD.clone(), path_dedot::CWD.join("src")],
             // Needs duplicating
             tab_size: IndentWidth::default(),
             line_length: LineLength::default(),
@@ -428,6 +429,7 @@ impl LinterSettings {
             pyflakes: pyflakes::settings::Settings::default(),
             pylint: pylint::settings::Settings::default(),
             pyupgrade: pyupgrade::settings::Settings::default(),
+            ruff: ruff::settings::Settings::default(),
             preview: PreviewMode::default(),
             explicit_preview_rules: false,
             extension: ExtensionMapping::default(),

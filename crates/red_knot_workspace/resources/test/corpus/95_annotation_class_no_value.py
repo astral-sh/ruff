@@ -1,0 +1,3 @@
+class F():
+    z: int
+

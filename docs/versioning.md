@@ -20,8 +20,11 @@ Ruff uses a custom versioning scheme that uses the **minor** version number for 
     - Stable rules are added to the default set
     - Stable rules are removed from the default set
     - A safe fix for a rule is promoted to stable
-- Formatter: 
+- Formatter:
      - The stable style changed
+- Language server:
+    - An existing capability is removed
+    - A deprecated server setting is removed
 
 **Patch** version increases will occur when:
 
@@ -40,6 +43,10 @@ Ruff uses a custom versioning scheme that uses the **minor** version number for 
 - Formatter:
     - The stable style changed to prevent invalid syntax, changes to the program's semantics, or removal of comments
     - The preview style changed
+- Language server:
+    - Support for a new capability is added
+    - A new server setting is added
+    - A server setting is deprecated
 
 
 ## Preview mode
@@ -70,3 +77,13 @@ Fixes have three applicability levels:
 - **Safe**: Can be applied automatically.
 
 Fixes for rules may be introduced at a lower applicability, then promoted to a higher applicability. Reducing the applicability of a fix is not a breaking change. The applicability of a given fix may change when the preview mode is enabled.
+
+## Visual Studio Code Extension
+
+Visual Studio Code [doesn't support pre-release
+tags](https://code.visualstudio.com/api/working-with-extensions/publishing-extension#prerelease-extensions)
+for extensions. Consequently, Ruff uses the following scheme to distinguish between stable and
+preview releases:
+
+Stable releases use even numbers in minor version component: `2024.30.0`, `2024.32.0`, `2024.34.0`, …
+Preview releases use odd numbers in minor version component: `2024.31.0`, `2024.33.0`, `2024.35.0`, …

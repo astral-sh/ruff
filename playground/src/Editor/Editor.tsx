@@ -1,33 +1,32 @@
 import {
   useCallback,
   useDeferredValue,
-  useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { Panel, PanelGroup } from "react-resizable-panels";
-import { DEFAULT_PYTHON_SOURCE } from "../constants";
-import init, { Diagnostic, Workspace } from "../pkg/ruff_wasm";
+import { Diagnostic, Workspace } from "../pkg";
 import { ErrorMessage } from "./ErrorMessage";
-import Header from "./Header";
 import PrimarySideBar from "./PrimarySideBar";
-import { HorizontalResizeHandle } from "./ResizeHandle";
+import { HorizontalResizeHandle, VerticalResizeHandle } from "./ResizeHandle";
 import SecondaryPanel, {
   SecondaryPanelResult,
   SecondaryTool,
 } from "./SecondaryPanel";
 import SecondarySideBar from "./SecondarySideBar";
-import { persist, persistLocal, restore, stringify } from "./settings";
 import SettingsEditor from "./SettingsEditor";
 import SourceEditor from "./SourceEditor";
-import { useTheme } from "./theme";
+import { Theme } from "./theme";
+import Diagnostics from "./Diagnostics";
+import { editor } from "monaco-editor";
+import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;
 
 type Tab = "Source" | "Settings";
 
-interface Source {
+export interface Source {
   pythonSource: string;
   settingsSource: string;
-  revision: number;
 }
 
 interface CheckResult {
@@ -36,15 +35,21 @@ interface CheckResult {
   secondary: SecondaryPanelResult;
 }
 
-export default function Editor() {
-  const [ruffVersion, setRuffVersion] = useState<string | null>(null);
-  const [checkResult, setCheckResult] = useState<CheckResult>({
-    diagnostics: [],
-    error: null,
-    secondary: null,
-  });
-  const [source, setSource] = useState<Source | null>(null);
+type Props = {
+  source: Source;
+  theme: Theme;
 
+  onSourceChanged(source: string): void;
+  onSettingsChanged(settings: string): void;
+};
+
+export default function Editor({
+  source,
+  theme,
+  onSourceChanged,
+  onSettingsChanged,
+}: Props) {
+  const editorRef = useRef<IStandaloneCodeEditor | null>(null);
   const [tab, setTab] = useState<Tab>("Source");
   const [secondaryTool, setSecondaryTool] = useState<SecondaryTool | null>(
     () => {
@@ -58,7 +63,7 @@ export default function Editor() {
       }
     },
   );
-  const [theme, setTheme] = useTheme();
+  const [selection, setSelection] = useState<number | null>(null);
 
   // Ideally this would be retrieved right from the URL... but routing without a proper
   // router is hard (there's no location changed event) and pulling in a router
@@ -81,33 +86,86 @@ export default function Editor() {
     setSecondaryTool(tool);
   };
 
-  useEffect(() => {
-    async function initAsync() {
-      await init();
-      const response = await restore();
-      const [settingsSource, pythonSource] = response ?? [
-        stringify(Workspace.defaultSettings()),
-        DEFAULT_PYTHON_SOURCE,
-      ];
+  const handleGoTo = useCallback((line: number, column: number) => {
+    const editor = editorRef.current;
 
-      setSource({
-        revision: 0,
-        pythonSource,
-        settingsSource,
-      });
-      setRuffVersion(Workspace.version());
-    }
-
-    initAsync().catch(console.error);
-  }, []);
-
-  const deferredSource = useDeferredValue(source);
-
-  useEffect(() => {
-    if (deferredSource == null) {
+    if (editor == null) {
       return;
     }
 
+    const range = {
+      startLineNumber: line,
+      startColumn: column,
+      endLineNumber: line,
+      endColumn: column,
+    };
+    editor.revealRange(range);
+    editor.setSelection(range);
+  }, []);
+
+  const handleSourceEditorMount = useCallback(
+    (editor: IStandaloneCodeEditor) => {
+      editorRef.current = editor;
+
+      editor.addAction({
+        contextMenuGroupId: "navigation",
+        contextMenuOrder: 0,
+        id: "reveal-node",
+        label: "Reveal node",
+        precondition: "editorTextFocus",
+
+        run(editor: editor.ICodeEditor): void | Promise<void> {
+          const position = editor.getPosition();
+          if (position == null) {
+            return;
+          }
+
+          const offset = editor.getModel()!.getOffsetAt(position);
+
+          setSelection(
+            charOffsetToByteOffset(editor.getModel()!.getValue(), offset),
+          );
+        },
+      });
+    },
+    [],
+  );
+
+  const handleSelectByteRange = useCallback(
+    (startByteOffset: number, endByteOffset: number) => {
+      const model = editorRef.current?.getModel();
+
+      if (model == null || editorRef.current == null) {
+        return;
+      }
+
+      const startCharacterOffset = byteOffsetToCharOffset(
+        source.pythonSource,
+        startByteOffset,
+      );
+      const endCharacterOffset = byteOffsetToCharOffset(
+        source.pythonSource,
+        endByteOffset,
+      );
+
+      const start = model.getPositionAt(startCharacterOffset);
+      const end = model.getPositionAt(endCharacterOffset);
+
+      const range = {
+        startLineNumber: start.lineNumber,
+        startColumn: start.column,
+        endLineNumber: end.lineNumber,
+        endColumn: end.column,
+      };
+      editorRef.current?.revealRange(range);
+      editorRef.current?.setSelection(range);
+    },
+    [source.pythonSource],
+  );
+
+  const deferredSource = useDeferredValue(source);
+
+  const checkResult: CheckResult = useMemo(() => {
     const { pythonSource, settingsSource } = deferredSource;
 
     try {
@@ -161,116 +219,87 @@ export default function Editor() {
         };
       }
 
-      setCheckResult({
+      return {
         diagnostics,
         error: null,
         secondary,
-      });
+      };
     } catch (e) {
-      setCheckResult({
+      return {
         diagnostics: [],
         error: (e as Error).message,
         secondary: null,
-      });
+      };
     }
   }, [deferredSource, secondaryTool]);
 
-  useEffect(() => {
-    if (source != null) {
-      persistLocal(source);
-    }
-  }, [source]);
-
-  const handleShare = useMemo(() => {
-    if (source == null) {
-      return undefined;
-    }
-
-    return () => {
-      return persist(source.settingsSource, source.pythonSource);
-    };
-  }, [source]);
-
-  const handlePythonSourceChange = useCallback((pythonSource: string) => {
-    setSource((state) =>
-      state
-        ? {
-            ...state,
-            pythonSource,
-            revision: state.revision + 1,
-          }
-        : null,
-    );
-  }, []);
-
-  const handleSettingsSourceChange = useCallback((settingsSource: string) => {
-    setSource((state) =>
-      state
-        ? {
-            ...state,
-            settingsSource,
-            revision: state.revision + 1,
-          }
-        : null,
-    );
-  }, []);
-
   return (
-    <main className="flex flex-col h-full bg-ayu-background dark:bg-ayu-background-dark">
-      <Header
-        edit={source ? source.revision : null}
-        theme={theme}
-        version={ruffVersion}
-        onChangeTheme={setTheme}
-        onShare={handleShare}
-      />
+    <>
+      <PanelGroup direction="horizontal" autoSaveId="main">
+        <PrimarySideBar onSelectTool={(tool) => setTab(tool)} selected={tab} />
 
-      <div className="flex flex-grow">
-        {source ? (
-          <PanelGroup direction="horizontal" autoSaveId="main">
-            <PrimarySideBar
-              onSelectTool={(tool) => setTab(tool)}
-              selected={tab}
-            />
-            <Panel id="main" order={0} className="my-2" minSize={10}>
+        <Panel id="main" order={0} minSize={10}>
+          <PanelGroup id="main" direction="vertical">
+            <Panel minSize={10} className="my-2" order={0}>
               <SourceEditor
                 visible={tab === "Source"}
                 source={source.pythonSource}
                 theme={theme}
                 diagnostics={checkResult.diagnostics}
-                onChange={handlePythonSourceChange}
+                onChange={onSourceChanged}
+                onMount={handleSourceEditorMount}
               />
               <SettingsEditor
                 visible={tab === "Settings"}
                 source={source.settingsSource}
                 theme={theme}
-                onChange={handleSettingsSourceChange}
+                onChange={onSettingsChanged}
               />
             </Panel>
-            {secondaryTool != null && (
+            {tab === "Source" && (
               <>
-                <HorizontalResizeHandle />
+                <VerticalResizeHandle />
                 <Panel
-                  id="secondary-panel"
+                  id="diagnostics"
+                  minSize={3}
                   order={1}
-                  className={"my-2"}
-                  minSize={10}
+                  className="my-2 flex flex-grow"
                 >
-                  <SecondaryPanel
+                  <Diagnostics
+                    diagnostics={checkResult.diagnostics}
+                    onGoTo={handleGoTo}
                     theme={theme}
-                    tool={secondaryTool}
-                    result={checkResult.secondary}
                   />
                 </Panel>
               </>
             )}
-            <SecondarySideBar
-              selected={secondaryTool}
-              onSelected={handleSecondaryToolSelected}
-            />
           </PanelGroup>
-        ) : null}
-      </div>
+        </Panel>
+        {secondaryTool != null && (
+          <>
+            <HorizontalResizeHandle />
+            <Panel
+              id="secondary-panel"
+              order={1}
+              className={"my-2"}
+              minSize={10}
+            >
+              <SecondaryPanel
+                theme={theme}
+                tool={secondaryTool}
+                result={checkResult.secondary}
+                selectionOffset={selection}
+                onSourceByteRangeClicked={handleSelectByteRange}
+              />
+            </Panel>
+          </>
+        )}
+        <SecondarySideBar
+          selected={secondaryTool}
+          onSelected={handleSecondaryToolSelected}
+        />
+      </PanelGroup>
+
       {checkResult.error && tab === "Source" ? (
         <div
           style={{
@@ -283,7 +312,7 @@ export default function Editor() {
           <ErrorMessage>{checkResult.error}</ErrorMessage>
         </div>
       ) : null}
-    </main>
+    </>
   );
 }
 
@@ -293,4 +322,26 @@ function parseSecondaryTool(tool: string): SecondaryTool | null {
   }
 
   return null;
+}
+
+function byteOffsetToCharOffset(content: string, byteOffset: number): number {
+  // Create a Uint8Array from the UTF-8 string
+  const encoder = new TextEncoder();
+  const utf8Bytes = encoder.encode(content);
+
+  // Slice the byte array up to the byteOffset
+  const slicedBytes = utf8Bytes.slice(0, byteOffset);
+
+  // Decode the sliced bytes to get a substring
+  const decoder = new TextDecoder("utf-8");
+  const decodedString = decoder.decode(slicedBytes);
+  return decodedString.length;
+}
+
+function charOffsetToByteOffset(content: string, charOffset: number): number {
+  // Create a Uint8Array from the UTF-8 string
+  const encoder = new TextEncoder();
+  const utf8Bytes = encoder.encode(content.substring(0, charOffset));
+
+  return utf8Bytes.length;
 }

@@ -5,6 +5,7 @@ use ruff_diagnostics::Edit;
 use ruff_python_ast::helpers::{
     pep_604_union, typing_optional, typing_union, ReturnStatementVisitor,
 };
+use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, ExprContext};
 use ruff_python_semantic::analyze::terminal::Terminal;
@@ -140,7 +141,7 @@ impl AutoPythonType {
                     )
                     .ok()?;
                 let expr = Expr::Name(ast::ExprName {
-                    id: binding,
+                    id: Name::from(binding),
                     range: TextRange::default(),
                     ctx: ExprContext::Load,
                 });
@@ -181,7 +182,7 @@ impl AutoPythonType {
                                     semantic,
                                 )
                                 .ok()?;
-                            let expr = typing_optional(element, binding);
+                            let expr = typing_optional(element, Name::from(binding));
                             Some((expr, vec![optional_edit]))
                         }
                         _ => {
@@ -198,7 +199,7 @@ impl AutoPythonType {
                                     semantic,
                                 )
                                 .ok()?;
-                            let expr = typing_union(&elements, binding);
+                            let expr = typing_union(&elements, Name::from(binding));
                             Some((expr, vec![union_edit]))
                         }
                     }

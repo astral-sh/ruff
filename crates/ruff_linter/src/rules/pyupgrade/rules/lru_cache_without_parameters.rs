@@ -13,23 +13,23 @@ use crate::checkers::ast::Checker;
 /// trailing parentheses, as long as no arguments are passed to it.
 ///
 /// ## Example
+///
 /// ```python
 /// import functools
 ///
 ///
 /// @functools.lru_cache()
-/// def foo():
-///     ...
+/// def foo(): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// import functools
 ///
 ///
 /// @functools.lru_cache
-/// def foo():
-///     ...
+/// def foo(): ...
 /// ```
 ///
 /// ## Options

@@ -411,17 +411,9 @@ async def function1():
 
 # no error
 async def function1():
-	await function2()
+    await function2()
     async with function3():
-    	pass
-# end
-
-
-# no error
-class Test:
-    async
-
-    def a(self): pass
+        pass
 # end
 
 
@@ -942,4 +934,43 @@ def arrow_strip_whitespace(obj: Table, /, *cols: str) -> Table: ...
 def arrow_strip_whitespace(obj: Array, /, *cols: str) -> Array: ...  # type: ignore[misc]
 def arrow_strip_whitespace(obj, /, *cols):
     ...
+# end
+
+
+# E302
+def test_update():
+    pass
+    # comment
+def test_clientmodel():
+    pass
+# end
+
+
+# E302
+def test_update():
+    pass
+        # comment
+def test_clientmodel():
+    pass
+# end
+
+
+# E302
+def test_update():
+    pass
+# comment
+def test_clientmodel():
+    pass
+# end
+
+
+# E305
+
+class A:
+    pass
+
+# ====== Cool constants ========
+BANANA = 100
+APPLE = 200
+
 # end

@@ -10,11 +10,11 @@ and more.
 `ruff check` is the primary entrypoint to the Ruff linter. It accepts a list of files or
 directories, and lints all discovered Python files, optionally fixing any fixable errors:
 
-```shell
-ruff check                  # Lint all files in the current directory.
-ruff check --fix            # Lint all files in the current directory, and fix any fixable errors.
-ruff check --watch          # Lint all files in the current directory, and re-lint on change.
-ruff check path/to/code/    # Lint all files in `path/to/code` (and any subdirectories).
+```console
+$ ruff check                  # Lint all files in the current directory.
+$ ruff check --fix            # Lint all files in the current directory, and fix any fixable errors.
+$ ruff check --watch          # Lint all files in the current directory, and re-lint on change.
+$ ruff check path/to/code/    # Lint all files in `path/to/code` (and any subdirectories).
 ```
 
 For the full list of supported options, run `ruff check --help`.
@@ -151,8 +151,8 @@ imports, reformat docstrings, rewrite type annotations to use newer Python synta
 
 To enable fixes, pass the `--fix` flag to `ruff check`:
 
-```shell
-ruff check --fix
+```console
+$ ruff check --fix
 ```
 
 By default, Ruff will fix all violations for which safe fixes are available; to determine
@@ -167,26 +167,26 @@ For example, [`unnecessary-iterable-allocation-for-first-element`](rules/unneces
 (`RUF015`) is a rule which checks for potentially unperformant use of `list(...)[0]`. The fix
 replaces this pattern with `next(iter(...))` which can result in a drastic speedup:
 
-```shell
+```console
 $ python -m timeit "head = list(range(99999999))[0]"
 1 loop, best of 5: 1.69 sec per loop
 ```
 
-```shell
+```console
 $ python -m timeit "head = next(iter(range(99999999)))"
 5000000 loops, best of 5: 70.8 nsec per loop
 ```
 
 However, when the collection is empty, this changes the raised exception from an `IndexError` to `StopIteration`:
 
-```shell
+```console
 $ python -c 'list(range(0))[0]'
 Traceback (most recent call last):
   File "<string>", line 1, in <module>
 IndexError: list index out of range
 ```
 
-```shell
+```console
 $ python -c 'next(iter(range(0)))[0]'
 Traceback (most recent call last):
   File "<string>", line 1, in <module>
@@ -197,7 +197,7 @@ Since this could break error handling, this fix is categorized as unsafe.
 
 Ruff only enables safe fixes by default. Unsafe fixes can be enabled by settings [`unsafe-fixes`](settings.md#unsafe-fixes) in your configuration file or passing the `--unsafe-fixes` flag to `ruff check`:
 
-```shell
+```console
 # Show unsafe fixes
 ruff check --unsafe-fixes
 
@@ -235,9 +235,8 @@ You may use prefixes to select rules as well, e.g., `F` can be used to promote f
 
 ### Disabling fixes
 
-To limit the set of rules that Ruff should fix, use the [`lint.fixable`](settings.md#lint_fixable) and
-[`lint.unfixable`](settings.md#lint_unfixable) settings, along with their [`lint.extend-fixable`](settings.md#lint_extend-fixable)
-and [`lint.extend-unfixable`](settings.md#lint_extend-unfixable) variants.
+To limit the set of rules that Ruff should fix, use the [`lint.fixable`](settings.md#lint_fixable)
+or [`lint.extend-fixable`](settings.md#lint_extend-fixable), and [`lint.unfixable`](settings.md#lint_unfixable) settings.
 
 For example, the following configuration would enable fixes for all rules except
 [`unused-imports`](rules/unused-import.md) (`F401`):

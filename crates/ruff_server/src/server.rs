@@ -1,9 +1,16 @@
 //! Scheduling, I/O, and API endpoints.
 
-use std::num::NonZeroUsize;
-
 use lsp_server as lsp;
 use lsp_types as types;
+use lsp_types::InitializeParams;
+use lsp_types::WorkspaceFolder;
+use std::num::NonZeroUsize;
+use std::ops::Deref;
+// The new PanicInfoHook name requires MSRV >= 1.82
+#[allow(deprecated)]
+use std::panic::PanicInfo;
+use std::str::FromStr;
+use thiserror::Error;
 use types::ClientCapabilities;
 use types::CodeActionKind;
 use types::CodeActionOptions;
@@ -17,6 +24,7 @@ use types::OneOf;
 use types::TextDocumentSyncCapability;
 use types::TextDocumentSyncKind;
 use types::TextDocumentSyncOptions;
+use types::Url;
 use types::WorkDoneProgressOptions;
 use types::WorkspaceFoldersServerCapabilities;
 
@@ -28,6 +36,7 @@ use self::schedule::Task;
 use crate::session::AllSettings;
 use crate::session::ClientSettings;
 use crate::session::Session;
+use crate::session::WorkspaceSettingsMap;
 use crate::PositionEncoding;
 
 mod api;
@@ -35,6 +44,7 @@ mod client;
 mod connection;
 mod schedule;
 
+use crate::message::try_show_message;
 pub(crate) use connection::ClientSender;
 
 pub(crate) type Result<T> = std::result::Result<T, api::Error>;
@@ -47,7 +57,7 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new(worker_threads: NonZeroUsize) -> crate::Result<Self> {
+    pub fn new(worker_threads: NonZeroUsize, preview: Option<bool>) -> crate::Result<Self> {
         let connection = ConnectionInitializer::stdio();
 
         let (id, init_params) = connection.initialize_start()?;
@@ -63,42 +73,45 @@ impl Server {
             crate::version(),
         )?;
 
+        if let Some(trace) = init_params.trace {
+            crate::trace::set_trace_value(trace);
+        }
+
         crate::message::init_messenger(connection.make_sender());
 
-        let AllSettings {
-            global_settings,
-            mut workspace_settings,
-        } = AllSettings::from_value(
-            init_params
-                .initialization_options
+        let InitializeParams {
+            initialization_options,
+            workspace_folders,
+            client_info,
+            ..
+        } = init_params;
+
+        let mut all_settings = AllSettings::from_value(
+            initialization_options
                 .unwrap_or_else(|| serde_json::Value::Object(serde_json::Map::default())),
         );
+        if let Some(preview) = preview {
+            all_settings.set_preview(preview);
+        }
+        let AllSettings {
+            global_settings,
+            workspace_settings,
+        } = all_settings;
 
-        let mut workspace_for_url = |url: lsp_types::Url| {
-            let Some(workspace_settings) = workspace_settings.as_mut() else {
-                return (url, ClientSettings::default());
-            };
-            let settings = workspace_settings.remove(&url).unwrap_or_else(|| {
-                tracing::warn!("No workspace settings found for {}", url);
-                ClientSettings::default()
-            });
-            (url, settings)
-        };
+        crate::trace::init_tracing(
+            connection.make_sender(),
+            global_settings
+                .tracing
+                .log_level
+                .unwrap_or(crate::trace::LogLevel::Info),
+            global_settings.tracing.log_file.as_deref(),
+            client_info.as_ref(),
+        );
 
-        let workspaces = init_params
-            .workspace_folders
-            .filter(|folders| !folders.is_empty())
-            .map(|folders| folders.into_iter().map(|folder| {
-                workspace_for_url(folder.uri)
-            }).collect())
-            .or_else(|| {
-                tracing::warn!("No workspace(s) were provided during initialization. Using the current working directory as a default workspace...");
-                let uri = types::Url::from_file_path(std::env::current_dir().ok()?).ok()?;
-                Some(vec![workspace_for_url(uri)])
-            })
-            .ok_or_else(|| {
-                anyhow::anyhow!("Failed to get the current working directory while creating a default workspace.")
-            })?;
+        let workspaces = Workspaces::from_workspace_folders(
+            workspace_folders,
+            workspace_settings.unwrap_or_default(),
+        )?;
 
         Ok(Self {
             connection,
@@ -107,13 +120,55 @@ impl Server {
                 &client_capabilities,
                 position_encoding,
                 global_settings,
-                workspaces,
+                &workspaces,
             )?,
             client_capabilities,
         })
     }
 
     pub fn run(self) -> crate::Result<()> {
+        // The new PanicInfoHook name requires MSRV >= 1.82
+        #[allow(deprecated)]
+        type PanicHook = Box<dyn Fn(&PanicInfo<'_>) + 'static + Sync + Send>;
+        struct RestorePanicHook {
+            hook: Option<PanicHook>,
+        }
+
+        impl Drop for RestorePanicHook {
+            fn drop(&mut self) {
+                if let Some(hook) = self.hook.take() {
+                    std::panic::set_hook(hook);
+                }
+            }
+        }
+
+        // unregister any previously registered panic hook
+        // The hook will be restored when this function exits.
+        let _ = RestorePanicHook {
+            hook: Some(std::panic::take_hook()),
+        };
+
+        // When we panic, try to notify the client.
+        std::panic::set_hook(Box::new(move |panic_info| {
+            use std::io::Write;
+
+            let backtrace = std::backtrace::Backtrace::force_capture();
+            tracing::error!("{panic_info}\n{backtrace}");
+
+            // we also need to print to stderr directly for when using `$logTrace` because
+            // the message won't be sent to the client.
+            // But don't use `eprintln` because `eprintln` itself may panic if the pipe is broken.
+            let mut stderr = std::io::stderr().lock();
+            writeln!(stderr, "{panic_info}\n{backtrace}").ok();
+
+            try_show_message(
+                "The Ruff language server exited with a panic. See the logs for more details."
+                    .to_string(),
+                lsp_types::MessageType::ERROR,
+            )
+            .ok();
+        }));
+
         event_loop_thread(move || {
             Self::event_loop(
                 &self.connection,
@@ -263,6 +318,14 @@ impl Server {
                     },
                 },
             )),
+            execute_command_provider: Some(types::ExecuteCommandOptions {
+                commands: SupportedCommand::all()
+                    .map(|command| command.identifier().to_string())
+                    .to_vec(),
+                work_done_progress_options: WorkDoneProgressOptions {
+                    work_done_progress: Some(false),
+                },
+            }),
             hover_provider: Some(types::HoverProviderCapability::Simple(true)),
             notebook_document_sync: Some(types::OneOf::Left(NotebookDocumentSyncOptions {
                 save: Some(false),
@@ -339,5 +402,177 @@ impl SupportedCodeAction {
             Self::NotebookSourceOrganizeImports,
         ]
         .into_iter()
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum SupportedCommand {
+    Debug,
+    Format,
+    FixAll,
+    OrganizeImports,
+}
+
+impl SupportedCommand {
+    const fn label(self) -> &'static str {
+        match self {
+            Self::FixAll => "Fix all auto-fixable problems",
+            Self::Format => "Format document",
+            Self::OrganizeImports => "Format imports",
+            Self::Debug => "Print debug information",
+        }
+    }
+
+    /// Returns the identifier of the command.
+    const fn identifier(self) -> &'static str {
+        match self {
+            SupportedCommand::Format => "ruff.applyFormat",
+            SupportedCommand::FixAll => "ruff.applyAutofix",
+            SupportedCommand::OrganizeImports => "ruff.applyOrganizeImports",
+            SupportedCommand::Debug => "ruff.printDebugInformation",
+        }
+    }
+
+    /// Returns all the commands that the server currently supports.
+    const fn all() -> [SupportedCommand; 4] {
+        [
+            SupportedCommand::Format,
+            SupportedCommand::FixAll,
+            SupportedCommand::OrganizeImports,
+            SupportedCommand::Debug,
+        ]
+    }
+}
+
+impl FromStr for SupportedCommand {
+    type Err = anyhow::Error;
+
+    fn from_str(name: &str) -> anyhow::Result<Self, Self::Err> {
+        Ok(match name {
+            "ruff.applyAutofix" => Self::FixAll,
+            "ruff.applyFormat" => Self::Format,
+            "ruff.applyOrganizeImports" => Self::OrganizeImports,
+            "ruff.printDebugInformation" => Self::Debug,
+            _ => return Err(anyhow::anyhow!("Invalid command `{name}`")),
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct Workspaces(Vec<Workspace>);
+
+impl Workspaces {
+    pub fn new(workspaces: Vec<Workspace>) -> Self {
+        Self(workspaces)
+    }
+
+    /// Create the workspaces from the provided workspace folders as provided by the client during
+    /// initialization.
+    fn from_workspace_folders(
+        workspace_folders: Option<Vec<WorkspaceFolder>>,
+        mut workspace_settings: WorkspaceSettingsMap,
+    ) -> std::result::Result<Workspaces, WorkspacesError> {
+        let mut client_settings_for_url = |url: &Url| {
+            workspace_settings.remove(url).unwrap_or_else(|| {
+                tracing::info!(
+                    "No workspace settings found for {}, using default settings",
+                    url
+                );
+                ClientSettings::default()
+            })
+        };
+
+        let workspaces =
+            if let Some(folders) = workspace_folders.filter(|folders| !folders.is_empty()) {
+                folders
+                    .into_iter()
+                    .map(|folder| {
+                        let settings = client_settings_for_url(&folder.uri);
+                        Workspace::new(folder.uri).with_settings(settings)
+                    })
+                    .collect()
+            } else {
+                let current_dir = std::env::current_dir().map_err(WorkspacesError::Io)?;
+                tracing::info!(
+                    "No workspace(s) were provided during initialization. \
+                Using the current working directory as a default workspace: {}",
+                    current_dir.display()
+                );
+                let uri = Url::from_file_path(current_dir)
+                    .map_err(|()| WorkspacesError::InvalidCurrentDir)?;
+                let settings = client_settings_for_url(&uri);
+                vec![Workspace::default(uri).with_settings(settings)]
+            };
+
+        Ok(Workspaces(workspaces))
+    }
+}
+
+impl Deref for Workspaces {
+    type Target = [Workspace];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[derive(Error, Debug)]
+enum WorkspacesError {
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+    #[error("Failed to create a URL from the current working directory")]
+    InvalidCurrentDir,
+}
+
+#[derive(Debug)]
+pub struct Workspace {
+    /// The [`Url`] pointing to the root of the workspace.
+    url: Url,
+    /// The client settings for this workspace.
+    settings: Option<ClientSettings>,
+    /// Whether this is the default workspace as created by the server. This will be the case when
+    /// no workspace folders were provided during initialization.
+    is_default: bool,
+}
+
+impl Workspace {
+    /// Create a new workspace with the given root URL.
+    pub fn new(url: Url) -> Self {
+        Self {
+            url,
+            settings: None,
+            is_default: false,
+        }
+    }
+
+    /// Create a new default workspace with the given root URL.
+    pub fn default(url: Url) -> Self {
+        Self {
+            url,
+            settings: None,
+            is_default: true,
+        }
+    }
+
+    /// Set the client settings for this workspace.
+    #[must_use]
+    pub fn with_settings(mut self, settings: ClientSettings) -> Self {
+        self.settings = Some(settings);
+        self
+    }
+
+    /// Returns the root URL of the workspace.
+    pub(crate) fn url(&self) -> &Url {
+        &self.url
+    }
+
+    /// Returns the client settings for this workspace.
+    pub(crate) fn settings(&self) -> Option<&ClientSettings> {
+        self.settings.as_ref()
+    }
+
+    /// Returns true if this is the default workspace.
+    pub(crate) fn is_default(&self) -> bool {
+        self.is_default
     }
 }

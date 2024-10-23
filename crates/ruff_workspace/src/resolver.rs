@@ -9,7 +9,7 @@ use std::sync::RwLock;
 use anyhow::Result;
 use anyhow::{anyhow, bail};
 use globset::{Candidate, GlobSet};
-use ignore::{WalkBuilder, WalkState};
+use ignore::{DirEntry, Error, ParallelVisitor, WalkBuilder, WalkState};
 use itertools::Itertools;
 use log::debug;
 use matchit::{InsertError, Match, Router};
@@ -156,9 +156,16 @@ impl<'a> Resolver<'a> {
             .insert(format!("{path}/{{*filepath}}"), self.settings.len() - 1)
         {
             Ok(()) => {}
-            Err(InsertError::Conflict { .. }) => {}
+            Err(InsertError::Conflict { .. }) => {
+                return;
+            }
             Err(_) => unreachable!("file paths are escaped before being inserted in the router"),
         }
+
+        // Insert a mapping that matches the directory itself (without a trailing slash).
+        // Inserting should always succeed because conflicts are resolved above and the above insertion guarantees
+        // that the path is correctly escaped.
+        self.router.insert(path, self.settings.len() - 1).unwrap();
     }
 
     /// Return the appropriate [`Settings`] for a given [`Path`].
@@ -212,7 +219,7 @@ impl<'a> Resolver<'a> {
 
     /// Return an iterator over the resolved [`Settings`] in this [`Resolver`].
     pub fn settings(&self) -> impl Iterator<Item = &Settings> {
-        std::iter::once(&self.pyproject_config.settings).chain(self.settings.iter())
+        std::iter::once(&self.pyproject_config.settings).chain(&self.settings)
     }
 }
 
@@ -246,7 +253,7 @@ fn is_package_with_cache<'a>(
 /// Applies a transformation to a [`Configuration`].
 ///
 /// Used to override options with the values provided by the CLI.
-pub trait ConfigurationTransformer: Sync {
+pub trait ConfigurationTransformer {
     fn transform(&self, config: Configuration) -> Configuration;
 }
 
@@ -256,7 +263,7 @@ pub trait ConfigurationTransformer: Sync {
 // configuration file extends another in the same path, we'll re-parse the same
 // file at least twice (possibly more than twice, since we'll also parse it when
 // resolving the "default" configuration).
-fn resolve_configuration(
+pub fn resolve_configuration(
     pyproject: &Path,
     relativity: Relativity,
     transformer: &dyn ConfigurationTransformer,
@@ -327,7 +334,7 @@ pub fn resolve_root_settings(
 pub fn python_files_in_path<'a>(
     paths: &[PathBuf],
     pyproject_config: &'a PyprojectConfig,
-    transformer: &dyn ConfigurationTransformer,
+    transformer: &(dyn ConfigurationTransformer + Sync),
 ) -> Result<(Vec<Result<ResolvedFile, ignore::Error>>, Resolver<'a>)> {
     // Normalize every path (e.g., convert from relative to absolute).
     let mut paths: Vec<PathBuf> = paths.iter().map(fs::normalize_path).unique().collect();
@@ -378,119 +385,201 @@ pub fn python_files_in_path<'a>(
     }
     builder.standard_filters(resolver.respect_gitignore());
     builder.hidden(false);
+
+    builder.threads(
+        std::thread::available_parallelism()
+            .map_or(1, std::num::NonZeroUsize::get)
+            .min(12),
+    );
+
     let walker = builder.build_parallel();
 
     // Run the `WalkParallel` to collect all Python files.
-    let is_hierarchical = resolver.is_hierarchical();
-    let error: std::sync::Mutex<Result<()>> = std::sync::Mutex::new(Ok(()));
-    let resolver: RwLock<Resolver> = RwLock::new(resolver);
-    let files: std::sync::Mutex<Vec<Result<ResolvedFile, ignore::Error>>> =
-        std::sync::Mutex::new(vec![]);
-    walker.run(|| {
-        Box::new(|result| {
-            // Respect our own exclusion behavior.
-            if let Ok(entry) = &result {
-                if entry.depth() > 0 {
-                    let path = entry.path();
-                    let resolver = resolver.read().unwrap();
-                    let settings = resolver.resolve(path);
-                    if let Some(file_name) = path.file_name() {
-                        let file_path = Candidate::new(path);
-                        let file_basename = Candidate::new(file_name);
-                        if match_candidate_exclusion(
-                            &file_path,
-                            &file_basename,
-                            &settings.file_resolver.exclude,
-                        ) {
-                            debug!("Ignored path via `exclude`: {:?}", path);
-                            return WalkState::Skip;
-                        } else if match_candidate_exclusion(
-                            &file_path,
-                            &file_basename,
-                            &settings.file_resolver.extend_exclude,
-                        ) {
-                            debug!("Ignored path via `extend-exclude`: {:?}", path);
-                            return WalkState::Skip;
-                        }
-                    } else {
-                        debug!("Ignored path due to error in parsing: {:?}", path);
+    let state = WalkPythonFilesState::new(resolver);
+    let mut visitor = PythonFilesVisitorBuilder::new(transformer, &state);
+    walker.visit(&mut visitor);
+
+    state.finish()
+}
+
+type ResolvedFiles = Vec<Result<ResolvedFile, ignore::Error>>;
+
+struct WalkPythonFilesState<'config> {
+    is_hierarchical: bool,
+    merged: std::sync::Mutex<(ResolvedFiles, Result<()>)>,
+    resolver: RwLock<Resolver<'config>>,
+}
+
+impl<'config> WalkPythonFilesState<'config> {
+    fn new(resolver: Resolver<'config>) -> Self {
+        Self {
+            is_hierarchical: resolver.is_hierarchical(),
+            merged: std::sync::Mutex::new((Vec::new(), Ok(()))),
+            resolver: RwLock::new(resolver),
+        }
+    }
+
+    fn finish(self) -> Result<(Vec<Result<ResolvedFile, ignore::Error>>, Resolver<'config>)> {
+        let (files, error) = self.merged.into_inner().unwrap();
+        error?;
+
+        Ok((files, self.resolver.into_inner().unwrap()))
+    }
+}
+
+struct PythonFilesVisitorBuilder<'s, 'config> {
+    state: &'s WalkPythonFilesState<'config>,
+    transformer: &'s (dyn ConfigurationTransformer + Sync),
+}
+
+impl<'s, 'config> PythonFilesVisitorBuilder<'s, 'config> {
+    fn new(
+        transformer: &'s (dyn ConfigurationTransformer + Sync),
+        state: &'s WalkPythonFilesState<'config>,
+    ) -> Self {
+        Self { state, transformer }
+    }
+}
+
+struct PythonFilesVisitor<'s, 'config> {
+    local_files: Vec<Result<ResolvedFile, ignore::Error>>,
+    local_error: Result<()>,
+    global: &'s WalkPythonFilesState<'config>,
+    transformer: &'s (dyn ConfigurationTransformer + Sync),
+}
+
+impl<'config, 's> ignore::ParallelVisitorBuilder<'s> for PythonFilesVisitorBuilder<'s, 'config>
+where
+    'config: 's,
+{
+    fn build(&mut self) -> Box<dyn ignore::ParallelVisitor + 's> {
+        Box::new(PythonFilesVisitor {
+            local_files: vec![],
+            local_error: Ok(()),
+            global: self.state,
+            transformer: self.transformer,
+        })
+    }
+}
+
+impl ParallelVisitor for PythonFilesVisitor<'_, '_> {
+    fn visit(&mut self, result: std::result::Result<DirEntry, Error>) -> WalkState {
+        // Respect our own exclusion behavior.
+        if let Ok(entry) = &result {
+            if entry.depth() > 0 {
+                let path = entry.path();
+                let resolver = self.global.resolver.read().unwrap();
+                let settings = resolver.resolve(path);
+                if let Some(file_name) = path.file_name() {
+                    let file_path = Candidate::new(path);
+                    let file_basename = Candidate::new(file_name);
+                    if match_candidate_exclusion(
+                        &file_path,
+                        &file_basename,
+                        &settings.file_resolver.exclude,
+                    ) {
+                        debug!("Ignored path via `exclude`: {:?}", path);
+                        return WalkState::Skip;
+                    } else if match_candidate_exclusion(
+                        &file_path,
+                        &file_basename,
+                        &settings.file_resolver.extend_exclude,
+                    ) {
+                        debug!("Ignored path via `extend-exclude`: {:?}", path);
                         return WalkState::Skip;
                     }
+                } else {
+                    debug!("Ignored path due to error in parsing: {:?}", path);
+                    return WalkState::Skip;
                 }
             }
+        }
 
-            // Search for the `pyproject.toml` file in this directory, before we visit any
-            // of its contents.
-            if is_hierarchical {
-                if let Ok(entry) = &result {
-                    if entry
-                        .file_type()
-                        .is_some_and(|file_type| file_type.is_dir())
-                    {
-                        match settings_toml(entry.path()) {
-                            Ok(Some(pyproject)) => match resolve_scoped_settings(
-                                &pyproject,
-                                Relativity::Parent,
-                                transformer,
-                            ) {
-                                Ok((root, settings)) => {
-                                    resolver.write().unwrap().add(root, settings);
-                                }
-                                Err(err) => {
-                                    *error.lock().unwrap() = Err(err);
-                                    return WalkState::Quit;
-                                }
-                            },
-                            Ok(None) => {}
+        // Search for the `pyproject.toml` file in this directory, before we visit any
+        // of its contents.
+        if self.global.is_hierarchical {
+            if let Ok(entry) = &result {
+                if entry
+                    .file_type()
+                    .is_some_and(|file_type| file_type.is_dir())
+                {
+                    match settings_toml(entry.path()) {
+                        Ok(Some(pyproject)) => match resolve_scoped_settings(
+                            &pyproject,
+                            Relativity::Parent,
+                            self.transformer,
+                        ) {
+                            Ok((root, settings)) => {
+                                self.global.resolver.write().unwrap().add(root, settings);
+                            }
                             Err(err) => {
-                                *error.lock().unwrap() = Err(err);
+                                self.local_error = Err(err);
                                 return WalkState::Quit;
                             }
+                        },
+                        Ok(None) => {}
+                        Err(err) => {
+                            self.local_error = Err(err);
+                            return WalkState::Quit;
                         }
                     }
                 }
             }
+        }
 
-            match result {
-                Ok(entry) => {
-                    // Ignore directories
-                    let resolved = if entry.file_type().map_or(true, |ft| ft.is_dir()) {
-                        None
-                    } else if entry.depth() == 0 {
-                        // Accept all files that are passed-in directly.
-                        Some(ResolvedFile::Root(entry.into_path()))
+        match result {
+            Ok(entry) => {
+                // Ignore directories
+                let resolved = if entry.file_type().map_or(true, |ft| ft.is_dir()) {
+                    None
+                } else if entry.depth() == 0 {
+                    // Accept all files that are passed-in directly.
+                    Some(ResolvedFile::Root(entry.into_path()))
+                } else {
+                    // Otherwise, check if the file is included.
+                    let path = entry.path();
+                    let resolver = self.global.resolver.read().unwrap();
+                    let settings = resolver.resolve(path);
+                    if settings.file_resolver.include.is_match(path) {
+                        debug!("Included path via `include`: {:?}", path);
+                        Some(ResolvedFile::Nested(entry.into_path()))
+                    } else if settings.file_resolver.extend_include.is_match(path) {
+                        debug!("Included path via `extend-include`: {:?}", path);
+                        Some(ResolvedFile::Nested(entry.into_path()))
                     } else {
-                        // Otherwise, check if the file is included.
-                        let path = entry.path();
-                        let resolver = resolver.read().unwrap();
-                        let settings = resolver.resolve(path);
-                        if settings.file_resolver.include.is_match(path) {
-                            debug!("Included path via `include`: {:?}", path);
-                            Some(ResolvedFile::Nested(entry.into_path()))
-                        } else if settings.file_resolver.extend_include.is_match(path) {
-                            debug!("Included path via `extend-include`: {:?}", path);
-                            Some(ResolvedFile::Nested(entry.into_path()))
-                        } else {
-                            None
-                        }
-                    };
-
-                    if let Some(resolved) = resolved {
-                        files.lock().unwrap().push(Ok(resolved));
+                        None
                     }
-                }
-                Err(err) => {
-                    files.lock().unwrap().push(Err(err));
+                };
+
+                if let Some(resolved) = resolved {
+                    self.local_files.push(Ok(resolved));
                 }
             }
+            Err(err) => {
+                self.local_files.push(Err(err));
+            }
+        }
 
-            WalkState::Continue
-        })
-    });
+        WalkState::Continue
+    }
+}
 
-    error.into_inner().unwrap()?;
+impl Drop for PythonFilesVisitor<'_, '_> {
+    fn drop(&mut self) {
+        let mut merged = self.global.merged.lock().unwrap();
+        let (ref mut files, ref mut error) = &mut *merged;
 
-    Ok((files.into_inner().unwrap(), resolver.into_inner().unwrap()))
+        if files.is_empty() {
+            *files = std::mem::take(&mut self.local_files);
+        } else {
+            files.append(&mut self.local_files);
+        }
+
+        let local_error = std::mem::replace(&mut self.local_error, Ok(()));
+        if error.is_ok() {
+            *error = local_error;
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -681,6 +770,39 @@ pub fn match_any_exclusion(
         }
     }
     None
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum InclusionKind {
+    /// The inclusion came from the `include` setting.
+    Include,
+    /// The inclusion came from the `extend-include` setting.
+    ExtendInclude,
+}
+
+impl std::fmt::Display for InclusionKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            InclusionKind::Include => write!(f, "include"),
+            InclusionKind::ExtendInclude => write!(f, "extend-include"),
+        }
+    }
+}
+
+/// Return the [`InclusionKind`] for a given [`Path`], if the path match any of the inclusion
+/// criteria.
+pub fn match_any_inclusion(
+    path: &Path,
+    include: &GlobSet,
+    extend_include: &GlobSet,
+) -> Option<InclusionKind> {
+    if include.is_match(path) {
+        Some(InclusionKind::Include)
+    } else if extend_include.is_match(path) {
+        Some(InclusionKind::ExtendInclude)
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]

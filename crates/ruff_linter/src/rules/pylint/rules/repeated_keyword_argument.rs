@@ -1,6 +1,4 @@
-use std::hash::BuildHasherDefault;
-
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -40,12 +38,9 @@ impl Violation for RepeatedKeywordArgument {
 pub(crate) fn repeated_keyword_argument(checker: &mut Checker, call: &ExprCall) {
     let ExprCall { arguments, .. } = call;
 
-    let mut seen = FxHashSet::with_capacity_and_hasher(
-        arguments.keywords.len(),
-        BuildHasherDefault::default(),
-    );
+    let mut seen = FxHashSet::with_capacity_and_hasher(arguments.keywords.len(), FxBuildHasher);
 
-    for keyword in arguments.keywords.iter() {
+    for keyword in &*arguments.keywords {
         if let Some(id) = &keyword.arg {
             // Ex) `func(a=1, a=2)`
             if !seen.insert(id.as_str()) {

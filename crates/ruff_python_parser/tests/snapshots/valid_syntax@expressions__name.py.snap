@@ -15,7 +15,7 @@ Module(
                     value: Name(
                         ExprName {
                             range: 0..1,
-                            id: "_",
+                            id: Name("_"),
                             ctx: Load,
                         },
                     ),
@@ -27,7 +27,7 @@ Module(
                     value: Name(
                         ExprName {
                             range: 3..4,
-                            id: "_",
+                            id: Name("_"),
                             ctx: Load,
                         },
                     ),
@@ -39,7 +39,7 @@ Module(
                     value: Name(
                         ExprName {
                             range: 6..8,
-                            id: "__",
+                            id: Name("__"),
                             ctx: Load,
                         },
                     ),
@@ -51,7 +51,7 @@ Module(
                     value: Name(
                         ExprName {
                             range: 9..17,
-                            id: "__init__",
+                            id: Name("__init__"),
                             ctx: Load,
                         },
                     ),
@@ -63,7 +63,7 @@ Module(
                     value: Name(
                         ExprName {
                             range: 18..22,
-                            id: "name",
+                            id: Name("name"),
                             ctx: Load,
                         },
                     ),
@@ -75,7 +75,7 @@ Module(
                     value: Name(
                         ExprName {
                             range: 24..28,
-                            id: "name",
+                            id: Name("name"),
                             ctx: Load,
                         },
                     ),
@@ -87,7 +87,7 @@ Module(
                     value: Name(
                         ExprName {
                             range: 60..65,
-                            id: "match",
+                            id: Name("match"),
                             ctx: Load,
                         },
                     ),
@@ -99,7 +99,7 @@ Module(
                     value: Name(
                         ExprName {
                             range: 66..70,
-                            id: "case",
+                            id: Name("case"),
                             ctx: Load,
                         },
                     ),
@@ -111,7 +111,7 @@ Module(
                     value: Name(
                         ExprName {
                             range: 71..75,
-                            id: "type",
+                            id: Name("type"),
                             ctx: Load,
                         },
                     ),

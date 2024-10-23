@@ -1,23 +1,25 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-non_ascii_name.py:1:1: PLC2401 Variable name `ápple_count` contains a non-ASCII character, consider renaming it
+non_ascii_name.py:1:1: PLC2401 Variable name `ápple_count` contains a non-ASCII character
   |
 1 | ápple_count: int = 1  # C2401
   | ^^^^^^^^^^^ PLC2401
 2 | ápple_count += 2  # C2401
 3 | ápple_count = 3  # C2401
   |
+  = help: Rename the variable using ASCII characters
 
-non_ascii_name.py:2:1: PLC2401 Variable name `ápple_count` contains a non-ASCII character, consider renaming it
+non_ascii_name.py:2:1: PLC2401 Variable name `ápple_count` contains a non-ASCII character
   |
 1 | ápple_count: int = 1  # C2401
 2 | ápple_count += 2  # C2401
   | ^^^^^^^^^^^ PLC2401
 3 | ápple_count = 3  # C2401
   |
+  = help: Rename the variable using ASCII characters
 
-non_ascii_name.py:3:1: PLC2401 Variable name `ápple_count` contains a non-ASCII character, consider renaming it
+non_ascii_name.py:3:1: PLC2401 Variable name `ápple_count` contains a non-ASCII character
   |
 1 | ápple_count: int = 1  # C2401
 2 | ápple_count += 2  # C2401
@@ -26,47 +28,53 @@ non_ascii_name.py:3:1: PLC2401 Variable name `ápple_count` contains a non-ASCII
 4 | 
 5 | (ápple_count for ápple_count in y)
   |
+  = help: Rename the variable using ASCII characters
 
-non_ascii_name.py:5:18: PLC2401 Variable name `ápple_count` contains a non-ASCII character, consider renaming it
+non_ascii_name.py:5:18: PLC2401 Variable name `ápple_count` contains a non-ASCII character
   |
 3 | ápple_count = 3  # C2401
 4 | 
 5 | (ápple_count for ápple_count in y)
   |                  ^^^^^^^^^^^ PLC2401
   |
+  = help: Rename the variable using ASCII characters
 
-non_ascii_name.py:8:10: PLC2401 Argument name `ápple_count` contains a non-ASCII character, consider renaming it
+non_ascii_name.py:8:10: PLC2401 Argument name `ápple_count` contains a non-ASCII character
    |
  8 | def func(ápple_count):
    |          ^^^^^^^^^^^ PLC2401
  9 |     global ápple_count
 10 |     nonlocal ápple_count
    |
+   = help: Rename the variable using ASCII characters
 
-non_ascii_name.py:9:12: PLC2401 Global name `ápple_count` contains a non-ASCII character, consider renaming it
+non_ascii_name.py:9:12: PLC2401 Global name `ápple_count` contains a non-ASCII character
    |
  8 | def func(ápple_count):
  9 |     global ápple_count
    |            ^^^^^^^^^^^ PLC2401
 10 |     nonlocal ápple_count
    |
+   = help: Rename the variable using ASCII characters
 
-non_ascii_name.py:13:5: PLC2401 Function name `ápple_count` contains a non-ASCII character, consider renaming it
+non_ascii_name.py:13:5: PLC2401 Function name `ápple_count` contains a non-ASCII character
    |
 13 | def ápple_count():
    |     ^^^^^^^^^^^ PLC2401
 14 |     pass
    |
+   = help: Rename the variable using ASCII characters
 
-non_ascii_name.py:18:10: PLC2401 Variable name `ápple_count` contains a non-ASCII character, consider renaming it
+non_ascii_name.py:18:10: PLC2401 Variable name `ápple_count` contains a non-ASCII character
    |
 17 | match ápple_count:
 18 |     case ápple_count:
    |          ^^^^^^^^^^^ PLC2401
 19 |         pass
    |
+   = help: Rename the variable using ASCII characters
 
-non_ascii_name.py:21:1: PLC2401 Annotation name `ápple_count` contains a non-ASCII character, consider renaming it
+non_ascii_name.py:21:1: PLC2401 Annotation name `ápple_count` contains a non-ASCII character
    |
 19 |         pass
 20 | 
@@ -75,5 +83,4 @@ non_ascii_name.py:21:1: PLC2401 Annotation name `ápple_count` contains a non-AS
 22 | 
 23 | try:
    |
-
-
+   = help: Rename the variable using ASCII characters

@@ -1,17 +1,21 @@
 //! ## The Ruff Language Server
 
-pub use edit::{PositionEncoding, TextDocument};
+pub use edit::{DocumentKey, NotebookDocument, PositionEncoding, TextDocument};
 use lsp_types::CodeActionKind;
-pub use server::Server;
+pub use server::{Server, Workspace, Workspaces};
+pub use session::{ClientSettings, DocumentQuery, DocumentSnapshot, Session};
+
+#[macro_use]
+mod message;
 
 mod edit;
 mod fix;
 mod format;
 mod lint;
-#[macro_use]
-mod message;
+mod resolve;
 mod server;
 mod session;
+mod trace;
 
 pub(crate) const SERVER_NAME: &str = "ruff";
 pub(crate) const DIAGNOSTIC_NAME: &str = "Ruff";

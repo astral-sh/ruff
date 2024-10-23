@@ -17,6 +17,7 @@ use crate::{has_skip_comment, prelude::*};
 /// > A compound statement consists of one or more ‘clauses.’ A clause consists of a header and a ‘suite.’
 /// > The clause headers of a particular compound statement are all at the same indentation level.
 /// > Each clause header begins with a uniquely identifying keyword and ends with a colon.
+///
 /// [source](https://docs.python.org/3/reference/compound_stmts.html#compound-statements)
 #[derive(Copy, Clone)]
 pub(crate) enum ClauseHeader<'a> {
@@ -380,21 +381,14 @@ pub(crate) struct FormatClauseBody<'a> {
     trailing_comments: &'a [SourceComment],
 }
 
-impl<'a> FormatClauseBody<'a> {
-    #[must_use]
-    pub(crate) fn with_kind(mut self, kind: SuiteKind) -> Self {
-        self.kind = kind;
-        self
-    }
-}
-
 pub(crate) fn clause_body<'a>(
     body: &'a Suite,
+    kind: SuiteKind,
     trailing_comments: &'a [SourceComment],
 ) -> FormatClauseBody<'a> {
     FormatClauseBody {
         body,
-        kind: SuiteKind::default(),
+        kind,
         trailing_comments,
     }
 }

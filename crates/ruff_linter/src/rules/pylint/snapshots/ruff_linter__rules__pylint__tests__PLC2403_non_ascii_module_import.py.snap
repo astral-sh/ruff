@@ -1,14 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-non_ascii_module_import.py:1:29: PLC2403 Module alias `łos` contains a non-ASCII character, use an ASCII-only alias
+non_ascii_module_import.py:1:29: PLC2403 Module alias `łos` contains a non-ASCII character
   |
 1 | from os.path import join as łos  # Error
   |                             ^^^ PLC2403
 2 | from os.path import join as los  # OK
   |
+  = help: Use an ASCII-only alias
 
-non_ascii_module_import.py:4:24: PLC2403 Module alias `łos` contains a non-ASCII character, use an ASCII-only alias
+non_ascii_module_import.py:4:24: PLC2403 Module alias `łos` contains a non-ASCII character
   |
 2 | from os.path import join as los  # OK
 3 | 
@@ -16,8 +17,9 @@ non_ascii_module_import.py:4:24: PLC2403 Module alias `łos` contains a non-ASCI
   |                        ^^^ PLC2403
 5 | import os.path.join as los  # OK
   |
+  = help: Use an ASCII-only alias
 
-non_ascii_module_import.py:7:8: PLC2403 Module name `os.path.łos` contains a non-ASCII character, use an ASCII-only alias
+non_ascii_module_import.py:7:8: PLC2403 Module name `os.path.łos` contains a non-ASCII character
   |
 5 | import os.path.join as los  # OK
 6 | 
@@ -25,8 +27,9 @@ non_ascii_module_import.py:7:8: PLC2403 Module name `os.path.łos` contains a no
   |        ^^^^^^^^^^^ PLC2403
 8 | import os.path.los  # OK
   |
+  = help: Use an ASCII-only alias
 
-non_ascii_module_import.py:10:21: PLC2403 Module name `łos` contains a non-ASCII character, use an ASCII-only alias
+non_ascii_module_import.py:10:21: PLC2403 Module name `łos` contains a non-ASCII character
    |
  8 | import os.path.los  # OK
  9 | 
@@ -34,5 +37,4 @@ non_ascii_module_import.py:10:21: PLC2403 Module name `łos` contains a non-ASCI
    |                     ^^^ PLC2403
 11 | from os.path import los  # OK
    |
-
-
+   = help: Use an ASCII-only alias

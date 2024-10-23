@@ -8,11 +8,14 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for `super` calls without parentheses.
+/// Detects attempts to use `super` without parentheses.
 ///
 /// ## Why is this bad?
-/// When `super` is used without parentheses, it is not an actual call, and
-/// thus has no effect.
+/// The [`super()` callable](https://docs.python.org/3/library/functions.html#super)
+/// can be used inside method definitions to create a proxy object that
+/// delegates attribute access to a superclass of the current class. Attempting
+/// to access attributes on `super` itself, however, instead of the object
+/// returned by a call to `super()`, will raise `AttributeError`.
 ///
 /// ## Example
 /// ```python
@@ -25,7 +28,7 @@ use crate::checkers::ast::Checker;
 /// class Dog(Animal):
 ///     @staticmethod
 ///     def speak():
-///         original_speak = super.speak()
+///         original_speak = super.speak()  # ERROR: `super.speak()`
 ///         return f"{original_speak} But as a dog, it barks!"
 /// ```
 ///
@@ -40,7 +43,7 @@ use crate::checkers::ast::Checker;
 /// class Dog(Animal):
 ///     @staticmethod
 ///     def speak():
-///         original_speak = super().speak()
+///         original_speak = super().speak()  # Correct: `super().speak()`
 ///         return f"{original_speak} But as a dog, it barks!"
 /// ```
 #[violation]

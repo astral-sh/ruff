@@ -15,7 +15,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "foo",
+                        id: Name("foo"),
                         range: 4..7,
                     },
                     type_params: None,
@@ -34,7 +34,7 @@ Module(
                                 value: Name(
                                     ExprName {
                                         range: 14..17,
-                                        id: "int",
+                                        id: Name("int"),
                                         ctx: Load,
                                     },
                                 ),
@@ -62,7 +62,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "foo",
+                        id: Name("foo"),
                         range: 27..30,
                     },
                     type_params: None,
@@ -81,7 +81,7 @@ Module(
                                 value: Name(
                                     ExprName {
                                         range: 38..41,
-                                        id: "int",
+                                        id: Name("int"),
                                         ctx: Load,
                                     },
                                 ),
@@ -109,7 +109,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "foo",
+                        id: Name("foo"),
                         range: 52..55,
                     },
                     type_params: None,
@@ -129,7 +129,7 @@ Module(
                                     Name(
                                         ExprName {
                                             range: 67..68,
-                                            id: "x",
+                                            id: Name("x"),
                                             ctx: Load,
                                         },
                                     ),

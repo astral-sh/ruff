@@ -11,7 +11,7 @@ expression: indentation_with_eol(UNIX_EOL)
     ),
     (
         Name(
-            "foo",
+            Name("foo"),
         ),
         4..7,
     ),

@@ -13,6 +13,8 @@ license = { workspace = true }
 [lib]
 
 [dependencies]
+ruff_cache = { workspace = true, optional = true }
+ruff_macros = { workspace = true, optional = true }
 ruff_python_trivia = { workspace = true }
 ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
@@ -21,12 +23,19 @@ aho-corasick = { workspace = true }
 bitflags = { workspace = true }
 is-macro = { workspace = true }
 itertools = { workspace = true }
-once_cell = { workspace = true }
 rustc-hash = { workspace = true }
+schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
+compact_str = { workspace = true }
 
 [features]
-serde = ["dep:serde", "ruff_text_size/serde"]
+schemars = ["dep:schemars"]
+cache = ["dep:ruff_cache", "dep:ruff_macros"]
+serde = ["dep:serde", "ruff_text_size/serde", "dep:ruff_cache", "compact_str/serde"]
 
 [lints]
 workspace = true
+
+[package.metadata.cargo-shear]
+# Used via `CacheKey` macro expansion.
+ignored = ["ruff_cache"]

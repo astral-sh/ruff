@@ -25,7 +25,7 @@ fn empty_config() {
         "if (1, 2):\n    pass",
         r#"{}"#,
         [ExpandedMessage {
-            code: Rule::IfTuple.noqa_code().to_string(),
+            code: Some(Rule::IfTuple.noqa_code().to_string()),
             message: "If test is a tuple, which is always `True`".to_string(),
             location: SourceLocation {
                 row: OneIndexed::from_zero_indexed(0),
@@ -34,6 +34,27 @@ fn empty_config() {
             end_location: SourceLocation {
                 row: OneIndexed::from_zero_indexed(0),
                 column: OneIndexed::from_zero_indexed(9)
+            },
+            fix: None,
+        }]
+    );
+}
+
+#[wasm_bindgen_test]
+fn syntax_error() {
+    check!(
+        "x =\ny = 1\n",
+        r#"{}"#,
+        [ExpandedMessage {
+            code: None,
+            message: "SyntaxError: Expected an expression".to_string(),
+            location: SourceLocation {
+                row: OneIndexed::from_zero_indexed(0),
+                column: OneIndexed::from_zero_indexed(3)
+            },
+            end_location: SourceLocation {
+                row: OneIndexed::from_zero_indexed(1),
+                column: OneIndexed::from_zero_indexed(0)
             },
             fix: None,
         }]

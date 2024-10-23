@@ -1,0 +1,49 @@
+---
+source: crates/ruff_linter/src/rules/pydoclint/mod.rs
+---
+DOC502_numpy.py:22:1: DOC502 Raised exception is not explicitly raised: `FasterThanLightError`
+   |
+20 |           Speed as distance divided by time.
+21 |   
+22 | /     Raises
+23 | |     ------
+24 | |     FasterThanLightError
+25 | |         If speed is greater than the speed of light.
+26 | |     """
+   | |____^ DOC502
+27 |       return distance / time
+   |
+   = help: Remove `FasterThanLightError` from the docstring
+
+DOC502_numpy.py:47:1: DOC502 Raised exceptions are not explicitly raised: `FasterThanLightError`, `DivisionByZero`
+   |
+45 |           Speed as distance divided by time.
+46 |   
+47 | /     Raises
+48 | |     ------
+49 | |     FasterThanLightError
+50 | |         If speed is greater than the speed of light.
+51 | |     DivisionByZero
+52 | |         If attempting to divide by zero.
+53 | |     """
+   | |____^ DOC502
+54 |       return distance / time
+   |
+   = help: Remove `FasterThanLightError`, `DivisionByZero` from the docstring
+
+DOC502_numpy.py:74:1: DOC502 Raised exception is not explicitly raised: `DivisionByZero`
+   |
+72 |           Speed as distance divided by time.
+73 |   
+74 | /     Raises
+75 | |     ------
+76 | |     FasterThanLightError
+77 | |         If speed is greater than the speed of light.
+78 | |     DivisionByZero
+79 | |         If attempting to divide by zero.
+80 | |     """
+   | |____^ DOC502
+81 |       try:
+82 |           return distance / time
+   |
+   = help: Remove `DivisionByZero` from the docstring

@@ -143,7 +143,7 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
                 visitor.visit_type_params(type_params);
             }
             visitor.visit_parameters(parameters);
-            for expr in returns {
+            if let Some(expr) = returns {
                 visitor.visit_annotation(expr);
             }
             visitor.visit_body(body);
@@ -459,10 +459,10 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
             range: _,
         }) => {
             visitor.visit_expr(left);
-            for cmp_op in &**ops {
+            for cmp_op in ops {
                 visitor.visit_cmp_op(cmp_op);
             }
-            for expr in &**comparators {
+            for expr in comparators {
                 visitor.visit_expr(expr);
             }
         }
@@ -593,10 +593,10 @@ pub fn walk_arguments<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, arguments: &
     // Note that the there might be keywords before the last arg, e.g. in
     // f(*args, a=2, *args2, **kwargs)`, but we follow Python in evaluating first `args` and then
     // `keywords`. See also [Arguments::arguments_source_order`].
-    for arg in arguments.args.iter() {
+    for arg in &*arguments.args {
         visitor.visit_expr(arg);
     }
-    for keyword in arguments.keywords.iter() {
+    for keyword in &*arguments.keywords {
         visitor.visit_keyword(keyword);
     }
 }

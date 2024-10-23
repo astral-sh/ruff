@@ -6,6 +6,7 @@ use itertools::Itertools;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::schema::{Cell, SourceValue};
+use crate::CellMetadata;
 
 impl fmt::Display for SourceValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -31,6 +32,18 @@ impl Cell {
         }
     }
 
+    pub fn is_code_cell(&self) -> bool {
+        matches!(self, Cell::Code(_))
+    }
+
+    pub fn metadata(&self) -> &CellMetadata {
+        match self {
+            Cell::Code(cell) => &cell.metadata,
+            Cell::Markdown(cell) => &cell.metadata,
+            Cell::Raw(cell) => &cell.metadata,
+        }
+    }
+
     /// Update the [`SourceValue`] of the cell.
     pub(crate) fn set_source(&mut self, source: SourceValue) {
         match self {
@@ -42,11 +55,21 @@ impl Cell {
 
     /// Return `true` if it's a valid code cell.
     ///
-    /// A valid code cell is a cell where the cell type is [`Cell::Code`] and the
-    /// source doesn't contain a cell magic.
-    pub(crate) fn is_valid_code_cell(&self) -> bool {
+    /// A valid code cell is a cell where:
+    /// 1. The cell type is [`Cell::Code`]
+    /// 2. The source doesn't contain a cell magic
+    /// 3. If the language id is set, it should be `python`
+    pub(crate) fn is_valid_python_code_cell(&self) -> bool {
         let source = match self {
-            Cell::Code(cell) => &cell.source,
+            Cell::Code(cell)
+                if cell
+                    .metadata
+                    .vscode
+                    .as_ref()
+                    .map_or(true, |vscode| vscode.language_id == "python") =>
+            {
+                &cell.source
+            }
             _ => return false,
         };
         // Ignore cells containing cell magic as they act on the entire cell
@@ -215,9 +238,19 @@ impl Cell {
             //
             // This is to avoid false positives when these variables are referenced
             // elsewhere in the notebook.
+            //
+            // Refer https://github.com/astral-sh/ruff/issues/13718 for `ipytest`.
             !matches!(
                 command,
-                "capture" | "debug" | "prun" | "pypy" | "python" | "python3" | "time" | "timeit"
+                "capture"
+                    | "debug"
+                    | "ipytest"
+                    | "prun"
+                    | "pypy"
+                    | "python"
+                    | "python3"
+                    | "time"
+                    | "timeit"
             )
         })
     }

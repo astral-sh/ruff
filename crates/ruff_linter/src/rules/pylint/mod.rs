@@ -36,13 +36,13 @@ mod tests {
     #[test_case(Rule::BadStringFormatType, Path::new("bad_string_format_type.py"))]
     #[test_case(Rule::BidirectionalUnicode, Path::new("bidirectional_unicode.py"))]
     #[test_case(Rule::BinaryOpException, Path::new("binary_op_exception.py"))]
+    #[test_case(
+        Rule::BooleanChainedComparison,
+        Path::new("boolean_chained_comparison.py")
+    )]
     #[test_case(Rule::CollapsibleElseIf, Path::new("collapsible_else_if.py"))]
     #[test_case(Rule::CompareToEmptyString, Path::new("compare_to_empty_string.py"))]
     #[test_case(Rule::ComparisonOfConstant, Path::new("comparison_of_constant.py"))]
-    #[test_case(
-        Rule::RepeatedIsinstanceCalls,
-        Path::new("repeated_isinstance_calls.py")
-    )]
     #[test_case(Rule::ComparisonWithItself, Path::new("comparison_with_itself.py"))]
     #[test_case(Rule::EqWithoutHash, Path::new("eq_without_hash.py"))]
     #[test_case(Rule::EmptyComment, Path::new("empty_comment.py"))]
@@ -100,6 +100,10 @@ mod tests {
         Rule::InvalidCharacterZeroWidthSpace,
         Path::new("invalid_characters.py")
     )]
+    #[test_case(
+        Rule::InvalidCharacterBackspace,
+        Path::new("invalid_characters_syntax_error.py")
+    )]
     #[test_case(Rule::InvalidEnvvarDefault, Path::new("invalid_envvar_default.py"))]
     #[test_case(Rule::InvalidEnvvarValue, Path::new("invalid_envvar_value.py"))]
     #[test_case(Rule::IterationOverSet, Path::new("iteration_over_set.py"))]
@@ -123,7 +127,10 @@ mod tests {
     #[test_case(Rule::RedefinedLoopName, Path::new("redefined_loop_name.py"))]
     #[test_case(Rule::ReturnInInit, Path::new("return_in_init.py"))]
     #[test_case(Rule::TooManyArguments, Path::new("too_many_arguments.py"))]
-    #[test_case(Rule::TooManyPositional, Path::new("too_many_positional.py"))]
+    #[test_case(
+        Rule::TooManyPositionalArguments,
+        Path::new("too_many_positional_arguments.py")
+    )]
     #[test_case(Rule::TooManyBranches, Path::new("too_many_branches.py"))]
     #[test_case(
         Rule::TooManyReturnStatements,
@@ -230,17 +237,6 @@ mod tests {
     }
 
     #[test]
-    fn repeated_isinstance_calls() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("pylint/repeated_isinstance_calls.py"),
-            &LinterSettings::for_rule(Rule::RepeatedIsinstanceCalls)
-                .with_target_version(PythonVersion::Py39),
-        )?;
-        assert_messages!(diagnostics);
-        Ok(())
-    }
-
-    #[test]
     fn continue_in_finally() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pylint/continue_in_finally.py"),
@@ -305,7 +301,7 @@ mod tests {
                     max_positional_args: 4,
                     ..pylint::settings::Settings::default()
                 },
-                ..LinterSettings::for_rule(Rule::TooManyPositional)
+                ..LinterSettings::for_rule(Rule::TooManyPositionalArguments)
             },
         )?;
         assert_messages!(diagnostics);
@@ -403,17 +399,6 @@ mod tests {
                 },
                 ..LinterSettings::for_rules(vec![Rule::TooManyLocals])
             },
-        )?;
-        assert_messages!(diagnostics);
-        Ok(())
-    }
-
-    #[test]
-    fn unspecified_encoding_python39_or_lower() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("pylint/unspecified_encoding.py"),
-            &LinterSettings::for_rule(Rule::UnspecifiedEncoding)
-                .with_target_version(PythonVersion::Py39),
         )?;
         assert_messages!(diagnostics);
         Ok(())

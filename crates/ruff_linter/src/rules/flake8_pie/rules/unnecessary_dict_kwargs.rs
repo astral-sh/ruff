@@ -1,7 +1,5 @@
-use std::hash::BuildHasherDefault;
-
 use itertools::Itertools;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -60,7 +58,7 @@ impl Violation for UnnecessaryDictKwargs {
 /// PIE804
 pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCall) {
     let mut duplicate_keywords = None;
-    for keyword in call.arguments.keywords.iter() {
+    for keyword in &*call.arguments.keywords {
         // keyword is a spread operator (indicated by None).
         if keyword.arg.is_some() {
             continue;
@@ -89,13 +87,13 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCal
             .iter_keys()
             .filter_map(|key| key.and_then(as_kwarg))
             .collect();
-        if kwargs.len() != dict.items.len() {
+        if kwargs.len() != dict.len() {
             continue;
         }
 
         let mut diagnostic = Diagnostic::new(UnnecessaryDictKwargs, keyword.range());
 
-        if dict.items.is_empty() {
+        if dict.is_empty() {
             diagnostic.try_set_fix(|| {
                 remove_argument(
                     keyword,
@@ -150,15 +148,11 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCal
 /// Determine the set of keywords that appear in multiple positions (either directly, as in
 /// `func(x=1)`, or indirectly, as in `func(**{"x": 1})`).
 fn duplicates(call: &ast::ExprCall) -> FxHashSet<&str> {
-    let mut seen = FxHashSet::with_capacity_and_hasher(
-        call.arguments.keywords.len(),
-        BuildHasherDefault::default(),
-    );
-    let mut duplicates = FxHashSet::with_capacity_and_hasher(
-        call.arguments.keywords.len(),
-        BuildHasherDefault::default(),
-    );
-    for keyword in call.arguments.keywords.iter() {
+    let mut seen =
+        FxHashSet::with_capacity_and_hasher(call.arguments.keywords.len(), FxBuildHasher);
+    let mut duplicates =
+        FxHashSet::with_capacity_and_hasher(call.arguments.keywords.len(), FxBuildHasher);
+    for keyword in &*call.arguments.keywords {
         if let Some(name) = &keyword.arg {
             if !seen.insert(name.as_str()) {
                 duplicates.insert(name.as_str());

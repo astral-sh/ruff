@@ -4,7 +4,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::fix::edits::pad;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::name::UnqualifiedName;
+use ruff_python_ast::name::{Name, UnqualifiedName};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
@@ -110,25 +110,23 @@ fn tuple_diagnostic(checker: &mut Checker, tuple: &ast::ExprTuple, aliases: &[&E
     if semantic.has_builtin_binding("TimeoutError") {
         // Filter out any `TimeoutErrors` aliases.
         let mut remaining: Vec<Expr> = tuple
-            .elts
             .iter()
-            .filter_map(|elt| {
-                if aliases.contains(&elt) {
+            .filter_map(|element| {
+                if aliases.contains(&element) {
                     None
                 } else {
-                    Some(elt.clone())
+                    Some(element.clone())
                 }
             })
             .collect();
 
         // If `TimeoutError` itself isn't already in the tuple, add it.
         if tuple
-            .elts
             .iter()
-            .all(|elt| !semantic.match_builtin_expr(elt, "TimeoutError"))
+            .all(|element| !semantic.match_builtin_expr(element, "TimeoutError"))
         {
             let node = ast::ExprName {
-                id: "TimeoutError".into(),
+                id: Name::new_static("TimeoutError"),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
             };
@@ -171,9 +169,9 @@ pub(crate) fn timeout_error_alias_handlers(checker: &mut Checker, handlers: &[Ex
             Expr::Tuple(tuple) => {
                 // List of aliases to replace with `TimeoutError`.
                 let mut aliases: Vec<&Expr> = vec![];
-                for elt in &tuple.elts {
-                    if is_alias(elt, checker.semantic(), checker.settings.target_version) {
-                        aliases.push(elt);
+                for element in tuple {
+                    if is_alias(element, checker.semantic(), checker.settings.target_version) {
+                        aliases.push(element);
                     }
                 }
                 if !aliases.is_empty() {

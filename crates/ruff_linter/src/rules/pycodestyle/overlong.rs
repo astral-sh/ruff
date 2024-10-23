@@ -1,7 +1,5 @@
 use std::ops::Deref;
 
-use unicode_width::UnicodeWidthStr;
-
 use ruff_python_trivia::{is_pragma_comment, CommentRanges};
 use ruff_source_file::Line;
 use ruff_text_size::{TextLen, TextRange};
@@ -61,7 +59,7 @@ impl Overlong {
         // begins before the limit.
         let last_chunk = chunks.last().unwrap_or(second_chunk);
         if last_chunk.contains("://") {
-            if width.get() - last_chunk.width() <= limit.value() as usize {
+            if width.get() - measure(last_chunk, tab_size).get() <= limit.value() as usize {
                 return None;
             }
         }

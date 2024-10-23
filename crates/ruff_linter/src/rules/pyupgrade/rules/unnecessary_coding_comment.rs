@@ -1,5 +1,5 @@
-use once_cell::sync::Lazy;
 use regex::Regex;
+use std::sync::LazyLock;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -42,8 +42,8 @@ impl AlwaysFixableViolation for UTF8EncodingDeclaration {
 }
 
 // Regex from PEP263.
-static CODING_COMMENT_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^[ \t\f]*#.*?coding[:=][ \t]*utf-?8").unwrap());
+static CODING_COMMENT_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^[ \t\f]*#.*?coding[:=][ \t]*utf-?8").unwrap());
 
 /// UP009
 pub(crate) fn unnecessary_coding_comment(

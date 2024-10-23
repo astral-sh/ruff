@@ -1,9 +1,9 @@
 use std::borrow::Cow;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
-use ruff_python_semantic::ScopeKind;
+use ruff_python_semantic::Binding;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -34,9 +34,29 @@ use itertools::izip;
 /// class Dog:
 ///     __slots__ = "breed", "name"
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe whenever Ruff can detect that code
+/// elsewhere in the same file reads the `__slots__` variable in some way.
+/// This is because the order of the items in `__slots__` may have semantic
+/// significance if the `__slots__` of a class is being iterated over, or
+/// being assigned to another value.
+///
+/// In the vast majority of other cases, this rule's fix is unlikely to
+/// cause breakage; as such, Ruff will otherwise mark this rule's fix as
+/// safe. However, note that (although it's rare) the value of `__slots__`
+/// could still be read by code outside of the module in which the
+/// `__slots__` definition occurs, in which case this rule's fix could
+/// theoretically cause breakage.
+///
+/// Additionally, note that for multiline `__slots__` definitions that
+/// include comments on their own line, it can be hard to tell where the
+/// comments should be moved to when sorting the contents of `__slots__`.
+/// While this rule's fix will never delete a comment, it might *sometimes*
+/// move a comment to an unexpected location.
 #[violation]
 pub struct UnsortedDunderSlots {
-    class_name: String,
+    class_name: ast::name::Name,
 }
 
 impl Violation for UnsortedDunderSlots {
@@ -55,27 +75,6 @@ impl Violation for UnsortedDunderSlots {
     }
 }
 
-/// Sort a `__slots__` definition
-/// represented by a `StmtAssign` AST node.
-/// For example: `__slots__ = ["b", "c", "a"]`.
-pub(crate) fn sort_dunder_slots_assign(
-    checker: &mut Checker,
-    ast::StmtAssign { value, targets, .. }: &ast::StmtAssign,
-) {
-    if let [expr] = targets.as_slice() {
-        sort_dunder_slots(checker, expr, value);
-    }
-}
-
-/// Sort a `__slots__` definition
-/// represented by a `StmtAnnAssign` AST node.
-/// For example: `__slots__: list[str] = ["b", "c", "a"]`.
-pub(crate) fn sort_dunder_slots_ann_assign(checker: &mut Checker, node: &ast::StmtAnnAssign) {
-    if let Some(value) = &node.value {
-        sort_dunder_slots(checker, &node.target, value);
-    }
-}
-
 const SORTING_STYLE: SortingStyle = SortingStyle::Natural;
 
 /// Sort a tuple, list, dict or set that defines `__slots__` in a class scope.
@@ -83,46 +82,59 @@ const SORTING_STYLE: SortingStyle = SortingStyle::Natural;
 /// This routine checks whether the display is sorted, and emits a
 /// violation if it is not sorted. If the tuple/list/set was not sorted,
 /// it attempts to set a `Fix` on the violation.
-fn sort_dunder_slots(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr) {
-    let ast::Expr::Name(ast::ExprName { id, .. }) = target else {
-        return;
+pub(crate) fn sort_dunder_slots(checker: &Checker, binding: &Binding) -> Option<Diagnostic> {
+    let semantic = checker.semantic();
+
+    let (target, value) = match binding.statement(semantic)? {
+        ast::Stmt::Assign(ast::StmtAssign { targets, value, .. }) => match targets.as_slice() {
+            [target] => (target, &**value),
+            _ => return None,
+        },
+        ast::Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
+            (&**target, value.as_deref()?)
+        }
+        _ => return None,
     };
 
+    let ast::ExprName { id, .. } = target.as_name_expr()?;
+
     if id != "__slots__" {
-        return;
+        return None;
     }
 
     // We're only interested in `__slots__` in the class scope
-    let ScopeKind::Class(ast::StmtClassDef {
-        name: class_name, ..
-    }) = checker.semantic().current_scope().kind
-    else {
-        return;
-    };
+    let enclosing_class = semantic.scopes[binding.scope].kind.as_class()?;
 
-    let Some(display) = StringLiteralDisplay::new(node) else {
-        return;
-    };
+    // and it has to be an assignment to a "display literal" (a literal dict/set/tuple/list)
+    let display = StringLiteralDisplay::new(value)?;
 
     let sort_classification = SortClassification::of_elements(&display.elts, SORTING_STYLE);
     if sort_classification.is_not_a_list_of_string_literals() || sort_classification.is_sorted() {
-        return;
+        return None;
     }
 
     let mut diagnostic = Diagnostic::new(
         UnsortedDunderSlots {
-            class_name: class_name.to_string(),
+            class_name: enclosing_class.name.id.clone(),
         },
         display.range,
     );
 
     if let SortClassification::UnsortedAndMaybeFixable { items } = sort_classification {
-        if let Some(fix) = display.generate_fix(&items, checker) {
-            diagnostic.set_fix(fix);
+        if let Some(sorted_source_code) = display.generate_sorted_source_code(&items, checker) {
+            let edit = Edit::range_replacement(sorted_source_code, display.range());
+
+            let applicability = if display.kind.is_set_literal() || binding.is_unused() {
+                Applicability::Safe
+            } else {
+                Applicability::Unsafe
+            };
+
+            diagnostic.set_fix(Fix::applicable_edit(edit, applicability));
         }
     }
 
-    checker.diagnostics.push(diagnostic);
+    Some(diagnostic)
 }
 
 /// Struct representing a [display](https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries)
@@ -136,7 +148,7 @@ struct StringLiteralDisplay<'a> {
     /// The source-code range of the display as a whole
     range: TextRange,
     /// What kind of a display is it? A dict, set, list or tuple?
-    display_kind: DisplayKind<'a>,
+    kind: DisplayKind<'a>,
 }
 
 impl Ranged for StringLiteralDisplay<'_> {
@@ -149,33 +161,38 @@ impl<'a> StringLiteralDisplay<'a> {
     fn new(node: &'a ast::Expr) -> Option<Self> {
         let result = match node {
             ast::Expr::List(ast::ExprList { elts, range, .. }) => {
-                let display_kind = DisplayKind::Sequence(SequenceKind::List);
+                let kind = DisplayKind::Sequence(SequenceKind::List);
                 Self {
                     elts: Cow::Borrowed(elts),
                     range: *range,
-                    display_kind,
+                    kind,
                 }
             }
-            ast::Expr::Tuple(tuple_node @ ast::ExprTuple { elts, range, .. }) => {
-                let display_kind = DisplayKind::Sequence(SequenceKind::Tuple {
-                    parenthesized: tuple_node.parenthesized,
+            ast::Expr::Tuple(ast::ExprTuple {
+                elts,
+                range,
+                parenthesized,
+                ..
+            }) => {
+                let kind = DisplayKind::Sequence(SequenceKind::Tuple {
+                    parenthesized: *parenthesized,
                 });
                 Self {
                     elts: Cow::Borrowed(elts),
                     range: *range,
-                    display_kind,
+                    kind,
                 }
             }
             ast::Expr::Set(ast::ExprSet { elts, range }) => {
-                let display_kind = DisplayKind::Sequence(SequenceKind::Set);
+                let kind = DisplayKind::Sequence(SequenceKind::Set);
                 Self {
                     elts: Cow::Borrowed(elts),
                     range: *range,
-                    display_kind,
+                    kind,
                 }
             }
-            ast::Expr::Dict(dict @ ast::ExprDict { items, range }) => {
-                let mut narrowed_keys = Vec::with_capacity(items.len());
+            ast::Expr::Dict(dict) => {
+                let mut narrowed_keys = Vec::with_capacity(dict.len());
                 for key in dict.iter_keys() {
                     if let Some(key) = key {
                         // This is somewhat unfortunate,
@@ -189,11 +206,11 @@ impl<'a> StringLiteralDisplay<'a> {
                 // `__slots__ = {"foo": "bar", **other_dict}`
                 // If `None` wasn't present in the keys,
                 // the length of the keys should always equal the length of the values
-                assert_eq!(narrowed_keys.len(), items.len());
+                assert_eq!(narrowed_keys.len(), dict.len());
                 Self {
                     elts: Cow::Owned(narrowed_keys),
-                    range: *range,
-                    display_kind: DisplayKind::Dict { items },
+                    range: dict.range(),
+                    kind: DisplayKind::Dict { items: &dict.items },
                 }
             }
             _ => return None,
@@ -201,11 +218,17 @@ impl<'a> StringLiteralDisplay<'a> {
         Some(result)
     }
 
-    fn generate_fix(&self, elements: &[&str], checker: &Checker) -> Option<Fix> {
+    fn generate_sorted_source_code(&self, elements: &[&str], checker: &Checker) -> Option<String> {
         let locator = checker.locator();
-        let is_multiline = locator.contains_line_break(self.range());
-        let sorted_source_code = match (&self.display_kind, is_multiline) {
-            (DisplayKind::Sequence(sequence_kind), true) => {
+
+        let multiline_classification = if locator.contains_line_break(self.range()) {
+            MultilineClassification::Multiline
+        } else {
+            MultilineClassification::SingleLine
+        };
+
+        match (&self.kind, multiline_classification) {
+            (DisplayKind::Sequence(sequence_kind), MultilineClassification::Multiline) => {
                 let analyzed_sequence = MultilineStringSequenceValue::from_source_range(
                     self.range(),
                     *sequence_kind,
@@ -214,35 +237,49 @@ impl<'a> StringLiteralDisplay<'a> {
                     elements,
                 )?;
                 assert_eq!(analyzed_sequence.len(), self.elts.len());
-                analyzed_sequence.into_sorted_source_code(SORTING_STYLE, locator, checker.stylist())
+                Some(analyzed_sequence.into_sorted_source_code(
+                    SORTING_STYLE,
+                    locator,
+                    checker.stylist(),
+                ))
             }
             // Sorting multiline dicts is unsupported
-            (DisplayKind::Dict { .. }, true) => return None,
-            (DisplayKind::Sequence(sequence_kind), false) => sort_single_line_elements_sequence(
-                *sequence_kind,
-                &self.elts,
-                elements,
-                locator,
-                SORTING_STYLE,
-            ),
-            (DisplayKind::Dict { items }, false) => {
-                sort_single_line_elements_dict(&self.elts, elements, items, locator)
+            (DisplayKind::Dict { .. }, MultilineClassification::Multiline) => None,
+            (DisplayKind::Sequence(sequence_kind), MultilineClassification::SingleLine) => {
+                Some(sort_single_line_elements_sequence(
+                    *sequence_kind,
+                    &self.elts,
+                    elements,
+                    locator,
+                    SORTING_STYLE,
+                ))
             }
-        };
-        Some(Fix::safe_edit(Edit::range_replacement(
-            sorted_source_code,
-            self.range,
-        )))
+            (DisplayKind::Dict { items }, MultilineClassification::SingleLine) => Some(
+                sort_single_line_elements_dict(&self.elts, elements, items, locator),
+            ),
+        }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MultilineClassification {
+    SingleLine,
+    Multiline,
 }
 
 /// An enumeration of the various kinds of
 /// [display literals](https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries)
 /// Python provides for builtin containers.
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 enum DisplayKind<'a> {
     Sequence(SequenceKind),
     Dict { items: &'a [ast::DictItem] },
+}
+
+impl<'a> DisplayKind<'a> {
+    const fn is_set_literal(self) -> bool {
+        matches!(self, Self::Sequence(SequenceKind::Set))
+    }
 }
 
 /// A newtype that zips together three iterables:

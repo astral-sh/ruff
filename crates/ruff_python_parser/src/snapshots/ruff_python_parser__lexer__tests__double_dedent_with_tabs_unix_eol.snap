@@ -11,7 +11,7 @@ expression: double_dedent_with_tabs_eol(UNIX_EOL)
     ),
     (
         Name(
-            "foo",
+            Name("foo"),
         ),
         4..7,
     ),
@@ -41,7 +41,7 @@ expression: double_dedent_with_tabs_eol(UNIX_EOL)
     ),
     (
         Name(
-            "x",
+            Name("x"),
         ),
         15..16,
     ),

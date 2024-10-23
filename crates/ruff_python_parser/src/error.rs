@@ -2,7 +2,6 @@ use std::fmt;
 
 use ruff_text_size::TextRange;
 
-use crate::lexer::{LexicalError, LexicalErrorType};
 use crate::TokenKind;
 
 /// Represents represent errors that occur during parsing and are
@@ -100,11 +99,15 @@ pub enum ParseErrorType {
     EmptyDeleteTargets,
     /// An empty import names list was found during parsing.
     EmptyImportNames,
+    /// An empty type parameter list was found during parsing.
+    EmptyTypeParams,
 
     /// An unparenthesized named expression was found where it is not allowed.
     UnparenthesizedNamedExpression,
     /// An unparenthesized tuple expression was found where it is not allowed.
     UnparenthesizedTupleExpression,
+    /// An unparenthesized generator expression was found where it is not allowed.
+    UnparenthesizedGeneratorExpression,
 
     /// An invalid usage of a lambda expression was found.
     InvalidLambdaExpressionUsage,
@@ -215,6 +218,9 @@ impl std::fmt::Display for ParseErrorType {
             ParseErrorType::UnparenthesizedTupleExpression => {
                 f.write_str("Unparenthesized tuple expression cannot be used here")
             }
+            ParseErrorType::UnparenthesizedGeneratorExpression => {
+                f.write_str("Unparenthesized generator expression cannot be used here")
+            }
             ParseErrorType::InvalidYieldExpressionUsage => {
                 f.write_str("Yield expression cannot be used here")
             }
@@ -243,6 +249,7 @@ impl std::fmt::Display for ParseErrorType {
             ParseErrorType::EmptyImportNames => {
                 f.write_str("Expected one or more symbol names after import")
             }
+            ParseErrorType::EmptyTypeParams => f.write_str("Type parameter list cannot be empty"),
             ParseErrorType::ParamAfterVarKeywordParam => {
                 f.write_str("Parameter cannot follow var-keyword parameter")
             }
@@ -294,4 +301,136 @@ impl std::fmt::Display for ParseErrorType {
             }
         }
     }
+}
+
+/// Represents an error that occur during lexing and are
+/// returned by the `parse_*` functions in the iterator in the
+/// [lexer] implementation.
+///
+/// [lexer]: crate::lexer
+#[derive(Debug, Clone, PartialEq)]
+pub struct LexicalError {
+    /// The type of error that occurred.
+    error: LexicalErrorType,
+    /// The location of the error.
+    location: TextRange,
+}
+
+impl LexicalError {
+    /// Creates a new `LexicalError` with the given error type and location.
+    pub fn new(error: LexicalErrorType, location: TextRange) -> Self {
+        Self { error, location }
+    }
+
+    pub fn error(&self) -> &LexicalErrorType {
+        &self.error
+    }
+
+    pub fn into_error(self) -> LexicalErrorType {
+        self.error
+    }
+
+    pub fn location(&self) -> TextRange {
+        self.location
+    }
+}
+
+impl std::ops::Deref for LexicalError {
+    type Target = LexicalErrorType;
+
+    fn deref(&self) -> &Self::Target {
+        self.error()
+    }
+}
+
+impl std::error::Error for LexicalError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(self.error())
+    }
+}
+
+impl std::fmt::Display for LexicalError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "{} at byte offset {}",
+            self.error(),
+            u32::from(self.location().start())
+        )
+    }
+}
+
+/// Represents the different types of errors that can occur during lexing.
+#[derive(Debug, Clone, PartialEq)]
+pub enum LexicalErrorType {
+    // TODO: Can probably be removed, the places it is used seem to be able
+    // to use the `UnicodeError` variant instead.
+    #[doc(hidden)]
+    StringError,
+    /// A string literal without the closing quote.
+    UnclosedStringError,
+    /// Decoding of a unicode escape sequence in a string literal failed.
+    UnicodeError,
+    /// Missing the `{` for unicode escape sequence.
+    MissingUnicodeLbrace,
+    /// Missing the `}` for unicode escape sequence.
+    MissingUnicodeRbrace,
+    /// The indentation is not consistent.
+    IndentationError,
+    /// An unrecognized token was encountered.
+    UnrecognizedToken { tok: char },
+    /// An f-string error containing the [`FStringErrorType`].
+    FStringError(FStringErrorType),
+    /// Invalid character encountered in a byte literal.
+    InvalidByteLiteral,
+    /// An unexpected character was encountered after a line continuation.
+    LineContinuationError,
+    /// An unexpected end of file was encountered.
+    Eof,
+    /// An unexpected error occurred.
+    OtherError(Box<str>),
+}
+
+impl std::error::Error for LexicalErrorType {}
+
+impl std::fmt::Display for LexicalErrorType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            LexicalErrorType::StringError => write!(f, "Got unexpected string"),
+            LexicalErrorType::FStringError(error) => write!(f, "f-string: {error}"),
+            LexicalErrorType::InvalidByteLiteral => {
+                write!(f, "bytes can only contain ASCII literal characters")
+            }
+            LexicalErrorType::UnicodeError => write!(f, "Got unexpected unicode"),
+            LexicalErrorType::IndentationError => {
+                write!(f, "unindent does not match any outer indentation level")
+            }
+            LexicalErrorType::UnrecognizedToken { tok } => {
+                write!(f, "Got unexpected token {tok}")
+            }
+            LexicalErrorType::LineContinuationError => {
+                write!(f, "Expected a newline after line continuation character")
+            }
+            LexicalErrorType::Eof => write!(f, "unexpected EOF while parsing"),
+            LexicalErrorType::OtherError(msg) => write!(f, "{msg}"),
+            LexicalErrorType::UnclosedStringError => {
+                write!(f, "missing closing quote in string literal")
+            }
+            LexicalErrorType::MissingUnicodeLbrace => {
+                write!(f, "Missing `{{` in Unicode escape sequence")
+            }
+            LexicalErrorType::MissingUnicodeRbrace => {
+                write!(f, "Missing `}}` in Unicode escape sequence")
+            }
+        }
+    }
+}
+
+#[cfg(target_pointer_width = "64")]
+mod sizes {
+    use crate::error::{LexicalError, LexicalErrorType};
+    use static_assertions::assert_eq_size;
+
+    assert_eq_size!(LexicalErrorType, [u8; 24]);
+    assert_eq_size!(LexicalError, [u8; 32]);
 }

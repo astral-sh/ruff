@@ -16,23 +16,23 @@ use crate::importer::ImportRequest;
 /// `functools.cache` as it is more readable and idiomatic.
 ///
 /// ## Example
+///
 /// ```python
 /// import functools
 ///
 ///
 /// @functools.lru_cache(maxsize=None)
-/// def foo():
-///     ...
+/// def foo(): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// import functools
 ///
 ///
 /// @functools.cache
-/// def foo():
-///     ...
+/// def foo(): ...
 /// ```
 ///
 /// ## Options

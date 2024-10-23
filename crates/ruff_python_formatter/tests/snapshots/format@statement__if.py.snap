@@ -609,4 +609,22 @@ if parent_body:
 ```
 
 
-
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -93,11 +93,13 @@
+     def f():
+         pass
+         # 1
++
+ elif True:
+ 
+     def f():
+         pass
+         # 2
++
+ else:
+ 
+     def f():
+```

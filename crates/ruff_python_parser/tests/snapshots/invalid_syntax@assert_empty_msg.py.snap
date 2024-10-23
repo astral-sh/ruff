@@ -15,7 +15,7 @@ Module(
                     test: Name(
                         ExprName {
                             range: 7..8,
-                            id: "x",
+                            id: Name("x"),
                             ctx: Load,
                         },
                     ),

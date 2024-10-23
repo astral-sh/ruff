@@ -18,21 +18,21 @@ Module(
                             test: Name(
                                 ExprName {
                                     range: 55..55,
-                                    id: "",
+                                    id: Name(""),
                                     ctx: Invalid,
                                 },
                             ),
                             body: Name(
                                 ExprName {
                                     range: 51..52,
-                                    id: "x",
+                                    id: Name("x"),
                                     ctx: Load,
                                 },
                             ),
                             orelse: Name(
                                 ExprName {
                                     range: 55..55,
-                                    id: "",
+                                    id: Name(""),
                                     ctx: Invalid,
                                 },
                             ),
@@ -46,7 +46,7 @@ Module(
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: "foo",
+                        id: Name("foo"),
                         range: 61..64,
                     },
                     type_params: None,

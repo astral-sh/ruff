@@ -66,3 +66,6 @@ def not_warnings_dot_deprecated(
 def not_a_deprecated_function() -> None: ...
 
 fbaz: str = f"51 character {foo} stringgggggggggggggggggggggggggg"  # Error: PYI053
+
+# see https://github.com/astral-sh/ruff/issues/12995
+def foo(bar: typing.Literal["a", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"]):...

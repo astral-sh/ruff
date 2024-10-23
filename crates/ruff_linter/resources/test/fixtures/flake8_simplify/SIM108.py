@@ -135,3 +135,62 @@ if TYPE_CHECKING:
     x = 3
 else:
     x = 5
+
+# SIM108 - should suggest
+# z = cond or other_cond
+if cond:
+    z = cond 
+else:
+    z = other_cond
+
+# SIM108 - should suggest
+# z = cond and other_cond
+if not cond:
+    z = cond
+else:
+    z = other_cond
+
+# SIM108 - should suggest
+# z = not cond and other_cond
+if cond:
+    z = not cond
+else:
+    z = other_cond
+
+# SIM108 does not suggest
+# a binary option in these cases,
+# despite the fact that `bool` 
+# is a subclass of both `int` and `float`
+# so, e.g. `True == 1`.
+# (Of course, these specific expressions 
+# should be simplified for other reasons...)
+if True:
+    z = 1
+else:
+    z = other
+
+if False:
+    z = 1
+else:
+    z = other
+
+if 1:
+    z = True
+else:
+    z = other
+
+# SIM108 does not suggest a binary option in this
+# case, since we'd be reducing the number of calls
+# from Two to one.
+if foo():
+    z = foo()
+else:
+    z = other
+
+# SIM108 does not suggest a binary option in this
+# case, since we'd be reducing the number of calls
+# from Two to one.
+if foo():
+    z = not foo()
+else:
+    z = other

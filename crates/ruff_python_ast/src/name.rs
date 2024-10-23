@@ -1,8 +1,209 @@
+use std::borrow::{Borrow, Cow};
 use std::fmt::{Debug, Display, Formatter, Write};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
 use crate::{nodes, Expr};
+
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "cache", derive(ruff_macros::CacheKey))]
+pub struct Name(compact_str::CompactString);
+
+impl Name {
+    #[inline]
+    pub fn empty() -> Self {
+        Self(compact_str::CompactString::default())
+    }
+
+    #[inline]
+    pub fn new(name: impl AsRef<str>) -> Self {
+        Self(compact_str::CompactString::new(name))
+    }
+
+    #[inline]
+    pub const fn new_static(name: &'static str) -> Self {
+        Self(compact_str::CompactString::const_new(name))
+    }
+
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl Debug for Name {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Name({:?})", self.as_str())
+    }
+}
+
+impl AsRef<str> for Name {
+    #[inline]
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl Deref for Name {
+    type Target = str;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
+    }
+}
+
+impl Borrow<str> for Name {
+    #[inline]
+    fn borrow(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl<'a> From<&'a str> for Name {
+    #[inline]
+    fn from(s: &'a str) -> Self {
+        Name(s.into())
+    }
+}
+
+impl From<String> for Name {
+    #[inline]
+    fn from(s: String) -> Self {
+        Name(s.into())
+    }
+}
+
+impl<'a> From<&'a String> for Name {
+    #[inline]
+    fn from(s: &'a String) -> Self {
+        Name(s.into())
+    }
+}
+
+impl<'a> From<Cow<'a, str>> for Name {
+    #[inline]
+    fn from(cow: Cow<'a, str>) -> Self {
+        Name(cow.into())
+    }
+}
+
+impl From<Box<str>> for Name {
+    #[inline]
+    fn from(b: Box<str>) -> Self {
+        Name(b.into())
+    }
+}
+
+impl From<compact_str::CompactString> for Name {
+    #[inline]
+    fn from(value: compact_str::CompactString) -> Self {
+        Self(value)
+    }
+}
+
+impl From<Name> for compact_str::CompactString {
+    #[inline]
+    fn from(name: Name) -> Self {
+        name.0
+    }
+}
+
+impl FromIterator<char> for Name {
+    fn from_iter<I: IntoIterator<Item = char>>(iter: I) -> Self {
+        Self(iter.into_iter().collect())
+    }
+}
+
+impl std::fmt::Display for Name {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl PartialEq<str> for Name {
+    #[inline]
+    fn eq(&self, other: &str) -> bool {
+        self.as_str() == other
+    }
+}
+
+impl PartialEq<Name> for str {
+    #[inline]
+    fn eq(&self, other: &Name) -> bool {
+        other == self
+    }
+}
+
+impl PartialEq<&str> for Name {
+    #[inline]
+    fn eq(&self, other: &&str) -> bool {
+        self.as_str() == *other
+    }
+}
+
+impl PartialEq<Name> for &str {
+    #[inline]
+    fn eq(&self, other: &Name) -> bool {
+        other == self
+    }
+}
+
+impl PartialEq<String> for Name {
+    fn eq(&self, other: &String) -> bool {
+        self == other.as_str()
+    }
+}
+
+impl PartialEq<Name> for String {
+    #[inline]
+    fn eq(&self, other: &Name) -> bool {
+        other == self
+    }
+}
+
+impl PartialEq<&String> for Name {
+    #[inline]
+    fn eq(&self, other: &&String) -> bool {
+        self.as_str() == *other
+    }
+}
+
+impl PartialEq<Name> for &String {
+    #[inline]
+    fn eq(&self, other: &Name) -> bool {
+        other == self
+    }
+}
+
+#[cfg(feature = "schemars")]
+impl schemars::JsonSchema for Name {
+    fn is_referenceable() -> bool {
+        String::is_referenceable()
+    }
+
+    fn schema_name() -> String {
+        String::schema_name()
+    }
+
+    fn schema_id() -> std::borrow::Cow<'static, str> {
+        String::schema_id()
+    }
+
+    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        String::json_schema(gen)
+    }
+
+    fn _schemars_private_non_optional_json_schema(
+        gen: &mut schemars::gen::SchemaGenerator,
+    ) -> schemars::schema::Schema {
+        String::_schemars_private_non_optional_json_schema(gen)
+    }
+
+    fn _schemars_private_is_option() -> bool {
+        String::_schemars_private_is_option()
+    }
+}
 
 /// A representation of a qualified name, like `typing.List`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

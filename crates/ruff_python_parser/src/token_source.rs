@@ -1,7 +1,9 @@
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::lexer::{Lexer, LexerCheckpoint, LexicalError, Token, TokenFlags, TokenValue};
-use crate::{Mode, TokenKind};
+use crate::error::LexicalError;
+use crate::lexer::{Lexer, LexerCheckpoint};
+use crate::token::{Token, TokenFlags, TokenKind, TokenValue};
+use crate::Mode;
 
 /// Token source for the parser that skips over any trivia tokens.
 #[derive(Debug)]
@@ -58,6 +60,34 @@ impl<'src> TokenSource<'src> {
         self.lexer.take_value()
     }
 
+    /// Calls the underlying [`re_lex_logical_token`] method on the lexer with the new lexer
+    /// position and updates the token vector accordingly.
+    ///
+    /// [`re_lex_logical_token`]: Lexer::re_lex_logical_token
+    pub(crate) fn re_lex_logical_token(&mut self) {
+        let mut non_logical_newline_start = None;
+        for token in self.tokens.iter().rev() {
+            match token.kind() {
+                TokenKind::NonLogicalNewline => {
+                    non_logical_newline_start = Some(token.start());
+                }
+                TokenKind::Comment => continue,
+                _ => break,
+            }
+        }
+
+        if self.lexer.re_lex_logical_token(non_logical_newline_start) {
+            let current_start = self.current_range().start();
+            while self
+                .tokens
+                .last()
+                .is_some_and(|last| last.start() >= current_start)
+            {
+                self.tokens.pop();
+            }
+        }
+    }
+
     /// Returns the next non-trivia token without consuming it.
     ///
     /// Use [`peek2`] to get the next two tokens.
@@ -97,7 +127,7 @@ impl<'src> TokenSource<'src> {
     fn do_bump(&mut self) {
         loop {
             let kind = self.lexer.next_token();
-            if is_trivia(kind) {
+            if kind.is_trivia() {
                 self.tokens
                     .push(Token::new(kind, self.current_range(), self.current_flags()));
                 continue;
@@ -110,7 +140,7 @@ impl<'src> TokenSource<'src> {
     fn next_non_trivia_token(&mut self) -> TokenKind {
         loop {
             let kind = self.lexer.next_token();
-            if is_trivia(kind) {
+            if kind.is_trivia() {
                 continue;
             }
             break kind;
@@ -169,8 +199,4 @@ pub(crate) struct TokenSourceCheckpoint {
 fn allocate_tokens_vec(contents: &str) -> Vec<Token> {
     let lower_bound = contents.len().saturating_mul(15) / 100;
     Vec::with_capacity(lower_bound)
-}
-
-fn is_trivia(token: TokenKind) -> bool {
-    matches!(token, TokenKind::Comment | TokenKind::NonLogicalNewline)
 }

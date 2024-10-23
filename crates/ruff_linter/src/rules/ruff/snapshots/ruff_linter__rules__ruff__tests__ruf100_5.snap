@@ -24,6 +24,8 @@ RUF100_5.py:11:1: ERA001 Found commented-out code
    |
 11 | #import os  # noqa: E501
    | ^^^^^^^^^^^^^^^^^^^^^^^^ ERA001
+12 | 
+13 | def f():
    |
    = help: Remove commented-out code
 
@@ -32,11 +34,16 @@ RUF100_5.py:11:1: ERA001 Found commented-out code
 9  9  | 
 10 10 | 
 11    |-#import os  # noqa: E501
+12 11 | 
+13 12 | def f():
+14 13 |     data = 1
 
 RUF100_5.py:11:13: RUF100 [*] Unused `noqa` directive (unused: `E501`)
    |
 11 | #import os  # noqa: E501
    |             ^^^^^^^^^^^^ RUF100
+12 | 
+13 | def f():
    |
    = help: Remove unused `noqa` directive
 
@@ -46,5 +53,43 @@ RUF100_5.py:11:13: RUF100 [*] Unused `noqa` directive (unused: `E501`)
 10 10 | 
 11    |-#import os  # noqa: E501
    11 |+#import os
+12 12 | 
+13 13 | def f():
+14 14 |     data = 1
 
+RUF100_5.py:16:18: RUF100 [*] Unused `noqa` directive (non-enabled: `RET504`)
+   |
+14 |     data = 1
+15 |     # line below should autofix to `return data  # fmt: skip`
+16 |     return data  # noqa: RET504 # fmt: skip
+   |                  ^^^^^^^^^^^^^^ RUF100
+17 | 
+18 | def f():
+   |
+   = help: Remove unused `noqa` directive
 
+ℹ Safe fix
+13 13 | def f():
+14 14 |     data = 1
+15 15 |     # line below should autofix to `return data  # fmt: skip`
+16    |-    return data  # noqa: RET504 # fmt: skip
+   16 |+    return data  # fmt: skip
+17 17 | 
+18 18 | def f():
+19 19 |     data = 1
+
+RUF100_5.py:21:18: RUF100 [*] Unused `noqa` directive (non-enabled: `RET504`)
+   |
+19 |     data = 1
+20 |     # line below should autofix to `return data`
+21 |     return data  # noqa: RET504 - intentional incorrect noqa, will be removed
+   |                  ^^^^^^^^^^^^^^ RUF100
+   |
+   = help: Remove unused `noqa` directive
+
+ℹ Safe fix
+18 18 | def f():
+19 19 |     data = 1
+20 20 |     # line below should autofix to `return data`
+21    |-    return data  # noqa: RET504 - intentional incorrect noqa, will be removed
+   21 |+    return data

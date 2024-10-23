@@ -14,7 +14,7 @@ Module(
                     range: 0..8,
                     names: [
                         Identifier {
-                            id: "x",
+                            id: Name("x"),
                             range: 7..8,
                         },
                     ],
@@ -47,5 +47,5 @@ Module(
 
   |
 1 | global x + 1
-  |          ^ Syntax Error: Expected ',', found '+'
+  |          ^ Syntax Error: Simple statements must be separated by newlines or semicolons
   |

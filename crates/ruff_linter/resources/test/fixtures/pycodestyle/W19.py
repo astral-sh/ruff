@@ -73,12 +73,12 @@ if bar:
 if ((foo.bar("baz") and
      foo.bar("bop")
      )):
-	print "yes"
+	print("yes")
 #: E101 W191 W504
 # also ok, but starting to look like LISP
 if ((foo.bar("baz") and
      foo.bar("bop"))):
-	print "yes"
+	print("yes")
 #: E101 W191 W504
 if (a == 2 or
     b == "abc def ghi"

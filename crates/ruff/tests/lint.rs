@@ -1434,7 +1434,7 @@ def unused(x):
 
     insta::assert_snapshot!(test_code, @r###"
 
-    def unused(x):  # noqa: ANN001, ANN201, ARG001, D103
+    def unused(x):  # noqa: ANN001, ANN201, D103
         pass
     "###);
 
@@ -1616,5 +1616,305 @@ print(
     )
     "###);
 
+    Ok(())
+}
+
+#[test]
+fn add_noqa_exclude() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint]
+exclude = ["excluded.py"]
+select = ["RUF015"]
+"#,
+    )?;
+
+    let test_path = tempdir.path().join("noqa.py");
+
+    fs::write(
+        &test_path,
+        r#"
+def first_square():
+    return [x * x for x in range(20)][0]
+"#,
+    )?;
+
+    let exclude_path = tempdir.path().join("excluded.py");
+
+    fs::write(
+        &exclude_path,
+        r#"
+def first_square():
+    return [x * x for x in range(20)][0]
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .current_dir(tempdir.path())
+            .args(STDIN_BASE_OPTIONS)
+            .args(["--add-noqa"]), @r###"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+
+        ----- stderr -----
+        Added 1 noqa directive.
+        "###);
+    });
+
+    Ok(())
+}
+
+/// Infer `3.11` from `requires-python` in `pyproject.toml`.
+#[test]
+fn requires_python() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("pyproject.toml");
+    fs::write(
+        &ruff_toml,
+        r#"[project]
+requires-python = ">= 3.11"
+
+[tool.ruff.lint]
+select = ["UP006"]
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(&ruff_toml)
+            .args(["--stdin-filename", "test.py"])
+            .arg("-")
+            .pass_stdin(r#"from typing import List; foo: List[int]"#), @r###"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        test.py:1:31: UP006 [*] Use `list` instead of `List` for type annotation
+        Found 1 error.
+        [*] 1 fixable with the `--fix` option.
+
+        ----- stderr -----
+        "###);
+    });
+
+    let pyproject_toml = tempdir.path().join("pyproject.toml");
+    fs::write(
+        &pyproject_toml,
+        r#"[project]
+requires-python = ">= 3.8"
+
+[tool.ruff.lint]
+select = ["UP006"]
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(&pyproject_toml)
+            .args(["--stdin-filename", "test.py"])
+            .arg("-")
+            .pass_stdin(r#"from typing import List; foo: List[int]"#), @r###"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        All checks passed!
+
+        ----- stderr -----
+        "###);
+    });
+
+    Ok(())
+}
+
+/// Infer `3.11` from `requires-python` in `pyproject.toml`.
+#[test]
+fn requires_python_patch() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let pyproject_toml = tempdir.path().join("pyproject.toml");
+    fs::write(
+        &pyproject_toml,
+        r#"[project]
+requires-python = ">= 3.11.4"
+
+[tool.ruff.lint]
+select = ["UP006"]
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(&pyproject_toml)
+            .args(["--stdin-filename", "test.py"])
+            .arg("-")
+            .pass_stdin(r#"from typing import List; foo: List[int]"#), @r###"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        test.py:1:31: UP006 [*] Use `list` instead of `List` for type annotation
+        Found 1 error.
+        [*] 1 fixable with the `--fix` option.
+
+        ----- stderr -----
+        "###);
+    });
+
+    Ok(())
+}
+
+/// Infer `3.11` from `requires-python` in `pyproject.toml`.
+#[test]
+fn requires_python_equals() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let pyproject_toml = tempdir.path().join("pyproject.toml");
+    fs::write(
+        &pyproject_toml,
+        r#"[project]
+requires-python = "== 3.11"
+
+[tool.ruff.lint]
+select = ["UP006"]
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(&pyproject_toml)
+            .args(["--stdin-filename", "test.py"])
+            .arg("-")
+            .pass_stdin(r#"from typing import List; foo: List[int]"#), @r###"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        test.py:1:31: UP006 [*] Use `list` instead of `List` for type annotation
+        Found 1 error.
+        [*] 1 fixable with the `--fix` option.
+
+        ----- stderr -----
+        "###);
+    });
+
+    Ok(())
+}
+
+/// Infer `3.11` from `requires-python` in `pyproject.toml`.
+#[test]
+fn requires_python_equals_patch() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let pyproject_toml = tempdir.path().join("pyproject.toml");
+    fs::write(
+        &pyproject_toml,
+        r#"[project]
+requires-python = "== 3.11.4"
+
+[tool.ruff.lint]
+select = ["UP006"]
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(&pyproject_toml)
+            .args(["--stdin-filename", "test.py"])
+            .arg("-")
+            .pass_stdin(r#"from typing import List; foo: List[int]"#), @r###"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        test.py:1:31: UP006 [*] Use `list` instead of `List` for type annotation
+        Found 1 error.
+        [*] 1 fixable with the `--fix` option.
+
+        ----- stderr -----
+        "###);
+    });
+
+    Ok(())
+}
+
+#[test]
+fn checks_notebooks_in_stable() -> anyhow::Result<()> {
+    let tempdir = TempDir::new()?;
+    std::fs::write(
+        tempdir.path().join("main.ipynb"),
+        r#"
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "ad6f36d9-4b7d-4562-8d00-f15a0f1fbb6d",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import random"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3 (ipykernel)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.12.0"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--select")
+        .arg("F401")
+        .current_dir(&tempdir)
+        , @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    main.ipynb:cell 1:1:8: F401 [*] `random` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
     Ok(())
 }

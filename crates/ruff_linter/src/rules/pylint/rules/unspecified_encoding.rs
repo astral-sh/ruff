@@ -1,7 +1,5 @@
 use std::fmt::{Display, Formatter};
 
-use anyhow::Result;
-
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::name::QualifiedName;
@@ -11,8 +9,6 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::add_argument;
-use crate::importer::ImportRequest;
-use crate::settings::types::PythonVersion;
 
 /// ## What it does
 /// Checks for uses of `open` and related calls without an explicit `encoding`
@@ -20,12 +16,17 @@ use crate::settings::types::PythonVersion;
 ///
 /// ## Why is this bad?
 /// Using `open` in text mode without an explicit encoding can lead to
-/// non-portable code, with differing behavior across platforms.
+/// non-portable code, with differing behavior across platforms. While readers
+/// may assume that UTF-8 is the default encoding, in reality, the default
+/// is locale-specific.
 ///
 /// Instead, consider using the `encoding` parameter to enforce a specific
-/// encoding. [PEP 597] recommends using `locale.getpreferredencoding(False)`
-/// as the default encoding on versions earlier than Python 3.10, and
-/// `encoding="locale"` on Python 3.10 and later.
+/// encoding. [PEP 597] recommends the use of `encoding="utf-8"` as a default,
+/// and suggests that it may become the default in future versions of Python.
+///
+/// If a local-specific encoding is intended, use `encoding="local"`  on
+/// Python 3.10 and later, or `locale.getpreferredencoding()` on earlier versions,
+/// to make the encoding explicit.
 ///
 /// ## Example
 /// ```python
@@ -86,13 +87,7 @@ pub(crate) fn unspecified_encoding(checker: &mut Checker, call: &ast::ExprCall) 
         },
         call.func.range(),
     );
-
-    if checker.settings.target_version >= PythonVersion::Py310 {
-        diagnostic.set_fix(generate_keyword_fix(checker, call));
-    } else {
-        diagnostic.try_set_fix(|| generate_import_fix(checker, call));
-    }
-
+    diagnostic.set_fix(generate_keyword_fix(checker, call));
     checker.diagnostics.push(diagnostic);
 }
 
@@ -158,7 +153,7 @@ impl Display for Callee<'_> {
     }
 }
 
-/// Generate an [`Edit`] for Python 3.10 and later.
+/// Generate an [`Edit`] to set `encoding="utf-8"`.
 fn generate_keyword_fix(checker: &Checker, call: &ast::ExprCall) -> Fix {
     Fix::unsafe_edit(add_argument(
         &format!(
@@ -167,7 +162,7 @@ fn generate_keyword_fix(checker: &Checker, call: &ast::ExprCall) -> Fix {
                 .generator()
                 .expr(&Expr::StringLiteral(ast::ExprStringLiteral {
                     value: ast::StringLiteralValue::single(ast::StringLiteral {
-                        value: "locale".to_string().into_boxed_str(),
+                        value: "utf-8".to_string().into_boxed_str(),
                         flags: StringLiteralFlags::default(),
                         range: TextRange::default(),
                     }),
@@ -178,22 +173,6 @@ fn generate_keyword_fix(checker: &Checker, call: &ast::ExprCall) -> Fix {
         checker.comment_ranges(),
         checker.locator().contents(),
     ))
-}
-
-/// Generate an [`Edit`] for Python 3.9 and earlier.
-fn generate_import_fix(checker: &Checker, call: &ast::ExprCall) -> Result<Fix> {
-    let (import_edit, binding) = checker.importer().get_or_import_symbol(
-        &ImportRequest::import("locale", "getpreferredencoding"),
-        call.start(),
-        checker.semantic(),
-    )?;
-    let argument_edit = add_argument(
-        &format!("encoding={binding}(False)"),
-        &call.arguments,
-        checker.comment_ranges(),
-        checker.locator().contents(),
-    );
-    Ok(Fix::unsafe_edits(import_edit, [argument_edit]))
 }
 
 /// Returns `true` if the given expression is a string literal containing a `b` character.

@@ -7,26 +7,26 @@ use std::sync::Arc;
 
 use anyhow::bail;
 use clap::builder::{TypedValueParser, ValueParserFactory};
-use clap::{command, Parser};
+use clap::{command, Parser, Subcommand};
 use colored::Colorize;
 use path_absolutize::path_dedot;
 use regex::Regex;
-use rustc_hash::FxHashMap;
-use toml;
-
+use ruff_graph::Direction;
 use ruff_linter::line_width::LineLength;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::registry::Rule;
 use ruff_linter::settings::types::{
-    ExtensionPair, FilePattern, PatternPrefixPair, PerFileIgnore, PreviewMode, PythonVersion,
-    SerializationFormat, UnsafeFixes,
+    ExtensionPair, FilePattern, OutputFormat, PatternPrefixPair, PerFileIgnore, PreviewMode,
+    PythonVersion, UnsafeFixes,
 };
-use ruff_linter::{warn_user, RuleParser, RuleSelector, RuleSelectorParser};
+use ruff_linter::{RuleParser, RuleSelector, RuleSelectorParser};
 use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::TextRange;
 use ruff_workspace::configuration::{Configuration, RuleSelection};
 use ruff_workspace::options::{Options, PycodestyleOptions};
 use ruff_workspace::resolver::ConfigurationTransformer;
+use rustc_hash::FxHashMap;
+use toml;
 
 /// All configuration options that can be passed "globally",
 /// i.e., can be passed to all subcommands
@@ -78,7 +78,7 @@ impl GlobalConfigArgs {
 #[command(
     author,
     name = "ruff",
-    about = "Ruff: An extremely fast Python linter.",
+    about = "Ruff: An extremely fast Python linter and code formatter.",
     after_help = "For help with a specific command, see: `ruff help <command>`."
 )]
 #[command(version)]
@@ -95,7 +95,6 @@ pub enum Command {
     /// Run Ruff on the given files or directories (default).
     Check(CheckCommand),
     /// Explain a rule (or all rules).
-    #[clap(alias = "--explain")]
     #[command(group = clap::ArgGroup::new("selector").multiple(false).required(true))]
     Rule {
         /// Rule to explain
@@ -125,20 +124,51 @@ pub enum Command {
         output_format: HelpFormat,
     },
     /// Clear any caches in the current directory and any subdirectories.
-    #[clap(alias = "--clean")]
     Clean,
     /// Generate shell completion.
-    #[clap(alias = "--generate-shell-completion", hide = true)]
+    #[clap(hide = true)]
     GenerateShellCompletion { shell: clap_complete_command::Shell },
     /// Run the Ruff formatter on the given files or directories.
     Format(FormatCommand),
     /// Run the language server.
     Server(ServerCommand),
+    /// Run analysis over Python source code.
+    #[clap(subcommand)]
+    Analyze(AnalyzeCommand),
     /// Display Ruff's version
     Version {
         #[arg(long, value_enum, default_value = "text")]
         output_format: HelpFormat,
     },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum AnalyzeCommand {
+    /// Generate a map of Python file dependencies or dependents.
+    Graph(AnalyzeGraphCommand),
+}
+
+#[derive(Clone, Debug, clap::Parser)]
+pub struct AnalyzeGraphCommand {
+    /// List of files or directories to include.
+    #[clap(help = "List of files or directories to include [default: .]")]
+    files: Vec<PathBuf>,
+    /// The direction of the import map. By default, generates a dependency map, i.e., a map from
+    /// file to files that it depends on. Use `--direction dependents` to generate a map from file
+    /// to files that depend on it.
+    #[clap(long, value_enum, default_value_t)]
+    direction: Direction,
+    /// Attempt to detect imports from string literals.
+    #[clap(long)]
+    detect_string_imports: bool,
+    /// Enable preview mode. Use `--no-preview` to disable.
+    #[arg(long, overrides_with("no_preview"))]
+    preview: bool,
+    #[clap(long, overrides_with("preview"), hide = true)]
+    no_preview: bool,
+    /// The minimum Python version that should be supported.
+    #[arg(long, value_enum)]
+    target_version: Option<PythonVersion>,
 }
 
 // The `Parser` derive is for ruff_dev, for ruff `Args` would be sufficient
@@ -160,26 +190,20 @@ pub struct CheckCommand {
     unsafe_fixes: bool,
     #[arg(long, overrides_with("unsafe_fixes"), hide = true)]
     no_unsafe_fixes: bool,
-    /// Show violations with source code.
-    /// Use `--no-show-source` to disable.
-    /// (Deprecated: use `--output-format=full` or `--output-format=concise` instead of `--show-source` and `--no-show-source`, respectively)
-    #[arg(long, overrides_with("no_show_source"))]
-    show_source: bool,
-    #[clap(long, overrides_with("show_source"), hide = true)]
-    no_show_source: bool,
     /// Show an enumeration of all fixed lint violations.
     /// Use `--no-show-fixes` to disable.
     #[arg(long, overrides_with("no_show_fixes"))]
     show_fixes: bool,
     #[clap(long, overrides_with("show_fixes"), hide = true)]
     no_show_fixes: bool,
-    /// Avoid writing any fixed files back; instead, output a diff for each changed file to stdout. Implies `--fix-only`.
+    /// Avoid writing any fixed files back; instead, output a diff for each changed file to stdout, and exit 0 if there are no diffs.
+    /// Implies `--fix-only`.
     #[arg(long, conflicts_with = "show_fixes")]
     pub diff: bool,
     /// Run in watch mode by re-running whenever files change.
     #[arg(short, long)]
     pub watch: bool,
-    /// Apply fixes to resolve lint violations, but don't report on leftover violations. Implies `--fix`.
+    /// Apply fixes to resolve lint violations, but don't report on, or exit non-zero for, leftover violations. Implies `--fix`.
     /// Use `--no-fix-only` to disable or `--unsafe-fixes` to include unsafe fixes.
     #[arg(long, overrides_with("no_fix_only"))]
     fix_only: bool,
@@ -190,10 +214,9 @@ pub struct CheckCommand {
     ignore_noqa: bool,
 
     /// Output serialization format for violations.
-    /// The default serialization format is "concise".
-    /// In preview mode, the default serialization format is "full".
+    /// The default serialization format is "full".
     #[arg(long, value_enum, env = "RUFF_OUTPUT_FORMAT")]
-    pub output_format: Option<SerializationFormat>,
+    pub output_format: Option<OutputFormat>,
 
     /// Specify file to write the linter output to (default: stdout).
     #[arg(short, long, env = "RUFF_OUTPUT_FILE")]
@@ -364,7 +387,6 @@ pub struct CheckCommand {
         long,
         // Unsupported default-command arguments.
         conflicts_with = "diff",
-        conflicts_with = "show_source",
         conflicts_with = "watch",
     )]
     pub statistics: bool,
@@ -410,9 +432,6 @@ pub struct CheckCommand {
         conflicts_with = "watch",
     )]
     pub show_settings: bool,
-    /// Dev-only argument to show fixes
-    #[arg(long, hide = true)]
-    pub ecosystem_ci: bool,
 }
 
 #[derive(Clone, Debug, clap::Parser)]
@@ -504,9 +523,20 @@ pub struct FormatCommand {
 
 #[derive(Copy, Clone, Debug, clap::Parser)]
 pub struct ServerCommand {
-    /// Enable preview mode; required for regular operation
-    #[arg(long)]
-    pub(crate) preview: bool,
+    /// Enable preview mode. Use `--no-preview` to disable.
+    ///
+    /// This enables unstable server features and turns on the preview mode for the linter
+    /// and the formatter.
+    #[arg(long, overrides_with("no_preview"))]
+    preview: bool,
+    #[clap(long, overrides_with("preview"), hide = true)]
+    no_preview: bool,
+}
+
+impl ServerCommand {
+    pub(crate) fn resolve_preview(self) -> Option<bool> {
+        resolve_bool_arg(self.preview, self.no_preview)
+    }
 }
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
@@ -661,7 +691,6 @@ impl CheckCommand {
         let check_arguments = CheckArguments {
             add_noqa: self.add_noqa,
             diff: self.diff,
-            ecosystem_ci: self.ecosystem_ci,
             exit_non_zero_on_fix: self.exit_non_zero_on_fix,
             exit_zero: self.exit_zero,
             files: self.files,
@@ -700,13 +729,10 @@ impl CheckCommand {
             unsafe_fixes: resolve_bool_arg(self.unsafe_fixes, self.no_unsafe_fixes)
                 .map(UnsafeFixes::from),
             force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
-            output_format: resolve_output_format(
-                self.output_format,
-                resolve_bool_arg(self.show_source, self.no_show_source),
-                resolve_bool_arg(self.preview, self.no_preview).unwrap_or_default(),
-            ),
+            output_format: self.output_format,
             show_fixes: resolve_bool_arg(self.show_fixes, self.no_show_fixes),
             extension: self.extension,
+            ..ExplicitConfigOverrides::default()
         };
 
         let config_args = ConfigArguments::from_cli_arguments(global_options, cli_overrides)?;
@@ -739,8 +765,34 @@ impl FormatCommand {
             target_version: self.target_version,
             cache_dir: self.cache_dir,
             extension: self.extension,
+            ..ExplicitConfigOverrides::default()
+        };
 
-            // Unsupported on the formatter CLI, but required on `Overrides`.
+        let config_args = ConfigArguments::from_cli_arguments(global_options, cli_overrides)?;
+        Ok((format_arguments, config_args))
+    }
+}
+
+impl AnalyzeGraphCommand {
+    /// Partition the CLI into command-line arguments and configuration
+    /// overrides.
+    pub fn partition(
+        self,
+        global_options: GlobalConfigArgs,
+    ) -> anyhow::Result<(AnalyzeGraphArgs, ConfigArguments)> {
+        let format_arguments = AnalyzeGraphArgs {
+            files: self.files,
+            direction: self.direction,
+        };
+
+        let cli_overrides = ExplicitConfigOverrides {
+            detect_string_imports: if self.detect_string_imports {
+                Some(true)
+            } else {
+                None
+            },
+            preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
+            target_version: self.target_version,
             ..ExplicitConfigOverrides::default()
         };
 
@@ -903,7 +955,7 @@ A `--config` flag must either be a path to a `.toml` configuration file
         // the user was trying to pass in a path to a configuration file
         // or some inline TOML.
         // We want to display the most helpful error to the user as possible.
-        if std::path::Path::new(value)
+        if Path::new(value)
             .extension()
             .map_or(false, |ext| ext.eq_ignore_ascii_case("toml"))
         {
@@ -932,50 +984,12 @@ The path `{value}` does not point to a configuration file"
     }
 }
 
-fn resolve_output_format(
-    output_format: Option<SerializationFormat>,
-    show_sources: Option<bool>,
-    preview: bool,
-) -> Option<SerializationFormat> {
-    Some(match (output_format, show_sources) {
-        (Some(o), None) => o,
-        (Some(SerializationFormat::Grouped), Some(true)) => {
-            warn_user!("`--show-source` with `--output-format=grouped` is deprecated, and will not show source files. Use `--output-format=full` to show source information.");
-            SerializationFormat::Grouped
-        }
-        (Some(fmt), Some(true)) => {
-            warn_user!("The `--show-source` argument is deprecated and has been ignored in favor of `--output-format={fmt}`.");
-            fmt
-        }
-        (Some(fmt), Some(false)) => {
-            warn_user!("The `--no-show-source` argument is deprecated and has been ignored in favor of `--output-format={fmt}`.");
-            fmt
-        }
-        (None, Some(true)) => {
-            warn_user!("The `--show-source` argument is deprecated. Use `--output-format=full` instead.");
-            SerializationFormat::Full
-        }
-        (None, Some(false)) => {
-            warn_user!("The `--no-show-source` argument is deprecated. Use `--output-format=concise` instead.");
-            SerializationFormat::Concise
-        }
-        (None, None) => return None
-    }).map(|format| match format {
-        SerializationFormat::Text => {
-            warn_user!("`--output-format=text` is deprecated. Use `--output-format=full` or `--output-format=concise` instead. `text` will be treated as `{}`.", SerializationFormat::default(preview));
-            SerializationFormat::default(preview)
-        },
-        other => other
-    })
-}
-
 /// CLI settings that are distinct from configuration (commands, lists of files,
 /// etc.).
 #[allow(clippy::struct_excessive_bools)]
 pub struct CheckArguments {
     pub add_noqa: bool,
     pub diff: bool,
-    pub ecosystem_ci: bool,
     pub exit_non_zero_on_fix: bool,
     pub exit_zero: bool,
     pub files: Vec<PathBuf>,
@@ -1190,6 +1204,13 @@ impl LineColumnParseError {
     }
 }
 
+/// CLI settings that are distinct from configuration (commands, lists of files, etc.).
+#[derive(Clone, Debug)]
+pub struct AnalyzeGraphArgs {
+    pub files: Vec<PathBuf>,
+    pub direction: Direction,
+}
+
 /// Configuration overrides provided via dedicated CLI flags:
 /// `--line-length`, `--respect-gitignore`, etc.
 #[derive(Clone, Default)]
@@ -1218,9 +1239,10 @@ struct ExplicitConfigOverrides {
     fix_only: Option<bool>,
     unsafe_fixes: Option<UnsafeFixes>,
     force_exclude: Option<bool>,
-    output_format: Option<SerializationFormat>,
+    output_format: Option<OutputFormat>,
     show_fixes: Option<bool>,
     extension: Option<Vec<ExtensionPair>>,
+    detect_string_imports: Option<bool>,
 }
 
 impl ConfigurationTransformer for ExplicitConfigOverrides {
@@ -1304,6 +1326,9 @@ impl ConfigurationTransformer for ExplicitConfigOverrides {
         }
         if let Some(extension) = &self.extension {
             config.extension = Some(extension.iter().cloned().collect());
+        }
+        if let Some(detect_string_imports) = &self.detect_string_imports {
+            config.analyze.detect_string_imports = Some(*detect_string_imports);
         }
 
         config

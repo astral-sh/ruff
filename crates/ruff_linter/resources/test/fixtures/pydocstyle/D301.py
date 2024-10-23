@@ -35,3 +35,67 @@ def make_unique_pod_id(pod_id: str) -> str | None:
 
 def shouldnt_add_raw_here2():
     u"Sum\\mary."
+
+
+def shouldnt_add_raw_for_double_quote_docstring_contains_docstring():
+    """
+    This docstring contains another double-quote docstring.
+
+        def foo():
+            \"\"\"Foo.\"\"\"
+    """
+
+
+def shouldnt_add_raw_for_double_quote_docstring_contains_docstring2():
+    """
+    This docstring contains another double-quote docstring.
+
+        def bar():
+            \"""Bar.\"""
+    
+    More content here.
+    """
+
+
+def shouldnt_add_raw_for_single_quote_docstring_contains_docstring():
+    '''
+    This docstring contains another single-quote docstring.
+
+        def foo():
+            \'\'\'Foo.\'\'\'
+    
+    More content here.
+    '''
+
+
+def shouldnt_add_raw_for_single_quote_docstring_contains_docstring2():
+    '''
+    This docstring contains another single-quote docstring.
+
+        def bar():
+            \'''Bar.\'''
+    
+    More content here.
+    '''
+
+def shouldnt_add_raw_for_docstring_contains_escaped_double_triple_quotes():
+    """
+    Escaped triple quote \""" or \"\"\".
+    """
+
+def shouldnt_add_raw_for_docstring_contains_escaped_single_triple_quotes():
+    '''
+    Escaped triple quote \''' or \'\'\'.
+    '''
+
+
+def should_add_raw_for_single_double_quote_escape():
+    """
+    This is single quote escape \".
+    """
+
+
+def should_add_raw_for_single_single_quote_escape():
+    '''
+    This is single quote escape \'.
+    '''

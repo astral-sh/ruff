@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{identifier::Identifier, Decorator, Parameters, Stmt};
+use ruff_python_semantic::analyze::visibility::is_property;
 
 use crate::checkers::ast::Checker;
 
@@ -14,22 +15,21 @@ use crate::checkers::ast::Checker;
 /// desired parameters and call that method instead.
 ///
 /// ## Example
+///
 /// ```python
 /// class Cat:
 ///     @property
-///     def purr(self, volume):
-///         ...
+///     def purr(self, volume): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// class Cat:
 ///     @property
-///     def purr(self):
-///         ...
+///     def purr(self): ...
 ///
-///     def purr_volume(self, volume):
-///         ...
+///     def purr_volume(self, volume): ...
 /// ```
 ///
 /// ## References
@@ -55,10 +55,8 @@ pub(crate) fn property_with_parameters(
         return;
     }
     let semantic = checker.semantic();
-    if decorator_list
-        .iter()
-        .any(|decorator| semantic.match_builtin_expr(&decorator.expression, "property"))
-    {
+    let extra_property_decorators = checker.settings.pydocstyle.property_decorators();
+    if is_property(decorator_list, extra_property_decorators, semantic) {
         checker
             .diagnostics
             .push(Diagnostic::new(PropertyWithParameters, stmt.identifier()));

@@ -70,7 +70,7 @@ pub(crate) fn delete_full_slice(checker: &mut Checker, delete: &ast::StmtDelete)
 
         // Fix is only supported for single-target deletions.
         if delete.targets.len() == 1 {
-            let replacement = generate_method_call(&name.id, "clear", checker.generator());
+            let replacement = generate_method_call(name.id.clone(), "clear", checker.generator());
             diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
                 replacement,
                 delete.start(),

@@ -1,6 +1,4 @@
-use std::hash::BuildHasherDefault;
-
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -29,41 +27,38 @@ use super::helpers::{is_pytest_parametrize, split_names};
 /// configured via the [`lint.flake8-pytest-style.parametrize-names-type`] setting.
 ///
 /// ## Example
+///
 /// ```python
 /// import pytest
 ///
 ///
 /// # single parameter, always expecting string
 /// @pytest.mark.parametrize(("param",), [1, 2, 3])
-/// def test_foo(param):
-///     ...
+/// def test_foo(param): ...
 ///
 ///
 /// # multiple parameters, expecting tuple
 /// @pytest.mark.parametrize(["param1", "param2"], [(1, 2), (3, 4)])
-/// def test_bar(param1, param2):
-///     ...
+/// def test_bar(param1, param2): ...
 ///
 ///
 /// # multiple parameters, expecting tuple
 /// @pytest.mark.parametrize("param1,param2", [(1, 2), (3, 4)])
-/// def test_baz(param1, param2):
-///     ...
+/// def test_baz(param1, param2): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// import pytest
 ///
 ///
 /// @pytest.mark.parametrize("param", [1, 2, 3])
-/// def test_foo(param):
-///     ...
+/// def test_foo(param): ...
 ///
 ///
 /// @pytest.mark.parametrize(("param1", "param2"), [(1, 2), (3, 4)])
-/// def test_bar(param1, param2):
-///     ...
+/// def test_bar(param1, param2): ...
 /// ```
 ///
 /// ## Options
@@ -151,14 +146,14 @@ impl Violation for PytestParametrizeNamesWrongType {
 /// - `list`: `@pytest.mark.parametrize(("key", "value"), [["a", "b"], ["c", "d"]])`
 ///
 /// ## Example
+///
 /// ```python
 /// import pytest
 ///
 ///
 /// # expected list, got tuple
 /// @pytest.mark.parametrize("param", (1, 2))
-/// def test_foo(param):
-///     ...
+/// def test_foo(param): ...
 ///
 ///
 /// # expected top-level list, got tuple
@@ -169,8 +164,7 @@ impl Violation for PytestParametrizeNamesWrongType {
 ///         (3, 4),
 ///     ),
 /// )
-/// def test_bar(param1, param2):
-///     ...
+/// def test_bar(param1, param2): ...
 ///
 ///
 /// # expected individual rows to be tuples, got lists
@@ -181,23 +175,21 @@ impl Violation for PytestParametrizeNamesWrongType {
 ///         [3, 4],
 ///     ],
 /// )
-/// def test_baz(param1, param2):
-///     ...
+/// def test_baz(param1, param2): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// import pytest
 ///
 ///
 /// @pytest.mark.parametrize("param", [1, 2, 3])
-/// def test_foo(param):
-///     ...
+/// def test_foo(param): ...
 ///
 ///
 /// @pytest.mark.parametrize(("param1", "param2"), [(1, 2), (3, 4)])
-/// def test_bar(param1, param2):
-///     ...
+/// def test_bar(param1, param2): ...
 /// ```
 ///
 /// ## Options
@@ -234,6 +226,7 @@ impl Violation for PytestParametrizeValuesWrongType {
 /// Duplicate test cases are redundant and should be removed.
 ///
 /// ## Example
+///
 /// ```python
 /// import pytest
 ///
@@ -245,11 +238,11 @@ impl Violation for PytestParametrizeValuesWrongType {
 ///         (1, 2),
 ///     ],
 /// )
-/// def test_foo(param1, param2):
-///     ...
+/// def test_foo(param1, param2): ...
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// import pytest
 ///
@@ -260,8 +253,7 @@ impl Violation for PytestParametrizeValuesWrongType {
 ///         (1, 2),
 ///     ],
 /// )
-/// def test_foo(param1, param2):
-///     ...
+/// def test_foo(param1, param2): ...
 /// ```
 ///
 /// ## Fix safety
@@ -300,7 +292,7 @@ fn elts_to_csv(elts: &[Expr], generator: Generator) -> Option<String> {
             .fold(String::new(), |mut acc, elt| {
                 if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = elt {
                     if !acc.is_empty() {
-                        acc.push(',');
+                        acc.push_str(", ");
                     }
                     acc.push_str(value.to_str());
                 }
@@ -424,9 +416,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
         }
         Expr::Tuple(ast::ExprTuple { elts, .. }) => {
             if elts.len() == 1 {
-                if let Some(first) = elts.first() {
-                    handle_single_name(checker, expr, first);
-                }
+                handle_single_name(checker, expr, &elts[0]);
             } else {
                 match names_type {
                     types::ParametrizeNameType::Tuple => {}
@@ -470,9 +460,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
         }
         Expr::List(ast::ExprList { elts, .. }) => {
             if elts.len() == 1 {
-                if let Some(first) = elts.first() {
-                    handle_single_name(checker, expr, first);
-                }
+                handle_single_name(checker, expr, &elts[0]);
             } else {
                 match names_type {
                     types::ParametrizeNameType::List => {}
@@ -664,7 +652,7 @@ fn check_duplicates(checker: &mut Checker, values: &Expr) {
     };
 
     let mut seen: FxHashMap<ComparableExpr, usize> =
-        FxHashMap::with_capacity_and_hasher(elts.len(), BuildHasherDefault::default());
+        FxHashMap::with_capacity_and_hasher(elts.len(), FxBuildHasher);
     let mut prev = None;
     for (index, element) in elts.iter().enumerate() {
         let expr = ComparableExpr::from(element);

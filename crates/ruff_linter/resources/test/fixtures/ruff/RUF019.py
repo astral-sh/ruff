@@ -13,6 +13,10 @@ if (k) in d and d[k]:
 if k in d and d[(k)]:
     pass
 
+not ("key" in dct and dct["key"])
+
+bool("key" in dct and dct["key"])
+
 # OK
 v = "k" in d and d["k"]
 

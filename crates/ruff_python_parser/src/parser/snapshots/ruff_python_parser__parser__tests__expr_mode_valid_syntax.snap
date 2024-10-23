@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_python_parser/src/parser/tests.rs
-expression: expr
+expression: parsed.expr()
 ---
 Name(
     ExprName {
         range: 0..5,
-        id: "first",
+        id: Name("first"),
         ctx: Load,
     },
 )

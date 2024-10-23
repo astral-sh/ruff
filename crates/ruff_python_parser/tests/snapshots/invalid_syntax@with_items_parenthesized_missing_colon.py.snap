@@ -19,7 +19,7 @@ Module(
                             context_expr: Name(
                                 ExprName {
                                     range: 34..39,
-                                    id: "item1",
+                                    id: Name("item1"),
                                     ctx: Load,
                                 },
                             ),
@@ -30,7 +30,7 @@ Module(
                             context_expr: Name(
                                 ExprName {
                                     range: 41..46,
-                                    id: "item2",
+                                    id: Name("item2"),
                                     ctx: Load,
                                 },
                             ),

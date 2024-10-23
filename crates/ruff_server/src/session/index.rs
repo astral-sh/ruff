@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 use std::{collections::BTreeMap, path::Path, sync::Arc};
 
@@ -8,6 +9,8 @@ use rustc_hash::FxHashMap;
 
 pub(crate) use ruff_settings::RuffSettings;
 
+use crate::edit::LanguageId;
+use crate::server::{Workspace, Workspaces};
 use crate::{
     edit::{DocumentKey, DocumentVersion, NotebookDocument},
     PositionEncoding, TextDocument,
@@ -16,8 +19,6 @@ use crate::{
 use super::{settings::ResolvedClientSettings, ClientSettings};
 
 mod ruff_settings;
-
-type SettingsIndex = BTreeMap<PathBuf, WorkspaceSettings>;
 
 /// Stores and tracks all open documents in a session, along with their associated settings.
 #[derive(Default)]
@@ -29,7 +30,7 @@ pub(crate) struct Index {
     notebook_cells: FxHashMap<Url, Url>,
 
     /// Maps a workspace folder root to its settings.
-    settings: SettingsIndex,
+    settings: WorkspaceSettingsIndex,
 }
 
 /// Settings associated with a workspace.
@@ -49,7 +50,7 @@ enum DocumentController {
 /// This query can 'select' a text document, full notebook, or a specific notebook cell.
 /// It also includes document settings.
 #[derive(Clone)]
-pub(crate) enum DocumentQuery {
+pub enum DocumentQuery {
     Text {
         file_url: Url,
         document: Arc<TextDocument>,
@@ -67,23 +68,18 @@ pub(crate) enum DocumentQuery {
 
 impl Index {
     pub(super) fn new(
-        workspace_folders: Vec<(Url, ClientSettings)>,
+        workspaces: &Workspaces,
         global_settings: &ClientSettings,
     ) -> crate::Result<Self> {
-        let mut settings_index = BTreeMap::new();
-        for (url, workspace_settings) in workspace_folders {
-            Self::register_workspace_settings(
-                &mut settings_index,
-                &url,
-                Some(workspace_settings),
-                global_settings,
-            )?;
+        let mut settings = WorkspaceSettingsIndex::default();
+        for workspace in &**workspaces {
+            settings.register_workspace(workspace, global_settings)?;
         }
 
         Ok(Self {
             documents: FxHashMap::default(),
             notebook_cells: FxHashMap::default(),
-            settings: settings_index,
+            settings,
         })
     }
 
@@ -146,8 +142,7 @@ impl Index {
     ) -> crate::Result<()> {
         // update notebook cell index
         if let Some(lsp_types::NotebookDocumentCellChangeStructure {
-            did_open,
-            did_close,
+            did_open: Some(did_open),
             ..
         }) = cells.as_ref().and_then(|cells| cells.structure.as_ref())
         {
@@ -155,18 +150,11 @@ impl Index {
                 anyhow::bail!("Tried to open unavailable document `{key}`");
             };
 
-            for opened_cell in did_open.iter().flatten() {
+            for opened_cell in did_open {
                 self.notebook_cells
                     .insert(opened_cell.uri.clone(), path.clone());
             }
-            for closed_cell in did_close.iter().flatten() {
-                if self.notebook_cells.remove(&closed_cell.uri).is_none() {
-                    tracing::warn!(
-                        "Tried to remove a notebook cell that does not exist: {}",
-                        closed_cell.uri
-                    );
-                }
-            }
+            // deleted notebook cells are closed via textDocument/didClose - we don't close them here.
         }
 
         let controller = self.document_controller_for_key(key)?;
@@ -180,49 +168,33 @@ impl Index {
 
     pub(super) fn open_workspace_folder(
         &mut self,
-        url: &Url,
+        url: Url,
         global_settings: &ClientSettings,
     ) -> crate::Result<()> {
         // TODO(jane): Find a way for workspace client settings to be added or changed dynamically.
-        Self::register_workspace_settings(&mut self.settings, url, None, global_settings)
+        self.settings
+            .register_workspace(&Workspace::new(url), global_settings)
     }
 
-    fn register_workspace_settings(
-        settings_index: &mut SettingsIndex,
-        workspace_url: &Url,
-        workspace_settings: Option<ClientSettings>,
-        global_settings: &ClientSettings,
-    ) -> crate::Result<()> {
-        let client_settings = if let Some(workspace_settings) = workspace_settings {
-            ResolvedClientSettings::with_workspace(&workspace_settings, global_settings)
-        } else {
-            ResolvedClientSettings::global(global_settings)
-        };
+    pub(super) fn num_documents(&self) -> usize {
+        self.documents.len()
+    }
 
-        let workspace_path = workspace_url
-            .to_file_path()
-            .map_err(|()| anyhow!("workspace URL was not a file path!"))?;
+    pub(super) fn num_workspaces(&self) -> usize {
+        self.settings.len()
+    }
 
-        let workspace_settings_index = ruff_settings::RuffSettingsIndex::new(
-            &workspace_path,
-            client_settings.editor_settings(),
-        );
-
-        settings_index.insert(
-            workspace_path,
-            WorkspaceSettings {
-                client_settings,
-                ruff_settings: workspace_settings_index,
-            },
-        );
-
-        Ok(())
+    pub(super) fn list_config_files(&self) -> Vec<&Path> {
+        self.settings
+            .values()
+            .flat_map(|WorkspaceSettings { ruff_settings, .. }| ruff_settings.list_files())
+            .collect()
     }
 
     pub(super) fn close_workspace_folder(&mut self, workspace_url: &Url) -> crate::Result<()> {
-        let workspace_path = workspace_url
-            .to_file_path()
-            .map_err(|()| anyhow!("workspace URL was not a file path!"))?;
+        let workspace_path = workspace_url.to_file_path().map_err(|()| {
+            anyhow!("Failed to convert workspace URL to file path: {workspace_url}")
+        })?;
 
         self.settings.remove(&workspace_path).ok_or_else(|| {
             anyhow!(
@@ -292,7 +264,6 @@ impl Index {
     }
 
     /// Reloads relevant existing settings files based on a changed settings file path.
-    /// This does not currently register new settings files.
     pub(super) fn reload_settings(&mut self, changed_url: &Url) {
         let Ok(changed_path) = changed_url.to_file_path() else {
             // Files that don't map to a path can't be a workspace configuration file.
@@ -303,16 +274,19 @@ impl Index {
             return;
         };
 
-        // TODO: I think this does not correctly reload settings when using `extend` and the extended
-        //  setting isn't in a parent folder.
-        for (root, settings) in self.settings.range_mut(enclosing_folder.to_path_buf()..) {
-            if !root.starts_with(enclosing_folder) {
+        for (root, settings) in self
+            .settings
+            .range_mut(..=enclosing_folder.to_path_buf())
+            .rev()
+        {
+            if !enclosing_folder.starts_with(root) {
                 break;
             }
 
             settings.ruff_settings = ruff_settings::RuffSettingsIndex::new(
                 root,
                 settings.client_settings.editor_settings(),
+                false,
             );
         }
     }
@@ -332,20 +306,24 @@ impl Index {
     }
 
     pub(super) fn close_document(&mut self, key: &DocumentKey) -> crate::Result<()> {
+        // Notebook cells URIs are removed from the index here, instead of during
+        // `update_notebook_document`. This is because a notebook cell, as a text document,
+        // is requested to be `closed` by VS Code after the notebook gets updated.
+        // This is not documented in the LSP specification explicitly, and this assumption
+        // may need revisiting in the future as we support more editors with notebook support.
+        if let DocumentKey::NotebookCell(uri) = key {
+            if self.notebook_cells.remove(uri).is_none() {
+                tracing::warn!("Tried to remove a notebook cell that does not exist: {uri}",);
+            }
+            return Ok(());
+        }
         let Some(url) = self.url_for_key(key).cloned() else {
             anyhow::bail!("Tried to close unavailable document `{key}`");
         };
 
-        let Some(controller) = self.documents.remove(&url) else {
+        let Some(_) = self.documents.remove(&url) else {
             anyhow::bail!("tried to close document that didn't exist at {}", url)
         };
-        if let Some(notebook) = controller.as_notebook() {
-            for url in notebook.urls() {
-                self.notebook_cells.remove(url).ok_or_else(|| {
-                    anyhow!("tried to de-register notebook cell with URL {url} that didn't exist")
-                })?;
-            }
-        }
         Ok(())
     }
 
@@ -407,6 +385,71 @@ impl Index {
             .range(..path.to_path_buf())
             .next_back()
             .map(|(_, settings)| settings)
+    }
+}
+
+/// Maps a workspace folder root to its settings.
+#[derive(Default)]
+struct WorkspaceSettingsIndex {
+    index: BTreeMap<PathBuf, WorkspaceSettings>,
+}
+
+impl WorkspaceSettingsIndex {
+    /// Register a workspace folder with the given settings.
+    ///
+    /// If the `workspace_settings` is [`Some`], it is preferred over the global settings for the
+    /// workspace. Otherwise, the global settings are used exclusively.
+    fn register_workspace(
+        &mut self,
+        workspace: &Workspace,
+        global_settings: &ClientSettings,
+    ) -> crate::Result<()> {
+        let workspace_url = workspace.url();
+        if workspace_url.scheme() != "file" {
+            tracing::info!("Ignoring non-file workspace URL: {workspace_url}");
+            show_warn_msg!("Ruff does not support non-file workspaces; Ignoring {workspace_url}");
+            return Ok(());
+        }
+        let workspace_path = workspace_url.to_file_path().map_err(|()| {
+            anyhow!("Failed to convert workspace URL to file path: {workspace_url}")
+        })?;
+
+        let client_settings = if let Some(workspace_settings) = workspace.settings() {
+            ResolvedClientSettings::with_workspace(workspace_settings, global_settings)
+        } else {
+            ResolvedClientSettings::global(global_settings)
+        };
+
+        let workspace_settings_index = ruff_settings::RuffSettingsIndex::new(
+            &workspace_path,
+            client_settings.editor_settings(),
+            workspace.is_default(),
+        );
+
+        tracing::info!("Registering workspace: {}", workspace_path.display());
+        self.insert(
+            workspace_path,
+            WorkspaceSettings {
+                client_settings,
+                ruff_settings: workspace_settings_index,
+            },
+        );
+
+        Ok(())
+    }
+}
+
+impl Deref for WorkspaceSettingsIndex {
+    type Target = BTreeMap<PathBuf, WorkspaceSettings>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.index
+    }
+}
+
+impl DerefMut for WorkspaceSettingsIndex {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.index
     }
 }
 
@@ -503,7 +546,7 @@ impl DocumentQuery {
     }
 
     /// Attempts to access the underlying notebook document that this query is selecting.
-    pub(crate) fn as_notebook(&self) -> Option<&NotebookDocument> {
+    pub fn as_notebook(&self) -> Option<&NotebookDocument> {
         match self {
             Self::Notebook { notebook, .. } => Some(notebook),
             Self::Text { .. } => None,
@@ -564,6 +607,14 @@ impl DocumentQuery {
             } => cell_uri
                 .as_ref()
                 .and_then(|cell_uri| notebook.cell_document_by_uri(cell_uri)),
+        }
+    }
+
+    pub(crate) fn text_document_language_id(&self) -> Option<LanguageId> {
+        if let DocumentQuery::Text { document, .. } = self {
+            document.language_id()
+        } else {
+            None
         }
     }
 }

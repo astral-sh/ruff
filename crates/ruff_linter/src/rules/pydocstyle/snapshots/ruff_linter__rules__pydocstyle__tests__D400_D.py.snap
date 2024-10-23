@@ -194,23 +194,13 @@ D.py:487:5: D400 [*] First line should end with a period
 489 489 | 
 490 490 | 
 
-D.py:514:5: D400 [*] First line should end with a period
+D.py:514:5: D400 First line should end with a period
     |
 513 | def valid_google_string():  # noqa: D400
 514 |     """Test a valid something!"""
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D400
     |
     = help: Add period
-
-ℹ Unsafe fix
-511 511 | 
-512 512 | 
-513 513 | def valid_google_string():  # noqa: D400
-514     |-    """Test a valid something!"""
-    514 |+    """Test a valid something!."""
-515 515 | 
-516 516 | 
-517 517 | @expect("D415: First line should end with a period, question mark, "
 
 D.py:520:5: D400 [*] First line should end with a period
     |
@@ -328,6 +318,4 @@ D.py:664:5: D400 [*] First line should end with a period
     665 |+    but continuations shouldn't be considered multi-line."
 666 666 | 
 667 667 | 
-668 668 | 
-
-
+668 668 |

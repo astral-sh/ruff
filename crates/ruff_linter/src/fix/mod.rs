@@ -130,13 +130,13 @@ fn apply_fixes<'a>(
 /// Compare two fixes.
 fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Ordering {
     // Always apply `RedefinedWhileUnused` before `UnusedImport`, as the latter can end up fixing
-    // the former.
-    {
-        match (rule1, rule2) {
-            (Rule::RedefinedWhileUnused, Rule::UnusedImport) => return std::cmp::Ordering::Less,
-            (Rule::UnusedImport, Rule::RedefinedWhileUnused) => return std::cmp::Ordering::Greater,
-            _ => std::cmp::Ordering::Equal,
-        }
+    // the former. But we can't apply this just for `RedefinedWhileUnused` and `UnusedImport` because it violates
+    // `< is transitive: a < b and b < c implies a < c. The same must hold for both == and >.`
+    // See https://github.com/astral-sh/ruff/issues/12469#issuecomment-2244392085
+    match (rule1, rule2) {
+        (Rule::RedefinedWhileUnused, _) => std::cmp::Ordering::Less,
+        (_, Rule::RedefinedWhileUnused) => std::cmp::Ordering::Greater,
+        _ => std::cmp::Ordering::Equal,
     }
     // Apply fixes in order of their start position.
     .then_with(|| fix1.min_start().cmp(&fix2.min_start()))
@@ -226,8 +226,8 @@ print("hello world")
         assert_eq!(
             source_map.markers(),
             &[
-                SourceMarker::new(10.into(), 10.into(),),
-                SourceMarker::new(10.into(), 21.into(),),
+                SourceMarker::new(10.into(), 10.into()),
+                SourceMarker::new(10.into(), 21.into()),
             ]
         );
     }
@@ -263,8 +263,8 @@ class A(Bar):
         assert_eq!(
             source_map.markers(),
             &[
-                SourceMarker::new(8.into(), 8.into(),),
-                SourceMarker::new(14.into(), 11.into(),),
+                SourceMarker::new(8.into(), 8.into()),
+                SourceMarker::new(14.into(), 11.into()),
             ]
         );
     }
@@ -335,8 +335,8 @@ class A(object):
             &[
                 SourceMarker::new(8.into(), 8.into()),
                 SourceMarker::new(16.into(), 8.into()),
-                SourceMarker::new(22.into(), 14.into(),),
-                SourceMarker::new(30.into(), 14.into(),),
+                SourceMarker::new(22.into(), 14.into()),
+                SourceMarker::new(30.into(), 14.into()),
             ]
         );
     }
@@ -371,8 +371,8 @@ class A:
         assert_eq!(
             source_map.markers(),
             &[
-                SourceMarker::new(7.into(), 7.into(),),
-                SourceMarker::new(15.into(), 7.into(),),
+                SourceMarker::new(7.into(), 7.into()),
+                SourceMarker::new(15.into(), 7.into()),
             ]
         );
     }

@@ -19,7 +19,7 @@ use tempfile::NamedTempFile;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_diagnostics::{DiagnosticKind, Fix};
-use ruff_linter::message::Message;
+use ruff_linter::message::{DiagnosticMessage, Message};
 use ruff_linter::{warn_user, VERSION};
 use ruff_macros::CacheKey;
 use ruff_notebook::NotebookIndex;
@@ -111,7 +111,7 @@ impl Cache {
                 return Cache::empty(path, package_root);
             }
             Err(err) => {
-                warn_user!("Failed to open cache file '{}': {err}", path.display());
+                warn_user!("Failed to open cache file `{}`: {err}", path.display());
                 return Cache::empty(path, package_root);
             }
         };
@@ -119,7 +119,7 @@ impl Cache {
         let mut package: PackageCache = match bincode::deserialize_from(BufReader::new(file)) {
             Ok(package) => package,
             Err(err) => {
-                warn_user!("Failed parse cache file '{}': {err}", path.display());
+                warn_user!("Failed parse cache file `{}`: {err}", path.display());
                 return Cache::empty(path, package_root);
             }
         };
@@ -127,7 +127,7 @@ impl Cache {
         // Sanity check.
         if package.package_root != package_root {
             warn_user!(
-                "Different package root in cache: expected '{}', got '{}'",
+                "Different package root in cache: expected `{}`, got `{}`",
                 package_root.display(),
                 package.package_root.display(),
             );
@@ -180,12 +180,24 @@ impl Cache {
             .write_all(&serialized)
             .context("Failed to write serialized cache to temporary file.")?;
 
-        temp_file.persist(&self.path).with_context(|| {
-            format!(
-                "Failed to rename temporary cache file to {}",
-                self.path.display()
-            )
-        })?;
+        if let Err(err) = temp_file.persist(&self.path) {
+            // On Windows, writing to the cache file can fail if the file is still open (e.g., if
+            // the user is running Ruff from multiple processes over the same directory).
+            if cfg!(windows) && err.error.kind() == io::ErrorKind::PermissionDenied {
+                warn_user!(
+                    "Failed to write cache file `{}`: {}",
+                    self.path.display(),
+                    err.error
+                );
+            } else {
+                return Err(err).with_context(|| {
+                    format!(
+                        "Failed to rename temporary cache file to {}",
+                        self.path.display()
+                    )
+                });
+            }
+        }
 
         Ok(())
     }
@@ -333,12 +345,14 @@ impl FileCache {
                 let file = SourceFileBuilder::new(path.to_string_lossy(), &*lint.source).finish();
                 lint.messages
                     .iter()
-                    .map(|msg| Message {
-                        kind: msg.kind.clone(),
-                        range: msg.range,
-                        fix: msg.fix.clone(),
-                        file: file.clone(),
-                        noqa_offset: msg.noqa_offset,
+                    .map(|msg| {
+                        Message::Diagnostic(DiagnosticMessage {
+                            kind: msg.kind.clone(),
+                            range: msg.range,
+                            fix: msg.fix.clone(),
+                            file: file.clone(),
+                            noqa_offset: msg.noqa_offset,
+                        })
                     })
                     .collect()
             };
@@ -412,18 +426,19 @@ impl LintCacheData {
         notebook_index: Option<NotebookIndex>,
     ) -> Self {
         let source = if let Some(msg) = messages.first() {
-            msg.file.source_text().to_owned()
+            msg.source_file().source_text().to_owned()
         } else {
             String::new() // No messages, no need to keep the source!
         };
 
         let messages = messages
             .iter()
+            .filter_map(|message| message.as_diagnostic_message())
             .map(|msg| {
                 // Make sure that all message use the same source file.
                 assert_eq!(
-                    msg.file,
-                    messages.first().unwrap().file,
+                    &msg.file,
+                    messages.first().unwrap().source_file(),
                     "message uses a different source file"
                 );
                 CacheMessage {
@@ -571,6 +586,7 @@ mod tests {
     use test_case::test_case;
 
     use ruff_cache::CACHE_DIR_NAME;
+    use ruff_linter::message::Message;
     use ruff_linter::settings::flags;
     use ruff_linter::settings::types::UnsafeFixes;
     use ruff_python_ast::PySourceType;
@@ -633,11 +649,7 @@ mod tests {
                     UnsafeFixes::Enabled,
                 )
                 .unwrap();
-                if diagnostics
-                    .messages
-                    .iter()
-                    .any(|m| m.kind.name == "SyntaxError")
-                {
+                if diagnostics.messages.iter().any(Message::is_syntax_error) {
                     parse_errors.push(path.clone());
                 }
                 paths.push(path);
@@ -662,7 +674,7 @@ mod tests {
 
             assert!(
                 cache.package.files.contains_key(relative_path),
-                "missing file from cache: '{}'",
+                "missing file from cache: `{}`",
                 relative_path.display()
             );
         }

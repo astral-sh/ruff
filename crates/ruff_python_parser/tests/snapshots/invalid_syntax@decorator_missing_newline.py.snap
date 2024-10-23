@@ -19,14 +19,14 @@ Module(
                             expression: Name(
                                 ExprName {
                                     range: 1..2,
-                                    id: "x",
+                                    id: Name("x"),
                                     ctx: Load,
                                 },
                             ),
                         },
                     ],
                     name: Identifier {
-                        id: "foo",
+                        id: Name("foo"),
                         range: 7..10,
                     },
                     type_params: None,
@@ -63,14 +63,14 @@ Module(
                             expression: Name(
                                 ExprName {
                                     range: 19..20,
-                                    id: "x",
+                                    id: Name("x"),
                                     ctx: Load,
                                 },
                             ),
                         },
                     ],
                     name: Identifier {
-                        id: "foo",
+                        id: Name("foo"),
                         range: 31..34,
                     },
                     type_params: None,
@@ -106,14 +106,14 @@ Module(
                             expression: Name(
                                 ExprName {
                                     range: 43..44,
-                                    id: "x",
+                                    id: Name("x"),
                                     ctx: Load,
                                 },
                             ),
                         },
                     ],
                     name: Identifier {
-                        id: "Foo",
+                        id: Name("Foo"),
                         range: 51..54,
                     },
                     type_params: None,

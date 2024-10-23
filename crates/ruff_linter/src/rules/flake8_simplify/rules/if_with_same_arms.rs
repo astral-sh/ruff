@@ -65,7 +65,7 @@ pub(crate) fn if_with_same_arms(checker: &mut Checker, stmt_if: &ast::StmtIf) {
         if !current_branch
             .body
             .iter()
-            .zip(following_branch.body.iter())
+            .zip(following_branch.body)
             .all(|(stmt1, stmt2)| ComparableStmt::from(stmt1) == ComparableStmt::from(stmt2))
         {
             continue;
@@ -121,12 +121,12 @@ fn merge_branches(
         return Err(anyhow::anyhow!("Expected colon after test"));
     };
 
-    let main_edit = Edit::deletion(
+    let deletion_edit = Edit::deletion(
         locator.full_line_end(current_branch.end()),
         locator.full_line_end(following_branch.end()),
     );
 
-    // If the test isn't parenthesized, consider parenthesizing it.
+    // If the following test isn't parenthesized, consider parenthesizing it.
     let following_branch_test = if let Some(range) = parenthesized_range(
         following_branch.test.into(),
         stmt_if.into(),
@@ -136,23 +136,45 @@ fn merge_branches(
         Cow::Borrowed(locator.slice(range))
     } else if matches!(
         following_branch.test,
-        Expr::BoolOp(ast::ExprBoolOp {
-            op: ast::BoolOp::Or,
-            ..
-        }) | Expr::Lambda(_)
-            | Expr::Named(_)
+        Expr::Lambda(_) | Expr::Named(_) | Expr::If(_)
     ) {
+        // If the following expressions binds more tightly than `or`, parenthesize it.
         Cow::Owned(format!("({})", locator.slice(following_branch.test)))
     } else {
         Cow::Borrowed(locator.slice(following_branch.test))
     };
 
+    let insertion_edit = Edit::insertion(
+        format!(" or {following_branch_test}"),
+        current_branch_colon.start(),
+    );
+
+    // If the current test isn't parenthesized, consider parenthesizing it.
+    //
+    // For example, if the current test is `x if x else y`, we should parenthesize it to
+    // `(x if x else y) or ...`.
+    let parenthesize_edit = if matches!(
+        current_branch.test,
+        Expr::Lambda(_) | Expr::Named(_) | Expr::If(_)
+    ) && parenthesized_range(
+        current_branch.test.into(),
+        stmt_if.into(),
+        comment_ranges,
+        locator.contents(),
+    )
+    .is_none()
+    {
+        Some(Edit::range_replacement(
+            format!("({})", locator.slice(current_branch.test)),
+            current_branch.test.range(),
+        ))
+    } else {
+        None
+    };
+
     Ok(Fix::safe_edits(
-        main_edit,
-        [Edit::insertion(
-            format!(" or {following_branch_test}"),
-            current_branch_colon.start(),
-        )],
+        deletion_edit,
+        parenthesize_edit.into_iter().chain(Some(insertion_edit)),
     ))
 }
 

@@ -18,7 +18,7 @@ Module(
                             value: Name(
                                 ExprName {
                                     range: 8..9,
-                                    id: "x",
+                                    id: Name("x"),
                                     ctx: Load,
                                 },
                             ),
@@ -70,14 +70,14 @@ Module(
                                                     Name(
                                                         ExprName {
                                                             range: 72..73,
-                                                            id: "x",
+                                                            id: Name("x"),
                                                             ctx: Load,
                                                         },
                                                     ),
                                                     Name(
                                                         ExprName {
                                                             range: 78..79,
-                                                            id: "y",
+                                                            id: Name("y"),
                                                             ctx: Load,
                                                         },
                                                     ),
@@ -90,7 +90,7 @@ Module(
                                 Name(
                                     ExprName {
                                         range: 81..82,
-                                        id: "z",
+                                        id: Name("z"),
                                         ctx: Load,
                                     },
                                 ),
@@ -136,7 +136,7 @@ Module(
                                 Name(
                                     ExprName {
                                         range: 112..113,
-                                        id: "x",
+                                        id: Name("x"),
                                         ctx: Load,
                                     },
                                 ),
