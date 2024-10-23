@@ -60,11 +60,10 @@ mod tests {
 
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote.py"))]
-    #[test_case(
-        Rule::RuntimeImportInTypeCheckingBlock,
-        Path::new("quote_annotations.py")
-    )]
-    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote_annotations.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote2.py"))]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote2.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote3.py"))]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote3.py"))]
     fn quote(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("quote_{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(

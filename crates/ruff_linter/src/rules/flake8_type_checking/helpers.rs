@@ -266,7 +266,7 @@ pub(crate) fn quote_annotation(
     }
 
     let quote = stylist.quote();
-    let mut quote_annotation = QuoteAnnotation::new(stylist);
+    let mut quote_annotation = QuoteAnnotation::new(semantic, stylist);
     quote_annotation.visit_expr(expr);
 
     let annotation = quote_annotation.annotation;
@@ -298,7 +298,7 @@ pub(crate) fn filter_contained(edits: Vec<Edit>) -> Vec<Edit> {
 }
 
 #[derive(Copy, PartialEq, Clone)]
-enum State {
+enum QuoteAnnotationState {
     Literal,
     AnnotatedFirst,
     AnnotatedRest,
@@ -306,25 +306,19 @@ enum State {
 }
 
 pub(crate) struct QuoteAnnotation<'a> {
-    state: Vec<State>,
     stylist: &'a Stylist<'a>,
+    semantic: &'a SemanticModel<'a>,
+    state: Vec<QuoteAnnotationState>,
     annotation: String,
 }
 
 impl<'a> QuoteAnnotation<'a> {
-    pub(crate) fn new(stylist: &'a Stylist<'a>) -> Self {
+    pub(crate) fn new(semantic: &'a SemanticModel<'a>, stylist: &'a Stylist<'a>) -> Self {
         Self {
-            state: vec![],
             stylist,
+            semantic,
+            state: Vec::new(),
             annotation: String::new(),
-        }
-    }
-
-    fn get_state(&self, name: &str) -> State {
-        match name {
-            "Literal" => State::Literal,
-            "Annotated" => State::AnnotatedFirst,
-            _ => State::Other,
         }
     }
 }
@@ -332,66 +326,60 @@ impl<'a> QuoteAnnotation<'a> {
 impl<'a> source_order::SourceOrderVisitor<'a> for QuoteAnnotation<'a> {
     fn visit_expr(&mut self, expr: &'a Expr) {
         let generator = Generator::from(self.stylist);
+
         match expr {
             Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
                 let value_expr = generator.expr(value);
                 self.annotation.push_str(&value_expr);
                 self.annotation.push('[');
-                match value.as_ref() {
-                    Expr::Name(ast::ExprName { id, .. }) => {
-                        self.state.push(self.get_state(id.as_str()));
+
+                if let Some(qualified_name) = self.semantic.resolve_qualified_name(value) {
+                    if self
+                        .semantic
+                        .match_typing_qualified_name(&qualified_name, "Literal")
+                    {
+                        self.state.push(QuoteAnnotationState::Literal);
+                    } else if self
+                        .semantic
+                        .match_typing_qualified_name(&qualified_name, "Annotated")
+                    {
+                        self.state.push(QuoteAnnotationState::AnnotatedFirst);
+                    } else {
+                        self.state.push(QuoteAnnotationState::Other);
                     }
-                    Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
-                        if let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() {
-                            if id.as_str() == "typing" {
-                                self.state.push(self.get_state(attr.id.as_str()));
-                            }
-                        }
-                    }
-                    _ => {}
                 }
 
                 self.visit_expr(slice);
                 self.state.pop();
                 self.annotation.push(']');
             }
-
             Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                let Some(first_elm) = elts.first() else {
+                let Some((first, remaining)) = elts.split_first() else {
                     return;
                 };
-                self.visit_expr(first_elm);
-                if self.state.last().copied() == Some(State::AnnotatedFirst) {
-                    self.state.push(State::AnnotatedRest);
+                self.visit_expr(first);
+                if let Some(last) = self.state.last_mut() {
+                    if *last == QuoteAnnotationState::AnnotatedFirst {
+                        *last = QuoteAnnotationState::AnnotatedRest;
+                    }
                 }
-                for elm in elts.iter().skip(1) {
+                for expr in remaining {
                     self.annotation.push_str(", ");
-                    self.visit_expr(elm);
+                    self.visit_expr(expr);
                 }
                 self.state.pop();
             }
             Expr::BinOp(ast::ExprBinOp {
                 left, op, right, ..
             }) => {
-                debug_assert!(*op == ast::Operator::BitOr);
+                debug_assert_eq!(*op, ast::Operator::BitOr);
                 self.visit_expr(left);
-                self.annotation.push(' ');
-                self.annotation.push_str(op.as_str());
-                self.annotation.push(' ');
+                self.annotation.push_str(" | ");
                 self.visit_expr(right);
-            }
-            Expr::BoolOp(ast::ExprBoolOp { op, values, .. }) => {
-                for (i, value) in values.iter().enumerate() {
-                    if i > 0 {
-                        self.annotation.push(' ');
-                        self.annotation.push_str(op.as_str());
-                    }
-                    self.visit_expr(value);
-                }
             }
             _ => {
                 let source = match self.state.last().copied() {
-                    Some(State::Literal | State::AnnotatedRest) => {
+                    Some(QuoteAnnotationState::Literal | QuoteAnnotationState::AnnotatedRest) => {
                         let mut source = generator.expr(expr);
                         source = source.replace(
                             self.stylist.quote().as_char(),
@@ -399,7 +387,8 @@ impl<'a> source_order::SourceOrderVisitor<'a> for QuoteAnnotation<'a> {
                         );
                         source
                     }
-                    None | Some(State::AnnotatedFirst | State::Other) => {
+                    None
+                    | Some(QuoteAnnotationState::AnnotatedFirst | QuoteAnnotationState::Other) => {
                         let mut source = generator.expr(expr);
                         source = source.replace(self.stylist.quote().as_char(), "");
                         source = source.replace(self.stylist.quote().opposite().as_char(), "");

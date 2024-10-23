@@ -1,13 +1,13 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-quote_annotations.py:2:44: TCH002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
+quote2.py:2:44: TCH002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
   |
 1 | def f():
 2 |     from django.contrib.auth.models import AbstractBaseUser
   |                                            ^^^^^^^^^^^^^^^^ TCH002
 3 | 
-4 |     def test_remove_inner_quotes_double(self, user: AbstractBaseUser["int"], view: "type[CondorBaseViewSet]"):
+4 |     def test_remove_inner_quotes_double(self, user: AbstractBaseUser["int"]):
   |
   = help: Move into type-checking block
 
@@ -19,13 +19,13 @@ quote_annotations.py:2:44: TCH002 [*] Move third-party import `django.contrib.au
 2 4 |     from django.contrib.auth.models import AbstractBaseUser
   5 |+def f():
 3 6 | 
-4   |-    def test_remove_inner_quotes_double(self, user: AbstractBaseUser["int"], view: "type[CondorBaseViewSet]"):
-  7 |+    def test_remove_inner_quotes_double(self, user: "AbstractBaseUser[int]", view: "type[CondorBaseViewSet]"):
+4   |-    def test_remove_inner_quotes_double(self, user: AbstractBaseUser["int"]):
+  7 |+    def test_remove_inner_quotes_double(self, user: "AbstractBaseUser[int]"):
 5 8 |         pass
 6 9 | 
 7 10 | 
 
-quote_annotations.py:9:44: TCH002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
+quote2.py:9:44: TCH002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
    |
  8 | def f():
  9 |     from django.contrib.auth.models import AbstractBaseUser
@@ -55,7 +55,7 @@ quote_annotations.py:9:44: TCH002 [*] Move third-party import `django.contrib.au
 13 16 | 
 14 17 | 
 
-quote_annotations.py:16:44: TCH002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
+quote2.py:16:44: TCH002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
    |
 15 | def f():
 16 |     from django.contrib.auth.models import AbstractBaseUser
@@ -85,7 +85,7 @@ quote_annotations.py:16:44: TCH002 [*] Move third-party import `django.contrib.a
 20 23 | 
 21 24 | 
 
-quote_annotations.py:25:44: TCH002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
+quote2.py:25:44: TCH002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
    |
 23 |     from typing import Annotated, Literal
 24 | 
@@ -116,7 +116,7 @@ quote_annotations.py:25:44: TCH002 [*] Move third-party import `django.contrib.a
 29 32 | 
 30 33 | 
 
-quote_annotations.py:34:44: TCH002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
+quote2.py:34:44: TCH002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
    |
 32 |     from typing import Literal
 33 | 
@@ -147,7 +147,7 @@ quote_annotations.py:34:44: TCH002 [*] Move third-party import `django.contrib.a
 38 41 | 
 39 42 | 
 
-quote_annotations.py:43:44: TCH002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
+quote2.py:43:44: TCH002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
    |
 41 |     from typing import Literal
 42 | 
@@ -178,7 +178,7 @@ quote_annotations.py:43:44: TCH002 [*] Move third-party import `django.contrib.a
 47 50 | 
 48 51 | 
 
-quote_annotations.py:52:44: TCH002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
+quote2.py:52:44: TCH002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
    |
 50 |     from typing import Literal
 51 | 
@@ -209,7 +209,7 @@ quote_annotations.py:52:44: TCH002 [*] Move third-party import `django.contrib.a
 56 59 | 
 57 60 | 
 
-quote_annotations.py:61:44: TCH002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
+quote2.py:61:44: TCH002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
    |
 59 |     from typing import Literal
 60 | 
@@ -240,7 +240,7 @@ quote_annotations.py:61:44: TCH002 [*] Move third-party import `django.contrib.a
 65 68 | 
 66 69 | 
 
-quote_annotations.py:70:44: TCH002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
+quote2.py:70:44: TCH002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
    |
 68 |     from typing import Annotated, Literal
 69 | 
@@ -269,157 +269,4 @@ quote_annotations.py:70:44: TCH002 [*] Move third-party import `django.contrib.a
    75 |+    def test_annotated_literal_mixed_quotes(user: "AbstractBaseUser[Annotated[str, 'max_length=20', Literal['user', 'admin']]]"):
 73 76 |         pass
 74 77 | 
-75 78 | 
-
-quote_annotations.py:79:44: TCH002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
-   |
-77 |     from typing import Literal, Union
-78 | 
-79 |     from django.contrib.auth.models import AbstractBaseUser
-   |                                            ^^^^^^^^^^^^^^^^ TCH002
-80 | 
-81 |     def test_union_literal_mixed_quotes(user: AbstractBaseUser[Union[Literal['active', "inactive"], str]]):
-   |
-   = help: Move into type-checking block
-
-ℹ Unsafe fix
-   1  |+from typing import TYPE_CHECKING
-   2  |+
-   3  |+if TYPE_CHECKING:
-   4  |+    from django.contrib.auth.models import AbstractBaseUser
-1  5  | def f():
-2  6  |     from django.contrib.auth.models import AbstractBaseUser
-3  7  | 
---------------------------------------------------------------------------------
-76 80 | def f():
-77 81 |     from typing import Literal, Union
-78 82 | 
-79    |-    from django.contrib.auth.models import AbstractBaseUser
-80 83 | 
-81    |-    def test_union_literal_mixed_quotes(user: AbstractBaseUser[Union[Literal['active', "inactive"], str]]):
-   84 |+    def test_union_literal_mixed_quotes(user: "AbstractBaseUser[Union[Literal['active', 'inactive'], str]]"):
-82 85 |         pass
-83 86 | 
-84 87 | 
-
-quote_annotations.py:88:44: TCH002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
-   |
-86 |     from typing import Callable, Literal
-87 | 
-88 |     from django.contrib.auth.models import AbstractBaseUser
-   |                                            ^^^^^^^^^^^^^^^^ TCH002
-89 | 
-90 |     def test_callable_literal_mixed_quotes(callable_fn: AbstractBaseUser[Callable[["int", Literal['admin', "user"]], 'bool']]):
-   |
-   = help: Move into type-checking block
-
-ℹ Unsafe fix
-   1  |+from typing import TYPE_CHECKING
-   2  |+
-   3  |+if TYPE_CHECKING:
-   4  |+    from django.contrib.auth.models import AbstractBaseUser
-1  5  | def f():
-2  6  |     from django.contrib.auth.models import AbstractBaseUser
-3  7  | 
---------------------------------------------------------------------------------
-85 89 | def f():
-86 90 |     from typing import Callable, Literal
-87 91 | 
-88    |-    from django.contrib.auth.models import AbstractBaseUser
-89 92 | 
-90    |-    def test_callable_literal_mixed_quotes(callable_fn: AbstractBaseUser[Callable[["int", Literal['admin', "user"]], 'bool']]):
-   93 |+    def test_callable_literal_mixed_quotes(callable_fn: "AbstractBaseUser[Callable[[int, Literal[admin, user]], bool]]"):
-91 94 |         pass
-92 95 | 
-93 96 | 
-
-quote_annotations.py:97:44: TCH002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
-   |
-95 |     from typing import Annotated, Callable, Literal
-96 | 
-97 |     from django.contrib.auth.models import AbstractBaseUser
-   |                                            ^^^^^^^^^^^^^^^^ TCH002
-98 | 
-99 |     def test_callable_annotated_literal(callable_fn: AbstractBaseUser[Callable[[int, Annotated[str, Literal['active', "inactive"]]], bool]]):
-   |
-   = help: Move into type-checking block
-
-ℹ Unsafe fix
-    1   |+from typing import TYPE_CHECKING
-    2   |+
-    3   |+if TYPE_CHECKING:
-    4   |+    from django.contrib.auth.models import AbstractBaseUser
-1   5   | def f():
-2   6   |     from django.contrib.auth.models import AbstractBaseUser
-3   7   | 
---------------------------------------------------------------------------------
-94  98  | def f():
-95  99  |     from typing import Annotated, Callable, Literal
-96  100 | 
-97      |-    from django.contrib.auth.models import AbstractBaseUser
-98  101 | 
-99      |-    def test_callable_annotated_literal(callable_fn: AbstractBaseUser[Callable[[int, Annotated[str, Literal['active', "inactive"]]], bool]]):
-    102 |+    def test_callable_annotated_literal(callable_fn: "AbstractBaseUser[Callable[[int, Annotated[str, Literal[active, inactive]]], bool]]"):
-100 103 |         pass
-101 104 | 
-102 105 | 
-
-quote_annotations.py:120:37: TCH002 [*] Move third-party import `django.contrib.auth.models` into a type-checking block
-    |
-118 |     from typing import literal
-119 | 
-120 |     from django.contrib.auth import models
-    |                                     ^^^^^^ TCH002
-121 | 
-122 |     def test_attribute(arg: models.AbstractBaseUser["int"]):
-    |
-    = help: Move into type-checking block
-
-ℹ Unsafe fix
-    1   |+from typing import TYPE_CHECKING
-    2   |+
-    3   |+if TYPE_CHECKING:
-    4   |+    from django.contrib.auth import models
-1   5   | def f():
-2   6   |     from django.contrib.auth.models import AbstractBaseUser
-3   7   | 
---------------------------------------------------------------------------------
-117 121 | def f():
-118 122 |     from typing import literal
-119 123 | 
-120     |-    from django.contrib.auth import models
-121 124 | 
-122     |-    def test_attribute(arg: models.AbstractBaseUser["int"]):
-    125 |+    def test_attribute(arg: "models.AbstractBaseUser[int]"):
-123 126 |         pass
-124 127 | 
-125 128 | 
-
-quote_annotations.py:129:37: TCH002 [*] Move third-party import `django.contrib.auth.models` into a type-checking block
-    |
-127 |     from typing import Literal
-128 | 
-129 |     from django.contrib.auth import models
-    |                                     ^^^^^^ TCH002
-130 | 
-131 |     def test_attribute_typing_literal(arg: models.AbstractBaseUser[Literal["admin"]]):
-    |
-    = help: Move into type-checking block
-
-ℹ Unsafe fix
-    1   |+from typing import TYPE_CHECKING
-    2   |+
-    3   |+if TYPE_CHECKING:
-    4   |+    from django.contrib.auth import models
-1   5   | def f():
-2   6   |     from django.contrib.auth.models import AbstractBaseUser
-3   7   | 
---------------------------------------------------------------------------------
-126 130 | def f():
-127 131 |     from typing import Literal
-128 132 | 
-129     |-    from django.contrib.auth import models
-130 133 | 
-131     |-    def test_attribute_typing_literal(arg: models.AbstractBaseUser[Literal["admin"]]):
-    134 |+    def test_attribute_typing_literal(arg: "models.AbstractBaseUser[Literal['admin']]"):
-132 135 |         pass
+75 78 |

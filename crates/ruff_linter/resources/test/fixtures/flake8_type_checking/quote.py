@@ -12,13 +12,6 @@ def f():
         ...
 
 
-# def f(): # Causes fixes to not converge
-#     from pandas import DataFrame
-#
-#     def baz() -> DataFrame["int"]:
-#         ...
-
-
 def f():
     import pandas as pd
 
