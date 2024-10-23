@@ -191,13 +191,13 @@ impl AstIdsBuilder {
 }
 
 /// Node key that can only be constructed for expressions.
-pub mod node_key {
+pub(crate) mod node_key {
     use ruff_python_ast as ast;
 
     use crate::node_key::NodeKey;
 
     #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
-    pub struct ExpressionNodeKey(NodeKey);
+    pub(crate) struct ExpressionNodeKey(NodeKey);
 
     impl From<ast::ExpressionRef<'_>> for ExpressionNodeKey {
         fn from(value: ast::ExpressionRef<'_>) -> Self {

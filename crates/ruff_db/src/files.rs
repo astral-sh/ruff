@@ -370,7 +370,6 @@ impl File {
 
     pub fn try_url(&self, db: &dyn Db) -> url::Url {
         let p = self.path(db);
-        eprintln!("TRY_URL ON {:?}", p);
         match p {
             FilePath::System(s) => {
                 url::Url::parse(&("file://".to_string() + &s.to_string())).unwrap()

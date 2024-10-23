@@ -34,15 +34,16 @@ impl BackgroundDocumentRequestHandler for GotoDefinitionHandler {
         match lookup_result {
             Some(DefLocation::Location { url, range }) => {
                 let result = Location { uri: url, range };
-                return Ok(Some(GotoDefinitionResponse::Array(vec![result])));
+                Ok(Some(GotoDefinitionResponse::Array(vec![result])))
             }
             Some(DefLocation::Todo { s }) => {
                 log_err_msg!("GOT TODO: {}", s);
+                Ok(None)
             }
             None => {
                 log_err_msg!("NOTHING FOUND");
+                Ok(None)
             }
         }
-        Ok(None)
     }
 }

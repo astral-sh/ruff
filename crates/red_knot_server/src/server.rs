@@ -186,7 +186,6 @@ impl Server {
         let mut scheduler =
             schedule::Scheduler::new(&mut session, worker_threads, connection.make_sender());
 
-        log_err_msg!("WELCOME TO RUFF LSP");
         for msg in connection.incoming() {
             if connection.handle_shutdown(&msg)? {
                 break;
