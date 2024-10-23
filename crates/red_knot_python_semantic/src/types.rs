@@ -299,6 +299,7 @@ impl<'db> Type<'db> {
         }
     }
 
+    #[track_caller]
     pub fn expect_class_literal(self) -> ClassType<'db> {
         self.into_class_literal_type()
             .expect("Expected a Type::ClassLiteral variant")
@@ -315,6 +316,7 @@ impl<'db> Type<'db> {
         }
     }
 
+    #[track_caller]
     pub fn expect_module_literal(self) -> File {
         self.into_module_literal_type()
             .expect("Expected a Type::ModuleLiteral variant")
@@ -327,6 +329,7 @@ impl<'db> Type<'db> {
         }
     }
 
+    #[track_caller]
     pub fn expect_union(self) -> UnionType<'db> {
         self.into_union_type()
             .expect("Expected a Type::Union variant")
@@ -343,6 +346,7 @@ impl<'db> Type<'db> {
         }
     }
 
+    #[track_caller]
     pub fn expect_intersection(self) -> IntersectionType<'db> {
         self.into_intersection_type()
             .expect("Expected a Type::Intersection variant")
@@ -355,6 +359,7 @@ impl<'db> Type<'db> {
         }
     }
 
+    #[track_caller]
     pub fn expect_function_literal(self) -> FunctionType<'db> {
         self.into_function_literal_type()
             .expect("Expected a Type::FunctionLiteral variant")
@@ -371,6 +376,7 @@ impl<'db> Type<'db> {
         }
     }
 
+    #[track_caller]
     pub fn expect_int_literal(self) -> i64 {
         self.into_int_literal_type()
             .expect("Expected a Type::IntLiteral variant")
