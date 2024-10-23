@@ -290,3 +290,21 @@ LEEEEEEEEEEEEEEEEEEEEEEFT = RRRRRRRRIIIIIIIIIIIIGGGGGHHHT | {
     "entityNameeeeeeeeeeeeeeeeee",  # comment must be long enough to
     "some long implicit concatenated string" "that should join"
 }
+
+# Ensure that flipping between Multiline and BestFit layout results in stable formatting
+# when using IfBreaksParenthesized layout.
+assert False, "Implicit concatenated string" "uses {} layout on {} format".format(
+    "Multiline", "first"
+)
+
+assert False, await "Implicit concatenated string" "uses {} layout on {} format".format(
+    "Multiline", "first"
+)
+
+assert False, "Implicit concatenated stringuses {} layout on {} format"[
+    aaaaaaaaa, bbbbbb
+]
+
+assert False, +"Implicit concatenated string" "uses {} layout on {} format".format(
+    "Multiline", "first"
+)

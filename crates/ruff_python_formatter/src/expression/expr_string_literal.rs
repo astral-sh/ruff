@@ -27,21 +27,20 @@ impl FormatNodeRule<ExprStringLiteral> for FormatExprStringLiteral {
     fn fmt_fields(&self, item: &ExprStringLiteral, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprStringLiteral { value, .. } = item;
 
-        match value.as_slice() {
-            [string_literal] => string_literal.format().with_options(self.kind).fmt(f),
-            _ => {
-                // Always join strings that aren't parenthesized and thus, always on a single line.
-                if !f.context().node_level().is_parenthesized() {
-                    if let Some(mut format_flat) =
-                        FormatImplicitConcatenatedStringFlat::new(item.into(), f.context())
-                    {
-                        format_flat.set_docstring(self.kind.is_docstring());
-                        return format_flat.fmt(f);
-                    }
+        if let [string_literal] = value.as_slice() {
+            string_literal.format().with_options(self.kind).fmt(f)
+        } else {
+            // Always join strings that aren't parenthesized and thus, always on a single line.
+            if !f.context().node_level().is_parenthesized() {
+                if let Some(mut format_flat) =
+                    FormatImplicitConcatenatedStringFlat::new(item.into(), f.context())
+                {
+                    format_flat.set_docstring(self.kind.is_docstring());
+                    return format_flat.fmt(f);
                 }
-
-                in_parentheses_only_group(&FormatImplicitConcatenatedString::new(item)).fmt(f)
             }
+
+            in_parentheses_only_group(&FormatImplicitConcatenatedString::new(item)).fmt(f)
         }
     }
 }
