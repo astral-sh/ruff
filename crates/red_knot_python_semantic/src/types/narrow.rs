@@ -4,7 +4,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, SymbolTable};
 use crate::semantic_index::symbol_table;
-use crate::types::{infer_expression_types, IntersectionBuilder, Type};
+use crate::types::{infer_expression_types, IntersectionBuilder, Type, UnionBuilder};
 use crate::Db;
 use itertools::Itertools;
 use ruff_python_ast as ast;
@@ -88,10 +88,15 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
     }
 
     fn evaluate_expression_constraint(&mut self, expression: Expression<'db>) {
-        if let ast::Expr::Compare(expr_compare) = expression.node_ref(self.db).node() {
-            self.add_expr_compare(expr_compare, expression);
+        match expression.node_ref(self.db).node() {
+            ast::Expr::Compare(expr_compare) => {
+                self.add_expr_compare(expr_compare, expression);
+            }
+            ast::Expr::Call(expr_call) => {
+                self.add_expr_call(expr_call, expression);
+            }
+            _ => {} // TODO other test expression kinds
         }
-        // TODO other test expression kinds
     }
 
     fn evaluate_pattern_constraint(&mut self, pattern: PatternConstraint<'db>) {
@@ -188,6 +193,51 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                     }
                     _ => {
                         // TODO other comparison types
+                    }
+                }
+            }
+        }
+    }
+
+    /// Generate a constraint from the *type* of the second argument of an `isinstance` call.
+    ///
+    /// Example: for `isinstance(…, str)`, we would infer `Type::ClassLiteral(str)` from the
+    /// second argument, but we need to generate a `Type::Instance(str)` constraint that can
+    /// be used to narrow down the type of the first argument.
+    fn to_isinstance_constraint(&self, classinfo: &Type<'db>) -> Option<Type<'db>> {
+        match classinfo {
+            Type::ClassLiteral(class) => Some(Type::Instance(*class)),
+            Type::Tuple(tuple) => {
+                let mut builder = UnionBuilder::new(self.db);
+                for element in tuple.elements(self.db) {
+                    builder = builder.add(self.to_isinstance_constraint(element)?);
+                }
+                Some(builder.build())
+            }
+            _ => None,
+        }
+    }
+
+    fn add_expr_call(&mut self, expr_call: &ast::ExprCall, expression: Expression<'db>) {
+        let scope = self.scope();
+        let inference = infer_expression_types(self.db, expression);
+
+        let func_name = expr_call.func.as_name_expr();
+
+        if matches!(func_name, Some(name) if name.id() == "isinstance") {
+            if expr_call.arguments.args.len() == 2 {
+                let lhs = &expr_call.arguments.args[0];
+                let rhs = &expr_call.arguments.args[1];
+
+                if let ast::Expr::Name(ast::ExprName { id, .. }) = lhs {
+                    let symbol = self.symbols().symbol_id_by_name(id).unwrap();
+
+                    let rhs_type = inference.expression_ty(rhs.scoped_ast_id(self.db, scope));
+
+                    // TODO: add support for PEP 604 union types on the right hand side:
+                    // isinstance(x, str | (int | float))
+                    if let Some(constraint) = self.to_isinstance_constraint(&rhs_type) {
+                        self.constraints.insert(symbol, constraint);
                     }
                 }
             }
