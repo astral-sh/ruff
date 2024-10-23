@@ -62,6 +62,28 @@ fn all_narrowing_constraints_for_expression<'db>(
     NarrowingConstraintsBuilder::new(db, Constraint::Expression(expression)).finish()
 }
 
+/// Generate a constraint from the *type* of the second argument of an `isinstance` call.
+///
+/// Example: for `isinstance(…, str)`, we would infer `Type::ClassLiteral(str)` from the
+/// second argument, but we need to generate a `Type::Instance(str)` constraint that can
+/// be used to narrow down the type of the first argument.
+fn generate_isinstance_constraint<'db>(
+    db: &'db dyn Db,
+    classinfo: &Type<'db>,
+) -> Option<Type<'db>> {
+    match classinfo {
+        Type::ClassLiteral(class) => Some(Type::Instance(*class)),
+        Type::Tuple(tuple) => {
+            let mut builder = UnionBuilder::new(db);
+            for element in tuple.elements(db) {
+                builder = builder.add(generate_isinstance_constraint(db, element)?);
+            }
+            Some(builder.build())
+        }
+        _ => None,
+    }
+}
+
 type NarrowingConstraints<'db> = FxHashMap<ScopedSymbolId, Type<'db>>;
 
 struct NarrowingConstraintsBuilder<'db> {
@@ -201,25 +223,6 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         }
     }
 
-    /// Generate a constraint from the *type* of the second argument of an `isinstance` call.
-    ///
-    /// Example: for `isinstance(…, str)`, we would infer `Type::ClassLiteral(str)` from the
-    /// second argument, but we need to generate a `Type::Instance(str)` constraint that can
-    /// be used to narrow down the type of the first argument.
-    fn to_isinstance_constraint(&self, classinfo: &Type<'db>) -> Option<Type<'db>> {
-        match classinfo {
-            Type::ClassLiteral(class) => Some(Type::Instance(*class)),
-            Type::Tuple(tuple) => {
-                let mut builder = UnionBuilder::new(self.db);
-                for element in tuple.elements(self.db) {
-                    builder = builder.add(self.to_isinstance_constraint(element)?);
-                }
-                Some(builder.build())
-            }
-            _ => None,
-        }
-    }
-
     fn add_expr_call(&mut self, expr_call: &ast::ExprCall, expression: Expression<'db>) {
         let scope = self.scope();
         let inference = infer_expression_types(self.db, expression);
@@ -239,7 +242,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
 
                     // TODO: add support for PEP 604 union types on the right hand side:
                     // isinstance(x, str | (int | float))
-                    if let Some(constraint) = self.to_isinstance_constraint(&rhs_type) {
+                    if let Some(constraint) = generate_isinstance_constraint(self.db, &rhs_type) {
                         self.constraints.insert(symbol, constraint);
                     }
                 }
