@@ -205,6 +205,7 @@ impl<'db> TypeInference<'db> {
         }
     }
 
+    #[track_caller]
     pub(crate) fn expression_ty(&self, expression: ScopedExpressionId) -> Type<'db> {
         self.expressions[&expression]
     }
@@ -213,10 +214,12 @@ impl<'db> TypeInference<'db> {
         self.expressions.get(&expression).copied()
     }
 
+    #[track_caller]
     pub(crate) fn binding_ty(&self, definition: Definition<'db>) -> Type<'db> {
         self.bindings[&definition]
     }
 
+    #[track_caller]
     pub(crate) fn declaration_ty(&self, definition: Definition<'db>) -> Type<'db> {
         self.declarations[&definition]
     }
