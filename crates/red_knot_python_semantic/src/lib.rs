@@ -11,11 +11,13 @@ pub use semantic_model::{HasTy, SemanticModel};
 
 pub mod ast_node_ref;
 mod db;
+pub mod location;
 mod module_name;
 mod module_resolver;
 mod node_key;
 mod program;
 mod python_version;
+pub mod search;
 pub mod semantic_index;
 mod semantic_model;
 pub(crate) mod site_packages;

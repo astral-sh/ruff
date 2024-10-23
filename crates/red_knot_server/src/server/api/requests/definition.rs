@@ -1,13 +1,9 @@
 use std::borrow::Cow;
 
-use lsp_types::{
-    request::GotoDefinition, GotoDefinitionParams, GotoDefinitionResponse, Location, Range,
-};
-
-use crate::{
-    server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler},
-    session::DefLocation,
-};
+use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
+use lsp_types::{request::GotoDefinition, GotoDefinitionParams, GotoDefinitionResponse, Location};
+use red_knot_python_semantic::location::DefLocation;
+use red_knot_python_semantic::search::definition_at_location;
 
 pub(crate) struct GotoDefinitionHandler;
 
@@ -27,9 +23,13 @@ impl BackgroundDocumentRequestHandler for GotoDefinitionHandler {
         params: GotoDefinitionParams,
     ) -> crate::server::api::Result<Option<GotoDefinitionResponse>> {
         log_err_msg!("ATTEMPTING LOOKUP...");
-        let lookup_result =
-            snapshot.definition_at_location(params.text_document_position_params.position, &db);
+        let Some(file) = snapshot.file(&db) else {
+            // XXX not sure if this should be considered an error or not...
+            return Ok(None);
+        };
 
+        let lookup_result =
+            definition_at_location(file, params.text_document_position_params.position, &db);
         match lookup_result {
             Some(DefLocation::Location { url, range }) => {
                 eprintln!("GOT SOMETHING!");
