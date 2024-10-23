@@ -86,6 +86,9 @@ if isinstance(x, A):
 
 ```py
 t = type("t", (), {})
+
+# This isn't testing what we want it to test if we infer anything more precise here:
+reveal_type(t)  # revealed: type
 x = 1 if flag else "foo"
 
 if isinstance(x, t):
