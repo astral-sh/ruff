@@ -54,6 +54,16 @@ impl Token {
         self.flags.is_triple_quoted()
     }
 
+    /// Returns `true` if the current token is a raw string of any kind.
+    ///
+    /// # Panics
+    ///
+    /// If it isn't a string or any f-string tokens.
+    pub const fn is_raw_string(self) -> bool {
+        assert!(self.is_any_string());
+        self.flags.is_raw_string()
+    }
+
     /// Returns the [`Quote`] style for the current string token of any kind.
     ///
     /// # Panics
@@ -62,6 +72,16 @@ impl Token {
     pub fn string_quote_style(self) -> Quote {
         assert!(self.is_any_string());
         self.flags.quote_style()
+    }
+
+    /// Returns the string flags for the current string token of any kind.
+    ///
+    /// # Panics
+    ///
+    /// If it isn't a string or any f-string tokens.
+    pub fn string_flags(self) -> AnyStringFlags {
+        assert!(self.is_any_string());
+        self.flags.as_any_string_flags()
     }
 
     /// Returns `true` if this is any kind of string token.
