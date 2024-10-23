@@ -113,3 +113,13 @@ x = 1 if flag else "a"
 if isinstance_alias(x, int):
     reveal_type(x)  # revealed: Literal[1]
 ```
+
+## Do support narrowing if `isinstance` is imported
+
+```py
+from builtins import isinstance as imported_isinstance
+
+x = 1 if flag else "a"
+if imported_isinstance(x, int):
+    reveal_type(x)  # revealed: Literal[1]
+```
