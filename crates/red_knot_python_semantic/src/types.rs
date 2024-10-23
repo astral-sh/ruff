@@ -868,16 +868,16 @@ impl<'db> Type<'db> {
     fn call(self, db: &'db dyn Db, arg_types: &[Type<'db>]) -> CallOutcome<'db> {
         match self {
             // TODO validate typed call arguments vs callable signature
-            Type::FunctionLiteral(function_type) => match function_type.known(db) {
-                None => CallOutcome::callable(function_type.return_type(db)),
-                Some(KnownFunction::RevealType) => CallOutcome::revealed(
-                    function_type.return_type(db),
-                    *arg_types.first().unwrap_or(&Type::Unknown),
-                ),
-                Some(KnownFunction::IsInstance) => {
-                    CallOutcome::callable(KnownClass::Bool.to_instance(db))
+            Type::FunctionLiteral(function_type) => {
+                if function_type.is_known(db, KnownFunction::RevealType) {
+                    CallOutcome::revealed(
+                        function_type.return_type(db),
+                        *arg_types.first().unwrap_or(&Type::Unknown),
+                    )
+                } else {
+                    CallOutcome::callable(function_type.return_type(db))
                 }
-            },
+            }
 
             // TODO annotated return type on `__new__` or metaclass `__call__`
             Type::ClassLiteral(class) => {
@@ -1597,6 +1597,10 @@ impl<'db> FunctionType<'db> {
                 }
             })
             .unwrap_or(Type::Unknown)
+    }
+
+    pub fn is_known(self, db: &'db dyn Db, known_function: KnownFunction) -> bool {
+        self.known(db) == Some(known_function)
     }
 }
 
