@@ -47,7 +47,13 @@ impl<'db> Definition<'db> {
         self.kind(db).category().is_binding()
     }
 
-    /// Return true if this is a symbol was defined in the `typing` or `typing_extensions` modules
+    pub(crate) fn is_builtin_definition(self, db: &'db dyn Db) -> bool {
+        file_to_module(db, self.file(db)).is_some_and(|module| {
+            module.search_path().is_standard_library() && matches!(&**module.name(), "builtins")
+        })
+    }
+
+    /// Return true if this symbol was defined in the `typing` or `typing_extensions` modules
     pub(crate) fn is_typing_definition(self, db: &'db dyn Db) -> bool {
         file_to_module(db, self.file(db)).is_some_and(|module| {
             module.search_path().is_standard_library()

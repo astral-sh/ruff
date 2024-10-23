@@ -4,7 +4,9 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, SymbolTable};
 use crate::semantic_index::symbol_table;
-use crate::types::{infer_expression_types, IntersectionBuilder, Type, UnionBuilder};
+use crate::types::{
+    infer_expression_types, IntersectionBuilder, KnownFunction, Type, UnionBuilder,
+};
 use crate::Db;
 use itertools::Itertools;
 use ruff_python_ast as ast;
@@ -222,22 +224,25 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         let scope = self.scope();
         let inference = infer_expression_types(self.db, expression);
 
-        let func_name = expr_call.func.as_name_expr();
+        if let Some(func_type) = inference
+            .expression_ty(expr_call.func.scoped_ast_id(self.db, scope))
+            .into_function_literal_type()
+        {
+            if func_type.known(self.db) == Some(KnownFunction::IsInstance) {
+                if expr_call.arguments.args.len() == 2 {
+                    let lhs = &expr_call.arguments.args[0];
+                    let rhs = &expr_call.arguments.args[1];
 
-        if matches!(func_name, Some(name) if name.id() == "isinstance") {
-            if expr_call.arguments.args.len() == 2 {
-                let lhs = &expr_call.arguments.args[0];
-                let rhs = &expr_call.arguments.args[1];
+                    if let ast::Expr::Name(ast::ExprName { id, .. }) = lhs {
+                        let symbol = self.symbols().symbol_id_by_name(id).unwrap();
 
-                if let ast::Expr::Name(ast::ExprName { id, .. }) = lhs {
-                    let symbol = self.symbols().symbol_id_by_name(id).unwrap();
+                        let rhs_type = inference.expression_ty(rhs.scoped_ast_id(self.db, scope));
 
-                    let rhs_type = inference.expression_ty(rhs.scoped_ast_id(self.db, scope));
-
-                    // TODO: add support for PEP 604 union types on the right hand side:
-                    // isinstance(x, str | (int | float))
-                    if let Some(constraint) = self.to_isinstance_constraint(&rhs_type) {
-                        self.constraints.insert(symbol, constraint);
+                        // TODO: add support for PEP 604 union types on the right hand side:
+                        // isinstance(x, str | (int | float))
+                        if let Some(constraint) = self.to_isinstance_constraint(&rhs_type) {
+                            self.constraints.insert(symbol, constraint);
+                        }
                     }
                 }
             }

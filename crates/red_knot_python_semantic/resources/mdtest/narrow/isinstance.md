@@ -81,3 +81,15 @@ if isinstance(x, A):
     if isinstance(x, B):
         reveal_type(x)  # revealed: A & B
 ```
+
+## Do not use custom `isinstance` for narrowing
+
+```py
+def isinstance(x, t):
+    return True
+
+
+x = 1 if flag else "a"
+if isinstance(x, int):
+    reveal_type(x)  # revealed: Literal[1] | Literal["a"]
+```

@@ -874,6 +874,9 @@ impl<'db> Type<'db> {
                     function_type.return_type(db),
                     *arg_types.first().unwrap_or(&Type::Unknown),
                 ),
+                Some(KnownFunction::IsInstance) => {
+                    CallOutcome::callable(KnownClass::Bool.to_instance(db))
+                }
             },
 
             // TODO annotated return type on `__new__` or metaclass `__call__`
@@ -1603,6 +1606,8 @@ impl<'db> FunctionType<'db> {
 pub enum KnownFunction {
     /// `builtins.reveal_type`, `typing.reveal_type` or `typing_extensions.reveal_type`
     RevealType,
+    /// `builtins.isinstance`
+    IsInstance,
 }
 
 #[salsa::interned]
