@@ -229,20 +229,16 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             .into_function_literal_type()
         {
             if func_type.known(self.db) == Some(KnownFunction::IsInstance) {
-                if expr_call.arguments.args.len() == 2 {
-                    let lhs = &expr_call.arguments.args[0];
-                    let rhs = &expr_call.arguments.args[1];
+                if let [ast::Expr::Name(ast::ExprName { id, .. }), rhs] = &*expr_call.arguments.args
+                {
+                    let symbol = self.symbols().symbol_id_by_name(id).unwrap();
 
-                    if let ast::Expr::Name(ast::ExprName { id, .. }) = lhs {
-                        let symbol = self.symbols().symbol_id_by_name(id).unwrap();
+                    let rhs_type = inference.expression_ty(rhs.scoped_ast_id(self.db, scope));
 
-                        let rhs_type = inference.expression_ty(rhs.scoped_ast_id(self.db, scope));
-
-                        // TODO: add support for PEP 604 union types on the right hand side:
-                        // isinstance(x, str | (int | float))
-                        if let Some(constraint) = self.to_isinstance_constraint(&rhs_type) {
-                            self.constraints.insert(symbol, constraint);
-                        }
+                    // TODO: add support for PEP 604 union types on the right hand side:
+                    // isinstance(x, str | (int | float))
+                    if let Some(constraint) = self.to_isinstance_constraint(&rhs_type) {
+                        self.constraints.insert(symbol, constraint);
                     }
                 }
             }
