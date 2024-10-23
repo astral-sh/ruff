@@ -127,6 +127,22 @@ if imported_isinstance(x, int):
     reveal_type(x)  # revealed: Literal[1]
 ```
 
+## Do not narrow if second argument is not a type
+
+```py
+x = 1 if flag else "a"
+
+# TODO: this should cause us to emit a diagnostic during
+# type checking
+if isinstance(x, "a"):
+    reveal_type(x)  # revealed: Literal[1] | Literal["a"]
+
+# TODO: this should cause us to emit a diagnostic during
+# type checking
+if isinstance(x, "int"):
+    reveal_type(x)  # revealed: Literal[1] | Literal["a"]
+```
+
 ## Do not narrow if there are keyword arguments
 
 ```py
