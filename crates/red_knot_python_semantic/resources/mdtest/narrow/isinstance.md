@@ -93,3 +93,13 @@ x = 1 if flag else "a"
 if isinstance(x, int):
     reveal_type(x)  # revealed: Literal[1] | Literal["a"]
 ```
+
+## Do support narrowing if `isinstance` is aliased
+
+```py
+isinstance_alias = isinstance
+
+x = 1 if flag else "a"
+if isinstance_alias(x, int):
+    reveal_type(x)  # revealed: Literal[1]
+```
