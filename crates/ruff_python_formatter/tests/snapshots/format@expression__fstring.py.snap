@@ -2164,7 +2164,7 @@ hello {
 
 # Implicit concatenated f-string containing quotes
 _ = (
-    'This string should change its quotes to double quotes'
+    "This string should change its quotes to double quotes"
     f'This string uses double quotes in an expression {"it's a quote"}'
     f'This f-string does not use any quotes.'
 )
@@ -3045,10 +3045,9 @@ f'{1=: {'ab"cd"'}}'  # It's okay if the quotes are in an expression part.
  
  # Implicit concatenated f-string containing quotes
  _ = (
--    'This string should change its quotes to double quotes'
+     "This string should change its quotes to double quotes"
 -    f'This string uses double quotes in an expression {"it's a quote"}'
 -    f'This f-string does not use any quotes.'
-+    "This string should change its quotes to double quotes"
 +    f"This string uses double quotes in an expression {"it's a quote"}"
 +    f"This f-string does not use any quotes."
  )
