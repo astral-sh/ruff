@@ -371,8 +371,9 @@ impl Format<PyFormatContext<'_>> for FormatLiteralContent {
             0,
             self.flags,
             self.flags.is_f_string() && !self.is_fstring,
-            true,
-            false,
+            // TODO: Remove the argument from `normalize_string` when promoting the `is_f_string_formatting_enabled` preview style.
+            self.flags.is_f_string() && !is_f_string_formatting_enabled(f.context()),
+            is_f_string_formatting_enabled(f.context()),
         );
 
         // Trim the start and end of the string if it's the first or last part of a docstring.

@@ -3,9 +3,7 @@ use ruff_python_ast::{AnyStringFlags, FString, StringFlags};
 use ruff_source_file::Locator;
 
 use crate::prelude::*;
-use crate::preview::{
-    is_f_string_formatting_enabled, is_f_string_implicit_concatenated_string_literal_quotes_enabled,
-};
+use crate::preview::is_f_string_formatting_enabled;
 use crate::string::{Quoting, StringNormalizer, StringQuotes};
 
 use super::f_string_element::FormatFStringElement;
@@ -33,12 +31,11 @@ impl Format<PyFormatContext<'_>> for FormatFString<'_> {
 
         // If the preview style is enabled, make the decision on what quotes to use locally for each
         // f-string instead of globally for the entire f-string expression.
-        let quoting =
-            if is_f_string_implicit_concatenated_string_literal_quotes_enabled(f.context()) {
-                Quoting::CanChange
-            } else {
-                self.quoting
-            };
+        let quoting = if is_f_string_formatting_enabled(f.context()) {
+            Quoting::CanChange
+        } else {
+            self.quoting
+        };
 
         let normalizer = StringNormalizer::from_context(f.context()).with_quoting(quoting);
 
