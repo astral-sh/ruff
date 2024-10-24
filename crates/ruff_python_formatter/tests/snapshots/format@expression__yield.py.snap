@@ -210,7 +210,7 @@ yield (
     )
 )
 
-yield "Cache key will cause errors if used with memcached: %r " "(longer than %s)" % (
+yield "Cache key will cause errors if used with memcached: %r (longer than %s)" % (
     key,
     MEMCACHE_MAX_KEY_LENGTH,
 )
@@ -228,8 +228,7 @@ yield (
     "Django to create, modify, and delete the table"
 )
 yield (
-    "# Feel free to rename the models, but don't rename db_table values or "
-    "field names."
+    "# Feel free to rename the models, but don't rename db_table values or field names."
 )
 
 yield (
@@ -241,8 +240,7 @@ yield (
     "Django to create, modify, and delete the table"
 )
 yield (
-    "# Feel free to rename the models, but don't rename db_table values or "
-    "field names."
+    "# Feel free to rename the models, but don't rename db_table values or field names."
 )
 
 # Regression test for: https://github.com/astral-sh/ruff/issues/7420
@@ -277,40 +275,4 @@ result = yield (
 )
 
 print((yield x))
-```
-
-
-## Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -78,7 +78,7 @@
-     )
- )
- 
--yield "Cache key will cause errors if used with memcached: %r " "(longer than %s)" % (
-+yield "Cache key will cause errors if used with memcached: %r (longer than %s)" % (
-     key,
-     MEMCACHE_MAX_KEY_LENGTH,
- )
-@@ -96,8 +96,7 @@
-     "Django to create, modify, and delete the table"
- )
- yield (
--    "# Feel free to rename the models, but don't rename db_table values or "
--    "field names."
-+    "# Feel free to rename the models, but don't rename db_table values or field names."
- )
- 
- yield (
-@@ -109,8 +108,7 @@
-     "Django to create, modify, and delete the table"
- )
- yield (
--    "# Feel free to rename the models, but don't rename db_table values or "
--    "field names."
-+    "# Feel free to rename the models, but don't rename db_table values or field names."
- )
- 
- # Regression test for: https://github.com/astral-sh/ruff/issues/7420
 ```

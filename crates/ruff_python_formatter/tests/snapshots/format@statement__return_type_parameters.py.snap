@@ -288,13 +288,13 @@ def test_return_multiline_string_binary_expression_return_type_annotation(
 #########################################################################################
 
 
-def test_implicit_concatenated_string_return_type(a) -> "str" "bbbbbbbbbbbbbbbb":
+def test_implicit_concatenated_string_return_type(a) -> "strbbbbbbbbbbbbbbbb":
     pass
 
 
 def test_overlong_implicit_concatenated_string_return_type(
     a,
-) -> "liiiiiiiiiiiisssssst[str]" "bbbbbbbbbbbbbbbb":
+) -> "liiiiiiiiiiiisssssst[str]bbbbbbbbbbbbbbbb":
     pass
 
 
@@ -412,27 +412,4 @@ def test_return_multiline_string_binary_expression_return_type_annotation(
     bbbbbbbbbbbbbbbbbbbbbbbbb,
 ]:
     pass
-```
-
-
-## Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -82,13 +82,13 @@
- #########################################################################################
- 
- 
--def test_implicit_concatenated_string_return_type(a) -> "str" "bbbbbbbbbbbbbbbb":
-+def test_implicit_concatenated_string_return_type(a) -> "strbbbbbbbbbbbbbbbb":
-     pass
- 
- 
- def test_overlong_implicit_concatenated_string_return_type(
-     a,
--) -> "liiiiiiiiiiiisssssst[str]" "bbbbbbbbbbbbbbbb":
-+) -> "liiiiiiiiiiiisssssst[str]bbbbbbbbbbbbbbbb":
-     pass
- 
- 
 ```

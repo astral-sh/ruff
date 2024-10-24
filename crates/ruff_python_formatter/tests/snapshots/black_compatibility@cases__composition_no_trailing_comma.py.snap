@@ -194,41 +194,7 @@ class C:
 ```diff
 --- Black
 +++ Ruff
-@@ -110,19 +110,20 @@
-             value, is_going_to_be="too long to fit in a single line", srsly=True
-         ), "Not what we expected"
- 
--        assert {
--            key1: value1,
--            key2: value2,
--            key3: value3,
--            key4: value4,
--            key5: value5,
--            key6: value6,
--            key7: value7,
--            key8: value8,
--            key9: value9,
--        } == expected, (
--            "Not what we expected and the message is too long to fit in one line"
--        )
-+        assert (
-+            {
-+                key1: value1,
-+                key2: value2,
-+                key3: value3,
-+                key4: value4,
-+                key5: value5,
-+                key6: value6,
-+                key7: value7,
-+                key8: value8,
-+                key9: value9,
-+            }
-+            == expected
-+        ), "Not what we expected and the message is too long to fit in one line"
- 
-         assert expected(
-             value, is_going_to_be="too long to fit in a single line", srsly=True
-@@ -161,9 +162,7 @@
+@@ -161,9 +161,7 @@
                        8 STORE_ATTR               0 (x)
                       10 LOAD_CONST               0 (None)
                       12 RETURN_VALUE
@@ -356,20 +322,19 @@ class C:
             value, is_going_to_be="too long to fit in a single line", srsly=True
         ), "Not what we expected"
 
-        assert (
-            {
-                key1: value1,
-                key2: value2,
-                key3: value3,
-                key4: value4,
-                key5: value5,
-                key6: value6,
-                key7: value7,
-                key8: value8,
-                key9: value9,
-            }
-            == expected
-        ), "Not what we expected and the message is too long to fit in one line"
+        assert {
+            key1: value1,
+            key2: value2,
+            key3: value3,
+            key4: value4,
+            key5: value5,
+            key6: value6,
+            key7: value7,
+            key8: value8,
+            key9: value9,
+        } == expected, (
+            "Not what we expected and the message is too long to fit in one line"
+        )
 
         assert expected(
             value, is_going_to_be="too long to fit in a single line", srsly=True
