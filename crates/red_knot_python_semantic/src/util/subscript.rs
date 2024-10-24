@@ -25,10 +25,10 @@ impl Nth {
         }
     }
 
-    fn to_nonnegative_index(self, len: usize) -> usize {
+    fn to_nonnegative_index(&self, len: usize) -> usize {
         match self {
-            Nth::FromStart(nth) => nth,
-            Nth::FromEnd(nth_rev) => len - nth_rev - 1,
+            Nth::FromStart(nth) => *nth,
+            Nth::FromEnd(nth_rev) => len - (*nth_rev).min(len - 1) - 1,
         }
     }
 }
@@ -58,7 +58,7 @@ where
         &mut self,
         start: Option<i64>,
         stop: Option<i64>,
-        step: Option<i64>,
+        step_int: Option<i64>,
     ) -> Option<impl Iterator<Item = I>> {
         let len = self.len();
 
@@ -70,16 +70,24 @@ where
             .map(|stop| stop.to_nonnegative_index(len))
             .unwrap_or(len)
             .clamp(0, len);
-        let step = step
-            .and_then(|step| usize::try_from(step).ok())
-            .unwrap_or(1);
 
-        let (skip, take_n) = if start == stop {
-            (start, 0)
-        } else if start < stop {
-            (start, stop - start)
+        let step_int = step_int.unwrap_or(1);
+        if step_int == 0 {
+            return None;
+        }
+
+        let (skip, take_n, step) = if step_int > 0 {
+            let step = usize::try_from(step_int).ok()?;
+
+            if start == stop {
+                (start, 0, step)
+            } else if start < stop {
+                (start, stop - start, step)
+            } else {
+                (stop + 1, 0, step)
+            }
         } else {
-            (stop + 1, 0)
+            todo!()
         };
 
         Some(self.skip(skip).take(take_n).step_by(step))
@@ -164,6 +172,16 @@ mod tests {
         );
     }
 
+    #[track_caller]
+    fn assert_slice_returns_none<const N: usize>(
+        input: &[char; N],
+        start: Option<i64>,
+        stop: Option<i64>,
+        step: Option<i64>,
+    ) {
+        assert!(input.iter().py_slice(start, stop, step).is_none());
+    }
+
     #[test]
     fn py_slice_basic() {
         let input = ['a', 'b', 'c', 'd', 'e'];
@@ -171,19 +189,69 @@ mod tests {
         assert_eq_slice(&input, Some(0), Some(0), None, &[]);
         assert_eq_slice(&input, Some(0), Some(1), None, &['a']);
         assert_eq_slice(&input, Some(0), Some(4), None, &['a', 'b', 'c', 'd']);
+        assert_eq_slice(&input, Some(0), Some(5), None, &['a', 'b', 'c', 'd', 'e']);
+        assert_eq_slice(&input, Some(0), Some(6), None, &['a', 'b', 'c', 'd', 'e']);
         assert_eq_slice(&input, Some(1), Some(3), None, &['b', 'c']);
+
+        assert_eq_slice(&input, Some(1), Some(1), None, &[]);
+        assert_eq_slice(&input, Some(2), Some(1), None, &[]);
 
         assert_eq_slice(&input, None, None, None, &['a', 'b', 'c', 'd', 'e']);
         assert_eq_slice(&input, Some(1), None, None, &['b', 'c', 'd', 'e']);
         assert_eq_slice(&input, None, Some(3), None, &['a', 'b', 'c']);
+        assert_eq_slice(&input, None, Some(6), None, &['a', 'b', 'c', 'd', 'e']);
     }
 
     #[test]
     fn py_slice_negatice_indices() {
         let input = ['a', 'b', 'c', 'd', 'e'];
 
-        assert_eq_slice(&input, Some(-3), Some(-1), None, &['c', 'd']);
+        assert_eq_slice(&input, Some(-5), Some(-5), None, &[]);
         assert_eq_slice(&input, Some(-5), Some(-3), None, &['a', 'b']);
+        assert_eq_slice(&input, Some(-5), Some(-1), None, &['a', 'b', 'c', 'd']);
+        assert_eq_slice(&input, Some(-6), Some(-1), None, &['a', 'b', 'c', 'd']);
+        assert_eq_slice(&input, Some(-3), Some(-1), None, &['c', 'd']);
+
         assert_eq_slice(&input, Some(-3), Some(-5), None, &[]);
+        assert_eq_slice(&input, Some(-2), Some(-7), None, &[]);
+    }
+
+    #[test]
+    fn py_slice_mixed_positive_negative_indices() {
+        let input = ['a', 'b', 'c', 'd', 'e'];
+
+        assert_eq_slice(&input, Some(0), Some(-1), None, &['a', 'b', 'c', 'd']);
+        assert_eq_slice(&input, Some(1), Some(-1), None, &['b', 'c', 'd']);
+        assert_eq_slice(&input, Some(3), Some(-1), None, &['d']);
+        assert_eq_slice(&input, Some(4), Some(-1), None, &[]);
+        assert_eq_slice(&input, Some(6), Some(-1), None, &[]);
+
+        assert_eq_slice(&input, Some(-5), Some(3), None, &['a', 'b', 'c']);
+        assert_eq_slice(&input, Some(-5), Some(1), None, &['a']);
+        assert_eq_slice(&input, Some(-5), Some(0), None, &[]);
+
+        assert_eq_slice(&input, Some(-7), Some(7), None, &['a', 'b', 'c', 'd', 'e']);
+    }
+
+    #[test]
+    fn py_slice_step() {
+        // indices:   0    1    2    3    4    5    6
+        let input = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
+
+        // Step size zero is invalid:
+        assert_slice_returns_none(&input, Some(0), Some(5), Some(0));
+        assert_slice_returns_none(&input, Some(0), Some(0), Some(0));
+
+        assert_eq_slice(&input, Some(0), Some(7), Some(2), &['a', 'c', 'e', 'g']);
+        assert_eq_slice(&input, Some(0), Some(6), Some(2), &['a', 'c', 'e']);
+        assert_eq_slice(&input, Some(0), Some(5), Some(2), &['a', 'c', 'e']);
+        assert_eq_slice(&input, Some(0), Some(4), Some(2), &['a', 'c']);
+        assert_eq_slice(&input, Some(0), Some(3), Some(2), &['a', 'c']);
+        assert_eq_slice(&input, Some(0), Some(2), Some(2), &['a']);
+        assert_eq_slice(&input, Some(0), Some(1), Some(2), &['a']);
+        assert_eq_slice(&input, Some(1), Some(5), Some(2), &['b', 'd']);
+
+        assert_eq_slice(&input, Some(0), Some(7), Some(3), &['a', 'd', 'g']);
+        assert_eq_slice(&input, Some(0), Some(6), Some(3), &['a', 'd']);
     }
 }
