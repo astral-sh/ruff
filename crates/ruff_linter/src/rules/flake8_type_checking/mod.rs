@@ -35,6 +35,8 @@ mod tests {
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_8.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_9.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote.py"))]
+    #[test_case(Rule::UnquotedTypeAlias, Path::new("TCH007.py"))]
+    #[test_case(Rule::QuotedTypeAlias, Path::new("TCH008.py"))]
     #[test_case(Rule::RuntimeStringUnion, Path::new("TCH010_1.py"))]
     #[test_case(Rule::RuntimeStringUnion, Path::new("TCH010_2.py"))]
     #[test_case(Rule::TypingOnlyFirstPartyImport, Path::new("TCH001.py"))]
@@ -425,6 +427,29 @@ mod tests {
             pass
     ",
         "multiple_modules_different_types"
+    )]
+    #[test_case(
+        r"
+        from __future__ import annotations
+
+        from typing import TYPE_CHECKING, TypeAlias
+        if TYPE_CHECKING:
+            from foo import Foo  # TCH004
+
+        a: TypeAlias = Foo | None  # OK
+    ",
+        "tch004_precedence_over_tch007"
+    )]
+    #[test_case(
+        r"
+        from __future__ import annotations
+
+        from typing import TypeAlias
+
+        a: TypeAlias = 'int | None'  # TCH008
+        b: TypeAlias = 'int' | None  # TCH010
+    ",
+        "tc010_precedence_over_tch008"
     )]
     fn contents(contents: &str, snapshot: &str) {
         let diagnostics = test_snippet(

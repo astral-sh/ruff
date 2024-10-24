@@ -662,6 +662,91 @@ impl<'a> SemanticModel<'a> {
                 }
             }
 
+            // FIXME: Shouldn't this happen above where `class_variables_visible` is set?
+            seen_function |= scope.kind.is_function();
+        }
+
+        None
+    }
+
+    /// Simulates a runtime load of a given [`ast::ExprName`].
+    ///
+    /// This should not be run until after all the bindings have been visited.
+    pub fn simulate_runtime_load(&self, name: &ast::ExprName) -> Option<BindingId> {
+        let symbol = name.id.as_str();
+        let range = name.range;
+        let mut seen_function = false;
+        let mut class_variables_visible = true;
+        let mut lexicographical_lookup = true;
+        for (index, scope_id) in self.scopes.ancestor_ids(self.scope_id).enumerate() {
+            let scope = &self.scopes[scope_id];
+
+            // Only once we leave a function scope and its enclosing type scope should
+            // we stop doing lexicographical lookups. We could e.g. have nested classes
+            // where we lookup symbols from the innermost class scope, which can only see
+            // things from the outer class(es) that have been defined before the inner
+            // class.
+            if seen_function && !scope.kind.is_type() {
+                lexicographical_lookup = false;
+            }
+
+            if scope.kind.is_class() {
+                if seen_function && matches!(symbol, "__class__") {
+                    return None;
+                }
+                if !class_variables_visible {
+                    continue;
+                }
+            }
+
+            class_variables_visible = scope.kind.is_type() && index == 0;
+
+            if let Some(binding_id) = scope.get(symbol) {
+                if lexicographical_lookup {
+                    // we need to look through all the shadowed bindings
+                    // since we may be shadowing a valid runtime binding
+                    // with an invalid one
+                    for shadowed_id in scope.shadowed_bindings(binding_id) {
+                        let binding = &self.bindings[shadowed_id];
+                        if binding.context.is_typing() {
+                            continue;
+                        }
+                        if let BindingKind::Annotation
+                        | BindingKind::Deletion
+                        | BindingKind::UnboundException(..)
+                        | BindingKind::ConditionalDeletion(..) = binding.kind
+                        {
+                            continue;
+                        }
+
+                        if binding.defn_range(self).ordering(range).is_lt() {
+                            return Some(shadowed_id);
+                        }
+                    }
+                } else {
+                    let candidate_id = match self.bindings[binding_id].kind {
+                        BindingKind::Annotation => continue,
+                        BindingKind::Deletion | BindingKind::UnboundException(None) => return None,
+                        BindingKind::ConditionalDeletion(binding_id) => binding_id,
+                        BindingKind::UnboundException(Some(binding_id)) => binding_id,
+                        _ => binding_id,
+                    };
+
+                    if self.bindings[candidate_id].context.is_typing() {
+                        continue;
+                    }
+
+                    return Some(candidate_id);
+                }
+            }
+
+            if index == 0 && scope.kind.is_class() {
+                if matches!(symbol, "__module__" | "__qualname__") {
+                    return None;
+                }
+            }
+
+            // FIXME: Shouldn't this happen above where `class_variables_visible` is set?
             seen_function |= scope.kind.is_function();
         }
 
@@ -1656,6 +1741,23 @@ impl<'a> SemanticModel<'a> {
             || (self.in_future_type_definition() && self.in_typing_only_annotation())
     }
 
+    /// Return `true` if the model is in an explicit type alias
+    pub const fn in_explicit_type_alias(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::EXPLICIT_TYPE_ALIAS)
+    }
+
+    /// Return `true` if the model is in a generic type alias
+    pub const fn in_generic_type_alias(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::GENERIC_TYPE_ALIAS)
+    }
+
+    /// Return `true` if the model is in a type alias
+    pub const fn in_type_alias(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::TYPE_ALIAS)
+    }
+
     /// Return `true` if the model is in an exception handler.
     pub const fn in_exception_handler(&self) -> bool {
         self.flags.intersects(SemanticModelFlags::EXCEPTION_HANDLER)
@@ -2224,6 +2326,16 @@ bitflags! {
         /// [PEP 257]: https://peps.python.org/pep-0257/#what-is-a-docstring
         const ATTRIBUTE_DOCSTRING = 1 << 26;
 
+        /// The model is in the value expression of a [PEP 613] explicit type alias.
+        ///
+        /// [PEP 613]: https://peps.python.org/pep-0613/
+        const EXPLICIT_TYPE_ALIAS = 1 << 27;
+
+        /// The model is in the value expression of a [PEP 695] type statement
+        ///
+        /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
+        const GENERIC_TYPE_ALIAS = 1 << 28;
+
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();
 
@@ -2240,6 +2352,9 @@ bitflags! {
         /// The context is in a typing-only context.
         const TYPING_CONTEXT = Self::TYPE_CHECKING_BLOCK.bits() | Self::TYPING_ONLY_ANNOTATION.bits() |
             Self::STRING_TYPE_DEFINITION.bits() | Self::TYPE_PARAM_DEFINITION.bits();
+
+        /// The context is in any type alias.
+        const TYPE_ALIAS = Self::EXPLICIT_TYPE_ALIAS.bits() | Self::GENERIC_TYPE_ALIAS.bits();
     }
 }
 

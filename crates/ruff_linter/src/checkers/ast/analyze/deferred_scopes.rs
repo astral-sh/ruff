@@ -52,6 +52,8 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
     // Identify any valid runtime imports. If a module is imported at runtime, and
     // used at runtime, then by default, we avoid flagging any other
     // imports from that model as typing-only.
+    // FIXME: This does not seem quite right, if only TC004 is enabled
+    //        then we don't need to collect the runtime imports
     let enforce_typing_imports = !checker.source_type.is_stub()
         && checker.any_enabled(&[
             Rule::RuntimeImportInTypeCheckingBlock,
@@ -375,6 +377,8 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         }
 
         if matches!(scope.kind, ScopeKind::Function(_) | ScopeKind::Module) {
+            // FIXME: This does not seem quite right, if only TC004 is enabled
+            //        then we don't need to collect the runtime imports
             if enforce_typing_imports {
                 let runtime_imports: Vec<&Binding> = checker
                     .semantic
