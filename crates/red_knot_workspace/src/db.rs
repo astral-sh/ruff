@@ -1,7 +1,6 @@
 use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 
-use lsp_types::Position;
 use red_knot_python_semantic::search::location_of_definition_of_item_at_location;
 use ruff_db::files::location::Location;
 use ruff_db::source::{line_index, source_text};
@@ -69,9 +68,9 @@ impl RootDatabase {
     pub fn location_of_definition_of_item_at_location(
         &self,
         file: File,
-        position: Position,
+        location: SourceLocation,
     ) -> Option<Location> {
-        location_of_definition_of_item_at_location(file, position, self)
+        location_of_definition_of_item_at_location(file, location, self)
     }
 
     pub fn location_to_source_location_range(

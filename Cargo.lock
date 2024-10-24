@@ -2104,7 +2104,6 @@ dependencies = [
  "hashbrown 0.15.0",
  "insta",
  "itertools 0.13.0",
- "lsp-types",
  "memchr",
  "ordermap",
  "red_knot_test",
@@ -2125,7 +2124,6 @@ dependencies = [
  "test-case",
  "thiserror",
  "tracing",
- "url",
 ]
 
 [[package]]

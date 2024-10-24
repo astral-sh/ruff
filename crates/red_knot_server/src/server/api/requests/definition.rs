@@ -6,7 +6,7 @@ use lsp_types::{request::GotoDefinition, GotoDefinitionParams, GotoDefinitionRes
 // maybe need to just move the type?
 use red_knot_workspace::db::RootDatabase;
 use ruff_db::files::{location::Location, File};
-use ruff_source_file::SourceLocation;
+use ruff_source_file::{OneIndexed, SourceLocation};
 
 pub(crate) struct GotoDefinitionHandler;
 
@@ -57,6 +57,15 @@ fn try_location_to_lsp_location(
     })
 }
 
+fn lsp_position_to_source_location(position: lsp_types::Position) -> SourceLocation {
+    // While it would be nice to just implement From here, that would require
+    // ruff_source_file to know about lsp-types
+    SourceLocation {
+        row: OneIndexed::from_zero_indexed(position.line as usize),
+        column: OneIndexed::from_zero_indexed(position.character as usize),
+    }
+}
+
 impl BackgroundDocumentRequestHandler for GotoDefinitionHandler {
     fn document_url(params: &GotoDefinitionParams) -> std::borrow::Cow<lsp_types::Url> {
         Cow::Borrowed(&params.text_document_position_params.text_document.uri)
@@ -75,7 +84,7 @@ impl BackgroundDocumentRequestHandler for GotoDefinitionHandler {
 
         let Some(location) = db.location_of_definition_of_item_at_location(
             file,
-            params.text_document_position_params.position,
+            lsp_position_to_source_location(params.text_document_position_params.position),
         ) else {
             return Ok(None);
         };

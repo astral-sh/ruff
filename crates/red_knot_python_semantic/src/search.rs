@@ -3,20 +3,19 @@ use crate::{
     semantic_index::{semantic_index, SemanticIndex},
     types::Type,
 };
-use lsp_types::Position;
 use ruff_db::{
     files::{location::Location, File},
     parsed::parsed_module,
     source::{line_index, source_text},
 };
 use ruff_python_ast::Identifier;
-use ruff_source_file::OneIndexed;
+use ruff_source_file::SourceLocation;
 
 use crate::Db;
 
 pub fn location_of_definition_of_item_at_location(
     file: File,
-    location: Position,
+    location: SourceLocation,
     db: &dyn Db,
 ) -> Option<Location> {
     // XXX now this returns one or none. It could return an iterator of locations
@@ -27,12 +26,7 @@ pub fn location_of_definition_of_item_at_location(
     let source = source_text(db.upcast(), file);
     let li = line_index(db.upcast(), file);
 
-    let text_size = li.offset(
-        // XXX bad
-        OneIndexed::from_zero_indexed(location.line as usize),
-        OneIndexed::from_zero_indexed(location.character as usize),
-        &source,
-    );
+    let text_size = li.offset(location.row, location.column, &source);
 
     return module.syntax().locate_def(text_size, index, db, file);
 }
