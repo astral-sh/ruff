@@ -21,8 +21,7 @@ use crate::expression::parentheses::{
 use crate::prelude::*;
 use crate::preview::{
     is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled,
-    is_f_string_implicit_concatenated_string_literal_quotes_enabled,
-    is_hug_parens_with_braces_and_square_brackets_enabled,
+    is_f_string_formatting_enabled, is_hug_parens_with_braces_and_square_brackets_enabled,
 };
 
 mod binary_like;
@@ -770,7 +769,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. })
                 if value.is_implicit_concatenated() =>
             {
-                if !is_f_string_implicit_concatenated_string_literal_quotes_enabled(self.context) {
+                if !is_f_string_formatting_enabled(self.context) {
                     self.update_max_precedence(OperatorPrecedence::String);
                 }
 
@@ -779,14 +778,14 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. })
                 if value.is_implicit_concatenated() =>
             {
-                if !is_f_string_implicit_concatenated_string_literal_quotes_enabled(self.context) {
+                if !is_f_string_formatting_enabled(self.context) {
                     self.update_max_precedence(OperatorPrecedence::String);
                 }
 
                 return;
             }
             Expr::FString(ast::ExprFString { value, .. }) if value.is_implicit_concatenated() => {
-                if !is_f_string_implicit_concatenated_string_literal_quotes_enabled(self.context) {
+                if !is_f_string_formatting_enabled(self.context) {
                     self.update_max_precedence(OperatorPrecedence::String);
                 }
 
