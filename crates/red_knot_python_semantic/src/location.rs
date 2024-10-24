@@ -36,10 +36,10 @@ pub(crate) fn location_from_definition<'db>(
         | DefinitionKind::MatchPattern(_)
         | DefinitionKind::ExceptHandler(_) => {
             let range = index.definition_range(definition);
-            return Location {
+            Location {
                 file: definition.file(db),
                 range,
-            };
+            }
         }
     }
 }
