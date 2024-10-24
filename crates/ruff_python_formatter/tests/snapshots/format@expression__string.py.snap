@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/string.py
-snapshot_kind: text
 ---
 ## Input
 ```python
@@ -401,11 +400,7 @@ a = """\\\x1f"""
 
 ("""aaaaaaaaa""" """bbbbbbbbbbbbbbbbbbbb""")
 
-(
-    f"""aaaa{
-    10}aaaaa"""
-    rf"""bbbbbbbbbbbbbbbbbbbb"""
-)
+(f"""aaaa{10}aaaaa""" rf"""bbbbbbbbbbbbbbbbbbbb""")
 
 if (r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb") + ["aaaaaaaaaa", "bbbbbbbbbbbbbbbb"]:
     ...
@@ -416,19 +411,11 @@ if (r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb") + ["aaaaaaaaaa", "bbbbbbbbbbbbbbbb"]:
 
 r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb"
 
-(
-    f"aaaa{
-    10}aaaaa"
-    rf"bbbbbbbbbbbbbbbbbbbb"
-)
+(f"aaaa{10}aaaaa" rf"bbbbbbbbbbbbbbbbbbbb")
 
 (r"""aaaaaaaaa""" r"""bbbbbbbbbbbbbbbbbbbb""")
 
-(
-    f"""aaaa{
-    10}aaaaa"""
-    rf"""bbbbbbbbbbbbbbbbbbbb"""
-)
+(f"""aaaa{10}aaaaa""" rf"""bbbbbbbbbbbbbbbbbbbb""")
 ```
 
 
@@ -457,7 +444,7 @@ r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb"
  
  
  # Regression test for https://github.com/astral-sh/ruff/issues/5893
-@@ -172,19 +172,31 @@
+@@ -172,15 +172,31 @@
  # In preview, don't collapse implicit concatenated strings that can't be joined into a single string
  # and that are multiline in the source.
  
@@ -480,12 +467,11 @@ r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb"
 +    """bbbbbbbbbbbbbbbbbbbb"""
 +)
  
- (
--    f"""aaaa{
--    10}aaaaa"""
+-(f"""aaaa{10}aaaaa""" rf"""bbbbbbbbbbbbbbbbbbbb""")
++(
 +    f"""aaaa{10}aaaaa"""
-     rf"""bbbbbbbbbbbbbbbbbbbb"""
- )
++    rf"""bbbbbbbbbbbbbbbbbbbb"""
++)
  
 -if (r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb") + ["aaaaaaaaaa", "bbbbbbbbbbbbbbbb"]:
 +if (
@@ -495,25 +481,6 @@ r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb"
      ...
  
  
-@@ -193,16 +205,8 @@
- 
- r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb"
- 
--(
--    f"aaaa{
--    10}aaaaa"
--    rf"bbbbbbbbbbbbbbbbbbbb"
--)
-+(f"aaaa{10}aaaaa" rf"bbbbbbbbbbbbbbbbbbbb")
- 
- (r"""aaaaaaaaa""" r"""bbbbbbbbbbbbbbbbbbbb""")
- 
--(
--    f"""aaaa{
--    10}aaaaa"""
--    rf"""bbbbbbbbbbbbbbbbbbbb"""
--)
-+(f"""aaaa{10}aaaaa""" rf"""bbbbbbbbbbbbbbbbbbbb""")
 ```
 
 
@@ -713,11 +680,7 @@ a = """\\\x1f"""
 
 ("""aaaaaaaaa""" """bbbbbbbbbbbbbbbbbbbb""")
 
-(
-    f"""aaaa{
-    10}aaaaa"""
-    rf"""bbbbbbbbbbbbbbbbbbbb"""
-)
+(f"""aaaa{10}aaaaa""" rf"""bbbbbbbbbbbbbbbbbbbb""")
 
 if (r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb') + ['aaaaaaaaaa', 'bbbbbbbbbbbbbbbb']:
     ...
@@ -728,19 +691,11 @@ if (r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb') + ['aaaaaaaaaa', 'bbbbbbbbbbbbbbbb']:
 
 r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb'
 
-(
-    f'aaaa{
-    10}aaaaa'
-    rf'bbbbbbbbbbbbbbbbbbbb'
-)
+(f'aaaa{10}aaaaa' rf'bbbbbbbbbbbbbbbbbbbb')
 
 (r"""aaaaaaaaa""" r"""bbbbbbbbbbbbbbbbbbbb""")
 
-(
-    f"""aaaa{
-    10}aaaaa"""
-    rf"""bbbbbbbbbbbbbbbbbbbb"""
-)
+(f"""aaaa{10}aaaaa""" rf"""bbbbbbbbbbbbbbbbbbbb""")
 ```
 
 
@@ -769,7 +724,7 @@ r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb'
  
  
  # Regression test for https://github.com/astral-sh/ruff/issues/5893
-@@ -172,19 +172,31 @@
+@@ -172,15 +172,31 @@
  # In preview, don't collapse implicit concatenated strings that can't be joined into a single string
  # and that are multiline in the source.
  
@@ -792,12 +747,11 @@ r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb'
 +    """bbbbbbbbbbbbbbbbbbbb"""
 +)
  
- (
--    f"""aaaa{
--    10}aaaaa"""
+-(f"""aaaa{10}aaaaa""" rf"""bbbbbbbbbbbbbbbbbbbb""")
++(
 +    f"""aaaa{10}aaaaa"""
-     rf"""bbbbbbbbbbbbbbbbbbbb"""
- )
++    rf"""bbbbbbbbbbbbbbbbbbbb"""
++)
  
 -if (r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb') + ['aaaaaaaaaa', 'bbbbbbbbbbbbbbbb']:
 +if (
@@ -807,23 +761,4 @@ r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb'
      ...
  
  
-@@ -193,16 +205,8 @@
- 
- r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb'
- 
--(
--    f'aaaa{
--    10}aaaaa'
--    rf'bbbbbbbbbbbbbbbbbbbb'
--)
-+(f'aaaa{10}aaaaa' rf'bbbbbbbbbbbbbbbbbbbb')
- 
- (r"""aaaaaaaaa""" r"""bbbbbbbbbbbbbbbbbbbb""")
- 
--(
--    f"""aaaa{
--    10}aaaaa"""
--    rf"""bbbbbbbbbbbbbbbbbbbb"""
--)
-+(f"""aaaa{10}aaaaa""" rf"""bbbbbbbbbbbbbbbbbbbb""")
 ```

@@ -1,7 +1,7 @@
 use ruff_formatter::{format_args, write, FormatError, RemoveSoftLinesBuffer};
 use ruff_python_ast::{
-    AnyNodeRef, Expr, ExprAttribute, ExprCall, FStringPart, Operator, StmtAssign, StringLike,
-    TypeParams,
+    AnyNodeRef, Expr, ExprAttribute, ExprCall, FString, FStringPart, Operator, StmtAssign,
+    StringLike, TypeParams,
 };
 
 use crate::builders::parenthesize_if_expands;
@@ -9,7 +9,6 @@ use crate::comments::{
     trailing_comments, Comments, LeadingDanglingTrailingComments, SourceComment,
 };
 use crate::context::{NodeLevel, WithNodeLevel};
-use crate::expression::expr_f_string::f_string_quoting;
 use crate::expression::parentheses::{
     is_expression_parenthesized, optional_parentheses, NeedsParentheses, OptionalParentheses,
     Parentheses, Parenthesize,
@@ -18,10 +17,8 @@ use crate::expression::{
     can_omit_optional_parentheses, has_own_parentheses, has_parentheses,
     maybe_parenthesize_expression,
 };
-use crate::other::f_string::{FStringLayout, FormatFString};
-use crate::preview::{
-    is_f_string_formatting_enabled, is_join_implicit_concatenated_string_enabled,
-};
+use crate::other::f_string::FStringLayout;
+use crate::preview::is_join_implicit_concatenated_string_enabled;
 use crate::statement::trailing_semicolon;
 use crate::string::implicit::{
     FormatImplicitConcatenatedStringExpanded, FormatImplicitConcatenatedStringFlat,
@@ -456,7 +453,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                         let f_string_flat = format_with(|f| {
                             let mut buffer = RemoveSoftLinesBuffer::new(&mut *f);
 
-                            write!(buffer, [format_f_string])
+                            write!(buffer, [format_f_string.format()])
                         })
                         .memoized();
 
@@ -518,7 +515,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                         // }moreeeeeeeeeeeeeeeee"
                         // ```
                         let format_f_string =
-                            format_with(|f| write!(f, [format_f_string, inline_comments]));
+                            format_with(|f| write!(f, [format_f_string.format(), inline_comments]));
 
                         best_fitting![single_line, joined_parenthesized, format_f_string]
                             .with_mode(BestFittingMode::AllLines)
@@ -668,7 +665,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                         // Similar to above, remove any soft line breaks emitted by the f-string
                         // formatting.
                         let mut buffer = RemoveSoftLinesBuffer::new(&mut *f);
-                        write!(buffer, [format_f_string])
+                        write!(buffer, [format_f_string.format()])
                     } else {
                         value.format().with_options(Parentheses::Never).fmt(f)
                     }
@@ -935,7 +932,8 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                     }
 
                     let format_f_string =
-                        format_with(|f| write!(f, [format_f_string, inline_comments])).memoized();
+                        format_with(|f| write!(f, [format_f_string.format(), inline_comments]))
+                            .memoized();
 
                     // Considering the following initial source:
                     //
@@ -1102,11 +1100,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
 fn format_f_string_assignment<'a>(
     string: StringLike<'a>,
     context: &PyFormatContext,
-) -> Option<FormatFString<'a>> {
-    if !is_f_string_formatting_enabled(context) {
-        return None;
-    }
-
+) -> Option<&'a FString> {
     let StringLike::FString(expr) = string else {
         return None;
     };
@@ -1128,10 +1122,7 @@ fn format_f_string_assignment<'a>(
         return None;
     }
 
-    Some(FormatFString::new(
-        f_string,
-        f_string_quoting(expr, context.source()),
-    ))
+    Some(f_string)
 }
 
 #[derive(Debug, Default)]
