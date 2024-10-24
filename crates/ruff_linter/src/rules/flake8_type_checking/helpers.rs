@@ -265,7 +265,7 @@ pub(crate) fn quote_annotation(
         }
     }
 
-    quote_type_expression(expr, semantic, stylist)
+    Ok(quote_type_expression(expr, semantic, stylist))
 }
 
 /// Wrap a type expression in quotes.
@@ -277,17 +277,14 @@ pub(crate) fn quote_type_expression(
     expr: &Expr,
     semantic: &SemanticModel,
     stylist: &Stylist,
-) -> Result<Edit> {
+) -> Edit {
     // Quote the entire expression.
     let quote = stylist.quote();
     let mut quote_annotator = QuoteAnnotator::new(semantic, stylist);
     quote_annotator.visit_expr(expr);
     let annotation = quote_annotator.into_annotation();
 
-    Ok(Edit::range_replacement(
-        format!("{quote}{annotation}{quote}"),
-        expr.range(),
-    ))
+    Edit::range_replacement(format!("{quote}{annotation}{quote}"), expr.range())
 }
 
 /// Filter out any [`Edit`]s that are completely contained by any other [`Edit`].
