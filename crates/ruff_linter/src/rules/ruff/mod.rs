@@ -370,7 +370,8 @@ mod tests {
     #[test_case(Rule::InvalidPyprojectToml, Path::new("bleach"))]
     #[test_case(Rule::InvalidPyprojectToml, Path::new("invalid_author"))]
     #[test_case(Rule::InvalidPyprojectToml, Path::new("maturin"))]
-    #[test_case(Rule::InvalidPyprojectToml, Path::new("maturin_gh_1615"))]
+    #[test_case(Rule::InvalidPyprojectToml, Path::new("various_invalid"))]
+    #[test_case(Rule::InvalidPyprojectToml, Path::new("pep639"))]
     fn invalid_pyproject_toml(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let path = test_resource_path("fixtures")
