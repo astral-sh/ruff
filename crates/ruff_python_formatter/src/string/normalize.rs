@@ -626,7 +626,7 @@ pub(crate) fn normalize_string(
     let mut formatted_value_nesting = 0u32;
 
     while let Some((index, c)) = chars.next() {
-        if matches!(c, '{' | '}') && is_fstring {
+        if matches!(c, '{' | '}') {
             if escape_braces {
                 // Escape `{` and `}` when converting a regular string literal to an f-string literal.
                 output.push_str(&input[last_index..=index]);
