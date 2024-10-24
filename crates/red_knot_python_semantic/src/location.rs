@@ -8,6 +8,9 @@ use ruff_text_size::TextSize;
 
 use ruff_python_ast as ast;
 
+///
+/// Given a definition, find the location of the definition.
+///
 pub(crate) fn location_from_definition<'db>(
     definition: Definition<'db>,
     index: &SemanticIndex<'db>,
@@ -20,8 +23,19 @@ pub(crate) fn location_from_definition<'db>(
     }
 }
 
-/// This trait is used to locate where something is defined
 pub(crate) trait CanLocate<'db> {
+    ///
+    /// Given a position in a file, try and find the definition for whatever
+    /// is underneath that position, then return the location of that definition.
+    ///
+    /// In the case where the position is outside of the range controlled, or
+    /// when nothing is found, return None.
+    ///
+    /// TODO currently this doesn't differentiate between "this position is outside
+    /// of my range" and "this position is within my range, but I could not find a
+    /// definition". This means that certain forms of short circuiting in the "there's
+    /// no definition to be found" case are not happenign
+    ///
     fn locate_def(
         &self,
         pos: TextSize,
@@ -92,51 +106,6 @@ where
     }
 }
 
-impl<'db> CanLocate<'db> for ast::Expr {
-    fn locate_def(
-        &self,
-        pos: TextSize,
-        index: &SemanticIndex<'db>,
-        db: &'db dyn Db,
-        file: File,
-    ) -> Option<Location> {
-        match self {
-            ast::Expr::BoolOp(inner) => inner.locate_def(pos, index, db, file),
-            ast::Expr::Named(inner) => inner.locate_def(pos, index, db, file),
-            ast::Expr::BinOp(inner) => inner.locate_def(pos, index, db, file),
-            ast::Expr::UnaryOp(inner) => inner.locate_def(pos, index, db, file),
-            ast::Expr::Lambda(inner) => inner.locate_def(pos, index, db, file),
-            ast::Expr::If(inner) => inner.locate_def(pos, index, db, file),
-            ast::Expr::Dict(inner) => inner.locate_def(pos, index, db, file),
-            ast::Expr::Set(inner) => inner.locate_def(pos, index, db, file),
-            ast::Expr::ListComp(inner) => inner.locate_def(pos, index, db, file),
-            ast::Expr::SetComp(inner) => inner.locate_def(pos, index, db, file),
-            ast::Expr::DictComp(inner) => inner.locate_def(pos, index, db, file),
-            ast::Expr::Generator(inner) => inner.locate_def(pos, index, db, file),
-            ast::Expr::Await(inner) => inner.locate_def(pos, index, db, file),
-            ast::Expr::Yield(inner) => inner.locate_def(pos, index, db, file),
-            ast::Expr::YieldFrom(inner) => inner.locate_def(pos, index, db, file),
-            ast::Expr::Compare(inner) => inner.locate_def(pos, index, db, file),
-            ast::Expr::Call(inner) => inner.locate_def(pos, index, db, file),
-            ast::Expr::FString(inner) => inner.locate_def(pos, index, db, file),
-            ast::Expr::StringLiteral(_) => None,
-            ast::Expr::BytesLiteral(_) => None,
-            ast::Expr::NumberLiteral(_) => None,
-            ast::Expr::BooleanLiteral(_) => None,
-            ast::Expr::NoneLiteral(_) => None,
-            ast::Expr::EllipsisLiteral(_) => None,
-            ast::Expr::Attribute(inner) => inner.locate_def(pos, index, db, file),
-            ast::Expr::Subscript(inner) => inner.locate_def(pos, index, db, file),
-            ast::Expr::Starred(inner) => inner.locate_def(pos, index, db, file),
-            ast::Expr::Name(inner) => inner.locate_def(pos, index, db, file),
-            ast::Expr::List(inner) => inner.locate_def(pos, index, db, file),
-            ast::Expr::Tuple(inner) => inner.locate_def(pos, index, db, file),
-            ast::Expr::Slice(inner) => inner.locate_def(pos, index, db, file),
-            ast::Expr::IpyEscapeCommand(_) => None,
-        }
-    }
-}
-
 macro_rules! impl_can_locate {
     // If an item has self.range, we can use it to quickly rule out problematic branches
     ($type:ty, ranged, $($field:ident),+) => {
@@ -177,6 +146,16 @@ macro_rules! locate_todo {
         }
     };
 }
+
+// for the most part, location is just traversing the AST looking for
+// the smallest AST node that has our position, without going over.
+//
+// This in practice turns into just checking attributes across various attributes
+// on our AST nodes. Unlike with walking, where we are walking across all the branches,
+// here we are just looking for one target and will return early once we find that
+//
+// For Enums in particular the macro isn't smart enough to handle that, so we generally
+// have broken those out below
 impl_can_locate!(ast::StmtFor, ranged, target, iter, body, orelse);
 impl_can_locate!(ast::StmtDelete, ranged, targets);
 impl_can_locate!(ast::DictItem, value);
@@ -245,11 +224,56 @@ impl_can_locate!(ast::ExprList, ranged, elts);
 impl_can_locate!(ast::ExprTuple, ranged, elts);
 impl_can_locate!(ast::ExprSlice, ranged, lower, upper, step);
 
+// these ones just bail instantly, but really should be expanded
 locate_todo!(ast::StmtImport);
 locate_todo!(ast::StmtImportFrom);
 locate_todo!(ast::ExceptHandler);
 locate_todo!(ast::Identifier);
 
+impl<'db> CanLocate<'db> for ast::Expr {
+    fn locate_def(
+        &self,
+        pos: TextSize,
+        index: &SemanticIndex<'db>,
+        db: &'db dyn Db,
+        file: File,
+    ) -> Option<Location> {
+        match self {
+            ast::Expr::BoolOp(inner) => inner.locate_def(pos, index, db, file),
+            ast::Expr::Named(inner) => inner.locate_def(pos, index, db, file),
+            ast::Expr::BinOp(inner) => inner.locate_def(pos, index, db, file),
+            ast::Expr::UnaryOp(inner) => inner.locate_def(pos, index, db, file),
+            ast::Expr::Lambda(inner) => inner.locate_def(pos, index, db, file),
+            ast::Expr::If(inner) => inner.locate_def(pos, index, db, file),
+            ast::Expr::Dict(inner) => inner.locate_def(pos, index, db, file),
+            ast::Expr::Set(inner) => inner.locate_def(pos, index, db, file),
+            ast::Expr::ListComp(inner) => inner.locate_def(pos, index, db, file),
+            ast::Expr::SetComp(inner) => inner.locate_def(pos, index, db, file),
+            ast::Expr::DictComp(inner) => inner.locate_def(pos, index, db, file),
+            ast::Expr::Generator(inner) => inner.locate_def(pos, index, db, file),
+            ast::Expr::Await(inner) => inner.locate_def(pos, index, db, file),
+            ast::Expr::Yield(inner) => inner.locate_def(pos, index, db, file),
+            ast::Expr::YieldFrom(inner) => inner.locate_def(pos, index, db, file),
+            ast::Expr::Compare(inner) => inner.locate_def(pos, index, db, file),
+            ast::Expr::Call(inner) => inner.locate_def(pos, index, db, file),
+            ast::Expr::FString(inner) => inner.locate_def(pos, index, db, file),
+            ast::Expr::StringLiteral(_) => None,
+            ast::Expr::BytesLiteral(_) => None,
+            ast::Expr::NumberLiteral(_) => None,
+            ast::Expr::BooleanLiteral(_) => None,
+            ast::Expr::NoneLiteral(_) => None,
+            ast::Expr::EllipsisLiteral(_) => None,
+            ast::Expr::Attribute(inner) => inner.locate_def(pos, index, db, file),
+            ast::Expr::Subscript(inner) => inner.locate_def(pos, index, db, file),
+            ast::Expr::Starred(inner) => inner.locate_def(pos, index, db, file),
+            ast::Expr::Name(inner) => inner.locate_def(pos, index, db, file),
+            ast::Expr::List(inner) => inner.locate_def(pos, index, db, file),
+            ast::Expr::Tuple(inner) => inner.locate_def(pos, index, db, file),
+            ast::Expr::Slice(inner) => inner.locate_def(pos, index, db, file),
+            ast::Expr::IpyEscapeCommand(_) => None,
+        }
+    }
+}
 impl<'db> CanLocate<'db> for ast::Stmt {
     fn locate_def(
         &self,
