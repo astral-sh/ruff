@@ -18,10 +18,7 @@ use {
     ruff_text_size::{Ranged, TextLen, TextRange, TextSize},
 };
 
-use crate::preview::{
-    is_docstring_code_block_in_docstring_indent_enabled,
-    is_join_implicit_concatenated_string_enabled,
-};
+use crate::preview::is_join_implicit_concatenated_string_enabled;
 use crate::string::StringQuotes;
 use crate::{prelude::*, DocstringCodeLineWidth, FormatModuleError};
 
@@ -508,17 +505,15 @@ impl<'src> DocstringLinePrinter<'_, '_, '_, 'src> {
                     .to_ascii_spaces(indent_width)
                     .saturating_add(kind.extra_indent_ascii_spaces());
 
-                if is_docstring_code_block_in_docstring_indent_enabled(self.f.context()) {
-                    // Add the in-docstring indentation
-                    current_indent = current_indent.saturating_add(
-                        u16::try_from(
-                            kind.indent()
-                                .columns()
-                                .saturating_sub(self.stripped_indentation.columns()),
-                        )
-                        .unwrap_or(u16::MAX),
-                    );
-                }
+                // Add the in-docstring indentation
+                current_indent = current_indent.saturating_add(
+                    u16::try_from(
+                        kind.indent()
+                            .columns()
+                            .saturating_sub(self.stripped_indentation.columns()),
+                    )
+                    .unwrap_or(u16::MAX),
+                );
 
                 let width = std::cmp::max(1, global_line_width.saturating_sub(current_indent));
                 LineWidth::try_from(width).expect("width should be capped at a minimum of 1")
