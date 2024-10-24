@@ -1461,6 +1461,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
             _ => {}
         };
 
+        // Restore boolean test flag after examining subexpressions
+        if flags_snapshot.intersects(SemanticModelFlags::BOOLEAN_TEST) {
+            self.semantic.flags |= SemanticModelFlags::BOOLEAN_TEST;
+        }
+
         // Step 4: Analysis
         analyze::expression(expr, self);
         match expr {
