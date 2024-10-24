@@ -76,7 +76,7 @@ impl RootDatabase {
 
     pub fn location_to_source_location_range(
         &self,
-        location: Location,
+        location: &Location,
     ) -> (SourceLocation, SourceLocation) {
         let li = line_index(self.upcast(), location.file);
         let contents = source_text(self.upcast(), location.file);

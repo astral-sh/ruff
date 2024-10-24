@@ -14,19 +14,25 @@ impl RequestHandler for GotoDefinitionHandler {
     type RequestType = GotoDefinition;
 }
 
-fn source_location_to_lsp_position(source_location: SourceLocation) -> lsp_types::Position {
-    return lsp_types::Position::new(
-        // XXX very wrong probably
-        source_location.row.to_zero_indexed() as u32,
-        source_location.column.to_zero_indexed() as u32,
-    );
+fn try_source_location_to_lsp_position(
+    source_location: &SourceLocation,
+) -> Option<lsp_types::Position> {
+    let (Ok(u32_row), Ok(u32_col)) = (
+        u32::try_from(source_location.row.to_zero_indexed()),
+        u32::try_from(source_location.column.to_zero_indexed()),
+    ) else {
+        // TODO decide how to handle this failure
+        return None;
+    };
+
+    Some(lsp_types::Position::new(u32_row, u32_col))
 }
-fn location_to_lsp_range(db: &RootDatabase, location: Location) -> lsp_types::Range {
+fn try_location_to_lsp_range(db: &RootDatabase, location: &Location) -> Option<lsp_types::Range> {
     let (start, end) = db.location_to_source_location_range(location);
-    lsp_types::Range {
-        start: source_location_to_lsp_position(start),
-        end: source_location_to_lsp_position(end),
-    }
+    Some(lsp_types::Range {
+        start: try_source_location_to_lsp_position(&start)?,
+        end: try_source_location_to_lsp_position(&end)?,
+    })
 }
 
 /// Try to generate a Url for an underlying file.
@@ -36,18 +42,18 @@ fn try_file_to_url(db: &RootDatabase, file: File) -> Option<Url> {
     // the following will return None for file paths that aren't System
     let path_buf = &file.path(db).clone().into_system_path_buf()?;
     // XXX is there a better trick to avoid building this String?
-    let file_protocol_path: String = format!("file://{}", path_buf);
+    let file_protocol_path: String = format!("file://{path_buf}");
     Some(Url::parse(&file_protocol_path).expect("Failed to parse a system path URL"))
 }
 fn try_location_to_lsp_location(
     db: &RootDatabase,
-    location: Location,
+    location: &Location,
 ) -> Option<lsp_types::Location> {
     // TODO this code currently doesn't handle virtual path'd files or vendored files
     let uri = try_file_to_url(db, location.file)?;
     Some(lsp_types::Location {
         uri,
-        range: location_to_lsp_range(db, location),
+        range: try_location_to_lsp_range(db, location)?,
     })
 }
 
@@ -74,7 +80,7 @@ impl BackgroundDocumentRequestHandler for GotoDefinitionHandler {
             return Ok(None);
         };
 
-        let Some(lsp_location) = try_location_to_lsp_location(&db, location) else {
+        let Some(lsp_location) = try_location_to_lsp_location(&db, &location) else {
             // TODO this branch currently will be hit for things like vendored files
             // but in some future we should always have an answer for "location -> lsp location",
             // and should error here
