@@ -16,7 +16,6 @@ use crate::expression::{
     can_omit_optional_parentheses, has_own_parentheses, has_parentheses,
     maybe_parenthesize_expression,
 };
-use crate::preview::is_join_implicit_concatenated_string_enabled;
 use crate::statement::trailing_semicolon;
 use crate::string::implicit::{
     FormatImplicitConcatenatedStringExpanded, FormatImplicitConcatenatedStringFlat,
@@ -593,20 +592,22 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                 // )
                 // ```
                 let flat_target_parenthesize_value = format_with(|f| {
-                    write!(f, [last_target, space(), operator, space(), token("("),])?;
-
-                    if is_join_implicit_concatenated_string_enabled(f.context()) {
-                        group(&soft_block_indent(&format_args![
-                            format_value,
-                            inline_comments
-                        ]))
-                        .should_expand(true)
-                        .fmt(f)?;
-                    } else {
-                        block_indent(&format_args![format_value, inline_comments]).fmt(f)?;
-                    }
-
-                    token(")").fmt(f)
+                    write!(
+                        f,
+                        [
+                            last_target,
+                            space(),
+                            operator,
+                            space(),
+                            token("("),
+                            group(&soft_block_indent(&format_args![
+                                format_value,
+                                inline_comments
+                            ]))
+                            .should_expand(true),
+                            token(")")
+                        ]
+                    )
                 });
 
                 // Fall back to parenthesizing (or splitting) the last target part if we can't make the value
@@ -618,15 +619,16 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                 // ] = c
                 // ```
                 let split_target_flat_value = format_with(|f| {
-                    if is_join_implicit_concatenated_string_enabled(f.context()) {
-                        group(&last_target).should_expand(true).fmt(f)?;
-                    } else {
-                        last_target.fmt(f)?;
-                    }
-
                     write!(
                         f,
-                        [space(), operator, space(), format_value, inline_comments]
+                        [
+                            group(&last_target).should_expand(true),
+                            space(),
+                            operator,
+                            space(),
+                            format_value,
+                            inline_comments
+                        ]
                     )
                 });
 

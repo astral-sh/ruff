@@ -6,7 +6,6 @@ use crate::expression::parentheses::{
     is_expression_parenthesized, parenthesized, Parentheses, Parenthesize,
 };
 use crate::prelude::*;
-use crate::preview::is_with_single_item_pre_39_enabled;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
 pub enum WithItemLayout {
@@ -136,9 +135,7 @@ impl FormatNodeRule<WithItem> for FormatWithItem {
             }
 
             WithItemLayout::Python38OrOlder { single } => {
-                let parenthesize = if (single && is_with_single_item_pre_39_enabled(f.context()))
-                    || is_parenthesized
-                {
+                let parenthesize = if single || is_parenthesized {
                     Parenthesize::IfBreaks
                 } else {
                     Parenthesize::IfRequired

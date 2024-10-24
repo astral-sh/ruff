@@ -33,7 +33,7 @@ line-ending                = LineFeed
 magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
-preview                    = Enabled
+preview                    = Disabled
 target_version             = Py38
 source_type                = Stub
 ```
@@ -56,6 +56,3 @@ class Test4:
 
 class Test4: ...
 ```
-
-
-

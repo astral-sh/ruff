@@ -235,9 +235,9 @@ String \"\"\"
 
 # String continuation
 
-"Let's" "start" "with" "a" "simple" "example"
+"Let'sstartwithasimpleexample"
 
-"Let's" "start" "with" "a" "simple" "example" "now repeat after me:" "I am confident" "I am confident" "I am confident" "I am confident" "I am confident"
+"Let'sstartwithasimpleexamplenow repeat after me:I am confidentI am confidentI am confidentI am confidentI am confident"
 
 (
     "Let's"
@@ -304,7 +304,7 @@ test_particular = [
 ]
 
 # Parenthesized string continuation with messed up indentation
-{"key": ([], "a" "b" "c")}
+{"key": ([], "abc")}
 
 
 # Regression test for https://github.com/astral-sh/ruff/issues/5893
@@ -328,34 +328,6 @@ a = f"""\x1f"""
 a = """\x1f"""
 a = """\\x1F"""
 a = """\\\x1f"""
-```
-
-
-#### Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -70,9 +70,9 @@
- 
- # String continuation
- 
--"Let's" "start" "with" "a" "simple" "example"
-+"Let'sstartwithasimpleexample"
- 
--"Let's" "start" "with" "a" "simple" "example" "now repeat after me:" "I am confident" "I am confident" "I am confident" "I am confident" "I am confident"
-+"Let'sstartwithasimpleexamplenow repeat after me:I am confidentI am confidentI am confidentI am confidentI am confident"
- 
- (
-     "Let's"
-@@ -139,7 +139,7 @@
- ]
- 
- # Parenthesized string continuation with messed up indentation
--{"key": ([], "a" "b" "c")}
-+{"key": ([], "abc")}
- 
- 
- # Regression test for https://github.com/astral-sh/ruff/issues/5893
 ```
 
 
@@ -447,9 +419,9 @@ String \"\"\"
 
 # String continuation
 
-"Let's" 'start' 'with' 'a' 'simple' 'example'
+"Let'sstartwithasimpleexample"
 
-"Let's" 'start' 'with' 'a' 'simple' 'example' 'now repeat after me:' 'I am confident' 'I am confident' 'I am confident' 'I am confident' 'I am confident'
+"Let'sstartwithasimpleexamplenow repeat after me:I am confidentI am confidentI am confidentI am confidentI am confident"
 
 (
     "Let's"
@@ -516,7 +488,7 @@ test_particular = [
 ]
 
 # Parenthesized string continuation with messed up indentation
-{'key': ([], 'a' 'b' 'c')}
+{'key': ([], 'abc')}
 
 
 # Regression test for https://github.com/astral-sh/ruff/issues/5893
@@ -540,32 +512,4 @@ a = f"""\x1f"""
 a = """\x1f"""
 a = """\\x1F"""
 a = """\\\x1f"""
-```
-
-
-#### Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -70,9 +70,9 @@
- 
- # String continuation
- 
--"Let's" 'start' 'with' 'a' 'simple' 'example'
-+"Let'sstartwithasimpleexample"
- 
--"Let's" 'start' 'with' 'a' 'simple' 'example' 'now repeat after me:' 'I am confident' 'I am confident' 'I am confident' 'I am confident' 'I am confident'
-+"Let'sstartwithasimpleexamplenow repeat after me:I am confidentI am confidentI am confidentI am confidentI am confident"
- 
- (
-     "Let's"
-@@ -139,7 +139,7 @@
- ]
- 
- # Parenthesized string continuation with messed up indentation
--{'key': ([], 'a' 'b' 'c')}
-+{'key': ([], 'abc')}
- 
- 
- # Regression test for https://github.com/astral-sh/ruff/issues/5893
 ```

@@ -3,10 +3,8 @@ use ruff_formatter::write;
 use ruff_python_ast::StmtAssert;
 
 use crate::comments::SourceComment;
-
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
-use crate::preview::is_join_implicit_concatenated_string_enabled;
 use crate::{has_skip_comment, prelude::*};
 
 #[derive(Default)]
@@ -30,18 +28,12 @@ impl FormatNodeRule<StmtAssert> for FormatStmtAssert {
         )?;
 
         if let Some(msg) = msg {
-            let parenthesize = if is_join_implicit_concatenated_string_enabled(f.context()) {
-                Parenthesize::IfBreaksParenthesized
-            } else {
-                Parenthesize::IfBreaks
-            };
-
             write!(
                 f,
                 [
                     token(","),
                     space(),
-                    maybe_parenthesize_expression(msg, item, parenthesize),
+                    maybe_parenthesize_expression(msg, item, Parenthesize::IfBreaksParenthesized),
                 ]
             )?;
         }

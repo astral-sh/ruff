@@ -104,7 +104,7 @@ elif   unformatted:
 -            "=foo.bar.:main",
 -        # fmt: on
 -            ]  # Includes an formatted indentation.
-+            "foo-bar" "=foo.bar.:main",
++            "foo-bar=foo.bar.:main",
 +            # fmt: on
 +        ]  # Includes an formatted indentation.
      },
@@ -128,7 +128,7 @@ setup(
     entry_points={
         # fmt: off
         "console_scripts": [
-            "foo-bar" "=foo.bar.:main",
+            "foo-bar=foo.bar.:main",
             # fmt: on
         ]  # Includes an formatted indentation.
     },

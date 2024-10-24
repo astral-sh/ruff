@@ -7,23 +7,14 @@ use ruff_python_ast::{
     str_prefix::{AnyStringPrefix, StringLiteralPrefix},
     AnyStringFlags, StringFlags,
 };
-use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
-use crate::expression::expr_f_string::f_string_quoting;
 use crate::prelude::*;
 use crate::QuoteStyle;
 
 pub(crate) mod docstring;
 pub(crate) mod implicit;
 mod normalize;
-
-#[derive(Copy, Clone, Debug, Default)]
-pub(crate) enum Quoting {
-    #[default]
-    CanChange,
-    Preserve,
-}
 
 impl Format<PyFormatContext<'_>> for AnyStringPrefix {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
@@ -89,19 +80,10 @@ impl From<Quote> for QuoteStyle {
 
 // Extension trait that adds formatter specific helper methods to `StringLike`.
 pub(crate) trait StringLikeExtensions {
-    fn quoting(&self, locator: &Locator<'_>) -> Quoting;
-
     fn is_multiline(&self, source: &str) -> bool;
 }
 
 impl StringLikeExtensions for ast::StringLike<'_> {
-    fn quoting(&self, locator: &Locator<'_>) -> Quoting {
-        match self {
-            Self::String(_) | Self::Bytes(_) => Quoting::CanChange,
-            Self::FString(f_string) => f_string_quoting(f_string, locator),
-        }
-    }
-
     fn is_multiline(&self, source: &str) -> bool {
         match self {
             Self::String(_) | Self::Bytes(_) => self.parts().any(|part| {
