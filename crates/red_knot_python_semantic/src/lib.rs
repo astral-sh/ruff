@@ -21,5 +21,6 @@ mod semantic_model;
 pub(crate) mod site_packages;
 mod stdlib;
 pub mod types;
+mod util;
 
 type FxOrderSet<V> = ordermap::set::OrderSet<V, BuildHasherDefault<FxHasher>>;
