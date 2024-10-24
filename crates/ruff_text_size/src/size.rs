@@ -1,5 +1,5 @@
 use {
-    crate::TextLen,
+    crate::{TextLen, TextRange},
     std::{
         convert::TryFrom,
         fmt, iter,
@@ -85,6 +85,23 @@ impl TextSize {
     /// ```
     pub const fn to_usize(&self) -> usize {
         self.raw as usize
+    }
+
+    /// Returns whether this TextSize would be in the TextRange.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use ruff_text_size::*;
+    /// assert!(
+    ///   TextSize::from(4).in_range(TextRange::new(2, 6))
+    /// );
+    /// assert!(
+    ///   !TextSize::from(1).in_range(TextRange::new(2, 6))
+    /// );
+    /// ```
+    pub fn in_range(&self, range: &TextRange) -> bool {
+        ((range.start().to_u32()) <= self.raw) && ((range.end().to_u32()) >= self.raw)
     }
 }
 
