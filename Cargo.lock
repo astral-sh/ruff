@@ -2491,7 +2491,7 @@ dependencies = [
  "serde",
  "static_assertions",
  "tracing",
- "unicode-width 0.1.13",
+ "unicode-width 0.2.0",
 ]
 
 [[package]]
@@ -2577,7 +2577,7 @@ dependencies = [
  "toml",
  "typed-arena",
  "unicode-normalization",
- "unicode-width 0.1.13",
+ "unicode-width 0.2.0",
  "unicode_names2",
  "url",
 ]
