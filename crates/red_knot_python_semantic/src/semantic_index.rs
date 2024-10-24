@@ -142,11 +142,11 @@ impl<'db> SemanticIndex<'db> {
         &self.ast_ids[scope_id]
     }
 
-    pub(crate) fn definition_range(&self, def: &Definition<'db>) -> TextRange {
+    pub(crate) fn definition_range(&self, def: Definition<'db>) -> TextRange {
         // XXX this function doesn't need to exist?
         // or at least it shouldn't work like this I think
         for (dnk, other_def) in &self.definitions_by_node {
-            if other_def == def {
+            if *other_def == def {
                 return dnk.0.range();
             }
         }

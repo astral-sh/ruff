@@ -289,10 +289,11 @@ impl<'db> UseDefMap<'db> {
         &self,
         symbol: ScopedSymbolId,
     ) -> Option<Definition<'db>> {
-        for binding in self.public_bindings(symbol) {
-            return Some(binding.binding);
+        if let Some(binding) = self.public_bindings(symbol).next() {
+            Some(binding.binding)
+        } else {
+            None
         }
-        None
     }
 
     pub(crate) fn public_may_be_unbound(&self, symbol: ScopedSymbolId) -> bool {

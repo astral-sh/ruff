@@ -30,7 +30,7 @@ pub fn definition_at_location(file: File, location: Position, db: &dyn Db) -> Op
         &source,
     );
 
-    return module.syntax().locate_def(&text_size, index, db, file);
+    return module.syntax().locate_def(text_size, index, db, file);
 }
 
 pub(crate) fn locate_name_on_type<'db>(
@@ -39,8 +39,6 @@ pub(crate) fn locate_name_on_type<'db>(
     typ: &Type<'db>,
     attr: &Identifier,
 ) -> Option<DefLocation> {
-    let Some(def) = typ.member_def(db, &attr.id) else {
-        return None;
-    };
+    let def = typ.member_def(db, &attr.id)?;
     Some(DefLocation::from_definition(def, index, db, def.file(db)))
 }

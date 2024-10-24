@@ -40,7 +40,7 @@ impl DefLocation {
         db: &dyn Db,
         file: File,
     ) -> DefLocation {
-        let range = index.definition_range(&definition);
+        let range = index.definition_range(definition);
         let final_range = ruff_range_to_lsp_range(db, file, range);
         return DefLocation::Location {
             url: definition.file(db).try_url(db.upcast()),
@@ -72,7 +72,7 @@ fn ruff_range_to_lsp_range(db: &dyn Db, file: File, range: TextRange) -> lsp_typ
 pub(crate) trait CanLocate<'db> {
     fn locate_def(
         &self,
-        pos: &TextSize,
+        pos: TextSize,
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
@@ -82,7 +82,7 @@ pub(crate) trait CanLocate<'db> {
 impl<'db> CanLocate<'db> for Stmt {
     fn locate_def(
         &self,
-        pos: &TextSize,
+        pos: TextSize,
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
@@ -120,7 +120,7 @@ where
 {
     fn locate_def(
         &self,
-        pos: &TextSize,
+        pos: TextSize,
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
@@ -141,7 +141,7 @@ where
 {
     fn locate_def(
         &self,
-        pos: &TextSize,
+        pos: TextSize,
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
@@ -162,7 +162,7 @@ where
 {
     fn locate_def(
         &self,
-        pos: &TextSize,
+        pos: TextSize,
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
@@ -176,7 +176,7 @@ where
 {
     fn locate_def(
         &self,
-        pos: &TextSize,
+        pos: TextSize,
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
@@ -191,7 +191,7 @@ where
 impl<'db> CanLocate<'db> for Expr {
     fn locate_def(
         &self,
-        pos: &TextSize,
+        pos: TextSize,
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
@@ -235,7 +235,7 @@ impl<'db> CanLocate<'db> for Expr {
 macro_rules! impl_can_locate {
     ($type:ty, ranged, $($field:ident),+) => {
         impl<'db> CanLocate<'db> for $type {
-            fn locate_def(&self, pos: &TextSize, index: &SemanticIndex<'db>, db: &'db dyn Db, file: File) -> Option<DefLocation> {
+            fn locate_def(&self, pos: TextSize, index: &SemanticIndex<'db>, db: &'db dyn Db, file: File) -> Option<DefLocation> {
                 if !pos.in_range(&self.range) {
                     return None;
                 }
@@ -247,7 +247,7 @@ macro_rules! impl_can_locate {
     // Case where `locate_def` directly forwards to a field.
     ($type:ty, $($field:ident),+) => {
         impl<'db> CanLocate<'db> for $type {
-            fn locate_def(&self, pos: &TextSize, index: &SemanticIndex<'db>, db: &'db dyn Db, file: File) -> Option<DefLocation> {
+            fn locate_def(&self, pos: TextSize, index: &SemanticIndex<'db>, db: &'db dyn Db, file: File) -> Option<DefLocation> {
                 None
                     $(.or_else(|| self.$field.locate_def(pos, index, db, file)))+
             }
@@ -261,7 +261,7 @@ macro_rules! locate_todo {
         impl<'db> CanLocate<'db> for $type {
             fn locate_def(
                 &self,
-                _pos: &TextSize,
+                _pos: TextSize,
                 _index: &SemanticIndex<'db>,
                 _db: &'db dyn Db,
                 _file: File,
@@ -336,7 +336,7 @@ locate_todo!(ExceptHandler);
 impl<'db> CanLocate<'db> for TypeParam {
     fn locate_def(
         &self,
-        pos: &TextSize,
+        pos: TextSize,
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
@@ -355,7 +355,7 @@ impl_can_locate!(TypeParamTypeVarTuple, ranged, default);
 impl<'db> CanLocate<'db> for FStringValue {
     fn locate_def(
         &self,
-        pos: &TextSize,
+        pos: TextSize,
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
@@ -373,7 +373,7 @@ impl<'db> CanLocate<'db> for FStringValue {
 impl<'db> CanLocate<'db> for FStringPart {
     fn locate_def(
         &self,
-        pos: &TextSize,
+        pos: TextSize,
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
@@ -396,7 +396,7 @@ impl<'db> CanLocate<'db> for FStringPart {
 impl<'db> CanLocate<'db> for ExprAttribute {
     fn locate_def(
         &self,
-        pos: &TextSize,
+        pos: TextSize,
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
@@ -425,7 +425,7 @@ impl<'db> CanLocate<'db> for ExprAttribute {
 impl<'db> CanLocate<'db> for ExprSubscript {
     fn locate_def(
         &self,
-        pos: &TextSize,
+        pos: TextSize,
         _index: &SemanticIndex<'db>,
         _db: &'db dyn Db,
         _file: File,
@@ -445,7 +445,7 @@ impl_can_locate!(ExprStarred, ranged, value);
 impl<'db> CanLocate<'db> for ExprName {
     fn locate_def(
         &self,
-        pos: &TextSize,
+        pos: TextSize,
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
@@ -460,14 +460,14 @@ impl<'db> CanLocate<'db> for ExprName {
             .ast_ids(file_scope_id)
             .use_id(ExpressionRef::from(self));
         let udm = use_def_map(db, scope);
-        for binding in udm.bindings_at_use(scoped_use_id) {
-            // take first binding I find
+        if let Some(binding) = udm.bindings_at_use(scoped_use_id).next() {
+            // take first binding I find as the canonical one
             let definition: Definition<'db> = binding.binding;
-            return Some(DefLocation::from_definition(definition, index, db, file));
+            Some(DefLocation::from_definition(definition, index, db, file))
+        } else {
+            // couldn't find a definition (perhaps this is unbound?)
+            None
         }
-        Some(DefLocation::Todo {
-            s: "Name Access!".to_string(),
-        })
     }
 }
 
@@ -478,7 +478,7 @@ impl_can_locate!(ExprSlice, ranged, lower, upper, step);
 impl<'db> CanLocate<'db> for Identifier {
     fn locate_def(
         &self,
-        _pos: &TextSize,
+        _pos: TextSize,
         _index: &SemanticIndex<'db>,
         _db: &'db dyn Db,
         _file: File,
