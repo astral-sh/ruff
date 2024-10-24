@@ -1466,8 +1466,9 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     /// Emit a diagnostic declaring that an index is out of bounds for a tuple.
-    pub(super) fn tuple_index_out_of_bounds_diagnostic(
+    pub(super) fn index_out_of_bounds_diagnostic(
         &mut self,
+        kind: &'static str,
         node: AnyNodeRef,
         tuple_ty: Type<'db>,
         length: usize,
@@ -1477,26 +1478,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             node,
             "index-out-of-bounds",
             format_args!(
-                "Index {index} is out of bounds for tuple of type `{}` with length {length}",
+                "Index {index} is out of bounds for {kind} `{}` with length {length}",
                 tuple_ty.display(self.db)
-            ),
-        );
-    }
-
-    /// Emit a diagnostic declaring that an index is out of bounds for a string.
-    pub(super) fn string_index_out_of_bounds_diagnostic(
-        &mut self,
-        node: AnyNodeRef,
-        string_ty: Type<'db>,
-        length: usize,
-        index: i64,
-    ) {
-        self.add_diagnostic(
-            node,
-            "index-out-of-bounds",
-            format_args!(
-                "Index {index} is out of bounds for string `{}` with length {length}",
-                string_ty.display(self.db)
             ),
         );
     }
@@ -3198,7 +3181,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                     .ok()
                     .and_then(|index| elements.get(index).copied())
                     .unwrap_or_else(|| {
-                        self.tuple_index_out_of_bounds_diagnostic(
+                        self.index_out_of_bounds_diagnostic(
+                            "tuple",
                             value_node.into(),
                             value_ty,
                             elements.len(),
@@ -3215,7 +3199,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                     .and_then(|index| elements.len().checked_sub(index))
                     .and_then(|index| elements.get(index).copied())
                     .unwrap_or_else(|| {
-                        self.tuple_index_out_of_bounds_diagnostic(
+                        self.index_out_of_bounds_diagnostic(
+                            "tuple",
                             value_node.into(),
                             value_ty,
                             elements.len(),
@@ -3243,7 +3228,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                         ))
                     })
                     .unwrap_or_else(|| {
-                        self.string_index_out_of_bounds_diagnostic(
+                        self.index_out_of_bounds_diagnostic(
+                            "string",
                             value_node.into(),
                             value_ty,
                             literal_value.chars().count(),
@@ -3266,7 +3252,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                         ))
                     })
                     .unwrap_or_else(|| {
-                        self.string_index_out_of_bounds_diagnostic(
+                        self.index_out_of_bounds_diagnostic(
+                            "string",
                             value_node.into(),
                             value_ty,
                             literal_value.chars().count(),
