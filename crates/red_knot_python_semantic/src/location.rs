@@ -1,6 +1,9 @@
 use crate::{
     search::locate_name_on_type,
-    semantic_index::{definition::Definition, use_def_map, SemanticIndex},
+    semantic_index::{
+        definition::{Definition, DefinitionKind},
+        use_def_map, SemanticIndex,
+    },
     Db, HasTy, SemanticModel,
 };
 use ruff_db::files::{location::Location, File};
@@ -16,10 +19,28 @@ pub(crate) fn location_from_definition<'db>(
     index: &SemanticIndex<'db>,
     db: &dyn Db,
 ) -> Location {
-    let range = index.definition_range(definition);
-    Location {
-        file: definition.file(db),
-        range,
+    match definition.kind(db) {
+        DefinitionKind::Import(_) => todo!(),
+        DefinitionKind::ImportFrom(_) => todo!(),
+        DefinitionKind::Function(_)
+        | DefinitionKind::Class(_)
+        | DefinitionKind::NamedExpression(_)
+        | DefinitionKind::Assignment(_)
+        | DefinitionKind::AnnotatedAssignment(_)
+        | DefinitionKind::AugmentedAssignment(_)
+        | DefinitionKind::For(_)
+        | DefinitionKind::Comprehension(_)
+        | DefinitionKind::Parameter(_)
+        | DefinitionKind::ParameterWithDefault(_)
+        | DefinitionKind::WithItem(_)
+        | DefinitionKind::MatchPattern(_)
+        | DefinitionKind::ExceptHandler(_) => {
+            let range = index.definition_range(definition);
+            return Location {
+                file: definition.file(db),
+                range,
+            };
+        }
     }
 }
 
