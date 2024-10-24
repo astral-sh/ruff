@@ -94,10 +94,10 @@ impl TextSize {
     /// ```rust
     /// # use ruff_text_size::*;
     /// assert!(
-    ///   TextSize::from(4).in_range(TextRange::new(2, 6))
+    ///   TextSize::from(4).in_range(&TextRange::new(2.into(), 6.into()))
     /// );
     /// assert!(
-    ///   !TextSize::from(1).in_range(TextRange::new(2, 6))
+    ///   !TextSize::from(1).in_range(&TextRange::new(2.into(), 6.into()))
     /// );
     /// ```
     pub fn in_range(&self, range: &TextRange) -> bool {
