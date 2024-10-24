@@ -10,6 +10,9 @@ reveal_type(s[1])  # revealed: Literal["b"]
 reveal_type(s[-1])  # revealed: Literal["e"]
 reveal_type(s[-2])  # revealed: Literal["d"]
 
+reveal_type(s[False])  # revealed: Literal["a"]
+reveal_type(s[True])  # revealed: Literal["b"]
+
 a = s[8]  # error: [index-out-of-bounds] "Index 8 is out of bounds for string `Literal["abcde"]` with length 5"
 reveal_type(a)  # revealed: Unknown
 
