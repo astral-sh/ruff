@@ -3,12 +3,12 @@ use crate::{
     semantic_index::{definition::Definition, use_def_map, SemanticIndex},
     Db, HasTy, SemanticModel,
 };
-use lsp_types::{Position, Range};
+use lsp_types::Range;
 use ruff_db::{
     files::File,
     source::{line_index, source_text},
 };
-use ruff_text_size::TextRange;
+use ruff_text_size::{TextRange, TextSize};
 use url::Url;
 
 // XXX should I just use an alias here? Not getting much value out of this huge import
@@ -68,28 +68,11 @@ fn ruff_range_to_lsp_range(db: &dyn Db, file: File, range: TextRange) -> lsp_typ
     }
 }
 
-// this is a position as number of characters from the start
-// XXX find something to use instead of this
-pub struct CPosition(pub u64);
-
-// LSP position... lsp-types
-impl From<Position> for CPosition {
-    fn from(_value: Position) -> Self {
-        todo!()
-    }
-}
-
-impl CPosition {
-    fn in_range(&self, range: &TextRange) -> bool {
-        (u64::from(range.start().to_u32()) <= self.0) && (u64::from(range.end().to_u32()) >= self.0)
-    }
-}
-
 /// This trait is used to locate where something is defined
 pub(crate) trait CanLocate<'db> {
     fn locate_def(
         &self,
-        cpos: &CPosition,
+        pos: &TextSize,
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
@@ -99,33 +82,33 @@ pub(crate) trait CanLocate<'db> {
 impl<'db> CanLocate<'db> for Stmt {
     fn locate_def(
         &self,
-        cpos: &CPosition,
+        pos: &TextSize,
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
     ) -> Option<DefLocation> {
         match self {
-            Stmt::FunctionDef(inner) => inner.locate_def(cpos, index, db, file),
-            Stmt::ClassDef(inner) => inner.locate_def(cpos, index, db, file),
-            Stmt::Return(inner) => inner.locate_def(cpos, index, db, file),
-            Stmt::Delete(inner) => inner.locate_def(cpos, index, db, file),
-            Stmt::Assign(inner) => inner.locate_def(cpos, index, db, file),
-            Stmt::AugAssign(inner) => inner.locate_def(cpos, index, db, file),
-            Stmt::AnnAssign(inner) => inner.locate_def(cpos, index, db, file),
-            Stmt::TypeAlias(inner) => inner.locate_def(cpos, index, db, file),
-            Stmt::For(inner) => inner.locate_def(cpos, index, db, file),
-            Stmt::While(inner) => inner.locate_def(cpos, index, db, file),
-            Stmt::If(inner) => inner.locate_def(cpos, index, db, file),
-            Stmt::With(inner) => inner.locate_def(cpos, index, db, file),
-            Stmt::Match(inner) => inner.locate_def(cpos, index, db, file),
-            Stmt::Raise(inner) => inner.locate_def(cpos, index, db, file),
-            Stmt::Try(inner) => inner.locate_def(cpos, index, db, file),
-            Stmt::Assert(inner) => inner.locate_def(cpos, index, db, file),
-            Stmt::Import(inner) => inner.locate_def(cpos, index, db, file),
-            Stmt::ImportFrom(inner) => inner.locate_def(cpos, index, db, file),
-            Stmt::Global(inner) => inner.locate_def(cpos, index, db, file),
-            Stmt::Nonlocal(inner) => inner.locate_def(cpos, index, db, file),
-            Stmt::Expr(inner) => inner.locate_def(cpos, index, db, file),
+            Stmt::FunctionDef(inner) => inner.locate_def(pos, index, db, file),
+            Stmt::ClassDef(inner) => inner.locate_def(pos, index, db, file),
+            Stmt::Return(inner) => inner.locate_def(pos, index, db, file),
+            Stmt::Delete(inner) => inner.locate_def(pos, index, db, file),
+            Stmt::Assign(inner) => inner.locate_def(pos, index, db, file),
+            Stmt::AugAssign(inner) => inner.locate_def(pos, index, db, file),
+            Stmt::AnnAssign(inner) => inner.locate_def(pos, index, db, file),
+            Stmt::TypeAlias(inner) => inner.locate_def(pos, index, db, file),
+            Stmt::For(inner) => inner.locate_def(pos, index, db, file),
+            Stmt::While(inner) => inner.locate_def(pos, index, db, file),
+            Stmt::If(inner) => inner.locate_def(pos, index, db, file),
+            Stmt::With(inner) => inner.locate_def(pos, index, db, file),
+            Stmt::Match(inner) => inner.locate_def(pos, index, db, file),
+            Stmt::Raise(inner) => inner.locate_def(pos, index, db, file),
+            Stmt::Try(inner) => inner.locate_def(pos, index, db, file),
+            Stmt::Assert(inner) => inner.locate_def(pos, index, db, file),
+            Stmt::Import(inner) => inner.locate_def(pos, index, db, file),
+            Stmt::ImportFrom(inner) => inner.locate_def(pos, index, db, file),
+            Stmt::Global(inner) => inner.locate_def(pos, index, db, file),
+            Stmt::Nonlocal(inner) => inner.locate_def(pos, index, db, file),
+            Stmt::Expr(inner) => inner.locate_def(pos, index, db, file),
             Stmt::Pass(_) | Stmt::Break(_) | Stmt::Continue(_) | Stmt::IpyEscapeCommand(_) => None,
         }
     }
@@ -137,13 +120,13 @@ where
 {
     fn locate_def(
         &self,
-        cpos: &CPosition,
+        pos: &TextSize,
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
     ) -> Option<DefLocation> {
         for item in self {
-            let lookup = item.locate_def(cpos, index, db, file);
+            let lookup = item.locate_def(pos, index, db, file);
             if lookup.is_some() {
                 return lookup;
             }
@@ -158,13 +141,13 @@ where
 {
     fn locate_def(
         &self,
-        cpos: &CPosition,
+        pos: &TextSize,
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
     ) -> Option<DefLocation> {
         for item in self {
-            let lookup = item.locate_def(cpos, index, db, file);
+            let lookup = item.locate_def(pos, index, db, file);
             if lookup.is_some() {
                 return lookup;
             }
@@ -179,12 +162,12 @@ where
 {
     fn locate_def(
         &self,
-        cpos: &CPosition,
+        pos: &TextSize,
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
     ) -> Option<DefLocation> {
-        self.as_ref().locate_def(cpos, index, db, file)
+        self.as_ref().locate_def(pos, index, db, file)
     }
 }
 impl<'db, T> CanLocate<'db> for Option<T>
@@ -193,14 +176,14 @@ where
 {
     fn locate_def(
         &self,
-        cpos: &CPosition,
+        pos: &TextSize,
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
     ) -> Option<DefLocation> {
         match self {
             None => None,
-            Some(elt) => elt.locate_def(cpos, index, db, file),
+            Some(elt) => elt.locate_def(pos, index, db, file),
         }
     }
 }
@@ -208,43 +191,43 @@ where
 impl<'db> CanLocate<'db> for Expr {
     fn locate_def(
         &self,
-        cpos: &CPosition,
+        pos: &TextSize,
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
     ) -> Option<DefLocation> {
         match self {
-            Expr::BoolOp(inner) => inner.locate_def(cpos, index, db, file),
-            Expr::Named(inner) => inner.locate_def(cpos, index, db, file),
-            Expr::BinOp(inner) => inner.locate_def(cpos, index, db, file),
-            Expr::UnaryOp(inner) => inner.locate_def(cpos, index, db, file),
-            Expr::Lambda(inner) => inner.locate_def(cpos, index, db, file),
-            Expr::If(inner) => inner.locate_def(cpos, index, db, file),
-            Expr::Dict(inner) => inner.locate_def(cpos, index, db, file),
-            Expr::Set(inner) => inner.locate_def(cpos, index, db, file),
-            Expr::ListComp(inner) => inner.locate_def(cpos, index, db, file),
-            Expr::SetComp(inner) => inner.locate_def(cpos, index, db, file),
-            Expr::DictComp(inner) => inner.locate_def(cpos, index, db, file),
-            Expr::Generator(inner) => inner.locate_def(cpos, index, db, file),
-            Expr::Await(inner) => inner.locate_def(cpos, index, db, file),
-            Expr::Yield(inner) => inner.locate_def(cpos, index, db, file),
-            Expr::YieldFrom(inner) => inner.locate_def(cpos, index, db, file),
-            Expr::Compare(inner) => inner.locate_def(cpos, index, db, file),
-            Expr::Call(inner) => inner.locate_def(cpos, index, db, file),
-            Expr::FString(inner) => inner.locate_def(cpos, index, db, file),
+            Expr::BoolOp(inner) => inner.locate_def(pos, index, db, file),
+            Expr::Named(inner) => inner.locate_def(pos, index, db, file),
+            Expr::BinOp(inner) => inner.locate_def(pos, index, db, file),
+            Expr::UnaryOp(inner) => inner.locate_def(pos, index, db, file),
+            Expr::Lambda(inner) => inner.locate_def(pos, index, db, file),
+            Expr::If(inner) => inner.locate_def(pos, index, db, file),
+            Expr::Dict(inner) => inner.locate_def(pos, index, db, file),
+            Expr::Set(inner) => inner.locate_def(pos, index, db, file),
+            Expr::ListComp(inner) => inner.locate_def(pos, index, db, file),
+            Expr::SetComp(inner) => inner.locate_def(pos, index, db, file),
+            Expr::DictComp(inner) => inner.locate_def(pos, index, db, file),
+            Expr::Generator(inner) => inner.locate_def(pos, index, db, file),
+            Expr::Await(inner) => inner.locate_def(pos, index, db, file),
+            Expr::Yield(inner) => inner.locate_def(pos, index, db, file),
+            Expr::YieldFrom(inner) => inner.locate_def(pos, index, db, file),
+            Expr::Compare(inner) => inner.locate_def(pos, index, db, file),
+            Expr::Call(inner) => inner.locate_def(pos, index, db, file),
+            Expr::FString(inner) => inner.locate_def(pos, index, db, file),
             Expr::StringLiteral(_) => None,
             Expr::BytesLiteral(_) => None,
             Expr::NumberLiteral(_) => None,
             Expr::BooleanLiteral(_) => None,
             Expr::NoneLiteral(_) => None,
             Expr::EllipsisLiteral(_) => None,
-            Expr::Attribute(inner) => inner.locate_def(cpos, index, db, file),
-            Expr::Subscript(inner) => inner.locate_def(cpos, index, db, file),
-            Expr::Starred(inner) => inner.locate_def(cpos, index, db, file),
-            Expr::Name(inner) => inner.locate_def(cpos, index, db, file),
-            Expr::List(inner) => inner.locate_def(cpos, index, db, file),
-            Expr::Tuple(inner) => inner.locate_def(cpos, index, db, file),
-            Expr::Slice(inner) => inner.locate_def(cpos, index, db, file),
+            Expr::Attribute(inner) => inner.locate_def(pos, index, db, file),
+            Expr::Subscript(inner) => inner.locate_def(pos, index, db, file),
+            Expr::Starred(inner) => inner.locate_def(pos, index, db, file),
+            Expr::Name(inner) => inner.locate_def(pos, index, db, file),
+            Expr::List(inner) => inner.locate_def(pos, index, db, file),
+            Expr::Tuple(inner) => inner.locate_def(pos, index, db, file),
+            Expr::Slice(inner) => inner.locate_def(pos, index, db, file),
             Expr::IpyEscapeCommand(_) => None,
         }
     }
@@ -252,21 +235,21 @@ impl<'db> CanLocate<'db> for Expr {
 macro_rules! impl_can_locate {
     ($type:ty, ranged, $($field:ident),+) => {
         impl<'db> CanLocate<'db> for $type {
-            fn locate_def(&self, cpos: &CPosition, index: &SemanticIndex<'db>, db: &'db dyn Db, file: File) -> Option<DefLocation> {
-                if !cpos.in_range(&self.range) {
+            fn locate_def(&self, pos: &TextSize, index: &SemanticIndex<'db>, db: &'db dyn Db, file: File) -> Option<DefLocation> {
+                if !pos.in_range(&self.range) {
                     return None;
                 }
                 None
-                    $(.or_else(|| self.$field.locate_def(cpos, index, db, file)))+
+                    $(.or_else(|| self.$field.locate_def(pos, index, db, file)))+
             }
         }
     };
     // Case where `locate_def` directly forwards to a field.
     ($type:ty, $($field:ident),+) => {
         impl<'db> CanLocate<'db> for $type {
-            fn locate_def(&self, cpos: &CPosition, index: &SemanticIndex<'db>, db: &'db dyn Db, file: File) -> Option<DefLocation> {
+            fn locate_def(&self, pos: &TextSize, index: &SemanticIndex<'db>, db: &'db dyn Db, file: File) -> Option<DefLocation> {
                 None
-                    $(.or_else(|| self.$field.locate_def(cpos, index, db, file)))+
+                    $(.or_else(|| self.$field.locate_def(pos, index, db, file)))+
             }
         }
     };
@@ -278,7 +261,7 @@ macro_rules! locate_todo {
         impl<'db> CanLocate<'db> for $type {
             fn locate_def(
                 &self,
-                _cpos: &CPosition,
+                _pos: &TextSize,
                 _index: &SemanticIndex<'db>,
                 _db: &'db dyn Db,
                 _file: File,
@@ -353,15 +336,15 @@ locate_todo!(ExceptHandler);
 impl<'db> CanLocate<'db> for TypeParam {
     fn locate_def(
         &self,
-        cpos: &CPosition,
+        pos: &TextSize,
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
     ) -> Option<DefLocation> {
         match self {
-            TypeParam::TypeVar(inner) => inner.locate_def(cpos, index, db, file),
-            TypeParam::ParamSpec(inner) => inner.locate_def(cpos, index, db, file),
-            TypeParam::TypeVarTuple(inner) => inner.locate_def(cpos, index, db, file),
+            TypeParam::TypeVar(inner) => inner.locate_def(pos, index, db, file),
+            TypeParam::ParamSpec(inner) => inner.locate_def(pos, index, db, file),
+            TypeParam::TypeVarTuple(inner) => inner.locate_def(pos, index, db, file),
         }
     }
 }
@@ -372,13 +355,13 @@ impl_can_locate!(TypeParamTypeVarTuple, ranged, default);
 impl<'db> CanLocate<'db> for FStringValue {
     fn locate_def(
         &self,
-        cpos: &CPosition,
+        pos: &TextSize,
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
     ) -> Option<DefLocation> {
         for part in self {
-            let result = part.locate_def(cpos, index, db, file);
+            let result = part.locate_def(pos, index, db, file);
             if result.is_some() {
                 return result;
             }
@@ -390,7 +373,7 @@ impl<'db> CanLocate<'db> for FStringValue {
 impl<'db> CanLocate<'db> for FStringPart {
     fn locate_def(
         &self,
-        cpos: &CPosition,
+        pos: &TextSize,
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
@@ -399,7 +382,7 @@ impl<'db> CanLocate<'db> for FStringPart {
             FStringPart::Literal(_) => None,
             FStringPart::FString(FString { elements, .. }) => {
                 for expression in elements.expressions() {
-                    let result = expression.locate_def(cpos, index, db, file);
+                    let result = expression.locate_def(pos, index, db, file);
                     if result.is_some() {
                         return result;
                     }
@@ -413,16 +396,16 @@ impl<'db> CanLocate<'db> for FStringPart {
 impl<'db> CanLocate<'db> for ExprAttribute {
     fn locate_def(
         &self,
-        cpos: &CPosition,
+        pos: &TextSize,
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
     ) -> Option<DefLocation> {
-        if !cpos.in_range(&self.range) {
+        if !pos.in_range(&self.range) {
             return None;
         }
         // we're definitely in here!
-        if cpos.in_range(&self.attr.range) {
+        if pos.in_range(&self.attr.range) {
             // we're on the attribute itself
             // so we'll look up the type of the expr
             // (to determine where this attribute is)
@@ -434,7 +417,7 @@ impl<'db> CanLocate<'db> for ExprAttribute {
             locate_name_on_type(db, index, &inner_ty, &self.attr)
         } else {
             // let's check out the inner expression
-            self.value.locate_def(cpos, index, db, file)
+            self.value.locate_def(pos, index, db, file)
         }
     }
 }
@@ -442,12 +425,12 @@ impl<'db> CanLocate<'db> for ExprAttribute {
 impl<'db> CanLocate<'db> for ExprSubscript {
     fn locate_def(
         &self,
-        cpos: &CPosition,
+        pos: &TextSize,
         _index: &SemanticIndex<'db>,
         _db: &'db dyn Db,
         _file: File,
     ) -> Option<DefLocation> {
-        if !cpos.in_range(&self.range) {
+        if !pos.in_range(&self.range) {
             return None;
         }
         // we're definitely in here!
@@ -462,12 +445,12 @@ impl_can_locate!(ExprStarred, ranged, value);
 impl<'db> CanLocate<'db> for ExprName {
     fn locate_def(
         &self,
-        cpos: &CPosition,
+        pos: &TextSize,
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
     ) -> Option<DefLocation> {
-        if !cpos.in_range(&self.range) {
+        if !pos.in_range(&self.range) {
             return None;
         }
 
@@ -495,7 +478,7 @@ impl_can_locate!(ExprSlice, ranged, lower, upper, step);
 impl<'db> CanLocate<'db> for Identifier {
     fn locate_def(
         &self,
-        _cpos: &CPosition,
+        _pos: &TextSize,
         _index: &SemanticIndex<'db>,
         _db: &'db dyn Db,
         _file: File,

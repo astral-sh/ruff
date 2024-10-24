@@ -23,7 +23,6 @@ pub fn definition_at_location(file: File, location: Position, db: &dyn Db) -> Op
     // let's try and look up the relevant AST node
     let module = parsed_module(db.upcast(), file);
 
-    // let's figure out the CPosition
     let source = source_text(db.upcast(), file);
     let li = line_index(db.upcast(), file);
 
@@ -37,12 +36,7 @@ pub fn definition_at_location(file: File, location: Position, db: &dyn Db) -> Op
     let cpos = CPosition(text_size.to_u32().into());
     eprintln!("Looking at offset {}", cpos.0);
 
-    let found_dlike =
-        module
-            .syntax()
-            .locate_def(&CPosition(text_size.to_u32().into()), index, db, file);
-    eprintln!("FOUND DLIKE {found_dlike:?}");
-    found_dlike
+    return module.syntax().locate_def(text_size, index, db, file);
 }
 
 pub(crate) fn locate_name_on_type<'db>(
