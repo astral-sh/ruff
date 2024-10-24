@@ -5,7 +5,7 @@ use std::path::Path;
 /// See `crates/red_knot_test/README.md` for documentation on these tests.
 #[dir_test(
     dir: "$CARGO_MANIFEST_DIR/resources/mdtest",
-    glob: "**/*.md"
+    glob: "**/instances/*.md"
 )]
 #[allow(clippy::needless_pass_by_value)]
 fn mdtest(fixture: Fixture<&str>) {
