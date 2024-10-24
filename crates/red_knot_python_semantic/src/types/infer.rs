@@ -3173,41 +3173,50 @@ impl<'db> TypeInferenceBuilder<'db> {
         value_ty: Type<'db>,
         slice_ty: Type<'db>,
     ) -> Type<'db> {
+        fn index_into_iterator<T>(
+            mut iter: impl DoubleEndedIterator<Item = T>,
+            index: i64,
+        ) -> Option<T> {
+            if index < 0 {
+                let nth_rev = index
+                    .checked_neg()
+                    .and_then(|int| usize::try_from(int).ok())?
+                    .checked_sub(1)?;
+
+                iter.rev().nth(nth_rev)
+            } else {
+                let nth = usize::try_from(index).ok()?;
+                iter.nth(nth)
+            }
+        }
+
+        fn index_into_slice<T>(slice: &[T], index: i64) -> Option<&T> {
+            let positive_index = if index < 0 {
+                slice.len().checked_sub(
+                    index
+                        .checked_neg()
+                        .and_then(|int| usize::try_from(int).ok())?,
+                )
+            } else {
+                usize::try_from(index).ok()
+            };
+            slice.get(positive_index?)
+        }
+
         match (value_ty, slice_ty) {
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
-            (Type::Tuple(tuple_ty), Type::IntLiteral(int)) if int >= 0 => {
+            (Type::Tuple(tuple_ty), Type::IntLiteral(int)) => {
                 let elements = tuple_ty.elements(self.db);
-                usize::try_from(int)
-                    .ok()
-                    .and_then(|index| elements.get(index).copied())
-                    .unwrap_or_else(|| {
-                        self.index_out_of_bounds_diagnostic(
-                            "tuple",
-                            value_node.into(),
-                            value_ty,
-                            elements.len(),
-                            int,
-                        );
-                        Type::Unknown
-                    })
-            }
-            // Ex) Given `("a", "b", "c", "d")[-1]`, return `"c"`
-            (Type::Tuple(tuple_ty), Type::IntLiteral(int)) if int < 0 => {
-                let elements = tuple_ty.elements(self.db);
-                int.checked_neg()
-                    .and_then(|int| usize::try_from(int).ok())
-                    .and_then(|index| elements.len().checked_sub(index))
-                    .and_then(|index| elements.get(index).copied())
-                    .unwrap_or_else(|| {
-                        self.index_out_of_bounds_diagnostic(
-                            "tuple",
-                            value_node.into(),
-                            value_ty,
-                            elements.len(),
-                            int,
-                        );
-                        Type::Unknown
-                    })
+                index_into_slice(elements, int).copied().unwrap_or_else(|| {
+                    self.index_out_of_bounds_diagnostic(
+                        "tuple",
+                        value_node.into(),
+                        value_ty,
+                        elements.len(),
+                        int,
+                    );
+                    Type::Unknown
+                })
             }
             // Ex) Given `("a", "b", "c", "d")[True]`, return `"b"`
             (Type::Tuple(_), Type::BooleanLiteral(bool)) => self.infer_subscript_expression_types(
@@ -3216,35 +3225,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::IntLiteral(i64::from(bool)),
             ),
             // Ex) Given `"value"[1]`, return `"a"`
-            (Type::StringLiteral(literal_ty), Type::IntLiteral(int)) if int >= 0 => {
+            (Type::StringLiteral(literal_ty), Type::IntLiteral(int)) => {
                 let literal_value = literal_ty.value(self.db);
-                usize::try_from(int)
-                    .ok()
-                    .and_then(|index| literal_value.chars().nth(index))
-                    .map(|ch| {
-                        Type::StringLiteral(StringLiteralType::new(
-                            self.db,
-                            ch.to_string().into_boxed_str(),
-                        ))
-                    })
-                    .unwrap_or_else(|| {
-                        self.index_out_of_bounds_diagnostic(
-                            "string",
-                            value_node.into(),
-                            value_ty,
-                            literal_value.chars().count(),
-                            int,
-                        );
-                        Type::Unknown
-                    })
-            }
-            // Ex) Given `"value"[-1]`, return `"e"`
-            (Type::StringLiteral(literal_ty), Type::IntLiteral(int)) if int < 0 => {
-                let literal_value = literal_ty.value(self.db);
-                int.checked_neg()
-                    .and_then(|int| usize::try_from(int).ok())
-                    .and_then(|index| index.checked_sub(1))
-                    .and_then(|index| literal_value.chars().rev().nth(index))
+                index_into_iterator(literal_value.chars(), int)
                     .map(|ch| {
                         Type::StringLiteral(StringLiteralType::new(
                             self.db,
