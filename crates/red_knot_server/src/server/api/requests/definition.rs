@@ -67,9 +67,10 @@ impl BackgroundDocumentRequestHandler for GotoDefinitionHandler {
             return Ok(None);
         };
 
-        let Some(definition) =
-            db.definition_at_location(file, params.text_document_position_params.position)
-        else {
+        let Some(location) = db.location_of_definition_of_item_at_location(
+            file,
+            params.text_document_position_params.position,
+        ) else {
             return Ok(None);
         };
 

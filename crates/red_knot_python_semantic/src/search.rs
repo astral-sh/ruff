@@ -14,7 +14,11 @@ use ruff_source_file::OneIndexed;
 
 use crate::Db;
 
-pub fn definition_at_location(file: File, location: Position, db: &dyn Db) -> Option<Location> {
+pub fn location_of_definition_of_item_at_location(
+    file: File,
+    location: Position,
+    db: &dyn Db,
+) -> Option<Location> {
     // XXX now this returns one or none. It could return an iterator of locations
     let index = semantic_index(db, file);
     // let's try and look up the relevant AST node
