@@ -173,14 +173,10 @@ impl<'db> IntersectionBuilder<'db> {
     pub(crate) fn add_negative(mut self, ty: Type<'db>) -> Self {
         // See comments above in `add_positive`; this is just the negated version.
         if let Type::Union(union) = ty {
-            union
-                .elements(self.db)
-                .iter()
-                .map(|elem| self.clone().add_negative(*elem))
-                .fold(IntersectionBuilder::empty(self.db), |mut builder, sub| {
-                    builder.intersections.extend(sub.intersections);
-                    builder
-                })
+            for elem in union.elements(self.db) {
+                self = self.clone().add_negative(*elem);
+            }
+            self
         } else {
             for inner in &mut self.intersections {
                 inner.add_negative(self.db, ty);
@@ -665,6 +661,27 @@ mod tests {
             .add_negative(Type::None)
             .build();
         assert_eq!(ty, Type::IntLiteral(1));
+    }
+
+    #[test]
+    fn build_negative_union_de_morgan() {
+        let db = setup_db();
+
+        let union = UnionBuilder::new(&db)
+            .add(Type::IntLiteral(1))
+            .add(Type::IntLiteral(2))
+            .build();
+        assert_eq!(union.display(&db).to_string(), "Literal[1, 2]");
+
+        let ty = IntersectionBuilder::new(&db).add_negative(union).build();
+
+        let expected = IntersectionBuilder::new(&db)
+            .add_negative(Type::IntLiteral(1))
+            .add_negative(Type::IntLiteral(2))
+            .build();
+
+        assert_eq!(ty.display(&db).to_string(), "~Literal[1] & ~Literal[2]");
+        assert_eq!(ty, expected);
     }
 
     #[test]

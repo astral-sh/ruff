@@ -40,6 +40,8 @@ x = 1 if flag else "a"
 
 if isinstance(x, (int, str)):
     reveal_type(x)  # revealed: Literal[1] | Literal["a"]
+else:
+    reveal_type(x)  # revealed: Never
 
 if isinstance(x, (int, bytes)):
     reveal_type(x)  # revealed: Literal[1]
@@ -51,6 +53,8 @@ if isinstance(x, (bytes, str)):
 # one of the possibilities:
 if isinstance(x, (int, object)):
     reveal_type(x)  # revealed: Literal[1] | Literal["a"]
+else:
+    reveal_type(x)  # revealed: Never
 
 y = 1 if flag1 else "a" if flag2 else b"b"
 if isinstance(y, (int, str)):
@@ -75,6 +79,8 @@ x = 1 if flag else "a"
 
 if isinstance(x, (bool, (bytes, int))):
     reveal_type(x)  # revealed: Literal[1]
+else:
+    reveal_type(x)  # revealed: Literal["a"]
 ```
 
 ## Class types
@@ -82,6 +88,7 @@ if isinstance(x, (bool, (bytes, int))):
 ```py
 class A: ...
 class B: ...
+class C: ...
 
 def get_object() -> object: ...
 
@@ -91,6 +98,15 @@ if isinstance(x, A):
     reveal_type(x)  # revealed: A
     if isinstance(x, B):
         reveal_type(x)  # revealed: A & B
+    else:
+        reveal_type(x)  # revealed: A & ~B
+
+if isinstance(x, (A, B)):
+    reveal_type(x)  # revealed: A | B
+elif isinstance(x, (A, C)):
+    reveal_type(x)  # revealed: C & ~A & ~B
+else:
+    reveal_type(x)  # revealed: object & ~A & ~B & ~C
 ```
 
 ## No narrowing for instances of `builtins.type`
