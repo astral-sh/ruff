@@ -11,12 +11,10 @@ use std::borrow::Cow;
 
 use crate::comments::{leading_comments, trailing_comments};
 use crate::expression::parentheses::in_parentheses_only_soft_line_break_or_space;
-use crate::other::f_string::{FStringContext, FStringLayout, FormatFString};
+use crate::other::f_string::{FStringContext, FStringLayout};
 use crate::other::f_string_element::FormatFStringExpressionElement;
 use crate::prelude::*;
-use crate::preview::{
-    is_f_string_formatting_enabled, is_join_implicit_concatenated_string_enabled,
-};
+use crate::preview::is_join_implicit_concatenated_string_enabled;
 use crate::string::docstring::needs_chaperone_space;
 use crate::string::normalize::{
     is_fstring_with_quoted_debug_expression, is_fstring_with_quoted_format_spec_and_debug,
@@ -81,7 +79,6 @@ impl<'a> FormatImplicitConcatenatedStringExpanded<'a> {
 impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringExpanded<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         let comments = f.context().comments().clone();
-        let quoting = self.string.quoting(f.context().source());
 
         let join_implicit_concatenated_string_enabled =
             is_join_implicit_concatenated_string_enabled(f.context());
@@ -104,7 +101,7 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringExpanded<'_
             let format_part = format_with(|f: &mut PyFormatter| match part {
                 StringLikePart::String(part) => part.format().fmt(f),
                 StringLikePart::Bytes(bytes_literal) => bytes_literal.format().fmt(f),
-                StringLikePart::FString(part) => FormatFString::new(part, quoting).fmt(f),
+                StringLikePart::FString(part) => part.format().fmt(f),
             });
 
             let part_comments = comments.leading_dangling_trailing(&part);
@@ -313,44 +310,29 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
                 }
 
                 StringLikePart::FString(f_string) => {
-                    if is_f_string_formatting_enabled(f.context()) {
-                        for element in &f_string.elements {
-                            match element {
-                                FStringElement::Literal(literal) => {
-                                    FormatLiteralContent {
-                                        range: literal.range(),
-                                        flags: self.flags,
-                                        is_fstring: true,
-                                        trim_end: false,
-                                        trim_start: false,
-                                    }
-                                    .fmt(f)?;
+                    for element in &f_string.elements {
+                        match element {
+                            FStringElement::Literal(literal) => {
+                                FormatLiteralContent {
+                                    range: literal.range(),
+                                    flags: self.flags,
+                                    is_fstring: true,
+                                    trim_end: false,
+                                    trim_start: false,
                                 }
-                                // Formatting the expression here and in the expanded version is safe **only**
-                                // because we assert that the f-string never contains any comments.
-                                FStringElement::Expression(expression) => {
-                                    let context = FStringContext::new(
-                                        self.flags,
-                                        FStringLayout::from_f_string(
-                                            f_string,
-                                            f.context().source(),
-                                        ),
-                                    );
+                                .fmt(f)?;
+                            }
+                            // Formatting the expression here and in the expanded version is safe **only**
+                            // because we assert that the f-string never contains any comments.
+                            FStringElement::Expression(expression) => {
+                                let context = FStringContext::new(
+                                    self.flags,
+                                    FStringLayout::from_f_string(f_string, f.context().source()),
+                                );
 
-                                    FormatFStringExpressionElement::new(expression, context)
-                                        .fmt(f)?;
-                                }
+                                FormatFStringExpressionElement::new(expression, context).fmt(f)?;
                             }
                         }
-                    } else {
-                        FormatLiteralContent {
-                            range: part.content_range(),
-                            flags: self.flags,
-                            is_fstring: true,
-                            trim_end: false,
-                            trim_start: false,
-                        }
-                        .fmt(f)?;
                     }
                 }
             }
@@ -376,9 +358,6 @@ impl Format<PyFormatContext<'_>> for FormatLiteralContent {
             0,
             self.flags,
             self.flags.is_f_string() && !self.is_fstring,
-            // TODO: Remove the argument from `normalize_string` when promoting the `is_f_string_formatting_enabled` preview style.
-            self.flags.is_f_string() && !is_f_string_formatting_enabled(f.context()),
-            is_f_string_formatting_enabled(f.context()),
         );
 
         // Trim the start and end of the string if it's the first or last part of a docstring.

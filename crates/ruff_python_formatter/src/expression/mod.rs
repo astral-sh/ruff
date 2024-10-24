@@ -19,9 +19,7 @@ use crate::expression::parentheses::{
     OptionalParentheses, Parentheses, Parenthesize,
 };
 use crate::prelude::*;
-use crate::preview::{
-    is_f_string_formatting_enabled, is_hug_parens_with_braces_and_square_brackets_enabled,
-};
+use crate::preview::is_hug_parens_with_braces_and_square_brackets_enabled;
 
 mod binary_like;
 pub(crate) mod expr_attribute;
@@ -751,32 +749,6 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 return;
             }
 
-            Expr::StringLiteral(ast::ExprStringLiteral { value, .. })
-                if value.is_implicit_concatenated() =>
-            {
-                if !is_f_string_formatting_enabled(self.context) {
-                    self.update_max_precedence(OperatorPrecedence::String);
-                }
-
-                return;
-            }
-            Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. })
-                if value.is_implicit_concatenated() =>
-            {
-                if !is_f_string_formatting_enabled(self.context) {
-                    self.update_max_precedence(OperatorPrecedence::String);
-                }
-
-                return;
-            }
-            Expr::FString(ast::ExprFString { value, .. }) if value.is_implicit_concatenated() => {
-                if !is_f_string_formatting_enabled(self.context) {
-                    self.update_max_precedence(OperatorPrecedence::String);
-                }
-
-                return;
-            }
-
             // Non terminal nodes that don't have a termination token.
             Expr::Named(_) | Expr::Generator(_) | Expr::Tuple(_) => {}
 
@@ -1178,8 +1150,6 @@ enum OperatorPrecedence {
     BitwiseXor,
     BitwiseOr,
     Comparator,
-    // Implicit string concatenation
-    String,
     BooleanOperation,
     Conditional,
 }

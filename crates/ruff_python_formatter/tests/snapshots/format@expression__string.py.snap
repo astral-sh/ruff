@@ -418,11 +418,7 @@ a = """\\\x1f"""
 
 ("""aaaaaaaaa""" """bbbbbbbbbbbbbbbbbbbb""")
 
-(
-    f"""aaaa{
-    10}aaaaa"""
-    rf"""bbbbbbbbbbbbbbbbbbbb"""
-)
+(f"""aaaa{10}aaaaa""" rf"""bbbbbbbbbbbbbbbbbbbb""")
 
 if (r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb") + ["aaaaaaaaaa", "bbbbbbbbbbbbbbbb"]:
     ...
@@ -433,19 +429,11 @@ if (r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb") + ["aaaaaaaaaa", "bbbbbbbbbbbbbbbb"]:
 
 r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb"
 
-(
-    f"aaaa{
-    10}aaaaa"
-    rf"bbbbbbbbbbbbbbbbbbbb"
-)
+(f"aaaa{10}aaaaa" rf"bbbbbbbbbbbbbbbbbbbb")
 
 (r"""aaaaaaaaa""" r"""bbbbbbbbbbbbbbbbbbbb""")
 
-(
-    f"""aaaa{
-    10}aaaaa"""
-    rf"""bbbbbbbbbbbbbbbbbbbb"""
-)
+(f"""aaaa{10}aaaaa""" rf"""bbbbbbbbbbbbbbbbbbbb""")
 
 
 # In docstring positions
@@ -490,7 +478,7 @@ def docstring_flat_overlong():
  
  
  # Regression test for https://github.com/astral-sh/ruff/issues/5893
-@@ -172,19 +172,31 @@
+@@ -172,15 +172,31 @@
  # In preview, don't collapse implicit concatenated strings that can't be joined into a single string
  # and that are multiline in the source.
  
@@ -513,12 +501,11 @@ def docstring_flat_overlong():
 +    """bbbbbbbbbbbbbbbbbbbb"""
 +)
  
- (
--    f"""aaaa{
--    10}aaaaa"""
+-(f"""aaaa{10}aaaaa""" rf"""bbbbbbbbbbbbbbbbbbbb""")
++(
 +    f"""aaaa{10}aaaaa"""
-     rf"""bbbbbbbbbbbbbbbbbbbb"""
- )
++    rf"""bbbbbbbbbbbbbbbbbbbb"""
++)
  
 -if (r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb") + ["aaaaaaaaaa", "bbbbbbbbbbbbbbbb"]:
 +if (
@@ -528,26 +515,7 @@ def docstring_flat_overlong():
      ...
  
  
-@@ -193,24 +205,19 @@
- 
- r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb"
- 
--(
--    f"aaaa{
--    10}aaaaa"
--    rf"bbbbbbbbbbbbbbbbbbbb"
--)
-+(f"aaaa{10}aaaaa" rf"bbbbbbbbbbbbbbbbbbbb")
- 
- (r"""aaaaaaaaa""" r"""bbbbbbbbbbbbbbbbbbbb""")
- 
--(
--    f"""aaaa{
--    10}aaaaa"""
--    rf"""bbbbbbbbbbbbbbbbbbbb"""
--)
-+(f"""aaaa{10}aaaaa""" rf"""bbbbbbbbbbbbbbbbbbbb""")
- 
+@@ -198,7 +214,10 @@
  
  # In docstring positions
  def docstring():
@@ -758,11 +726,7 @@ a = """\\\x1f"""
 
 ("""aaaaaaaaa""" """bbbbbbbbbbbbbbbbbbbb""")
 
-(
-    f"""aaaa{
-    10}aaaaa"""
-    rf"""bbbbbbbbbbbbbbbbbbbb"""
-)
+(f"""aaaa{10}aaaaa""" rf"""bbbbbbbbbbbbbbbbbbbb""")
 
 if (r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb') + ['aaaaaaaaaa', 'bbbbbbbbbbbbbbbb']:
     ...
@@ -773,19 +737,11 @@ if (r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb') + ['aaaaaaaaaa', 'bbbbbbbbbbbbbbbb']:
 
 r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb'
 
-(
-    f'aaaa{
-    10}aaaaa'
-    rf'bbbbbbbbbbbbbbbbbbbb'
-)
+(f'aaaa{10}aaaaa' rf'bbbbbbbbbbbbbbbbbbbb')
 
 (r"""aaaaaaaaa""" r"""bbbbbbbbbbbbbbbbbbbb""")
 
-(
-    f"""aaaa{
-    10}aaaaa"""
-    rf"""bbbbbbbbbbbbbbbbbbbb"""
-)
+(f"""aaaa{10}aaaaa""" rf"""bbbbbbbbbbbbbbbbbbbb""")
 
 
 # In docstring positions
@@ -830,7 +786,7 @@ def docstring_flat_overlong():
  
  
  # Regression test for https://github.com/astral-sh/ruff/issues/5893
-@@ -172,19 +172,31 @@
+@@ -172,15 +172,31 @@
  # In preview, don't collapse implicit concatenated strings that can't be joined into a single string
  # and that are multiline in the source.
  
@@ -853,12 +809,11 @@ def docstring_flat_overlong():
 +    """bbbbbbbbbbbbbbbbbbbb"""
 +)
  
- (
--    f"""aaaa{
--    10}aaaaa"""
+-(f"""aaaa{10}aaaaa""" rf"""bbbbbbbbbbbbbbbbbbbb""")
++(
 +    f"""aaaa{10}aaaaa"""
-     rf"""bbbbbbbbbbbbbbbbbbbb"""
- )
++    rf"""bbbbbbbbbbbbbbbbbbbb"""
++)
  
 -if (r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb') + ['aaaaaaaaaa', 'bbbbbbbbbbbbbbbb']:
 +if (
@@ -868,26 +823,7 @@ def docstring_flat_overlong():
      ...
  
  
-@@ -193,24 +205,19 @@
- 
- r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb'
- 
--(
--    f'aaaa{
--    10}aaaaa'
--    rf'bbbbbbbbbbbbbbbbbbbb'
--)
-+(f'aaaa{10}aaaaa' rf'bbbbbbbbbbbbbbbbbbbb')
- 
- (r"""aaaaaaaaa""" r"""bbbbbbbbbbbbbbbbbbbb""")
- 
--(
--    f"""aaaa{
--    10}aaaaa"""
--    rf"""bbbbbbbbbbbbbbbbbbbb"""
--)
-+(f"""aaaa{10}aaaaa""" rf"""bbbbbbbbbbbbbbbbbbbb""")
- 
+@@ -198,7 +214,10 @@
  
  # In docstring positions
  def docstring():
