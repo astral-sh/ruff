@@ -7,8 +7,11 @@ b = b"\x00abc\xff"
 
 reveal_type(b[0])  # revealed: Literal[b"\x00"]
 reveal_type(b[1])  # revealed: Literal[b"a"]
+reveal_type(b[4])  # revealed: Literal[b"\xff"]
+
 reveal_type(b[-1])  # revealed: Literal[b"\xff"]
 reveal_type(b[-2])  # revealed: Literal[b"c"]
+reveal_type(b[-5])  # revealed: Literal[b"\x00"]
 
 reveal_type(b[False])  # revealed: Literal[b"\x00"]
 reveal_type(b[True])  # revealed: Literal[b"a"]

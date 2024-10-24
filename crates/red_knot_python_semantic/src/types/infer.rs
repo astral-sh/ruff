@@ -3173,7 +3173,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         value_ty: Type<'db>,
         slice_ty: Type<'db>,
     ) -> Type<'db> {
-        fn index_into_iterator<T>(
+        fn iterator_at_index<T>(
             mut iter: impl DoubleEndedIterator<Item = T>,
             index: i64,
         ) -> Option<T> {
@@ -3190,7 +3190,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         }
 
-        fn index_into_slice<T>(slice: &[T], index: i64) -> Option<&T> {
+        fn slice_at_index<T>(slice: &[T], index: i64) -> Option<&T> {
             let positive_index = if index < 0 {
                 slice.len().checked_sub(
                     index
@@ -3207,7 +3207,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
             (Type::Tuple(tuple_ty), Type::IntLiteral(int)) => {
                 let elements = tuple_ty.elements(self.db);
-                index_into_slice(elements, int).copied().unwrap_or_else(|| {
+                slice_at_index(elements, int).copied().unwrap_or_else(|| {
                     self.index_out_of_bounds_diagnostic(
                         "tuple",
                         value_node.into(),
@@ -3227,7 +3227,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             // Ex) Given `"value"[1]`, return `"a"`
             (Type::StringLiteral(literal_ty), Type::IntLiteral(int)) => {
                 let literal_value = literal_ty.value(self.db);
-                index_into_iterator(literal_value.chars(), int)
+                iterator_at_index(literal_value.chars(), int)
                     .map(|ch| {
                         Type::StringLiteral(StringLiteralType::new(
                             self.db,
@@ -3248,7 +3248,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             // Ex) Given `b"value"[1]`, return `b"a"`
             (Type::BytesLiteral(literal_ty), Type::IntLiteral(int)) => {
                 let literal_value = literal_ty.value(self.db);
-                index_into_slice(literal_value.as_ref(), int)
+                slice_at_index(literal_value.as_ref(), int)
                     .map(|byte| {
                         Type::BytesLiteral(BytesLiteralType::new(self.db, [*byte].as_slice()))
                     })
