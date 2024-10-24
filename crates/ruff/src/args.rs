@@ -92,7 +92,7 @@ pub struct Args {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, clap::Subcommand)]
 pub enum Command {
-    /// Run Ruff on the given files or directories (default).
+    /// Run Ruff on the given files or directories.
     Check(CheckCommand),
     /// Explain a rule (or all rules).
     #[command(group = clap::ArgGroup::new("selector").multiple(false).required(true))]

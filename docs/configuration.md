@@ -515,7 +515,7 @@ Ruff: An extremely fast Python linter and code formatter.
 Usage: ruff [OPTIONS] <COMMAND>
 
 Commands:
-  check    Run Ruff on the given files or directories (default)
+  check    Run Ruff on the given files or directories
   rule     Explain a rule (or all rules)
   config   List or describe the available configuration options
   linter   List all supported upstream linters
