@@ -1371,7 +1371,25 @@ impl<'db> TypeInferenceBuilder<'db> {
             simple: _,
         } = assignment;
 
-        let annotation_ty = self.infer_annotation_expression(annotation);
+        let mut annotation_ty = self.infer_annotation_expression(annotation);
+
+        // If the variable is annotated with SpecialForm then create a new class with name of the
+        // variable.
+        if let Type::Instance(class) = annotation_ty {
+            if class.is_known(self.db, KnownClass::SpecialForm) {
+                let target_name = target.as_name_expr().unwrap().id.clone();
+                let new_class = ClassType::new(
+                    self.db,
+                    target_name,
+                    class.definition(self.db),
+                    class.body_scope(self.db),
+                    // We say this is a known class and is a special form
+                    Some(KnownClass::SpecialForm),
+                );
+                annotation_ty = Type::ClassLiteral(new_class);
+            }
+        }
+
         if let Some(value) = value {
             let value_ty = self.infer_expression(value);
             self.add_declaration_with_binding(
@@ -3249,6 +3267,23 @@ impl<'db> TypeInferenceBuilder<'db> {
                     value_ty,
                     Type::IntLiteral(i64::from(bool)),
                 ),
+
+            // Handling of Special Forms
+            (Type::ClassLiteral(class), slice_ty)
+                if class.is_known(self.db, KnownClass::SpecialForm) =>
+            {
+                if class.name(self.db) == "Literal" {
+                    match slice_ty {
+                        Type::Tuple(tuple) => {
+                            let elts = tuple.elements(self.db);
+                            Type::Union(UnionType::new(self.db, elts))
+                        }
+                        ty => ty,
+                    }
+                } else {
+                    Type::Todo
+                }
+            }
             (value_ty, slice_ty) => {
                 // Resolve the value to its class.
                 let value_meta_ty = value_ty.to_meta_type(self.db);
@@ -3465,11 +3500,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::NumberLiteral(_literal) => Type::Todo,
             ast::Expr::BooleanLiteral(_literal) => Type::Todo,
 
-            // TODO: this may be a place we need to revisit with special forms.
-            ast::Expr::Subscript(subscript) => {
-                self.infer_subscript_expression(subscript);
-                Type::Todo
-            }
+            ast::Expr::Subscript(subscript) => self.infer_subscript_expression(subscript),
 
             // Forms which are invalid in the context of annotation expressions: we infer their
             // nested expressions as normal expressions, but the type of the top-level expression is

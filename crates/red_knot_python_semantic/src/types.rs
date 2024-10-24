@@ -725,7 +725,8 @@ impl<'db> Type<'db> {
                     | KnownClass::Dict
                     | KnownClass::GenericAlias
                     | KnownClass::ModuleType
-                    | KnownClass::FunctionType,
+                    | KnownClass::FunctionType
+                    | KnownClass::SpecialForm,
                 ) => false,
                 None => false,
             },
@@ -1119,6 +1120,7 @@ pub enum KnownClass {
     FunctionType,
     // Typeshed
     NoneType, // Part of `types` for Python >= 3.10
+    SpecialForm,
 }
 
 impl<'db> KnownClass {
@@ -1139,6 +1141,7 @@ impl<'db> KnownClass {
             Self::ModuleType => "ModuleType",
             Self::FunctionType => "FunctionType",
             Self::NoneType => "NoneType",
+            Self::SpecialForm => "_SpecialForm",
         }
     }
 
@@ -1163,6 +1166,11 @@ impl<'db> KnownClass {
                 types_symbol_ty(db, self.as_str())
             }
             Self::NoneType => typeshed_symbol_ty(db, self.as_str()),
+            Self::SpecialForm => {
+                let t = typeshed_symbol_ty(db, self.as_str());
+                debug_assert!(!t.is_unbound(), "special form not found");
+                t
+            }
         }
     }
 
@@ -1195,6 +1203,7 @@ impl<'db> KnownClass {
             "NoneType" => Some(Self::NoneType),
             "ModuleType" => Some(Self::ModuleType),
             "FunctionType" => Some(Self::FunctionType),
+            "_SpecialForm" => Some(Self::SpecialForm),
             _ => None,
         }
     }
@@ -1218,6 +1227,9 @@ impl<'db> KnownClass {
             | Self::Dict => module.name() == "builtins",
             Self::GenericAlias | Self::ModuleType | Self::FunctionType => module.name() == "types",
             Self::NoneType => matches!(module.name().as_str(), "_typeshed" | "types"),
+            Self::SpecialForm => {
+                matches!(module.name().as_str(), "typing")
+            }
         }
     }
 }
