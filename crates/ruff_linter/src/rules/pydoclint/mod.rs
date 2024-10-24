@@ -12,6 +12,7 @@ mod tests {
     use crate::registry::Rule;
     use crate::rules::pydocstyle;
     use crate::rules::pydocstyle::settings::Convention;
+    use crate::settings::types::PreviewMode;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
@@ -57,6 +58,26 @@ mod tests {
             Path::new("pydoclint").join(path).as_path(),
             &settings::LinterSettings {
                 pydocstyle: pydocstyle::settings::Settings::new(Some(Convention::Numpy), [], []),
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::DocstringMissingReturns, Path::new("DOC201_sphinx.py"))]
+    #[test_case(Rule::DocstringExtraneousReturns, Path::new("DOC202_sphinx.py"))]
+    #[test_case(Rule::DocstringMissingYields, Path::new("DOC402_sphinx.py"))]
+    #[test_case(Rule::DocstringExtraneousYields, Path::new("DOC403_sphinx.py"))]
+    #[test_case(Rule::DocstringMissingException, Path::new("DOC501_sphinx.py"))]
+    #[test_case(Rule::DocstringExtraneousException, Path::new("DOC502_sphinx.py"))]
+    fn rules_sphinx_style(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("pydoclint").join(path).as_path(),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                pydocstyle: pydocstyle::settings::Settings::new(Some(Convention::Sphinx), [], []),
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;

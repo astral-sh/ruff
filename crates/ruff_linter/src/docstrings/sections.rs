@@ -1,7 +1,9 @@
 use std::fmt::{Debug, Formatter};
 use std::iter::FusedIterator;
 
-use ruff_python_ast::docstrings::{leading_space, leading_words};
+use ruff_python_ast::docstrings::{
+    leading_space, leading_space_and_colon, leading_words, sphinx_section_name,
+};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use strum_macros::EnumIter;
 
@@ -31,17 +33,20 @@ pub(crate) enum SectionKind {
     Notes,
     OtherArgs,
     OtherArguments,
-    OtherParams,
     OtherParameters,
+    OtherParams,
+    Param,
     Parameters,
     Raises,
     References,
     Return,
     Returns,
+    RType,
     SeeAlso,
     ShortSummary,
     Tip,
     Todo,
+    Type,
     Warning,
     Warnings,
     Warns,
@@ -71,17 +76,20 @@ impl SectionKind {
             "notes" => Some(Self::Notes),
             "other args" => Some(Self::OtherArgs),
             "other arguments" => Some(Self::OtherArguments),
-            "other params" => Some(Self::OtherParams),
             "other parameters" => Some(Self::OtherParameters),
+            "other params" => Some(Self::OtherParams),
+            "param" => Some(Self::Param),
             "parameters" => Some(Self::Parameters),
             "raises" => Some(Self::Raises),
             "references" => Some(Self::References),
             "return" => Some(Self::Return),
             "returns" => Some(Self::Returns),
+            "rtype" => Some(Self::RType),
             "see also" => Some(Self::SeeAlso),
             "short summary" => Some(Self::ShortSummary),
             "tip" => Some(Self::Tip),
             "todo" => Some(Self::Todo),
+            "type" => Some(Self::Type),
             "warning" => Some(Self::Warning),
             "warnings" => Some(Self::Warnings),
             "warns" => Some(Self::Warns),
@@ -112,17 +120,20 @@ impl SectionKind {
             Self::Notes => "Notes",
             Self::OtherArgs => "Other Args",
             Self::OtherArguments => "Other Arguments",
-            Self::OtherParams => "Other Params",
             Self::OtherParameters => "Other Parameters",
+            Self::OtherParams => "Other Params",
+            Self::Param => "Param",
             Self::Parameters => "Parameters",
             Self::Raises => "Raises",
             Self::References => "References",
             Self::Return => "Return",
             Self::Returns => "Returns",
+            Self::RType => "RType",
             Self::SeeAlso => "See Also",
             Self::ShortSummary => "Short Summary",
             Self::Tip => "Tip",
             Self::Todo => "Todo",
+            Self::Type => "Type",
             Self::Warning => "Warning",
             Self::Warnings => "Warnings",
             Self::Warns => "Warns",
@@ -180,7 +191,33 @@ impl<'a> SectionContexts<'a> {
         let mut previous_line = lines.next();
 
         while let Some(line) = lines.next() {
-            if let Some(section_kind) = suspected_as_section(&line, style) {
+            if matches!(style, SectionStyle::Sphinx) {
+                if let Some(section_name) = sphinx_section_name(&line) {
+                    if let Some(kind) = SectionKind::from_str(section_name) {
+                        if style.sections().contains(&kind) {
+                            let indent = leading_space_and_colon(&line);
+                            let indent_size = indent.text_len();
+                            let section_name_size = section_name.text_len();
+
+                            if let Some(mut last) = last.take() {
+                                last.range = TextRange::new(last.start(), line.start());
+                                contexts.push(last);
+                            }
+
+                            last = Some(SectionContextData {
+                                kind,
+                                indent_size: indent.text_len(),
+                                name_range: TextRange::at(
+                                    line.start() + indent_size,
+                                    section_name_size,
+                                ),
+                                range: TextRange::empty(line.start()),
+                                summary_full_end: line.full_end(),
+                            });
+                        }
+                    }
+                }
+            } else if let Some(section_kind) = suspected_as_section(&line, style) {
                 let indent = leading_space(&line);
                 let indent_size = indent.text_len();
 
