@@ -34,13 +34,6 @@ pub(crate) fn is_with_single_item_pre_39_enabled(context: &PyFormatContext) -> b
     context.is_preview()
 }
 
-/// See [#9447](https://github.com/astral-sh/ruff/issues/9447)
-pub(crate) fn is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled(
-    context: &PyFormatContext,
-) -> bool {
-    context.is_preview()
-}
-
 /// See [#6933](https://github.com/astral-sh/ruff/issues/6933).
 /// This style also covers the black preview styles `remove_redundant_guard_parens` and `parens_for_long_if_clauses_in_case_block `.
 /// WARNING: This preview style depends on `is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled`

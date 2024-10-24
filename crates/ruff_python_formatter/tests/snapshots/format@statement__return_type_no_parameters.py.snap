@@ -245,11 +245,9 @@ def test_return_union_with_elements_exceeding_length() -> (
 #########################################################################################
 
 
-def test_return_multiline_string_type_annotation() -> (
-    """str
+def test_return_multiline_string_type_annotation() -> """str
     | list[str]
-"""
-):
+""":
     pass
 
 
@@ -295,9 +293,9 @@ def no_parameters_subscript_return_type() -> list[str]:
 # 1. Black tries to keep the list flat by parenthesizing the list as shown below even when the `list` identifier
 #    fits on the header line. IMO, this adds unnecessary parentheses that can be avoided
 #    and supporting it requires extra complexity (best_fitting! layout)
-def no_parameters_overlong_subscript_return_type_with_single_element() -> (
-    list[xxxxxxxxxxxxxxxxxxxxx]
-):
+def no_parameters_overlong_subscript_return_type_with_single_element() -> list[
+    xxxxxxxxxxxxxxxxxxxxx
+]:
     pass
 
 
@@ -306,23 +304,18 @@ def no_parameters_overlong_subscript_return_type_with_single_element() -> (
 #    `list[`. It is also inconsistent with how subscripts are normally formatted where it first tries to fit the entire subscript,
 #     then splits after `list[` but keeps all elements on a single line, and finally, splits after each element.
 # IMO: Splitting after the `list[` and trying to keep the elements together when possible seems more consistent.
-def no_parameters_subscript_return_type_multiple_elements() -> (
-    list[
-        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,
-        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,
-    ]
-):
+def no_parameters_subscript_return_type_multiple_elements() -> list[
+    xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx, xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+]:
     pass
 
 
 # Black removes the parentheses even the elements exceed the configured line width.
 # So does Ruff.
-def no_parameters_subscript_return_type_multiple_overlong_elements() -> (
-    list[
-        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,
-        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,
-    ]
-):
+def no_parameters_subscript_return_type_multiple_overlong_elements() -> list[
+    xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,
+    xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,
+]:
     pass
 
 
@@ -341,11 +334,9 @@ def no_parameters_subscriptreturn_type_with_overlong_value_() -> (
 # `no_parameters_subscript_return_type_multiple_overlong_elements` shows. However, it doesn't
 # when the subscript contains a single element. Black then keeps the parentheses.
 # Ruff removes the parentheses in this case for consistency.
-def no_parameters_overlong_subscript_return_type_with_overlong_single_element() -> (
-    list[
-        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-    ]
-):
+def no_parameters_overlong_subscript_return_type_with_overlong_single_element() -> list[
+    xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+]:
     pass
 
 
@@ -354,13 +345,10 @@ def no_parameters_overlong_subscript_return_type_with_overlong_single_element() 
 #########################################################################################
 
 
-def test_binary_expression_return_type_annotation() -> (
-    aaaaaaaaaaaaaaaaaaaaaaaaaa
-    > [
-        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
-        bbbbbbbbbbbbbbbbbbbbbbbbb,
-    ]
-):
+def test_binary_expression_return_type_annotation() -> aaaaaaaaaaaaaaaaaaaaaaaaaa > [
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+    bbbbbbbbbbbbbbbbbbbbbbbbb,
+]:
     pass
 
 
@@ -370,12 +358,10 @@ def test_binary_expression_return_type_annotation() -> (
 
 
 # Don't paranthesize lists
-def f() -> (
-    [
-        a,
-        b,
-    ]
-):
+def f() -> [
+    a,
+    b,
+]:
     pass
 ```
 
@@ -384,21 +370,7 @@ def f() -> (
 ```diff
 --- Stable
 +++ Preview
-@@ -58,11 +58,9 @@
- #########################################################################################
- 
- 
--def test_return_multiline_string_type_annotation() -> (
--    """str
-+def test_return_multiline_string_type_annotation() -> """str
-     | list[str]
--"""
--):
-+""":
-     pass
- 
- 
-@@ -80,12 +78,12 @@
+@@ -78,12 +78,12 @@
  #########################################################################################
  
  
@@ -413,96 +385,4 @@ def f() -> (
  ):
      pass
  
-@@ -108,9 +106,9 @@
- # 1. Black tries to keep the list flat by parenthesizing the list as shown below even when the `list` identifier
- #    fits on the header line. IMO, this adds unnecessary parentheses that can be avoided
- #    and supporting it requires extra complexity (best_fitting! layout)
--def no_parameters_overlong_subscript_return_type_with_single_element() -> (
--    list[xxxxxxxxxxxxxxxxxxxxx]
--):
-+def no_parameters_overlong_subscript_return_type_with_single_element() -> list[
-+    xxxxxxxxxxxxxxxxxxxxx
-+]:
-     pass
- 
- 
-@@ -119,23 +117,18 @@
- #    `list[`. It is also inconsistent with how subscripts are normally formatted where it first tries to fit the entire subscript,
- #     then splits after `list[` but keeps all elements on a single line, and finally, splits after each element.
- # IMO: Splitting after the `list[` and trying to keep the elements together when possible seems more consistent.
--def no_parameters_subscript_return_type_multiple_elements() -> (
--    list[
--        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,
--        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,
--    ]
--):
-+def no_parameters_subscript_return_type_multiple_elements() -> list[
-+    xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx, xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-+]:
-     pass
- 
- 
- # Black removes the parentheses even the elements exceed the configured line width.
- # So does Ruff.
--def no_parameters_subscript_return_type_multiple_overlong_elements() -> (
--    list[
--        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,
--        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,
--    ]
--):
-+def no_parameters_subscript_return_type_multiple_overlong_elements() -> list[
-+    xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,
-+    xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,
-+]:
-     pass
- 
- 
-@@ -154,11 +147,9 @@
- # `no_parameters_subscript_return_type_multiple_overlong_elements` shows. However, it doesn't
- # when the subscript contains a single element. Black then keeps the parentheses.
- # Ruff removes the parentheses in this case for consistency.
--def no_parameters_overlong_subscript_return_type_with_overlong_single_element() -> (
--    list[
--        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
--    ]
--):
-+def no_parameters_overlong_subscript_return_type_with_overlong_single_element() -> list[
-+    xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-+]:
-     pass
- 
- 
-@@ -167,13 +158,10 @@
- #########################################################################################
- 
- 
--def test_binary_expression_return_type_annotation() -> (
--    aaaaaaaaaaaaaaaaaaaaaaaaaa
--    > [
--        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
--        bbbbbbbbbbbbbbbbbbbbbbbbb,
--    ]
--):
-+def test_binary_expression_return_type_annotation() -> aaaaaaaaaaaaaaaaaaaaaaaaaa > [
-+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
-+    bbbbbbbbbbbbbbbbbbbbbbbbb,
-+]:
-     pass
- 
- 
-@@ -183,10 +171,8 @@
- 
- 
- # Don't paranthesize lists
--def f() -> (
--    [
--        a,
--        b,
--    ]
--):
-+def f() -> [
-+    a,
-+    b,
-+]:
-     pass
 ```
