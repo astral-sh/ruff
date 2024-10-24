@@ -31,44 +31,6 @@ pub(crate) trait CanLocate<'db> {
     ) -> Option<Location>;
 }
 
-impl<'db> CanLocate<'db> for ast::Stmt {
-    fn locate_def(
-        &self,
-        pos: TextSize,
-        index: &SemanticIndex<'db>,
-        db: &'db dyn Db,
-        file: File,
-    ) -> Option<Location> {
-        match self {
-            ast::Stmt::FunctionDef(inner) => inner.locate_def(pos, index, db, file),
-            ast::Stmt::ClassDef(inner) => inner.locate_def(pos, index, db, file),
-            ast::Stmt::Return(inner) => inner.locate_def(pos, index, db, file),
-            ast::Stmt::Delete(inner) => inner.locate_def(pos, index, db, file),
-            ast::Stmt::Assign(inner) => inner.locate_def(pos, index, db, file),
-            ast::Stmt::AugAssign(inner) => inner.locate_def(pos, index, db, file),
-            ast::Stmt::AnnAssign(inner) => inner.locate_def(pos, index, db, file),
-            ast::Stmt::TypeAlias(inner) => inner.locate_def(pos, index, db, file),
-            ast::Stmt::For(inner) => inner.locate_def(pos, index, db, file),
-            ast::Stmt::While(inner) => inner.locate_def(pos, index, db, file),
-            ast::Stmt::If(inner) => inner.locate_def(pos, index, db, file),
-            ast::Stmt::With(inner) => inner.locate_def(pos, index, db, file),
-            ast::Stmt::Match(inner) => inner.locate_def(pos, index, db, file),
-            ast::Stmt::Raise(inner) => inner.locate_def(pos, index, db, file),
-            ast::Stmt::Try(inner) => inner.locate_def(pos, index, db, file),
-            ast::Stmt::Assert(inner) => inner.locate_def(pos, index, db, file),
-            ast::Stmt::Import(inner) => inner.locate_def(pos, index, db, file),
-            ast::Stmt::ImportFrom(inner) => inner.locate_def(pos, index, db, file),
-            ast::Stmt::Global(inner) => inner.locate_def(pos, index, db, file),
-            ast::Stmt::Nonlocal(inner) => inner.locate_def(pos, index, db, file),
-            ast::Stmt::Expr(inner) => inner.locate_def(pos, index, db, file),
-            ast::Stmt::Pass(_)
-            | ast::Stmt::Break(_)
-            | ast::Stmt::Continue(_)
-            | ast::Stmt::IpyEscapeCommand(_) => None,
-        }
-    }
-}
-
 impl<'db, T> CanLocate<'db> for Vec<T>
 where
     T: CanLocate<'db>,
@@ -80,16 +42,10 @@ where
         db: &'db dyn Db,
         file: File,
     ) -> Option<Location> {
-        for item in self {
-            let lookup = item.locate_def(pos, index, db, file);
-            if lookup.is_some() {
-                return lookup;
-            }
-        }
-        None
+        self.iter()
+            .find_map(|item| item.locate_def(pos, index, db, file))
     }
 }
-// XXX can merge Vec and [T] into something else?
 impl<'db, T> CanLocate<'db> for [T]
 where
     T: CanLocate<'db>,
@@ -101,13 +57,8 @@ where
         db: &'db dyn Db,
         file: File,
     ) -> Option<Location> {
-        for item in self {
-            let lookup = item.locate_def(pos, index, db, file);
-            if lookup.is_some() {
-                return lookup;
-            }
-        }
-        None
+        self.iter()
+            .find_map(|item| item.locate_def(pos, index, db, file))
     }
 }
 
@@ -136,10 +87,8 @@ where
         db: &'db dyn Db,
         file: File,
     ) -> Option<Location> {
-        match self {
-            None => None,
-            Some(elt) => elt.locate_def(pos, index, db, file),
-        }
+        self.as_ref()
+            .and_then(|elt| elt.locate_def(pos, index, db, file))
     }
 }
 
@@ -187,7 +136,9 @@ impl<'db> CanLocate<'db> for ast::Expr {
         }
     }
 }
+
 macro_rules! impl_can_locate {
+    // If an item has self.range, we can use it to quickly rule out problematic branches
     ($type:ty, ranged, $($field:ident),+) => {
         impl<'db> CanLocate<'db> for $type {
             fn locate_def(&self, pos: TextSize, index: &SemanticIndex<'db>, db: &'db dyn Db, file: File) -> Option<Location> {
@@ -199,7 +150,7 @@ macro_rules! impl_can_locate {
             }
         }
     };
-    // Case where `locate_def` directly forwards to a field.
+
     ($type:ty, $($field:ident),+) => {
         impl<'db> CanLocate<'db> for $type {
             fn locate_def(&self, pos: TextSize, index: &SemanticIndex<'db>, db: &'db dyn Db, file: File) -> Option<Location> {
@@ -284,10 +235,59 @@ impl_can_locate!(
 );
 impl_can_locate!(ast::ParameterWithDefault, ranged, parameter, default);
 impl_can_locate!(ast::Parameter, ranged, annotation);
+impl_can_locate!(ast::StmtExpr, ranged, value);
+impl_can_locate!(ast::TypeParamTypeVar, ranged, bound, default);
+impl_can_locate!(ast::TypeParamParamSpec, ranged, default);
+impl_can_locate!(ast::TypeParamTypeVarTuple, ranged, default);
+impl_can_locate!(ast::ExprSubscript, ranged, value, slice);
+impl_can_locate!(ast::ExprStarred, ranged, value);
+impl_can_locate!(ast::ExprList, ranged, elts);
+impl_can_locate!(ast::ExprTuple, ranged, elts);
+impl_can_locate!(ast::ExprSlice, ranged, lower, upper, step);
+
 locate_todo!(ast::StmtImport);
 locate_todo!(ast::StmtImportFrom);
-impl_can_locate!(ast::StmtExpr, ranged, value);
 locate_todo!(ast::ExceptHandler);
+locate_todo!(ast::Identifier);
+
+impl<'db> CanLocate<'db> for ast::Stmt {
+    fn locate_def(
+        &self,
+        pos: TextSize,
+        index: &SemanticIndex<'db>,
+        db: &'db dyn Db,
+        file: File,
+    ) -> Option<Location> {
+        match self {
+            ast::Stmt::FunctionDef(inner) => inner.locate_def(pos, index, db, file),
+            ast::Stmt::ClassDef(inner) => inner.locate_def(pos, index, db, file),
+            ast::Stmt::Return(inner) => inner.locate_def(pos, index, db, file),
+            ast::Stmt::Delete(inner) => inner.locate_def(pos, index, db, file),
+            ast::Stmt::Assign(inner) => inner.locate_def(pos, index, db, file),
+            ast::Stmt::AugAssign(inner) => inner.locate_def(pos, index, db, file),
+            ast::Stmt::AnnAssign(inner) => inner.locate_def(pos, index, db, file),
+            ast::Stmt::TypeAlias(inner) => inner.locate_def(pos, index, db, file),
+            ast::Stmt::For(inner) => inner.locate_def(pos, index, db, file),
+            ast::Stmt::While(inner) => inner.locate_def(pos, index, db, file),
+            ast::Stmt::If(inner) => inner.locate_def(pos, index, db, file),
+            ast::Stmt::With(inner) => inner.locate_def(pos, index, db, file),
+            ast::Stmt::Match(inner) => inner.locate_def(pos, index, db, file),
+            ast::Stmt::Raise(inner) => inner.locate_def(pos, index, db, file),
+            ast::Stmt::Try(inner) => inner.locate_def(pos, index, db, file),
+            ast::Stmt::Assert(inner) => inner.locate_def(pos, index, db, file),
+            ast::Stmt::Import(inner) => inner.locate_def(pos, index, db, file),
+            ast::Stmt::ImportFrom(inner) => inner.locate_def(pos, index, db, file),
+            ast::Stmt::Global(inner) => inner.locate_def(pos, index, db, file),
+            ast::Stmt::Nonlocal(inner) => inner.locate_def(pos, index, db, file),
+            ast::Stmt::Expr(inner) => inner.locate_def(pos, index, db, file),
+            ast::Stmt::Pass(_)
+            | ast::Stmt::Break(_)
+            | ast::Stmt::Continue(_)
+            | ast::Stmt::IpyEscapeCommand(_) => None,
+        }
+    }
+}
+
 impl<'db> CanLocate<'db> for ast::TypeParam {
     fn locate_def(
         &self,
@@ -304,9 +304,6 @@ impl<'db> CanLocate<'db> for ast::TypeParam {
     }
 }
 
-impl_can_locate!(ast::TypeParamTypeVar, ranged, bound, default);
-impl_can_locate!(ast::TypeParamParamSpec, ranged, default);
-impl_can_locate!(ast::TypeParamTypeVarTuple, ranged, default);
 impl<'db> CanLocate<'db> for ast::FStringValue {
     fn locate_def(
         &self,
@@ -315,13 +312,8 @@ impl<'db> CanLocate<'db> for ast::FStringValue {
         db: &'db dyn Db,
         file: File,
     ) -> Option<Location> {
-        for part in self {
-            let result = part.locate_def(pos, index, db, file);
-            if result.is_some() {
-                return result;
-            }
-        }
-        None
+        self.iter()
+            .find_map(|item| item.locate_def(pos, index, db, file))
     }
 }
 
@@ -335,15 +327,9 @@ impl<'db> CanLocate<'db> for ast::FStringPart {
     ) -> Option<Location> {
         match self {
             ast::FStringPart::Literal(_) => None,
-            ast::FStringPart::FString(ast::FString { elements, .. }) => {
-                for expression in elements.expressions() {
-                    let result = expression.locate_def(pos, index, db, file);
-                    if result.is_some() {
-                        return result;
-                    }
-                }
-                None
-            }
+            ast::FStringPart::FString(ast::FString { elements, .. }) => elements
+                .expressions()
+                .find_map(|expression| expression.locate_def(pos, index, db, file)),
         }
     }
 }
@@ -377,9 +363,6 @@ impl<'db> CanLocate<'db> for ast::ExprAttribute {
     }
 }
 
-impl_can_locate!(ast::ExprSubscript, ranged, value, slice);
-impl_can_locate!(ast::ExprStarred, ranged, value);
-
 impl<'db> CanLocate<'db> for ast::ExprName {
     fn locate_def(
         &self,
@@ -398,30 +381,9 @@ impl<'db> CanLocate<'db> for ast::ExprName {
             .ast_ids(file_scope_id)
             .use_id(ast::ExpressionRef::from(self));
         let udm = use_def_map(db, scope);
-        if let Some(binding) = udm.bindings_at_use(scoped_use_id).next() {
-            // take first binding I find as the canonical one
-            let definition: Definition<'db> = binding.binding;
-            Some(location_from_definition(definition, index, db))
-        } else {
-            // couldn't find a definition (perhaps this is unbound?)
-            None
-        }
-    }
-}
-
-impl_can_locate!(ast::ExprList, ranged, elts);
-impl_can_locate!(ast::ExprTuple, ranged, elts);
-impl_can_locate!(ast::ExprSlice, ranged, lower, upper, step);
-
-impl<'db> CanLocate<'db> for ast::Identifier {
-    fn locate_def(
-        &self,
-        _pos: TextSize,
-        _index: &SemanticIndex<'db>,
-        _db: &'db dyn Db,
-        _file: File,
-    ) -> Option<Location> {
-        // TODO figure this one out
-        None
+        let binding = udm.bindings_at_use(scoped_use_id).next()?;
+        // take first binding I find as the canonical one
+        let definition: Definition<'db> = binding.binding;
+        Some(location_from_definition(definition, index, db))
     }
 }
