@@ -557,7 +557,7 @@ Or `ruff help check` for more on the linting command:
 <!-- Begin auto-generated check help. -->
 
 ```text
-Run Ruff on the given files or directories (default)
+Run Ruff on the given files or directories
 
 Usage: ruff check [OPTIONS] [FILES]...
 
