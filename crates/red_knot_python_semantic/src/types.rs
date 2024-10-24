@@ -332,10 +332,9 @@ impl<'db> Type<'db> {
             .expect("Expected a Type::ModuleLiteral variant")
     }
 
+    #[must_use]
     pub fn negate(&self, db: &'db dyn Db) -> Type<'db> {
-        let r = IntersectionBuilder::new(db)
-            .add_negative(self.clone())
-            .build();
+        let r = IntersectionBuilder::new(db).add_negative(*self).build();
         r
     }
 
