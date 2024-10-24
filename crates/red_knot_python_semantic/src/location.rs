@@ -3,13 +3,11 @@ use crate::{
     semantic_index::{definition::Definition, use_def_map, SemanticIndex},
     Db, HasTy, SemanticModel,
 };
-use lsp_types::Range;
 use ruff_db::{
-    files::File,
+    files::{location::Location, File},
     source::{line_index, source_text},
 };
 use ruff_text_size::{TextRange, TextSize};
-use url::Url;
 
 // XXX should I just use an alias here? Not getting much value out of this huge import
 use ruff_python_ast::{
@@ -25,28 +23,16 @@ use ruff_python_ast::{
     TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, TypeParams, WithItem,
 };
 
-#[derive(Debug)]
-pub enum DefLocation {
-    // XXX not including lsp_types in here would be good
-    // same for Url
-    Location { url: Url, range: Range },
-    Todo { s: String },
-}
-
-impl DefLocation {
-    pub(crate) fn from_definition<'db>(
-        definition: Definition<'db>,
-        index: &SemanticIndex<'db>,
-        db: &dyn Db,
-        file: File,
-    ) -> DefLocation {
-        let range = index.definition_range(definition);
-        let final_range = ruff_range_to_lsp_range(db, file, range);
-        return DefLocation::Location {
-            url: definition.file(db).try_url(db.upcast()),
-            range: final_range,
-        };
-    }
+pub(crate) fn location_from_definition<'db>(
+    definition: Definition<'db>,
+    index: &SemanticIndex<'db>,
+    db: &dyn Db,
+) -> Location {
+    let range = index.definition_range(definition);
+    return Location {
+        file: definition.file(db),
+        range,
+    };
 }
 
 fn ruff_range_to_lsp_range(db: &dyn Db, file: File, range: TextRange) -> lsp_types::Range {
@@ -76,7 +62,7 @@ pub(crate) trait CanLocate<'db> {
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
-    ) -> Option<DefLocation>;
+    ) -> Option<Location>;
 }
 
 impl<'db> CanLocate<'db> for Stmt {
@@ -86,7 +72,7 @@ impl<'db> CanLocate<'db> for Stmt {
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
-    ) -> Option<DefLocation> {
+    ) -> Option<Location> {
         match self {
             Stmt::FunctionDef(inner) => inner.locate_def(pos, index, db, file),
             Stmt::ClassDef(inner) => inner.locate_def(pos, index, db, file),
@@ -124,7 +110,7 @@ where
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
-    ) -> Option<DefLocation> {
+    ) -> Option<Location> {
         for item in self {
             let lookup = item.locate_def(pos, index, db, file);
             if lookup.is_some() {
@@ -145,7 +131,7 @@ where
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
-    ) -> Option<DefLocation> {
+    ) -> Option<Location> {
         for item in self {
             let lookup = item.locate_def(pos, index, db, file);
             if lookup.is_some() {
@@ -166,7 +152,7 @@ where
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
-    ) -> Option<DefLocation> {
+    ) -> Option<Location> {
         self.as_ref().locate_def(pos, index, db, file)
     }
 }
@@ -180,7 +166,7 @@ where
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
-    ) -> Option<DefLocation> {
+    ) -> Option<Location> {
         match self {
             None => None,
             Some(elt) => elt.locate_def(pos, index, db, file),
@@ -195,7 +181,7 @@ impl<'db> CanLocate<'db> for Expr {
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
-    ) -> Option<DefLocation> {
+    ) -> Option<Location> {
         match self {
             Expr::BoolOp(inner) => inner.locate_def(pos, index, db, file),
             Expr::Named(inner) => inner.locate_def(pos, index, db, file),
@@ -235,7 +221,7 @@ impl<'db> CanLocate<'db> for Expr {
 macro_rules! impl_can_locate {
     ($type:ty, ranged, $($field:ident),+) => {
         impl<'db> CanLocate<'db> for $type {
-            fn locate_def(&self, pos: TextSize, index: &SemanticIndex<'db>, db: &'db dyn Db, file: File) -> Option<DefLocation> {
+            fn locate_def(&self, pos: TextSize, index: &SemanticIndex<'db>, db: &'db dyn Db, file: File) -> Option<Location> {
                 if !pos.in_range(&self.range) {
                     return None;
                 }
@@ -247,7 +233,7 @@ macro_rules! impl_can_locate {
     // Case where `locate_def` directly forwards to a field.
     ($type:ty, $($field:ident),+) => {
         impl<'db> CanLocate<'db> for $type {
-            fn locate_def(&self, pos: TextSize, index: &SemanticIndex<'db>, db: &'db dyn Db, file: File) -> Option<DefLocation> {
+            fn locate_def(&self, pos: TextSize, index: &SemanticIndex<'db>, db: &'db dyn Db, file: File) -> Option<Location> {
                 None
                     $(.or_else(|| self.$field.locate_def(pos, index, db, file)))+
             }
@@ -265,7 +251,7 @@ macro_rules! locate_todo {
                 _index: &SemanticIndex<'db>,
                 _db: &'db dyn Db,
                 _file: File,
-            ) -> Option<DefLocation> {
+            ) -> Option<Location> {
                 None
             }
         }
@@ -340,7 +326,7 @@ impl<'db> CanLocate<'db> for TypeParam {
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
-    ) -> Option<DefLocation> {
+    ) -> Option<Location> {
         match self {
             TypeParam::TypeVar(inner) => inner.locate_def(pos, index, db, file),
             TypeParam::ParamSpec(inner) => inner.locate_def(pos, index, db, file),
@@ -359,7 +345,7 @@ impl<'db> CanLocate<'db> for FStringValue {
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
-    ) -> Option<DefLocation> {
+    ) -> Option<Location> {
         for part in self {
             let result = part.locate_def(pos, index, db, file);
             if result.is_some() {
@@ -377,7 +363,7 @@ impl<'db> CanLocate<'db> for FStringPart {
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
-    ) -> Option<DefLocation> {
+    ) -> Option<Location> {
         match self {
             FStringPart::Literal(_) => None,
             FStringPart::FString(FString { elements, .. }) => {
@@ -400,7 +386,7 @@ impl<'db> CanLocate<'db> for ExprAttribute {
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
-    ) -> Option<DefLocation> {
+    ) -> Option<Location> {
         if !pos.in_range(&self.range) {
             return None;
         }
@@ -422,24 +408,7 @@ impl<'db> CanLocate<'db> for ExprAttribute {
     }
 }
 
-impl<'db> CanLocate<'db> for ExprSubscript {
-    fn locate_def(
-        &self,
-        pos: TextSize,
-        _index: &SemanticIndex<'db>,
-        _db: &'db dyn Db,
-        _file: File,
-    ) -> Option<DefLocation> {
-        if !pos.in_range(&self.range) {
-            return None;
-        }
-        // we're definitely in here!
-        Some(DefLocation::Todo {
-            s: "Subscript Access!".to_string(),
-        })
-    }
-}
-
+impl_can_locate!(ExprSubscript, ranged, value, slice);
 impl_can_locate!(ExprStarred, ranged, value);
 
 impl<'db> CanLocate<'db> for ExprName {
@@ -449,7 +418,7 @@ impl<'db> CanLocate<'db> for ExprName {
         index: &SemanticIndex<'db>,
         db: &'db dyn Db,
         file: File,
-    ) -> Option<DefLocation> {
+    ) -> Option<Location> {
         if !pos.in_range(&self.range) {
             return None;
         }
@@ -463,7 +432,7 @@ impl<'db> CanLocate<'db> for ExprName {
         if let Some(binding) = udm.bindings_at_use(scoped_use_id).next() {
             // take first binding I find as the canonical one
             let definition: Definition<'db> = binding.binding;
-            Some(DefLocation::from_definition(definition, index, db, file))
+            Some(location_from_definition(definition, index, db))
         } else {
             // couldn't find a definition (perhaps this is unbound?)
             None
@@ -482,7 +451,7 @@ impl<'db> CanLocate<'db> for Identifier {
         _index: &SemanticIndex<'db>,
         _db: &'db dyn Db,
         _file: File,
-    ) -> Option<DefLocation> {
+    ) -> Option<Location> {
         // TODO figure this one out
         None
     }

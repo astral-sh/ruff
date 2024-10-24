@@ -2,8 +2,11 @@ use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 
 use lsp_types::Position;
-use red_knot_python_semantic::location::DefLocation;
 use red_knot_python_semantic::search::definition_at_location;
+use red_knot_python_semantic::semantic_index::definition::Definition;
+use ruff_db::files::location::Location;
+use ruff_db::source::{line_index, source_text};
+use ruff_source_file::SourceLocation;
 use salsa::plumbing::ZalsaDatabase;
 use salsa::{Cancelled, Event};
 
@@ -64,8 +67,19 @@ impl RootDatabase {
         self.with_db(|db| check_file(db, file))
     }
 
-    pub fn definition_at_location(&self, file: File, position: Position) -> Option<DefLocation> {
+    pub fn definition_at_location(&self, file: File, position: Position) -> Option<Location> {
         definition_at_location(file, position, self)
+    }
+
+    pub fn location_to_source_location_range(
+        &self,
+        location: Location,
+    ) -> (SourceLocation, SourceLocation) {
+        let li = line_index(self.upcast(), location.file);
+        let contents = source_text(self.upcast(), location.file);
+        let loc_start = li.source_location(location.range.start(), &contents);
+        let loc_end = li.source_location(location.range.end(), &contents);
+        (loc_start, loc_end)
     }
     /// Returns a mutable reference to the system.
     ///

@@ -18,6 +18,7 @@ use crate::vendored::{VendoredPath, VendoredPathBuf};
 use crate::{vendored, Db, FxDashMap};
 
 mod file_root;
+pub mod location;
 mod path;
 
 /// Interns a file system path and returns a salsa `File` ingredient.

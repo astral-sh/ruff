@@ -1,20 +1,20 @@
 use crate::{
-    location::CanLocate,
+    location::{location_from_definition, CanLocate},
     semantic_index::{semantic_index, SemanticIndex},
     types::Type,
 };
 use lsp_types::Position;
 use ruff_db::{
-    files::File,
+    files::{location::Location, File},
     parsed::parsed_module,
     source::{line_index, source_text},
 };
 use ruff_python_ast::Identifier;
 use ruff_source_file::OneIndexed;
 
-use crate::{location::DefLocation, Db};
+use crate::Db;
 
-pub fn definition_at_location(file: File, location: Position, db: &dyn Db) -> Option<DefLocation> {
+pub fn definition_at_location(file: File, location: Position, db: &dyn Db) -> Option<Location> {
     // XXX now this returns one or none. It could return an iterator of locations
     let index = semantic_index(db, file);
     // let's try and look up the relevant AST node
@@ -38,7 +38,7 @@ pub(crate) fn locate_name_on_type<'db>(
     index: &SemanticIndex<'db>,
     typ: &Type<'db>,
     attr: &Identifier,
-) -> Option<DefLocation> {
+) -> Option<Location> {
     let def = typ.member_def(db, &attr.id)?;
-    Some(DefLocation::from_definition(def, index, db, def.file(db)))
+    Some(location_from_definition(def, index, db))
 }
