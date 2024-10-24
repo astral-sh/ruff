@@ -13,7 +13,6 @@ use crate::comments::{leading_comments, trailing_comments};
 use crate::expression::parentheses::in_parentheses_only_soft_line_break_or_space;
 use crate::other::f_string::{FStringContext, FStringLayout, FormatFString};
 use crate::other::f_string_element::FormatFStringExpressionElement;
-use crate::other::string_literal::StringLiteralKind;
 use crate::prelude::*;
 use crate::preview::{
     is_f_string_formatting_enabled, is_join_implicit_concatenated_string_enabled,
@@ -103,16 +102,7 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringExpanded<'_
 
         for part in self.string.parts() {
             let format_part = format_with(|f: &mut PyFormatter| match part {
-                StringLikePart::String(part) => {
-                    let kind = if self.string.is_fstring() {
-                        #[allow(deprecated)]
-                        StringLiteralKind::InImplicitlyConcatenatedFString(quoting)
-                    } else {
-                        StringLiteralKind::String
-                    };
-
-                    part.format().with_options(kind).fmt(f)
-                }
+                StringLikePart::String(part) => part.format().fmt(f),
                 StringLikePart::Bytes(bytes_literal) => bytes_literal.format().fmt(f),
                 StringLikePart::FString(part) => FormatFString::new(part, quoting).fmt(f),
             });
