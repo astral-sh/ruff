@@ -1,11 +1,9 @@
 [
   {
-    "quote_style": "preserve",
-    "preview": "enabled"
+    "quote_style": "preserve"
   },
   {
     "quote_style": "preserve",
-    "preview": "enabled",
     "target_version": "py312"
   }
 ]
