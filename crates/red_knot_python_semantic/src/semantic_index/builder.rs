@@ -247,7 +247,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         let expression = self.add_standalone_expression(constraint_node);
         let constraint = Constraint {
             node: ConstraintNode::Expression(expression),
-            negated: false,
+            negative: false,
         };
         self.current_use_def_map_mut().record_constraint(constraint);
 
@@ -258,7 +258,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_use_def_map_mut()
             .record_constraint(Constraint {
                 node: constraint.node,
-                negated: true,
+                negative: true,
             });
     }
 
@@ -298,7 +298,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_use_def_map_mut()
             .record_constraint(Constraint {
                 node: ConstraintNode::Pattern(pattern_constraint),
-                negated: false,
+                negative: false,
             });
         pattern_constraint
     }

@@ -9,7 +9,7 @@ use crate::semantic_index::symbol::{FileScopeId, ScopeId};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Constraint<'db> {
     pub(crate) node: ConstraintNode<'db>,
-    pub(crate) negated: bool,
+    pub(crate) negative: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
