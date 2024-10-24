@@ -286,7 +286,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Create a [`Generator`] to generate source code based on the current AST state.
-    pub(crate) fn generator(&self) -> Generator {
+    pub(crate) fn generator(&self) -> Generator<'a> {
         Generator::new(
             self.stylist.indentation(),
             self.f_string_quote_style().unwrap_or(self.stylist.quote()),

@@ -1,10 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{name::Name, Expr, ExprName, Stmt, StmtAssign, StmtIf};
-use ruff_python_codegen::Generator;
-use ruff_python_index::Indexer;
 use ruff_python_semantic::SemanticModel;
-use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 use crate::{checkers::ast::Checker, fix::edits::delete_stmt, settings::types::PythonVersion};
@@ -79,60 +76,53 @@ pub(crate) fn unnecessary_assignment(checker: &mut Checker, stmt: &StmtIf) {
         return;
     }
 
-    let if_test = stmt.test.as_ref();
-    let semantic = checker.semantic();
-    let mut errors: Vec<AssignmentBeforeIfStmt> = Vec::new();
+    let if_test = &*stmt.test;
+
+    let previous_assignment = PreviousAssignment::new(checker.semantic());
+    let mut diagnostics: Vec<Diagnostic> = Vec::new();
 
     // case - if check (`if test1:`)
-    if let Some(unreferenced_binding) = find_assignment_before_if_stmt(semantic, if_test, if_test) {
-        errors.push(unreferenced_binding);
+    if let Some(unreferenced_binding) =
+        find_assignment_before_if_stmt(&previous_assignment, if_test, if_test)
+    {
+        diagnostics.push(create_diagnostic(checker, unreferenced_binding));
     };
 
-    // case - bool operations (`if test1 and test2:`)
-    if let Expr::BoolOp(expr) = if_test {
-        errors.extend(
-            expr.values
-                .iter()
-                .filter_map(|bool_test| {
-                    find_assignment_before_if_stmt(semantic, if_test, bool_test)
-                })
-                .collect::<Vec<AssignmentBeforeIfStmt>>(),
-        );
-    }
+    match &*stmt.test {
+        // case - bool operations (`if test1 and test2:`)
+        Expr::BoolOp(expr) => diagnostics.extend(expr.values.iter().filter_map(|bool_test| {
+            Some(create_diagnostic(
+                checker,
+                find_assignment_before_if_stmt(&previous_assignment, if_test, bool_test)?,
+            ))
+        })),
 
-    // case - compare (`if test1 is not None:`)
-    if let Expr::Compare(compare) = if_test {
-        if let Some(error) = find_assignment_before_if_stmt(semantic, if_test, &compare.left) {
-            errors.push(error);
-        };
+        // case - compare (`if test1 is not None:`)
+        Expr::Compare(compare) => {
+            if let Some(error) =
+                find_assignment_before_if_stmt(&previous_assignment, if_test, &compare.left)
+            {
+                diagnostics.push(create_diagnostic(checker, error));
+            };
+        }
+
+        _ => {}
     }
 
     // case - elif else clauses (`elif test1:`)
-    errors.extend(
+    diagnostics.extend(
         stmt.elif_else_clauses
             .iter()
-            .filter(|elif_else_clause| elif_else_clause.test.is_some())
             .filter_map(|elif_else_clause| {
-                let elif_check = elif_else_clause.test.as_ref().unwrap();
-                find_assignment_before_if_stmt(semantic, elif_check, elif_check)
+                elif_else_clause.test.as_ref().and_then(|elif_check| {
+                    find_assignment_before_if_stmt(&previous_assignment, elif_check, elif_check)
+                })
             })
-            .collect::<Vec<AssignmentBeforeIfStmt>>(),
+            .map(|assignment_before_if| create_diagnostic(checker, assignment_before_if)),
     );
 
     // add found diagnostics
-    checker.diagnostics.extend(
-        errors
-            .into_iter()
-            .map(|error| {
-                create_diagnostic(
-                    checker.locator(),
-                    checker.indexer(),
-                    checker.generator(),
-                    error,
-                )
-            })
-            .collect::<Vec<Diagnostic>>(),
-    );
+    checker.diagnostics.extend(diagnostics);
 }
 
 /// Find possible assignment before if statement
@@ -140,22 +130,17 @@ pub(crate) fn unnecessary_assignment(checker: &mut Checker, stmt: &StmtIf) {
 /// * `if_test` - the complete if test (`if test1 and test2`)
 /// * `if_test_part` - part of the if test (`test1`)
 fn find_assignment_before_if_stmt<'a>(
-    semantic: &'a SemanticModel,
+    previous_assignment: &PreviousAssignment<'a>,
     if_test: &'a Expr,
     if_test_part: &'a Expr,
 ) -> Option<AssignmentBeforeIfStmt<'a>> {
     // early exit when the test part is not a variable
-    let Expr::Name(test_variable) = if_test_part else {
-        return None;
-    };
+    let test_variable = if_test_part.as_name_expr()?;
 
-    let current_statement = semantic.current_statement();
-    let previous_statement = semantic
-        .previous_statement(current_statement)?
-        .as_assign_stmt()?;
+    let assignment = previous_assignment.get()?;
 
     // only care about single assignment target like `x = 'example'`
-    let [assigned_variable] = &previous_statement.targets[..] else {
+    let [assigned_variable] = &assignment.targets[..] else {
         return None;
     };
 
@@ -164,17 +149,12 @@ fn find_assignment_before_if_stmt<'a>(
         return None;
     }
 
-    Some((if_test, test_variable, previous_statement))
+    Some((if_test, test_variable, assignment))
 }
 
-fn create_diagnostic(
-    locator: &Locator,
-    indexer: &Indexer,
-    generator: Generator,
-    error: AssignmentBeforeIfStmt,
-) -> Diagnostic {
+fn create_diagnostic(checker: &Checker, error: AssignmentBeforeIfStmt) -> Diagnostic {
     let (origin, expr_name, assignment) = error;
-    let assignment_expr = generator.expr(&assignment.value);
+    let assignment_expr = checker.generator().expr(&assignment.value);
     let use_parentheses = origin.is_bool_op_expr() || !assignment.value.is_name_expr();
 
     let mut diagnostic = Diagnostic::new(
@@ -192,11 +172,39 @@ fn create_diagnostic(
         format!("{} := {}", expr_name.id, assignment_expr)
     };
 
-    let delete_assignment_edit =
-        delete_stmt(&Stmt::from(assignment.clone()), None, locator, indexer);
+    let delete_assignment_edit = delete_stmt(
+        &Stmt::from(assignment.clone()),
+        None,
+        checker.locator(),
+        checker.indexer(),
+    );
     let use_walrus_edit = Edit::range_replacement(format, diagnostic.range());
 
     diagnostic.set_fix(Fix::unsafe_edits(delete_assignment_edit, [use_walrus_edit]));
 
     diagnostic
+}
+
+struct PreviousAssignment<'a> {
+    memory: std::cell::OnceCell<Option<&'a StmtAssign>>,
+    semantic: &'a SemanticModel<'a>,
+}
+
+impl<'a> PreviousAssignment<'a> {
+    fn new(semantic: &'a SemanticModel<'a>) -> Self {
+        Self {
+            memory: std::cell::OnceCell::new(),
+            semantic,
+        }
+    }
+
+    fn get(&self) -> Option<&'a StmtAssign> {
+        *self.memory.get_or_init(|| {
+            let current_statement = self.semantic.current_statement();
+
+            self.semantic
+                .previous_statement(current_statement)
+                .and_then(|stmt| stmt.as_assign_stmt())
+        })
+    }
 }
