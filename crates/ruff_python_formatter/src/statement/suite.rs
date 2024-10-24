@@ -792,31 +792,16 @@ impl<'a> DocstringStmt<'a> {
             return None;
         }
 
-        let Stmt::Expr(expr_stmt) = stmt else {
-            return None;
-        };
-
-        if !Self::is_docstring_statement(expr_stmt, context) {
-            return None;
-        }
-
-        Some(DocstringStmt {
+        Self::is_docstring_statement(stmt.as_expr_stmt()?, context).then_some(DocstringStmt {
             docstring: stmt,
             suite_kind,
         })
     }
 
     pub(crate) fn is_docstring_statement(stmt: &StmtExpr, context: &PyFormatContext) -> bool {
-        if context.options().source_type().is_ipynb() {
-            return false;
-        }
-
         if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = stmt.value.as_ref() {
-            if value.is_implicit_concatenated() {
-                !value.iter().any(|literal| context.comments().has(literal))
-            } else {
-                true
-            }
+            !value.is_implicit_concatenated()
+                || !value.iter().any(|literal| context.comments().has(literal))
         } else {
             false
         }
