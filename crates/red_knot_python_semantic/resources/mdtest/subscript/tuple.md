@@ -16,3 +16,13 @@ reveal_type(a)  # revealed: Unknown
 b = t[-4]  # error: [index-out-of-bounds]
 reveal_type(b)  # revealed: Unknown
 ```
+
+## Slices
+
+```py
+t = (1, "a", None, b"b")
+
+reveal_type(t[0:2])  # revealed: tuple[Literal[1], Literal["a"]]
+reveal_type(t[1:3])  # revealed: tuple[Literal["a"], None]
+reveal_type(t[-2:4])  # revealed: tuple[None, Literal[b"b"]]
+```

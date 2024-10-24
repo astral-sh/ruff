@@ -90,6 +90,15 @@ impl Display for DisplayRepresentation<'_> {
 
                 escape.bytes_repr().write(f)
             }
+            Type::SliceLiteral(slice) => {
+                write!(
+                    f,
+                    "slice[{start:?}, {stop:?}, {step:?}]", // TODO
+                    start = slice.start(self.db),
+                    stop = slice.stop(self.db),
+                    step = slice.step(self.db),
+                )
+            }
             Type::Tuple(tuple) => {
                 f.write_str("tuple[")?;
                 let elements = tuple.elements(self.db);
