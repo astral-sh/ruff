@@ -2334,6 +2334,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             .expect("Symbol table should create a symbol for every Name node")
             .is_bound();
 
+        let mut ty = Type::Unbound;
+
         // In function-like scopes, any local variable (symbol that is bound in this scope) can
         // only have a definition in this scope, or error; it never references another scope.
         // (At runtime, it would use the `LOAD_FAST` opcode.)
@@ -2364,11 +2366,23 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             // No nonlocal binding, check module globals. Avoid infinite recursion if `self.scope`
             // already is module globals.
-            let ty = if file_scope_id.is_global() {
-                Type::Unbound
-            } else {
-                global_symbol_ty(self.db, self.file, name)
+            if !file_scope_id.is_global() {
+                ty = global_symbol_ty(self.db, self.file, name);
             };
+
+            // Still possibly unbound? All modules are instances of `types.ModuleType`;
+            // look it up there (with a few very special exceptions)
+            if ty.may_be_unbound(self.db)
+                && !matches!(&**name, "__dict__" | "__init__" | "__getattr__")
+            {
+                // TODO: this should be `KnownClass::ModuleType.to_instance()`,
+                // but we don't yet support looking up attributes on instances
+                let module_type = KnownClass::ModuleType.to_class(self.db);
+                let module_type_member_ty = module_type.member(self.db, name);
+                if !module_type_member_ty.is_unbound() {
+                    return ty.replace_unbound_with(self.db, module_type_member_ty);
+                }
+            }
 
             // Fallback to builtins (without infinite recursion if we're already in builtins.)
             if ty.may_be_unbound(self.db) && Some(self.scope()) != builtins_module_scope(self.db) {
@@ -2382,13 +2396,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                     );
                     builtin_ty = typing_extensions_symbol_ty(self.db, name);
                 }
-                ty.replace_unbound_with(self.db, builtin_ty)
-            } else {
-                ty
+                ty = ty.replace_unbound_with(self.db, builtin_ty);
             }
-        } else {
-            Type::Unbound
         }
+
+        ty
     }
 
     fn infer_name_expression(&mut self, name: &ast::ExprName) -> Type<'db> {
