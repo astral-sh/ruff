@@ -3180,7 +3180,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let elements = tuple_ty.elements(self.db);
                 elements
                     .iter()
-                    .python_subscript(int)
+                    .subscript_index(int)
                     .copied()
                     .unwrap_or_else(|| {
                         self.index_out_of_bounds_diagnostic(
@@ -3204,7 +3204,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let literal_value = literal_ty.value(self.db);
                 literal_value
                     .chars()
-                    .python_subscript(int)
+                    .subscript_index(int)
                     .map(|ch| {
                         Type::StringLiteral(StringLiteralType::new(
                             self.db,
@@ -3227,7 +3227,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let literal_value = literal_ty.value(self.db);
                 literal_value
                     .iter()
-                    .python_subscript(int)
+                    .subscript_index(int)
                     .map(|byte| {
                         Type::BytesLiteral(BytesLiteralType::new(self.db, [*byte].as_slice()))
                     })
