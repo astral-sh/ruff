@@ -22,3 +22,13 @@ x: int = "foo"  # error: [invalid-assignment] "Object of type `Literal["foo"]` i
 x: int
 x = "foo"  # error: [invalid-assignment] "Object of type `Literal["foo"]` is not assignable to `int`"
 ```
+
+## PEP-604 annotations not yet supported
+
+```py
+def f() -> str | None:
+    return None
+
+# TODO: should be `str | None` (but Todo is better than `Unknown`)
+reveal_type(f())  # revealed: @Todo
+```

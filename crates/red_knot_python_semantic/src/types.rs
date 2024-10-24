@@ -220,6 +220,9 @@ fn declarations_ty<'db>(
     } else {
         first
     };
+    // Make sure not to emit spurious errors relating to `Type::Todo`,
+    // since we only infer this type due to a limitation in our current model
+    conflicting.retain(|ty| !ty.is_todo());
     if conflicting.is_empty() {
         Ok(declared_ty)
     } else {
@@ -290,6 +293,10 @@ impl<'db> Type<'db> {
 
     pub const fn is_never(&self) -> bool {
         matches!(self, Type::Never)
+    }
+
+    pub const fn is_todo(&self) -> bool {
+        matches!(self, Type::Todo)
     }
 
     pub const fn into_class_literal_type(self) -> Option<ClassType<'db>> {
