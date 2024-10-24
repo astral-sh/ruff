@@ -3,15 +3,6 @@
 ## Simple
 
 ```py
-reveal_type(b"red" b"knot")  # revealed: Literal[b"redknot"]
-reveal_type(b"hello")  # revealed: Literal[b"hello"]
-reveal_type(b"world" + b"!")  # revealed: Literal[b"world!"]
-reveal_type(b"\xff\x00")  # revealed: Literal[b"\xff\x00"]
-```
-
-## Indexing
-
-```py
 b = b"\x00abc\xff"
 
 reveal_type(b[0])  # revealed: Literal[b"\x00"]
@@ -27,4 +18,15 @@ reveal_type(x)  # revealed: Unknown
 
 y = b[-6]  # error: [index-out-of-bounds] "Index -6 is out of bounds for bytes literal `Literal[b"\x00abc\xff"]` with length 5"
 reveal_type(y)  # revealed: Unknown
+```
+
+## Function return
+
+```py
+def int_instance() -> int: ...
+
+
+a = b"abcde"[int_instance()]
+# TODO: Support overloads... Should be `bytes`
+reveal_type(a)  # revealed: @Todo
 ```
