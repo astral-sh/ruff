@@ -132,8 +132,8 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             ast::Expr::Compare(expr_compare) => {
                 self.add_expr_compare(expr_compare, expression, negate);
             }
-            ast::Expr::Call(expr_call) if !negate => {
-                self.add_expr_call(expr_call, expression);
+            ast::Expr::Call(expr_call) => {
+                self.add_expr_call(expr_call, expression, negate);
             }
             _ => {} // TODO other test expression kinds
         }
@@ -256,7 +256,12 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         }
     }
 
-    fn add_expr_call(&mut self, expr_call: &ast::ExprCall, expression: Expression<'db>) {
+    fn add_expr_call(
+        &mut self,
+        expr_call: &ast::ExprCall,
+        expression: Expression<'db>,
+        negative: bool,
+    ) {
         let scope = self.scope();
         let inference = infer_expression_types(self.db, expression);
 
@@ -275,7 +280,11 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
 
                     // TODO: add support for PEP 604 union types on the right hand side:
                     // isinstance(x, str | (int | float))
-                    if let Some(constraint) = generate_isinstance_constraint(self.db, &rhs_type) {
+                    if let Some(mut constraint) = generate_isinstance_constraint(self.db, &rhs_type)
+                    {
+                        if negative {
+                            constraint = constraint.negate(self.db);
+                        }
                         self.constraints.insert(symbol, constraint);
                     }
                 }

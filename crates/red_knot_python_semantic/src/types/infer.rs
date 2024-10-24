@@ -2417,7 +2417,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 } else {
                     None
                 };
-
                 bindings_ty(self.db, definitions, unbound_ty)
             }
             ExprContext::Store | ExprContext::Del => Type::None,
