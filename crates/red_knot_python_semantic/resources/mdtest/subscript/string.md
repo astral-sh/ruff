@@ -32,15 +32,15 @@ reveal_type(s[0:5])  # revealed: Literal["abcde"]
 
 reveal_type(s[-3:5])  # revealed: Literal["cde"]
 
-# reveal_type(s[0:])  # revealed: Literal["abcde"]
-# reveal_type(s[1:])  # revealed: Literal["bcde"]
-# reveal_type(s[5:])  # revealed: Literal[""]
+reveal_type(s[0:])  # revealed: Literal["abcde"]
+reveal_type(s[1:])  # revealed: Literal["bcde"]
+reveal_type(s[5:])  # revealed: Literal[""]
 
-# reveal_type(s[:0])  # revealed: Literal[""]
-# reveal_type(s[:1])  # revealed: Literal["a"]
-# reveal_type(s[:5])  # revealed: Literal["abcde"]
+reveal_type(s[:0])  # revealed: Literal[""]
+reveal_type(s[:1])  # revealed: Literal["a"]
+reveal_type(s[:5])  # revealed: Literal["abcde"]
 
-# reveal_type(s[:])  # revealed: Literal["abcde"]
+reveal_type(s[:])  # revealed: Literal["abcde"]
 ```
 
 ## Function return

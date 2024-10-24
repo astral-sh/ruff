@@ -3384,14 +3384,29 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ty_upper = self.infer_optional_expression(upper.as_deref());
         let ty_step = self.infer_optional_expression(step.as_deref());
 
-        match (ty_lower, ty_upper, ty_step) {
-            (Some(Type::IntLiteral(lower)), Some(Type::IntLiteral(upper)), None) => {
-                Type::SliceLiteral(SliceLiteralType::new(
-                    self.db,
-                    Some(lower),
-                    Some(upper),
-                    None,
-                ))
+        enum SliceArg {
+            Arg(Option<i64>),
+            Unsupported,
+        }
+
+        let type_to_slice_argument = |ty: Option<Type<'db>>| match ty {
+            Some(Type::IntLiteral(n)) => SliceArg::Arg(Some(n)),
+            Some(Type::BooleanLiteral(b)) => SliceArg::Arg(Some(i64::from(b))),
+            Some(Type::None) => SliceArg::Arg(None),
+            Some(Type::Instance(class)) if class.is_known(self.db, KnownClass::NoneType) => {
+                SliceArg::Arg(None)
+            }
+            None => SliceArg::Arg(None),
+            _ => SliceArg::Unsupported,
+        };
+
+        match (
+            type_to_slice_argument(ty_lower),
+            type_to_slice_argument(ty_upper),
+            type_to_slice_argument(ty_step),
+        ) {
+            (SliceArg::Arg(lower), SliceArg::Arg(upper), SliceArg::Arg(step)) => {
+                Type::SliceLiteral(SliceLiteralType::new(self.db, lower, upper, step))
             }
             _ => KnownClass::Slice.to_instance(self.db),
         }
