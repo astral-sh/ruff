@@ -1,10 +1,11 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprName, Stmt};
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::any_over_expr;
-use ruff_python_semantic::analyze::typing::is_list;
+use ruff_python_semantic::{analyze::typing::is_list, Binding};
+use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
 
@@ -49,6 +50,8 @@ pub struct ManualListComprehension {
 }
 
 impl Violation for ManualListComprehension {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let ManualListComprehension { is_async } = self;
@@ -187,11 +190,68 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
     }) {
         return;
     }
-
-    checker.diagnostics.push(Diagnostic::new(
+    let mut diagnostic = Diagnostic::new(
         ManualListComprehension {
             is_async: for_stmt.is_async,
         },
         *range,
-    ));
+    );
+    diagnostic.try_set_fix(|| {
+        Ok(convert_to_list_extend(
+            binding,
+            for_stmt,
+            if_test.map(std::convert::AsRef::as_ref),
+            arg,
+            checker,
+        ))
+    });
+    checker.diagnostics.push(diagnostic);
+}
+
+fn convert_to_list_extend(
+    binding: &Binding,
+    for_stmt: &ast::StmtFor,
+    if_test: Option<&ast::Expr>,
+    to_append: &Expr,
+    checker: &Checker,
+) -> Fix {
+    let comprehension = ast::Comprehension {
+        target: (*for_stmt.target).clone(),
+        iter: (*for_stmt.iter).clone(),
+        is_async: for_stmt.is_async,
+        ifs: if_test.into_iter().cloned().collect(),
+        range: TextRange::default(),
+    };
+
+    let generator = ast::ExprGenerator {
+        elt: Box::new(to_append.clone()),
+        generators: vec![comprehension],
+        parenthesized: false,
+        range: TextRange::default(),
+    };
+
+    let extend = ast::ExprAttribute {
+        value: Box::new(Expr::Name(ExprName {
+            id: binding.name(checker.locator()).into(),
+            ctx: ast::ExprContext::Load,
+            range: TextRange::default(),
+        })),
+        attr: ast::Identifier::new("extend", TextRange::default()),
+        ctx: ast::ExprContext::Load,
+        range: TextRange::default(),
+    };
+
+    let list_extend = ast::ExprCall {
+        func: Box::new(ast::Expr::Attribute(extend)),
+        arguments: Arguments {
+            args: Box::new([ast::Expr::Generator(generator)]),
+            range: TextRange::default(),
+            keywords: Box::new([]),
+        },
+        range: TextRange::default(),
+    };
+
+    let comprehension_body = checker.generator().expr(&Expr::Call(list_extend));
+
+    Fix::unsafe_edit(Edit::range_replacement(comprehension_body, for_stmt.range))
 }
