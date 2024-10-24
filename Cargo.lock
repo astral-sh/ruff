@@ -1774,18 +1774,6 @@ checksum = "e3aeb8f54c078314c2065ee649a7241f46b9d8e418e1a9581ba0546657d7aa3a"
 
 [[package]]
 name = "pep440_rs"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0c29f9c43de378b4e4e0cd7dbcce0e5cfb80443de8c05620368b2948bc936a1"
-dependencies = [
- "once_cell",
- "regex",
- "serde",
- "unicode-width 0.1.13",
-]
-
-[[package]]
-name = "pep440_rs"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c8ee724d21f351f9d47276614ac9710975db827ba9fe2ca5a517ba648193307"
@@ -1797,18 +1785,18 @@ dependencies = [
 
 [[package]]
 name = "pep508_rs"
-version = "0.3.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "910c513bea0f4f833122321c0f20e8c704e01de98692f6989c2ec21f43d88b1e"
+checksum = "ffdf081596428a48e65d457c812a17ab46ec1bbf0d580b3a2bf05b6674a15206"
 dependencies = [
  "once_cell",
- "pep440_rs 0.4.0",
+ "pep440_rs",
  "regex",
  "serde",
  "thiserror",
- "tracing",
- "unicode-width 0.1.13",
+ "unicode-width 0.2.0",
  "url",
+ "urlencoding",
 ]
 
 [[package]]
@@ -1972,12 +1960,12 @@ dependencies = [
 
 [[package]]
 name = "pyproject-toml"
-version = "0.9.0"
+version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95c3dd745f99aa3c554b7bb00859f7d18c2f1d6afd749ccc86d60b61e702abd9"
+checksum = "c5d395dea9c0bd6cca9991e8e1ec5dd41ba57b7de65a70ff3a1231ceb0b87a4c"
 dependencies = [
  "indexmap",
- "pep440_rs 0.4.0",
+ "pep440_rs",
  "pep508_rs",
  "serde",
  "toml",
@@ -2546,7 +2534,7 @@ dependencies = [
  "natord",
  "path-absolutize",
  "pathdiff",
- "pep440_rs 0.7.1",
+ "pep440_rs",
  "pyproject-toml",
  "quick-junit",
  "regex",
@@ -2877,7 +2865,7 @@ dependencies = [
  "matchit",
  "path-absolutize",
  "path-slash",
- "pep440_rs 0.7.1",
+ "pep440_rs",
  "regex",
  "ruff_cache",
  "ruff_formatter",
@@ -3746,6 +3734,12 @@ dependencies = [
  "percent-encoding",
  "serde",
 ]
+
+[[package]]
+name = "urlencoding"
+version = "2.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "daf8dba3b7eb870caf1ddeed7bc9d2a049f3cfdfae7cb521b087cc33ae4c49da"
 
 [[package]]
 name = "utf8parse"
