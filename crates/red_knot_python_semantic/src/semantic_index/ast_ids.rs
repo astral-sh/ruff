@@ -40,7 +40,7 @@ impl AstIds {
         })
     }
 
-    pub fn use_id(&self, key: impl Into<ExpressionNodeKey>) -> ScopedUseId {
+    pub(crate) fn use_id(&self, key: impl Into<ExpressionNodeKey>) -> ScopedUseId {
         self.uses_map[&key.into()]
     }
 }

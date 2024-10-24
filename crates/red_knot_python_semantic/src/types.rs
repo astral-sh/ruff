@@ -824,11 +824,6 @@ impl<'db> Type<'db> {
             // TODO
             Type::None => None,
             // TODO
-            Type::Function(_) => None,
-            // TODO
-            Type::Module(_) => None,
-            Type::Class(class) => class.class_member_def(db, name),
-            // TODO
             Type::Instance(class) => {
                 // TODO MRO? get_own_instance_member, get_instance_member
                 return class.class_member_def(db, name);
@@ -851,6 +846,11 @@ impl<'db> Type<'db> {
             Type::Todo => None,
             // TODO
             Type::IntLiteral(_) => None,
+            // TODO
+            Type::FunctionLiteral(_) => todo!(),
+            // TODO
+            Type::ModuleLiteral(_) => todo!(),
+            Type::ClassLiteral(class) => class.class_member_def(db, name),
         }
     }
     /// Resolves the boolean value of a type.

@@ -12,10 +12,7 @@ use ruff_db::{
 use ruff_python_ast::Identifier;
 use ruff_source_file::OneIndexed;
 
-use crate::{
-    location::{CPosition, DefLocation},
-    Db,
-};
+use crate::{location::DefLocation, Db};
 
 pub fn definition_at_location(file: File, location: Position, db: &dyn Db) -> Option<DefLocation> {
     // XXX now this returns one or none. It could return an iterator of locations
@@ -33,10 +30,7 @@ pub fn definition_at_location(file: File, location: Position, db: &dyn Db) -> Op
         &source,
     );
 
-    let cpos = CPosition(text_size.to_u32().into());
-    eprintln!("Looking at offset {}", cpos.0);
-
-    return module.syntax().locate_def(text_size, index, db, file);
+    return module.syntax().locate_def(&text_size, index, db, file);
 }
 
 pub(crate) fn locate_name_on_type<'db>(
