@@ -1,6 +1,7 @@
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModule;
 use ruff_python_ast as ast;
+use ruff_text_size::TextRange;
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::module_resolver::file_to_module;
@@ -582,7 +583,13 @@ impl ExceptHandlerDefinitionKind {
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
-pub(crate) struct DefinitionNodeKey(pub(crate) NodeKey);
+pub(crate) struct DefinitionNodeKey(NodeKey);
+
+impl DefinitionNodeKey {
+    pub(crate) fn range(&self) -> TextRange {
+        self.0.range()
+    }
+}
 
 impl From<&ast::Alias> for DefinitionNodeKey {
     fn from(node: &ast::Alias) -> Self {

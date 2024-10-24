@@ -25,7 +25,7 @@ use crate::Db;
 /// x = foo()
 /// ```
 #[derive(Debug)]
-pub struct AstIds {
+pub(crate) struct AstIds {
     /// Maps expressions to their expression id.
     expressions_map: FxHashMap<ExpressionNodeKey, ScopedExpressionId>,
     /// Maps expressions which "use" a symbol (that is, [`ast::ExprName`]) to a use id.

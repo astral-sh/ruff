@@ -143,11 +143,16 @@ impl<'db> SemanticIndex<'db> {
     }
 
     pub(crate) fn definition_range(&self, def: Definition<'db>) -> TextRange {
-        // XXX this function doesn't need to exist?
-        // or at least it shouldn't work like this I think
+        // XXX I am finding the definition range with this (terrible)
+        // lookup, but it's possible I could be using some other data
+        // to find the definition's location
+        //
+        // If there is really no other way, then I believe the proper
+        // thing to do here is to add the range to the `Definiition`
+        // struct proper
         for (dnk, other_def) in &self.definitions_by_node {
             if *other_def == def {
-                return dnk.0.range();
+                return dnk.range();
             }
         }
         panic!("Could not find definition")

@@ -26,7 +26,7 @@ pub(crate) use self::infer::{
 mod builder;
 mod diagnostic;
 mod display;
-pub mod infer;
+mod infer;
 mod narrow;
 
 pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
