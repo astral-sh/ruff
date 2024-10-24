@@ -828,11 +828,7 @@ impl<'db> Type<'db> {
                 // More info in https://docs.python.org/3/library/stdtypes.html#truth-value-testing
                 Truthiness::Ambiguous
             }
-            Type::Instance(_) => {
-                // TODO: lookup `__bool__` and `__len__` methods on the instance's class
-                // More info in https://docs.python.org/3/library/stdtypes.html#truth-value-testing
-                Truthiness::Ambiguous
-            }
+            Type::Instance(_) => Truthiness::Ambiguous,
             Type::Union(union) => {
                 let union_elements = union.elements(db);
                 let first_element_truthiness = union_elements[0].bool(db);
