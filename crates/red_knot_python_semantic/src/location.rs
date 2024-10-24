@@ -26,10 +26,10 @@ pub(crate) fn location_from_definition<'db>(
     db: &dyn Db,
 ) -> Location {
     let range = index.definition_range(definition);
-    return Location {
+    Location {
         file: definition.file(db),
         range,
-    };
+    }
 }
 
 /// This trait is used to locate where something is defined
