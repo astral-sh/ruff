@@ -173,7 +173,7 @@ Ruff:
     - cd $CODE_LOCATION
     - ruff --version
     - ruff check --output-format=gitlab > code-quality-report.json
-    - ruff format --diff --verbose
+    - ruff format --diff
   artifacts:
     reports:
       codequality: $CODE_LOCATION/code-quality-report.json
