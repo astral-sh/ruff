@@ -55,7 +55,7 @@ use crate::types::{
     typing_extensions_symbol_ty, BytesLiteralType, ClassType, FunctionType, KnownFunction,
     StringLiteralType, Truthiness, TupleType, Type, TypeArrayDisplay, UnionType,
 };
-use crate::util::subscript::{iterator_at_index, slice_at_index};
+use crate::util::subscript::PythonSubscript;
 use crate::Db;
 
 use super::{KnownClass, UnionBuilder};
@@ -3178,16 +3178,20 @@ impl<'db> TypeInferenceBuilder<'db> {
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
             (Type::Tuple(tuple_ty), Type::IntLiteral(int)) => {
                 let elements = tuple_ty.elements(self.db);
-                slice_at_index(elements, int).copied().unwrap_or_else(|| {
-                    self.index_out_of_bounds_diagnostic(
-                        "tuple",
-                        value_node.into(),
-                        value_ty,
-                        elements.len(),
-                        int,
-                    );
-                    Type::Unknown
-                })
+                elements
+                    .iter()
+                    .python_subscript(int)
+                    .copied()
+                    .unwrap_or_else(|| {
+                        self.index_out_of_bounds_diagnostic(
+                            "tuple",
+                            value_node.into(),
+                            value_ty,
+                            elements.len(),
+                            int,
+                        );
+                        Type::Unknown
+                    })
             }
             // Ex) Given `("a", "b", "c", "d")[True]`, return `"b"`
             (Type::Tuple(_), Type::BooleanLiteral(bool)) => self.infer_subscript_expression_types(
@@ -3198,7 +3202,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             // Ex) Given `"value"[1]`, return `"a"`
             (Type::StringLiteral(literal_ty), Type::IntLiteral(int)) => {
                 let literal_value = literal_ty.value(self.db);
-                iterator_at_index(literal_value.chars(), int)
+                literal_value
+                    .chars()
+                    .python_subscript(int)
                     .map(|ch| {
                         Type::StringLiteral(StringLiteralType::new(
                             self.db,
@@ -3219,7 +3225,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             // Ex) Given `b"value"[1]`, return `b"a"`
             (Type::BytesLiteral(literal_ty), Type::IntLiteral(int)) => {
                 let literal_value = literal_ty.value(self.db);
-                slice_at_index(literal_value.as_ref(), int)
+                literal_value
+                    .iter()
+                    .python_subscript(int)
                     .map(|byte| {
                         Type::BytesLiteral(BytesLiteralType::new(self.db, [*byte].as_slice()))
                     })
