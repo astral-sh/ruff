@@ -1,6 +1,7 @@
 use std::iter::FusedIterator;
 use std::sync::Arc;
 
+use ruff_text_size::TextRange;
 use rustc_hash::{FxBuildHasher, FxHashMap};
 use salsa::plumbing::AsId;
 
@@ -141,6 +142,21 @@ impl<'db> SemanticIndex<'db> {
         &self.ast_ids[scope_id]
     }
 
+    pub(crate) fn definition_range(&self, def: Definition<'db>) -> TextRange {
+        // XXX I am finding the definition range with this (terrible)
+        // lookup, but it's possible I could be using some other data
+        // to find the definition's location
+        //
+        // If there is really no other way, then I believe the proper
+        // thing to do here is to add the range to the `Definiition`
+        // struct proper
+        for (dnk, other_def) in &self.definitions_by_node {
+            if *other_def == def {
+                return dnk.range();
+            }
+        }
+        panic!("Could not find definition")
+    }
     /// Returns the ID of the `expression`'s enclosing scope.
     pub(crate) fn expression_scope_id(
         &self,

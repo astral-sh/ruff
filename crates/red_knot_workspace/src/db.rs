@@ -1,6 +1,10 @@
 use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 
+use red_knot_python_semantic::search::location_of_definition_of_item_at_location;
+use ruff_db::files::location::Location;
+use ruff_db::source::{line_index, source_text};
+use ruff_source_file::SourceLocation;
 use salsa::plumbing::ZalsaDatabase;
 use salsa::{Cancelled, Event};
 
@@ -61,6 +65,24 @@ impl RootDatabase {
         self.with_db(|db| check_file(db, file))
     }
 
+    pub fn location_of_definition_of_item_at_location(
+        &self,
+        file: File,
+        location: &SourceLocation,
+    ) -> Option<Location> {
+        location_of_definition_of_item_at_location(file, location, self)
+    }
+
+    pub fn location_to_source_location_range(
+        &self,
+        location: &Location,
+    ) -> (SourceLocation, SourceLocation) {
+        let li = line_index(self.upcast(), location.file);
+        let contents = source_text(self.upcast(), location.file);
+        let loc_start = li.source_location(location.range.start(), &contents);
+        let loc_end = li.source_location(location.range.end(), &contents);
+        (loc_start, loc_end)
+    }
     /// Returns a mutable reference to the system.
     ///
     /// WARNING: Triggers a new revision, canceling other database handles. This can lead to deadlock.
