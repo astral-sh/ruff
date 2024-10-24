@@ -155,11 +155,9 @@ class Iterator:
     def __next__(self) -> int:
         return 42
 
-
 class Iterable:
     def __iter__(self) -> Iterator:
         return Iterator()
-
 
 (a, b) = Iterable()
 reveal_type(a)  # revealed: int
@@ -173,11 +171,9 @@ class Iterator:
     def __next__(self) -> int:
         return 42
 
-
 class Iterable:
     def __iter__(self) -> Iterator:
         return Iterator()
-
 
 (a, (b, c), d) = (1, Iterable(), 2)
 reveal_type(a)  # revealed: Literal[1]

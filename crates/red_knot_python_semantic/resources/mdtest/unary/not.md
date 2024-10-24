@@ -12,10 +12,8 @@ reveal_type(not not None)  # revealed: Literal[False]
 ```py
 from typing import reveal_type
 
-
 def f():
     return 1
-
 
 reveal_type(not f)  # revealed: Literal[False]
 # TODO Unknown should not be part of the type of typing.reveal_type
@@ -27,7 +25,6 @@ reveal_type(not f)  # revealed: Literal[False]
 ```py
 import b
 import warnings
-
 
 reveal_type(not b)  # revealed: Literal[False]
 reveal_type(not warnings)  # revealed: Literal[False]

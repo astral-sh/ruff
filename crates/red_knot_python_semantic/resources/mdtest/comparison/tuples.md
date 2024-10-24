@@ -61,7 +61,6 @@ reveal_type(c >= d)  # revealed: Literal[True]
 def bool_instance() -> bool: ...
 def int_instance() -> int: ...
 
-
 a = (bool_instance(),)
 b = (int_instance(),)
 
@@ -144,7 +143,6 @@ class A:
     def __gt__(self, o) -> tuple: ...
     def __ge__(self, o) -> list: ...
 
-
 a = (A(), A())
 
 # TODO: All @Todo should be bool
@@ -162,7 +160,6 @@ reveal_type(a >= a)  # revealed: @Todo
 
 ```py
 def int_instance() -> int: ...
-
 
 a = (1, 2)
 b = ((3, 4), (1, 2))

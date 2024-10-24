@@ -9,10 +9,8 @@ with the conditionally-defined type:
 def returns_bool() -> bool:
     return True
 
-
 if returns_bool():
     copyright = 1
-
 
 def f():
     reveal_type(copyright)  # revealed: Literal[copyright] | Literal[1]
@@ -26,10 +24,8 @@ Same is true if the name is annotated:
 def returns_bool() -> bool:
     return True
 
-
 if returns_bool():
     copyright: int = 1
-
 
 def f():
     reveal_type(copyright)  # revealed: Literal[copyright] | int

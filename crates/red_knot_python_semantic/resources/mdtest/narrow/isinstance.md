@@ -66,13 +66,9 @@ if isinstance(x, (bool, (bytes, int))):
 
 ```py
 class A: ...
-
-
 class B: ...
 
-
 def get_object() -> object: ...
-
 
 x = get_object()
 
@@ -100,7 +96,6 @@ if isinstance(x, t):
 ```py
 def isinstance(x, t):
     return True
-
 
 x = 1 if flag else "a"
 if isinstance(x, int):

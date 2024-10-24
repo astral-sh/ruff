@@ -62,9 +62,7 @@ bool(1) / False
 # revealed: float
 reveal_type(1.0 / 0)
 
-
 class MyInt(int): ...
-
 
 # No error for a subclass of int
 # revealed: float

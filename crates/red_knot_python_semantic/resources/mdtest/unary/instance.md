@@ -14,16 +14,13 @@ class Number:
     def __invert__(self) -> Literal[True]:
         return True
 
-
 a = Number()
 
 reveal_type(+a)  # revealed: int
 reveal_type(-a)  # revealed: int
 reveal_type(~a)  # revealed: @Todo
 
-
 class NoDunder: ...
-
 
 b = NoDunder()
 +b  # error: [unsupported-operator] "Unary operator `+` is unsupported for type `NoDunder`"

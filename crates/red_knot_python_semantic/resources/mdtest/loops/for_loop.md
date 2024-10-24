@@ -7,11 +7,9 @@ class IntIterator:
     def __next__(self) -> int:
         return 42
 
-
 class IntIterable:
     def __iter__(self) -> IntIterator:
         return IntIterator()
-
 
 for x in IntIterable():
     pass
@@ -26,11 +24,9 @@ class IntIterator:
     def __next__(self) -> int:
         return 42
 
-
 class IntIterable:
     def __iter__(self) -> IntIterator:
         return IntIterator()
-
 
 x = "foo"
 
@@ -47,11 +43,9 @@ class IntIterator:
     def __next__(self) -> int:
         return 42
 
-
 class IntIterable:
     def __iter__(self) -> IntIterator:
         return IntIterator()
-
 
 for x in IntIterable():
     pass
@@ -68,11 +62,9 @@ class IntIterator:
     def __next__(self) -> int:
         return 42
 
-
 class IntIterable:
     def __iter__(self) -> IntIterator:
         return IntIterator()
-
 
 for x in IntIterable():
     if x > 5:
@@ -89,7 +81,6 @@ reveal_type(x)  # revealed: int | Literal["foo"]
 class OldStyleIterable:
     def __getitem__(self, key: int) -> int:
         return 42
-
 
 for x in OldStyleIterable():
     pass
@@ -115,7 +106,6 @@ class NotIterable:
     else:
         __iter__ = None
 
-
 for x in NotIterable():  # error: "Object of type `NotIterable` is not iterable"
     pass
 
@@ -136,9 +126,7 @@ for x in nonsense:  # error: "Object of type `Literal[123]` is not iterable"
 class NotIterable:
     def __getitem__(self, key: int) -> int:
         return 42
-
     __iter__ = None
-
 
 for x in NotIterable():  # error: "Object of type `NotIterable` is not iterable"
     pass

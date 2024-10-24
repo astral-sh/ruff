@@ -53,9 +53,7 @@ class A:
     def __or__(self, other) -> A:
         return self
 
-
 class B: ...
-
 
 reveal_type(A() + B())  # revealed: A
 reveal_type(A() - B())  # revealed: A
@@ -117,9 +115,7 @@ class A:
     def __ror__(self, other) -> A:
         return self
 
-
 class B: ...
-
 
 reveal_type(B() + A())  # revealed: A
 reveal_type(B() - A())  # revealed: A
@@ -148,9 +144,7 @@ class A:
     def __rsub__(self, other) -> int:
         return 1
 
-
 class B: ...
-
 
 reveal_type(A() + B())  # revealed: int
 reveal_type(B() - A())  # revealed: int
@@ -167,14 +161,11 @@ class A:
     def __add__(self, other: B) -> int:
         return 42
 
-
 class B:
     def __radd__(self, other: A) -> str:
         return "foo"
 
-
 reveal_type(A() + B())  # revealed:  int
-
 
 # Edge case: C is a subtype of C, *but* if the two sides are of *equal* types,
 # the lhs *still* takes precedence
@@ -184,7 +175,6 @@ class C:
 
     def __radd__(self, other: C) -> str:
         return "foo"
-
 
 reveal_type(C() + C())  # revealed: int
 ```
@@ -203,21 +193,16 @@ class A:
     def __radd__(self, other) -> str:
         return "foo"
 
-
 class MyString(str): ...
-
 
 class B(A):
     def __radd__(self, other) -> MyString:
         return MyString()
 
-
 reveal_type(A() + B())  # revealed: MyString
-
 
 # N.B. Still a subtype of `A`, even though `A` does not appear directly in the class's `__bases__`
 class C(B): ...
-
 
 # TODO: we currently only understand direct subclasses as subtypes of the superclass.
 # We need to iterate through the full MRO rather than just the class's bases;
@@ -240,9 +225,7 @@ class A:
     def __radd__(self, other) -> int:
         return 42
 
-
 class B(A): ...
-
 
 reveal_type(A() + B())  # revealed: str
 ```
@@ -266,11 +249,9 @@ class A:
     def __sub__(self, other: A) -> A:
         return A()
 
-
 class B:
     def __rsub__(self, other: A) -> B:
         return B()
-
 
 # TODO: this should be `B` (the return annotation of `B.__rsub__`),
 # because `A.__sub__` is annotated as only accepting `A`,
@@ -287,10 +268,8 @@ class A:
     def __call__(self, other) -> int:
         return 42
 
-
 class B:
     __add__ = A()
-
 
 reveal_type(B() + B())  # revealed: int
 ```
@@ -311,14 +290,11 @@ reveal_type(42 + 4.2)  # revealed: int
 # TODO should be complex, need to check arg type and fall back to `rhs.__radd__`
 reveal_type(3 + 3j)  # revealed: int
 
-
 def returns_int() -> int:
     return 42
 
-
 def returns_bool() -> bool:
     return True
-
 
 x = returns_bool()
 y = returns_int()
@@ -342,7 +318,6 @@ class A:
 
     def __radd__(self, other) -> A:
         return self
-
 
 reveal_type(A() + 1)  # revealed: A
 # TODO should be `A` since `int.__add__` doesn't support `A` instances
@@ -388,14 +363,11 @@ from does_not_exist import Foo  # error: [unresolved-import]
 
 reveal_type(Foo)  # revealed: Unknown
 
-
 class X:
     def __add__(self, other: object) -> int:
         return 42
 
-
 class Y(Foo): ...
-
 
 # TODO: Should be `int | Unknown`; see above discussion.
 reveal_type(X() + Y())  # revealed: int
@@ -411,11 +383,9 @@ The magic method must exist on the class, not just on the instance:
 def add_impl(self, other) -> int:
     return 1
 
-
 class A:
     def __init__(self):
         self.__add__ = add_impl
-
 
 # error: [unsupported-operator] "Operator `+` is unsupported between objects of type `A` and `A`"
 # revealed: Unknown
@@ -426,7 +396,6 @@ reveal_type(A() + A())
 
 ```py
 class A: ...
-
 
 # error: [unsupported-operator]
 # revealed: Unknown
@@ -441,13 +410,10 @@ A left-hand dunder method doesn't apply for the right-hand operand, or vice vers
 class A:
     def __add__(self, other) -> int: ...
 
-
 class B:
     def __radd__(self, other) -> int: ...
 
-
 class C: ...
-
 
 # error: [unsupported-operator]
 # revealed: Unknown
@@ -470,7 +436,6 @@ left-hand operand. For context, see
 class Foo:
     def __radd__(self, other: Foo) -> Foo:
         return self
-
 
 # error: [unsupported-operator]
 # revealed: Unknown

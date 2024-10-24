@@ -14,7 +14,6 @@ def f(x: str):
 ```py path=a.py
 def f(): ...
 
-
 f = 1  # error: "Implicit shadowing of function `f`; annotate to make it explicit if this is intentional"
 ```
 
@@ -22,7 +21,6 @@ f = 1  # error: "Implicit shadowing of function `f`; annotate to make it explici
 
 ```py path=a.py
 def f(): ...
-
 
 f: int = 1
 ```

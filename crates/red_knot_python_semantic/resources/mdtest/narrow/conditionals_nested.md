@@ -5,7 +5,6 @@
 ```py
 def int_instance() -> int: ...
 
-
 x = int_instance()
 
 if x != 1:
