@@ -88,7 +88,7 @@ impl BackgroundDocumentRequestHandler for GotoDefinitionHandler {
 
         let Some(location) = db.location_of_definition_of_item_at_location(
             file,
-            lsp_position_to_source_location(params.text_document_position_params.position),
+            &lsp_position_to_source_location(params.text_document_position_params.position),
         ) else {
             return Ok(None);
         };

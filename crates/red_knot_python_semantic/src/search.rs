@@ -15,7 +15,7 @@ use crate::Db;
 
 pub fn location_of_definition_of_item_at_location(
     file: File,
-    location: SourceLocation,
+    location: &SourceLocation,
     db: &dyn Db,
 ) -> Option<Location> {
     // XXX now this returns one or none. It could return an iterator of locations

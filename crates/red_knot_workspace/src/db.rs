@@ -68,7 +68,7 @@ impl RootDatabase {
     pub fn location_of_definition_of_item_at_location(
         &self,
         file: File,
-        location: SourceLocation,
+        location: &SourceLocation,
     ) -> Option<Location> {
         location_of_definition_of_item_at_location(file, location, self)
     }
