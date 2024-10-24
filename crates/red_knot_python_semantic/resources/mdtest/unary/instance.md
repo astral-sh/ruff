@@ -18,7 +18,7 @@ a = Number()
 
 reveal_type(+a)  # revealed: int
 reveal_type(-a)  # revealed: int
-# TODO: this should be False
+# TODO: this should be True
 reveal_type(~a)  # revealed: object
 
 class NoDunder: ...
