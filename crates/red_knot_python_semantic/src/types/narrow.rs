@@ -246,6 +246,14 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                     (ast::CmpOp::NotEq, true) | (ast::CmpOp::Eq, false) => {
                         if rhs_ty.is_single_valued(self.db) {
                             self.constraints.insert(symbol, rhs_ty);
+                        } else if let Some(union) = rhs_ty.into_union_type() {
+                            if union
+                                .elements(self.db)
+                                .iter()
+                                .all(|ty| ty.is_single_valued(self.db))
+                            {
+                                self.constraints.insert(symbol, rhs_ty);
+                            }
                         }
                     }
                     _ => {
