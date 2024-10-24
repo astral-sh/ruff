@@ -3202,8 +3202,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             // Ex) Given `"value"[1]`, return `"a"`
             (Type::StringLiteral(literal_ty), Type::IntLiteral(int)) => {
                 let literal_value = literal_ty.value(self.db);
-                literal_value
-                    .chars()
+                let chars: Vec<_> = literal_value.chars().collect();
+                chars
+                    .iter()
                     .subscript_index(int)
                     .map(|ch| {
                         Type::StringLiteral(StringLiteralType::new(
@@ -3335,7 +3336,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_optional_expression(upper.as_deref());
         self.infer_optional_expression(step.as_deref());
 
-        // TODO slice
         Type::Todo
     }
 
