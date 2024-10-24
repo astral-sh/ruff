@@ -355,22 +355,7 @@ f"aaaaaaaaaaaaaaaa \
 )
 ```
 
-## Outputs
-### Output 1
-```
-indent-style               = space
-line-width                 = 88
-indent-width               = 4
-quote-style                = Double
-line-ending                = LineFeed
-magic-trailing-comma       = Respect
-docstring-code             = Disabled
-docstring-code-line-width  = "dynamic"
-preview                    = Enabled
-target_version             = Py39
-source_type                = Python
-```
-
+## Output
 ```python
 "aaaaaaaaabbbbbbbbbbbbbbbbbbbb"  # Join
 
@@ -616,12 +601,9 @@ assert (
 ##############################################################################
 # Use can_omit_optional_parentheses layout to avoid an instability where the formatter
 # picks the can_omit_optional_parentheses layout when the strings are joined.
-if f"implicitconcatenatedstring" + f"implicitconcadddddddddddedring" * len([
-    aaaaaa,
-    bbbbbbbbbbbbbbbb,
-    cccccccccccccccccc,
-    ddddddddddddddddddddddddddd,
-]):
+if f"implicitconcatenatedstring" + f"implicitconcadddddddddddedring" * len(
+    [aaaaaa, bbbbbbbbbbbbbbbb, cccccccccccccccccc, ddddddddddddddddddddddddddd]
+):
     pass
 
 # Keep parenthesizing multiline - implicit concatenated strings
@@ -791,4 +773,27 @@ f"aaaaaaaaaaaaaaaa \
     "cccccccccccccc \
             ddddddddddddddddddd"  # comment 4
 )
+```
+
+
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -242,9 +242,12 @@
+ ##############################################################################
+ # Use can_omit_optional_parentheses layout to avoid an instability where the formatter
+ # picks the can_omit_optional_parentheses layout when the strings are joined.
+-if f"implicitconcatenatedstring" + f"implicitconcadddddddddddedring" * len(
+-    [aaaaaa, bbbbbbbbbbbbbbbb, cccccccccccccccccc, ddddddddddddddddddddddddddd]
+-):
++if f"implicitconcatenatedstring" + f"implicitconcadddddddddddedring" * len([
++    aaaaaa,
++    bbbbbbbbbbbbbbbb,
++    cccccccccccccccccc,
++    ddddddddddddddddddddddddddd,
++]):
+     pass
+ 
+ # Keep parenthesizing multiline - implicit concatenated strings
 ```
