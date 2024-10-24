@@ -3245,8 +3245,26 @@ impl<'db> TypeInferenceBuilder<'db> {
                         Type::Unknown
                     })
             }
+            // Ex) Given `b"value"[1]`, return `b"a"`
+            (Type::BytesLiteral(literal_ty), Type::IntLiteral(int)) => {
+                let literal_value = literal_ty.value(self.db);
+                index_into_slice(literal_value.as_ref(), int)
+                    .map(|byte| {
+                        Type::BytesLiteral(BytesLiteralType::new(self.db, [*byte].as_slice()))
+                    })
+                    .unwrap_or_else(|| {
+                        self.index_out_of_bounds_diagnostic(
+                            "bytes literal",
+                            value_node.into(),
+                            value_ty,
+                            literal_value.len(),
+                            int,
+                        );
+                        Type::Unknown
+                    })
+            }
             // Ex) Given `"value"[True]`, return `"a"`
-            (Type::StringLiteral(_), Type::BooleanLiteral(bool)) => self
+            (Type::StringLiteral(_) | Type::BytesLiteral(_), Type::BooleanLiteral(bool)) => self
                 .infer_subscript_expression_types(
                     value_node,
                     value_ty,
