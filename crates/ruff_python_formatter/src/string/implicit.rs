@@ -164,20 +164,8 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                             .contains(['\n', '\r']),
                         FStringElement::Expression(expression) => {
                             if is_f_string_formatting_enabled(context) {
-                                // The formatter preserves the whitespace around the debug text of an expression.
-                                // If the text contains any new lines, then it can't fit on a single line.
-                                if expression.debug_text.is_some()
-                                    && context.locator().slice(expression).contains(['\n', '\r'])
-                                {
-                                    return true;
-                                }
-
                                 // Expressions containing comments can't be joined.
-                                if context.comments().contains_comments(expression.into()) {
-                                    return true;
-                                }
-
-                                false
+                                context.comments().contains_comments(expression.into())
                             } else {
                                 // Multiline f-string expressions can't be joined if the f-string formatting is disabled because
                                 // the string gets inserted in verbatim preserving the newlines.

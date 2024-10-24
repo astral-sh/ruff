@@ -359,12 +359,16 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                         // ]}" "more"
                         // ```
                         if string.is_fstring() && flat.inspect(f)?.will_break() {
-                            return maybe_parenthesize_expression(
-                                value,
-                                *statement,
-                                Parenthesize::IfBreaks,
-                            )
-                            .fmt(f);
+                            inline_comments.mark_unformatted();
+
+                            return write!(
+                                f,
+                                [maybe_parenthesize_expression(
+                                    value,
+                                    *statement,
+                                    Parenthesize::IfBreaks,
+                                )]
+                            );
                         }
 
                         let expanded = format_with(|f| {
@@ -658,6 +662,8 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                     if format_implicit_flat.string().is_fstring()
                         && format_value.inspect(f)?.will_break()
                     {
+                        inline_comments.mark_unformatted();
+
                         return write!(
                             f,
                             [
@@ -851,6 +857,12 @@ impl<'a> OptionalParenthesesInlinedComments<'a> {
     fn mark_formatted(&self) {
         for comment in self.expression {
             comment.mark_formatted();
+        }
+    }
+
+    fn mark_unformatted(&self) {
+        for comment in self.expression {
+            comment.mark_unformatted();
         }
     }
 }

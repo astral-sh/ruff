@@ -238,9 +238,20 @@ aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
 [a,]
 }" "moreeeeeeeeeeeeeeeeeeee" "test" # comment
 
+aaaaaaaaaaaaaaaaaa = (
+    f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+[a,]
+}" "moreeeeeeeeeeeeeeeeeeee" "test" # comment
+)
+
 aaaaa[aaaaaaaaaaa] = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
 [a,]
 }" "moreeeeeeeeeeeeeeeeeeee" "test" # comment
+
+aaaaa[aaaaaaaaaaa] = (f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
+[a,]
+}" "moreeeeeeeeeeeeeeeeeeee" "test" # comment
+)
 
 # Don't inline f-strings that contain commented expressions
 aaaaaaaaaaaaaaaaaa = (
