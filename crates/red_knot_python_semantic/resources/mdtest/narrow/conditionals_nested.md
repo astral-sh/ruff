@@ -28,7 +28,7 @@ if x != 1:
         reveal_type(x)  # revealed: Literal[3]
 ```
 
-## Elif else blocks
+## elif-else blocks
 
 ```py
 x = 1 if flag1 else 2 if flag2 else 3 if flag3 else 4
