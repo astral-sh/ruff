@@ -1,7 +1,7 @@
 use itertools::Itertools;
-use once_cell::sync::Lazy;
 use regex::Regex;
 use rustc_hash::FxHashSet;
+use std::sync::LazyLock;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
@@ -1846,8 +1846,8 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
 }
 
 // See: `GOOGLE_ARGS_REGEX` in `pydocstyle/checker.py`.
-static GOOGLE_ARGS_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^\s*(\*?\*?\w+)\s*(\(.*?\))?\s*:(\r\n|\n)?\s*.+").unwrap());
+static GOOGLE_ARGS_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\s*(\*?\*?\w+)\s*(\(.*?\))?\s*:(\r\n|\n)?\s*.+").unwrap());
 
 fn args_section(context: &SectionContext) -> FxHashSet<String> {
     let mut following_lines = context.following_lines().peekable();

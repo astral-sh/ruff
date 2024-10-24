@@ -11,7 +11,7 @@ use ruff_python_stdlib::typing::{
 };
 use ruff_text_size::Ranged;
 
-use crate::analyze::type_inference::{PythonType, ResolvedPythonType};
+use crate::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use crate::model::SemanticModel;
 use crate::{Binding, BindingKind, Modules};
 
@@ -487,7 +487,7 @@ fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -> bo
             // The type checker might know how to infer the type based on `init_expr`.
             Some(Stmt::Assign(ast::StmtAssign { targets, value, .. })) => targets
                 .iter()
-                .find_map(|target| match_value(binding, target, value.as_ref()))
+                .find_map(|target| match_value(binding, target, value))
                 .is_some_and(|value| T::match_initializer(value, semantic)),
 
             // ```python
@@ -496,7 +496,7 @@ fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -> bo
             //
             // In this situation, we check only the annotation.
             Some(Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. })) => {
-                T::match_annotation(annotation.as_ref(), semantic)
+                T::match_annotation(annotation, semantic)
             }
 
             _ => false,
@@ -512,7 +512,7 @@ fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -> bo
                     .expressions(source)
                     .find_map(|expr| expr.as_named_expr())
                     .and_then(|ast::ExprNamed { target, value, .. }| {
-                        match_value(binding, target.as_ref(), value.as_ref())
+                        match_value(binding, target, value)
                     })
                     .is_some_and(|value| T::match_initializer(value, semantic))
             })
@@ -543,13 +543,13 @@ fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -> bo
             //
             // We trust the annotation and see if the type checker matches the annotation.
             Some(Stmt::FunctionDef(ast::StmtFunctionDef { parameters, .. })) => {
-                let Some(parameter) = find_parameter(parameters.as_ref(), binding) else {
+                let Some(parameter) = find_parameter(parameters, binding) else {
                     return false;
                 };
                 let Some(ref annotation) = parameter.parameter.annotation else {
                     return false;
                 };
-                T::match_annotation(annotation.as_ref(), semantic)
+                T::match_annotation(annotation, semantic)
             }
 
             _ => false,
@@ -562,7 +562,7 @@ fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -> bo
             //
             // It's a typed declaration, type annotation is the only source of information.
             Some(Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. })) => {
-                T::match_annotation(annotation.as_ref(), semantic)
+                T::match_annotation(annotation, semantic)
             }
             _ => false,
         },
@@ -576,7 +576,7 @@ trait BuiltinTypeChecker {
     /// Builtin type name.
     const BUILTIN_TYPE_NAME: &'static str;
     /// Type name as found in the `Typing` module.
-    const TYPING_NAME: &'static str;
+    const TYPING_NAME: Option<&'static str>;
     /// [`PythonType`] associated with the intended type.
     const EXPR_TYPE: PythonType;
 
@@ -584,7 +584,7 @@ trait BuiltinTypeChecker {
     fn match_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
         let value = map_subscript(annotation);
         semantic.match_builtin_expr(value, Self::BUILTIN_TYPE_NAME)
-            || semantic.match_typing_expr(value, Self::TYPING_NAME)
+            || Self::TYPING_NAME.is_some_and(|name| semantic.match_typing_expr(value, name))
     }
 
     /// Check initializer expression to match the intended type.
@@ -624,7 +624,7 @@ struct ListChecker;
 
 impl BuiltinTypeChecker for ListChecker {
     const BUILTIN_TYPE_NAME: &'static str = "list";
-    const TYPING_NAME: &'static str = "List";
+    const TYPING_NAME: Option<&'static str> = Some("List");
     const EXPR_TYPE: PythonType = PythonType::List;
 }
 
@@ -632,7 +632,7 @@ struct DictChecker;
 
 impl BuiltinTypeChecker for DictChecker {
     const BUILTIN_TYPE_NAME: &'static str = "dict";
-    const TYPING_NAME: &'static str = "Dict";
+    const TYPING_NAME: Option<&'static str> = Some("Dict");
     const EXPR_TYPE: PythonType = PythonType::Dict;
 }
 
@@ -640,7 +640,7 @@ struct SetChecker;
 
 impl BuiltinTypeChecker for SetChecker {
     const BUILTIN_TYPE_NAME: &'static str = "set";
-    const TYPING_NAME: &'static str = "Set";
+    const TYPING_NAME: Option<&'static str> = Some("Set");
     const EXPR_TYPE: PythonType = PythonType::Set;
 }
 
@@ -648,8 +648,16 @@ struct TupleChecker;
 
 impl BuiltinTypeChecker for TupleChecker {
     const BUILTIN_TYPE_NAME: &'static str = "tuple";
-    const TYPING_NAME: &'static str = "Tuple";
+    const TYPING_NAME: Option<&'static str> = Some("Tuple");
     const EXPR_TYPE: PythonType = PythonType::Tuple;
+}
+
+struct IntChecker;
+
+impl BuiltinTypeChecker for IntChecker {
+    const BUILTIN_TYPE_NAME: &'static str = "int";
+    const TYPING_NAME: Option<&'static str> = None;
+    const EXPR_TYPE: PythonType = PythonType::Number(NumberLike::Integer);
 }
 
 pub struct IoBaseChecker;
@@ -718,7 +726,7 @@ impl TypeChecker for IoBaseChecker {
 
         // Ex) `open("file.txt")`
         semantic
-            .resolve_qualified_name(func.as_ref())
+            .resolve_qualified_name(func)
             .is_some_and(|qualified_name| {
                 matches!(
                     qualified_name.segments(),
@@ -731,17 +739,39 @@ impl TypeChecker for IoBaseChecker {
 /// Test whether the given binding can be considered a list.
 ///
 /// For this, we check what value might be associated with it through it's initialization and
-/// what annotation it has (we consider `list` and `typing.List`).
+/// what annotation it has (we consider `list` and `typing.List`)
 pub fn is_list(binding: &Binding, semantic: &SemanticModel) -> bool {
     check_type::<ListChecker>(binding, semantic)
 }
 
 /// Test whether the given binding can be considered a dictionary.
 ///
-/// For this, we check what value might be associated with it through it's initialization and
-/// what annotation it has (we consider `dict` and `typing.Dict`).
+/// For this, we check what value might be associated with it through it's initialization,
+/// what annotation it has (we consider `dict` and `typing.Dict`), and if it is a variadic keyword
+/// argument parameter.
 pub fn is_dict(binding: &Binding, semantic: &SemanticModel) -> bool {
+    // ```python
+    // def foo(**kwargs):
+    //   ...
+    // ```
+    if matches!(binding.kind, BindingKind::Argument) {
+        if let Some(Stmt::FunctionDef(ast::StmtFunctionDef { parameters, .. })) =
+            binding.statement(semantic)
+        {
+            if let Some(kwarg_parameter) = parameters.kwarg.as_deref() {
+                if kwarg_parameter.name.range() == binding.range() {
+                    return true;
+                }
+            }
+        }
+    }
+
     check_type::<DictChecker>(binding, semantic)
+}
+
+/// Test whether the given binding can be considered an integer.
+pub fn is_int(binding: &Binding, semantic: &SemanticModel) -> bool {
+    check_type::<IntChecker>(binding, semantic)
 }
 
 /// Test whether the given binding can be considered a set.
@@ -754,10 +784,26 @@ pub fn is_set(binding: &Binding, semantic: &SemanticModel) -> bool {
 
 /// Test whether the given binding can be considered a tuple.
 ///
-/// For this, we check what value might be associated with it through
-/// it's initialization and what annotation it has (we consider `tuple` and
-/// `typing.Tuple`).
+/// For this, we check what value might be associated with it through it's initialization, what
+/// annotation it has (we consider `tuple` and `typing.Tuple`), and if it is a variadic positional
+/// argument.
 pub fn is_tuple(binding: &Binding, semantic: &SemanticModel) -> bool {
+    // ```python
+    // def foo(*args):
+    //   ...
+    // ```
+    if matches!(binding.kind, BindingKind::Argument) {
+        if let Some(Stmt::FunctionDef(ast::StmtFunctionDef { parameters, .. })) =
+            binding.statement(semantic)
+        {
+            if let Some(arg_parameter) = parameters.vararg.as_deref() {
+                if arg_parameter.name.range() == binding.range() {
+                    return true;
+                }
+            }
+        }
+    }
+
     check_type::<TupleChecker>(binding, semantic)
 }
 
@@ -853,7 +899,7 @@ pub fn find_binding_value<'a>(binding: &Binding, semantic: &'a SemanticModel) ->
                 .expressions(parent_id)
                 .find_map(|expr| expr.as_named_expr());
             if let Some(ast::ExprNamed { target, value, .. }) = parent {
-                return match_value(binding, target.as_ref(), value.as_ref());
+                return match_value(binding, target, value);
             }
         }
         // Ex) `x = 1`
@@ -861,14 +907,14 @@ pub fn find_binding_value<'a>(binding: &Binding, semantic: &'a SemanticModel) ->
             Some(Stmt::Assign(ast::StmtAssign { value, targets, .. })) => {
                 return targets
                     .iter()
-                    .find_map(|target| match_value(binding, target, value.as_ref()))
+                    .find_map(|target| match_value(binding, target, value))
             }
             Some(Stmt::AnnAssign(ast::StmtAnnAssign {
                 value: Some(value),
                 target,
                 ..
             })) => {
-                return match_value(binding, target, value.as_ref());
+                return match_value(binding, target, value);
             }
             _ => {}
         },
@@ -912,7 +958,7 @@ fn match_value<'a>(binding: &Binding, target: &Expr, value: &'a Expr) -> Option<
 
 /// Given a target and value, find the value that's assigned to the given symbol.
 fn match_target<'a>(binding: &Binding, targets: &[Expr], values: &'a [Expr]) -> Option<&'a Expr> {
-    for (target, value) in targets.iter().zip(values.iter()) {
+    for (target, value) in targets.iter().zip(values) {
         match target {
             Expr::Tuple(ast::ExprTuple {
                 elts: target_elts, ..

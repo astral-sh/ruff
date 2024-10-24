@@ -130,6 +130,8 @@ pub fn dedent(text: &str) -> Cow<'_, str> {
 /// current indentation, then removes whitespace from each line to
 /// match the provided indentation.
 ///
+/// Leading comments are ignored unless the block is only composed of comments.
+///
 /// Lines that are indented by _less_ than the indent of the first line
 /// are left unchanged.
 ///
@@ -139,17 +141,21 @@ pub fn dedent(text: &str) -> Cow<'_, str> {
 /// If the first line is indented by less than the provided indent.
 pub fn dedent_to(text: &str, indent: &str) -> Option<String> {
     // Look at the indentation of the first non-empty line, to determine the "baseline" indentation.
+    let mut first_comment = None;
     let existing_indent_len = text
         .universal_newlines()
         .find_map(|line| {
             let trimmed = line.trim_whitespace_start();
-            if trimmed.is_empty() || trimmed.starts_with('#') {
+            if trimmed.is_empty() {
+                None
+            } else if trimmed.starts_with('#') && first_comment.is_none() {
+                first_comment = Some(line.len() - trimmed.len());
                 None
             } else {
                 Some(line.len() - trimmed.len())
             }
         })
-        .unwrap_or_default();
+        .unwrap_or(first_comment.unwrap_or_default());
 
     if existing_indent_len < indent.len() {
         return None;
@@ -431,5 +437,29 @@ mod tests {
             "baz"
         ].join("\n");
         assert_eq!(dedent_to(&x, ""), Some(y));
+
+        let x = [
+            "  # foo",
+            "    # bar",
+            "# baz"
+        ].join("\n");
+        let y = [
+            "  # foo",
+            "  # bar",
+            "# baz"
+        ].join("\n");
+        assert_eq!(dedent_to(&x, "  "), Some(y));
+
+        let x = [
+            "  # foo",
+            "    bar",
+            "      baz"
+        ].join("\n");
+        let y = [
+            "  # foo",
+            "  bar",
+            "    baz"
+        ].join("\n");
+        assert_eq!(dedent_to(&x, "  "), Some(y));
     }
 }

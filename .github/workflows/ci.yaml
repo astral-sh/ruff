@@ -148,7 +148,7 @@ jobs:
       # sync, not just public items. Eventually we should do this for all
       # crates; for now add crates here as they are warning-clean to prevent
       # regression.
-      - run: cargo doc --no-deps -p red_knot_python_semantic -p red_knot -p ruff_db --document-private-items
+      - run: cargo doc --no-deps -p red_knot_python_semantic -p red_knot -p red_knot_test -p ruff_db --document-private-items
         env:
           # Setting RUSTDOCFLAGS because `cargo doc --check` isn't yet implemented (https://github.com/rust-lang/cargo/issues/10025).
           RUSTDOCFLAGS: "-D warnings"
@@ -193,7 +193,7 @@ jobs:
         run: rustup target add wasm32-unknown-unknown
       - uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
           cache: "npm"
           cache-dependency-path: playground/package-lock.json
       - uses: jetli/wasm-pack-action@v0.4.0
@@ -518,6 +518,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
       - name: "Add SSH key"
         if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
         uses: webfactory/ssh-agent@v0.9.0
@@ -525,13 +527,15 @@ jobs:
           ssh-private-key: ${{ secrets.MKDOCS_INSIDERS_SSH_KEY }}
       - name: "Install Rust toolchain"
         run: rustup show
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
       - uses: Swatinem/rust-cache@v2
       - name: "Install Insiders dependencies"
         if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
-        run: pip install -r docs/requirements-insiders.txt
+        run: uv pip install -r docs/requirements-insiders.txt --system
       - name: "Install dependencies"
         if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS != 'true' }}
-        run: pip install -r docs/requirements.txt
+        run: uv pip install -r docs/requirements.txt --system
       - name: "Update README File"
         run: python scripts/transform_readme.py --target mkdocs
       - name: "Generate docs"
@@ -608,7 +612,7 @@ jobs:
           just test
 
   benchmarks:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: determine_changes
     if: ${{ github.repository == 'astral-sh/ruff' && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20

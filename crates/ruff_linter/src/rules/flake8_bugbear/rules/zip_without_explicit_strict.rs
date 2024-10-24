@@ -16,9 +16,9 @@ use crate::fix::edits::add_argument;
 /// resulting iterator will be silently truncated to the length of the shortest
 /// iterable. This can lead to subtle bugs.
 ///
-/// Use the `strict` parameter to raise a `ValueError` if the iterables are of
-/// non-uniform length. If the iterables are intentionally different lengths, the
-/// parameter should be explicitly set to `False`.
+/// Pass `strict=True` to raise a `ValueError` if the iterables are of
+/// non-uniform length. Alternatively, if the iterables are deliberately
+/// different lengths, pass `strict=False` to make the intention explicit.
 ///
 /// ## Example
 /// ```python
@@ -47,7 +47,7 @@ impl AlwaysFixableViolation for ZipWithoutExplicitStrict {
     }
 
     fn fix_title(&self) -> String {
-        "Add explicit `strict=False`".to_string()
+        "Add explicit value for parameter `strict=`".to_string()
     }
 }
 
@@ -116,7 +116,7 @@ fn is_infinite_iterator(arg: &Expr, semantic: &SemanticModel) -> bool {
                     }
 
                     // Ex) `iterools.repeat(1, times=None)`
-                    for keyword in &**keywords {
+                    for keyword in keywords {
                         if keyword.arg.as_ref().is_some_and(|name| name == "times") {
                             if keyword.value.is_none_literal_expr() {
                                 return true;

@@ -180,3 +180,6 @@ x[~y]
 if i == -1:
     pass
 #:
+
+if a  ==  1:
+    print(a)

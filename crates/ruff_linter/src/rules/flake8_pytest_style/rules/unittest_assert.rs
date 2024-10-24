@@ -252,7 +252,7 @@ impl UnittestAssert {
             FxHashMap::with_capacity_and_hasher(args.len() + keywords.len(), FxBuildHasher);
 
         // Process positional arguments.
-        for (arg_name, value) in arg_spec.iter().zip(args.iter()) {
+        for (arg_name, value) in arg_spec.iter().zip(args) {
             args_map.insert(arg_name, value);
         }
 

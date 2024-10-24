@@ -72,8 +72,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
     // - `for` loop followed by `return True` or `return False`.
     let Some(terminal) = match_else_return(stmt).or_else(|| {
         let parent = checker.semantic().current_statement_parent()?;
-        let suite = traversal::suite(stmt, parent)?;
-        let sibling = traversal::next_sibling(stmt, suite)?;
+        let sibling = traversal::suite(stmt, parent)?.next_sibling()?;
         match_sibling_return(stmt, sibling)
     }) else {
         return;

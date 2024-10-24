@@ -143,10 +143,10 @@ fn concatenate_expressions(expr: &Expr) -> Option<(Expr, Type)> {
         }
         // If the splat element is itself a list/tuple, insert them in the other list/tuple.
         Expr::List(ast::ExprList { elts, .. }) if matches!(type_, Type::List) => {
-            other_elements.iter().chain(elts.iter()).cloned().collect()
+            other_elements.iter().chain(elts).cloned().collect()
         }
         Expr::Tuple(ast::ExprTuple { elts, .. }) if matches!(type_, Type::Tuple) => {
-            other_elements.iter().chain(elts.iter()).cloned().collect()
+            other_elements.iter().chain(elts).cloned().collect()
         }
         _ => return None,
     };

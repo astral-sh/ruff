@@ -21,11 +21,14 @@ impl super::SyncNotificationHandler for DidOpen {
         types::DidOpenTextDocumentParams {
             text_document:
                 types::TextDocumentItem {
-                    uri, text, version, ..
+                    uri,
+                    text,
+                    version,
+                    language_id,
                 },
         }: types::DidOpenTextDocumentParams,
     ) -> Result<()> {
-        let document = TextDocument::new(text, version);
+        let document = TextDocument::new(text, version).with_language_id(&language_id);
 
         session.open_text_document(uri.clone(), document);
 

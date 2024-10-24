@@ -47,7 +47,7 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
 fn compute_diagnostics(snapshot: &DocumentSnapshot, db: &RootDatabase) -> Vec<Diagnostic> {
     let Some(file) = snapshot.file(db) else {
         tracing::info!(
-            "No file found for snapshot for '{}'",
+            "No file found for snapshot for `{}`",
             snapshot.query().file_url()
         );
         return vec![];

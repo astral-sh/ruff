@@ -132,7 +132,7 @@ impl Files {
                     Err(_) => return Err(FileError::NotFound),
                 };
 
-                tracing::trace!("Adding vendored file '{}'", path);
+                tracing::trace!("Adding vendored file `{}`", path);
                 let file = File::builder(FilePath::Vendored(path.to_path_buf()))
                     .permissions(Some(0o444))
                     .revision(metadata.revision())
@@ -406,17 +406,17 @@ impl File {
         };
 
         if file.status(db) != status {
-            tracing::debug!("Updating the status of '{}'", file.path(db),);
+            tracing::debug!("Updating the status of `{}`", file.path(db));
             file.set_status(db).to(status);
         }
 
         if file.revision(db) != revision {
-            tracing::debug!("Updating the revision of '{}'", file.path(db));
+            tracing::debug!("Updating the revision of `{}`", file.path(db));
             file.set_revision(db).to(revision);
         }
 
         if file.permissions(db) != permission {
-            tracing::debug!("Updating the permissions of '{}'", file.path(db),);
+            tracing::debug!("Updating the permissions of `{}`", file.path(db));
             file.set_permissions(db).to(permission);
         }
     }
@@ -450,7 +450,7 @@ impl VirtualFile {
     /// Increments the revision of the underlying [`File`].
     fn sync(&self, db: &mut dyn Db) {
         let file = self.0;
-        tracing::debug!("Updating the revision of '{}'", file.path(db));
+        tracing::debug!("Updating the revision of `{}`", file.path(db));
         let current_revision = file.revision(db);
         file.set_revision(db)
             .to(FileRevision::new(current_revision.as_u128() + 1));
@@ -458,7 +458,7 @@ impl VirtualFile {
 
     /// Closes the virtual file.
     pub fn close(&self, db: &mut dyn Db) {
-        tracing::debug!("Closing virtual file '{}'", self.0.path(db));
+        tracing::debug!("Closing virtual file `{}`", self.0.path(db));
         self.0.set_status(db).to(FileStatus::NotFound);
     }
 }
@@ -503,7 +503,8 @@ mod tests {
     use crate::files::{system_path_to_file, vendored_path_to_file, FileError};
     use crate::system::DbWithTestSystem;
     use crate::tests::TestDb;
-    use crate::vendored::tests::VendoredFileSystemBuilder;
+    use crate::vendored::VendoredFileSystemBuilder;
+    use zip::CompressionMethod;
 
     #[test]
     fn system_existing_file() -> crate::system::Result<()> {
@@ -548,7 +549,7 @@ mod tests {
     fn stubbed_vendored_file() -> crate::system::Result<()> {
         let mut db = TestDb::new();
 
-        let mut vendored_builder = VendoredFileSystemBuilder::new();
+        let mut vendored_builder = VendoredFileSystemBuilder::new(CompressionMethod::Stored);
         vendored_builder
             .add_file("test.pyi", "def foo() -> str")
             .unwrap();

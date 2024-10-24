@@ -57,7 +57,7 @@ use ruff_python_semantic::{
     ModuleKind, ModuleSource, NodeId, ScopeId, ScopeKind, SemanticModel, SemanticModelFlags,
     StarImport, SubmoduleImport,
 };
-use ruff_python_stdlib::builtins::{python_builtins, IPYTHON_BUILTINS, MAGIC_GLOBALS};
+use ruff_python_stdlib::builtins::{python_builtins, MAGIC_GLOBALS};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::{Locator, OneIndexed, SourceRow};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -424,6 +424,26 @@ impl<'a> Checker<'a> {
         self.parsed_annotations_cache
             .lookup_or_parse(annotation, self.locator.contents())
     }
+
+    /// Apply a test to an annotation expression,
+    /// abstracting over the fact that the annotation expression might be "stringized".
+    ///
+    /// A stringized annotation is one enclosed in string quotes:
+    /// `foo: "typing.Any"` means the same thing to a type checker as `foo: typing.Any`.
+    pub(crate) fn match_maybe_stringized_annotation(
+        &self,
+        expr: &ast::Expr,
+        match_fn: impl FnOnce(&ast::Expr) -> bool,
+    ) -> bool {
+        if let ast::Expr::StringLiteral(string_annotation) = expr {
+            let Some(parsed_annotation) = self.parse_type_annotation(string_annotation) else {
+                return false;
+            };
+            match_fn(parsed_annotation.expression())
+        } else {
+            match_fn(expr)
+        }
+    }
 }
 
 impl<'a> Visitor<'a> for Checker<'a> {
@@ -712,7 +732,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
                 // The default values of the parameters needs to be evaluated in the enclosing
                 // scope.
-                for parameter in &**parameters {
+                for parameter in parameters {
                     if let Some(expr) = parameter.default() {
                         self.visit_expr(expr);
                     }
@@ -724,7 +744,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     self.visit_type_params(type_params);
                 }
 
-                for parameter in &**parameters {
+                for parameter in parameters {
                     if let Some(expr) = parameter.annotation() {
                         if singledispatch && !parameter.is_variadic() {
                             self.visit_runtime_required_annotation(expr);
@@ -1951,23 +1971,25 @@ impl<'a> Checker<'a> {
     }
 
     fn bind_builtins(&mut self) {
-        for builtin in python_builtins(self.settings.target_version.minor())
-            .iter()
-            .chain(MAGIC_GLOBALS.iter())
-            .chain(
-                self.source_type
-                    .is_ipynb()
-                    .then_some(IPYTHON_BUILTINS)
-                    .into_iter()
-                    .flatten(),
-            )
-            .copied()
-            .chain(self.settings.builtins.iter().map(String::as_str))
-        {
+        let mut bind_builtin = |builtin| {
             // Add the builtin to the scope.
             let binding_id = self.semantic.push_builtin();
             let scope = self.semantic.global_scope_mut();
             scope.add(builtin, binding_id);
+        };
+
+        let standard_builtins = python_builtins(
+            self.settings.target_version.minor(),
+            self.source_type.is_ipynb(),
+        );
+        for builtin in standard_builtins {
+            bind_builtin(builtin);
+        }
+        for builtin in MAGIC_GLOBALS {
+            bind_builtin(builtin);
+        }
+        for builtin in &self.settings.builtins {
+            bind_builtin(builtin);
         }
     }
 

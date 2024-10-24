@@ -5,6 +5,7 @@ use ruff_python_ast::PatternMatchAs;
 use crate::comments::dangling_comments;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
+use crate::preview::is_match_case_parentheses_enabled;
 
 #[derive(Default)]
 pub struct FormatPatternMatchAs;
@@ -54,8 +55,16 @@ impl NeedsParentheses for PatternMatchAs {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,
-        _context: &PyFormatContext,
+        context: &PyFormatContext,
     ) -> OptionalParentheses {
-        OptionalParentheses::Multiline
+        if is_match_case_parentheses_enabled(context) {
+            if self.name.is_some() {
+                OptionalParentheses::Multiline
+            } else {
+                OptionalParentheses::BestFit
+            }
+        } else {
+            OptionalParentheses::Multiline
+        }
     }
 }

@@ -2,8 +2,8 @@ use std::borrow::Cow;
 
 use ruff_formatter::{format_args, write, Buffer, RemoveSoftLinesBuffer};
 use ruff_python_ast::{
-    ConversionFlag, Expr, FStringElement, FStringExpressionElement, FStringLiteralElement,
-    StringFlags,
+    AnyStringFlags, ConversionFlag, Expr, FStringElement, FStringExpressionElement,
+    FStringLiteralElement, StringFlags,
 };
 use ruff_text_size::Ranged;
 
@@ -33,7 +33,7 @@ impl Format<PyFormatContext<'_>> for FormatFStringElement<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         match self.element {
             FStringElement::Literal(string_literal) => {
-                FormatFStringLiteralElement::new(string_literal, self.context).fmt(f)
+                FormatFStringLiteralElement::new(string_literal, self.context.flags()).fmt(f)
             }
             FStringElement::Expression(expression) => {
                 FormatFStringExpressionElement::new(expression, self.context).fmt(f)
@@ -45,19 +45,24 @@ impl Format<PyFormatContext<'_>> for FormatFStringElement<'_> {
 /// Formats an f-string literal element.
 pub(crate) struct FormatFStringLiteralElement<'a> {
     element: &'a FStringLiteralElement,
-    context: FStringContext,
+    /// Flags of the enclosing F-string part
+    fstring_flags: AnyStringFlags,
 }
 
 impl<'a> FormatFStringLiteralElement<'a> {
-    pub(crate) fn new(element: &'a FStringLiteralElement, context: FStringContext) -> Self {
-        Self { element, context }
+    pub(crate) fn new(element: &'a FStringLiteralElement, fstring_flags: AnyStringFlags) -> Self {
+        Self {
+            element,
+            fstring_flags,
+        }
     }
 }
 
 impl Format<PyFormatContext<'_>> for FormatFStringLiteralElement<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let literal_content = f.context().locator().slice(self.element.range());
-        let normalized = normalize_string(literal_content, 0, self.context.flags(), true);
+        let normalized =
+            normalize_string(literal_content, 0, self.fstring_flags, false, false, true);
         match &normalized {
             Cow::Borrowed(_) => source_text_slice(self.element.range()).fmt(f),
             Cow::Owned(normalized) => text(normalized).fmt(f),
@@ -231,11 +236,9 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
                 if let Some(format_spec) = format_spec.as_deref() {
                     token(":").fmt(f)?;
 
-                    f.join()
-                        .entries(format_spec.elements.iter().map(|element| {
-                            FormatFStringElement::new(element, self.context.f_string())
-                        }))
-                        .finish()?;
+                    for element in &format_spec.elements {
+                        FormatFStringElement::new(element, self.context.f_string()).fmt(f)?;
+                    }
 
                     // These trailing comments can only occur if the format specifier is
                     // present. For example,

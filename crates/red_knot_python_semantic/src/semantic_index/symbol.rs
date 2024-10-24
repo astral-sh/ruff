@@ -44,16 +44,16 @@ impl Symbol {
     }
 
     /// Is the symbol defined in its containing scope?
-    pub fn is_defined(&self) -> bool {
-        self.flags.contains(SymbolFlags::IS_DEFINED)
+    pub fn is_bound(&self) -> bool {
+        self.flags.contains(SymbolFlags::IS_BOUND)
     }
 }
 
 bitflags! {
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-    pub(super) struct SymbolFlags: u8 {
+    struct SymbolFlags: u8 {
         const IS_USED         = 1 << 0;
-        const IS_DEFINED      = 1 << 1;
+        const IS_BOUND      = 1 << 1;
         /// TODO: This flag is not yet set by anything
         const MARKED_GLOBAL   = 1 << 2;
         /// TODO: This flag is not yet set by anything
@@ -147,6 +147,10 @@ impl FileScopeId {
     /// Returns the scope id of the module-global scope.
     pub fn global() -> Self {
         FileScopeId::from_u32(0)
+    }
+
+    pub fn is_global(self) -> bool {
+        self == FileScopeId::global()
     }
 
     pub fn to_scope_id(self, db: &dyn Db, file: File) -> ScopeId<'_> {
@@ -268,11 +272,7 @@ impl SymbolTableBuilder {
         }
     }
 
-    pub(super) fn add_or_update_symbol(
-        &mut self,
-        name: Name,
-        flags: SymbolFlags,
-    ) -> (ScopedSymbolId, bool) {
+    pub(super) fn add_symbol(&mut self, name: Name) -> (ScopedSymbolId, bool) {
         let hash = SymbolTable::hash_name(&name);
         let entry = self
             .table
@@ -281,15 +281,9 @@ impl SymbolTableBuilder {
             .from_hash(hash, |id| self.table.symbols[*id].name() == &name);
 
         match entry {
-            RawEntryMut::Occupied(entry) => {
-                let symbol = &mut self.table.symbols[*entry.key()];
-                symbol.insert_flags(flags);
-
-                (*entry.key(), false)
-            }
+            RawEntryMut::Occupied(entry) => (*entry.key(), false),
             RawEntryMut::Vacant(entry) => {
-                let mut symbol = Symbol::new(name);
-                symbol.insert_flags(flags);
+                let symbol = Symbol::new(name);
 
                 let id = self.table.symbols.push(symbol);
                 entry.insert_with_hasher(hash, id, (), |id| {
@@ -298,6 +292,14 @@ impl SymbolTableBuilder {
                 (id, true)
             }
         }
+    }
+
+    pub(super) fn mark_symbol_bound(&mut self, id: ScopedSymbolId) {
+        self.table.symbols[id].insert_flags(SymbolFlags::IS_BOUND);
+    }
+
+    pub(super) fn mark_symbol_used(&mut self, id: ScopedSymbolId) {
+        self.table.symbols[id].insert_flags(SymbolFlags::IS_USED);
     }
 
     pub(super) fn finish(mut self) -> SymbolTable {

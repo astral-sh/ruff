@@ -1,5 +1,6 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
+use std::borrow::Cow;
 use std::fmt;
 use std::fmt::Debug;
 use std::iter::FusedIterator;
@@ -1295,7 +1296,7 @@ impl FStringValue {
 
     /// Returns an iterator over all the [`FStringPart`]s contained in this value
     /// that allows modification.
-    pub(crate) fn iter_mut(&mut self) -> IterMut<FStringPart> {
+    pub fn iter_mut(&mut self) -> IterMut<FStringPart> {
         self.as_mut_slice().iter_mut()
     }
 
@@ -1748,7 +1749,7 @@ impl StringLiteralValue {
 
     /// Returns an iterator over all the [`StringLiteral`] parts contained in this value
     /// that allows modification.
-    pub(crate) fn iter_mut(&mut self) -> IterMut<StringLiteral> {
+    pub fn iter_mut(&mut self) -> IterMut<StringLiteral> {
         self.as_mut_slice().iter_mut()
     }
 
@@ -2047,7 +2048,7 @@ impl PartialEq for ConcatenatedStringLiteral {
         // The `zip` here is safe because we have checked the length of both parts.
         self.strings
             .iter()
-            .zip(other.strings.iter())
+            .zip(&other.strings)
             .all(|(s1, s2)| s1 == s2)
     }
 }
@@ -2137,7 +2138,7 @@ impl BytesLiteralValue {
 
     /// Returns an iterator over all the [`BytesLiteral`] parts contained in this value
     /// that allows modification.
-    pub(crate) fn iter_mut(&mut self) -> IterMut<BytesLiteral> {
+    pub fn iter_mut(&mut self) -> IterMut<BytesLiteral> {
         self.as_mut_slice().iter_mut()
     }
 
@@ -2183,6 +2184,22 @@ impl PartialEq<[u8]> for BytesLiteralValue {
         self.bytes()
             .zip(other.iter().copied())
             .all(|(b1, b2)| b1 == b2)
+    }
+}
+
+impl<'a> From<&'a BytesLiteralValue> for Cow<'a, [u8]> {
+    fn from(value: &'a BytesLiteralValue) -> Self {
+        match &value.inner {
+            BytesLiteralValueInner::Single(BytesLiteral {
+                value: bytes_value, ..
+            }) => Cow::from(bytes_value.as_ref()),
+            BytesLiteralValueInner::Concatenated(bytes_literal_vec) => Cow::Owned(
+                bytes_literal_vec
+                    .iter()
+                    .flat_map(|bytes_literal| bytes_literal.value.to_vec())
+                    .collect::<Vec<u8>>(),
+            ),
+        }
     }
 }
 
@@ -2954,6 +2971,42 @@ impl Operator {
             Operator::FloorDiv => "//",
         }
     }
+
+    pub const fn dunder(self) -> &'static str {
+        match self {
+            Operator::Add => "__add__",
+            Operator::Sub => "__sub__",
+            Operator::Mult => "__mul__",
+            Operator::MatMult => "__matmul__",
+            Operator::Div => "__truediv__",
+            Operator::Mod => "__mod__",
+            Operator::Pow => "__pow__",
+            Operator::LShift => "__lshift__",
+            Operator::RShift => "__rshift__",
+            Operator::BitOr => "__or__",
+            Operator::BitXor => "__xor__",
+            Operator::BitAnd => "__and__",
+            Operator::FloorDiv => "__floordiv__",
+        }
+    }
+
+    pub const fn reflected_dunder(self) -> &'static str {
+        match self {
+            Operator::Add => "__radd__",
+            Operator::Sub => "__rsub__",
+            Operator::Mult => "__rmul__",
+            Operator::MatMult => "__rmatmul__",
+            Operator::Div => "__rtruediv__",
+            Operator::Mod => "__rmod__",
+            Operator::Pow => "__rpow__",
+            Operator::LShift => "__rlshift__",
+            Operator::RShift => "__rrshift__",
+            Operator::BitOr => "__ror__",
+            Operator::BitXor => "__rxor__",
+            Operator::BitAnd => "__rand__",
+            Operator::FloorDiv => "__rfloordiv__",
+        }
+    }
 }
 
 impl fmt::Display for Operator {
@@ -3120,6 +3173,29 @@ impl Pattern {
             Pattern::MatchAs(PatternMatchAs { pattern: None, .. }) => true,
             Pattern::MatchOr(PatternMatchOr { patterns, .. }) => {
                 patterns.iter().any(Pattern::is_irrefutable)
+            }
+            _ => false,
+        }
+    }
+
+    /// Checks if the [`Pattern`] is a [wildcard pattern].
+    ///
+    /// The following are wildcard patterns:
+    /// ```python
+    /// match subject:
+    ///     case _ as x: ...
+    ///     case _ | _: ...
+    ///     case _: ...
+    /// ```
+    ///
+    /// [wildcard pattern]: https://docs.python.org/3/reference/compound_stmts.html#wildcard-patterns
+    pub fn is_wildcard(&self) -> bool {
+        match self {
+            Pattern::MatchAs(PatternMatchAs { pattern, .. }) => {
+                pattern.as_deref().map_or(true, Pattern::is_wildcard)
+            }
+            Pattern::MatchOr(PatternMatchOr { patterns, .. }) => {
+                patterns.iter().all(Pattern::is_wildcard)
             }
             _ => false,
         }
@@ -3581,6 +3657,14 @@ impl<'a> IntoIterator for &'a Parameters {
     type Item = AnyParameterRef<'a>;
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a Box<Parameters> {
+    type IntoIter = ParametersIterator<'a>;
+    type Item = AnyParameterRef<'a>;
+    fn into_iter(self) -> Self::IntoIter {
+        (&**self).into_iter()
     }
 }
 

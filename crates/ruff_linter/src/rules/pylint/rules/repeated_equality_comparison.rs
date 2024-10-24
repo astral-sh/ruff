@@ -108,7 +108,7 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
         // Break into sequences of consecutive comparisons.
         let mut sequences: Vec<(Vec<usize>, Vec<&Expr>)> = Vec::new();
         let mut last = None;
-        for (index, comparator) in indices.iter().zip(comparators.iter()) {
+        for (index, comparator) in indices.iter().zip(comparators) {
             if last.is_some_and(|last| last + 1 == *index) {
                 let (indices, comparators) = sequences.last_mut().unwrap();
                 indices.push(*index);

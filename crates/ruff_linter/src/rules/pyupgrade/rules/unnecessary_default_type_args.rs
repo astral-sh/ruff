@@ -19,7 +19,7 @@ use crate::checkers::ast::Checker;
 /// ## Examples
 ///
 /// ```python
-/// from typing import Generator, AsyncGenerator
+/// from collections.abc import Generator, AsyncGenerator
 ///
 ///
 /// def sync_gen() -> Generator[int, None, None]:
@@ -33,7 +33,7 @@ use crate::checkers::ast::Checker;
 /// Use instead:
 ///
 /// ```python
-/// from typing import Generator, AsyncGenerator
+/// from collections.abc import Generator, AsyncGenerator
 ///
 ///
 /// def sync_gen() -> Generator[int]:
@@ -47,6 +47,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 ///
 /// - [PEP 696 – Type Defaults for Type Parameters](https://peps.python.org/pep-0696/)
+/// - [Annotating generators and coroutines](https://docs.python.org/3.13/library/typing.html#annotating-generators-and-coroutines)
 /// - [typing.Generator](https://docs.python.org/3.13/library/typing.html#typing.Generator)
 /// - [typing.AsyncGenerator](https://docs.python.org/3.13/library/typing.html#typing.AsyncGenerator)
 #[violation]
@@ -140,9 +141,20 @@ impl DefaultedTypeAnnotation {
     /// includes default type arguments.
     fn from_expr(expr: &Expr, semantic: &ruff_python_semantic::SemanticModel) -> Option<Self> {
         let qualified_name = semantic.resolve_qualified_name(expr)?;
-        if semantic.match_typing_qualified_name(&qualified_name, "Generator") {
+
+        if semantic.match_typing_qualified_name(&qualified_name, "Generator")
+            || matches!(
+                qualified_name.segments(),
+                ["collections", "abc", "Generator"]
+            )
+        {
             Some(Self::Generator)
-        } else if semantic.match_typing_qualified_name(&qualified_name, "AsyncGenerator") {
+        } else if semantic.match_typing_qualified_name(&qualified_name, "AsyncGenerator")
+            || matches!(
+                qualified_name.segments(),
+                ["collections", "abc", "AsyncGenerator"]
+            )
+        {
             Some(Self::AsyncGenerator)
         } else {
             None

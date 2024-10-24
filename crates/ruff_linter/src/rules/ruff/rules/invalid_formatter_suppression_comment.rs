@@ -75,7 +75,7 @@ pub(crate) fn ignored_formatter_suppression_comment(checker: &mut Checker, suite
         .into_iter()
         .filter_map(|range| {
             Some(SuppressionComment {
-                range: *range,
+                range,
                 kind: SuppressionKind::from_comment(locator.slice(range))?,
             })
         })

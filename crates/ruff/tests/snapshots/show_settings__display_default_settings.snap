@@ -50,7 +50,7 @@ file_resolver.exclude = [
 	"venv",
 ]
 file_resolver.extend_exclude = [
-	"crates/red_knot_python_semantic/vendor/",
+	"crates/red_knot_vendored/vendor/",
 	"crates/ruff/resources/",
 	"crates/ruff_linter/resources/",
 	"crates/ruff_python_formatter/resources/",
@@ -200,7 +200,7 @@ linter.safety_table.forced_unsafe = []
 linter.target_version = Py37
 linter.preview = disabled
 linter.explicit_preview_rules = false
-linter.extension.mapping = {}
+linter.extension = ExtensionMapping({})
 linter.allowed_confusables = []
 linter.builtins = []
 linter.dummy_variable_rgx = ^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$
@@ -359,6 +359,7 @@ linter.pycodestyle.max_line_length = 88
 linter.pycodestyle.max_doc_length = none
 linter.pycodestyle.ignore_overlong_task_comments = false
 linter.pyflakes.extend_generics = []
+linter.pyflakes.allowed_unused_imports = []
 linter.pylint.allow_magic_value_types = [
 	str,
 	bytes,
@@ -387,5 +388,13 @@ formatter.quote_style = double
 formatter.magic_trailing_comma = respect
 formatter.docstring_code_format = disabled
 formatter.docstring_code_line_width = dynamic
+
+# Analyze Settings
+analyze.exclude = []
+analyze.preview = disabled
+analyze.target_version = Py37
+analyze.detect_string_imports = false
+analyze.extension = ExtensionMapping({})
+analyze.include_dependencies = {}
 
 ----- stderr -----

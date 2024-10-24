@@ -257,6 +257,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "R1714") => (RuleGroup::Stable, rules::pylint::rules::RepeatedEqualityComparison),
         (Pylint, "R1722") => (RuleGroup::Stable, rules::pylint::rules::SysExitAlias),
         (Pylint, "R1730") => (RuleGroup::Stable, rules::pylint::rules::IfStmtMinMax),
+        (Pylint, "R1716") => (RuleGroup::Preview, rules::pylint::rules::BooleanChainedComparison),
         (Pylint, "R1733") => (RuleGroup::Preview, rules::pylint::rules::UnnecessaryDictIndexLookup),
         (Pylint, "R1736") => (RuleGroup::Stable, rules::pylint::rules::UnnecessaryListIndexLookup),
         (Pylint, "R2004") => (RuleGroup::Stable, rules::pylint::rules::MagicValueComparison),
@@ -856,9 +857,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Tryceratops, "004") => (RuleGroup::Stable, rules::tryceratops::rules::TypeCheckWithoutTypeError),
         (Tryceratops, "200") => (RuleGroup::Removed, rules::tryceratops::rules::ReraiseNoCause),
         (Tryceratops, "201") => (RuleGroup::Stable, rules::tryceratops::rules::VerboseRaise),
+        (Tryceratops, "203") => (RuleGroup::Stable, rules::tryceratops::rules::UselessTryExcept),
         (Tryceratops, "300") => (RuleGroup::Stable, rules::tryceratops::rules::TryConsiderElse),
         (Tryceratops, "301") => (RuleGroup::Stable, rules::tryceratops::rules::RaiseWithinTry),
-        (Tryceratops, "302") => (RuleGroup::Stable, rules::tryceratops::rules::UselessTryExcept),
         (Tryceratops, "400") => (RuleGroup::Stable, rules::tryceratops::rules::ErrorInsteadOfException),
         (Tryceratops, "401") => (RuleGroup::Stable, rules::tryceratops::rules::VerboseLogMessage),
 
@@ -963,6 +964,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "031") => (RuleGroup::Preview, rules::ruff::rules::IncorrectlyParenthesizedTupleInSubscript),
         (Ruff, "032") => (RuleGroup::Preview, rules::ruff::rules::DecimalFromFloatLiteral),
         (Ruff, "033") => (RuleGroup::Preview, rules::ruff::rules::PostInitDefault),
+        (Ruff, "034") => (RuleGroup::Preview, rules::ruff::rules::UselessIfElse),
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
         (Ruff, "101") => (RuleGroup::Stable, rules::ruff::rules::RedirectedNOQA),
 
@@ -1055,6 +1057,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "148") => (RuleGroup::Preview, rules::refurb::rules::UnnecessaryEnumerate),
         (Refurb, "152") => (RuleGroup::Preview, rules::refurb::rules::MathConstant),
         (Refurb, "154") => (RuleGroup::Preview, rules::refurb::rules::RepeatedGlobal),
+        (Refurb, "156") => (RuleGroup::Preview, rules::refurb::rules::HardcodedStringCharset),
         (Refurb, "157") => (RuleGroup::Preview, rules::refurb::rules::VerboseDecimalConstructor),
         (Refurb, "161") => (RuleGroup::Stable, rules::refurb::rules::BitCount),
         (Refurb, "163") => (RuleGroup::Stable, rules::refurb::rules::RedundantLogBase),
@@ -1068,6 +1071,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "180") => (RuleGroup::Preview, rules::refurb::rules::MetaClassABCMeta),
         (Refurb, "181") => (RuleGroup::Stable, rules::refurb::rules::HashlibDigestHex),
         (Refurb, "187") => (RuleGroup::Stable, rules::refurb::rules::ListReverseCopy),
+        (Refurb, "188") => (RuleGroup::Preview, rules::refurb::rules::SliceToRemovePrefixOrSuffix),
         (Refurb, "192") => (RuleGroup::Preview, rules::refurb::rules::SortedMinMax),
 
         // flake8-logging

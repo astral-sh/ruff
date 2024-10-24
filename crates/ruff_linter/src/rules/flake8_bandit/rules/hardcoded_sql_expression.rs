@@ -1,18 +1,19 @@
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
+
 use regex::Regex;
-use ruff_python_ast::{self as ast, Expr, Operator};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::raw_contents;
+use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
-static SQL_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)\b(select\s.+\sfrom\s|delete\s+from\s|(insert|replace)\s.+\svalues\s|update\s.+\sset\s)")
-        .unwrap()
+static SQL_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)\b(select\s+.*\s+from\s|delete\s+from\s|(insert|replace)\s+.*\s+values\s|update\s+.*\s+set\s)")
+    .unwrap()
 });
 
 /// ## What it does
@@ -88,6 +89,7 @@ pub(crate) fn hardcoded_sql_expression(checker: &mut Checker, expr: &Expr) {
             };
             string.value.to_str().escape_default().to_string()
         }
+
         // f"select * from table where val = {val}"
         Expr::FString(f_string) => concatenated_f_string(f_string, checker.locator()),
         _ => return,
@@ -113,9 +115,7 @@ pub(crate) fn hardcoded_sql_expression(checker: &mut Checker, expr: &Expr) {
 fn concatenated_f_string(expr: &ast::ExprFString, locator: &Locator) -> String {
     expr.value
         .iter()
-        .filter_map(|part| {
-            raw_contents(locator.slice(part)).map(|s| s.escape_default().to_string())
-        })
+        .filter_map(|part| raw_contents(locator.slice(part)))
         .collect()
 }
 

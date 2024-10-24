@@ -16,7 +16,7 @@ use super::walk_directory::{
 };
 
 /// A system implementation that uses the OS file system.
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct OsSystem {
     inner: Arc<OsSystemInner>,
 }

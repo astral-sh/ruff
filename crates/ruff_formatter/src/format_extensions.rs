@@ -139,7 +139,7 @@ where
     /// # Ok(())
     /// # }
     /// ```
-    pub fn inspect(&mut self, f: &mut Formatter<Context>) -> FormatResult<&[FormatElement]> {
+    pub fn inspect(&self, f: &mut Formatter<Context>) -> FormatResult<&[FormatElement]> {
         let result = self.memory.get_or_init(|| f.intern(&self.inner));
 
         match result.as_ref() {

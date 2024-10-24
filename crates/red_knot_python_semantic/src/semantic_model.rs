@@ -8,7 +8,7 @@ use crate::module_name::ModuleName;
 use crate::module_resolver::{resolve_module, Module};
 use crate::semantic_index::ast_ids::HasScopedAstId;
 use crate::semantic_index::semantic_index;
-use crate::types::{definition_ty, global_symbol_ty_by_name, infer_scope_types, Type};
+use crate::types::{binding_ty, global_symbol_ty, infer_scope_types, Type};
 use crate::Db;
 
 pub struct SemanticModel<'db> {
@@ -35,12 +35,12 @@ impl<'db> SemanticModel<'db> {
         line_index(self.db.upcast(), self.file)
     }
 
-    pub fn resolve_module(&self, module_name: ModuleName) -> Option<Module> {
+    pub fn resolve_module(&self, module_name: &ModuleName) -> Option<Module> {
         resolve_module(self.db, module_name)
     }
 
     pub fn global_symbol_ty(&self, module: &Module, symbol_name: &str) -> Type<'db> {
-        global_symbol_ty_by_name(self.db, module.file(), symbol_name)
+        global_symbol_ty(self.db, module.file(), symbol_name)
     }
 }
 
@@ -147,24 +147,24 @@ impl HasTy for ast::Expr {
     }
 }
 
-macro_rules! impl_definition_has_ty {
+macro_rules! impl_binding_has_ty {
     ($ty: ty) => {
         impl HasTy for $ty {
             #[inline]
             fn ty<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
                 let index = semantic_index(model.db, model.file);
-                let definition = index.definition(self);
-                definition_ty(model.db, definition)
+                let binding = index.definition(self);
+                binding_ty(model.db, binding)
             }
         }
     };
 }
 
-impl_definition_has_ty!(ast::StmtFunctionDef);
-impl_definition_has_ty!(ast::StmtClassDef);
-impl_definition_has_ty!(ast::Alias);
-impl_definition_has_ty!(ast::Parameter);
-impl_definition_has_ty!(ast::ParameterWithDefault);
+impl_binding_has_ty!(ast::StmtFunctionDef);
+impl_binding_has_ty!(ast::StmtClassDef);
+impl_binding_has_ty!(ast::Alias);
+impl_binding_has_ty!(ast::Parameter);
+impl_binding_has_ty!(ast::ParameterWithDefault);
 
 #[cfg(test)]
 mod tests {
@@ -175,7 +175,6 @@ mod tests {
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
-    use crate::types::Type;
     use crate::{HasTy, ProgramSettings, SemanticModel};
 
     fn setup_db<'a>(files: impl IntoIterator<Item = (&'a str, &'a str)>) -> anyhow::Result<TestDb> {
@@ -205,7 +204,7 @@ mod tests {
         let model = SemanticModel::new(&db, foo);
         let ty = function.ty(&model);
 
-        assert!(matches!(ty, Type::Function(_)));
+        assert!(ty.is_function_literal());
 
         Ok(())
     }
@@ -222,7 +221,7 @@ mod tests {
         let model = SemanticModel::new(&db, foo);
         let ty = class.ty(&model);
 
-        assert!(matches!(ty, Type::Class(_)));
+        assert!(ty.is_class_literal());
 
         Ok(())
     }
@@ -243,7 +242,7 @@ mod tests {
         let model = SemanticModel::new(&db, bar);
         let ty = alias.ty(&model);
 
-        assert!(matches!(ty, Type::Class(_)));
+        assert!(ty.is_class_literal());
 
         Ok(())
     }

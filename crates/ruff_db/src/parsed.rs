@@ -79,8 +79,9 @@ mod tests {
     use crate::parsed::parsed_module;
     use crate::system::{DbWithTestSystem, SystemPath, SystemVirtualPath};
     use crate::tests::TestDb;
-    use crate::vendored::{tests::VendoredFileSystemBuilder, VendoredPath};
+    use crate::vendored::{VendoredFileSystemBuilder, VendoredPath};
     use crate::Db;
+    use zip::CompressionMethod;
 
     #[test]
     fn python_file() -> crate::system::Result<()> {
@@ -150,7 +151,7 @@ mod tests {
     fn vendored_file() {
         let mut db = TestDb::new();
 
-        let mut vendored_builder = VendoredFileSystemBuilder::new();
+        let mut vendored_builder = VendoredFileSystemBuilder::new(CompressionMethod::Stored);
         vendored_builder
             .add_file(
                 "path.pyi",

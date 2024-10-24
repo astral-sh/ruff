@@ -119,4 +119,44 @@ SIM910.py:31:7: SIM910 [*] Use `ages.get("Cat")` instead of `ages.get("Cat", Non
 33 33 | # OK
 34 34 | ages = ["Tom", "Maria", "Dog"]
 
+SIM910.py:39:9: SIM910 [*] Use `kwargs.get('a')` instead of `kwargs.get('a', None)`
+   |
+37 | # SIM910
+38 | def foo(**kwargs):
+39 |     a = kwargs.get('a', None)
+   |         ^^^^^^^^^^^^^^^^^^^^^ SIM910
+40 | 
+41 | # SIM910
+   |
+   = help: Replace `kwargs.get('a', None)` with `kwargs.get('a')`
 
+ℹ Safe fix
+36 36 | 
+37 37 | # SIM910
+38 38 | def foo(**kwargs):
+39    |-    a = kwargs.get('a', None)
+   39 |+    a = kwargs.get('a')
+40 40 | 
+41 41 | # SIM910
+42 42 | def foo(some_dict: dict):
+
+SIM910.py:43:9: SIM910 [*] Use `some_dict.get('a')` instead of `some_dict.get('a', None)`
+   |
+41 | # SIM910
+42 | def foo(some_dict: dict):
+43 |     a = some_dict.get('a', None)
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^ SIM910
+44 | 
+45 | # OK
+   |
+   = help: Replace `some_dict.get('a', None)` with `some_dict.get('a')`
+
+ℹ Safe fix
+40 40 | 
+41 41 | # SIM910
+42 42 | def foo(some_dict: dict):
+43    |-    a = some_dict.get('a', None)
+   43 |+    a = some_dict.get('a')
+44 44 | 
+45 45 | # OK
+46 46 | def foo(some_other: object):

@@ -1,4 +1,7 @@
 use anyhow::Result;
+use ast::visitor::source_order;
+use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
+use ruff_source_file::Locator;
 use std::cmp::Reverse;
 
 use ruff_diagnostics::Edit;
@@ -9,7 +12,6 @@ use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_semantic::{
     analyze, Binding, BindingKind, Modules, NodeId, ResolvedReference, ScopeKind, SemanticModel,
 };
-use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 use crate::rules::flake8_type_checking::settings::Settings;
@@ -223,9 +225,7 @@ pub(crate) fn is_singledispatch_implementation(
 pub(crate) fn quote_annotation(
     node_id: NodeId,
     semantic: &SemanticModel,
-    locator: &Locator,
     stylist: &Stylist,
-    generator: Generator,
 ) -> Result<Edit> {
     let expr = semantic.expression(node_id).expect("Expression not found");
     if let Some(parent_id) = semantic.parent_expression_id(node_id) {
@@ -235,7 +235,7 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the value of a subscript, we need to quote the entire
                     // expression. For example, when quoting `DataFrame` in `DataFrame[int]`, we
                     // should generate `"DataFrame[int]"`.
-                    return quote_annotation(parent_id, semantic, locator, stylist, generator);
+                    return quote_annotation(parent_id, semantic, stylist);
                 }
             }
             Some(Expr::Attribute(parent)) => {
@@ -243,7 +243,7 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the value of an attribute, we need to quote the entire
                     // expression. For example, when quoting `DataFrame` in `pd.DataFrame`, we
                     // should generate `"pd.DataFrame"`.
-                    return quote_annotation(parent_id, semantic, locator, stylist, generator);
+                    return quote_annotation(parent_id, semantic, stylist);
                 }
             }
             Some(Expr::Call(parent)) => {
@@ -251,7 +251,7 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the function of a call, we need to quote the entire
                     // expression. For example, when quoting `DataFrame` in `DataFrame()`, we
                     // should generate `"DataFrame()"`.
-                    return quote_annotation(parent_id, semantic, locator, stylist, generator);
+                    return quote_annotation(parent_id, semantic, stylist);
                 }
             }
             Some(Expr::BinOp(parent)) => {
@@ -259,15 +259,16 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the left or right side of a binary operation, we need to
                     // quote the entire expression. For example, when quoting `DataFrame` in
                     // `DataFrame | Series`, we should generate `"DataFrame | Series"`.
-                    return quote_annotation(parent_id, semantic, locator, stylist, generator);
+                    return quote_annotation(parent_id, semantic, stylist);
                 }
             }
             _ => {}
         }
     }
 
-    quote_type_expression(expr, locator, stylist, generator)
+    quote_type_expression(expr, semantic, stylist)
 }
+
 /// Wrap a type expression in quotes.
 ///
 /// This function assumes that the callee already expanded expression components
@@ -275,24 +276,14 @@ pub(crate) fn quote_annotation(
 /// a [`Expr::Subscript`], [`Expr::Attribute`], `[Expr::Call]` or `[Expr::BinOp]`.
 pub(crate) fn quote_type_expression(
     expr: &Expr,
-    locator: &Locator,
+    semantic: &SemanticModel,
     stylist: &Stylist,
-    generator: Generator,
 ) -> Result<Edit> {
-    // If the annotation already contains a quote, avoid attempting to re-quote it. For example:
-    // ```python
-    // from typing import Literal
-    //
-    // Set[Literal["Foo"]]
-    // ```
-    let text = locator.slice(expr);
-    if text.contains('\'') || text.contains('"') {
-        return Err(anyhow::anyhow!("Annotation already contains a quote"));
-    }
-
     // Quote the entire expression.
     let quote = stylist.quote();
-    let annotation = generator.expr(expr);
+    let mut quote_annotator = QuoteAnnotator::new(semantic, stylist);
+    quote_annotator.visit_expr(expr);
+    let annotation = quote_annotator.into_annotation();
 
     Ok(Edit::range_replacement(
         format!("{quote}{annotation}{quote}"),
@@ -318,4 +309,112 @@ pub(crate) fn filter_contained(edits: Vec<Edit>) -> Vec<Edit> {
         }
     }
     filtered
+}
+
+#[derive(Copy, PartialEq, Clone)]
+enum QuoteAnnotatorState {
+    Literal,
+    AnnotatedFirst,
+    AnnotatedRest,
+    Other,
+}
+
+pub(crate) struct QuoteAnnotator<'a> {
+    stylist: &'a Stylist<'a>,
+    semantic: &'a SemanticModel<'a>,
+    state: Vec<QuoteAnnotatorState>,
+    annotation: String,
+}
+
+impl<'a> QuoteAnnotator<'a> {
+    fn new(semantic: &'a SemanticModel<'a>, stylist: &'a Stylist<'a>) -> Self {
+        Self {
+            stylist,
+            semantic,
+            state: Vec::new(),
+            annotation: String::new(),
+        }
+    }
+
+    fn into_annotation(self) -> String {
+        self.annotation
+    }
+}
+
+impl<'a> source_order::SourceOrderVisitor<'a> for QuoteAnnotator<'a> {
+    fn visit_expr(&mut self, expr: &'a Expr) {
+        let generator = Generator::from(self.stylist);
+
+        match expr {
+            Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+                let value_expr = generator.expr(value);
+                self.annotation.push_str(&value_expr);
+                self.annotation.push('[');
+
+                if let Some(qualified_name) = self.semantic.resolve_qualified_name(value) {
+                    if self
+                        .semantic
+                        .match_typing_qualified_name(&qualified_name, "Literal")
+                    {
+                        self.state.push(QuoteAnnotatorState::Literal);
+                    } else if self
+                        .semantic
+                        .match_typing_qualified_name(&qualified_name, "Annotated")
+                    {
+                        self.state.push(QuoteAnnotatorState::AnnotatedFirst);
+                    } else {
+                        self.state.push(QuoteAnnotatorState::Other);
+                    }
+                }
+
+                self.visit_expr(slice);
+                self.state.pop();
+                self.annotation.push(']');
+            }
+            Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                let Some((first, remaining)) = elts.split_first() else {
+                    return;
+                };
+                self.visit_expr(first);
+                if let Some(last) = self.state.last_mut() {
+                    if *last == QuoteAnnotatorState::AnnotatedFirst {
+                        *last = QuoteAnnotatorState::AnnotatedRest;
+                    }
+                }
+                for expr in remaining {
+                    self.annotation.push_str(", ");
+                    self.visit_expr(expr);
+                }
+                self.state.pop();
+            }
+            Expr::BinOp(ast::ExprBinOp {
+                left, op, right, ..
+            }) => {
+                debug_assert_eq!(*op, ast::Operator::BitOr);
+                self.visit_expr(left);
+                self.annotation.push_str(" | ");
+                self.visit_expr(right);
+            }
+            _ => {
+                let source = match self.state.last().copied() {
+                    Some(QuoteAnnotatorState::Literal | QuoteAnnotatorState::AnnotatedRest) => {
+                        let mut source = generator.expr(expr);
+                        source = source.replace(
+                            self.stylist.quote().as_char(),
+                            &self.stylist.quote().opposite().as_char().to_string(),
+                        );
+                        source
+                    }
+                    None
+                    | Some(QuoteAnnotatorState::AnnotatedFirst | QuoteAnnotatorState::Other) => {
+                        let mut source = generator.expr(expr);
+                        source = source.replace(self.stylist.quote().as_char(), "");
+                        source = source.replace(self.stylist.quote().opposite().as_char(), "");
+                        source
+                    }
+                };
+                self.annotation.push_str(&source);
+            }
+        }
+    }
 }

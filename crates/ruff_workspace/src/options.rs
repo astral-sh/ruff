@@ -1,11 +1,14 @@
 use regex::Regex;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+use std::path::PathBuf;
 use strum::IntoEnumIterator;
 
 use crate::options_base::{OptionsMetadata, Visit};
 use crate::settings::LineEnding;
 use ruff_formatter::IndentStyle;
+use ruff_graph::Direction;
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::rules::flake8_import_conventions::settings::BannedAliases;
 use ruff_linter::rules::flake8_pytest_style::settings::SettingsError;
@@ -24,7 +27,7 @@ use ruff_linter::rules::{
     pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
 };
 use ruff_linter::settings::types::{
-    IdentifierPattern, OutputFormat, PreviewMode, PythonVersion, RequiredVersion,
+    IdentifierPattern, OutputFormat, PythonVersion, RequiredVersion,
 };
 use ruff_linter::{warn_user_once, RuleSelector};
 use ruff_macros::{CombineOptions, OptionsMetadata};
@@ -412,17 +415,6 @@ pub struct Options {
     )]
     pub indent_width: Option<IndentWidth>,
 
-    /// The number of spaces a tab is equal to when enforcing long-line violations (like `E501`)
-    /// or formatting code with the formatter.
-    ///
-    /// This option changes the number of spaces inserted by the formatter when
-    /// using soft-tabs (`indent-style = space`).
-    #[deprecated(
-        since = "0.1.2",
-        note = "The `tab-size` option has been renamed to `indent-width` to emphasize that it configures the indentation used by the formatter as well as the tab width. Please update your configuration to use `indent-width = <value>` instead."
-    )]
-    pub tab_size: Option<IndentWidth>,
-
     #[option_group]
     pub lint: Option<LintOptions>,
 
@@ -433,6 +425,10 @@ pub struct Options {
     /// Options to configure code formatting.
     #[option_group]
     pub format: Option<FormatOptions>,
+
+    /// Options to configure import map generation.
+    #[option_group]
+    pub analyze: Option<AnalyzeOptions>,
 }
 
 /// Configures how Ruff checks your code.
@@ -1494,12 +1490,9 @@ pub struct Flake8PytestStyleOptions {
 }
 
 impl Flake8PytestStyleOptions {
-    pub fn try_into_settings(
-        self,
-        preview: PreviewMode,
-    ) -> anyhow::Result<flake8_pytest_style::settings::Settings> {
+    pub fn try_into_settings(self) -> anyhow::Result<flake8_pytest_style::settings::Settings> {
         Ok(flake8_pytest_style::settings::Settings {
-            fixture_parentheses: self.fixture_parentheses.unwrap_or(preview.is_disabled()),
+            fixture_parentheses: self.fixture_parentheses.unwrap_or_default(),
             parametrize_names_type: self.parametrize_names_type.unwrap_or_default(),
             parametrize_values_type: self.parametrize_values_type.unwrap_or_default(),
             parametrize_values_row_type: self.parametrize_values_row_type.unwrap_or_default(),
@@ -1525,7 +1518,7 @@ impl Flake8PytestStyleOptions {
                 .transpose()
                 .map_err(SettingsError::InvalidRaisesExtendRequireMatchFor)?
                 .unwrap_or_default(),
-            mark_parentheses: self.mark_parentheses.unwrap_or(preview.is_disabled()),
+            mark_parentheses: self.mark_parentheses.unwrap_or_default(),
         })
     }
 }
@@ -2805,12 +2798,28 @@ pub struct PyflakesOptions {
         example = "extend-generics = [\"django.db.models.ForeignKey\"]"
     )]
     pub extend_generics: Option<Vec<String>>,
+
+    /// A list of modules to ignore when considering unused imports.
+    ///
+    /// Used to prevent violations for specific modules that are known to have side effects on
+    /// import (e.g., `hvplot.pandas`).
+    ///
+    /// Modules in this list are expected to be fully-qualified names (e.g., `hvplot.pandas`). Any
+    /// submodule of a given module will also be ignored (e.g., given `hvplot`, `hvplot.pandas`
+    /// will also be ignored).
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"allowed-unused-imports = ["hvplot.pandas"]"#
+    )]
+    pub allowed_unused_imports: Option<Vec<String>>,
 }
 
 impl PyflakesOptions {
     pub fn into_settings(self) -> pyflakes::settings::Settings {
         pyflakes::settings::Settings {
             extend_generics: self.extend_generics.unwrap_or_default(),
+            allowed_unused_imports: self.allowed_unused_imports.unwrap_or_default(),
         }
     }
 }
@@ -3304,6 +3313,80 @@ pub struct FormatOptions {
         "#
     )]
     pub docstring_code_line_length: Option<DocstringCodeLineWidth>,
+}
+
+/// Configures Ruff's `analyze` command.
+#[derive(
+    Clone, Debug, PartialEq, Eq, Default, Deserialize, Serialize, OptionsMetadata, CombineOptions,
+)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct AnalyzeOptions {
+    /// A list of file patterns to exclude from analysis in addition to the files excluded globally (see [`exclude`](#exclude), and [`extend-exclude`](#extend-exclude)).
+    ///
+    /// Exclusions are based on globs, and can be either:
+    ///
+    /// - Single-path patterns, like `.mypy_cache` (to exclude any directory
+    ///   named `.mypy_cache` in the tree), `foo.py` (to exclude any file named
+    ///   `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ).
+    /// - Relative patterns, like `directory/foo.py` (to exclude that specific
+    ///   file) or `directory/*.py` (to exclude any Python files in
+    ///   `directory`). Note that these paths are relative to the project root
+    ///   (e.g., the directory containing your `pyproject.toml`).
+    ///
+    /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"
+            exclude = ["generated"]
+        "#
+    )]
+    pub exclude: Option<Vec<String>>,
+    /// Whether to enable preview mode. When preview mode is enabled, Ruff will expose unstable
+    /// commands.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # Enable preview features.
+            preview = true
+        "#
+    )]
+    pub preview: Option<bool>,
+    /// Whether to generate a map from file to files that it depends on (dependencies) or files that
+    /// depend on it (dependents).
+    #[option(
+        default = r#""dependencies""#,
+        value_type = r#""dependents" | "dependencies""#,
+        example = r#"
+            direction = "dependencies"
+        "#
+    )]
+    pub direction: Option<Direction>,
+    /// Whether to detect imports from string literals. When enabled, Ruff will search for string
+    /// literals that "look like" import paths, and include them in the import map, if they resolve
+    /// to valid Python modules.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            detect-string-imports = true
+        "#
+    )]
+    pub detect_string_imports: Option<bool>,
+    /// A map from file path to the list of file paths or globs that should be considered
+    /// dependencies of that file, regardless of whether relevant imports are detected.
+    #[option(
+        default = "{}",
+        value_type = "dict[str, list[str]]",
+        example = r#"
+            include-dependencies = {
+                "foo/bar.py": ["foo/baz/*.py"],
+            }
+        "#
+    )]
+    pub include_dependencies: Option<BTreeMap<PathBuf, Vec<String>>>,
 }
 
 #[cfg(test)]

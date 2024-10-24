@@ -1,7 +1,6 @@
-use std::fmt;
-
 use aho_corasick::{AhoCorasick, AhoCorasickKind, Anchored, Input, MatchKind, StartKind};
-use once_cell::sync::Lazy;
+use std::fmt;
+use std::sync::LazyLock;
 
 use ruff_text_size::{TextLen, TextRange};
 
@@ -205,7 +204,7 @@ pub fn raw_contents_range(contents: &str) -> Option<TextRange> {
 }
 
 /// An [`AhoCorasick`] matcher for string and byte literal prefixes.
-static PREFIX_MATCHER: Lazy<AhoCorasick> = Lazy::new(|| {
+static PREFIX_MATCHER: LazyLock<AhoCorasick> = LazyLock::new(|| {
     AhoCorasick::builder()
         .start_kind(StartKind::Anchored)
         .match_kind(MatchKind::LeftmostLongest)

@@ -1,12 +1,13 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fmt::{self, Debug};
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use zip::{read::ZipFile, ZipArchive, ZipWriter};
-
 use crate::file_revision::FileRevision;
+use zip::result::ZipResult;
+use zip::write::FileOptions;
+use zip::{read::ZipFile, CompressionMethod, ZipArchive, ZipWriter};
 
 pub use self::path::{VendoredPath, VendoredPathBuf};
 
@@ -177,7 +178,6 @@ struct ZipFileDebugInfo {
     crc32_hash: u32,
     compressed_size: u64,
     uncompressed_size: u64,
-    compression_method: zip::CompressionMethod,
     kind: FileType,
 }
 
@@ -187,7 +187,6 @@ impl<'a> From<ZipFile<'a>> for ZipFileDebugInfo {
             crc32_hash: value.crc32(),
             compressed_size: value.compressed_size(),
             uncompressed_size: value.size(),
-            compression_method: value.compression(),
             kind: if value.is_dir() {
                 FileType::Directory
             } else {
@@ -341,69 +340,61 @@ impl<'a> From<&'a VendoredPath> for NormalizedVendoredPath<'a> {
     }
 }
 
+pub struct VendoredFileSystemBuilder {
+    writer: ZipWriter<io::Cursor<Vec<u8>>>,
+    compression_method: CompressionMethod,
+}
+
+impl VendoredFileSystemBuilder {
+    pub fn new(compression_method: CompressionMethod) -> Self {
+        let buffer = io::Cursor::new(Vec::new());
+
+        Self {
+            writer: ZipWriter::new(buffer),
+            compression_method,
+        }
+    }
+
+    pub fn add_file(
+        &mut self,
+        path: impl AsRef<VendoredPath>,
+        content: &str,
+    ) -> std::io::Result<()> {
+        self.writer
+            .start_file(path.as_ref().as_str(), self.options())?;
+        self.writer.write_all(content.as_bytes())
+    }
+
+    pub fn add_directory(&mut self, path: impl AsRef<VendoredPath>) -> ZipResult<()> {
+        self.writer
+            .add_directory(path.as_ref().as_str(), self.options())
+    }
+
+    pub fn finish(mut self) -> Result<VendoredFileSystem> {
+        let buffer = self.writer.finish()?;
+
+        VendoredFileSystem::new(buffer.into_inner())
+    }
+
+    fn options(&self) -> FileOptions {
+        FileOptions::default()
+            .compression_method(self.compression_method)
+            .unix_permissions(0o644)
+    }
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
-    use std::io::Write;
 
     use insta::assert_snapshot;
-    use zip::result::ZipResult;
-    use zip::write::FileOptions;
-    use zip::{CompressionMethod, ZipWriter};
 
     use super::*;
 
     const FUNCTOOLS_CONTENTS: &str = "def update_wrapper(): ...";
     const ASYNCIO_TASKS_CONTENTS: &str = "class Task: ...";
 
-    pub struct VendoredFileSystemBuilder {
-        writer: ZipWriter<io::Cursor<Vec<u8>>>,
-    }
-
-    impl Default for VendoredFileSystemBuilder {
-        fn default() -> Self {
-            Self::new()
-        }
-    }
-
-    impl VendoredFileSystemBuilder {
-        pub fn new() -> Self {
-            let buffer = io::Cursor::new(Vec::new());
-
-            Self {
-                writer: ZipWriter::new(buffer),
-            }
-        }
-
-        pub fn add_file(
-            &mut self,
-            path: impl AsRef<VendoredPath>,
-            content: &str,
-        ) -> std::io::Result<()> {
-            self.writer
-                .start_file(path.as_ref().as_str(), Self::options())?;
-            self.writer.write_all(content.as_bytes())
-        }
-
-        pub fn add_directory(&mut self, path: impl AsRef<VendoredPath>) -> ZipResult<()> {
-            self.writer
-                .add_directory(path.as_ref().as_str(), Self::options())
-        }
-
-        pub fn finish(mut self) -> Result<VendoredFileSystem> {
-            let buffer = self.writer.finish()?;
-
-            VendoredFileSystem::new(buffer.into_inner())
-        }
-
-        fn options() -> FileOptions {
-            FileOptions::default()
-                .compression_method(CompressionMethod::Zstd)
-                .unix_permissions(0o644)
-        }
-    }
-
     fn mock_typeshed() -> VendoredFileSystem {
-        let mut builder = VendoredFileSystemBuilder::new();
+        let mut builder = VendoredFileSystemBuilder::new(CompressionMethod::Stored);
 
         builder.add_directory("stdlib/").unwrap();
         builder
@@ -441,28 +432,24 @@ pub(crate) mod tests {
                     crc32_hash: 0,
                     compressed_size: 0,
                     uncompressed_size: 0,
-                    compression_method: Stored,
                     kind: Directory,
                 },
                 "stdlib/asyncio/": ZipFileDebugInfo {
                     crc32_hash: 0,
                     compressed_size: 0,
                     uncompressed_size: 0,
-                    compression_method: Stored,
                     kind: Directory,
                 },
                 "stdlib/asyncio/tasks.pyi": ZipFileDebugInfo {
                     crc32_hash: 2826547428,
-                    compressed_size: 24,
+                    compressed_size: 15,
                     uncompressed_size: 15,
-                    compression_method: Zstd,
                     kind: File,
                 },
                 "stdlib/functools.pyi": ZipFileDebugInfo {
                     crc32_hash: 1099005079,
-                    compressed_size: 34,
+                    compressed_size: 25,
                     uncompressed_size: 25,
-                    compression_method: Zstd,
                     kind: File,
                 },
             },

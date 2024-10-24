@@ -59,6 +59,10 @@ impl ModulePath {
         self.relative_path.push(component);
     }
 
+    pub(crate) fn pop(&mut self) -> bool {
+        self.relative_path.pop()
+    }
+
     #[must_use]
     pub(super) fn is_directory(&self, resolver: &ResolverContext) -> bool {
         let ModulePath {

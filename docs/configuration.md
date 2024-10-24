@@ -515,13 +515,14 @@ Ruff: An extremely fast Python linter and code formatter.
 Usage: ruff [OPTIONS] <COMMAND>
 
 Commands:
-  check    Run Ruff on the given files or directories (default)
+  check    Run Ruff on the given files or directories
   rule     Explain a rule (or all rules)
   config   List or describe the available configuration options
   linter   List all supported upstream linters
   clean    Clear any caches in the current directory and any subdirectories
   format   Run the Ruff formatter on the given files or directories
   server   Run the language server
+  analyze  Run analysis over Python source code
   version  Display Ruff's version
   help     Print this message or the help of the given subcommand(s)
 
@@ -556,7 +557,7 @@ Or `ruff help check` for more on the linting command:
 <!-- Begin auto-generated check help. -->
 
 ```text
-Run Ruff on the given files or directories (default)
+Run Ruff on the given files or directories
 
 Usage: ruff check [OPTIONS] [FILES]...
 
@@ -588,7 +589,7 @@ Options:
           Ignore any `# noqa` comments
       --output-format <OUTPUT_FORMAT>
           Output serialization format for violations. The default serialization
-          format is "full" [env: RUFF_OUTPUT_FORMAT=] [possible values: text,
+          format is "full" [env: RUFF_OUTPUT_FORMAT=] [possible values:
           concise, full, json, json-lines, junit, grouped, github, gitlab,
           pylint, rdjson, azure, sarif]
   -o, --output-file <OUTPUT_FILE>

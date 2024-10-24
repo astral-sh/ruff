@@ -46,7 +46,7 @@ impl NeedsParentheses for PatternMatchClass {
         // ): ...
         // ```
         if context.comments().has_dangling(self) {
-            OptionalParentheses::Multiline
+            OptionalParentheses::Always
         } else {
             OptionalParentheses::Never
         }

@@ -13,13 +13,6 @@ def f():
 
 
 def f():
-    from pandas import DataFrame
-
-    def baz() -> DataFrame["int"]:
-        ...
-
-
-def f():
     import pandas as pd
 
     def baz() -> pd.DataFrame:

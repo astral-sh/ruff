@@ -194,7 +194,7 @@ impl CommentRanges {
     }
 
     /// Returns `true` if a comment is an own-line comment (as opposed to an end-of-line comment).
-    fn is_own_line(offset: TextSize, locator: &Locator) -> bool {
+    pub fn is_own_line(offset: TextSize, locator: &Locator) -> bool {
         let range = TextRange::new(locator.line_start(offset), offset);
         locator.slice(range).chars().all(is_python_whitespace)
     }
@@ -215,10 +215,10 @@ impl Debug for CommentRanges {
 }
 
 impl<'a> IntoIterator for &'a CommentRanges {
-    type Item = &'a TextRange;
-    type IntoIter = std::slice::Iter<'a, TextRange>;
+    type Item = TextRange;
+    type IntoIter = std::iter::Copied<std::slice::Iter<'a, TextRange>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.raw.iter()
+        self.raw.iter().copied()
     }
 }

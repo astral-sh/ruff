@@ -133,6 +133,7 @@ class Pyright(Tool):
     def cold_command(self, project: Project, venv: Venv) -> Command:
         command = [
             str(self.path),
+            "--threads",
             "--venvpath",
             str(
                 venv.path.parent
@@ -200,7 +201,14 @@ class Venv:
             "uv",
             "pip",
             "install",
+            "--python",
+            self.python,
             "--quiet",
+            # We pass `--exclude-newer` to ensure that type-checking of one of
+            # our projects isn't unexpectedly broken by a change in the
+            # annotations of one of that project's dependencies
+            "--exclude-newer",
+            "2024-09-03T00:00:00Z",
             *dependencies,
         ]
 

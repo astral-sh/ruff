@@ -2,13 +2,12 @@
 //! command-line options. Structure is optimized for internal usage, as opposed
 //! to external visibility or parsing.
 
-use std::fmt::{Display, Formatter};
-use std::path::{Path, PathBuf};
-
-use once_cell::sync::Lazy;
 use path_absolutize::path_dedot;
 use regex::Regex;
 use rustc_hash::FxHashSet;
+use std::fmt::{Display, Formatter};
+use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 
 use crate::codes::RuleCodePrefix;
 use ruff_macros::CacheKey;
@@ -285,7 +284,7 @@ impl Display for LinterSettings {
                 self.target_version | debug,
                 self.preview,
                 self.explicit_preview_rules,
-                self.extension | nested,
+                self.extension | debug,
 
                 self.allowed_confusables | array,
                 self.builtins | array,
@@ -355,8 +354,8 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
 
 pub const TASK_TAGS: &[&str] = &["TODO", "FIXME", "XXX"];
 
-pub static DUMMY_VARIABLE_RGX: Lazy<Regex> =
-    Lazy::new(|| Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap());
+pub static DUMMY_VARIABLE_RGX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap());
 
 impl LinterSettings {
     pub fn for_rule(rule_code: Rule) -> Self {

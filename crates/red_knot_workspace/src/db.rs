@@ -4,7 +4,7 @@ use std::sync::Arc;
 use salsa::plumbing::ZalsaDatabase;
 use salsa::{Cancelled, Event};
 
-use red_knot_python_semantic::{vendored_typeshed_stubs, Db as SemanticDb, Program};
+use red_knot_python_semantic::{Db as SemanticDb, Program};
 use ruff_db::files::{File, Files};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
@@ -124,7 +124,7 @@ impl SemanticDb for RootDatabase {
 #[salsa::db]
 impl SourceDb for RootDatabase {
     fn vendored(&self) -> &VendoredFileSystem {
-        vendored_typeshed_stubs()
+        red_knot_vendored::file_system()
     }
 
     fn system(&self) -> &dyn System {
@@ -161,7 +161,7 @@ pub(crate) mod tests {
 
     use salsa::Event;
 
-    use red_knot_python_semantic::{vendored_typeshed_stubs, Db as SemanticDb};
+    use red_knot_python_semantic::Db as SemanticDb;
     use ruff_db::files::Files;
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
@@ -183,7 +183,7 @@ pub(crate) mod tests {
             Self {
                 storage: salsa::Storage::default(),
                 system: TestSystem::default(),
-                vendored: vendored_typeshed_stubs().clone(),
+                vendored: red_knot_vendored::file_system().clone(),
                 files: Files::default(),
                 events: Arc::default(),
             }

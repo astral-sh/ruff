@@ -5,8 +5,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_python_ast::helpers::from_relative_import;
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
-use ruff_python_ast::{self as ast, Expr, ExprContext, Operator, Stmt};
-use ruff_python_stdlib::path::is_python_stub_file;
+use ruff_python_ast::{self as ast, Expr, ExprContext, Operator, PySourceType, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::binding::{
@@ -881,7 +880,7 @@ impl<'a> SemanticModel<'a> {
                 let resolved: QualifiedName = qualified_name
                     .segments()
                     .iter()
-                    .chain(tail.iter())
+                    .chain(tail)
                     .copied()
                     .collect();
                 Some(resolved)
@@ -895,7 +894,7 @@ impl<'a> SemanticModel<'a> {
                         .segments()
                         .iter()
                         .take(1)
-                        .chain(tail.iter())
+                        .chain(tail)
                         .copied()
                         .collect(),
                 )
@@ -918,7 +917,7 @@ impl<'a> SemanticModel<'a> {
                     qualified_name
                         .segments()
                         .iter()
-                        .chain(tail.iter())
+                        .chain(tail)
                         .copied()
                         .collect()
                 };
@@ -2361,7 +2360,7 @@ bitflags! {
 
 impl SemanticModelFlags {
     pub fn new(path: &Path) -> Self {
-        if is_python_stub_file(path) {
+        if PySourceType::from(path).is_stub() {
             Self::STUB_FILE
         } else {
             Self::default()

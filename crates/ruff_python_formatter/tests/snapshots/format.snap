@@ -1,0 +1,50 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/join_implicit_concatenated_string_preserve.py
+---
+## Input
+```python
+"diffent '" 'quote "are fine"'  # join
+
+# More single quotes
+"one single'" "two 'single'" ' two "double"'
+
+# More double quotes
+'one double"' 'two "double"' " two 'single'"
+
+# Equal number of single and double quotes
+'two "double"' " two 'single'"
+
+f"{'Hy \"User\"'}"
+```
+
+## Outputs
+### Output 1
+```
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Preserve
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Enabled
+target_version             = Py38
+source_type                = Python
+```
+
+```python
+"diffent 'quote \"are fine\""  # join
+
+# More single quotes
+"one single'two 'single' two \"double\""
+
+# More double quotes
+'one double"two "double" two \'single\''
+
+# Equal number of single and double quotes
+'two "double" two \'single\''
+
+f"{'Hy "User"'}"
+```

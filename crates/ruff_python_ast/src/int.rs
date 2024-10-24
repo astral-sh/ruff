@@ -96,6 +96,14 @@ impl Int {
         }
     }
 
+    /// Return the [`Int`] as an u64, if it can be represented as that data type.
+    pub fn as_usize(&self) -> Option<usize> {
+        match &self.0 {
+            Number::Small(small) => usize::try_from(*small).ok(),
+            Number::Big(_) => None,
+        }
+    }
+
     /// Return the [`Int`] as an i8, if it can be represented as that data type.
     pub fn as_i8(&self) -> Option<i8> {
         match &self.0 {

@@ -573,7 +573,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
 ```diff
 --- Black
 +++ Ruff
-@@ -25,41 +25,42 @@
+@@ -25,20 +25,17 @@
      "Jaguar",
  )
  
@@ -599,27 +599,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
          )
  
  
- class A:
-     def foo():
--        XXXXXXXXXXXX.append((
--            "xxx_xxxxxxxxxx(xxxxx={}, xxxx={}, xxxxx, xxxx_xxxx_xxxxxxxxxx={})".format(
--                xxxxx, xxxx, xxxx_xxxx_xxxxxxxxxx
--            ),
--            my_var,
--            my_other_var,
--        ))
-+        XXXXXXXXXXXX.append(
-+            (
-+                "xxx_xxxxxxxxxx(xxxxx={}, xxxx={}, xxxxx, xxxx_xxxx_xxxxxxxxxx={})".format(
-+                    xxxxx, xxxx, xxxx_xxxx_xxxxxxxxxx
-+                ),
-+                my_var,
-+                my_other_var,
-+            )
-+        )
- 
- 
- class A:
+@@ -57,9 +54,11 @@
      class B:
          def foo():
              bar(
@@ -634,26 +614,20 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
                  ),
                  varX,
                  varY,
-@@ -70,9 +71,10 @@
- def foo(xxxx):
+@@ -71,8 +70,9 @@
      for xxx_xxxx, _xxx_xxx, _xxx_xxxxx, xxx_xxxx in xxxx:
          for xxx in xxx_xxxx:
--            assert ("x" in xxx) or (xxx in xxx_xxx_xxxxx), (
+             assert ("x" in xxx) or (xxx in xxx_xxx_xxxxx), (
 -                "{0} xxxxxxx xx {1}, xxx {1} xx xxx xx xxxx xx xxx xxxx: xxx xxxx {2}"
 -                .format(xxx_xxxx, xxx, xxxxxx.xxxxxxx(xxx_xxx_xxxxx))
-+            assert (
-+                ("x" in xxx) or (xxx in xxx_xxx_xxxxx)
-+            ), "{0} xxxxxxx xx {1}, xxx {1} xx xxx xx xxxx xx xxx xxxx: xxx xxxx {2}".format(
-+                xxx_xxxx, xxx, xxxxxx.xxxxxxx(xxx_xxx_xxxxx)
++                "{0} xxxxxxx xx {1}, xxx {1} xx xxx xx xxxx xx xxx xxxx: xxx xxxx {2}".format(
++                    xxx_xxxx, xxx, xxxxxx.xxxxxxx(xxx_xxx_xxxxx)
++                )
              )
  
  
-@@ -80,10 +82,11 @@
-     def disappearing_comment():
-         return (
-             (  # xx -x xxxxxxx xx xxx xxxxxxx.
--                "{{xxx_xxxxxxxxxx_xxxxxxxx}} xxx xxxx {} {{xxxx}} >&2".format(
-+                "{{xxx_xxxxxxxxxx_xxxxxxxx}} xxx xxxx" " {} {{xxxx}} >&2".format(
+@@ -83,7 +83,8 @@
+                 "{{xxx_xxxxxxxxxx_xxxxxxxx}} xxx xxxx {} {{xxxx}} >&2".format(
                      "{xxxx} {xxxxxx}"
                      if xxxxx.xx_xxxxxxxxxx
 -                    else (  # Disappearing Comment
@@ -662,7 +636,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
                          "--xxxxxxx --xxxxxx=x --xxxxxx-xxxxx=xxxxxx"
                          " --xxxxxx-xxxx=xxxxxxxxxxx.xxx"
                      )
-@@ -113,18 +116,25 @@
+@@ -113,18 +114,25 @@
  
  
  func_call_where_string_arg_has_method_call_and_bad_parens(
@@ -694,7 +668,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
  )
  
  
-@@ -132,52 +142,60 @@
+@@ -132,52 +140,60 @@
      def append(self):
          if True:
              xxxx.xxxxxxx.xxxxx(
@@ -709,7 +683,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
 +                (
 +                    "xxxxxxxxxx xxxx xx xxxxxx(%x) xx %x xxxx xx xxx %x.xx"
 +                    % (len(self) + 1, xxxx.xxxxxxxxxx, xxxx.xxxxxxxxxx)
-+                )
+                 )
 +                + (
 +                    " %.3f (%s) to %.3f (%s).\n"
 +                    % (
@@ -718,7 +692,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
 +                        x,
 +                        xxxx.xxxxxxxxxxxxxx(xx),
 +                    )
-                 )
++                )
              )
  
  
@@ -788,7 +762,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
  }
  
  
-@@ -185,10 +203,10 @@
+@@ -185,10 +201,10 @@
      def foo(self):
          if True:
              xxxxx_xxxxxxxxxxxx(
@@ -803,7 +777,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
              )
  
  
-@@ -232,39 +250,24 @@
+@@ -232,36 +248,21 @@
  
  some_dictionary = {
      "xxxxx006": [
@@ -847,12 +821,8 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
 +    )  # xxxx xxxxxxxxxx xxxx xx xxxx xx xxx xxxxxxxx xxxxxx xxxxx.
  
  
--some_tuple = ("some string", "some string which should be joined")
-+some_tuple = ("some string", "some string" " which should be joined")
- 
- some_commented_string = (  # This comment stays at the top.
-     "This string is long but not so long that it needs hahahah toooooo be so greatttt"
-@@ -279,36 +282,25 @@
+ some_tuple = ("some string", "some string which should be joined")
+@@ -279,34 +280,21 @@
  )
  
  lpar_and_rpar_have_comments = func_call(  # LPAR Comment
@@ -878,26 +848,22 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
 -    f" {'{{}}' if ID is None else ID} | perl -nE 'print if /^{field}:/'"
 -)
 +cmd_fstring = f"sudo -E deluge-console info --detailed --sort-reverse=time_added {'{{}}' if ID is None else ID} | perl -nE 'print if /^{field}:/'"
-+
-+cmd_fstring = f"sudo -E deluge-console info --detailed --sort-reverse=time_added {{'' if ID is None else ID}} | perl -nE 'print if /^{field}:/'"
  
 -cmd_fstring = (
 -    "sudo -E deluge-console info --detailed --sort-reverse=time_added {'' if ID is"
 -    f" None else ID}} | perl -nE 'print if /^{field}:/'"
 -)
-+fstring = f"This string really doesn't need to be an {{{{fstring}}}}, but this one most certainly, absolutely {does}."
++cmd_fstring = f"sudo -E deluge-console info --detailed --sort-reverse=time_added {{'' if ID is None else ID}} | perl -nE 'print if /^{field}:/'"
  
- fstring = (
+-fstring = (
 -    "This string really doesn't need to be an {{fstring}}, but this one most"
 -    f" certainly, absolutely {does}."
-+    f"We have to remember to escape {braces}." " Like {these}." f" But not {this}."
- )
--
--fstring = f"We have to remember to escape {braces}. Like {{these}}. But not {this}."
+-)
++fstring = f"This string really doesn't need to be an {{{{fstring}}}}, but this one most certainly, absolutely {does}."
  
+ fstring = f"We have to remember to escape {braces}. Like {{these}}. But not {this}."
  
- class A:
-@@ -364,10 +356,7 @@
+@@ -364,10 +352,7 @@
          def foo():
              if not hasattr(module, name):
                  raise ValueError(
@@ -909,7 +875,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
                      % (name, module_name, get_docs_version())
                  )
  
-@@ -382,35 +371,33 @@
+@@ -382,23 +367,19 @@
  
  class Step(StepBase):
      def who(self):
@@ -931,29 +897,16 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
          )
  
  
--xxxxxxx_xxxxxx_xxxxxxx = xxx([
--    xxxxxxxxxxxx(
--        xxxxxx_xxxxxxx=(
+ xxxxxxx_xxxxxx_xxxxxxx = xxx([
+     xxxxxxxxxxxx(
+         xxxxxx_xxxxxxx=(
 -            '((x.aaaaaaaaa = "xxxxxx.xxxxxxxxxxxxxxxxxxxxx") || (x.xxxxxxxxx ='
 -            ' "xxxxxxxxxxxx")) && '
--            # xxxxx xxxxxxxxxxxx xxxx xxx (xxxxxxxxxxxxxxxx) xx x xxxxxxxxx xx xxxxxx.
--            "(x.bbbbbbbbbbbb.xxx != "
--            '"xxx:xxx:xxx::cccccccccccc:xxxxxxx-xxxx/xxxxxxxxxxx/xxxxxxxxxxxxxxxxx") && '
-+xxxxxxx_xxxxxx_xxxxxxx = xxx(
-+    [
-+        xxxxxxxxxxxx(
-+            xxxxxx_xxxxxxx=(
-+                '((x.aaaaaaaaa = "xxxxxx.xxxxxxxxxxxxxxxxxxxxx") || (x.xxxxxxxxx = "xxxxxxxxxxxx")) && '
-+                # xxxxx xxxxxxxxxxxx xxxx xxx (xxxxxxxxxxxxxxxx) xx x xxxxxxxxx xx xxxxxx.
-+                "(x.bbbbbbbbbbbb.xxx != "
-+                '"xxx:xxx:xxx::cccccccccccc:xxxxxxx-xxxx/xxxxxxxxxxx/xxxxxxxxxxxxxxxxx") && '
-+            )
-         )
--    )
--])
-+    ]
-+)
- 
++            '((x.aaaaaaaaa = "xxxxxx.xxxxxxxxxxxxxxxxxxxxx") || (x.xxxxxxxxx = "xxxxxxxxxxxx")) && '
+             # xxxxx xxxxxxxxxxxx xxxx xxx (xxxxxxxxxxxxxxxx) xx x xxxxxxxxx xx xxxxxx.
+             "(x.bbbbbbbbbbbb.xxx != "
+             '"xxx:xxx:xxx::cccccccccccc:xxxxxxx-xxxx/xxxxxxxxxxx/xxxxxxxxxxxxxxxxx") && '
+@@ -409,8 +390,8 @@
  if __name__ == "__main__":
      for i in range(4, 8):
          cmd = (
@@ -964,7 +917,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
          )
  
  
-@@ -432,9 +419,7 @@
+@@ -432,9 +413,7 @@
          assert xxxxxxx_xxxx in [
              x.xxxxx.xxxxxx.xxxxx.xxxxxx,
              x.xxxxx.xxxxxx.xxxxx.xxxx,
@@ -975,7 +928,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
  
  
  value.__dict__[key] = (
-@@ -449,8 +434,7 @@
+@@ -449,8 +428,7 @@
  
  RE_TWO_BACKSLASHES = {
      "asdf_hjkl_jkl": re.compile(
@@ -985,7 +938,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
      ),
  }
  
-@@ -462,13 +446,9 @@
+@@ -462,13 +440,9 @@
  
  # We do NOT split on f-string expressions.
  print(
@@ -1001,7 +954,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
  
  # The parens should NOT be removed in this case.
  (
-@@ -478,8 +458,8 @@
+@@ -478,8 +452,8 @@
  
  # The parens should NOT be removed in this case.
  (
@@ -1012,7 +965,13 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
  )
  
  # The parens should NOT be removed in this case.
-@@ -518,88 +498,78 @@
+@@ -513,93 +487,83 @@
+ 
+ 
+ temp_msg = (
+-    f"{f'{humanize_number(pos)}.': <{pound_len+2}} "
++    f"{f'{humanize_number(pos)}.': <{pound_len + 2}} "
+     f"{balance: <{bal_len + 5}} "
      f"<<{author.display_name}>>\n"
  )
  
@@ -1136,14 +1095,16 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
      "6. Click on Create Credential at the top."
      '7. At the top click the link for "API key".'
      "8. No application restrictions are needed. Click Create at the bottom."
-@@ -613,55 +583,40 @@
+@@ -608,7 +572,7 @@
+ 
+ # It shouldn't matter if the string prefixes are capitalized.
+ temp_msg = (
+-    f"{F'{humanize_number(pos)}.': <{pound_len+2}} "
++    f"{f'{humanize_number(pos)}.': <{pound_len + 2}} "
+     f"{balance: <{bal_len + 5}} "
      f"<<{author.display_name}>>\n"
  )
- 
--fstring = f"We have to remember to escape {braces}. Like {{these}}. But not {this}."
-+fstring = (
-+    f"We have to remember to escape {braces}." " Like {these}." f" But not {this}."
-+)
+@@ -617,51 +581,34 @@
  
  welcome_to_programming = R"hello," R" world!"
  
@@ -1209,22 +1170,15 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
  )
  
  # Regression test for https://github.com/psf/black/issues/3455.
-@@ -672,9 +627,11 @@
- }
- 
+@@ -674,7 +621,4 @@
  # Regression test for https://github.com/psf/black/issues/3506.
--s = f"With single quote: '  {my_dict['foo']} With double quote: \"  {my_dict['bar']}"
--
- s = (
+ s = f"With single quote: '  {my_dict['foo']} With double quote: \"  {my_dict['bar']}"
+ 
+-s = (
 -    "Lorem Ipsum is simply dummy text of the printing and typesetting"
 -    f" industry:'{my_dict['foo']}'"
-+    "With single quote: ' "
-+    f" {my_dict['foo']}"
-+    ' With double quote: " '
-+    f' {my_dict["bar"]}'
- )
-+
-+s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:\'{my_dict["foo"]}\''
+-)
++s = f"Lorem Ipsum is simply dummy text of the printing and typesetting industry:'{my_dict['foo']}'"
 ```
 
 ## Ruff Output
@@ -1273,15 +1227,13 @@ class A:
 
 class A:
     def foo():
-        XXXXXXXXXXXX.append(
-            (
-                "xxx_xxxxxxxxxx(xxxxx={}, xxxx={}, xxxxx, xxxx_xxxx_xxxxxxxxxx={})".format(
-                    xxxxx, xxxx, xxxx_xxxx_xxxxxxxxxx
-                ),
-                my_var,
-                my_other_var,
-            )
-        )
+        XXXXXXXXXXXX.append((
+            "xxx_xxxxxxxxxx(xxxxx={}, xxxx={}, xxxxx, xxxx_xxxx_xxxxxxxxxx={})".format(
+                xxxxx, xxxx, xxxx_xxxx_xxxxxxxxxx
+            ),
+            my_var,
+            my_other_var,
+        ))
 
 
 class A:
@@ -1303,10 +1255,10 @@ class A:
 def foo(xxxx):
     for xxx_xxxx, _xxx_xxx, _xxx_xxxxx, xxx_xxxx in xxxx:
         for xxx in xxx_xxxx:
-            assert (
-                ("x" in xxx) or (xxx in xxx_xxx_xxxxx)
-            ), "{0} xxxxxxx xx {1}, xxx {1} xx xxx xx xxxx xx xxx xxxx: xxx xxxx {2}".format(
-                xxx_xxxx, xxx, xxxxxx.xxxxxxx(xxx_xxx_xxxxx)
+            assert ("x" in xxx) or (xxx in xxx_xxx_xxxxx), (
+                "{0} xxxxxxx xx {1}, xxx {1} xx xxx xx xxxx xx xxx xxxx: xxx xxxx {2}".format(
+                    xxx_xxxx, xxx, xxxxxx.xxxxxxx(xxx_xxx_xxxxx)
+                )
             )
 
 
@@ -1314,7 +1266,7 @@ class A:
     def disappearing_comment():
         return (
             (  # xx -x xxxxxxx xx xxx xxxxxxx.
-                "{{xxx_xxxxxxxxxx_xxxxxxxx}} xxx xxxx" " {} {{xxxx}} >&2".format(
+                "{{xxx_xxxxxxxxxx_xxxxxxxx}} xxx xxxx {} {{xxxx}} >&2".format(
                     "{xxxx} {xxxxxx}"
                     if xxxxx.xx_xxxxxxxxxx
                     # Disappearing Comment
@@ -1499,7 +1451,7 @@ def foo():
     )  # xxxx xxxxxxxxxx xxxx xx xxxx xx xxx xxxxxxxx xxxxxx xxxxx.
 
 
-some_tuple = ("some string", "some string" " which should be joined")
+some_tuple = ("some string", "some string which should be joined")
 
 some_commented_string = (  # This comment stays at the top.
     "This string is long but not so long that it needs hahahah toooooo be so greatttt"
@@ -1530,9 +1482,7 @@ cmd_fstring = f"sudo -E deluge-console info --detailed --sort-reverse=time_added
 
 fstring = f"This string really doesn't need to be an {{{{fstring}}}}, but this one most certainly, absolutely {does}."
 
-fstring = (
-    f"We have to remember to escape {braces}." " Like {these}." f" But not {this}."
-)
+fstring = f"We have to remember to escape {braces}. Like {{these}}. But not {this}."
 
 
 class A:
@@ -1612,18 +1562,16 @@ class Step(StepBase):
         )
 
 
-xxxxxxx_xxxxxx_xxxxxxx = xxx(
-    [
-        xxxxxxxxxxxx(
-            xxxxxx_xxxxxxx=(
-                '((x.aaaaaaaaa = "xxxxxx.xxxxxxxxxxxxxxxxxxxxx") || (x.xxxxxxxxx = "xxxxxxxxxxxx")) && '
-                # xxxxx xxxxxxxxxxxx xxxx xxx (xxxxxxxxxxxxxxxx) xx x xxxxxxxxx xx xxxxxx.
-                "(x.bbbbbbbbbbbb.xxx != "
-                '"xxx:xxx:xxx::cccccccccccc:xxxxxxx-xxxx/xxxxxxxxxxx/xxxxxxxxxxxxxxxxx") && '
-            )
+xxxxxxx_xxxxxx_xxxxxxx = xxx([
+    xxxxxxxxxxxx(
+        xxxxxx_xxxxxxx=(
+            '((x.aaaaaaaaa = "xxxxxx.xxxxxxxxxxxxxxxxxxxxx") || (x.xxxxxxxxx = "xxxxxxxxxxxx")) && '
+            # xxxxx xxxxxxxxxxxx xxxx xxx (xxxxxxxxxxxxxxxx) xx x xxxxxxxxx xx xxxxxx.
+            "(x.bbbbbbbbbbbb.xxx != "
+            '"xxx:xxx:xxx::cccccccccccc:xxxxxxx-xxxx/xxxxxxxxxxx/xxxxxxxxxxxxxxxxx") && '
         )
-    ]
-)
+    )
+])
 
 if __name__ == "__main__":
     for i in range(4, 8):
@@ -1725,7 +1673,7 @@ class X:
 
 
 temp_msg = (
-    f"{f'{humanize_number(pos)}.': <{pound_len+2}} "
+    f"{f'{humanize_number(pos)}.': <{pound_len + 2}} "
     f"{balance: <{bal_len + 5}} "
     f"<<{author.display_name}>>\n"
 )
@@ -1810,14 +1758,12 @@ message = (
 
 # It shouldn't matter if the string prefixes are capitalized.
 temp_msg = (
-    f"{F'{humanize_number(pos)}.': <{pound_len+2}} "
+    f"{f'{humanize_number(pos)}.': <{pound_len + 2}} "
     f"{balance: <{bal_len + 5}} "
     f"<<{author.display_name}>>\n"
 )
 
-fstring = (
-    f"We have to remember to escape {braces}." " Like {these}." f" But not {this}."
-)
+fstring = f"We have to remember to escape {braces}. Like {{these}}. But not {this}."
 
 welcome_to_programming = R"hello," R" world!"
 
@@ -1859,14 +1805,9 @@ a_dict = {
 }
 
 # Regression test for https://github.com/psf/black/issues/3506.
-s = (
-    "With single quote: ' "
-    f" {my_dict['foo']}"
-    ' With double quote: " '
-    f' {my_dict["bar"]}'
-)
+s = f"With single quote: '  {my_dict['foo']} With double quote: \"  {my_dict['bar']}"
 
-s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:\'{my_dict["foo"]}\''
+s = f"Lorem Ipsum is simply dummy text of the printing and typesetting industry:'{my_dict['foo']}'"
 ```
 
 ## Black Output

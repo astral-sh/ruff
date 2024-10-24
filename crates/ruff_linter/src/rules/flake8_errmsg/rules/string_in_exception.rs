@@ -30,7 +30,7 @@ use crate::registry::Rule;
 /// ```console
 /// Traceback (most recent call last):
 ///   File "tmp.py", line 2, in <module>
-///     raise RuntimeError("Some value is incorrect")
+///     raise RuntimeError("'Some value' is incorrect")
 /// RuntimeError: 'Some value' is incorrect
 /// ```
 ///

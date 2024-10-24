@@ -1,8 +1,7 @@
 //! Detect code style from Python source code.
 
+use std::cell::OnceCell;
 use std::ops::Deref;
-
-use once_cell::unsync::OnceCell;
 
 use ruff_python_ast::str::Quote;
 use ruff_python_parser::{Token, TokenKind, Tokens};

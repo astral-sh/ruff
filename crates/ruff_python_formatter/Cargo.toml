@@ -28,7 +28,6 @@ clap = { workspace = true }
 countme = { workspace = true }
 itertools = { workspace = true }
 memchr = { workspace = true }
-once_cell = { workspace = true }
 regex = { workspace = true }
 rustc-hash = { workspace = true }
 serde = { workspace = true, optional = true }

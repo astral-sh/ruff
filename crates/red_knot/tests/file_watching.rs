@@ -42,14 +42,14 @@ impl TestCase {
 
     fn stop_watch(&mut self) -> Vec<watch::ChangeEvent> {
         self.try_stop_watch(Duration::from_secs(10))
-            .expect("Expected watch changes but observed none.")
+            .expect("Expected watch changes but observed none")
     }
 
     fn try_stop_watch(&mut self, timeout: Duration) -> Option<Vec<watch::ChangeEvent>> {
         let watcher = self
             .watcher
             .take()
-            .expect("Cannot call `stop_watch` more than once.");
+            .expect("Cannot call `stop_watch` more than once");
 
         let mut all_events = self
             .changes_receiver
@@ -72,7 +72,7 @@ impl TestCase {
     #[cfg(unix)]
     fn take_watch_changes(&self) -> Vec<watch::ChangeEvent> {
         self.try_take_watch_changes(Duration::from_secs(10))
-            .expect("Expected watch changes but observed none.")
+            .expect("Expected watch changes but observed none")
     }
 
     fn try_take_watch_changes(&self, timeout: Duration) -> Option<Vec<watch::ChangeEvent>> {
@@ -150,14 +150,14 @@ where
             let absolute_path = workspace_path.join(relative_path);
             if let Some(parent) = absolute_path.parent() {
                 std::fs::create_dir_all(parent).with_context(|| {
-                    format!("Failed to create parent directory for file '{relative_path}'.",)
+                    format!("Failed to create parent directory for file `{relative_path}`")
                 })?;
             }
 
             let mut file = std::fs::File::create(absolute_path.as_std_path())
-                .with_context(|| format!("Failed to open file '{relative_path}'"))?;
+                .with_context(|| format!("Failed to open file `{relative_path}`"))?;
             file.write_all(content.as_bytes())
-                .with_context(|| format!("Failed to write to file '{relative_path}'"))?;
+                .with_context(|| format!("Failed to write to file `{relative_path}`"))?;
             file.sync_data()?;
         }
 
@@ -194,7 +194,7 @@ where
 
     let root_path = SystemPath::from_std_path(temp_dir.path()).ok_or_else(|| {
         anyhow!(
-            "Temp directory '{}' is not a valid UTF-8 path.",
+            "Temporary directory `{}` is not a valid UTF-8 path.",
             temp_dir.path().display()
         )
     })?;
@@ -209,7 +209,7 @@ where
     let workspace_path = root_path.join("workspace");
 
     std::fs::create_dir_all(workspace_path.as_std_path())
-        .with_context(|| format!("Failed to create workspace directory '{workspace_path}'",))?;
+        .with_context(|| format!("Failed to create workspace directory `{workspace_path}`"))?;
 
     setup_files
         .setup(&root_path, &workspace_path)
@@ -233,7 +233,7 @@ where
         }))
     {
         std::fs::create_dir_all(path.as_std_path())
-            .with_context(|| format!("Failed to create search path '{path}'"))?;
+            .with_context(|| format!("Failed to create search path `{path}`"))?;
     }
 
     let configuration = Configuration {
@@ -501,7 +501,10 @@ fn directory_moved_to_workspace() -> anyhow::Result<()> {
         .with_context(|| "Failed to create __init__.py")?;
     std::fs::write(a_original_path.as_std_path(), "").with_context(|| "Failed to create a.py")?;
 
-    let sub_a_module = resolve_module(case.db().upcast(), ModuleName::new_static("sub.a").unwrap());
+    let sub_a_module = resolve_module(
+        case.db().upcast(),
+        &ModuleName::new_static("sub.a").unwrap(),
+    );
 
     assert_eq!(sub_a_module, None);
     assert_eq!(
@@ -525,7 +528,11 @@ fn directory_moved_to_workspace() -> anyhow::Result<()> {
         .expect("a.py to exist");
 
     // `import sub.a` should now resolve
-    assert!(resolve_module(case.db().upcast(), ModuleName::new_static("sub.a").unwrap()).is_some());
+    assert!(resolve_module(
+        case.db().upcast(),
+        &ModuleName::new_static("sub.a").unwrap()
+    )
+    .is_some());
 
     assert_eq!(
         case.collect_package_files(&case.workspace_path("bar.py")),
@@ -544,7 +551,11 @@ fn directory_moved_to_trash() -> anyhow::Result<()> {
     ])?;
     let bar = case.system_file(case.workspace_path("bar.py")).unwrap();
 
-    assert!(resolve_module(case.db().upcast(), ModuleName::new_static("sub.a").unwrap()).is_some());
+    assert!(resolve_module(
+        case.db().upcast(),
+        &ModuleName::new_static("sub.a").unwrap()
+    )
+    .is_some());
 
     let sub_path = case.workspace_path("sub");
     let init_file = case
@@ -569,7 +580,11 @@ fn directory_moved_to_trash() -> anyhow::Result<()> {
     case.apply_changes(changes);
 
     // `import sub.a` should no longer resolve
-    assert!(resolve_module(case.db().upcast(), ModuleName::new_static("sub.a").unwrap()).is_none());
+    assert!(resolve_module(
+        case.db().upcast(),
+        &ModuleName::new_static("sub.a").unwrap()
+    )
+    .is_none());
 
     assert!(!init_file.exists(case.db()));
     assert!(!a_file.exists(case.db()));
@@ -592,10 +607,14 @@ fn directory_renamed() -> anyhow::Result<()> {
 
     let bar = case.system_file(case.workspace_path("bar.py")).unwrap();
 
-    assert!(resolve_module(case.db().upcast(), ModuleName::new_static("sub.a").unwrap()).is_some());
     assert!(resolve_module(
         case.db().upcast(),
-        ModuleName::new_static("foo.baz").unwrap()
+        &ModuleName::new_static("sub.a").unwrap()
+    )
+    .is_some());
+    assert!(resolve_module(
+        case.db().upcast(),
+        &ModuleName::new_static("foo.baz").unwrap()
     )
     .is_none());
 
@@ -623,11 +642,15 @@ fn directory_renamed() -> anyhow::Result<()> {
     case.apply_changes(changes);
 
     // `import sub.a` should no longer resolve
-    assert!(resolve_module(case.db().upcast(), ModuleName::new_static("sub.a").unwrap()).is_none());
+    assert!(resolve_module(
+        case.db().upcast(),
+        &ModuleName::new_static("sub.a").unwrap()
+    )
+    .is_none());
     // `import foo.baz` should now resolve
     assert!(resolve_module(
         case.db().upcast(),
-        ModuleName::new_static("foo.baz").unwrap()
+        &ModuleName::new_static("foo.baz").unwrap()
     )
     .is_some());
 
@@ -665,7 +688,11 @@ fn directory_deleted() -> anyhow::Result<()> {
 
     let bar = case.system_file(case.workspace_path("bar.py")).unwrap();
 
-    assert!(resolve_module(case.db().upcast(), ModuleName::new_static("sub.a").unwrap()).is_some(),);
+    assert!(resolve_module(
+        case.db().upcast(),
+        &ModuleName::new_static("sub.a").unwrap()
+    )
+    .is_some());
 
     let sub_path = case.workspace_path("sub");
 
@@ -688,7 +715,11 @@ fn directory_deleted() -> anyhow::Result<()> {
     case.apply_changes(changes);
 
     // `import sub.a` should no longer resolve
-    assert!(resolve_module(case.db().upcast(), ModuleName::new_static("sub.a").unwrap()).is_none());
+    assert!(resolve_module(
+        case.db().upcast(),
+        &ModuleName::new_static("sub.a").unwrap()
+    )
+    .is_none());
 
     assert!(!init_file.exists(case.db()));
     assert!(!a_file.exists(case.db()));
@@ -710,7 +741,7 @@ fn search_path() -> anyhow::Result<()> {
     let site_packages = case.root_path().join("site_packages");
 
     assert_eq!(
-        resolve_module(case.db(), ModuleName::new("a").unwrap()),
+        resolve_module(case.db(), &ModuleName::new("a").unwrap()),
         None
     );
 
@@ -720,7 +751,7 @@ fn search_path() -> anyhow::Result<()> {
 
     case.apply_changes(changes);
 
-    assert!(resolve_module(case.db().upcast(), ModuleName::new_static("a").unwrap()).is_some());
+    assert!(resolve_module(case.db().upcast(), &ModuleName::new_static("a").unwrap()).is_some());
     assert_eq!(
         case.collect_package_files(&case.workspace_path("bar.py")),
         &[case.system_file(case.workspace_path("bar.py")).unwrap()]
@@ -736,7 +767,7 @@ fn add_search_path() -> anyhow::Result<()> {
     let site_packages = case.workspace_path("site_packages");
     std::fs::create_dir_all(site_packages.as_std_path())?;
 
-    assert!(resolve_module(case.db().upcast(), ModuleName::new_static("a").unwrap()).is_none());
+    assert!(resolve_module(case.db().upcast(), &ModuleName::new_static("a").unwrap()).is_none());
 
     // Register site-packages as a search path.
     case.update_search_path_settings(SearchPathConfiguration {
@@ -751,7 +782,7 @@ fn add_search_path() -> anyhow::Result<()> {
 
     case.apply_changes(changes);
 
-    assert!(resolve_module(case.db().upcast(), ModuleName::new_static("a").unwrap()).is_some());
+    assert!(resolve_module(case.db().upcast(), &ModuleName::new_static("a").unwrap()).is_some());
 
     Ok(())
 }
@@ -805,7 +836,7 @@ fn changed_versions_file() -> anyhow::Result<()> {
 
     // Unset the custom typeshed directory.
     assert_eq!(
-        resolve_module(case.db(), ModuleName::new("os").unwrap()),
+        resolve_module(case.db(), &ModuleName::new("os").unwrap()),
         None
     );
 
@@ -820,7 +851,7 @@ fn changed_versions_file() -> anyhow::Result<()> {
 
     case.apply_changes(changes);
 
-    assert!(resolve_module(case.db(), ModuleName::new("os").unwrap()).is_some());
+    assert!(resolve_module(case.db(), &ModuleName::new("os").unwrap()).is_some());
 
     Ok(())
 }
@@ -1044,7 +1075,7 @@ mod unix {
 
         let baz = resolve_module(
             case.db().upcast(),
-            ModuleName::new_static("bar.baz").unwrap(),
+            &ModuleName::new_static("bar.baz").unwrap(),
         )
         .expect("Expected bar.baz to exist in site-packages.");
         let baz_workspace = case.workspace_path("bar/baz.py");
@@ -1125,7 +1156,7 @@ mod unix {
 
         let baz = resolve_module(
             case.db().upcast(),
-            ModuleName::new_static("bar.baz").unwrap(),
+            &ModuleName::new_static("bar.baz").unwrap(),
         )
         .expect("Expected bar.baz to exist in site-packages.");
         let bar_baz = case.workspace_path("bar/baz.py");
@@ -1229,7 +1260,7 @@ mod unix {
 
         let baz = resolve_module(
             case.db().upcast(),
-            ModuleName::new_static("bar.baz").unwrap(),
+            &ModuleName::new_static("bar.baz").unwrap(),
         )
         .expect("Expected bar.baz to exist in site-packages.");
         let baz_site_packages_path =

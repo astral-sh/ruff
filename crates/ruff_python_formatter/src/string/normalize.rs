@@ -1,41 +1,37 @@
 use std::borrow::Cow;
+use std::cmp::Ordering;
 use std::iter::FusedIterator;
 
 use ruff_formatter::FormatContext;
-use ruff_python_ast::{str::Quote, AnyStringFlags, StringFlags};
-use ruff_source_file::Locator;
+use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
+use ruff_python_ast::{
+    str::Quote, AnyStringFlags, BytesLiteral, FString, StringFlags, StringLikePart, StringLiteral,
+};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::context::FStringState;
-use crate::options::PythonVersion;
 use crate::prelude::*;
 use crate::preview::is_f_string_formatting_enabled;
-use crate::string::{Quoting, StringPart, StringQuotes};
+use crate::string::{Quoting, StringQuotes};
 use crate::QuoteStyle;
 
-pub(crate) struct StringNormalizer {
+pub(crate) struct StringNormalizer<'a, 'src> {
     quoting: Quoting,
-    preferred_quote_style: QuoteStyle,
-    parent_docstring_quote_char: Option<Quote>,
-    f_string_state: FStringState,
-    target_version: PythonVersion,
-    format_fstring: bool,
+    preferred_quote_style: Option<QuoteStyle>,
+    context: &'a PyFormatContext<'src>,
 }
 
-impl StringNormalizer {
-    pub(crate) fn from_context(context: &PyFormatContext<'_>) -> Self {
+impl<'a, 'src> StringNormalizer<'a, 'src> {
+    pub(crate) fn from_context(context: &'a PyFormatContext<'src>) -> Self {
         Self {
             quoting: Quoting::default(),
-            preferred_quote_style: QuoteStyle::default(),
-            parent_docstring_quote_char: context.docstring(),
-            f_string_state: context.f_string_state(),
-            target_version: context.options().target_version(),
-            format_fstring: is_f_string_formatting_enabled(context),
+            preferred_quote_style: None,
+            context,
         }
     }
 
     pub(crate) fn with_preferred_quote_style(mut self, quote_style: QuoteStyle) -> Self {
-        self.preferred_quote_style = quote_style;
+        self.preferred_quote_style = Some(quote_style);
         self
     }
 
@@ -44,48 +40,59 @@ impl StringNormalizer {
         self
     }
 
-    fn quoting(&self, string: StringPart) -> Quoting {
-        if let FStringState::InsideExpressionElement(context) = self.f_string_state {
-            // If we're inside an f-string, we need to make sure to preserve the
-            // existing quotes unless we're inside a triple-quoted f-string and
-            // the inner string itself isn't triple-quoted. For example:
-            //
-            // ```python
-            // f"""outer {"inner"}"""  # Valid
-            // f"""outer {"""inner"""}"""  # Invalid
-            // ```
-            //
-            // Or, if the target version supports PEP 701.
-            //
-            // The reason to preserve the quotes is based on the assumption that
-            // the original f-string is valid in terms of quoting, and we don't
-            // want to change that to make it invalid.
-            if (context.f_string().flags().is_triple_quoted() && !string.flags().is_triple_quoted())
-                || self.target_version.supports_pep_701()
-            {
-                self.quoting
-            } else {
-                Quoting::Preserve
-            }
-        } else {
-            self.quoting
-        }
-    }
-
-    /// Computes the strings preferred quotes.
-    pub(crate) fn choose_quotes(&self, string: StringPart, locator: &Locator) -> QuoteSelection {
-        let raw_content = locator.slice(string.content_range());
-        let first_quote_or_normalized_char_offset = raw_content
-            .bytes()
-            .position(|b| matches!(b, b'\\' | b'"' | b'\'' | b'\r' | b'{'));
-        let string_flags = string.flags();
-
-        let new_kind = match self.quoting(string) {
-            Quoting::Preserve => string_flags,
+    /// Determines the preferred quote style for `string`.
+    /// The formatter should use the preferred quote style unless
+    /// it can't because the string contains the preferred quotes OR
+    /// it leads to more escaping.
+    ///
+    /// Note: If you add more cases here where we return `QuoteStyle::Preserve`,
+    /// make sure to also add them to [`FormatImplicitConcatenatedStringFlat::new`].
+    pub(super) fn preferred_quote_style(&self, string: StringLikePart) -> QuoteStyle {
+        match self.quoting {
+            Quoting::Preserve => QuoteStyle::Preserve,
             Quoting::CanChange => {
+                let preferred_quote_style = self
+                    .preferred_quote_style
+                    .unwrap_or(self.context.options().quote_style());
+
+                if preferred_quote_style.is_preserve() {
+                    return QuoteStyle::Preserve;
+                }
+
+                // There are two cases where it's necessary to preserve the quotes
+                // if the target version is pre 3.12 and the part is an f-string.
+                if !self.context.options().target_version().supports_pep_701() {
+                    if let StringLikePart::FString(fstring) = string {
+                        // An f-string expression contains a debug text with a quote character
+                        // because the formatter will emit the debug expression **exactly** the same as in the source text.
+                        if is_fstring_with_quoted_debug_expression(fstring, self.context) {
+                            return QuoteStyle::Preserve;
+                        }
+
+                        // An f-string expression that contains a triple quoted string literal expression
+                        // that contains a quote.
+                        if is_fstring_with_triple_quoted_literal_expression_containing_quotes(
+                            fstring,
+                            self.context,
+                        ) {
+                            return QuoteStyle::Preserve;
+                        }
+                    }
+                }
+
+                // For f-strings prefer alternating the quotes unless The outer string is triple quoted and the inner isn't.
+                if let FStringState::InsideExpressionElement(parent_context) =
+                    self.context.f_string_state()
+                {
+                    let parent_flags = parent_context.f_string().flags();
+
+                    if !parent_flags.is_triple_quoted() || string.flags().is_triple_quoted() {
+                        return QuoteStyle::from(parent_flags.quote_style().opposite());
+                    }
+                }
+
                 // Per PEP 8, always prefer double quotes for triple-quoted strings.
-                // Except when using quote-style-preserve.
-                let preferred_style = if string_flags.is_triple_quoted() {
+                if string.flags().is_triple_quoted() {
                     // ... unless we're formatting a code snippet inside a docstring,
                     // then we specifically want to invert our quote style to avoid
                     // writing out invalid Python.
@@ -131,41 +138,54 @@ impl StringNormalizer {
                     // Overall this is a bit of a corner case and just inverting the
                     // style from what the parent ultimately decided upon works, even
                     // if it doesn't have perfect alignment with PEP8.
-                    if let Some(quote) = self.parent_docstring_quote_char {
+                    if let Some(quote) = self.context.docstring() {
                         QuoteStyle::from(quote.opposite())
-                    } else if self.preferred_quote_style.is_preserve() {
-                        QuoteStyle::Preserve
                     } else {
                         QuoteStyle::Double
                     }
                 } else {
-                    self.preferred_quote_style
-                };
-
-                if let Ok(preferred_quote) = Quote::try_from(preferred_style) {
-                    if let Some(first_quote_or_normalized_char_offset) =
-                        first_quote_or_normalized_char_offset
-                    {
-                        if string_flags.is_raw_string() {
-                            choose_quotes_for_raw_string(
-                                &raw_content[first_quote_or_normalized_char_offset..],
-                                string_flags,
-                                preferred_quote,
-                            )
-                        } else {
-                            choose_quotes_impl(
-                                &raw_content[first_quote_or_normalized_char_offset..],
-                                string_flags,
-                                preferred_quote,
-                            )
-                        }
-                    } else {
-                        string_flags.with_quote_style(preferred_quote)
-                    }
-                } else {
-                    string_flags
+                    preferred_quote_style
                 }
             }
+        }
+    }
+
+    /// Computes the strings preferred quotes.
+    pub(crate) fn choose_quotes(&self, string: StringLikePart) -> QuoteSelection {
+        let raw_content = self.context.locator().slice(string.content_range());
+        let first_quote_or_normalized_char_offset = raw_content
+            .bytes()
+            .position(|b| matches!(b, b'\\' | b'"' | b'\'' | b'\r' | b'{'));
+        let string_flags = string.flags();
+        let preferred_style = self.preferred_quote_style(string);
+
+        let new_kind = match (
+            Quote::try_from(preferred_style),
+            first_quote_or_normalized_char_offset,
+        ) {
+            // The string contains no quotes so it's safe to use the preferred quote style
+            (Ok(preferred_quote), None) => string_flags.with_quote_style(preferred_quote),
+
+            // The preferred quote style is single or double quotes, and the string contains a quote or
+            // another character that may require escaping
+            (Ok(preferred_quote), Some(first_quote_or_normalized_char_offset)) => {
+                let metadata = if string.is_fstring() {
+                    QuoteMetadata::from_part(string, self.context, preferred_quote)
+                } else {
+                    QuoteMetadata::from_str(
+                        &raw_content[first_quote_or_normalized_char_offset..],
+                        string.flags(),
+                        preferred_quote,
+                    )
+                };
+
+                let quote = metadata.choose(preferred_quote);
+
+                string_flags.with_quote_style(quote)
+            }
+
+            // The preferred quote style is to preserve the quotes, so let's do that.
+            (Err(()), _) => string_flags,
         };
 
         QuoteSelection {
@@ -175,13 +195,9 @@ impl StringNormalizer {
     }
 
     /// Computes the strings preferred quotes and normalizes its content.
-    pub(crate) fn normalize<'a>(
-        &self,
-        string: StringPart,
-        locator: &'a Locator,
-    ) -> NormalizedString<'a> {
-        let raw_content = locator.slice(string.content_range());
-        let quote_selection = self.choose_quotes(string, locator);
+    pub(crate) fn normalize(&self, string: StringLikePart) -> NormalizedString<'src> {
+        let raw_content = self.context.locator().slice(string.content_range());
+        let quote_selection = self.choose_quotes(string);
 
         let normalized = if let Some(first_quote_or_escape_offset) =
             quote_selection.first_quote_or_normalized_char_offset
@@ -192,7 +208,9 @@ impl StringNormalizer {
                 quote_selection.flags,
                 // TODO: Remove the `b'{'` in `choose_quotes` when promoting the
                 // `format_fstring` preview style
-                self.format_fstring,
+                false,
+                false,
+                is_f_string_formatting_enabled(self.context),
             )
         } else {
             Cow::Borrowed(raw_content)
@@ -220,119 +238,201 @@ impl QuoteSelection {
     }
 }
 
-#[derive(Debug)]
-pub(crate) struct NormalizedString<'a> {
-    /// Holds data about the quotes and prefix of the string
-    flags: AnyStringFlags,
+#[derive(Clone, Debug)]
+pub(crate) struct QuoteMetadata {
+    kind: QuoteMetadataKind,
 
-    /// The range of the string's content in the source (minus prefix and quotes).
-    content_range: TextRange,
-
-    /// The normalized text
-    text: Cow<'a, str>,
+    /// The quote style in the source.
+    source_style: Quote,
 }
 
-impl<'a> NormalizedString<'a> {
-    pub(crate) fn text(&self) -> &Cow<'a, str> {
-        &self.text
-    }
+/// Tracks information about the used quotes in a string which is used
+/// to choose the quotes for a part.
+impl QuoteMetadata {
+    pub(crate) fn from_part(
+        part: StringLikePart,
+        context: &PyFormatContext,
+        preferred_quote: Quote,
+    ) -> Self {
+        match part {
+            StringLikePart::String(_) | StringLikePart::Bytes(_) => {
+                let text = context.locator().slice(part.content_range());
 
-    pub(crate) fn flags(&self) -> AnyStringFlags {
-        self.flags
-    }
-}
-
-impl Ranged for NormalizedString<'_> {
-    fn range(&self) -> TextRange {
-        self.content_range
-    }
-}
-
-impl Format<PyFormatContext<'_>> for NormalizedString<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
-        let quotes = StringQuotes::from(self.flags);
-        ruff_formatter::write!(f, [self.flags.prefix(), quotes])?;
-        match &self.text {
-            Cow::Borrowed(_) => {
-                source_text_slice(self.range()).fmt(f)?;
+                Self::from_str(text, part.flags(), preferred_quote)
             }
-            Cow::Owned(normalized) => {
-                text(normalized).fmt(f)?;
-            }
-        }
-        quotes.fmt(f)
-    }
-}
+            StringLikePart::FString(fstring) => {
+                if is_f_string_formatting_enabled(context) {
+                    // For f-strings, only consider the quotes inside string-literals but ignore
+                    // quotes inside expressions. This allows both the outer and the nested literals
+                    // to make the optimal local-choice to reduce the total number of quotes necessary.
+                    // This doesn't require any pre 312 special handling because an expression
+                    // can never contain the outer quote character, not even escaped:
+                    // ```python
+                    // f"{'escaping a quote like this \" is a syntax error pre 312'}"
+                    // ```
+                    let mut literals = fstring.elements.literals();
 
-/// Choose the appropriate quote style for a raw string.
-///
-/// The preferred quote style is chosen unless the string contains unescaped quotes of the
-/// preferred style. For example, `r"foo"` is chosen over `r'foo'` if the preferred quote
-/// style is double quotes.
-fn choose_quotes_for_raw_string(
-    input: &str,
-    flags: AnyStringFlags,
-    preferred_quote: Quote,
-) -> AnyStringFlags {
-    let preferred_quote_char = preferred_quote.as_char();
-    let mut chars = input.chars().peekable();
-    let contains_unescaped_configured_quotes = loop {
-        match chars.next() {
-            Some('\\') => {
-                // Ignore escaped characters
-                chars.next();
-            }
-            // `"` or `'`
-            Some(c) if c == preferred_quote_char => {
-                if !flags.is_triple_quoted() {
-                    break true;
-                }
+                    let Some(first) = literals.next() else {
+                        return QuoteMetadata::from_str("", part.flags(), preferred_quote);
+                    };
 
-                match chars.peek() {
-                    // We can't turn `r'''\""'''` into `r"""\"""""`, this would confuse the parser
-                    // about where the closing triple quotes start
-                    None => break true,
-                    Some(next) if *next == preferred_quote_char => {
-                        // `""` or `''`
-                        chars.next();
+                    let mut metadata = QuoteMetadata::from_str(
+                        context.locator().slice(first.range()),
+                        fstring.flags.into(),
+                        preferred_quote,
+                    );
 
-                        // We can't turn `r'''""'''` into `r""""""""`, nor can we have
-                        // `"""` or `'''` respectively inside the string
-                        if chars.peek().is_none() || chars.peek() == Some(&preferred_quote_char) {
-                            break true;
-                        }
+                    for literal in literals {
+                        metadata = metadata
+                            .merge(&QuoteMetadata::from_str(
+                                context.locator().slice(literal.range()),
+                                fstring.flags.into(),
+                                preferred_quote,
+                            ))
+                            .expect("Merge to succeed because all parts have the same flags");
                     }
-                    _ => {}
+
+                    metadata
+                } else {
+                    let text = context.locator().slice(part.content_range());
+
+                    Self::from_str(text, part.flags(), preferred_quote)
                 }
             }
-            Some(_) => continue,
-            None => break false,
         }
-    };
-    if contains_unescaped_configured_quotes {
-        flags
-    } else {
-        flags.with_quote_style(preferred_quote)
+    }
+
+    pub(crate) fn from_str(text: &str, flags: AnyStringFlags, preferred_quote: Quote) -> Self {
+        let kind = if flags.is_raw_string() {
+            QuoteMetadataKind::raw(text, preferred_quote, flags.is_triple_quoted())
+        } else if flags.is_triple_quoted() {
+            QuoteMetadataKind::triple_quoted(text, preferred_quote)
+        } else {
+            QuoteMetadataKind::regular(text)
+        };
+
+        Self {
+            kind,
+            source_style: flags.quote_style(),
+        }
+    }
+
+    pub(super) fn choose(&self, preferred_quote: Quote) -> Quote {
+        match self.kind {
+            QuoteMetadataKind::Raw { contains_preferred } => {
+                if contains_preferred {
+                    self.source_style
+                } else {
+                    preferred_quote
+                }
+            }
+            QuoteMetadataKind::Triple { contains_preferred } => {
+                if contains_preferred {
+                    self.source_style
+                } else {
+                    preferred_quote
+                }
+            }
+            QuoteMetadataKind::Regular {
+                single_quotes,
+                double_quotes,
+            } => match single_quotes.cmp(&double_quotes) {
+                Ordering::Less => Quote::Single,
+                Ordering::Equal => preferred_quote,
+                Ordering::Greater => Quote::Double,
+            },
+        }
+    }
+
+    /// Merges the quotes metadata of different literals.
+    ///
+    /// ## Raw and triple quoted strings
+    /// Merging raw and triple quoted strings is only correct if all literals are from the same part.
+    /// E.g. it's okay to merge triple and raw strings from a single `FString` part's literals
+    /// but it isn't safe to merge raw and triple quoted strings from different parts of an implicit
+    /// concatenated string. Where safe means, it may lead to incorrect results.
+    pub(super) fn merge(self, other: &QuoteMetadata) -> Option<QuoteMetadata> {
+        let kind = match (self.kind, other.kind) {
+            (
+                QuoteMetadataKind::Regular {
+                    single_quotes: self_single,
+                    double_quotes: self_double,
+                },
+                QuoteMetadataKind::Regular {
+                    single_quotes: other_single,
+                    double_quotes: other_double,
+                },
+            ) => QuoteMetadataKind::Regular {
+                single_quotes: self_single + other_single,
+                double_quotes: self_double + other_double,
+            },
+
+            // Can't merge quotes from raw strings (even when both strings are raw)
+            (
+                QuoteMetadataKind::Raw {
+                    contains_preferred: self_contains_preferred,
+                },
+                QuoteMetadataKind::Raw {
+                    contains_preferred: other_contains_preferred,
+                },
+            ) => QuoteMetadataKind::Raw {
+                contains_preferred: self_contains_preferred || other_contains_preferred,
+            },
+
+            (
+                QuoteMetadataKind::Triple {
+                    contains_preferred: self_contains_preferred,
+                },
+                QuoteMetadataKind::Triple {
+                    contains_preferred: other_contains_preferred,
+                },
+            ) => QuoteMetadataKind::Triple {
+                contains_preferred: self_contains_preferred || other_contains_preferred,
+            },
+
+            (_, _) => return None,
+        };
+
+        Some(Self {
+            kind,
+            source_style: self.source_style,
+        })
     }
 }
 
-/// Choose the appropriate quote style for a string.
-///
-/// For single quoted strings, the preferred quote style is used, unless the alternative quote style
-/// would require fewer escapes.
-///
-/// For triple quoted strings, the preferred quote style is always used, unless the string contains
-/// a triplet of the quote character (e.g., if double quotes are preferred, double quotes will be
-/// used unless the string contains `"""`).
-fn choose_quotes_impl(
-    input: &str,
-    flags: AnyStringFlags,
-    preferred_quote: Quote,
-) -> AnyStringFlags {
-    let quote = if flags.is_triple_quoted() {
+#[derive(Copy, Clone, Debug)]
+enum QuoteMetadataKind {
+    /// A raw string.
+    ///
+    /// For raw strings it's only possible to change the quotes if the preferred quote style
+    /// isn't used inside the string.
+    Raw { contains_preferred: bool },
+
+    /// Regular (non raw) triple quoted string.
+    ///
+    /// For triple quoted strings it's only possible to change the quotes if no
+    /// triple of the preferred quotes is used inside the string.
+    Triple { contains_preferred: bool },
+
+    /// A single quoted string that uses either double or single quotes.
+    ///
+    /// For regular strings it's desired to pick the quote style that requires the least escaping.
+    /// E.g. pick single quotes for `'A "dog"'` because using single quotes would require escaping
+    /// the two `"`.
+    Regular {
+        single_quotes: u32,
+        double_quotes: u32,
+    },
+}
+
+impl QuoteMetadataKind {
+    /// For triple quoted strings, the preferred quote style can't be used if the string contains
+    /// a tripled of the quote character (e.g., if double quotes are preferred, double quotes will be
+    /// used unless the string contains `"""`).
+    fn triple_quoted(content: &str, preferred_quote: Quote) -> Self {
         // True if the string contains a triple quote sequence of the configured quote style.
         let mut uses_triple_quotes = false;
-        let mut chars = input.chars().peekable();
+        let mut chars = content.chars().peekable();
 
         while let Some(c) = chars.next() {
             let preferred_quote_char = preferred_quote.as_char();
@@ -380,18 +480,18 @@ fn choose_quotes_impl(
             }
         }
 
-        if uses_triple_quotes {
-            // String contains a triple quote sequence of the configured quote style.
-            // Keep the existing quote style.
-            flags.quote_style()
-        } else {
-            preferred_quote
+        Self::Triple {
+            contains_preferred: uses_triple_quotes,
         }
-    } else {
+    }
+
+    /// For single quoted strings, the preferred quote style is used, unless the alternative quote style
+    /// would require fewer escapes.
+    fn regular(text: &str) -> Self {
         let mut single_quotes = 0u32;
         let mut double_quotes = 0u32;
 
-        for c in input.chars() {
+        for c in text.chars() {
             match c {
                 '\'' => {
                     single_quotes += 1;
@@ -405,36 +505,107 @@ fn choose_quotes_impl(
             }
         }
 
-        match preferred_quote {
-            Quote::Single => {
-                if single_quotes > double_quotes {
-                    Quote::Double
-                } else {
-                    Quote::Single
-                }
-            }
-            Quote::Double => {
-                if double_quotes > single_quotes {
-                    Quote::Single
-                } else {
-                    Quote::Double
-                }
-            }
+        Self::Regular {
+            single_quotes,
+            double_quotes,
         }
-    };
+    }
 
-    flags.with_quote_style(quote)
+    /// Computes if a raw string uses the preferred quote. If it does, then it's not possible
+    /// to change the quote style because it would require escaping which isn't possible in raw strings.
+    fn raw(text: &str, preferred: Quote, triple_quoted: bool) -> Self {
+        let mut chars = text.chars().peekable();
+        let preferred_quote_char = preferred.as_char();
+
+        let contains_unescaped_configured_quotes = loop {
+            match chars.next() {
+                Some('\\') => {
+                    // Ignore escaped characters
+                    chars.next();
+                }
+                // `"` or `'`
+                Some(c) if c == preferred_quote_char => {
+                    if !triple_quoted {
+                        break true;
+                    }
+
+                    match chars.peek() {
+                        // We can't turn `r'''\""'''` into `r"""\"""""`, this would confuse the parser
+                        // about where the closing triple quotes start
+                        None => break true,
+                        Some(next) if *next == preferred_quote_char => {
+                            // `""` or `''`
+                            chars.next();
+
+                            // We can't turn `r'''""'''` into `r""""""""`, nor can we have
+                            // `"""` or `'''` respectively inside the string
+                            if chars.peek().is_none() || chars.peek() == Some(&preferred_quote_char)
+                            {
+                                break true;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                Some(_) => continue,
+                None => break false,
+            }
+        };
+
+        Self::Raw {
+            contains_preferred: contains_unescaped_configured_quotes,
+        }
+    }
 }
 
-/// Adds the necessary quote escapes and removes unnecessary escape sequences when quoting `input`
-/// with the provided [`StringQuotes`] style.
-///
-/// Returns the normalized string and whether it contains new lines.
+#[derive(Debug)]
+pub(crate) struct NormalizedString<'a> {
+    /// Holds data about the quotes and prefix of the string
+    flags: AnyStringFlags,
+
+    /// The range of the string's content in the source (minus prefix and quotes).
+    content_range: TextRange,
+
+    /// The normalized text
+    text: Cow<'a, str>,
+}
+
+impl<'a> NormalizedString<'a> {
+    pub(crate) fn text(&self) -> &Cow<'a, str> {
+        &self.text
+    }
+
+    pub(crate) fn flags(&self) -> AnyStringFlags {
+        self.flags
+    }
+}
+
+impl Ranged for NormalizedString<'_> {
+    fn range(&self) -> TextRange {
+        self.content_range
+    }
+}
+
+impl Format<PyFormatContext<'_>> for NormalizedString<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+        let quotes = StringQuotes::from(self.flags);
+        ruff_formatter::write!(f, [self.flags.prefix(), quotes])?;
+        match &self.text {
+            Cow::Borrowed(_) => source_text_slice(self.range()).fmt(f)?,
+            Cow::Owned(normalized) => text(normalized).fmt(f)?,
+        }
+
+        quotes.fmt(f)
+    }
+}
+
 pub(crate) fn normalize_string(
     input: &str,
     start_offset: usize,
-    flags: AnyStringFlags,
-    format_fstring: bool,
+    new_flags: AnyStringFlags,
+    escape_braces: bool,
+    flip_nested_fstring_quotes: bool,
+    format_f_string: bool,
 ) -> Cow<str> {
     // The normalized string if `input` is not yet normalized.
     // `output` must remain empty if `input` is already normalized.
@@ -443,29 +614,39 @@ pub(crate) fn normalize_string(
     // If `last_index` is `0` at the end, then the input is already normalized and can be returned as is.
     let mut last_index = 0;
 
-    let quote = flags.quote_style();
+    let quote = new_flags.quote_style();
     let preferred_quote = quote.as_char();
     let opposite_quote = quote.opposite().as_char();
 
     let mut chars = CharIndicesWithOffset::new(input, start_offset).peekable();
 
-    let is_raw = flags.is_raw_string();
-    let is_fstring = !format_fstring && flags.is_f_string();
+    let is_raw = new_flags.is_raw_string();
+
+    let is_fstring = !format_f_string && new_flags.is_f_string();
     let mut formatted_value_nesting = 0u32;
 
     while let Some((index, c)) = chars.next() {
-        if is_fstring && matches!(c, '{' | '}') {
-            if chars.peek().copied().is_some_and(|(_, next)| next == c) {
-                // Skip over the second character of the double braces
-                chars.next();
-            } else if c == '{' {
-                formatted_value_nesting += 1;
-            } else {
-                // Safe to assume that `c == '}'` here because of the matched pattern above
-                formatted_value_nesting = formatted_value_nesting.saturating_sub(1);
+        if matches!(c, '{' | '}') && is_fstring {
+            if escape_braces {
+                // Escape `{` and `}` when converting a regular string literal to an f-string literal.
+                output.push_str(&input[last_index..=index]);
+                output.push(c);
+                last_index = index + c.len_utf8();
+                continue;
+            } else if is_fstring {
+                if chars.peek().copied().is_some_and(|(_, next)| next == c) {
+                    // Skip over the second character of the double braces
+                    chars.next();
+                } else if c == '{' {
+                    formatted_value_nesting += 1;
+                } else {
+                    // Safe to assume that `c == '}'` here because of the matched pattern above
+                    formatted_value_nesting = formatted_value_nesting.saturating_sub(1);
+                }
+                continue;
             }
-            continue;
         }
+
         if c == '\r' {
             output.push_str(&input[last_index..index]);
 
@@ -488,8 +669,10 @@ pub(crate) fn normalize_string(
                     } else {
                         // Length of the `\` plus the length of the escape sequence character (`u` | `U` | `x`)
                         let escape_start_len = '\\'.len_utf8() + next.len_utf8();
-                        if let Some(normalised) = UnicodeEscape::new(next, !flags.is_byte_string())
-                            .and_then(|escape| escape.normalize(&input[index + escape_start_len..]))
+                        if let Some(normalised) =
+                            UnicodeEscape::new(next, !new_flags.is_byte_string()).and_then(
+                                |escape| escape.normalize(&input[index + escape_start_len..]),
+                            )
                         {
                             let escape_start_offset = index + escape_start_len;
                             if let Cow::Owned(normalised) = &normalised {
@@ -507,7 +690,7 @@ pub(crate) fn normalize_string(
                         }
                     }
 
-                    if !flags.is_triple_quoted() {
+                    if !new_flags.is_triple_quoted() {
                         #[allow(clippy::if_same_then_else)]
                         if next == opposite_quote && formatted_value_nesting == 0 {
                             // Remove the escape by ending before the backslash and starting again with the quote
@@ -520,7 +703,7 @@ pub(crate) fn normalize_string(
                         }
                     }
                 }
-            } else if !flags.is_triple_quoted()
+            } else if !new_flags.is_triple_quoted()
                 && c == preferred_quote
                 && formatted_value_nesting == 0
             {
@@ -529,18 +712,24 @@ pub(crate) fn normalize_string(
                 output.push('\\');
                 output.push(c);
                 last_index = index + preferred_quote.len_utf8();
+            } else if c == preferred_quote
+                && flip_nested_fstring_quotes
+                && formatted_value_nesting > 0
+            {
+                // Flip the quotes
+                output.push_str(&input[last_index..index]);
+                output.push(opposite_quote);
+                last_index = index + preferred_quote.len_utf8();
             }
         }
     }
 
-    let normalized = if last_index == 0 {
+    if last_index == 0 {
         Cow::Borrowed(input)
     } else {
         output.push_str(&input[last_index..]);
         Cow::Owned(output)
-    };
-
-    normalized
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -689,17 +878,142 @@ impl UnicodeEscape {
     }
 }
 
+/// Returns `true` if `string` is an f-string part that contains a debug expression that uses quotes
+/// and the format target is pre Python 312
+/// We can't join f-strings where:
+///
+/// ```python
+/// f"{10 + len('bar')=}"
+/// f'{10 + len("bar")=}'
+/// f""""{10 + len('''bar''')=}"""
+/// ```
+pub(super) fn is_fstring_with_quoted_debug_expression(
+    fstring: &FString,
+    context: &PyFormatContext,
+) -> bool {
+    if fstring.elements.expressions().any(|expression| {
+        if expression.debug_text.is_some() {
+            let content = context.locator().slice(expression.range());
+            match fstring.flags.quote_style() {
+                Quote::Single => {
+                    if fstring.flags.is_triple_quoted() {
+                        content.contains(r#"""""#)
+                    } else {
+                        content.contains('"')
+                    }
+                }
+                Quote::Double => {
+                    if fstring.flags.is_triple_quoted() {
+                        content.contains("'''")
+                    } else {
+                        content.contains('\'')
+                    }
+                }
+            }
+        } else {
+            false
+        }
+    }) {
+        return true;
+    }
+
+    false
+}
+
+/// Tests if the `fstring` contains any triple quoted string, byte, or f-string literal that
+/// contains a quote character opposite to its own quote character.
+///
+/// ```python
+/// f'{"""other " """}'
+/// ```
+///
+/// We can't flip the quote of the outer f-string because it would result in invalid syntax:
+/// ```python
+/// f"{'''other " '''}'
+/// ```
+pub(super) fn is_fstring_with_triple_quoted_literal_expression_containing_quotes(
+    fstring: &FString,
+    context: &PyFormatContext,
+) -> bool {
+    struct Visitor<'a> {
+        context: &'a PyFormatContext<'a>,
+        found: bool,
+    }
+
+    impl Visitor<'_> {
+        fn visit_string_like_part(&mut self, part: StringLikePart) {
+            if !part.flags().is_triple_quoted() || self.found {
+                return;
+            }
+
+            let contains_quotes = match part {
+                StringLikePart::String(_) | StringLikePart::Bytes(_) => {
+                    self.contains_quote(part.content_range(), part.flags())
+                }
+                StringLikePart::FString(fstring) => {
+                    let mut contains_quotes = false;
+                    for literal in fstring.elements.literals() {
+                        if self.contains_quote(literal.range(), fstring.flags.into()) {
+                            contains_quotes = true;
+                            break;
+                        }
+                    }
+
+                    contains_quotes
+                }
+            };
+
+            if contains_quotes {
+                self.found = true;
+            }
+        }
+
+        fn contains_quote(&self, range: TextRange, flags: AnyStringFlags) -> bool {
+            self.context
+                .locator()
+                .slice(range)
+                .contains(flags.quote_style().as_char())
+        }
+    }
+
+    impl SourceOrderVisitor<'_> for Visitor<'_> {
+        fn visit_f_string(&mut self, f_string: &FString) {
+            self.visit_string_like_part(StringLikePart::FString(f_string));
+        }
+
+        fn visit_string_literal(&mut self, string_literal: &StringLiteral) {
+            self.visit_string_like_part(StringLikePart::String(string_literal));
+        }
+
+        fn visit_bytes_literal(&mut self, bytes_literal: &BytesLiteral) {
+            self.visit_string_like_part(StringLikePart::Bytes(bytes_literal));
+        }
+    }
+
+    let mut visitor = Visitor {
+        context,
+        found: false,
+    };
+
+    ruff_python_ast::visitor::source_order::walk_f_string(&mut visitor, fstring);
+
+    visitor.found
+}
+
 #[cfg(test)]
 mod tests {
     use std::borrow::Cow;
 
+    use ruff_python_ast::str_prefix::FStringPrefix;
     use ruff_python_ast::{
         str::Quote,
         str_prefix::{AnyStringPrefix, ByteStringPrefix},
         AnyStringFlags,
     };
 
-    use super::{normalize_string, UnicodeEscape};
+    use crate::string::normalize_string;
+
+    use super::UnicodeEscape;
 
     #[test]
     fn normalize_32_escape() {
@@ -723,9 +1037,35 @@ mod tests {
                 Quote::Double,
                 false,
             ),
+            false,
+            false,
             true,
         );
 
         assert_eq!(r"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a", &normalized);
+    }
+
+    #[test]
+    fn normalize_nested_fstring() {
+        let input =
+            r#"With single quote: '  {my_dict['foo']} With double quote: "  {my_dict["bar"]}"#;
+
+        let normalized = normalize_string(
+            input,
+            0,
+            AnyStringFlags::new(
+                AnyStringPrefix::Format(FStringPrefix::Regular),
+                Quote::Double,
+                false,
+            ),
+            false,
+            true,
+            false,
+        );
+
+        assert_eq!(
+            "With single quote: '  {my_dict['foo']} With double quote: \\\"  {my_dict['bar']}",
+            &normalized
+        );
     }
 }

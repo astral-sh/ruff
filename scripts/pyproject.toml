@@ -2,7 +2,7 @@
 name = "scripts"
 version = "0.0.1"
 dependencies = ["stdlibs"]
-requires-python = ">=3.8"
+requires-python = ">=3.11"
 
 [tool.black]
 line-length = 88

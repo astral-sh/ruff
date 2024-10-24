@@ -114,22 +114,19 @@ fn lint_maybe_undefined(context: &SemanticLintContext, name: &ast::ExprName) {
         return;
     }
     let semantic = &context.semantic;
-    match name.ty(semantic) {
-        Type::Unbound => {
-            context.push_diagnostic(format_diagnostic(
-                context,
-                &format!("Name '{}' used when not defined.", &name.id),
-                name.start(),
-            ));
-        }
-        Type::Union(union) if union.contains(semantic.db(), Type::Unbound) => {
-            context.push_diagnostic(format_diagnostic(
-                context,
-                &format!("Name '{}' used when possibly not defined.", &name.id),
-                name.start(),
-            ));
-        }
-        _ => {}
+    let ty = name.ty(semantic);
+    if ty.is_unbound() {
+        context.push_diagnostic(format_diagnostic(
+            context,
+            &format!("Name `{}` used when not defined", &name.id),
+            name.start(),
+        ));
+    } else if ty.may_be_unbound(semantic.db()) {
+        context.push_diagnostic(format_diagnostic(
+            context,
+            &format!("Name `{}` used when possibly not defined", &name.id),
+            name.start(),
+        ));
     }
 }
 
@@ -139,13 +136,13 @@ fn lint_bad_override(context: &SemanticLintContext, class: &ast::StmtClassDef) {
     // TODO we should have a special marker on the real typing module (from typeshed) so if you
     //   have your own "typing" module in your project, we don't consider it THE typing module (and
     //   same for other stdlib modules that our lint rules care about)
-    let Some(typing) = semantic.resolve_module(ModuleName::new("typing").unwrap()) else {
+    let Some(typing) = semantic.resolve_module(&ModuleName::new("typing").unwrap()) else {
         return;
     };
 
     let override_ty = semantic.global_symbol_ty(&typing, "override");
 
-    let Type::Class(class_ty) = class.ty(semantic) else {
+    let Type::ClassLiteral(class_ty) = class.ty(semantic) else {
         return;
     };
 
@@ -154,7 +151,7 @@ fn lint_bad_override(context: &SemanticLintContext, class: &ast::StmtClassDef) {
         .iter()
         .filter_map(|stmt| stmt.as_function_def_stmt())
     {
-        let Type::Function(ty) = function.ty(semantic) else {
+        let Type::FunctionLiteral(ty) = function.ty(semantic) else {
             return;
         };
 
@@ -164,7 +161,7 @@ fn lint_bad_override(context: &SemanticLintContext, class: &ast::StmtClassDef) {
         if ty.has_decorator(db, override_ty) {
             let method_name = ty.name(db);
             if class_ty
-                .inherited_class_member(db, &method_name)
+                .inherited_class_member(db, method_name)
                 .is_unbound()
             {
                 // TODO should have a qualname() method to support nested classes
@@ -307,13 +304,13 @@ mod tests {
             *messages,
             if cfg!(windows) {
                 vec![
-                    "\\src\\a.py:3:4: Name 'flag' used when not defined.",
-                    "\\src\\a.py:5:1: Name 'y' used when possibly not defined.",
+                    "\\src\\a.py:3:4: Name `flag` used when not defined",
+                    "\\src\\a.py:5:1: Name `y` used when possibly not defined",
                 ]
             } else {
                 vec![
-                    "/src/a.py:3:4: Name 'flag' used when not defined.",
-                    "/src/a.py:5:1: Name 'y' used when possibly not defined.",
+                    "/src/a.py:3:4: Name `flag` used when not defined",
+                    "/src/a.py:5:1: Name `y` used when possibly not defined",
                 ]
             }
         );

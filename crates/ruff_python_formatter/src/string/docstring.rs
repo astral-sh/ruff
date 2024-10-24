@@ -2,15 +2,15 @@
 // "reStructuredText."
 #![allow(clippy::doc_markdown)]
 
+use itertools::Itertools;
 use std::cmp::Ordering;
+use std::sync::LazyLock;
 use std::{borrow::Cow, collections::VecDeque};
 
-use itertools::Itertools;
-
+use regex::Regex;
 use ruff_formatter::printer::SourceMapGeneration;
-use ruff_python_ast::{str::Quote, StringFlags};
+use ruff_python_ast::{str::Quote, AnyStringFlags, StringFlags};
 use ruff_python_trivia::CommentRanges;
-use {once_cell::sync::Lazy, regex::Regex};
 use {
     ruff_formatter::{write, FormatOptions, IndentStyle, LineWidth, Printed},
     ruff_python_trivia::{is_python_whitespace, PythonWhitespace},
@@ -18,10 +18,13 @@ use {
     ruff_text_size::{Ranged, TextLen, TextRange, TextSize},
 };
 
+use super::NormalizedString;
+use crate::preview::{
+    is_docstring_code_block_in_docstring_indent_enabled,
+    is_join_implicit_concatenated_string_enabled,
+};
 use crate::string::StringQuotes;
 use crate::{prelude::*, DocstringCodeLineWidth, FormatModuleError};
-
-use super::NormalizedString;
 
 /// Format a docstring by trimming whitespace and adjusting the indentation.
 ///
@@ -167,7 +170,7 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
     if docstring[first.len()..].trim().is_empty() {
         // For `"""\n"""` or other whitespace between the quotes, black keeps a single whitespace,
         // but `""""""` doesn't get one inserted.
-        if needs_chaperone_space(normalized, trim_end)
+        if needs_chaperone_space(normalized.flags(), trim_end, f.context())
             || (trim_end.is_empty() && !docstring.is_empty())
         {
             space().fmt(f)?;
@@ -189,7 +192,7 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
         // We don't want to count whitespace-only lines as miss-indented
         .filter(|line| !line.trim().is_empty())
         .map(Indentation::from_str)
-        .min_by_key(|indentation| indentation.width())
+        .min_by_key(|indentation| indentation.columns())
         .unwrap_or_default();
 
     DocstringLinePrinter {
@@ -207,7 +210,7 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
     let trim_end = docstring
         .as_ref()
         .trim_end_matches(|c: char| c.is_whitespace() && c != '\n');
-    if needs_chaperone_space(normalized, trim_end) {
+    if needs_chaperone_space(normalized.flags(), trim_end, f.context()) {
         space().fmt(f)?;
     }
 
@@ -353,7 +356,7 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
                             };
                             // This looks suspicious, but it's consistent with the whitespace
                             // normalization that will occur anyway.
-                            let indent = " ".repeat(min_indent.width());
+                            let indent = " ".repeat(min_indent.columns());
                             for docline in formatted_lines {
                                 self.print_one(
                                     &docline.map(|line| std::format!("{indent}{line}")),
@@ -363,7 +366,7 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
                         CodeExampleKind::Markdown(fenced) => {
                             // This looks suspicious, but it's consistent with the whitespace
                             // normalization that will occur anyway.
-                            let indent = " ".repeat(fenced.opening_fence_indent.width());
+                            let indent = " ".repeat(fenced.opening_fence_indent.columns());
                             for docline in formatted_lines {
                                 self.print_one(
                                     &docline.map(|line| std::format!("{indent}{line}")),
@@ -455,7 +458,7 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
             // (see example in [`format_docstring`] doc comment). We then
             // prepend the in-docstring indentation to the string.
             let indent_len =
-                Indentation::from_str(trim_end).width() - self.stripped_indentation.width();
+                Indentation::from_str(trim_end).columns() - self.stripped_indentation.columns();
             let in_docstring_indent = " ".repeat(indent_len) + trim_end.trim_start();
             text(&in_docstring_indent).fmt(self.f)?;
         };
@@ -500,11 +503,24 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
                 let global_line_width = self.f.options().line_width().value();
                 let indent_width = self.f.options().indent_width();
                 let indent_level = self.f.context().indent_level();
-                let current_indent = indent_level
+                let mut current_indent = indent_level
                     .to_ascii_spaces(indent_width)
                     .saturating_add(kind.extra_indent_ascii_spaces());
+
+                if is_docstring_code_block_in_docstring_indent_enabled(self.f.context()) {
+                    // Add the in-docstring indentation
+                    current_indent = current_indent.saturating_add(
+                        u16::try_from(
+                            kind.indent()
+                                .columns()
+                                .saturating_sub(self.stripped_indentation.columns()),
+                        )
+                        .unwrap_or(u16::MAX),
+                    );
+                }
+
                 let width = std::cmp::max(1, global_line_width.saturating_sub(current_indent));
-                LineWidth::try_from(width).expect("width is capped at a minimum of 1")
+                LineWidth::try_from(width).expect("width should be capped at a minimum of 1")
             }
         };
 
@@ -828,6 +844,26 @@ impl<'src> CodeExampleKind<'src> {
             _ => 0,
         }
     }
+
+    /// The indent of the entire code block relative to the start of the line.
+    ///
+    /// For example:
+    /// ```python
+    /// def test():
+    ///     """Docstring
+    ///     Example:
+    ///        >>> 1 + 1
+    /// ```
+    ///
+    /// The `>>> ` block has an indent of 8 columns: The shared indent with the docstring and the 4 spaces
+    /// inside the docstring.
+    fn indent(&self) -> Indentation {
+        match self {
+            CodeExampleKind::Doctest(doctest) => Indentation::from_str(doctest.ps1_indent),
+            CodeExampleKind::Rst(rst) => rst.min_indent.unwrap_or(rst.opening_indent),
+            CodeExampleKind::Markdown(markdown) => markdown.opening_fence_indent,
+        }
+    }
 }
 
 /// State corresponding to a single doctest code example found in a docstring.
@@ -1042,7 +1078,7 @@ impl<'src> CodeExampleRst<'src> {
         // [directives]: https://docutils.sourceforge.io/docs/ref/rst/restructuredtext.html#directives
         // [Pygments lexer names]: https://pygments.org/docs/lexers/
         // [code-block]: https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-code-block
-        static DIRECTIVE_START: Lazy<Regex> = Lazy::new(|| {
+        static DIRECTIVE_START: LazyLock<Regex> = LazyLock::new(|| {
             Regex::new(
                 r"(?m)^\s*\.\. \s*(?i:code-block|sourcecode)::\s*(?i:python|py|python3|py3)$",
             )
@@ -1287,7 +1323,7 @@ impl<'src> CodeExampleMarkdown<'src> {
     ///
     /// [fenced code block]: https://spec.commonmark.org/0.30/#fenced-code-blocks
     fn new(original: InputDocstringLine<'src>) -> Option<CodeExampleMarkdown<'src>> {
-        static FENCE_START: Lazy<Regex> = Lazy::new(|| {
+        static FENCE_START: LazyLock<Regex> = LazyLock::new(|| {
             Regex::new(
                 r"(?xm)
                 ^
@@ -1571,9 +1607,18 @@ fn docstring_format_source(
 /// If the last line of the docstring is `content" """` or `content\ """`, we need a chaperone space
 /// that avoids `content""""` and `content\"""`. This does only applies to un-escaped backslashes,
 /// so `content\\ """` doesn't need a space while `content\\\ """` does.
-fn needs_chaperone_space(normalized: &NormalizedString, trim_end: &str) -> bool {
-    trim_end.ends_with(normalized.flags().quote_style().as_char())
-        || trim_end.chars().rev().take_while(|c| *c == '\\').count() % 2 == 1
+pub(super) fn needs_chaperone_space(
+    flags: AnyStringFlags,
+    trim_end: &str,
+    context: &PyFormatContext,
+) -> bool {
+    if trim_end.chars().rev().take_while(|c| *c == '\\').count() % 2 == 1 {
+        true
+    } else if is_join_implicit_concatenated_string_enabled(context) {
+        flags.is_triple_quoted() && trim_end.ends_with(flags.quote_style().as_char())
+    } else {
+        trim_end.ends_with(flags.quote_style().as_char())
+    }
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -1663,7 +1708,7 @@ impl Indentation {
     /// to the next multiple of 8. This is effectively a port of
     /// [`str.expandtabs`](https://docs.python.org/3/library/stdtypes.html#str.expandtabs),
     /// which black [calls with the default tab width of 8](https://github.com/psf/black/blob/c36e468794f9256d5e922c399240d49782ba04f1/src/black/strings.py#L61).
-    const fn width(self) -> usize {
+    const fn columns(self) -> usize {
         match self {
             Self::Spaces(count) => count,
             Self::Tabs(count) => count * Self::TAB_INDENT_WIDTH,
@@ -1769,7 +1814,7 @@ impl Indentation {
     fn trim_start_str(self, line: &str) -> &str {
         let mut seen_indent_len = 0;
         let mut trimmed = line;
-        let indent_len = self.width();
+        let indent_len = self.columns();
 
         for char in line.chars() {
             if seen_indent_len >= indent_len {
@@ -1797,13 +1842,13 @@ impl Indentation {
 
 impl PartialOrd for Indentation {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.width().cmp(&other.width()))
+        Some(self.columns().cmp(&other.columns()))
     }
 }
 
 impl PartialEq for Indentation {
     fn eq(&self, other: &Self) -> bool {
-        self.width() == other.width()
+        self.columns() == other.columns()
     }
 }
 
@@ -1843,10 +1888,10 @@ mod tests {
     use crate::string::docstring::Indentation;
 
     #[test]
-    fn test_indentation_like_black() {
-        assert_eq!(Indentation::from_str("\t \t  \t").width(), 24);
-        assert_eq!(Indentation::from_str("\t        \t").width(), 24);
-        assert_eq!(Indentation::from_str("\t\t\t").width(), 24);
-        assert_eq!(Indentation::from_str("    ").width(), 4);
+    fn indentation_like_black() {
+        assert_eq!(Indentation::from_str("\t \t  \t").columns(), 24);
+        assert_eq!(Indentation::from_str("\t        \t").columns(), 24);
+        assert_eq!(Indentation::from_str("\t\t\t").columns(), 24);
+        assert_eq!(Indentation::from_str("    ").columns(), 4);
     }
 }

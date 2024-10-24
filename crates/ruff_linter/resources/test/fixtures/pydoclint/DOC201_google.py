@@ -207,3 +207,10 @@ def foo(s: str) -> str | None:
         s (str): A string.
     """
     return None
+
+
+class Spam:
+    # OK
+    def __new__(cls) -> 'Spam':
+        """New!!"""
+        return cls()

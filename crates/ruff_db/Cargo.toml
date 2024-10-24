@@ -26,26 +26,26 @@ filetime = { workspace = true }
 ignore = { workspace = true, optional = true }
 matchit = { workspace = true }
 salsa = { workspace = true }
+serde = { workspace = true, optional = true }
 path-slash = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, optional = true }
 tracing-tree = { workspace = true, optional = true }
 rustc-hash = { workspace = true }
-
-[target.'cfg(not(target_arch="wasm32"))'.dependencies]
-zip = { workspace = true, features = ["zstd"] }
+zip = { workspace = true }
 
 [target.'cfg(target_arch="wasm32")'.dependencies]
 web-time = { version = "1.1.0" }
-zip = { workspace = true, features = ["deflate"] }
 
 [dev-dependencies]
 insta = { workspace = true }
 tempfile = { workspace = true }
 
 [features]
+default = ["os"]
 cache = ["ruff_cache"]
 os = ["ignore"]
+serde = ["dep:serde", "camino/serde1"]
 # Exposes testing utilities.
 testing = ["tracing-subscriber", "tracing-tree"]

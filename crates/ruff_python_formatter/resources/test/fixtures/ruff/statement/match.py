@@ -588,3 +588,28 @@ match n % 3, n % 5:
 match x:
     case Child(aaaaaaaaa, bbbbbbbbbbbbbbb, cccccc), Doc(aaaaa, bbbbbbbbbb, ddddddddddddd):
         pass
+
+
+match guard_comments:
+    case "abcd" if (  # trailing open parentheses comment
+        aaaaaaaaahhhhhhhh == 1 and bbbbbbaaaaaaaaaaa == 2
+    ):
+        pass
+
+    case "bcdef" if (
+        aaaaaaaaahhhhhhhh == 1 and bbbbbbaaaaaaaaaaa == 2 # trailing end of line comment
+    ):  # comment
+        pass
+
+    case "efgh" if (
+        # leading own line comment
+        aaaaaahhhhhh == 1
+    ):
+        pass
+
+    case "hijk" if (
+        aaaaaaaaa == 1
+        # trailing own line comment
+    ):
+        pass
+

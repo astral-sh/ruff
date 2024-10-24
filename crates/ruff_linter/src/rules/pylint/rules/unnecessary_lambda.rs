@@ -179,7 +179,7 @@ pub(crate) fn unnecessary_lambda(checker: &mut Checker, lambda: &ExprLambda) {
             if call_posargs.len() != lambda_posargs.len() {
                 return;
             }
-            for (param, arg) in lambda_posargs.iter().zip(call_posargs.iter()) {
+            for (param, arg) in lambda_posargs.iter().zip(call_posargs) {
                 let Expr::Name(ast::ExprName { id, .. }) = arg else {
                     return;
                 };
