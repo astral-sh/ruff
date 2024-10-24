@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.7.1
+
+### Preview features
+
+- Fix `E221` and `E222` to flag missing or extra whitespace around `==` operator ([#13890](https://github.com/astral-sh/ruff/pull/13890))
+- Formatter: Alternate quotes for strings inside f-strings in preview  ([#13860](https://github.com/astral-sh/ruff/pull/13860))
+- Formatter: Join implicit concatenated strings when they fit on a line ([#13663](https://github.com/astral-sh/ruff/pull/13663))
+- \[`pylint`\] Restrict `iteration-over-set` to only work on sets of literals (`PLC0208`) ([#13731](https://github.com/astral-sh/ruff/pull/13731))
+
+### Rule changes
+
+- \[`flake8-type-checking`\] Support auto-quoting when annotations contain quotes ([#11811](https://github.com/astral-sh/ruff/pull/11811))
+
+### Server
+
+- Avoid indexing the workspace for single-file mode ([#13770](https://github.com/astral-sh/ruff/pull/13770))
+
+### Bug fixes
+
+- Make `ARG002` compatible with `EM101` when raising `NotImplementedError` ([#13714](https://github.com/astral-sh/ruff/pull/13714))
+
+### Other changes
+
+- Introduce more Docker tags for Ruff (similar to uv) ([#13274](https://github.com/astral-sh/ruff/pull/13274))
+
 ## 0.7.0
 
 Check out the [blog post](https://astral.sh/blog/ruff-v0.7.0) for a migration guide and overview of the changes!
