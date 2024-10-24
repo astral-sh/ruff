@@ -62,3 +62,86 @@ invalid_characters.py:55:21: PLE2510 [*] Invalid unescaped character backspace, 
 56 56 | 
 57 57 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998106
 58 58 | x = f"""}}ab"""
+
+invalid_characters.py:63:35: PLE2510 [*] Invalid unescaped character backspace, use "\b" instead
+   |
+62 | # https://github.com/astral-sh/ruff/issues/13294#issuecomment-2341955180
+63 | raw_single_singlequote = r'\ \' " ␈'
+   |                                   ^ PLE2510
+64 | raw_triple_singlequote = r'''\ ' " '''
+65 | raw_triple_singlequote_2 = r'''​ \''' \''''
+   |
+   = help: Replace with escape sequence
+
+ℹ Safe fix
+60 60 | x = f"""}}a␛b"""
+61 61 | 
+62 62 | # https://github.com/astral-sh/ruff/issues/13294#issuecomment-2341955180
+63    |-raw_single_singlequote = r'\ \' " ␈'
+   63 |+raw_single_singlequote = '\\ \\\' " \b'
+64 64 | raw_triple_singlequote = r'''\ ' " '''
+65 65 | raw_triple_singlequote_2 = r'''​ \''' \''''
+66 66 | raw_single_doublequote = r"\ ' \" ␛"
+
+invalid_characters.py:77:1: PLE2510 [*] Invalid unescaped character backspace, use "\b" instead
+   |
+75 | raw_single_doublequote_multiline = r"' \
+76 | \" \
+77 | ␈"
+   | ^ PLE2510
+78 | raw_triple_doublequote_multiline = r"""' \
+79 | " \
+   |
+   = help: Replace with escape sequence
+
+ℹ Safe fix
+72 72 | raw_triple_singlequote_multiline = r'''' \
+73 73 | " \
+74 74 | '''
+75    |-raw_single_doublequote_multiline = r"' \
+76    |-\" \
+77    |-␈"
+   75 |+raw_single_doublequote_multiline = "' \\\n\
+   76 |+\\\" \\\n\
+   77 |+\b"
+78 78 | raw_triple_doublequote_multiline = r"""' \
+79 79 | " \
+80 80 | ␈"""
+
+invalid_characters.py:80:1: PLE2510 [*] Invalid unescaped character backspace, use "\b" instead
+   |
+78 | raw_triple_doublequote_multiline = r"""' \
+79 | " \
+80 | ␈"""
+   | ^ PLE2510
+81 | raw_nested_fstrings = rf'␈\ {rf'\ {rf'␛\' '}'}'
+   |
+   = help: Replace with escape sequence
+
+ℹ Safe fix
+75 75 | raw_single_doublequote_multiline = r"' \
+76 76 | \" \
+77 77 | ␈"
+78    |-raw_triple_doublequote_multiline = r"""' \
+79    |-" \
+80    |-␈"""
+   78 |+raw_triple_doublequote_multiline = """' \\
+   79 |+" \\
+   80 |+\b"""
+81 81 | raw_nested_fstrings = rf'␈\ {rf'\ {rf'␛\' '}'}'
+
+invalid_characters.py:81:26: PLE2510 [*] Invalid unescaped character backspace, use "\b" instead
+   |
+79 | " \
+80 | ␈"""
+81 | raw_nested_fstrings = rf'␈\ {rf'\ {rf'␛\' '}'}'
+   |                          ^ PLE2510
+   |
+   = help: Replace with escape sequence
+
+ℹ Safe fix
+78 78 | raw_triple_doublequote_multiline = r"""' \
+79 79 | " \
+80 80 | ␈"""
+81    |-raw_nested_fstrings = rf'␈\ {rf'\ {rf'␛\' '}'}'
+   81 |+raw_nested_fstrings = f'\b\\ {rf'\ {rf'␛\' '}'}'
