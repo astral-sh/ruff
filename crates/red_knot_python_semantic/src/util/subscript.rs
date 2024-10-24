@@ -68,7 +68,12 @@ mod tests {
 
         assert_eq!(iter.clone().python_subscript(-1), Some(u64::MAX));
         assert_eq!(iter.clone().python_subscript(-2), Some(u64::MAX - 1));
-        // i64::MIN is not representable as a positive number, so the
+
+        // i64::MIN is not representable as a positive number, so it is not
+        // a valid index:
+        assert_eq!(iter.clone().python_subscript(i64::MIN), None);
+
+        // but i64::MIN +1 is:
         assert_eq!(
             iter.clone().python_subscript(i64::MIN + 1),
             Some(2u64.pow(63) + 1)
