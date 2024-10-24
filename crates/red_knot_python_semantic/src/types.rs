@@ -322,6 +322,12 @@ impl<'db> Type<'db> {
             .expect("Expected a Type::ModuleLiteral variant")
     }
 
+    #[must_use]
+    pub fn negate(&self, db: &'db dyn Db) -> Type<'db> {
+        let r = IntersectionBuilder::new(db).add_negative(*self).build();
+        r
+    }
+
     pub const fn into_union_type(self) -> Option<UnionType<'db>> {
         match self {
             Type::Union(union_type) => Some(union_type),

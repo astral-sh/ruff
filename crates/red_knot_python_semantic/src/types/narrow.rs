@@ -1,5 +1,5 @@
 use crate::semantic_index::ast_ids::HasScopedAstId;
-use crate::semantic_index::constraint::{Constraint, PatternConstraint};
+use crate::semantic_index::constraint::{Constraint, ConstraintNode, PatternConstraint};
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, SymbolTable};
@@ -34,13 +34,13 @@ pub(crate) fn narrowing_constraint<'db>(
     constraint: Constraint<'db>,
     definition: Definition<'db>,
 ) -> Option<Type<'db>> {
-    match constraint {
-        Constraint::Expression(expression) => {
-            all_narrowing_constraints_for_expression(db, expression)
+    match constraint.node {
+        ConstraintNode::Expression(expression) => {
+            all_narrowing_constraints_for_expression(db, expression, constraint.negative)
                 .get(&definition.symbol(db))
                 .copied()
         }
-        Constraint::Pattern(pattern) => all_narrowing_constraints_for_pattern(db, pattern)
+        ConstraintNode::Pattern(pattern) => all_narrowing_constraints_for_pattern(db, pattern)
             .get(&definition.symbol(db))
             .copied(),
     }
@@ -51,15 +51,30 @@ fn all_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternConstraint<'db>,
 ) -> NarrowingConstraints<'db> {
-    NarrowingConstraintsBuilder::new(db, Constraint::Pattern(pattern)).finish()
+    NarrowingConstraintsBuilder::new(
+        db,
+        Constraint {
+            node: ConstraintNode::Pattern(pattern),
+            negative: false,
+        },
+    )
+    .finish()
 }
 
 #[salsa::tracked(return_ref)]
 fn all_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
+    negative: bool,
 ) -> NarrowingConstraints<'db> {
-    NarrowingConstraintsBuilder::new(db, Constraint::Expression(expression)).finish()
+    NarrowingConstraintsBuilder::new(
+        db,
+        Constraint {
+            node: ConstraintNode::Expression(expression),
+            negative,
+        },
+    )
+    .finish()
 }
 
 /// Generate a constraint from the *type* of the second argument of an `isinstance` call.
@@ -102,22 +117,23 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
     }
 
     fn finish(mut self) -> NarrowingConstraints<'db> {
-        match self.constraint {
-            Constraint::Expression(expression) => self.evaluate_expression_constraint(expression),
-            Constraint::Pattern(pattern) => self.evaluate_pattern_constraint(pattern),
+        match self.constraint.node {
+            ConstraintNode::Expression(expression) => {
+                self.evaluate_expression_constraint(expression, self.constraint.negative);
+            }
+            ConstraintNode::Pattern(pattern) => self.evaluate_pattern_constraint(pattern),
         }
-
         self.constraints.shrink_to_fit();
         self.constraints
     }
 
-    fn evaluate_expression_constraint(&mut self, expression: Expression<'db>) {
+    fn evaluate_expression_constraint(&mut self, expression: Expression<'db>, negative: bool) {
         match expression.node_ref(self.db).node() {
             ast::Expr::Compare(expr_compare) => {
-                self.add_expr_compare(expr_compare, expression);
+                self.add_expr_compare(expr_compare, expression, negative);
             }
             ast::Expr::Call(expr_call) => {
-                self.add_expr_call(expr_call, expression);
+                self.add_expr_call(expr_call, expression, negative);
             }
             _ => {} // TODO other test expression kinds
         }
@@ -159,13 +175,18 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
     }
 
     fn scope(&self) -> ScopeId<'db> {
-        match self.constraint {
-            Constraint::Expression(expression) => expression.scope(self.db),
-            Constraint::Pattern(pattern) => pattern.scope(self.db),
+        match self.constraint.node {
+            ConstraintNode::Expression(expression) => expression.scope(self.db),
+            ConstraintNode::Pattern(pattern) => pattern.scope(self.db),
         }
     }
 
-    fn add_expr_compare(&mut self, expr_compare: &ast::ExprCompare, expression: Expression<'db>) {
+    fn add_expr_compare(
+        &mut self,
+        expr_compare: &ast::ExprCompare,
+        expression: Expression<'db>,
+        negative: bool,
+    ) {
         let ast::ExprCompare {
             range: _,
             left,
@@ -175,6 +196,13 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         if !left.is_name_expr() && comparators.iter().all(|c| !c.is_name_expr()) {
             // If none of the comparators are name expressions,
             // we have no symbol to narrow down the type of.
+            return;
+        }
+        if negative && comparators.len() > 1 {
+            // We can't negate a constraint made by a multi-comparator expression, since we can't
+            // know which comparison part is the one being negated.
+            // For example, the negation of  `x is 1 is y is 2`, would be `(x is not 1) or (y is not 1) or (y is not 2)`
+            // and that requires cross-symbol constraints, which we don't support yet.
             return;
         }
         let scope = self.scope();
@@ -192,27 +220,40 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             {
                 // SAFETY: we should always have a symbol for every Name node.
                 let symbol = self.symbols().symbol_id_by_name(id).unwrap();
-                let comp_ty = inference.expression_ty(right.scoped_ast_id(self.db, scope));
-                match op {
-                    ast::CmpOp::IsNot => {
-                        if comp_ty.is_singleton() {
+                let rhs_ty = inference.expression_ty(right.scoped_ast_id(self.db, scope));
+                match (op, negative) {
+                    (ast::CmpOp::IsNot, false) | (ast::CmpOp::Is, true) => {
+                        if rhs_ty.is_singleton() {
                             let ty = IntersectionBuilder::new(self.db)
-                                .add_negative(comp_ty)
+                                .add_negative(rhs_ty)
                                 .build();
                             self.constraints.insert(symbol, ty);
                         } else {
                             // Non-singletons cannot be safely narrowed using `is not`
                         }
                     }
-                    ast::CmpOp::Is => {
-                        self.constraints.insert(symbol, comp_ty);
+                    (ast::CmpOp::Is, false) | (ast::CmpOp::IsNot, true) => {
+                        self.constraints.insert(symbol, rhs_ty);
                     }
-                    ast::CmpOp::NotEq => {
-                        if comp_ty.is_single_valued(self.db) {
+                    (ast::CmpOp::NotEq, false) | (ast::CmpOp::Eq, true) => {
+                        if rhs_ty.is_single_valued(self.db) {
                             let ty = IntersectionBuilder::new(self.db)
-                                .add_negative(comp_ty)
+                                .add_negative(rhs_ty)
                                 .build();
                             self.constraints.insert(symbol, ty);
+                        }
+                    }
+                    (ast::CmpOp::NotEq, true) | (ast::CmpOp::Eq, false) => {
+                        if rhs_ty.is_single_valued(self.db) {
+                            self.constraints.insert(symbol, rhs_ty);
+                        } else if let Some(union) = rhs_ty.into_union_type() {
+                            if union
+                                .elements(self.db)
+                                .iter()
+                                .all(|ty| ty.is_single_valued(self.db))
+                            {
+                                self.constraints.insert(symbol, rhs_ty);
+                            }
                         }
                     }
                     _ => {
@@ -223,7 +264,12 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         }
     }
 
-    fn add_expr_call(&mut self, expr_call: &ast::ExprCall, expression: Expression<'db>) {
+    fn add_expr_call(
+        &mut self,
+        expr_call: &ast::ExprCall,
+        expression: Expression<'db>,
+        negative: bool,
+    ) {
         let scope = self.scope();
         let inference = infer_expression_types(self.db, expression);
 
@@ -242,7 +288,11 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
 
                     // TODO: add support for PEP 604 union types on the right hand side:
                     // isinstance(x, str | (int | float))
-                    if let Some(constraint) = generate_isinstance_constraint(self.db, &rhs_type) {
+                    if let Some(mut constraint) = generate_isinstance_constraint(self.db, &rhs_type)
+                    {
+                        if negative {
+                            constraint = constraint.negate(self.db);
+                        }
                         self.constraints.insert(symbol, constraint);
                     }
                 }
