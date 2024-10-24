@@ -1,7 +1,6 @@
 use anyhow::Result;
 use ast::visitor::source_order;
 use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
-use ruff_source_file::Locator;
 use std::cmp::Reverse;
 
 use ruff_diagnostics::Edit;
