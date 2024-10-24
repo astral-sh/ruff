@@ -52,13 +52,12 @@ use crate::stdlib::builtins_module_scope;
 use crate::types::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 use crate::types::{
     bindings_ty, builtins_symbol_ty, declarations_ty, global_symbol_ty, symbol_ty,
-    typing_extensions_symbol_ty, BytesLiteralType, ClassType, FunctionType, KnownFunction,
-    StringLiteralType, Truthiness, TupleType, Type, TypeArrayDisplay, UnionType,
+    typing_extensions_symbol_ty, BytesLiteralType, ClassType, FunctionType, IterationOutcome,
+    KnownClass, KnownFunction, SliceLiteralType, StringLiteralType, Truthiness, TupleType, Type,
+    TypeArrayDisplay, UnionBuilder, UnionType,
 };
-use crate::util::subscript::PythonSubscript;
+use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
-
-use super::{IterationOutcome, KnownClass, UnionBuilder};
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -3201,20 +3200,38 @@ impl<'db> TypeInferenceBuilder<'db> {
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
             (Type::Tuple(tuple_ty), Type::IntLiteral(int)) => {
                 let elements = tuple_ty.elements(self.db);
-                elements
-                    .iter()
-                    .python_subscript(int)
-                    .copied()
-                    .unwrap_or_else(|| {
-                        self.index_out_of_bounds_diagnostic(
-                            "tuple",
-                            value_node.into(),
-                            value_ty,
-                            elements.len(),
-                            int,
-                        );
-                        Type::Unknown
-                    })
+                elements.iter().py_index(int).copied().unwrap_or_else(|_| {
+                    self.index_out_of_bounds_diagnostic(
+                        "tuple",
+                        value_node.into(),
+                        value_ty,
+                        elements.len(),
+                        int,
+                    );
+                    Type::Unknown
+                })
+            }
+            // Ex) Given `("a", 1, Null)[0:2]`, return `("a", 1)`
+            (Type::Tuple(tuple_ty), Type::SliceLiteral(slice_ty)) => {
+                let elements = tuple_ty.elements(self.db);
+                let start = slice_ty.start(self.db);
+                let stop = slice_ty.stop(self.db);
+                let step = slice_ty.step(self.db);
+
+                if let Ok(new_elements) = elements.iter().py_slice(start, stop, step) {
+                    let new_elements: Vec<_> = new_elements.copied().collect();
+                    Type::Tuple(TupleType::new(self.db, new_elements.into_boxed_slice()))
+                } else {
+                    self.index_out_of_bounds_diagnostic(
+                        "tuple",
+                        value_node.into(),
+                        value_ty,
+                        elements.len(),
+                        100, // TODO
+                    );
+
+                    Type::Unknown
+                }
             }
             // Ex) Given `("a", "b", "c", "d")[True]`, return `"b"`
             (Type::Tuple(_), Type::BooleanLiteral(bool)) => self.infer_subscript_expression_types(
@@ -3227,14 +3244,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let literal_value = literal_ty.value(self.db);
                 literal_value
                     .chars()
-                    .python_subscript(int)
+                    .py_index(int)
                     .map(|ch| {
                         Type::StringLiteral(StringLiteralType::new(
                             self.db,
                             ch.to_string().into_boxed_str(),
                         ))
                     })
-                    .unwrap_or_else(|| {
+                    .unwrap_or_else(|_| {
                         self.index_out_of_bounds_diagnostic(
                             "string",
                             value_node.into(),
@@ -3245,16 +3262,41 @@ impl<'db> TypeInferenceBuilder<'db> {
                         Type::Unknown
                     })
             }
+            // Ex) Given `"value"[1:3]`, return `"al"`
+            (Type::StringLiteral(literal_ty), Type::SliceLiteral(slice_ty)) => {
+                let literal_value = literal_ty.value(self.db);
+                let start = slice_ty.start(self.db);
+                let stop = slice_ty.stop(self.db);
+                let step = slice_ty.step(self.db);
+                let chars: Vec<_> = literal_value.chars().collect();
+                if let Ok(new_chars) = chars.into_iter().py_slice(start, stop, step) {
+                    let new_literal = new_chars.collect::<String>();
+                    Type::StringLiteral(StringLiteralType::new(
+                        self.db,
+                        new_literal.into_boxed_str(),
+                    ))
+                } else {
+                    self.index_out_of_bounds_diagnostic(
+                        "string",
+                        value_node.into(),
+                        value_ty,
+                        literal_value.chars().count(),
+                        100, // TODO
+                    );
+
+                    Type::Unknown
+                }
+            }
             // Ex) Given `b"value"[1]`, return `b"a"`
             (Type::BytesLiteral(literal_ty), Type::IntLiteral(int)) => {
                 let literal_value = literal_ty.value(self.db);
                 literal_value
                     .iter()
-                    .python_subscript(int)
+                    .py_index(int)
                     .map(|byte| {
                         Type::BytesLiteral(BytesLiteralType::new(self.db, [*byte].as_slice()))
                     })
-                    .unwrap_or_else(|| {
+                    .unwrap_or_else(|_| {
                         self.index_out_of_bounds_diagnostic(
                             "bytes literal",
                             value_node.into(),
@@ -3347,6 +3389,11 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     fn infer_slice_expression(&mut self, slice: &ast::ExprSlice) -> Type<'db> {
+        enum SliceArg {
+            Arg(Option<i64>),
+            Unsupported,
+        }
+
         let ast::ExprSlice {
             range: _,
             lower,
@@ -3354,12 +3401,31 @@ impl<'db> TypeInferenceBuilder<'db> {
             step,
         } = slice;
 
-        self.infer_optional_expression(lower.as_deref());
-        self.infer_optional_expression(upper.as_deref());
-        self.infer_optional_expression(step.as_deref());
+        let ty_lower = self.infer_optional_expression(lower.as_deref());
+        let ty_upper = self.infer_optional_expression(upper.as_deref());
+        let ty_step = self.infer_optional_expression(step.as_deref());
 
-        // TODO slice
-        Type::Todo
+        let type_to_slice_argument = |ty: Option<Type<'db>>| match ty {
+            Some(Type::IntLiteral(n)) => SliceArg::Arg(Some(n)),
+            Some(Type::BooleanLiteral(b)) => SliceArg::Arg(Some(i64::from(b))),
+            Some(Type::None) => SliceArg::Arg(None),
+            Some(Type::Instance(class)) if class.is_known(self.db, KnownClass::NoneType) => {
+                SliceArg::Arg(None)
+            }
+            None => SliceArg::Arg(None),
+            _ => SliceArg::Unsupported,
+        };
+
+        match (
+            type_to_slice_argument(ty_lower),
+            type_to_slice_argument(ty_upper),
+            type_to_slice_argument(ty_step),
+        ) {
+            (SliceArg::Arg(lower), SliceArg::Arg(upper), SliceArg::Arg(step)) => {
+                Type::SliceLiteral(SliceLiteralType::new(self.db, lower, upper, step))
+            }
+            _ => KnownClass::Slice.to_instance(self.db),
+        }
     }
 
     fn infer_type_parameters(&mut self, type_parameters: &ast::TypeParams) {
