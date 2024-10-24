@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use lsp_types::Position;
 use red_knot_python_semantic::search::location_of_definition_of_item_at_location;
-use red_knot_python_semantic::semantic_index::definition::Definition;
 use ruff_db::files::location::Location;
 use ruff_db::source::{line_index, source_text};
 use ruff_source_file::SourceLocation;

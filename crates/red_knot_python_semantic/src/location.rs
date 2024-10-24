@@ -3,11 +3,8 @@ use crate::{
     semantic_index::{definition::Definition, use_def_map, SemanticIndex},
     Db, HasTy, SemanticModel,
 };
-use ruff_db::{
-    files::{location::Location, File},
-    source::{line_index, source_text},
-};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_db::files::{location::Location, File};
+use ruff_text_size::TextSize;
 
 // XXX should I just use an alias here? Not getting much value out of this huge import
 use ruff_python_ast::{
@@ -33,25 +30,6 @@ pub(crate) fn location_from_definition<'db>(
         file: definition.file(db),
         range,
     };
-}
-
-fn ruff_range_to_lsp_range(db: &dyn Db, file: File, range: TextRange) -> lsp_types::Range {
-    let li = line_index(db.upcast(), file);
-    let contents = source_text(db.upcast(), file);
-    let loc_start = li.source_location(range.start(), &contents);
-    let loc_end = li.source_location(range.end(), &contents);
-    lsp_types::Range {
-        start: lsp_types::Position::new(
-            // XXX very wrong probably
-            loc_start.row.to_zero_indexed() as u32,
-            loc_start.column.to_zero_indexed() as u32,
-        ),
-        end: lsp_types::Position::new(
-            // XXX very wrong probably
-            loc_end.row.to_zero_indexed() as u32,
-            loc_end.column.to_zero_indexed() as u32,
-        ),
-    }
 }
 
 /// This trait is used to locate where something is defined
