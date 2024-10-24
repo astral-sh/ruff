@@ -1,9 +1,13 @@
 use std::borrow::Cow;
 
-use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
+use crate::{
+    server::{
+        api::traits::{BackgroundDocumentRequestHandler, RequestHandler},
+        client::Notifier,
+    },
+    DocumentSnapshot,
+};
 use lsp_types::{request::GotoDefinition, GotoDefinitionParams, GotoDefinitionResponse, Url};
-// XXX the one place where I'm using something from red_knot_python_semantic
-// maybe need to just move the type?
 use red_knot_workspace::db::RootDatabase;
 use ruff_db::files::{location::Location, File};
 use ruff_source_file::{OneIndexed, SourceLocation};
@@ -67,14 +71,14 @@ fn lsp_position_to_source_location(position: lsp_types::Position) -> SourceLocat
 }
 
 impl BackgroundDocumentRequestHandler for GotoDefinitionHandler {
-    fn document_url(params: &GotoDefinitionParams) -> std::borrow::Cow<lsp_types::Url> {
+    fn document_url(params: &GotoDefinitionParams) -> Cow<lsp_types::Url> {
         Cow::Borrowed(&params.text_document_position_params.text_document.uri)
     }
 
     fn run_with_snapshot(
-        snapshot: crate::DocumentSnapshot,
+        snapshot: DocumentSnapshot,
         db: RootDatabase,
-        _notifier: crate::server::client::Notifier,
+        _notifier: Notifier,
         params: GotoDefinitionParams,
     ) -> crate::server::api::Result<Option<GotoDefinitionResponse>> {
         let Some(file) = snapshot.file(&db) else {

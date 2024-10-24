@@ -1,4 +1,4 @@
-use lsp_server::{self as server, ErrorCode};
+use lsp_server as server;
 
 use crate::server::schedule::Task;
 use crate::session::Session;
@@ -33,13 +33,7 @@ pub(super) fn request<'a>(req: server::Request) -> Task<'a> {
         ),
         method => {
             tracing::warn!("Received request {method} which does not have a handler");
-            Err(Error::new(
-                anyhow::Error::msg(format!(
-                    "Received request {method} which does not have a handler"
-                )),
-                ErrorCode::MethodNotFound,
-            ))
-            // return Task::nothing();
+            return Task::nothing();
         }
     }
     .unwrap_or_else(|err| {

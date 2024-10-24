@@ -218,7 +218,6 @@ impl Server {
     fn server_capabilities(position_encoding: PositionEncoding) -> ServerCapabilities {
         ServerCapabilities {
             position_encoding: Some(position_encoding.into()),
-            // XXX there's definitely a better construction strategy here
             definition_provider: Some(lsp_types::OneOf::Right(DefinitionOptions {
                 work_done_progress_options: WorkDoneProgressOptions {
                     work_done_progress: None,
