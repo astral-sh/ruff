@@ -199,10 +199,10 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             return;
         }
         if negative && comparators.len() > 1 {
-            // We can't negate a constraint made by a multi comparator expression, since we can't
-            // know which comparison part is the one that is being negated.
+            // We can't negate a constraint made by a multi-comparator expression, since we can't
+            // know which comparison part is the one being negated.
             // For example, the negation of  `x is 1 is y is 2`, would be `(x is not 1) or (y is not 1) or (y is not 2)`
-            // and that's requires cross-symbol constrains which we don't support yet.
+            // and that requires cross-symbol constraints, which we don't support yet.
             return;
         }
         let scope = self.scope();
