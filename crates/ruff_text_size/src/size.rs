@@ -87,7 +87,7 @@ impl TextSize {
         self.raw as usize
     }
 
-    /// Returns whether this TextSize would be in the TextRange.
+    /// Returns whether this `TextSize` would be in the `TextRange`.
     ///
     /// # Examples
     ///

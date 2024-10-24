@@ -1751,6 +1751,15 @@ impl<'db> ClassType<'db> {
     pub fn own_class_member_def(self, db: &'db dyn Db, name: &str) -> Option<Definition<'db>> {
         let scope = self.body_scope(db);
         let st = symbol_table(db, scope);
+        // here we're making the following assumption: that the first binding for a symbol
+        // would be a good consideration for a definition site
+        //
+        // class C:
+        //    a: int
+        //    a = 2
+        //
+        // In the above "a = 2" is considered the "definition" of C.a with this logic.
+        // XXX this feels wrong
         st.symbol_id_by_name(name)
             .and_then(|sid| use_def_map(db, scope).first_binding_for_symbol_id(sid))
     }
