@@ -5,7 +5,6 @@
 ```py
 class NotSubscriptable: ...
 
-
 a = NotSubscriptable()[0]  # error: "Cannot subscript object of type `NotSubscriptable` with no `__getitem__` method"
 ```
 
@@ -14,7 +13,6 @@ a = NotSubscriptable()[0]  # error: "Cannot subscript object of type `NotSubscri
 ```py
 class NotSubscriptable:
     __getitem__ = None
-
 
 a = NotSubscriptable()[0]  # error: "Method `__getitem__` of type `None` is not callable on object of type `NotSubscriptable`"
 ```
@@ -26,7 +24,6 @@ class Identity:
     def __getitem__(self, index: int) -> int:
         return index
 
-
 reveal_type(Identity()[0])  # revealed: int
 ```
 
@@ -35,18 +32,15 @@ reveal_type(Identity()[0])  # revealed: int
 ```py
 flag = True
 
-
 class Identity:
     if flag:
 
         def __getitem__(self, index: int) -> int:
             return index
-
     else:
 
         def __getitem__(self, index: int) -> str:
             return str(index)
-
 
 reveal_type(Identity()[0])  # revealed: int | str
 ```

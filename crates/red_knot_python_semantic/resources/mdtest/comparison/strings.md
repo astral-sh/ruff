@@ -5,7 +5,6 @@
 ```py
 def str_instance() -> str: ...
 
-
 reveal_type("abc" == "abc")  # revealed: Literal[True]
 reveal_type("ab_cd" <= "ab_ce")  # revealed: Literal[True]
 reveal_type("abc" in "ab cd")  # revealed: Literal[False]

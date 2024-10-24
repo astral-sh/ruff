@@ -5,7 +5,6 @@
 ```py
 class NotSubscriptable: ...
 
-
 a = NotSubscriptable[0]  # error: "Cannot subscript object of type `Literal[NotSubscriptable]` with no `__class_getitem__` method"
 ```
 
@@ -16,7 +15,6 @@ class Identity:
     def __class_getitem__(cls, item: int) -> str:
         return item
 
-
 reveal_type(Identity[0])  # revealed: str
 ```
 
@@ -25,18 +23,15 @@ reveal_type(Identity[0])  # revealed: str
 ```py
 flag = True
 
-
 class UnionClassGetItem:
     if flag:
 
         def __class_getitem__(cls, item: int) -> str:
             return item
-
     else:
 
         def __class_getitem__(cls, item: int) -> int:
             return item
-
 
 reveal_type(UnionClassGetItem[0])  # revealed: str | int
 ```
@@ -46,16 +41,13 @@ reveal_type(UnionClassGetItem[0])  # revealed: str | int
 ```py
 flag = True
 
-
 class A:
     def __class_getitem__(cls, item: int) -> str:
         return item
 
-
 class B:
     def __class_getitem__(cls, item: int) -> int:
         return item
-
 
 x = A if flag else B
 
@@ -69,15 +61,12 @@ reveal_type(x[0])  # revealed: str | int
 flag = True
 
 if flag:
-
     class Spam:
         def __class_getitem__(self, x: int) -> str:
             return "foo"
 
 else:
-
     class Spam: ...
-
 
 # error: [call-non-callable] "Method `__class_getitem__` of type `Literal[__class_getitem__] | Unbound` is not callable on object of type `Literal[Spam, Spam]`"
 # revealed: str | Unknown
@@ -90,7 +79,6 @@ reveal_type(Spam[42])
 flag = True
 
 if flag:
-
     class Eggs:
         def __class_getitem__(self, x: int) -> str:
             return "foo"

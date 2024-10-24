@@ -46,10 +46,10 @@ repos:
           )$
 
   - repo: https://github.com/adamchainz/blacken-docs
-    rev: 1.19.0
+    rev: 1.19.1
     hooks:
       - id: blacken-docs
-        args: ["--line-length", "130"]
+        args: ["--pyi", "--line-length", "130"]
         files: '^crates/.*/resources/mdtest/.*\.md'
         additional_dependencies:
           - black==24.10.0

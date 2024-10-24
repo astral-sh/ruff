@@ -6,7 +6,6 @@
 def foo() -> str:
     pass
 
-
 reveal_type(True or False)  # revealed: Literal[True]
 reveal_type("x" or "y" or "z")  # revealed: Literal["x"]
 reveal_type("" or "y" or "z")  # revealed: Literal["y"]
@@ -23,7 +22,6 @@ reveal_type(foo() or True)  # revealed: str | Literal[True]
 def foo() -> str:
     pass
 
-
 reveal_type(True and False)  # revealed: Literal[False]
 reveal_type(False and True)  # revealed: Literal[False]
 reveal_type(foo() and False)  # revealed: str | Literal[False]
@@ -39,7 +37,6 @@ reveal_type("" and "y")  # revealed: Literal[""]
 def returns_bool() -> bool:
     return True
 
-
 if returns_bool():
     x = True
 else:
@@ -53,7 +50,6 @@ reveal_type(x)  # revealed: bool
 ```py
 def foo() -> str:
     pass
-
 
 reveal_type("x" and "y" or "z")  # revealed: Literal["y"]
 reveal_type("x" or "y" and "z")  # revealed: Literal["x"]
@@ -69,7 +65,6 @@ reveal_type("x" or "y" and "")  # revealed: Literal["x"]
 
 ```py path=a.py
 redefined_builtin_bool = bool
-
 
 def my_bool(x) -> bool:
     return True
@@ -90,9 +85,7 @@ reveal_type(bool((0,)))  # revealed: Literal[True]
 reveal_type(bool("NON EMPTY"))  # revealed: Literal[True]
 reveal_type(bool(True))  # revealed: Literal[True]
 
-
 def foo(): ...
-
 
 reveal_type(bool(foo))  # revealed: Literal[True]
 ```

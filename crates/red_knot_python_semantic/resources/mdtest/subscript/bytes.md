@@ -28,7 +28,6 @@ reveal_type(y)  # revealed: Unknown
 ```py
 def int_instance() -> int: ...
 
-
 a = b"abcde"[int_instance()]
 # TODO: Support overloads... Should be `bytes`
 reveal_type(a)  # revealed: @Todo

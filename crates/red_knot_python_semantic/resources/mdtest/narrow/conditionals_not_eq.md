@@ -31,10 +31,7 @@ if x != 1:
 
 ```py
 class A: ...
-
-
 class B: ...
-
 
 C = A if flag else B
 
@@ -48,7 +45,6 @@ Only single-valued types should narrow the type:
 
 ```py
 def int_instance() -> int: ...
-
 
 x = int_instance() if flag else None
 y = int_instance()
