@@ -159,14 +159,14 @@ As with the distroless image, each image is published with ruff version tags as
 
 ## GitLab CI/CD
 
-You can use the following configuration to run a `ruff format`, and a `ruff check` compatible with GitLab's codequality.
+You can add the following configuration to `.gitlab-ci.yml` to run a `ruff format`, and a `ruff check` compatible with GitLab's codequality.
 
 ```yaml
 Ruff:
   stage: .pre
   interruptible: true
   image:
-    name: ghcr.io/astral-sh/ruff:0.7-alpine
+    name: ghcr.io/astral-sh/ruff:0.7.1-alpine
   variables:
     CODE_LOCATION: $CI_PROJECT_DIR
   script:
