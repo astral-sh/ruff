@@ -3,6 +3,7 @@ use rustc_hash::FxHashMap;
 use ast::traversal;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::traversal::EnclosingSuite;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::analyze::typing::is_list;
@@ -179,10 +180,10 @@ fn match_consecutive_appends<'a>(
 
     // In order to match consecutive statements, we need to go to the tree ancestor of the
     // given statement, find its position there, and match all 'appends' from there.
-    let siblings: &[Stmt] = if semantic.at_top_level() {
+    let suite = if semantic.at_top_level() {
         // If the statement is at the top level, we should go to the parent module.
         // Module is available in the definitions list.
-        semantic.definitions.python_ast()?
+        EnclosingSuite::new(semantic.definitions.python_ast()?, stmt)?
     } else {
         // Otherwise, go to the parent, and take its body as a sequence of siblings.
         semantic
@@ -190,11 +191,12 @@ fn match_consecutive_appends<'a>(
             .and_then(|parent| traversal::suite(stmt, parent))?
     };
 
-    let stmt_index = siblings.iter().position(|sibling| sibling == stmt)?;
-
     // We shouldn't repeat the same work for many 'appends' that go in a row. Let's check
     // that this statement is at the beginning of such a group.
-    if stmt_index != 0 && match_append(semantic, &siblings[stmt_index - 1]).is_some() {
+    if suite
+        .previous_sibling()
+        .is_some_and(|previous_stmt| match_append(semantic, previous_stmt).is_some())
+    {
         return None;
     }
 
@@ -202,9 +204,9 @@ fn match_consecutive_appends<'a>(
     Some(
         std::iter::once(append)
             .chain(
-                siblings
+                suite
+                    .next_siblings()
                     .iter()
-                    .skip(stmt_index + 1)
                     .map_while(|sibling| match_append(semantic, sibling)),
             )
             .collect(),

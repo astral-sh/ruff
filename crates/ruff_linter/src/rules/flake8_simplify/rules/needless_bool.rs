@@ -144,7 +144,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
                 .semantic()
                 .current_statement_parent()
                 .and_then(|parent| traversal::suite(stmt, parent))
-                .and_then(|suite| traversal::next_sibling(stmt, suite))
+                .and_then(|suite| suite.next_sibling())
             else {
                 return;
             };
