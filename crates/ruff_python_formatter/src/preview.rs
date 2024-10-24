@@ -30,10 +30,6 @@ pub(crate) fn is_f_string_implicit_concatenated_string_literal_quotes_enabled(
     context.is_preview()
 }
 
-pub(crate) fn is_with_single_item_pre_39_enabled(context: &PyFormatContext) -> bool {
-    context.is_preview()
-}
-
 /// Returns `true` if implicitly concatenated strings should be joined if they all fit on a single line.
 /// See [#9457](https://github.com/astral-sh/ruff/issues/9457)
 /// WARNING: This preview style depends on `is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled`
