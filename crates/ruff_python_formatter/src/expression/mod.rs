@@ -20,7 +20,6 @@ use crate::expression::parentheses::{
 };
 use crate::prelude::*;
 use crate::preview::{
-    is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled,
     is_f_string_formatting_enabled, is_hug_parens_with_braces_and_square_brackets_enabled,
 };
 
@@ -388,18 +387,12 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
             // is parenthesized. Unless, it's the `Parenthesize::IfBreaksParenthesizedNested` layout
             // where parenthesizing nested `maybe_parenthesized_expression` is explicitly desired.
             _ if f.context().node_level().is_parenthesized() => {
-                if !is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled(
-                    f.context(),
-                ) {
-                    OptionalParentheses::Never
-                } else if matches!(parenthesize, Parenthesize::IfBreaksParenthesizedNested) {
-                    return parenthesize_if_expands(
-                        &expression.format().with_options(Parentheses::Never),
-                    )
-                    .with_indent(!is_expression_huggable(expression, f.context()))
-                    .fmt(f);
+                return if matches!(parenthesize, Parenthesize::IfBreaksParenthesizedNested) {
+                    parenthesize_if_expands(&expression.format().with_options(Parentheses::Never))
+                        .with_indent(!is_expression_huggable(expression, f.context()))
+                        .fmt(f)
                 } else {
-                    return expression.format().with_options(Parentheses::Never).fmt(f);
+                    expression.format().with_options(Parentheses::Never).fmt(f)
                 }
             }
             needs_parentheses => needs_parentheses,
@@ -409,13 +402,12 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
 
         match needs_parentheses {
             OptionalParentheses::Multiline => match parenthesize {
-                Parenthesize::IfBreaksParenthesized | Parenthesize::IfBreaksParenthesizedNested if !is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled(f.context()) => {
-                    parenthesize_if_expands(&unparenthesized).fmt(f)
-                }
-
                 Parenthesize::IfRequired => unparenthesized.fmt(f),
 
-                Parenthesize::Optional | Parenthesize::IfBreaks | Parenthesize::IfBreaksParenthesized | Parenthesize::IfBreaksParenthesizedNested => {
+                Parenthesize::Optional
+                | Parenthesize::IfBreaks
+                | Parenthesize::IfBreaksParenthesized
+                | Parenthesize::IfBreaksParenthesizedNested => {
                     if can_omit_optional_parentheses(expression, f.context()) {
                         optional_parentheses(&unparenthesized).fmt(f)
                     } else {
@@ -424,9 +416,6 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                 }
             },
             OptionalParentheses::BestFit => match parenthesize {
-                Parenthesize::IfBreaksParenthesized | Parenthesize::IfBreaksParenthesizedNested if !is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled(f.context()) =>
-                    parenthesize_if_expands(&unparenthesized).fmt(f),
-
                 Parenthesize::IfBreaksParenthesized | Parenthesize::IfBreaksParenthesizedNested => {
                     // Can-omit layout is relevant for `"abcd".call`. We don't want to add unnecessary
                     // parentheses in this case.
@@ -454,15 +443,11 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                 }
             },
             OptionalParentheses::Never => match parenthesize {
-                Parenthesize::IfBreaksParenthesized |  Parenthesize::IfBreaksParenthesizedNested if !is_empty_parameters_no_unnecessary_parentheses_around_return_value_enabled(f.context()) => {
-                    parenthesize_if_expands(&unparenthesized)
-                        .with_indent(!is_expression_huggable(expression, f.context()))
-                        .fmt(f)
-                }
-
-                Parenthesize::Optional | Parenthesize::IfBreaks | Parenthesize::IfRequired | Parenthesize::IfBreaksParenthesized |  Parenthesize::IfBreaksParenthesizedNested => {
-                    unparenthesized.fmt(f)
-                }
+                Parenthesize::Optional
+                | Parenthesize::IfBreaks
+                | Parenthesize::IfRequired
+                | Parenthesize::IfBreaksParenthesized
+                | Parenthesize::IfBreaksParenthesizedNested => unparenthesized.fmt(f),
             },
 
             OptionalParentheses::Always => {
