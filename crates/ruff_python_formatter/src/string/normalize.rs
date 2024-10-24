@@ -44,6 +44,9 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
     /// The formatter should use the preferred quote style unless
     /// it can't because the string contains the preferred quotes OR
     /// it leads to more escaping.
+    ///
+    /// Note: If you add more cases here where we return `QuoteStyle::Preserve`,
+    /// make sure to also add them to [`FormatImplicitConcatenatedStringFlat::new`].
     pub(super) fn preferred_quote_style(&self, string: StringLikePart) -> QuoteStyle {
         match self.quoting {
             Quoting::Preserve => QuoteStyle::Preserve,
@@ -205,6 +208,8 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
                 quote_selection.flags,
                 // TODO: Remove the `b'{'` in `choose_quotes` when promoting the
                 // `format_fstring` preview style
+                false,
+                false,
                 is_f_string_formatting_enabled(self.context),
             )
         } else {
@@ -598,6 +603,8 @@ pub(crate) fn normalize_string(
     input: &str,
     start_offset: usize,
     new_flags: AnyStringFlags,
+    escape_braces: bool,
+    flip_nested_fstring_quotes: bool,
     format_f_string: bool,
 ) -> Cow<str> {
     // The normalized string if `input` is not yet normalized.
@@ -620,16 +627,24 @@ pub(crate) fn normalize_string(
 
     while let Some((index, c)) = chars.next() {
         if matches!(c, '{' | '}') && is_fstring {
-            if chars.peek().copied().is_some_and(|(_, next)| next == c) {
-                // Skip over the second character of the double braces
-                chars.next();
-            } else if c == '{' {
-                formatted_value_nesting += 1;
-            } else {
-                // Safe to assume that `c == '}'` here because of the matched pattern above
-                formatted_value_nesting = formatted_value_nesting.saturating_sub(1);
+            if escape_braces {
+                // Escape `{` and `}` when converting a regular string literal to an f-string literal.
+                output.push_str(&input[last_index..=index]);
+                output.push(c);
+                last_index = index + c.len_utf8();
+                continue;
+            } else if is_fstring {
+                if chars.peek().copied().is_some_and(|(_, next)| next == c) {
+                    // Skip over the second character of the double braces
+                    chars.next();
+                } else if c == '{' {
+                    formatted_value_nesting += 1;
+                } else {
+                    // Safe to assume that `c == '}'` here because of the matched pattern above
+                    formatted_value_nesting = formatted_value_nesting.saturating_sub(1);
+                }
+                continue;
             }
-            continue;
         }
 
         if c == '\r' {
@@ -696,6 +711,14 @@ pub(crate) fn normalize_string(
                 output.push_str(&input[last_index..index]);
                 output.push('\\');
                 output.push(c);
+                last_index = index + preferred_quote.len_utf8();
+            } else if c == preferred_quote
+                && flip_nested_fstring_quotes
+                && formatted_value_nesting > 0
+            {
+                // Flip the quotes
+                output.push_str(&input[last_index..index]);
+                output.push(opposite_quote);
                 last_index = index + preferred_quote.len_utf8();
             }
         }
@@ -981,6 +1004,7 @@ pub(super) fn is_fstring_with_triple_quoted_literal_expression_containing_quotes
 mod tests {
     use std::borrow::Cow;
 
+    use ruff_python_ast::str_prefix::FStringPrefix;
     use ruff_python_ast::{
         str::Quote,
         str_prefix::{AnyStringPrefix, ByteStringPrefix},
@@ -1013,9 +1037,35 @@ mod tests {
                 Quote::Double,
                 false,
             ),
+            false,
+            false,
             true,
         );
 
         assert_eq!(r"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a", &normalized);
+    }
+
+    #[test]
+    fn normalize_nested_fstring() {
+        let input =
+            r#"With single quote: '  {my_dict['foo']} With double quote: "  {my_dict["bar"]}"#;
+
+        let normalized = normalize_string(
+            input,
+            0,
+            AnyStringFlags::new(
+                AnyStringPrefix::Format(FStringPrefix::Regular),
+                Quote::Double,
+                false,
+            ),
+            false,
+            true,
+            false,
+        );
+
+        assert_eq!(
+            "With single quote: '  {my_dict['foo']} With double quote: \\\"  {my_dict['bar']}",
+            &normalized
+        );
     }
 }

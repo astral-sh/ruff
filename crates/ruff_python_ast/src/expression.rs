@@ -506,7 +506,7 @@ pub enum StringLikePart<'a> {
     FString(&'a ast::FString),
 }
 
-impl StringLikePart<'_> {
+impl<'a> StringLikePart<'a> {
     /// Returns the [`AnyStringFlags`] for the current string-like part.
     pub fn flags(&self) -> AnyStringFlags {
         match self {
@@ -523,6 +523,17 @@ impl StringLikePart<'_> {
             self.start() + kind.opener_len(),
             self.end() - kind.closer_len(),
         )
+    }
+
+    pub const fn is_string_literal(self) -> bool {
+        matches!(self, Self::String(_))
+    }
+
+    pub const fn as_string_literal(self) -> Option<&'a ast::StringLiteral> {
+        match self {
+            StringLikePart::String(value) => Some(value),
+            _ => None,
+        }
     }
 
     pub const fn is_fstring(self) -> bool {
@@ -571,6 +582,7 @@ impl Ranged for StringLikePart<'_> {
 /// An iterator over all the [`StringLikePart`] of a string-like expression.
 ///
 /// This is created by the [`StringLike::parts`] method.
+#[derive(Clone)]
 pub enum StringLikePartIter<'a> {
     String(std::slice::Iter<'a, ast::StringLiteral>),
     Bytes(std::slice::Iter<'a, ast::BytesLiteral>),
@@ -604,6 +616,26 @@ impl<'a> Iterator for StringLikePartIter<'a> {
             StringLikePartIter::Bytes(inner) => inner.size_hint(),
             StringLikePartIter::FString(inner) => inner.size_hint(),
         }
+    }
+}
+
+impl DoubleEndedIterator for StringLikePartIter<'_> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let part = match self {
+            StringLikePartIter::String(inner) => StringLikePart::String(inner.next_back()?),
+            StringLikePartIter::Bytes(inner) => StringLikePart::Bytes(inner.next_back()?),
+            StringLikePartIter::FString(inner) => {
+                let part = inner.next_back()?;
+                match part {
+                    ast::FStringPart::Literal(string_literal) => {
+                        StringLikePart::String(string_literal)
+                    }
+                    ast::FStringPart::FString(f_string) => StringLikePart::FString(f_string),
+                }
+            }
+        };
+
+        Some(part)
     }
 }
 

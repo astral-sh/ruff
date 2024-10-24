@@ -211,9 +211,9 @@ impl<'ast> SourceOrderVisitor<'ast> for FindEnclosingNode<'_, 'ast> {
         // Don't pick potential docstrings as the closest enclosing node because `suite.rs` than fails to identify them as
         // docstrings and docstring formatting won't kick in.
         // Format the enclosing node instead and slice the formatted docstring from the result.
-        let is_maybe_docstring = node.as_stmt_expr().is_some_and(|stmt| {
-            DocstringStmt::is_docstring_statement(stmt, self.context.options().source_type())
-        });
+        let is_maybe_docstring = node
+            .as_stmt_expr()
+            .is_some_and(|stmt| DocstringStmt::is_docstring_statement(stmt, self.context));
 
         if is_maybe_docstring {
             return TraversalSignal::Skip;

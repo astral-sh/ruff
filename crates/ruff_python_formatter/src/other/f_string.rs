@@ -76,14 +76,9 @@ impl Format<PyFormatContext<'_>> for FormatFString<'_> {
         let quotes = StringQuotes::from(string_kind);
         write!(f, [string_kind.prefix(), quotes])?;
 
-        f.join()
-            .entries(
-                self.value
-                    .elements
-                    .iter()
-                    .map(|element| FormatFStringElement::new(element, context)),
-            )
-            .finish()?;
+        for element in &self.value.elements {
+            FormatFStringElement::new(element, context).fmt(f)?;
+        }
 
         // Ending quote
         quotes.fmt(f)
@@ -98,7 +93,7 @@ pub(crate) struct FStringContext {
 }
 
 impl FStringContext {
-    const fn new(flags: AnyStringFlags, layout: FStringLayout) -> Self {
+    pub(crate) const fn new(flags: AnyStringFlags, layout: FStringLayout) -> Self {
         Self {
             enclosing_flags: flags,
             layout,
@@ -125,7 +120,7 @@ pub(crate) enum FStringLayout {
 }
 
 impl FStringLayout {
-    fn from_f_string(f_string: &FString, locator: &Locator) -> Self {
+    pub(crate) fn from_f_string(f_string: &FString, locator: &Locator) -> Self {
         // Heuristic: Allow breaking the f-string expressions across multiple lines
         // only if there already is at least one multiline expression. This puts the
         // control in the hands of the user to decide if they want to break the

@@ -366,22 +366,13 @@ actual: {some_var}"""
  [
      """cow
  moos""",
-@@ -198,7 +239,7 @@
- `--global-option` is reserved to flags like `--verbose` or `--quiet`.
- """
- 
--this_will_become_one_line = "abc"
-+this_will_become_one_line = "a" "b" "c"
- 
- this_will_stay_on_three_lines = (
-     "a"  # comment
 @@ -206,7 +247,9 @@
      "c"
  )
  
 -this_will_also_become_one_line = "abc"  # comment
 +this_will_also_become_one_line = (  # comment
-+    "a" "b" "c"
++    "abc"
 +)
  
  assert some_var == expected_result, """
@@ -632,7 +623,7 @@ Please use `--build-option` instead,
 `--global-option` is reserved to flags like `--verbose` or `--quiet`.
 """
 
-this_will_become_one_line = "a" "b" "c"
+this_will_become_one_line = "abc"
 
 this_will_stay_on_three_lines = (
     "a"  # comment
@@ -641,7 +632,7 @@ this_will_stay_on_three_lines = (
 )
 
 this_will_also_become_one_line = (  # comment
-    "a" "b" "c"
+    "abc"
 )
 
 assert some_var == expected_result, """
