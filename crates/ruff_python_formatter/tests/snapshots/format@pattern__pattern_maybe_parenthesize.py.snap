@@ -515,26 +515,32 @@ match x:
 
 ## Always use parentheses for implicitly concatenated strings
 match x:
-    case (
-        "implicit" "concatenated" "string"
-        | [aaaaaa, bbbbbbbbbbbbbbbb, cccccccccccccccccc, ddddddddddddddddddddddddddd]
-    ):
+    case "implicitconcatenatedstring" | [
+        aaaaaa,
+        bbbbbbbbbbbbbbbb,
+        cccccccccccccccccc,
+        ddddddddddddddddddddddddddd,
+    ]:
         pass
 
 
 match x:
-    case (
-        b"implicit" b"concatenated" b"string"
-        | [aaaaaa, bbbbbbbbbbbbbbbb, cccccccccccccccccc, ddddddddddddddddddddddddddd]
-    ):
+    case b"implicitconcatenatedstring" | [
+        aaaaaa,
+        bbbbbbbbbbbbbbbb,
+        cccccccccccccccccc,
+        ddddddddddddddddddddddddddd,
+    ]:
         pass
 
 
 match x:
-    case (
-        f"implicit" "concatenated" "string"
-        | [aaaaaa, bbbbbbbbbbbbbbbb, cccccccccccccccccc, ddddddddddddddddddddddddddd]
-    ):
+    case f"implicitconcatenatedstring" | [
+        aaaaaa,
+        bbbbbbbbbbbbbbbb,
+        cccccccccccccccccc,
+        ddddddddddddddddddddddddddd,
+    ]:
         pass
 
 
@@ -586,56 +592,4 @@ match x:
         ccccccccccccccccccccccccccccccccc,
     ]:
         pass
-```
-
-
-## Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -212,26 +212,32 @@
- 
- ## Always use parentheses for implicitly concatenated strings
- match x:
--    case (
--        "implicit" "concatenated" "string"
--        | [aaaaaa, bbbbbbbbbbbbbbbb, cccccccccccccccccc, ddddddddddddddddddddddddddd]
--    ):
-+    case "implicitconcatenatedstring" | [
-+        aaaaaa,
-+        bbbbbbbbbbbbbbbb,
-+        cccccccccccccccccc,
-+        ddddddddddddddddddddddddddd,
-+    ]:
-         pass
- 
- 
- match x:
--    case (
--        b"implicit" b"concatenated" b"string"
--        | [aaaaaa, bbbbbbbbbbbbbbbb, cccccccccccccccccc, ddddddddddddddddddddddddddd]
--    ):
-+    case b"implicitconcatenatedstring" | [
-+        aaaaaa,
-+        bbbbbbbbbbbbbbbb,
-+        cccccccccccccccccc,
-+        ddddddddddddddddddddddddddd,
-+    ]:
-         pass
- 
- 
- match x:
--    case (
--        f"implicit" "concatenated" "string"
--        | [aaaaaa, bbbbbbbbbbbbbbbb, cccccccccccccccccc, ddddddddddddddddddddddddddd]
--    ):
-+    case f"implicitconcatenatedstring" | [
-+        aaaaaa,
-+        bbbbbbbbbbbbbbbb,
-+        cccccccccccccccccc,
-+        ddddddddddddddddddddddddddd,
-+    ]:
-         pass
- 
- 
 ```

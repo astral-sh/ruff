@@ -1510,7 +1510,7 @@ source_type                = Python
 ```
 
 ```python
-(f"{one}" f"{two}")
+(f"{one}{two}")
 
 
 rf"Not-so-tricky \"quote"
@@ -1550,7 +1550,7 @@ result_f = (
 )
 
 (
-    f"{1}" f"{2}"  # comment 3
+    f"{1}{2}"  # comment 3
 )
 
 (
@@ -1910,12 +1910,15 @@ aaaaaaaaaaaa["bbbbbbbbbbbbbbbb"] = (
 )
 
 # But, the following f-string does have a split point because of the multiline expression.
-aaaaaaaaaaaa["bbbbbbbbbbbbbbbb"] = (
-    f"aaaaaaaaaaaaaaaaaaa {aaaaaaaaa + bbbbbbbbbbb + cccccccccccccc} ddddddddddddddddddd"
-)
-aaaaaaaaaaaa["bbbbbbbbbbbbbbbb"] = (
-    f"aaaaaaaaaaaaaaaaaaa {aaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbb + cccccccccccccccccccccc + dddddddddddddddddddddddddddd} ddddddddddddddddddd"
-)
+aaaaaaaaaaaa["bbbbbbbbbbbbbbbb"] = f"aaaaaaaaaaaaaaaaaaa {
+    aaaaaaaaa + bbbbbbbbbbb + cccccccccccccc
+} ddddddddddddddddddd"
+aaaaaaaaaaaa["bbbbbbbbbbbbbbbb"] = f"aaaaaaaaaaaaaaaaaaa {
+    aaaaaaaaaaaaaaaaaaaa
+    + bbbbbbbbbbbbbbbbbbbbb
+    + cccccccccccccccccccccc
+    + dddddddddddddddddddddddddddd
+} ddddddddddddddddddd"
 
 # This is an implicitly concatenated f-string but it cannot be joined because otherwise
 # it'll exceed the line length limit. So, the two f-strings will be inside parentheses
@@ -1926,9 +1929,7 @@ a = (
 )  # inline
 
 # Similar to the above example but this fits within the line length limit.
-a = (
-    f"test{expression}flat" f"can be {joined} togethereeeeeeeeeeeeeeeeeeeeeeeeeee"
-)  # inline
+a = f"test{expression}flatcan be {joined} togethereeeeeeeeeeeeeeeeeeeeeeeeeee"  # inline
 
 # The following test cases are adopted from implicit string concatenation but for a
 # single f-string instead.
@@ -2112,9 +2113,9 @@ assert f"aaaaaaaaa{expression}bbbbbbbbbbbb", f"cccccccccccccccc{
     expression
 }dddddddddddddddd"
 
-assert (
-    f"aaaaaaaaa{expression}bbbbbbbbbbbb"
-), f"cccccccccccccccc{expression}dddddddddddddddd"
+assert f"aaaaaaaaa{expression}bbbbbbbbbbbb", (
+    f"cccccccccccccccc{expression}dddddddddddddddd"
+)
 
 assert f"aaaaaaaaaaaaaaaaaaaaaaaaaaa{
     expression
@@ -2130,7 +2131,11 @@ assert f"aaaaaaaaaaaaaaaaaaaaaaaaaaa{
     expression
 } dddddddddddddddddddddddddd"
 
-assert f"aaaaaaaaaaaaaaaaaaaaaaaaaaa{expression}bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", f"cccccccccccccccccccccccccccccccc {expression} ddddddddddddddddddddddddddddddddddddd"
+assert (
+    f"aaaaaaaaaaaaaaaaaaaaaaaaaaa{expression}bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+), (
+    f"cccccccccccccccccccccccccccccccc {expression} ddddddddddddddddddddddddddddddddddddd"
+)
 
 # F-strings as a single argument to a call expression to test whether it's huggable or not.
 call(f"{testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee}")
@@ -2216,8 +2221,8 @@ _ = (
 f"aaaaaaaaaaaaaaaaaaaaaaaaaa {10**27} bbbbbbbbbbbbbbbbbbbbbbbbbb ccccccccccccccccccccccccc"
 
 # Regression test for https://github.com/astral-sh/ruff/issues/14778
-f"{'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' 'a' if True else ''}"
-f"{'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' 'a' if True else ''}"
+f"{'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' if True else ''}"
+f"{'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' if True else ''}"
 
 # Quotes reuse
 f"{'a'}"
@@ -2260,96 +2265,4 @@ f'{x:a{y=:{z:hy "user"}}} \'\'\''
 f"""{1=: "this" is fine}"""
 f"""{1=: "this" is fine}"""  # Change quotes to double quotes because they're preferred
 f'{1=: {'ab"cd"'}}'  # It's okay if the quotes are in an expression part.
-```
-
-
-#### Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -1,4 +1,4 @@
--(f"{one}" f"{two}")
-+(f"{one}{two}")
- 
- 
- rf"Not-so-tricky \"quote"
-@@ -38,7 +38,7 @@
- )
- 
- (
--    f"{1}" f"{2}"  # comment 3
-+    f"{1}{2}"  # comment 3
- )
- 
- (
-@@ -398,12 +398,15 @@
- )
- 
- # But, the following f-string does have a split point because of the multiline expression.
--aaaaaaaaaaaa["bbbbbbbbbbbbbbbb"] = (
--    f"aaaaaaaaaaaaaaaaaaa {aaaaaaaaa + bbbbbbbbbbb + cccccccccccccc} ddddddddddddddddddd"
--)
--aaaaaaaaaaaa["bbbbbbbbbbbbbbbb"] = (
--    f"aaaaaaaaaaaaaaaaaaa {aaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbb + cccccccccccccccccccccc + dddddddddddddddddddddddddddd} ddddddddddddddddddd"
--)
-+aaaaaaaaaaaa["bbbbbbbbbbbbbbbb"] = f"aaaaaaaaaaaaaaaaaaa {
-+    aaaaaaaaa + bbbbbbbbbbb + cccccccccccccc
-+} ddddddddddddddddddd"
-+aaaaaaaaaaaa["bbbbbbbbbbbbbbbb"] = f"aaaaaaaaaaaaaaaaaaa {
-+    aaaaaaaaaaaaaaaaaaaa
-+    + bbbbbbbbbbbbbbbbbbbbb
-+    + cccccccccccccccccccccc
-+    + dddddddddddddddddddddddddddd
-+} ddddddddddddddddddd"
- 
- # This is an implicitly concatenated f-string but it cannot be joined because otherwise
- # it'll exceed the line length limit. So, the two f-strings will be inside parentheses
-@@ -414,9 +417,7 @@
- )  # inline
- 
- # Similar to the above example but this fits within the line length limit.
--a = (
--    f"test{expression}flat" f"can be {joined} togethereeeeeeeeeeeeeeeeeeeeeeeeeee"
--)  # inline
-+a = f"test{expression}flatcan be {joined} togethereeeeeeeeeeeeeeeeeeeeeeeeeee"  # inline
- 
- # The following test cases are adopted from implicit string concatenation but for a
- # single f-string instead.
-@@ -600,9 +601,9 @@
-     expression
- }dddddddddddddddd"
- 
--assert (
--    f"aaaaaaaaa{expression}bbbbbbbbbbbb"
--), f"cccccccccccccccc{expression}dddddddddddddddd"
-+assert f"aaaaaaaaa{expression}bbbbbbbbbbbb", (
-+    f"cccccccccccccccc{expression}dddddddddddddddd"
-+)
- 
- assert f"aaaaaaaaaaaaaaaaaaaaaaaaaaa{
-     expression
-@@ -618,7 +619,11 @@
-     expression
- } dddddddddddddddddddddddddd"
- 
--assert f"aaaaaaaaaaaaaaaaaaaaaaaaaaa{expression}bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", f"cccccccccccccccccccccccccccccccc {expression} ddddddddddddddddddddddddddddddddddddd"
-+assert (
-+    f"aaaaaaaaaaaaaaaaaaaaaaaaaaa{expression}bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-+), (
-+    f"cccccccccccccccccccccccccccccccc {expression} ddddddddddddddddddddddddddddddddddddd"
-+)
- 
- # F-strings as a single argument to a call expression to test whether it's huggable or not.
- call(f"{testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee}")
-@@ -704,8 +709,8 @@
- f"aaaaaaaaaaaaaaaaaaaaaaaaaa {10**27} bbbbbbbbbbbbbbbbbbbbbbbbbb ccccccccccccccccccccccccc"
- 
- # Regression test for https://github.com/astral-sh/ruff/issues/14778
--f"{'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' 'a' if True else ''}"
--f"{'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' 'a' if True else ''}"
-+f"{'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' if True else ''}"
-+f"{'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' if True else ''}"
- 
- # Quotes reuse
- f"{'a'}"
 ```

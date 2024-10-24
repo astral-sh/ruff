@@ -18,7 +18,6 @@ use {
     ruff_text_size::{Ranged, TextLen, TextRange, TextSize},
 };
 
-use crate::preview::is_join_implicit_concatenated_string_enabled;
 use crate::string::StringQuotes;
 use crate::{prelude::*, DocstringCodeLineWidth, FormatModuleError};
 
@@ -168,7 +167,7 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
     if docstring[first.len()..].trim().is_empty() {
         // For `"""\n"""` or other whitespace between the quotes, black keeps a single whitespace,
         // but `""""""` doesn't get one inserted.
-        if needs_chaperone_space(normalized.flags(), trim_end, f.context())
+        if needs_chaperone_space(normalized.flags(), trim_end)
             || (trim_end.is_empty() && !docstring.is_empty())
         {
             space().fmt(f)?;
@@ -208,7 +207,7 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
     let trim_end = docstring
         .as_ref()
         .trim_end_matches(|c: char| c.is_whitespace() && c != '\n');
-    if needs_chaperone_space(normalized.flags(), trim_end, f.context()) {
+    if needs_chaperone_space(normalized.flags(), trim_end) {
         space().fmt(f)?;
     }
 
@@ -1602,17 +1601,11 @@ fn docstring_format_source(
 /// If the last line of the docstring is `content" """` or `content\ """`, we need a chaperone space
 /// that avoids `content""""` and `content\"""`. This does only applies to un-escaped backslashes,
 /// so `content\\ """` doesn't need a space while `content\\\ """` does.
-pub(super) fn needs_chaperone_space(
-    flags: AnyStringFlags,
-    trim_end: &str,
-    context: &PyFormatContext,
-) -> bool {
+pub(super) fn needs_chaperone_space(flags: AnyStringFlags, trim_end: &str) -> bool {
     if trim_end.chars().rev().take_while(|c| *c == '\\').count() % 2 == 1 {
         true
-    } else if is_join_implicit_concatenated_string_enabled(context) {
-        flags.is_triple_quoted() && trim_end.ends_with(flags.quote_style().as_char())
     } else {
-        trim_end.ends_with(flags.quote_style().as_char())
+        flags.is_triple_quoted() && trim_end.ends_with(flags.quote_style().as_char())
     }
 }
 

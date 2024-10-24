@@ -310,9 +310,9 @@ String \"\"\"
 
 # String continuation
 
-"Let's" "start" "with" "a" "simple" "example"
+"Let'sstartwithasimpleexample"
 
-"Let's" "start" "with" "a" "simple" "example" "now repeat after me:" "I am confident" "I am confident" "I am confident" "I am confident" "I am confident"
+"Let'sstartwithasimpleexamplenow repeat after me:I am confidentI am confidentI am confidentI am confidentI am confident"
 
 (
     "Let's"
@@ -379,7 +379,7 @@ test_particular = [
 ]
 
 # Parenthesized string continuation with messed up indentation
-{"key": ([], "a" "b" "c")}
+{"key": ([], "abc")}
 
 
 # Regression test for https://github.com/astral-sh/ruff/issues/5893
@@ -412,15 +412,31 @@ a = """\\\x1f"""
 # In preview, don't collapse implicit concatenated strings that can't be joined into a single string
 # and that are multiline in the source.
 
-(r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb")
+(
+    r"aaaaaaaaa"
+    r"bbbbbbbbbbbbbbbbbbbb"
+)
 
-(r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb" "cccccccccccccccccccccc")
+(
+    r"aaaaaaaaa"
+    r"bbbbbbbbbbbbbbbbbbbb"
+    "cccccccccccccccccccccc"
+)
 
-("""aaaaaaaaa""" """bbbbbbbbbbbbbbbbbbbb""")
+(
+    """aaaaaaaaa"""
+    """bbbbbbbbbbbbbbbbbbbb"""
+)
 
-(f"""aaaa{10}aaaaa""" rf"""bbbbbbbbbbbbbbbbbbbb""")
+(
+    f"""aaaa{10}aaaaa"""
+    rf"""bbbbbbbbbbbbbbbbbbbb"""
+)
 
-if (r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb") + ["aaaaaaaaaa", "bbbbbbbbbbbbbbbb"]:
+if (
+    r"aaaaaaaaa"
+    r"bbbbbbbbbbbbbbbbbbbb"
+) + ["aaaaaaaaaa", "bbbbbbbbbbbbbbbb"]:
     ...
 
 
@@ -438,7 +454,10 @@ r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb"
 
 # In docstring positions
 def docstring():
-    r"aaaaaaaaa" "bbbbbbbbbbbbbbbbbbbb"
+    (
+        r"aaaaaaaaa"
+        "bbbbbbbbbbbbbbbbbbbb"
+    )
 
 
 def docstring_flat():
@@ -450,83 +469,6 @@ def docstring_flat_overlong():
         r"aaaaaaaaa"
         r"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     )
-```
-
-
-#### Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -70,9 +70,9 @@
- 
- # String continuation
- 
--"Let's" "start" "with" "a" "simple" "example"
-+"Let'sstartwithasimpleexample"
- 
--"Let's" "start" "with" "a" "simple" "example" "now repeat after me:" "I am confident" "I am confident" "I am confident" "I am confident" "I am confident"
-+"Let'sstartwithasimpleexamplenow repeat after me:I am confidentI am confidentI am confidentI am confidentI am confident"
- 
- (
-     "Let's"
-@@ -139,7 +139,7 @@
- ]
- 
- # Parenthesized string continuation with messed up indentation
--{"key": ([], "a" "b" "c")}
-+{"key": ([], "abc")}
- 
- 
- # Regression test for https://github.com/astral-sh/ruff/issues/5893
-@@ -172,15 +172,31 @@
- # In preview, don't collapse implicit concatenated strings that can't be joined into a single string
- # and that are multiline in the source.
- 
--(r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb")
-+(
-+    r"aaaaaaaaa"
-+    r"bbbbbbbbbbbbbbbbbbbb"
-+)
- 
--(r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb" "cccccccccccccccccccccc")
-+(
-+    r"aaaaaaaaa"
-+    r"bbbbbbbbbbbbbbbbbbbb"
-+    "cccccccccccccccccccccc"
-+)
- 
--("""aaaaaaaaa""" """bbbbbbbbbbbbbbbbbbbb""")
-+(
-+    """aaaaaaaaa"""
-+    """bbbbbbbbbbbbbbbbbbbb"""
-+)
- 
--(f"""aaaa{10}aaaaa""" rf"""bbbbbbbbbbbbbbbbbbbb""")
-+(
-+    f"""aaaa{10}aaaaa"""
-+    rf"""bbbbbbbbbbbbbbbbbbbb"""
-+)
- 
--if (r"aaaaaaaaa" r"bbbbbbbbbbbbbbbbbbbb") + ["aaaaaaaaaa", "bbbbbbbbbbbbbbbb"]:
-+if (
-+    r"aaaaaaaaa"
-+    r"bbbbbbbbbbbbbbbbbbbb"
-+) + ["aaaaaaaaaa", "bbbbbbbbbbbbbbbb"]:
-     ...
- 
- 
-@@ -198,7 +214,10 @@
- 
- # In docstring positions
- def docstring():
--    r"aaaaaaaaa" "bbbbbbbbbbbbbbbbbbbb"
-+    (
-+        r"aaaaaaaaa"
-+        "bbbbbbbbbbbbbbbbbbbb"
-+    )
- 
- 
- def docstring_flat():
 ```
 
 
@@ -618,9 +560,9 @@ String \"\"\"
 
 # String continuation
 
-"Let's" 'start' 'with' 'a' 'simple' 'example'
+"Let'sstartwithasimpleexample"
 
-"Let's" 'start' 'with' 'a' 'simple' 'example' 'now repeat after me:' 'I am confident' 'I am confident' 'I am confident' 'I am confident' 'I am confident'
+"Let'sstartwithasimpleexamplenow repeat after me:I am confidentI am confidentI am confidentI am confidentI am confident"
 
 (
     "Let's"
@@ -687,7 +629,7 @@ test_particular = [
 ]
 
 # Parenthesized string continuation with messed up indentation
-{'key': ([], 'a' 'b' 'c')}
+{'key': ([], 'abc')}
 
 
 # Regression test for https://github.com/astral-sh/ruff/issues/5893
@@ -720,15 +662,31 @@ a = """\\\x1f"""
 # In preview, don't collapse implicit concatenated strings that can't be joined into a single string
 # and that are multiline in the source.
 
-(r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb')
+(
+    r'aaaaaaaaa'
+    r'bbbbbbbbbbbbbbbbbbbb'
+)
 
-(r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb' 'cccccccccccccccccccccc')
+(
+    r'aaaaaaaaa'
+    r'bbbbbbbbbbbbbbbbbbbb'
+    'cccccccccccccccccccccc'
+)
 
-("""aaaaaaaaa""" """bbbbbbbbbbbbbbbbbbbb""")
+(
+    """aaaaaaaaa"""
+    """bbbbbbbbbbbbbbbbbbbb"""
+)
 
-(f"""aaaa{10}aaaaa""" rf"""bbbbbbbbbbbbbbbbbbbb""")
+(
+    f"""aaaa{10}aaaaa"""
+    rf"""bbbbbbbbbbbbbbbbbbbb"""
+)
 
-if (r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb') + ['aaaaaaaaaa', 'bbbbbbbbbbbbbbbb']:
+if (
+    r'aaaaaaaaa'
+    r'bbbbbbbbbbbbbbbbbbbb'
+) + ['aaaaaaaaaa', 'bbbbbbbbbbbbbbbb']:
     ...
 
 
@@ -746,7 +704,10 @@ r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb'
 
 # In docstring positions
 def docstring():
-    r'aaaaaaaaa' 'bbbbbbbbbbbbbbbbbbbb'
+    (
+        r'aaaaaaaaa'
+        'bbbbbbbbbbbbbbbbbbbb'
+    )
 
 
 def docstring_flat():
@@ -758,81 +719,4 @@ def docstring_flat_overlong():
         r'aaaaaaaaa'
         r'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
     )
-```
-
-
-#### Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -70,9 +70,9 @@
- 
- # String continuation
- 
--"Let's" 'start' 'with' 'a' 'simple' 'example'
-+"Let'sstartwithasimpleexample"
- 
--"Let's" 'start' 'with' 'a' 'simple' 'example' 'now repeat after me:' 'I am confident' 'I am confident' 'I am confident' 'I am confident' 'I am confident'
-+"Let'sstartwithasimpleexamplenow repeat after me:I am confidentI am confidentI am confidentI am confidentI am confident"
- 
- (
-     "Let's"
-@@ -139,7 +139,7 @@
- ]
- 
- # Parenthesized string continuation with messed up indentation
--{'key': ([], 'a' 'b' 'c')}
-+{'key': ([], 'abc')}
- 
- 
- # Regression test for https://github.com/astral-sh/ruff/issues/5893
-@@ -172,15 +172,31 @@
- # In preview, don't collapse implicit concatenated strings that can't be joined into a single string
- # and that are multiline in the source.
- 
--(r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb')
-+(
-+    r'aaaaaaaaa'
-+    r'bbbbbbbbbbbbbbbbbbbb'
-+)
- 
--(r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb' 'cccccccccccccccccccccc')
-+(
-+    r'aaaaaaaaa'
-+    r'bbbbbbbbbbbbbbbbbbbb'
-+    'cccccccccccccccccccccc'
-+)
- 
--("""aaaaaaaaa""" """bbbbbbbbbbbbbbbbbbbb""")
-+(
-+    """aaaaaaaaa"""
-+    """bbbbbbbbbbbbbbbbbbbb"""
-+)
- 
--(f"""aaaa{10}aaaaa""" rf"""bbbbbbbbbbbbbbbbbbbb""")
-+(
-+    f"""aaaa{10}aaaaa"""
-+    rf"""bbbbbbbbbbbbbbbbbbbb"""
-+)
- 
--if (r'aaaaaaaaa' r'bbbbbbbbbbbbbbbbbbbb') + ['aaaaaaaaaa', 'bbbbbbbbbbbbbbbb']:
-+if (
-+    r'aaaaaaaaa'
-+    r'bbbbbbbbbbbbbbbbbbbb'
-+) + ['aaaaaaaaaa', 'bbbbbbbbbbbbbbbb']:
-     ...
- 
- 
-@@ -198,7 +214,10 @@
- 
- # In docstring positions
- def docstring():
--    r'aaaaaaaaa' 'bbbbbbbbbbbbbbbbbbbb'
-+    (
-+        r'aaaaaaaaa'
-+        'bbbbbbbbbbbbbbbbbbbb'
-+    )
- 
- 
- def docstring_flat():
 ```

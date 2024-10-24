@@ -170,7 +170,7 @@ rf"\{"a"}"
  
  x = """foo {{ {2 + 2}bar
  baz"""
-@@ -28,70 +26,59 @@
+@@ -28,74 +26,62 @@
  
  x = f"""foo {{ {2 + 2}bar {{ baz"""
  
@@ -258,8 +258,13 @@ rf"\{"a"}"
 +f"{X!r}"
  
  raise ValueError(
-     "xxxxxxxxxxxIncorrect --line-ranges format, expect START-END, found"
-@@ -105,8 +92,10 @@
+-    "xxxxxxxxxxxIncorrect --line-ranges format, expect START-END, found"
+-    f" {lines_str!r}"
++    f"xxxxxxxxxxxIncorrect --line-ranges format, expect START-END, found {lines_str!r}"
+ )
+ 
+ f"`escape` only permitted in {{'html', 'latex', 'latex-math'}}, \
+@@ -105,8 +91,10 @@
  rf"\{{\}}"
  
  f"""
@@ -272,7 +277,7 @@ rf"\{"a"}"
  """
  
  value: str = f"""foo
-@@ -124,13 +113,15 @@
+@@ -124,13 +112,15 @@
  
  f'{{\\"kind\\":\\"ConfigMap\\",\\"metadata\\":{{\\"annotations\\":{{}},\\"name\\":\\"cluster-info\\",\\"namespace\\":\\"amazon-cloudwatch\\"}}}}'
  
@@ -381,8 +386,7 @@ f"""foo {datetime.datetime.now():%Y
 f"{X!r}"
 
 raise ValueError(
-    "xxxxxxxxxxxIncorrect --line-ranges format, expect START-END, found"
-    f" {lines_str!r}"
+    f"xxxxxxxxxxxIncorrect --line-ranges format, expect START-END, found {lines_str!r}"
 )
 
 f"`escape` only permitted in {{'html', 'latex', 'latex-math'}}, \

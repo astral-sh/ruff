@@ -14,7 +14,6 @@ use crate::expression::parentheses::in_parentheses_only_soft_line_break_or_space
 use crate::other::f_string::{FStringContext, FStringLayout};
 use crate::other::f_string_element::FormatFStringExpressionElement;
 use crate::prelude::*;
-use crate::preview::is_join_implicit_concatenated_string_enabled;
 use crate::string::docstring::needs_chaperone_space;
 use crate::string::normalize::{
     is_fstring_with_quoted_debug_expression, is_fstring_with_quoted_format_spec_and_debug,
@@ -80,12 +79,8 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringExpanded<'_
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         let comments = f.context().comments().clone();
 
-        let join_implicit_concatenated_string_enabled =
-            is_join_implicit_concatenated_string_enabled(f.context());
-
         // Keep implicit concatenated strings expanded unless they're already written on a single line.
         if matches!(self.layout, ImplicitConcatenatedLayout::Multipart)
-            && join_implicit_concatenated_string_enabled
             && self.string.parts().tuple_windows().any(|(a, b)| {
                 f.context()
                     .source()
@@ -106,7 +101,6 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringExpanded<'_
 
             let part_comments = comments.leading_dangling_trailing(&part);
             joiner.entry(&format_args![
-                (!join_implicit_concatenated_string_enabled).then_some(line_suffix_boundary()),
                 leading_comments(part_comments.leading),
                 format_part,
                 trailing_comments(part_comments.trailing)
@@ -136,10 +130,6 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
     /// Creates a new formatter. Returns `None` if the string can't be merged into a single string.
     pub(crate) fn new(string: StringLike<'a>, context: &PyFormatContext) -> Option<Self> {
         fn merge_flags(string: StringLike, context: &PyFormatContext) -> Option<AnyStringFlags> {
-            if !is_join_implicit_concatenated_string_enabled(context) {
-                return None;
-            }
-
             // Multiline strings can never fit on a single line.
             if string.is_multiline(context) {
                 return None;
@@ -382,7 +372,7 @@ impl Format<PyFormatContext<'_>> for FormatLiteralContent {
                 Cow::Owned(normalized) => text(normalized).fmt(f)?,
             }
 
-            if self.trim_end && needs_chaperone_space(self.flags, &normalized, f.context()) {
+            if self.trim_end && needs_chaperone_space(self.flags, &normalized) {
                 space().fmt(f)?;
             }
         }
