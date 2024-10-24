@@ -3178,20 +3178,16 @@ impl<'db> TypeInferenceBuilder<'db> {
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
             (Type::Tuple(tuple_ty), Type::IntLiteral(int)) => {
                 let elements = tuple_ty.elements(self.db);
-                elements
-                    .iter()
-                    .subscript_index(int)
-                    .copied()
-                    .unwrap_or_else(|| {
-                        self.index_out_of_bounds_diagnostic(
-                            "tuple",
-                            value_node.into(),
-                            value_ty,
-                            elements.len(),
-                            int,
-                        );
-                        Type::Unknown
-                    })
+                elements.iter().py_index(int).copied().unwrap_or_else(|| {
+                    self.index_out_of_bounds_diagnostic(
+                        "tuple",
+                        value_node.into(),
+                        value_ty,
+                        elements.len(),
+                        int,
+                    );
+                    Type::Unknown
+                })
             }
             // Ex) Given `("a", "b", "c", "d")[True]`, return `"b"`
             (Type::Tuple(_), Type::BooleanLiteral(bool)) => self.infer_subscript_expression_types(
@@ -3205,7 +3201,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let chars: Vec<_> = literal_value.chars().collect();
                 chars
                     .iter()
-                    .subscript_index(int)
+                    .py_index(int)
                     .map(|ch| {
                         Type::StringLiteral(StringLiteralType::new(
                             self.db,
@@ -3228,7 +3224,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let literal_value = literal_ty.value(self.db);
                 literal_value
                     .iter()
-                    .subscript_index(int)
+                    .py_index(int)
                     .map(|byte| {
                         Type::BytesLiteral(BytesLiteralType::new(self.db, [*byte].as_slice()))
                     })
