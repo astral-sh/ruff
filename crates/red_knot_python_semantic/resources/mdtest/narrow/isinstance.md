@@ -106,6 +106,7 @@ if isinstance(x, (A, B)):
 elif isinstance(x, (A, C)):
     reveal_type(x)  # revealed: C & ~A & ~B
 else:
+    # TODO: Should be simplified to ~A & ~B & ~C
     reveal_type(x)  # revealed: object & ~A & ~B & ~C
 ```
 

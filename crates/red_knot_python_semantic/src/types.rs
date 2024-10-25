@@ -334,8 +334,7 @@ impl<'db> Type<'db> {
 
     #[must_use]
     pub fn negate(&self, db: &'db dyn Db) -> Type<'db> {
-        let r = IntersectionBuilder::new(db).add_negative(*self).build();
-        r
+        IntersectionBuilder::new(db).add_negative(*self).build()
     }
 
     pub const fn into_union_type(self) -> Option<UnionType<'db>> {

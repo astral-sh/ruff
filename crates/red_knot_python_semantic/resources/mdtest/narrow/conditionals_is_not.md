@@ -86,6 +86,9 @@ if y is not x is not False:  # Interpreted as `(y is not x) and (x is not False)
     reveal_type(x)  # revealed: Literal[True]
     reveal_type(y)  # revealed: bool
 else:
+    # The negation of the clause above is (y is x) or (x is False)
+    # So we can't narrow the type of x or y here, because each arm of the `or` could be true
+
     reveal_type(x)  # revealed: bool
     reveal_type(y)  # revealed: bool
 ```
