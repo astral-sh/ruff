@@ -14,12 +14,23 @@ The most common case involves implementing these methods for the same type:
 
 ```py
 class A:
-    def __eq__(self, other: A) -> int: ...
-    def __ne__(self, other: A) -> float: ...
-    def __lt__(self, other: A) -> str: ...
-    def __le__(self, other: A) -> bytes: ...
-    def __gt__(self, other: A) -> list: ...
-    def __ge__(self, other: A) -> set: ...
+    def __eq__(self, other: A) -> int:
+        return 42
+
+    def __ne__(self, other: A) -> float:
+        return 42.0
+
+    def __lt__(self, other: A) -> str:
+        return "42"
+
+    def __le__(self, other: A) -> bytes:
+        return b"42"
+
+    def __gt__(self, other: A) -> list:
+        return [42]
+
+    def __ge__(self, other: A) -> set:
+        return {42}
 
 reveal_type(A() == A())  # revealed: int
 reveal_type(A() != A())  # revealed: float
@@ -35,12 +46,23 @@ In some cases, classes may implement rich comparison dunder methods for comparis
 
 ```py
 class A:
-    def __eq__(self, other: B) -> int: ...
-    def __ne__(self, other: B) -> float: ...
-    def __lt__(self, other: B) -> str: ...
-    def __le__(self, other: B) -> bytes: ...
-    def __gt__(self, other: B) -> list: ...
-    def __ge__(self, other: B) -> set: ...
+    def __eq__(self, other: B) -> int:
+        return 42
+
+    def __ne__(self, other: B) -> float:
+        return 42.0
+
+    def __lt__(self, other: B) -> str:
+        return "42"
+
+    def __le__(self, other: B) -> bytes:
+        return b"42"
+
+    def __gt__(self, other: B) -> list:
+        return [42]
+
+    def __ge__(self, other: B) -> set:
+        return {42}
 
 class B: ...
 
@@ -59,17 +81,31 @@ Note: class B has its own `__eq__` and `__ne__` methods to override those of obj
 
 ```py
 class A:
-    def __eq__(self, other: B) -> int: ...
-    def __ne__(self, other: B) -> float: ...
-    def __lt__(self, other: B) -> str: ...
-    def __le__(self, other: B) -> bytes: ...
-    def __gt__(self, other: B) -> list: ...
-    def __ge__(self, other: B) -> set: ...
+    def __eq__(self, other: B) -> int:
+        return 42
+
+    def __ne__(self, other: B) -> float:
+        return 42.0
+
+    def __lt__(self, other: B) -> str:
+        return "42"
+
+    def __le__(self, other: B) -> bytes:
+        return b"42"
+
+    def __gt__(self, other: B) -> list:
+        return [42]
+
+    def __ge__(self, other: B) -> set:
+        return {42}
 
 class B:
     # To override builtins.object.__eq__ and builtins.object.__ne__
-    def __eq__(self, other: str) -> B: ...
-    def __ne__(self, other: str) -> B: ...
+    def __eq__(self, other: str) -> B:
+        return B()
+
+    def __ne__(self, other: str) -> B:
+        return B()
 
 # TODO: should be `int` and `float`, need to check arg type and fall back to `rhs.__eq__` and `rhs.__ne__`
 reveal_type(B() == A())  # revealed: B
@@ -82,8 +118,11 @@ reveal_type(B() > A())  # revealed: str
 reveal_type(B() >= A())  # revealed: bytes
 
 class C:
-    def __gt__(self, other: C) -> int: ...
-    def __ge__(self, other: C) -> float: ...
+    def __gt__(self, other: C) -> int:
+        return 42
+
+    def __ge__(self, other: C) -> float:
+        return 42.0
 
 reveal_type(C() < C())  # revealed: int
 reveal_type(C() <= C())  # revealed: float
@@ -95,20 +134,42 @@ When subclasses override comparison methods, these overridden methods take prece
 
 ```py
 class A:
-    def __eq__(self, other: A) -> A: ...
-    def __ne__(self, other: A) -> A: ...
-    def __lt__(self, other: A) -> A: ...
-    def __le__(self, other: A) -> A: ...
-    def __gt__(self, other: A) -> A: ...
-    def __ge__(self, other: A) -> A: ...
+    def __eq__(self, other: A) -> A:
+        return A()
+
+    def __ne__(self, other: A) -> A:
+        return A()
+
+    def __lt__(self, other: A) -> A:
+        return A()
+
+    def __le__(self, other: A) -> A:
+        return A()
+
+    def __gt__(self, other: A) -> A:
+        return A()
+
+    def __ge__(self, other: A) -> A:
+        return A()
 
 class B(A):
-    def __eq__(self, other: A) -> int: ...
-    def __ne__(self, other: A) -> float: ...
-    def __lt__(self, other: A) -> str: ...
-    def __le__(self, other: A) -> bytes: ...
-    def __gt__(self, other: A) -> list: ...
-    def __ge__(self, other: A) -> set: ...
+    def __eq__(self, other: A) -> int:
+        return 42
+
+    def __ne__(self, other: A) -> float:
+        return 42.0
+
+    def __lt__(self, other: A) -> str:
+        return "42"
+
+    def __le__(self, other: A) -> bytes:
+        return b"42"
+
+    def __gt__(self, other: A) -> list:
+        return [42]
+
+    def __ge__(self, other: A) -> set:
+        return {42}
 
 reveal_type(A() == B())  # revealed: int
 reveal_type(A() != B())  # revealed: float
@@ -126,12 +187,18 @@ In the case of a subclass, the right-hand side has pirority. However, if the ove
 
 ```py
 class A:
-    def __lt__(self, other: A) -> A: ...
-    def __gt__(self, other: A) -> A: ...
+    def __lt__(self, other: A) -> A:
+        return A()
+
+    def __gt__(self, other: A) -> A:
+        return A()
 
 class B(A):
-    def __lt__(self, other: int) -> B: ...
-    def __gt__(self, other: int) -> B: ...
+    def __lt__(self, other: int) -> B:
+        return B()
+
+    def __gt__(self, other: int) -> B:
+        return B()
 
 # TODO: should be `A`, need to check argument type and fall back to LHS method
 reveal_type(A() < B())  # revealed: B
@@ -175,8 +242,11 @@ Please refer to the [docs](https://docs.python.org/3/reference/datamodel.html#ob
 
 ```py
 class A:
-    def __eq__(self, other: int) -> A: ...
-    def __ne__(self, other: int) -> A: ...
+    def __eq__(self, other: int) -> A:
+        return A()
+
+    def __ne__(self, other: int) -> A:
+        return A()
 
 # TODO: it should be `bool`, need to check arg type and fall back to `is` and `is not`
 reveal_type(A() == A())  # revealed: A
@@ -217,8 +287,11 @@ reveal_type(1 <= 2j)  # revealed: bool
 reveal_type(1 > 2j)  # revealed: bool
 reveal_type(1 >= 2j)  # revealed: bool
 
-def bool_instance() -> bool: ...
-def int_instance() -> int: ...
+def bool_instance() -> bool:
+    return True
+
+def int_instance() -> int:
+    return 42
 
 x = bool_instance()
 y = int_instance()

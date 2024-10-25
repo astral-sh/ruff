@@ -19,7 +19,8 @@ reveal_type(1 <= "" and 0 < 1)  # revealed: bool
 ## Integer instance
 
 ```py
-def int_instance() -> int: ...
+def int_instance() -> int:
+    return 42
 
 reveal_type(1 == int_instance())  # revealed: bool
 reveal_type(9 < int_instance())  # revealed: bool
