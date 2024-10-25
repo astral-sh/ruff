@@ -11,6 +11,7 @@ use crate::Db;
 use itertools::Itertools;
 use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
+use std::ptr::null;
 use std::sync::Arc;
 
 /// Return the type constraint that `test` (if true) would place on `definition`, if any.
@@ -219,8 +220,9 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                 // SAFETY: we should always have a symbol for every Name node.
                 let symbol = self.symbols().symbol_id_by_name(id).unwrap();
                 let rhs_ty = inference.expression_ty(right.scoped_ast_id(self.db, scope));
-                match (op, negative) {
-                    (ast::CmpOp::IsNot, false) | (ast::CmpOp::Is, true) => {
+
+                match if negative { op.negate() } else { *op } {
+                    ast::CmpOp::IsNot => {
                         if rhs_ty.is_singleton() {
                             let ty = IntersectionBuilder::new(self.db)
                                 .add_negative(rhs_ty)
@@ -230,10 +232,10 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                             // Non-singletons cannot be safely narrowed using `is not`
                         }
                     }
-                    (ast::CmpOp::Is, false) | (ast::CmpOp::IsNot, true) => {
+                    ast::CmpOp::Is => {
                         self.constraints.insert(symbol, rhs_ty);
                     }
-                    (ast::CmpOp::NotEq, false) | (ast::CmpOp::Eq, true) => {
+                    ast::CmpOp::NotEq => {
                         if rhs_ty.is_single_valued(self.db) {
                             let ty = IntersectionBuilder::new(self.db)
                                 .add_negative(rhs_ty)
@@ -241,7 +243,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                             self.constraints.insert(symbol, ty);
                         }
                     }
-                    (ast::CmpOp::NotEq, true) | (ast::CmpOp::Eq, false) => {
+                    ast::CmpOp::Eq => {
                         if rhs_ty.is_single_valued(self.db) {
                             self.constraints.insert(symbol, rhs_ty);
                         } else if let Some(union) = rhs_ty.into_union_type() {
