@@ -1,5 +1,4 @@
-use std::borrow::Cow;
-
+use itertools::Itertools;
 use ruff_formatter::{format_args, write, FormatContext};
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::str_prefix::{
@@ -8,6 +7,7 @@ use ruff_python_ast::str_prefix::{
 use ruff_python_ast::{AnyStringFlags, FStringElement, StringFlags, StringLike, StringLikePart};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
+use std::borrow::Cow;
 
 use crate::comments::{leading_comments, trailing_comments};
 use crate::expression::parentheses::in_parentheses_only_soft_line_break_or_space;
@@ -41,12 +41,20 @@ impl<'a> FormatImplicitConcatenatedString<'a> {
 
 impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedString<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let expanded = FormatImplicitConcatenatedStringExpanded::new(self.string);
+        let flat = FormatImplicitConcatenatedStringFlat::new(self.string, f.context());
+        let expanded = FormatImplicitConcatenatedStringExpanded::new(
+            self.string,
+            if flat.is_some() {
+                ImplicitConcatenatedLayout::MaybeFlat
+            } else {
+                ImplicitConcatenatedLayout::Multipart
+            },
+        );
 
         // If the string can be joined, try joining the implicit concatenated string into a single string
         // if it fits on the line. Otherwise, parenthesize the string parts and format each part on its
         // own line.
-        if let Some(flat) = FormatImplicitConcatenatedStringFlat::new(self.string, f.context()) {
+        if let Some(flat) = flat {
             write!(
                 f,
                 [if_group_fits_on_line(&flat), if_group_breaks(&expanded)]
@@ -60,13 +68,14 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedString<'_> {
 /// Formats an implicit concatenated string where parts are separated by a space or line break.
 pub(crate) struct FormatImplicitConcatenatedStringExpanded<'a> {
     string: StringLike<'a>,
+    layout: ImplicitConcatenatedLayout,
 }
 
 impl<'a> FormatImplicitConcatenatedStringExpanded<'a> {
-    pub(crate) fn new(string: StringLike<'a>) -> Self {
+    pub(crate) fn new(string: StringLike<'a>, layout: ImplicitConcatenatedLayout) -> Self {
         assert!(string.is_implicit_concatenated());
 
-        Self { string }
+        Self { string, layout }
     }
 }
 
@@ -77,6 +86,19 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringExpanded<'_
 
         let join_implicit_concatenated_string_enabled =
             is_join_implicit_concatenated_string_enabled(f.context());
+
+        // Keep implicit concatenated strings expanded unless they're already written on a single line.
+        if matches!(self.layout, ImplicitConcatenatedLayout::Multipart)
+            && join_implicit_concatenated_string_enabled
+            && self.string.parts().tuple_windows().any(|(a, b)| {
+                f.context()
+                    .source()
+                    .contains_line_break(TextRange::new(a.end(), b.start()))
+            })
+        {
+            expand_parent().fmt(f)?;
+        }
+
         let mut joiner = f.join_with(in_parentheses_only_soft_line_break_or_space());
 
         for part in self.string.parts() {
@@ -106,6 +128,14 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringExpanded<'_
 
         joiner.finish()
     }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) enum ImplicitConcatenatedLayout {
+    /// The string might get joined into a single string if it fits on a single line.
+    MaybeFlat,
+    /// The string will remain a multipart string.
+    Multipart,
 }
 
 /// Formats an implicit concatenated string where parts are joined into a single string if possible.
