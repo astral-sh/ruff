@@ -13,6 +13,8 @@ Classes can support rich comparison by implementing dunder methods like `__eq__`
 The most common case involves implementing these methods for the same type:
 
 ```py
+from __future__ import annotations
+
 class A:
     def __eq__(self, other: A) -> int:
         return 42
@@ -45,6 +47,8 @@ reveal_type(A() >= A())  # revealed: set
 In some cases, classes may implement rich comparison dunder methods for comparisons with a different type:
 
 ```py
+from __future__ import annotations
+
 class A:
     def __eq__(self, other: B) -> int:
         return 42
@@ -80,6 +84,8 @@ Fallback to the right-hand side’s comparison methods occurs when the left-hand
 Note: class B has its own `__eq__` and `__ne__` methods to override those of object, but these methods will be ignored here because they require a mismatched operand type.
 
 ```py
+from __future__ import annotations
+
 class A:
     def __eq__(self, other: B) -> int:
         return 42
@@ -133,6 +139,8 @@ reveal_type(C() <= C())  # revealed: float
 When subclasses override comparison methods, these overridden methods take precedence over those in the parent class. Class B inherits from A and redefines comparison methods to return types other than A.
 
 ```py
+from __future__ import annotations
+
 class A:
     def __eq__(self, other: A) -> A:
         return A()
@@ -186,6 +194,8 @@ reveal_type(A() >= B())  # revealed: bytes
 In the case of a subclass, the right-hand side has pirority. However, if the overridden dunder method has an mismatched type to operand, the comparison will fall back to the left-hand side.
 
 ```py
+from __future__ import annotations
+
 class A:
     def __lt__(self, other: A) -> A:
         return A()
@@ -241,6 +251,8 @@ This test confirms that `==` and `!=` comparisons default to identity comparison
 Please refer to the [docs](https://docs.python.org/3/reference/datamodel.html#object.__eq__)
 
 ```py
+from __future__ import annotations
+
 class A:
     def __eq__(self, other: int) -> A:
         return A()
