@@ -296,7 +296,7 @@ impl DefinitionNodeRef<'_> {
                 handler,
                 is_star,
             }) => DefinitionKind::ExceptHandler(ExceptHandlerDefinitionKind {
-                handler: AstNodeRef::new(parsed.clone(), handler),
+                handler: AstNodeRef::new(parsed, handler),
                 is_star,
             }),
         }

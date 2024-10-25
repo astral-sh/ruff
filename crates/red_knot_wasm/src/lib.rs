@@ -110,14 +110,14 @@ impl Workspace {
     pub fn check_file(&self, file_id: &FileHandle) -> Result<Vec<String>, Error> {
         let result = self.db.check_file(file_id.file).map_err(into_error)?;
 
-        Ok(result.clone())
+        Ok(result)
     }
 
     /// Checks all open files
     pub fn check(&self) -> Result<Vec<String>, Error> {
         let result = self.db.check().map_err(into_error)?;
 
-        Ok(result.clone())
+        Ok(result)
     }
 
     /// Returns the parsed AST for `path`

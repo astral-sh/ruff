@@ -144,7 +144,7 @@ pub fn main() -> ExitStatus {
 }
 
 fn run() -> anyhow::Result<ExitStatus> {
-    let args = Args::parse_from(std::env::args().collect::<Vec<_>>());
+    let args = Args::parse_from(std::env::args());
 
     if matches!(args.command, Some(Command::Server)) {
         return run_server().map(|()| ExitStatus::Success);

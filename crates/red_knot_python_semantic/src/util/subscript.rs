@@ -18,6 +18,7 @@ impl<I, T: DoubleEndedIterator<Item = I>> PythonSubscript for T {
 }
 
 #[cfg(test)]
+#[allow(clippy::redundant_clone)]
 mod tests {
     use super::PythonSubscript;
 
