@@ -70,9 +70,9 @@ reveal_type("hello" in A())  # revealed: bool
 reveal_type("hello" not in A())  # revealed: bool
 ```
 
-## Literal Result for in and not in Checks
+## Literal Result for `in` and `not in`
 
-Tests with Literals as return types in `__contains__`, the result of operator also should be BooleanLiteral:
+`__contains__` with a literal return type may result in a `BooleanLiteral` outcome.
 
 ```py
 from typing import Literal
