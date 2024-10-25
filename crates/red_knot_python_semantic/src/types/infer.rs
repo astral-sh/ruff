@@ -58,7 +58,7 @@ use crate::types::{
 use crate::util::subscript::PythonSubscript;
 use crate::Db;
 
-use super::{KnownClass, UnionBuilder};
+use super::{IterationOutcome, KnownClass, UnionBuilder};
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -3797,21 +3797,11 @@ fn perform_membership_test_comparison<'db>(
     let contains_dunder = right_class.class_member(db, "__contains__");
 
     let compare_result_opt = if contains_dunder.is_unbound() {
-        // If `__contains__` is unbound, the code falls back to checking the `__iter__` method for an iteration-based membership test.
-        right_class
-            .class_member(db, "__iter__")
-            .call(db, &[right_instance])
-            .return_ty(db)
-            .map(|_| KnownClass::Bool.to_instance(db))
-            .or_else(|| {
-                // If `__iter__` is not defined, the code falls back to the old-style iteration protocol,
-                // where Python iterates over natural numbers (0..) until an IndexError is raised or the item is found.
-                right_class
-                    .class_member(db, "__getitem__")
-                    .call(db, &[right_instance, KnownClass::Int.to_instance(db)]) // Simulate item access with an integer index.
-                    .return_ty(db)
-                    .map(|_item_ty| KnownClass::Bool.to_instance(db))
-            })
+        // iteration-based membership test
+        match right_instance.iterate(db) {
+            IterationOutcome::Iterable { .. } => Some(KnownClass::Bool.to_instance(db)),
+            IterationOutcome::NotIterable { .. } => None,
+        }
     } else {
         // If `__contains__` is available, it is used directly for the membership test.
         contains_dunder
@@ -3820,9 +3810,15 @@ fn perform_membership_test_comparison<'db>(
     };
 
     compare_result_opt
-        .map(|ty| match op {
-            MembershipTestCompareOperator::In => ty.bool(db).into_type(db),
-            MembershipTestCompareOperator::NotIn => ty.bool(db).negate().into_type(db),
+        .map(|ty| {
+            if matches!(ty, Type::Todo) {
+                return Type::Todo;
+            }
+
+            match op {
+                MembershipTestCompareOperator::In => ty.bool(db).into_type(db),
+                MembershipTestCompareOperator::NotIn => ty.bool(db).negate().into_type(db),
+            }
         })
         .ok_or_else(|| CompareUnsupportedError {
             op: op.into(),
