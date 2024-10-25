@@ -3471,6 +3471,17 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::Todo
             }
 
+            // TODO PEP-604 unions
+            ast::Expr::BinOp(binary) => {
+                self.infer_binary_expression(binary);
+                match binary.op {
+                    // PEP-604 unions are okay
+                    ast::Operator::BitOr => Type::Todo,
+                    // anything else is an invalid annotation:
+                    _ => Type::Unknown,
+                }
+            }
+
             // Forms which are invalid in the context of annotation expressions: we infer their
             // nested expressions as normal expressions, but the type of the top-level expression is
             // always `Type::Unknown` in these cases.
@@ -3480,10 +3491,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             ast::Expr::Named(named) => {
                 self.infer_named_expression(named);
-                Type::Unknown
-            }
-            ast::Expr::BinOp(binary) => {
-                self.infer_binary_expression(binary);
                 Type::Unknown
             }
             ast::Expr::UnaryOp(unary) => {

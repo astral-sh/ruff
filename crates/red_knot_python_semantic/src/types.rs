@@ -211,7 +211,13 @@ fn declarations_ty<'db>(
     let declared_ty = if let Some(second) = all_types.next() {
         let mut builder = UnionBuilder::new(db).add(first);
         for other in [second].into_iter().chain(all_types) {
-            if !first.is_equivalent_to(db, other) {
+            // Make sure not to emit spurious errors relating to `Type::Todo`,
+            // since we only infer this type due to a limitation in our current model.
+            //
+            // `Unknown` is different here, since we might infer `Unknown`
+            // for one of these due to a variable being defined in one possible
+            // control-flow branch but not another one.
+            if !first.is_equivalent_to(db, other) && !first.is_todo() && !other.is_todo() {
                 conflicting.push(other);
             }
             builder = builder.add(other);
@@ -290,6 +296,10 @@ impl<'db> Type<'db> {
 
     pub const fn is_never(&self) -> bool {
         matches!(self, Type::Never)
+    }
+
+    pub const fn is_todo(&self) -> bool {
+        matches!(self, Type::Todo)
     }
 
     pub const fn into_class_literal_type(self) -> Option<ClassType<'db>> {
