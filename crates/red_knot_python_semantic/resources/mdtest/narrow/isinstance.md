@@ -5,6 +5,11 @@ Narrowing for `isinstance(object, classinfo)` expressions.
 ## `classinfo` is a single type
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
+
 x = 1 if flag else "a"
 
 if isinstance(x, int):
@@ -26,6 +31,11 @@ Note: `isinstance(x, (int, str))` should not be confused with
 `isinstance(x, int | str)`:
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag, flag1, flag2 = bool_instance(), bool_instance(), bool_instance()
+
 x = 1 if flag else "a"
 
 if isinstance(x, (int, str)):
@@ -56,6 +66,11 @@ if isinstance(y, (str, bytes)):
 ## `classinfo` is a nested tuple of types
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
+
 x = 1 if flag else "a"
 
 if isinstance(x, (bool, (bytes, int))):
@@ -81,6 +96,11 @@ if isinstance(x, A):
 ## No narrowing for instances of `builtins.type`
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
+
 t = type("t", (), {})
 
 # This isn't testing what we want it to test if we infer anything more precise here:
@@ -94,6 +114,11 @@ if isinstance(x, t):
 ## Do not use custom `isinstance` for narrowing
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
+
 def isinstance(x, t):
     return True
 
@@ -105,6 +130,11 @@ if isinstance(x, int):
 ## Do support narrowing if `isinstance` is aliased
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
+
 isinstance_alias = isinstance
 
 x = 1 if flag else "a"
@@ -117,6 +147,10 @@ if isinstance_alias(x, int):
 ```py
 from builtins import isinstance as imported_isinstance
 
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
 x = 1 if flag else "a"
 if imported_isinstance(x, int):
     reveal_type(x)  # revealed: Literal[1]
@@ -125,6 +159,10 @@ if imported_isinstance(x, int):
 ## Do not narrow if second argument is not a type
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
 x = 1 if flag else "a"
 
 # TODO: this should cause us to emit a diagnostic during
@@ -141,6 +179,10 @@ if isinstance(x, "int"):
 ## Do not narrow if there are keyword arguments
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
 x = 1 if flag else "a"
 
 # TODO: this should cause us to emit a diagnostic

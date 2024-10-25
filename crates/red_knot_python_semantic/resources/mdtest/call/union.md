@@ -3,6 +3,11 @@
 ## Union of return types
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
+
 if flag:
 
     def f() -> int:
@@ -21,6 +26,11 @@ reveal_type(f())  # revealed: int | str
 ```py
 from nonexistent import f  # error: [unresolved-import] "Cannot resolve import `nonexistent`"
 
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
+
 if flag:
 
     def f() -> int:
@@ -34,6 +44,11 @@ reveal_type(f())  # revealed: Unknown | int
 Calling a union with a non-callable element should emit a diagnostic.
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
+
 if flag:
     f = 1
 else:
@@ -50,6 +65,11 @@ reveal_type(x)  # revealed: Unknown | int
 Calling a union with multiple non-callable elements should mention all of them in the diagnostic.
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag, flag2 = bool_instance(), bool_instance()
+
 if flag:
     f = 1
 elif flag2:
@@ -69,6 +89,11 @@ reveal_type(f())
 Calling a union with no callable elements can emit a simpler diagnostic.
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
+
 if flag:
     f = 1
 else:

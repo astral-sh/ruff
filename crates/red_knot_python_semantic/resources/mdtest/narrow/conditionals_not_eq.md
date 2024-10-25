@@ -3,6 +3,10 @@
 ## `x != None`
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
 x = None if flag else 1
 
 if x != None:
@@ -12,6 +16,10 @@ if x != None:
 ## `!=` for other singleton types
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
 x = True if flag else False
 
 if x != False:
@@ -21,6 +29,10 @@ if x != False:
 ## `x != y` where `y` is of literal type
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
 x = 1 if flag else 2
 
 if x != 1:
@@ -30,6 +42,11 @@ if x != 1:
 ## `x != y` where `y` is a single-valued type
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
+
 class A: ...
 class B: ...
 
@@ -44,8 +61,13 @@ if C != A:
 Only single-valued types should narrow the type:
 
 ```py
-def int_instance() -> int: ...
+def bool_instance() -> bool:
+    return True
 
+def int_instance() -> int:
+    return 42
+
+flag = bool_instance()
 x = int_instance() if flag else None
 y = int_instance()
 

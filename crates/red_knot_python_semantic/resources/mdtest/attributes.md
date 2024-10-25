@@ -3,6 +3,11 @@
 ## Union of attributes
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
+
 if flag:
     class C:
         x = 1

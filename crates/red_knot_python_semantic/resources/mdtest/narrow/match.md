@@ -3,6 +3,11 @@
 ## Single `match` pattern
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
+
 x = None if flag else 1
 reveal_type(x)  # revealed: None | Literal[1]
 
