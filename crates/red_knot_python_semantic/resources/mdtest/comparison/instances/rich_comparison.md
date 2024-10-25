@@ -1,58 +1,73 @@
 # Comparison: Rich Comparison
 
-## Compare to same type
+Rich comparison operations (`==`, `!=`, `<`, `<=`, `>`, `>=`) in Python are implemented through double-underscore methods that allow customization of comparison behavior.
+
+For references, see:
+
+- <https://docs.python.org/3/reference/datamodel.html#object.__lt__>
+- <https://snarky.ca/unravelling-rich-comparison-operators/>
+
+## Implements Rich Comparison Dunders For Same Class
+
+Classes can support rich comparison by implementing dunder methods like `__eq__`, `__ne__`, etc.
+The most common case involves implementing these methods for the same type:
 
 ```py
 class A:
-    def __eq__(self, other: A) -> bool: ...
-    def __ne__(self, other: A) -> bool: ...
-    def __lt__(self, other: A) -> bool: ...
-    def __le__(self, other: A) -> bool: ...
-    def __gt__(self, other: A) -> bool: ...
-    def __ge__(self, other: A) -> bool: ...
+    def __eq__(self, other: A) -> int: ...
+    def __ne__(self, other: A) -> float: ...
+    def __lt__(self, other: A) -> str: ...
+    def __le__(self, other: A) -> bytes: ...
+    def __gt__(self, other: A) -> list: ...
+    def __ge__(self, other: A) -> set: ...
 
 
-reveal_type(A() == A())  # revealed: bool
-reveal_type(A() != A())  # revealed: bool
-reveal_type(A() < A())  # revealed: bool
-reveal_type(A() <= A())  # revealed: bool
-reveal_type(A() > A())  # revealed: bool
-reveal_type(A() >= A())  # revealed: bool
+reveal_type(A() == A())  # revealed: int
+reveal_type(A() != A())  # revealed: float
+reveal_type(A() < A())  # revealed: str
+reveal_type(A() <= A())  # revealed: bytes
+reveal_type(A() > A())  # revealed: list
+reveal_type(A() >= A())  # revealed: set
 ```
 
-## Compare to other type
+## Implements Rich Comparison Dunders for Other Class
+
+In some cases, classes may implement rich comparison dunder methods for comparisons with a different type:
 
 ```py
 class A:
-    def __eq__(self, other: B) -> bool: ...
-    def __ne__(self, other: B) -> bool: ...
-    def __lt__(self, other: B) -> bool: ...
-    def __le__(self, other: B) -> bool: ...
-    def __gt__(self, other: B) -> bool: ...
-    def __ge__(self, other: B) -> bool: ...
+    def __eq__(self, other: B) -> int: ...
+    def __ne__(self, other: B) -> float: ...
+    def __lt__(self, other: B) -> str: ...
+    def __le__(self, other: B) -> bytes: ...
+    def __gt__(self, other: B) -> list: ...
+    def __ge__(self, other: B) -> set: ...
 
 
 class B: ...
 
 
-reveal_type(A() == B())  # revealed: bool
-reveal_type(A() != B())  # revealed: bool
-reveal_type(A() < B())  # revealed: bool
-reveal_type(A() <= B())  # revealed: bool
-reveal_type(A() > B())  # revealed: bool
-reveal_type(A() >= B())  # revealed: bool
+reveal_type(A() == B())  # revealed: int
+reveal_type(A() != B())  # revealed: float
+reveal_type(A() < B())  # revealed: str
+reveal_type(A() <= B())  # revealed: bytes
+reveal_type(A() > B())  # revealed: list
+reveal_type(A() >= B())  # revealed: set
 ```
 
 ## Reflected Comparisons
 
+Fallback to the right-hand side’s comparison methods occurs when the left-hand side does not define them.
+Note: class B has its own `__eq__` and `__ne__` methods to override those of object, but these methods will be ignored here because they require a mismatched operand type.
+
 ```py
 class A:
-    def __eq__(self, other: B) -> A: ...
-    def __ne__(self, other: B) -> A: ...
-    def __lt__(self, other: B) -> A: ...
-    def __le__(self, other: B) -> A: ...
-    def __gt__(self, other: B) -> A: ...
-    def __ge__(self, other: B) -> A: ...
+    def __eq__(self, other: B) -> int: ...
+    def __ne__(self, other: B) -> float: ...
+    def __lt__(self, other: B) -> str: ...
+    def __le__(self, other: B) -> bytes: ...
+    def __gt__(self, other: B) -> list: ...
+    def __ge__(self, other: B) -> set: ...
 
 
 class B:
@@ -61,26 +76,29 @@ class B:
     def __ne__(self, other: str) -> B: ...
 
 
-# TODO: should be `A`, need to check arg type and fall back to `rhs.__eq__` and `rhs.__ne__`
+# TODO: should be `int` and `float`, need to check arg type and fall back to `rhs.__eq__` and `rhs.__ne__`
 reveal_type(B() == A())  # revealed: B
 reveal_type(B() != A())  # revealed: B
 
-reveal_type(B() < A())  # revealed: A
-reveal_type(B() <= A())  # revealed: A
-reveal_type(B() > A())  # revealed: A
-reveal_type(B() >= A())  # revealed: A
+reveal_type(B() < A())  # revealed: list
+reveal_type(B() <= A())  # revealed: set
+
+reveal_type(B() > A())  # revealed: str
+reveal_type(B() >= A())  # revealed: bytes
 
 
 class C:
-    def __gt__(self, other: C) -> C: ...
-    def __ge__(self, other: C) -> C: ...
+    def __gt__(self, other: C) -> int: ...
+    def __ge__(self, other: C) -> float: ...
 
 
-reveal_type(C() < C())  # revealed: C
-reveal_type(C() <= C())  # revealed: C
+reveal_type(C() < C())  # revealed: int
+reveal_type(C() <= C())  # revealed: float
 ```
 
 ## Reflected Comparisons with Subclasses
+
+When subclasses override comparison methods, these overridden methods take precedence over those in the parent class. Class B inherits from A and redefines comparison methods to return types other than A.
 
 ```py
 class A:
@@ -93,23 +111,27 @@ class A:
 
 
 class B(A):
-    def __eq__(self, other: A) -> B: ...
-    def __ne__(self, other: A) -> B: ...
-    def __lt__(self, other: A) -> B: ...
-    def __le__(self, other: A) -> B: ...
-    def __gt__(self, other: A) -> B: ...
-    def __ge__(self, other: A) -> B: ...
+    def __eq__(self, other: A) -> int: ...
+    def __ne__(self, other: A) -> float: ...
+    def __lt__(self, other: A) -> str: ...
+    def __le__(self, other: A) -> bytes: ...
+    def __gt__(self, other: A) -> list: ...
+    def __ge__(self, other: A) -> set: ...
 
 
-reveal_type(A() == B())  # revealed: B
-reveal_type(A() != B())  # revealed: B
-reveal_type(A() < B())  # revealed: B
-reveal_type(A() <= B())  # revealed: B
-reveal_type(A() > B())  # revealed: B
-reveal_type(A() >= B())  # revealed: B
+reveal_type(A() == B())  # revealed: int
+reveal_type(A() != B())  # revealed: float
+
+reveal_type(A() < B())  # revealed: list
+reveal_type(A() <= B())  # revealed: set
+
+reveal_type(A() > B())  # revealed: str
+reveal_type(A() >= B())  # revealed: bytes
 ```
 
 ## Reflected Comparisons with Subclass But Falls Back to LHS
+
+In the case of a subclass, the right-hand side has pirority. However, if the overridden dunder method has an mismatched type to operand, the comparison will fall back to the left-hand side.
 
 ```py
 class A:
@@ -139,6 +161,8 @@ unknowable nature of `Any`/`Unknown`, we must consider both possibilities:
 and overrides `__gt__`; but it also might not. Thus, the correct answer here
 for the `reveal_type` is `int | Unknown`.
 
+(This test is referenced from `mdtest/binary/instances.md`)
+
 ```py
 from does_not_exist import Foo  # error: [unresolved-import]
 
@@ -157,6 +181,23 @@ class Y(Foo): ...
 reveal_type(X() < Y())  # revealed: int
 ```
 
+## Equality and Inequality Fallback
+
+This test confirms that `==` and `!=` comparisons default to identity comparisons (`is`, `is not`) when argument types do not match the method signature.
+
+Please refer to the [docs](https://docs.python.org/3/reference/datamodel.html#object.__eq__)
+
+```py
+class A:
+    def __eq__(self, other: int) -> A: ...
+    def __ne__(self, other: int) -> A: ...
+
+
+# TODO: it should be `bool`, need to check arg type and fall back to `is` and `is not`
+reveal_type(A() == A())  # revealed: A
+reveal_type(A() != A())  # revealed: A
+```
+
 ## Object Comparisons with Typeshed
 
 ```py
@@ -171,19 +212,6 @@ reveal_type(object() != A())  # revealed: bool
 # error: "Operator `<` is not supported for types `A` and `object`"
 # revealed: Unknown
 reveal_type(A() < object())
-```
-
-## Equality and Inequality Fallback
-
-```py
-class A:
-    def __eq__(self, other: int) -> A: ...
-    def __ne__(self, other: int) -> A: ...
-
-
-# TODO: it should be `bool`, need to check arg type and fall back to `is` and `is not`
-reveal_type(A() == A())  # revealed: A
-reveal_type(A() != A())  # revealed: A
 ```
 
 ## Numbers Comparison with typeshed
