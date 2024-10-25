@@ -10,10 +10,8 @@ reveal_type(b)  # revealed: bool
 c = object() < 5  # error: "Operator `<` is not supported for types `object` and `int`"
 reveal_type(c)  # revealed: Unknown
 
-# TODO should error, need to check if __lt__ signature is valid for right operand
-d = 5 < object()
-# TODO: should be `Unknown`
-reveal_type(d)  # revealed: bool
+d = 5 < object()  # error: "Operator `<` is not supported for types `int` and `object`"
+reveal_type(d)  # revealed: Unknown
 
 int_literal_or_str_literal = 1 if flag else "foo"
 # error: "Operator `in` is not supported for types `Literal[42]` and `Literal[1]`, in comparing `Literal[42]` with `Literal[1] | Literal["foo"]`"
