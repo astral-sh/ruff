@@ -3072,6 +3072,7 @@ impl CmpOp {
         }
     }
 
+    #[must_use]
     pub const fn negate(&self) -> Self {
         match self {
             CmpOp::Eq => CmpOp::NotEq,

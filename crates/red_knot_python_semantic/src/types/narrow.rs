@@ -11,7 +11,6 @@ use crate::Db;
 use itertools::Itertools;
 use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
-use std::ptr::null;
 use std::sync::Arc;
 
 /// Return the type constraint that `test` (if true) would place on `definition`, if any.
@@ -36,14 +35,17 @@ pub(crate) fn narrowing_constraint<'db>(
     definition: Definition<'db>,
 ) -> Option<Type<'db>> {
     match predicate.node {
-        PredicateNode::Expression(expression) => match predicate.negative {
-            false => all_narrowing_constraints_for_expression(db, expression)
-                .get(&definition.symbol(db))
-                .copied(),
-            true => all_negative_narrowing_constraints_for_expression(db, expression)
-                .get(&definition.symbol(db))
-                .copied(),
-        },
+        PredicateNode::Expression(expression) => {
+            if predicate.negative {
+                all_negative_narrowing_constraints_for_expression(db, expression)
+                    .get(&definition.symbol(db))
+                    .copied()
+            } else {
+                all_narrowing_constraints_for_expression(db, expression)
+                    .get(&definition.symbol(db))
+                    .copied()
+            }
+        }
         PredicateNode::Pattern(pattern) => all_narrowing_constraints_for_pattern(db, pattern)
             .get(&definition.symbol(db))
             .copied(),
