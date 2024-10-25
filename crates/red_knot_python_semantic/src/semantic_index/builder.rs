@@ -27,7 +27,7 @@ use crate::semantic_index::use_def::{FlowSnapshot, UseDefMapBuilder};
 use crate::semantic_index::SemanticIndex;
 use crate::Db;
 
-use super::constraint::{Constraint, ConstraintNode, PatternConstraint};
+use super::constraint::{PatternPredicate, Predicate, PredicateNode};
 use super::definition::{
     AssignmentKind, DefinitionCategory, ExceptHandlerDefinitionNodeRef,
     MatchPatternDefinitionNodeRef, WithItemDefinitionNodeRef,
@@ -243,23 +243,22 @@ impl<'db> SemanticIndexBuilder<'db> {
         definition
     }
 
-    fn add_expression_constraint(&mut self, constraint_node: &ast::Expr) -> Constraint<'db> {
-        let expression = self.add_standalone_expression(constraint_node);
-        let constraint = Constraint {
-            node: ConstraintNode::Expression(expression),
+    fn add_expression_predicate(&mut self, predicate_node: &ast::Expr) -> Predicate<'db> {
+        let expression = self.add_standalone_expression(predicate_node);
+        let predicate = Predicate {
+            node: PredicateNode::Expression(expression),
             negative: false,
         };
-        self.current_use_def_map_mut().record_constraint(constraint);
+        self.current_use_def_map_mut().record_predicate(predicate);
 
-        constraint
+        predicate
     }
 
-    fn add_constraint_negation(&mut self, constraint: Constraint<'db>) {
-        self.current_use_def_map_mut()
-            .record_constraint(Constraint {
-                node: constraint.node,
-                negative: true,
-            });
+    fn add_negated_predicate(&mut self, predicate: Predicate<'db>) {
+        self.current_use_def_map_mut().record_predicate(Predicate {
+            node: predicate.node,
+            negative: true,
+        });
     }
 
     fn push_assignment(&mut self, assignment: CurrentAssignment<'db>) {
@@ -275,11 +274,11 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_assignments.last()
     }
 
-    fn add_pattern_constraint(
+    fn add_pattern_predicate(
         &mut self,
         subject: &ast::Expr,
         pattern: &ast::Pattern,
-    ) -> PatternConstraint<'db> {
+    ) -> PatternPredicate<'db> {
         #[allow(unsafe_code)]
         let (subject, pattern) = unsafe {
             (
@@ -287,7 +286,7 @@ impl<'db> SemanticIndexBuilder<'db> {
                 AstNodeRef::new(self.module.clone(), pattern),
             )
         };
-        let pattern_constraint = PatternConstraint::new(
+        let pattern_predicate = PatternPredicate::new(
             self.db,
             self.file,
             self.current_scope(),
@@ -295,12 +294,11 @@ impl<'db> SemanticIndexBuilder<'db> {
             pattern,
             countme::Count::default(),
         );
-        self.current_use_def_map_mut()
-            .record_constraint(Constraint {
-                node: ConstraintNode::Pattern(pattern_constraint),
-                negative: false,
-            });
-        pattern_constraint
+        self.current_use_def_map_mut().record_predicate(Predicate {
+            node: PredicateNode::Pattern(pattern_predicate),
+            negative: false,
+        });
+        pattern_predicate
     }
 
     /// Record an expression that needs to be a Salsa ingredient, because we need to infer its type
@@ -653,8 +651,8 @@ where
             ast::Stmt::If(node) => {
                 self.visit_expr(&node.test);
                 let pre_if = self.flow_snapshot();
-                let constraint = self.add_expression_constraint(&node.test);
-                let mut constraints = vec![constraint];
+                let predicate = self.add_expression_predicate(&node.test);
+                let mut predicates = vec![predicate];
                 self.visit_body(&node.body);
                 let mut post_clauses: Vec<FlowSnapshot> = vec![];
                 for clause in &node.elif_else_clauses {
@@ -664,12 +662,12 @@ where
                     // we can only take an elif/else branch if none of the previous ones were
                     // taken, so the block entry state is always `pre_if`
                     self.flow_restore(pre_if.clone());
-                    for constraint in &constraints {
-                        self.add_constraint_negation(*constraint);
+                    for predicate in &predicates {
+                        self.add_negated_predicate(*predicate);
                     }
                     if let Some(elif_test) = &clause.test {
                         self.visit_expr(elif_test);
-                        constraints.push(self.add_expression_constraint(elif_test));
+                        predicates.push(self.add_expression_predicate(elif_test));
                     }
                     self.visit_body(&clause.body);
                 }
@@ -787,14 +785,14 @@ where
                 let Some((first, remaining)) = cases.split_first() else {
                     return;
                 };
-                self.add_pattern_constraint(subject, &first.pattern);
+                self.add_pattern_predicate(subject, &first.pattern);
                 self.visit_match_case(first);
 
                 let mut post_case_snapshots = vec![];
                 for case in remaining {
                     post_case_snapshots.push(self.flow_snapshot());
                     self.flow_restore(after_subject.clone());
-                    self.add_pattern_constraint(subject, &case.pattern);
+                    self.add_pattern_predicate(subject, &case.pattern);
                     self.visit_match_case(case);
                 }
                 for post_clause_state in post_case_snapshots {

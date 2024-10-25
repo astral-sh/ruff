@@ -1,7 +1,7 @@
 //! Track live bindings per symbol, applicable constraints per binding, and live declarations.
 //!
 //! These data structures operate entirely on scope-local newtype-indices for definitions and
-//! constraints, referring to their location in the `all_definitions` and `all_constraints`
+//! constraints, referring to their location in the `all_definitions` and `all_predicates`
 //! indexvecs in [`super::UseDefMapBuilder`].
 //!
 //! We need to track arbitrary associations between bindings and constraints, not just a single set

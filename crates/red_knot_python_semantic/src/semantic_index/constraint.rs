@@ -7,19 +7,19 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{FileScopeId, ScopeId};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct Constraint<'db> {
-    pub(crate) node: ConstraintNode<'db>,
+pub(crate) struct Predicate<'db> {
+    pub(crate) node: PredicateNode<'db>,
     pub(crate) negative: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum ConstraintNode<'db> {
+pub(crate) enum PredicateNode<'db> {
     Expression(Expression<'db>),
-    Pattern(PatternConstraint<'db>),
+    Pattern(PatternPredicate<'db>),
 }
 
 #[salsa::tracked]
-pub(crate) struct PatternConstraint<'db> {
+pub(crate) struct PatternPredicate<'db> {
     #[id]
     pub(crate) file: File,
 
@@ -35,10 +35,10 @@ pub(crate) struct PatternConstraint<'db> {
     pub(crate) pattern: AstNodeRef<ast::Pattern>,
 
     #[no_eq]
-    count: countme::Count<PatternConstraint<'static>>,
+    count: countme::Count<PatternPredicate<'static>>,
 }
 
-impl<'db> PatternConstraint<'db> {
+impl<'db> PatternPredicate<'db> {
     pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         self.file_scope(db).to_scope_id(db, self.file(db))
     }
