@@ -51,6 +51,22 @@ else:
     reveal_type(x)  # revealed: Literal[345]
 ```
 
+## `is not` for other types
+
+```py
+class A: ...
+
+x = A()
+y = x if flag else None
+
+if y is not x:
+    reveal_type(y)  # revealed: A | None
+else:
+    reveal_type(y)  # revealed: A
+
+reveal_type(y)  # revealed: A | None
+```
+
 ## `is not` in chained comparisons
 
 The type guard removes `False` from the union type of the tested value only.
