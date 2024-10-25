@@ -122,10 +122,7 @@ impl TestRule for StableTestRuleSafeFix {
         } else {
             Some(
                 Diagnostic::new(StableTestRuleSafeFix, ruff_text_size::TextRange::default())
-                    .with_fix(Fix::safe_edit(Edit::insertion(
-                        comment.to_string(),
-                        TextSize::new(0),
-                    ))),
+                    .with_fix(Fix::safe_edit(Edit::insertion(comment, TextSize::new(0)))),
             )
         }
     }
@@ -169,10 +166,7 @@ impl TestRule for StableTestRuleUnsafeFix {
                     StableTestRuleUnsafeFix,
                     ruff_text_size::TextRange::default(),
                 )
-                .with_fix(Fix::unsafe_edit(Edit::insertion(
-                    comment.to_string(),
-                    TextSize::new(0),
-                ))),
+                .with_fix(Fix::unsafe_edit(Edit::insertion(comment, TextSize::new(0)))),
             )
         }
     }
@@ -217,7 +211,7 @@ impl TestRule for StableTestRuleDisplayOnlyFix {
                     ruff_text_size::TextRange::default(),
                 )
                 .with_fix(Fix::display_only_edit(Edit::insertion(
-                    comment.to_string(),
+                    comment,
                     TextSize::new(0),
                 ))),
             )

@@ -1850,7 +1850,7 @@ static GOOGLE_ARGS_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^\s*(\*?\*?\w+)\s*(\(.*?\))?\s*:(\r\n|\n)?\s*.+").unwrap());
 
 fn args_section(context: &SectionContext) -> FxHashSet<String> {
-    let mut following_lines = context.following_lines().peekable();
+    let mut following_lines = context.following_lines();
     let Some(first_line) = following_lines.next() else {
         return FxHashSet::default();
     };

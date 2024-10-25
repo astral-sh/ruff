@@ -37,7 +37,7 @@ impl SyncNotificationHandler for DidOpenNotebookHandler {
             params.cell_text_documents,
         )
         .with_failure_code(ErrorCode::InternalError)?;
-        session.open_notebook_document(params.notebook_document.uri.clone(), notebook);
+        session.open_notebook_document(params.notebook_document.uri, notebook);
 
         match path {
             AnySystemPath::System(path) => {
