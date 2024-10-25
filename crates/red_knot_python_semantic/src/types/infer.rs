@@ -33,8 +33,8 @@ use std::num::NonZeroU32;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext, UnaryOp};
-use ruff_text_size::{Ranged, TextSize};
-use rustc_hash::{FxHashMap, FxHashSet};
+use ruff_text_size::Ranged;
+use rustc_hash::FxHashMap;
 use salsa;
 use salsa::plumbing::AsId;
 
@@ -291,10 +291,6 @@ pub(super) struct TypeInferenceBuilder<'db> {
     // Cached lookups
     file: File,
 
-    /// Offsets of [`ast::ExprName`] nodes representing unbound names
-    /// for which we've already added diagnostics
-    unbound_names: FxHashSet<TextSize>,
-
     /// The type inference results
     types: TypeInference<'db>,
 }
@@ -325,7 +321,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             index,
             region,
             file,
-            unbound_names: FxHashSet::default(),
             types: TypeInference::empty(scope),
         }
     }
@@ -2423,20 +2418,18 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                 let ty = bindings_ty(self.db, definitions, unbound_ty);
 
-                if ty.may_be_unbound(self.db) && self.unbound_names.insert(name.start()) {
-                    if ty.is_unbound() {
-                        self.add_diagnostic(
-                            name.into(),
-                            "unresolved-reference",
-                            format_args!("Name `{id}` used when not defined"),
-                        );
-                    } else {
-                        self.add_diagnostic(
-                            name.into(),
-                            "possibly-unresolved-reference",
-                            format_args!("Name `{id}` used when possibly not defined"),
-                        );
-                    }
+                if ty.is_unbound() {
+                    self.add_diagnostic(
+                        name.into(),
+                        "unresolved-reference",
+                        format_args!("Name `{id}` used when not defined"),
+                    );
+                } else if ty.may_be_unbound(self.db) {
+                    self.add_diagnostic(
+                        name.into(),
+                        "possibly-unresolved-reference",
+                        format_args!("Name `{id}` used when possibly not defined"),
+                    );
                 }
 
                 ty
