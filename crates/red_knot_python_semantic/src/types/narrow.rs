@@ -35,11 +35,14 @@ pub(crate) fn narrowing_constraint<'db>(
     definition: Definition<'db>,
 ) -> Option<Type<'db>> {
     match constraint.node {
-        ConstraintNode::Expression(expression) => {
-            all_narrowing_constraints_for_expression(db, expression, constraint.negative)
+        ConstraintNode::Expression(expression) => match constraint.negative {
+            false => all_narrowing_constraints_for_expression(db, expression)
                 .get(&definition.symbol(db))
-                .copied()
-        }
+                .copied(),
+            true => all_negative_narrowing_constraints_for_expression(db, expression)
+                .get(&definition.symbol(db))
+                .copied(),
+        },
         ConstraintNode::Pattern(pattern) => all_narrowing_constraints_for_pattern(db, pattern)
             .get(&definition.symbol(db))
             .copied(),
@@ -65,13 +68,27 @@ fn all_narrowing_constraints_for_pattern<'db>(
 fn all_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
-    negative: bool,
 ) -> NarrowingConstraints<'db> {
     NarrowingConstraintsBuilder::new(
         db,
         Constraint {
             node: ConstraintNode::Expression(expression),
-            negative,
+            negative: false,
+        },
+    )
+    .finish()
+}
+
+#[salsa::tracked(return_ref)]
+fn all_negative_narrowing_constraints_for_expression<'db>(
+    db: &'db dyn Db,
+    expression: Expression<'db>,
+) -> NarrowingConstraints<'db> {
+    NarrowingConstraintsBuilder::new(
+        db,
+        Constraint {
+            node: ConstraintNode::Expression(expression),
+            negative: true,
         },
     )
     .finish()

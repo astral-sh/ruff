@@ -174,7 +174,7 @@ impl<'db> IntersectionBuilder<'db> {
         // See comments above in `add_positive`; this is just the negated version.
         if let Type::Union(union) = ty {
             for elem in union.elements(self.db) {
-                self = self.clone().add_negative(*elem);
+                self = self.add_negative(*elem);
             }
             self
         } else {
