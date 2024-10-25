@@ -16,6 +16,10 @@ if x != 1:
 ## Multiple negative contributions with simplification
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag1, flag2 = bool_instance(), bool_instance()
 x = 1 if flag1 else 2 if flag2 else 3
 
 if x != 1:

@@ -320,9 +320,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             db,
             index,
             region,
-
             file,
-
             types: TypeInference::empty(scope),
         }
     }
@@ -2418,7 +2416,23 @@ impl<'db> TypeInferenceBuilder<'db> {
                     None
                 };
 
-                bindings_ty(self.db, definitions, unbound_ty)
+                let ty = bindings_ty(self.db, definitions, unbound_ty);
+
+                if ty.is_unbound() {
+                    self.add_diagnostic(
+                        name.into(),
+                        "unresolved-reference",
+                        format_args!("Name `{id}` used when not defined"),
+                    );
+                } else if ty.may_be_unbound(self.db) {
+                    self.add_diagnostic(
+                        name.into(),
+                        "possibly-unresolved-reference",
+                        format_args!("Name `{id}` used when possibly not defined"),
+                    );
+                }
+
+                ty
             }
             ExprContext::Store | ExprContext::Del => Type::None,
             ExprContext::Invalid => Type::Unknown,
@@ -3808,6 +3822,7 @@ mod tests {
         Ok(db)
     }
 
+    #[track_caller]
     fn assert_public_ty(db: &TestDb, file_name: &str, symbol_name: &str, expected: &str) {
         let file = system_path_to_file(db, file_name).expect("file to exist");
 
@@ -3819,6 +3834,7 @@ mod tests {
         );
     }
 
+    #[track_caller]
     fn assert_scope_ty(
         db: &TestDb,
         file_name: &str,
@@ -3844,6 +3860,7 @@ mod tests {
         assert_eq!(ty.display(db).to_string(), expected);
     }
 
+    #[track_caller]
     fn assert_diagnostic_messages(diagnostics: &TypeCheckDiagnostics, expected: &[&str]) {
         let messages: Vec<&str> = diagnostics
             .iter()
@@ -3852,6 +3869,7 @@ mod tests {
         assert_eq!(&messages, expected);
     }
 
+    #[track_caller]
     fn assert_file_diagnostics(db: &TestDb, filename: &str, expected: &[&str]) {
         let file = system_path_to_file(db, filename).unwrap();
         let diagnostics = check_types(db, file);
@@ -4439,7 +4457,7 @@ mod tests {
             from typing_extensions import reveal_type
 
             try:
-                x
+                print
             except as e:
                 reveal_type(e)
             ",
@@ -4576,7 +4594,10 @@ mod tests {
         assert_file_diagnostics(
             &db,
             "src/a.py",
-            &["Object of type `Unbound` is not iterable"],
+            &[
+                "Name `x` used when not defined",
+                "Object of type `Unbound` is not iterable",
+            ],
         );
 
         Ok(())
@@ -4711,7 +4732,7 @@ mod tests {
         assert_scope_ty(&db, "src/a.py", &["foo", "<listcomp>"], "z", "Unbound");
 
         // (There is a diagnostic for invalid syntax that's emitted, but it's not listed by `assert_file_diagnostics`)
-        assert_file_diagnostics(&db, "src/a.py", &[]);
+        assert_file_diagnostics(&db, "src/a.py", &["Name `z` used when not defined"]);
 
         Ok(())
     }

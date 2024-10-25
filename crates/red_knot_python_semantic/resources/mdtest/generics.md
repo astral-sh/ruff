@@ -6,9 +6,13 @@ Basic PEP 695 generics
 
 ```py
 class MyBox[T]:
+    # TODO: `T` is defined here
+    # error: [unresolved-reference] "Name `T` used when not defined"
     data: T
     box_model_number = 695
 
+    # TODO: `T` is defined here
+    # error: [unresolved-reference] "Name `T` used when not defined"
     def __init__(self, data: T):
         self.data = data
 
@@ -26,13 +30,19 @@ reveal_type(MyBox.box_model_number)  # revealed: Literal[695]
 
 ```py
 class MyBox[T]:
+    # TODO: `T` is defined here
+    # error: [unresolved-reference] "Name `T` used when not defined"
     data: T
 
+    # TODO: `T` is defined here
+    # error: [unresolved-reference] "Name `T` used when not defined"
     def __init__(self, data: T):
         self.data = data
 
-# TODO not error on the subscripting
-class MySecureBox[T](MyBox[T]): ...  # error: [non-subscriptable]
+# TODO not error on the subscripting or the use of type param
+# error: [unresolved-reference] "Name `T` used when not defined"
+# error: [non-subscriptable]
+class MySecureBox[T](MyBox[T]): ...
 
 secure_box: MySecureBox[int] = MySecureBox(5)
 reveal_type(secure_box)  # revealed: MySecureBox

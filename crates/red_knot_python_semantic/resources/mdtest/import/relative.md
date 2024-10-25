@@ -102,7 +102,7 @@ reveal_type(X)  # revealed: Literal[42]
 ```
 
 ```py path=package/foo.py
-x
+x  # error: [unresolved-reference]
 ```
 
 ```py path=package/bar.py

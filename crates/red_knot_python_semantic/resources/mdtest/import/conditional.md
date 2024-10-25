@@ -3,11 +3,22 @@
 ## Maybe unbound
 
 ```py path=maybe_unbound.py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
 if flag:
     y = 3
-x = y
-reveal_type(x)  # revealed: Unbound | Literal[3]
-reveal_type(y)  # revealed: Unbound | Literal[3]
+
+x = y  # error: [possibly-unresolved-reference]
+
+# revealed: Unbound | Literal[3]
+# error: [possibly-unresolved-reference]
+reveal_type(x)
+
+# revealed: Unbound | Literal[3]
+# error: [possibly-unresolved-reference]
+reveal_type(y)
 ```
 
 ```py
@@ -20,11 +31,22 @@ reveal_type(y)  # revealed: Literal[3]
 ## Maybe unbound annotated
 
 ```py path=maybe_unbound_annotated.py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
+
 if flag:
     y: int = 3
-x = y
-reveal_type(x)  # revealed: Unbound | Literal[3]
-reveal_type(y)  # revealed: Unbound | Literal[3]
+x = y  # error: [possibly-unresolved-reference]
+
+# revealed: Unbound | Literal[3]
+# error: [possibly-unresolved-reference]
+reveal_type(x)
+
+# revealed: Unbound | Literal[3]
+# error: [possibly-unresolved-reference]
+reveal_type(y)
 ```
 
 Importing an annotated name prefers the declared type over the inferred type:
@@ -43,6 +65,10 @@ def f(): ...
 ```
 
 ```py path=b.py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
 if flag:
     from c import f
 else:
@@ -67,6 +93,10 @@ x: int
 ```
 
 ```py path=b.py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
 if flag:
     from c import x
 else:

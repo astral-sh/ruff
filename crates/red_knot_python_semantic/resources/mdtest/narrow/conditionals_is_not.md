@@ -5,6 +5,10 @@
 The type guard removes `None` from the union type:
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
 x = None if flag else 1
 
 if x is not None:
@@ -16,6 +20,10 @@ reveal_type(x)  # revealed: None | Literal[1]
 ## `is not` for other singleton types
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
 x = True if flag else False
 reveal_type(x)  # revealed: bool
 
@@ -42,6 +50,10 @@ if x is not y:
 The type guard removes `False` from the union type of the tested value only.
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+x_flag, y_flag = bool_instance(), bool_instance()
 x = True if x_flag else False
 y = True if y_flag else False
 
