@@ -21,7 +21,6 @@ reveal_type(1 <= "" and 0 < 1)  # revealed: bool
 ```py
 def int_instance() -> int: ...
 
-
 reveal_type(1 == int_instance())  # revealed: bool
 reveal_type(9 < int_instance())  # revealed: bool
 reveal_type(int_instance() < int_instance())  # revealed: bool

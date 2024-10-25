@@ -15,7 +15,6 @@ Classes can support membership tests by implementing the `__contains__` method:
 class A:
     def __contains__(self, item: str) -> bool: ...
 
-
 reveal_type("hello" in A())  # revealed: bool
 reveal_type("hello" not in A())  # revealed: bool
 # TODO: should be Unknown, need to check arg type and should be failed
@@ -31,7 +30,6 @@ Classes that don't implement `__contains__`, but do implement `__iter__`, also s
 class A:
     def __iter__(self) -> Iterator[str]: ...
 
-
 reveal_type("hello" in A())  # revealed: bool
 reveal_type("hello" not in A())  # revealed: bool
 reveal_type(42 in A())  # revealed: bool
@@ -45,7 +43,6 @@ The final fallback is to implement `__getitem__` for integer keys: Python will c
 ```py
 class A:
     def __getitem__(self, key: int) -> str: ...
-
 
 reveal_type("hello" in A())  # revealed: bool
 reveal_type("hello" not in A())  # revealed: bool
@@ -61,7 +58,6 @@ Python coerces the results of containment checks to bool, even if `__contains__`
 class A:
     def __contains__(self, item: str) -> str: ...
 
-
 reveal_type("hello" in A())  # revealed: bool
 reveal_type("hello" not in A())  # revealed: bool
 ```
@@ -74,10 +70,8 @@ Tests with Literals as return types in `__contains__`, the result of operator al
 class AlwaysTrue:
     def __contains__(self, item: int) -> Literal[1]: ...
 
-
 class AlwaysFalse:
     def __contains__(self, item: int) -> Literal[""]: ...
-
 
 # TODO: it should be Literal[True] and Literal[False]
 reveal_type(42 in AlwaysTrue())  # revealed: @Todo
@@ -94,21 +88,13 @@ If `__contains__` is implemented, checking membership of a type it doesn't accep
 
 ```py
 class Contains: ...
-
-
 class Iter: ...
-
-
 class GetItem: ...
-
 
 class A:
     def __contains__(self, item: Contains) -> bool: ...
-
     def __iter__(self) -> Iterator[Iter]: ...
-
     def __getitem__(self, key: int) -> GetItem: ...
-
 
 reveal_type(Contains() in A())  # revealed: bool
 
@@ -116,12 +102,9 @@ reveal_type(Contains() in A())  # revealed: bool
 reveal_type(Iter() in A())  # revealed: bool
 reveal_type(GetItem() in A())  # revealed: bool
 
-
 class B:
     def __iter__(self) -> Iterator[Iter]: ...
-
     def __getitem__(self, key: int) -> GetItem: ...
-
 
 reveal_type(Iter() in B())  # revealed: bool
 # GetItem instance use `__iter__`, it's because `Iter` and `GetItem` are comparable
@@ -135,7 +118,6 @@ If `__getitem__` is implemented but does not accept integer arguments, then memb
 ```py
 class A:
     def __getitem__(self, key: str) -> str: ...
-
 
 # TODO should be Never
 reveal_type(42 in A())  # revealed: bool

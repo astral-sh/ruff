@@ -21,7 +21,6 @@ class A:
     def __gt__(self, other: A) -> list: ...
     def __ge__(self, other: A) -> set: ...
 
-
 reveal_type(A() == A())  # revealed: int
 reveal_type(A() != A())  # revealed: float
 reveal_type(A() < A())  # revealed: str
@@ -43,9 +42,7 @@ class A:
     def __gt__(self, other: B) -> list: ...
     def __ge__(self, other: B) -> set: ...
 
-
 class B: ...
-
 
 reveal_type(A() == B())  # revealed: int
 reveal_type(A() != B())  # revealed: float
@@ -69,12 +66,10 @@ class A:
     def __gt__(self, other: B) -> list: ...
     def __ge__(self, other: B) -> set: ...
 
-
 class B:
     # To override builtins.object.__eq__ and builtins.object.__ne__
     def __eq__(self, other: str) -> B: ...
     def __ne__(self, other: str) -> B: ...
-
 
 # TODO: should be `int` and `float`, need to check arg type and fall back to `rhs.__eq__` and `rhs.__ne__`
 reveal_type(B() == A())  # revealed: B
@@ -86,11 +81,9 @@ reveal_type(B() <= A())  # revealed: set
 reveal_type(B() > A())  # revealed: str
 reveal_type(B() >= A())  # revealed: bytes
 
-
 class C:
     def __gt__(self, other: C) -> int: ...
     def __ge__(self, other: C) -> float: ...
-
 
 reveal_type(C() < C())  # revealed: int
 reveal_type(C() <= C())  # revealed: float
@@ -109,7 +102,6 @@ class A:
     def __gt__(self, other: A) -> A: ...
     def __ge__(self, other: A) -> A: ...
 
-
 class B(A):
     def __eq__(self, other: A) -> int: ...
     def __ne__(self, other: A) -> float: ...
@@ -117,7 +109,6 @@ class B(A):
     def __le__(self, other: A) -> bytes: ...
     def __gt__(self, other: A) -> list: ...
     def __ge__(self, other: A) -> set: ...
-
 
 reveal_type(A() == B())  # revealed: int
 reveal_type(A() != B())  # revealed: float
@@ -138,11 +129,9 @@ class A:
     def __lt__(self, other: A) -> A: ...
     def __gt__(self, other: A) -> A: ...
 
-
 class B(A):
     def __lt__(self, other: int) -> B: ...
     def __gt__(self, other: int) -> B: ...
-
 
 # TODO: should be `A`, need to check argument type and fall back to LHS method
 reveal_type(A() < B())  # revealed: B
@@ -168,14 +157,11 @@ from does_not_exist import Foo  # error: [unresolved-import]
 
 reveal_type(Foo)  # revealed: Unknown
 
-
 class X:
     def __lt__(self, other: object) -> int:
         return 42
 
-
 class Y(Foo): ...
-
 
 # TODO: Should be `int | Unknown`; see above discussion.
 reveal_type(X() < Y())  # revealed: int
@@ -192,7 +178,6 @@ class A:
     def __eq__(self, other: int) -> A: ...
     def __ne__(self, other: int) -> A: ...
 
-
 # TODO: it should be `bool`, need to check arg type and fall back to `is` and `is not`
 reveal_type(A() == A())  # revealed: A
 reveal_type(A() != A())  # revealed: A
@@ -202,7 +187,6 @@ reveal_type(A() != A())  # revealed: A
 
 ```py
 class A: ...
-
 
 reveal_type(A() == object())  # revealed: bool
 reveal_type(A() != object())  # revealed: bool
@@ -224,7 +208,6 @@ reveal_type(1 <= 1.0)  # revealed: bool
 reveal_type(1 > 1.0)  # revealed: bool
 reveal_type(1 >= 1.0)  # revealed: bool
 
-
 reveal_type(1 == 2j)  # revealed: bool
 reveal_type(1 != 2j)  # revealed: bool
 
@@ -234,10 +217,8 @@ reveal_type(1 <= 2j)  # revealed: bool
 reveal_type(1 > 2j)  # revealed: bool
 reveal_type(1 >= 2j)  # revealed: bool
 
-
 def bool_instance() -> bool: ...
 def int_instance() -> int: ...
-
 
 x = bool_instance()
 y = int_instance()
