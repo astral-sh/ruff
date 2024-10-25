@@ -2334,8 +2334,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             .expect("Symbol table should create a symbol for every Name node")
             .is_bound();
 
-        let mut ty = Type::Unbound;
-
         // In function-like scopes, any local variable (symbol that is bound in this scope) can
         // only have a definition in this scope, or error; it never references another scope.
         // (At runtime, it would use the `LOAD_FAST` opcode.)
@@ -2366,8 +2364,10 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             // No nonlocal binding, check module globals. Avoid infinite recursion if `self.scope`
             // already is module globals.
-            if !file_scope_id.is_global() {
-                ty = global_symbol_ty(self.db, self.file, name);
+            let ty = if file_scope_id.is_global() {
+                Type::Unbound
+            } else {
+                global_symbol_ty(self.db, self.file, name)
             };
 
             // Still possibly unbound? All modules are instances of `types.ModuleType`;
@@ -2396,11 +2396,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                     );
                     builtin_ty = typing_extensions_symbol_ty(self.db, name);
                 }
-                ty = ty.replace_unbound_with(self.db, builtin_ty);
+                ty.replace_unbound_with(self.db, builtin_ty)
+            } else {
+                ty
             }
+        } else {
+            Type::Unbound
         }
-
-        ty
     }
 
     fn infer_name_expression(&mut self, name: &ast::ExprName) -> Type<'db> {
