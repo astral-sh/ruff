@@ -545,7 +545,7 @@ mod tests {
     use crate::workspace::check_file;
 
     #[test]
-    fn check_file_skips_type_chyecking_when_file_cant_be_read() -> ruff_db::system::Result<()> {
+    fn check_file_skips_type_checking_when_file_cant_be_read() -> ruff_db::system::Result<()> {
         let mut db = TestDb::new();
         let path = SystemPath::new("test.py");
 
