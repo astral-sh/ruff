@@ -15,12 +15,9 @@ use ruff_db::{
 use ruff_python_ast::{name::Name, PySourceType};
 use ruff_text_size::Ranged;
 
+use crate::db::Db;
 use crate::db::RootDatabase;
 use crate::workspace::files::{Index, Indexed, IndexedIter, PackageFiles};
-use crate::{
-    db::Db,
-    lint::{lint_semantic, lint_syntax},
-};
 
 mod files;
 mod metadata;
@@ -423,8 +420,6 @@ pub(super) fn check_file(db: &dyn Db, file: File) -> Vec<String> {
         ));
     }
 
-    diagnostics.extend_from_slice(lint_syntax(db, file));
-    diagnostics.extend_from_slice(lint_semantic(db, file));
     diagnostics
 }
 
@@ -540,17 +535,17 @@ impl Iterator for WorkspaceFilesIter<'_> {
 
 #[cfg(test)]
 mod tests {
+    use red_knot_python_semantic::types::check_types;
     use ruff_db::files::system_path_to_file;
     use ruff_db::source::source_text;
     use ruff_db::system::{DbWithTestSystem, SystemPath};
     use ruff_db::testing::assert_function_query_was_not_run;
 
     use crate::db::tests::TestDb;
-    use crate::lint::lint_syntax;
     use crate::workspace::check_file;
 
     #[test]
-    fn check_file_skips_linting_when_file_cant_be_read() -> ruff_db::system::Result<()> {
+    fn check_file_skips_type_chyecking_when_file_cant_be_read() -> ruff_db::system::Result<()> {
         let mut db = TestDb::new();
         let path = SystemPath::new("test.py");
 
@@ -568,7 +563,7 @@ mod tests {
         );
 
         let events = db.take_salsa_events();
-        assert_function_query_was_not_run(&db, lint_syntax, file, &events);
+        assert_function_query_was_not_run(&db, check_types, file, &events);
 
         // The user now creates a new file with an empty text. The source text
         // content returned by `source_text` remains unchanged, but the diagnostics should get updated.
