@@ -211,7 +211,13 @@ fn declarations_ty<'db>(
     let declared_ty = if let Some(second) = all_types.next() {
         let mut builder = UnionBuilder::new(db).add(first);
         for other in [second].into_iter().chain(all_types) {
-            if !first.is_equivalent_to(db, other) {
+            // Make sure not to emit spurious errors relating to `Type::Todo`,
+            // since we only infer this type due to a limitation in our current model.
+            //
+            // `Unknown` is different here, since we might infer `Unknown`
+            // for one of these due to a variable being defined in one possible
+            // control-flow branch but not another one.
+            if !first.is_equivalent_to(db, other) && !first.is_todo() && !other.is_todo() {
                 conflicting.push(other);
             }
             builder = builder.add(other);
@@ -220,9 +226,6 @@ fn declarations_ty<'db>(
     } else {
         first
     };
-    // Make sure not to emit spurious errors relating to `Type::Todo`,
-    // since we only infer this type due to a limitation in our current model
-    conflicting.retain(|ty| !ty.is_todo());
     if conflicting.is_empty() {
         Ok(declared_ty)
     } else {
