@@ -71,6 +71,34 @@ For example, to run `ruff check --select B ./src` using Ruff version `0.0.259`:
     src: "./src"
 ```
 
+## GitLab CI/CD
+
+You can add the following configuration to `.gitlab-ci.yml` to run a `ruff format` in parallel with a `ruff check` compatible with GitLab's codequality report.
+
+```yaml
+.base_ruff:
+  stage: build
+  interruptible: true
+  image:
+    name: ghcr.io/astral-sh/ruff:0.7.1-alpine
+  before_script:
+    - cd $CI_PROJECT_DIR
+    - ruff --version
+
+Ruff Check:
+  extends: .base_ruff  
+  script:
+    - ruff check --output-format=gitlab > code-quality-report.json
+  artifacts:
+    reports:
+      codequality: $CI_PROJECT_DIR/code-quality-report.json
+
+Ruff Format:
+  extends: .base_ruff
+  script:
+    - ruff format --diff
+```
+
 ## pre-commit
 
 Ruff can be used as a [pre-commit](https://pre-commit.com) hook via [`ruff-pre-commit`](https://github.com/astral-sh/ruff-pre-commit):
@@ -157,24 +185,3 @@ In addition, ruff publishes the following images:
 As with the distroless image, each image is published with ruff version tags as
 `ruff:{major}.{minor}.{patch}-{base}` and `ruff:{major}.{minor}-{base}`, e.g., `ruff:0.6.6-alpine`.
 
-## GitLab CI/CD
-
-You can add the following configuration to `.gitlab-ci.yml` to run a `ruff format`, and a `ruff check` compatible with GitLab's codequality.
-
-```yaml
-Ruff:
-  stage: .pre
-  interruptible: true
-  image:
-    name: ghcr.io/astral-sh/ruff:0.7.1-alpine
-  variables:
-    CODE_LOCATION: $CI_PROJECT_DIR
-  script:
-    - cd $CODE_LOCATION
-    - ruff --version
-    - ruff check --output-format=gitlab > code-quality-report.json
-    - ruff format --diff
-  artifacts:
-    reports:
-      codequality: $CODE_LOCATION/code-quality-report.json
-```
