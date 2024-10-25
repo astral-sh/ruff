@@ -154,12 +154,12 @@ class Venv:
         self.path = path
 
     @property
-    def name(self):
+    def name(self) -> str:
         """The name of the virtual environment directory."""
         return self.path.name
 
     @property
-    def python(self):
+    def python(self) -> Path:
         """Returns the path to the python executable"""
         return self.script("python")
 
@@ -193,7 +193,7 @@ class Venv:
         root = parent / "venv"
         return Venv(root)
 
-    def install(self, dependencies: list[str]):
+    def install(self, dependencies: list[str]) -> None:
         """Installs the dependencies required to type check the project."""
 
         logging.debug(f"Installing dependencies: {', '.join(dependencies)}")
@@ -202,7 +202,7 @@ class Venv:
             "pip",
             "install",
             "--python",
-            self.python,
+            self.python.as_posix(),
             "--quiet",
             # We pass `--exclude-newer` to ensure that type-checking of one of
             # our projects isn't unexpectedly broken by a change in the

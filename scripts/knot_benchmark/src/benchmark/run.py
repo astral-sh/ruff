@@ -16,7 +16,7 @@ if typing.TYPE_CHECKING:
     from benchmark.cases import Tool
 
 
-def main():
+def main() -> None:
     """Run the benchmark."""
     parser = argparse.ArgumentParser(
         description="Benchmark knot against other packaging tools."
@@ -69,7 +69,7 @@ def main():
     )
     parser.add_argument(
         "--knot-path",
-        type=str,
+        type=Path,
         help="Path(s) to the red_knot binary to benchmark.",
         action="append",
     )
@@ -116,8 +116,8 @@ def main():
     ]
 
     for project in projects:
-        with tempfile.TemporaryDirectory() as cwd:
-            cwd = Path(cwd)
+        with tempfile.TemporaryDirectory() as tempdir:
+            cwd = Path(tempdir)
             project.clone(cwd)
 
             venv = Venv.create(cwd)
