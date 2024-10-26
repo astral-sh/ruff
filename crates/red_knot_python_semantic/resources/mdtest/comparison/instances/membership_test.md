@@ -1,6 +1,8 @@
 # Comparison: Membership Test
 
-In Python, "membership test operators" refer to `in` and `not in` operator. To customize their behavior, classes can implement methods like `__contains__`, `__iter__`, or `__getitem__`.
+In Python, "membership test operators" refer to `in` and `not in` operator. To
+customize their behavior, classes can implement methods like `__contains__`,
+`__iter__`, or `__getitem__`.
 
 For references, see:
 
@@ -25,7 +27,8 @@ reveal_type(42 not in A())  # revealed: bool
 
 ## Implements `__iter__`
 
-Classes that don't implement `__contains__`, but do implement `__iter__`, also support containment checks; the needle will be sought in their iterated items:
+Classes that don't implement `__contains__`, but do implement `__iter__`, also
+support containment checks; the needle will be sought in their iterated items:
 
 ```py
 class StringIterator:
@@ -44,7 +47,10 @@ reveal_type(42 not in A())  # revealed: bool
 
 ## Implements `__getitems__`
 
-The final fallback is to implement `__getitem__` for integer keys: Python will call it with 0, 1, 2... until it either finds the needle (returning True for the membership test) or `__getitem__` raises IndexError, which is silenced and returns `False` for the membership test.
+The final fallback is to implement `__getitem__` for integer keys: Python will
+call it with 0, 1, 2... until it either finds the needle (returning True for the
+membership test) or `__getitem__` raises IndexError, which is silenced and
+returns `False` for the membership test.
 
 ```py
 class A:
@@ -59,7 +65,8 @@ reveal_type(42 not in A())  # revealed: bool
 
 ## Wrong Return Type
 
-Python coerces the results of containment checks to bool, even if `__contains__` returns a non-bool:
+Python coerces the results of containment checks to bool, even if `__contains__`
+returns a non-bool:
 
 ```py
 class A:
@@ -72,7 +79,8 @@ reveal_type("hello" not in A())  # revealed: bool
 
 ## Literal Result for `in` and `not in`
 
-`__contains__` with a literal return type may result in a `BooleanLiteral` outcome.
+`__contains__` with a literal return type may result in a `BooleanLiteral`
+outcome.
 
 ```py
 from typing import Literal
@@ -96,7 +104,9 @@ reveal_type(42 not in AlwaysFalse())  # revealed: @Todo
 
 ## No Fallback for `__contains__`
 
-If `__contains__` is implemented, checking membership of a type it doesn't accept is an error; it doesn't result in a fallback to `__iter__` or `__getitem__`:
+If `__contains__` is implemented, checking membership of a type it doesn't
+accept is an error; it doesn't result in a fallback to `__iter__` or
+`__getitem__`:
 
 ```py
 class CheckContains: ...
@@ -138,7 +148,8 @@ reveal_type(CheckGetItem() in B())  # revealed: bool
 
 ## Invalid Old-Style Iteration
 
-If `__getitem__` is implemented but does not accept integer arguments, then membership test is not supported and should emit a diagnostic.
+If `__getitem__` is implemented but does not accept integer arguments, then
+membership test is not supported and should emit a diagnostic.
 
 ```py
 class A:
