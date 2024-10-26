@@ -2,13 +2,13 @@ use std::path::Path;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::Locator;
 
 use crate::registry::Rule;
 use crate::rules::flake8_builtins::rules::builtin_module_shadowing;
 use crate::rules::flake8_no_pep420::rules::implicit_namespace_package;
 use crate::rules::pep8_naming::rules::invalid_module_name;
 use crate::settings::LinterSettings;
+use crate::Locator;
 
 pub(crate) fn check_file_path(
     path: &Path,

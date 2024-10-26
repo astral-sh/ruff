@@ -1,18 +1,17 @@
 use itertools::Itertools;
-use ruff_python_ast::{Alias, StmtImportFrom};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::whitespace::indentation;
+use ruff_python_ast::{Alias, StmtImportFrom};
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::Tokens;
-use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-
 use crate::rules::pyupgrade::fixes;
 use crate::settings::types::PythonVersion;
+use crate::Locator;
 
 /// An import was moved and renamed as part of a deprecation.
 /// For example, `typing.AbstractSet` was moved to `collections.abc.Set`.
@@ -617,7 +616,7 @@ impl<'a> ImportReplacer<'a> {
             let fix = Some(matched);
             Some((operation, fix))
         } else {
-            let indentation = indentation(self.locator, self.import_from_stmt);
+            let indentation = indentation(self.locator.contents(), self.import_from_stmt);
 
             // If we have matched _and_ unmatched names, but the import is not on its own
             // line, we can't add a statement after it. For example, if we have

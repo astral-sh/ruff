@@ -1,9 +1,9 @@
-use ruff_text_size::{TextLen, TextRange};
-
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_codegen::Stylist;
-use ruff_source_file::Locator;
+use ruff_text_size::{TextLen, TextRange};
+
+use crate::Locator;
 
 /// ## What it does
 /// Checks for files missing a new line at the end of the file.

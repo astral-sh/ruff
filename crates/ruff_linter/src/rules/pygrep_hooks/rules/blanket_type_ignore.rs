@@ -1,13 +1,15 @@
+use std::sync::LazyLock;
+
 use anyhow::{anyhow, Result};
 use memchr::memchr_iter;
 use regex::Regex;
-use std::sync::LazyLock;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::Locator;
 use ruff_text_size::TextSize;
+
+use crate::Locator;
 
 /// ## What it does
 /// Check for `type: ignore` annotations that suppress all type warnings, as

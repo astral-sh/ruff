@@ -4,11 +4,11 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::PySourceType;
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::Locator;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::comments::shebang::ShebangDirective;
 use crate::fs;
+use crate::Locator;
 
 /// ## What it does
 /// Checks for packages that are missing an `__init__.py` file.

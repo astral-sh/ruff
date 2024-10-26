@@ -12,12 +12,12 @@ use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{self as ast, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::Modules;
-use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_import, match_import_from, match_statement};
 use crate::fix::codemods::CodegenStylist;
+use crate::Locator;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub(crate) enum MockReference {
@@ -282,7 +282,7 @@ pub(crate) fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                 .any(|name| &name.name == "mock" || &name.name == "mock.mock")
             {
                 // Generate the fix, if needed, which is shared between all `mock` imports.
-                let content = if let Some(indent) = indentation(checker.locator(), stmt) {
+                let content = if let Some(indent) = indentation(checker.source(), stmt) {
                     match format_import(stmt, indent, checker.locator(), checker.stylist()) {
                         Ok(content) => Some(content),
                         Err(e) => {
@@ -330,7 +330,7 @@ pub(crate) fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                     },
                     stmt.range(),
                 );
-                if let Some(indent) = indentation(checker.locator(), stmt) {
+                if let Some(indent) = indentation(checker.source(), stmt) {
                     diagnostic.try_set_fix(|| {
                         format_import_from(stmt, indent, checker.locator(), checker.stylist())
                             .map(|content| Edit::range_replacement(content, stmt.range()))

@@ -1,3 +1,6 @@
+use memchr::memchr2_iter;
+use rustc_hash::FxHashSet;
+
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
@@ -5,14 +8,11 @@ use ruff_python_literal::format::FormatSpec;
 use ruff_python_parser::parse_expression;
 use ruff_python_semantic::analyze::logging::is_logger_candidate;
 use ruff_python_semantic::{Modules, SemanticModel};
-use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
-
-use memchr::memchr2_iter;
-use rustc_hash::FxHashSet;
 
 use crate::checkers::ast::Checker;
 use crate::rules::fastapi::rules::is_fastapi_route_call;
+use crate::Locator;
 
 /// ## What it does
 /// Searches for strings that look like they were meant to be f-strings, but are missing an `f` prefix.

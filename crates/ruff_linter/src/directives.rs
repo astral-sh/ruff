@@ -4,15 +4,16 @@ use std::iter::Peekable;
 use std::str::FromStr;
 
 use bitflags::bitflags;
-use ruff_python_parser::{TokenKind, Tokens};
-use ruff_python_trivia::CommentRanges;
-use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use ruff_python_index::Indexer;
-use ruff_source_file::Locator;
+use ruff_python_parser::{TokenKind, Tokens};
+use ruff_python_trivia::CommentRanges;
+use ruff_source_file::LineRanges;
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::noqa::NoqaMapping;
 use crate::settings::LinterSettings;
+use crate::Locator;
 
 bitflags! {
     #[derive(Debug, Copy, Clone)]
@@ -360,24 +361,23 @@ impl TodoDirectiveKind {
 
 #[cfg(test)]
 mod tests {
+    use ruff_python_index::Indexer;
     use ruff_python_parser::parse_module;
     use ruff_python_trivia::CommentRanges;
     use ruff_text_size::{TextLen, TextRange, TextSize};
-
-    use ruff_python_index::Indexer;
-    use ruff_source_file::Locator;
 
     use crate::directives::{
         extract_isort_directives, extract_noqa_line_for, TodoDirective, TodoDirectiveKind,
     };
     use crate::noqa::NoqaMapping;
+    use crate::Locator;
 
     use super::IsortDirectives;
 
     fn noqa_mappings(contents: &str) -> NoqaMapping {
         let parsed = parse_module(contents).unwrap();
         let locator = Locator::new(contents);
-        let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
+        let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());
 
         extract_noqa_line_for(parsed.tokens(), &locator, &indexer)
     }

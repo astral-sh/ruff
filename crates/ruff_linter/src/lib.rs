@@ -5,6 +5,7 @@
 //!
 //! [Ruff]: https://github.com/astral-sh/ruff
 
+pub use locator::Locator;
 pub use noqa::generate_noqa_edits;
 #[cfg(feature = "clap")]
 pub use registry::clap_completion::RuleParser;
@@ -27,6 +28,7 @@ pub mod fs;
 mod importer;
 pub mod line_width;
 pub mod linter;
+mod locator;
 pub mod logging;
 pub mod message;
 mod noqa;

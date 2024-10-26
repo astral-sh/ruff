@@ -536,7 +536,7 @@ pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
         // Avoid removing comments.
         if checker
             .comment_ranges()
-            .has_comments(expr, checker.locator())
+            .has_comments(expr, checker.source())
         {
             continue;
         }

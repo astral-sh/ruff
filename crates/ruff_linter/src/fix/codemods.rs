@@ -13,9 +13,9 @@ use unicode_normalization::UnicodeNormalization;
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::Stmt;
 use ruff_python_codegen::Stylist;
-use ruff_source_file::Locator;
 
 use crate::cst::matchers::match_statement;
+use crate::Locator;
 
 /// Glue code to make libcst codegen work with ruff's Stylist
 pub(crate) trait CodegenStylist<'a>: Codegen<'a> {

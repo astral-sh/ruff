@@ -5,12 +5,11 @@ use ruff_python_ast::{self as ast, ModModule, PySourceType, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::Parsed;
 use ruff_python_semantic::{FutureImport, NameImport};
-use ruff_source_file::Locator;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::importer::Importer;
-
 use crate::settings::LinterSettings;
+use crate::Locator;
 
 /// ## What it does
 /// Adds any required imports, as specified by the user, to the top of the

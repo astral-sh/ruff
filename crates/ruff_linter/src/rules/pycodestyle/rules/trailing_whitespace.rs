@@ -1,11 +1,12 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_index::Indexer;
-use ruff_source_file::{Line, Locator};
+use ruff_source_file::Line;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::registry::Rule;
 use crate::settings::LinterSettings;
+use crate::Locator;
 
 /// ## What it does
 /// Checks for superfluous trailing whitespace.
@@ -100,7 +101,7 @@ pub(crate) fn trailing_whitespace(
                 diagnostic.set_fix(Fix::applicable_edit(
                     Edit::range_deletion(TextRange::new(
                         indexer
-                            .preceded_by_continuations(line.start(), locator)
+                            .preceded_by_continuations(line.start(), locator.contents())
                             .unwrap_or(range.start()),
                         range.end(),
                     )),

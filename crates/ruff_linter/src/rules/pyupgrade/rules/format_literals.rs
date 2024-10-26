@@ -1,13 +1,13 @@
+use std::sync::LazyLock;
+
 use anyhow::{anyhow, Result};
 use libcst_native::{Arg, Expression};
 use regex::Regex;
-use std::sync::LazyLock;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_codegen::Stylist;
-use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -15,8 +15,8 @@ use crate::cst::matchers::{
     match_attribute, match_call_mut, match_expression, transform_expression_text,
 };
 use crate::fix::codemods::CodegenStylist;
-
 use crate::rules::pyflakes::format::FormatSummary;
+use crate::Locator;
 
 /// ## What it does
 /// Checks for unnecessary positional indices in format strings.

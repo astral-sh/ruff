@@ -1,8 +1,9 @@
 use ruff_python_ast::{self as ast, Stmt};
 use ruff_python_parser::Tokens;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_source_file::Locator;
+use crate::Locator;
 
 use super::comments::Comment;
 use super::helpers::trailing_comma;

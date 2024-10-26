@@ -7,7 +7,6 @@ use ruff_python_ast::{
     str_prefix::{AnyStringPrefix, StringLiteralPrefix},
     AnyStringFlags, StringFlags,
 };
-use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 use crate::expression::expr_f_string::f_string_quoting;
@@ -89,16 +88,16 @@ impl From<Quote> for QuoteStyle {
 
 // Extension trait that adds formatter specific helper methods to `StringLike`.
 pub(crate) trait StringLikeExtensions {
-    fn quoting(&self, locator: &Locator<'_>) -> Quoting;
+    fn quoting(&self, source: &str) -> Quoting;
 
     fn is_multiline(&self, source: &str) -> bool;
 }
 
 impl StringLikeExtensions for ast::StringLike<'_> {
-    fn quoting(&self, locator: &Locator<'_>) -> Quoting {
+    fn quoting(&self, source: &str) -> Quoting {
         match self {
             Self::String(_) | Self::Bytes(_) => Quoting::CanChange,
-            Self::FString(f_string) => f_string_quoting(f_string, locator),
+            Self::FString(f_string) => f_string_quoting(f_string, source),
         }
     }
 

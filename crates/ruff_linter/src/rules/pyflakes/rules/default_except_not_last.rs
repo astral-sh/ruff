@@ -1,9 +1,9 @@
-use ruff_python_ast::{self as ast, ExceptHandler};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::identifier::except;
-use ruff_source_file::Locator;
+use ruff_python_ast::{self as ast, ExceptHandler};
+
+use crate::Locator;
 
 /// ## What it does
 /// Checks for `except` blocks that handle all exceptions, but are not the last

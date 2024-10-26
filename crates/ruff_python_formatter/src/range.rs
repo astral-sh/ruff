@@ -10,7 +10,6 @@ use ruff_python_parser::{parse, AsMode};
 use ruff_python_trivia::{
     indentation_at_offset, BackwardsTokenizer, CommentRanges, SimpleToken, SimpleTokenKind,
 };
-use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::comments::Comments;
@@ -300,8 +299,7 @@ fn narrow_range(
     enclosing_node: AnyNodeRef,
     context: &PyFormatContext,
 ) -> TextRange {
-    let locator = context.locator();
-    let enclosing_indent = indentation_at_offset(enclosing_node.start(), &locator)
+    let enclosing_indent = indentation_at_offset(enclosing_node.start(), context.source())
         .expect("Expected enclosing to never be a same line body statement.");
 
     let mut visitor = NarrowRange {
@@ -513,7 +511,7 @@ impl NarrowRange<'_> {
             // dedent the second line to 0 spaces and the `indent` then adds a 2 space indentation to match the indentation in the source.
             // This is incorrect because the leading whitespace is the content of the string and not indentation, resulting in changed string content.
             if let Some(indentation) =
-                indentation_at_offset(first_child.start(), &self.context.locator())
+                indentation_at_offset(first_child.start(), self.context.source())
             {
                 let relative_indent = indentation.strip_prefix(self.enclosing_indent).unwrap();
                 let expected_indents = self.level;
@@ -718,8 +716,7 @@ impl Format<PyFormatContext<'_>> for FormatEnclosingNode<'_> {
 /// # Panics
 /// If `offset` is outside of `source`.
 fn indent_level(offset: TextSize, source: &str, options: &PyFormatOptions) -> Option<u16> {
-    let locator = Locator::new(source);
-    let indentation = indentation_at_offset(offset, &locator)?;
+    let indentation = indentation_at_offset(offset, source)?;
 
     let level = match options.indent_style() {
         IndentStyle::Tab => {

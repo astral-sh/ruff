@@ -1,11 +1,11 @@
-use ruff_text_size::{TextLen, TextRange, TextSize};
-
 use ruff_diagnostics::AlwaysFixableViolation;
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_parser::TokenKind;
-use ruff_source_file::Locator;
+use ruff_text_size::{TextLen, TextRange, TextSize};
+
+use crate::Locator;
 
 /// ## What it does
 /// Checks for strings that contain the control character `BS`.

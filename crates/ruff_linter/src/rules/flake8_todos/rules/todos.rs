@@ -1,13 +1,14 @@
-use regex::RegexSet;
-use ruff_python_trivia::CommentRanges;
-use ruff_source_file::Locator;
-use ruff_text_size::{TextLen, TextRange, TextSize};
 use std::sync::LazyLock;
+
+use regex::RegexSet;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_trivia::CommentRanges;
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::directives::{TodoComment, TodoDirective, TodoDirectiveKind};
+use crate::Locator;
 
 /// ## What it does
 /// Checks that a TODO comment is labelled with "TODO".

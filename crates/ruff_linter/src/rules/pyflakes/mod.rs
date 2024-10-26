@@ -12,15 +12,12 @@ mod tests {
     use anyhow::Result;
     use regex::Regex;
     use rustc_hash::FxHashMap;
-
     use test_case::test_case;
 
     use ruff_python_ast::PySourceType;
     use ruff_python_codegen::Stylist;
     use ruff_python_index::Indexer;
-
     use ruff_python_trivia::textwrap::dedent;
-    use ruff_source_file::Locator;
     use ruff_text_size::Ranged;
 
     use crate::linter::check_path;
@@ -31,6 +28,7 @@ mod tests {
     use crate::settings::{flags, LinterSettings};
     use crate::source_kind::SourceKind;
     use crate::test::{test_contents, test_path, test_snippet};
+    use crate::Locator;
     use crate::{assert_messages, directives};
 
     #[test_case(Rule::UnusedImport, Path::new("F401_0.py"))]
@@ -712,8 +710,8 @@ mod tests {
         let parsed =
             ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type);
         let locator = Locator::new(&contents);
-        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
-        let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
+        let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
+        let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());
         let directives = directives::extract_directives(
             parsed.tokens(),
             directives::Flags::from_settings(&settings),

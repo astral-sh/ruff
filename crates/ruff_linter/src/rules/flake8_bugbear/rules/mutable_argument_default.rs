@@ -9,10 +9,11 @@ use ruff_python_semantic::analyze::function_type::is_stub;
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{indentation_at_offset, textwrap};
-use ruff_source_file::Locator;
+use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::Locator;
 
 /// ## What it does
 /// Checks for uses of mutable objects as function argument defaults.
@@ -145,7 +146,7 @@ fn move_initialization(
 
     // Avoid attempting to fix single-line functions.
     let statement = body.peek()?;
-    if indexer.preceded_by_multi_statement_line(statement, locator) {
+    if indexer.preceded_by_multi_statement_line(statement, locator.contents()) {
         return None;
     }
 
@@ -170,7 +171,7 @@ fn move_initialization(
     content.push_str(stylist.line_ending().as_str());
 
     // Determine the indentation depth of the function body.
-    let indentation = indentation_at_offset(statement.start(), locator)?;
+    let indentation = indentation_at_offset(statement.start(), locator.contents())?;
 
     // Indent the edit to match the body indentation.
     let mut content = textwrap::indent(&content, indentation).to_string();
@@ -186,7 +187,7 @@ fn move_initialization(
             if let Some(next) = body.peek() {
                 // If there's a second statement, insert _before_ it, but ensure this isn't a
                 // multi-statement line.
-                if indexer.in_multi_statement_line(statement, locator) {
+                if indexer.in_multi_statement_line(statement, locator.contents()) {
                     continue;
                 }
                 pos = locator.line_start(next.start());

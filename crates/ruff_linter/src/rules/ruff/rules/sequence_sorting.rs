@@ -6,16 +6,18 @@
 use std::borrow::Cow;
 use std::cmp::Ordering;
 
+use is_macro;
+use natord;
+
 use ruff_python_ast as ast;
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::{TokenKind, Tokens};
 use ruff_python_stdlib::str::is_cased_uppercase;
 use ruff_python_trivia::{first_non_trivia_token, leading_indentation, SimpleTokenKind};
-use ruff_source_file::Locator;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use is_macro;
-use natord;
+use crate::Locator;
 
 /// An enumeration of the different sorting styles
 /// currently supported for displays of string literals
@@ -422,7 +424,7 @@ impl<'a> MultilineStringSequenceValue<'a> {
         //
         let newline = stylist.line_ending().as_str();
         let start_offset = self.start();
-        let leading_indent = leading_indentation(locator.full_line(start_offset));
+        let leading_indent = leading_indentation(locator.full_line_str(start_offset));
         let item_indent = format!("{}{}", leading_indent, stylist.indentation().as_str());
 
         let prelude =

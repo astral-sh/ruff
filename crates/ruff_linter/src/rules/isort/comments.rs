@@ -1,8 +1,9 @@
 use std::borrow::Cow;
 
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
+
+use crate::Locator;
 
 #[derive(Debug)]
 pub(crate) struct Comment<'a> {

@@ -295,7 +295,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             continue;
         };
 
-        let name = binding.name(checker.locator());
+        let name = binding.name(checker.source());
 
         // If an import is marked as required, avoid treating it as unused, regardless of whether
         // it was _actually_ used.

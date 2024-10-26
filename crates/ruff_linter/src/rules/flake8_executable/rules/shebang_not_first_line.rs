@@ -1,9 +1,9 @@
-use ruff_text_size::{TextRange, TextSize};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_trivia::is_python_whitespace;
-use ruff_source_file::Locator;
+use ruff_text_size::{TextRange, TextSize};
+
+use crate::Locator;
 
 /// ## What it does
 /// Checks for a shebang directive that is not at the beginning of the file.

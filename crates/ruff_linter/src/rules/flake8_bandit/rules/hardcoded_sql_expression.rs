@@ -6,10 +6,10 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::raw_contents;
 use ruff_python_ast::{self as ast, Expr, Operator};
-use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::Locator;
 
 static SQL_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)\b(select\s+.*\s+from\s|delete\s+from\s|(insert|replace)\s+.*\s+values\s|update\s+.*\s+set\s)")

@@ -2748,7 +2748,6 @@ dependencies = [
  "ruff_python_ast",
  "ruff_python_parser",
  "ruff_python_stdlib",
- "ruff_source_file",
  "ruff_text_size",
  "rustc-hash 2.0.0",
  "schemars",
@@ -2779,7 +2778,6 @@ dependencies = [
  "insta",
  "ruff_python_parser",
  "ruff_python_trivia",
- "ruff_source_file",
  "ruff_text_size",
 ]
 

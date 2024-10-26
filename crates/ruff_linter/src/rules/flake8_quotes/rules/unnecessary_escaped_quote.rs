@@ -1,10 +1,10 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, AnyStringFlags, StringFlags, StringLike};
-use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::Locator;
 
 use super::super::helpers::{contains_escaped_quote, raw_contents, unescape_string};
 
