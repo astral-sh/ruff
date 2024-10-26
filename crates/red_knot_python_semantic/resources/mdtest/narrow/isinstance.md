@@ -5,6 +5,11 @@ Narrowing for `isinstance(object, classinfo)` expressions.
 ## `classinfo` is a single type
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
+
 x = 1 if flag else "a"
 
 if isinstance(x, int):
@@ -26,10 +31,17 @@ Note: `isinstance(x, (int, str))` should not be confused with
 `isinstance(x, int | str)`:
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag, flag1, flag2 = bool_instance(), bool_instance(), bool_instance()
+
 x = 1 if flag else "a"
 
 if isinstance(x, (int, str)):
     reveal_type(x)  # revealed: Literal[1] | Literal["a"]
+else:
+    reveal_type(x)  # revealed: Never
 
 if isinstance(x, (int, bytes)):
     reveal_type(x)  # revealed: Literal[1]
@@ -41,6 +53,8 @@ if isinstance(x, (bytes, str)):
 # one of the possibilities:
 if isinstance(x, (int, object)):
     reveal_type(x)  # revealed: Literal[1] | Literal["a"]
+else:
+    reveal_type(x)  # revealed: Never
 
 y = 1 if flag1 else "a" if flag2 else b"b"
 if isinstance(y, (int, str)):
@@ -56,10 +70,17 @@ if isinstance(y, (str, bytes)):
 ## `classinfo` is a nested tuple of types
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
+
 x = 1 if flag else "a"
 
 if isinstance(x, (bool, (bytes, int))):
     reveal_type(x)  # revealed: Literal[1]
+else:
+    reveal_type(x)  # revealed: Literal["a"]
 ```
 
 ## Class types
@@ -67,6 +88,7 @@ if isinstance(x, (bool, (bytes, int))):
 ```py
 class A: ...
 class B: ...
+class C: ...
 
 def get_object() -> object: ...
 
@@ -76,11 +98,26 @@ if isinstance(x, A):
     reveal_type(x)  # revealed: A
     if isinstance(x, B):
         reveal_type(x)  # revealed: A & B
+    else:
+        reveal_type(x)  # revealed: A & ~B
+
+if isinstance(x, (A, B)):
+    reveal_type(x)  # revealed: A | B
+elif isinstance(x, (A, C)):
+    reveal_type(x)  # revealed: C & ~A & ~B
+else:
+    # TODO: Should be simplified to ~A & ~B & ~C
+    reveal_type(x)  # revealed: object & ~A & ~B & ~C
 ```
 
 ## No narrowing for instances of `builtins.type`
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
+
 t = type("t", (), {})
 
 # This isn't testing what we want it to test if we infer anything more precise here:
@@ -94,6 +131,11 @@ if isinstance(x, t):
 ## Do not use custom `isinstance` for narrowing
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
+
 def isinstance(x, t):
     return True
 
@@ -105,6 +147,11 @@ if isinstance(x, int):
 ## Do support narrowing if `isinstance` is aliased
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
+
 isinstance_alias = isinstance
 
 x = 1 if flag else "a"
@@ -117,6 +164,10 @@ if isinstance_alias(x, int):
 ```py
 from builtins import isinstance as imported_isinstance
 
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
 x = 1 if flag else "a"
 if imported_isinstance(x, int):
     reveal_type(x)  # revealed: Literal[1]
@@ -125,6 +176,10 @@ if imported_isinstance(x, int):
 ## Do not narrow if second argument is not a type
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
 x = 1 if flag else "a"
 
 # TODO: this should cause us to emit a diagnostic during
@@ -141,6 +196,10 @@ if isinstance(x, "int"):
 ## Do not narrow if there are keyword arguments
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
 x = 1 if flag else "a"
 
 # TODO: this should cause us to emit a diagnostic

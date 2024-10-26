@@ -211,7 +211,13 @@ fn declarations_ty<'db>(
     let declared_ty = if let Some(second) = all_types.next() {
         let mut builder = UnionBuilder::new(db).add(first);
         for other in [second].into_iter().chain(all_types) {
-            if !first.is_equivalent_to(db, other) {
+            // Make sure not to emit spurious errors relating to `Type::Todo`,
+            // since we only infer this type due to a limitation in our current model.
+            //
+            // `Unknown` is different here, since we might infer `Unknown`
+            // for one of these due to a variable being defined in one possible
+            // control-flow branch but not another one.
+            if !first.is_equivalent_to(db, other) && !first.is_todo() && !other.is_todo() {
                 conflicting.push(other);
             }
             builder = builder.add(other);
@@ -292,6 +298,10 @@ impl<'db> Type<'db> {
         matches!(self, Type::Never)
     }
 
+    pub const fn is_todo(&self) -> bool {
+        matches!(self, Type::Todo)
+    }
+
     pub const fn into_class_literal_type(self) -> Option<ClassType<'db>> {
         match self {
             Type::ClassLiteral(class_type) => Some(class_type),
@@ -320,6 +330,11 @@ impl<'db> Type<'db> {
     pub fn expect_module_literal(self) -> File {
         self.into_module_literal_type()
             .expect("Expected a Type::ModuleLiteral variant")
+    }
+
+    #[must_use]
+    pub fn negate(&self, db: &'db dyn Db) -> Type<'db> {
+        IntersectionBuilder::new(db).add_negative(*self).build()
     }
 
     pub const fn into_union_type(self) -> Option<UnionType<'db>> {

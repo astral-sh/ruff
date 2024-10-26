@@ -14,7 +14,9 @@ class IntIterable:
 for x in IntIterable():
     pass
 
-reveal_type(x)  # revealed: Unbound | int
+# revealed: Unbound | int
+# error: [possibly-unresolved-reference]
+reveal_type(x)
 ```
 
 ## With previous definition
@@ -85,7 +87,9 @@ class OldStyleIterable:
 for x in OldStyleIterable():
     pass
 
-reveal_type(x)  # revealed: Unbound | int
+# revealed: Unbound | int
+# error: [possibly-unresolved-reference]
+reveal_type(x)
 ```
 
 ## With heterogeneous tuple
@@ -94,12 +98,19 @@ reveal_type(x)  # revealed: Unbound | int
 for x in (1, "a", b"foo"):
     pass
 
-reveal_type(x)  # revealed: Unbound | Literal[1] | Literal["a"] | Literal[b"foo"]
+# revealed: Unbound | Literal[1] | Literal["a"] | Literal[b"foo"]
+# error: [possibly-unresolved-reference]
+reveal_type(x)
 ```
 
 ## With non-callable iterator
 
 ```py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
+
 class NotIterable:
     if flag:
         __iter__ = 1
@@ -109,7 +120,9 @@ class NotIterable:
 for x in NotIterable():  # error: "Object of type `NotIterable` is not iterable"
     pass
 
-reveal_type(x)  # revealed: Unbound | Unknown
+# revealed: Unbound | Unknown
+# error: [possibly-unresolved-reference]
+reveal_type(x)
 ```
 
 ## Invalid iterable

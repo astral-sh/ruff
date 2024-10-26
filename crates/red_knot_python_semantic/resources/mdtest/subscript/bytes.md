@@ -26,7 +26,8 @@ reveal_type(y)  # revealed: Unknown
 ## Function return
 
 ```py
-def int_instance() -> int: ...
+def int_instance() -> int:
+    return 42
 
 a = b"abcde"[int_instance()]
 # TODO: Support overloads... Should be `bytes`

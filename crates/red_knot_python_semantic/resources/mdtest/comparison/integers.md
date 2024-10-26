@@ -19,6 +19,7 @@ reveal_type(1 <= "" and 0 < 1)  # revealed: bool
 ## Integer instance
 
 ```py
+# TODO: implement lookup of `__eq__` on typeshed `int` stub.
 def int_instance() -> int:
     return 42
 

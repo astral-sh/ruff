@@ -1,6 +1,9 @@
 # Comparison: Unsupported operators
 
 ```py
+def bool_instance() -> bool:
+    return True
+
 a = 1 in 7  # error: "Operator `in` is not supported for types `Literal[1]` and `Literal[7]`"
 reveal_type(a)  # revealed: bool
 
@@ -19,6 +22,7 @@ d = 5 < object()
 # TODO: should be Unknown, once operand type check is implemented
 reveal_type(d)  # revealed: bool
 
+flag = bool_instance()
 int_literal_or_str_literal = 1 if flag else "foo"
 # error: "Operator `in` is not supported for types `Literal[42]` and `Literal[1]`, in comparing `Literal[42]` with `Literal[1] | Literal["foo"]`"
 e = 42 in int_literal_or_str_literal
