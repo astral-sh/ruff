@@ -36,12 +36,12 @@ pub(crate) fn narrowing_constraint<'db>(
 ) -> Option<Type<'db>> {
     match predicate.node {
         PredicateNode::Expression(expression) => {
-            if predicate.negative {
-                all_negative_narrowing_constraints_for_expression(db, expression)
+            if predicate.is_positive {
+                all_narrowing_constraints_for_expression(db, expression)
                     .get(&definition.symbol(db))
                     .copied()
             } else {
-                all_narrowing_constraints_for_expression(db, expression)
+                all_negative_narrowing_constraints_for_expression(db, expression)
                     .get(&definition.symbol(db))
                     .copied()
             }
@@ -57,7 +57,7 @@ fn all_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
 ) -> NarrowingConstraints<'db> {
-    NarrowingConstraintsBuilder::new(db, PredicateNode::Pattern(pattern), false).finish()
+    NarrowingConstraintsBuilder::new(db, PredicateNode::Pattern(pattern), true).finish()
 }
 
 #[salsa::tracked(return_ref)]
@@ -65,7 +65,7 @@ fn all_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
 ) -> NarrowingConstraints<'db> {
-    NarrowingConstraintsBuilder::new(db, PredicateNode::Expression(expression), false).finish()
+    NarrowingConstraintsBuilder::new(db, PredicateNode::Expression(expression), true).finish()
 }
 
 #[salsa::tracked(return_ref)]
@@ -73,7 +73,7 @@ fn all_negative_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
 ) -> NarrowingConstraints<'db> {
-    NarrowingConstraintsBuilder::new(db, PredicateNode::Expression(expression), true).finish()
+    NarrowingConstraintsBuilder::new(db, PredicateNode::Expression(expression), false).finish()
 }
 
 /// Generate a constraint from the *type* of the second argument of an `isinstance` call.
@@ -103,16 +103,16 @@ type NarrowingConstraints<'db> = FxHashMap<ScopedSymbolId, Type<'db>>;
 struct NarrowingConstraintsBuilder<'db> {
     db: &'db dyn Db,
     predicate: PredicateNode<'db>,
-    negative: bool,
+    is_positive: bool,
     constraints: NarrowingConstraints<'db>,
 }
 
 impl<'db> NarrowingConstraintsBuilder<'db> {
-    fn new(db: &'db dyn Db, predicate: PredicateNode<'db>, negative: bool) -> Self {
+    fn new(db: &'db dyn Db, predicate: PredicateNode<'db>, is_positive: bool) -> Self {
         Self {
             db,
             predicate,
-            negative,
+            is_positive,
             constraints: NarrowingConstraints::default(),
         }
     }
@@ -120,7 +120,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
     fn finish(mut self) -> NarrowingConstraints<'db> {
         match self.predicate {
             PredicateNode::Expression(expression) => {
-                self.evaluate_expression_constraint(expression, self.negative);
+                self.evaluate_expression_constraint(expression, self.is_positive);
             }
             PredicateNode::Pattern(pattern) => self.evaluate_pattern_constraint(pattern),
         }
@@ -128,13 +128,13 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         self.constraints
     }
 
-    fn evaluate_expression_constraint(&mut self, expression: Expression<'db>, negative: bool) {
+    fn evaluate_expression_constraint(&mut self, expression: Expression<'db>, is_positive: bool) {
         match expression.node_ref(self.db).node() {
             ast::Expr::Compare(expr_compare) => {
-                self.add_expr_compare(expr_compare, expression, negative);
+                self.add_expr_compare(expr_compare, expression, is_positive);
             }
             ast::Expr::Call(expr_call) => {
-                self.add_expr_call(expr_call, expression, negative);
+                self.add_expr_call(expr_call, expression, is_positive);
             }
             _ => {} // TODO other test expression kinds
         }
@@ -186,7 +186,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         &mut self,
         expr_compare: &ast::ExprCompare,
         expression: Expression<'db>,
-        negative: bool,
+        is_positive: bool,
     ) {
         let ast::ExprCompare {
             range: _,
@@ -199,7 +199,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             // we have no symbol to narrow down the type of.
             return;
         }
-        if negative && comparators.len() > 1 {
+        if !is_positive && comparators.len() > 1 {
             // We can't negate a constraint made by a multi-comparator expression, since we can't
             // know which comparison part is the one being negated.
             // For example, the negation of  `x is 1 is y is 2`, would be `(x is not 1) or (y is not 1) or (y is not 2)`
@@ -223,7 +223,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                 let symbol = self.symbols().symbol_id_by_name(id).unwrap();
                 let rhs_ty = inference.expression_ty(right.scoped_ast_id(self.db, scope));
 
-                match if negative { op.negate() } else { *op } {
+                match if is_positive { *op } else { op.negate() } {
                     ast::CmpOp::IsNot => {
                         if rhs_ty.is_singleton() {
                             let ty = IntersectionBuilder::new(self.db)
@@ -257,7 +257,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         &mut self,
         expr_call: &ast::ExprCall,
         expression: Expression<'db>,
-        negative: bool,
+        is_positive: bool,
     ) {
         let scope = self.scope();
         let inference = infer_expression_types(self.db, expression);
@@ -279,7 +279,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                     // isinstance(x, str | (int | float))
                     if let Some(mut constraint) = generate_isinstance_constraint(self.db, &rhs_type)
                     {
-                        if negative {
+                        if !is_positive {
                             constraint = constraint.negate(self.db);
                         }
                         self.constraints.insert(symbol, constraint);

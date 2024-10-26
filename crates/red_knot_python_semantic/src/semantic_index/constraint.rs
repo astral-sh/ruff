@@ -9,7 +9,7 @@ use crate::semantic_index::symbol::{FileScopeId, ScopeId};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Predicate<'db> {
     pub(crate) node: PredicateNode<'db>,
-    pub(crate) negative: bool,
+    pub(crate) is_positive: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

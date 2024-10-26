@@ -247,7 +247,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         let expression = self.add_standalone_expression(predicate_node);
         let predicate = Predicate {
             node: PredicateNode::Expression(expression),
-            negative: false,
+            is_positive: true,
         };
         self.current_use_def_map_mut().record_predicate(predicate);
 
@@ -257,7 +257,7 @@ impl<'db> SemanticIndexBuilder<'db> {
     fn add_negated_predicate(&mut self, predicate: Predicate<'db>) {
         self.current_use_def_map_mut().record_predicate(Predicate {
             node: predicate.node,
-            negative: true,
+            is_positive: false,
         });
     }
 
@@ -296,7 +296,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         );
         self.current_use_def_map_mut().record_predicate(Predicate {
             node: PredicateNode::Pattern(pattern_predicate),
-            negative: false,
+            is_positive: true,
         });
         pattern_predicate
     }
