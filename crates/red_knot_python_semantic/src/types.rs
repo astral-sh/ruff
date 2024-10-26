@@ -95,7 +95,11 @@ pub(crate) fn global_symbol_ty<'db>(db: &'db dyn Db, file: File, name: &str) -> 
     // Not defined explicitly in the global scope?
     // All modules are instances of `types.ModuleType`;
     // look it up there (with a few very special exceptions)
-    if explicit_ty.may_be_unbound(db) && !matches!(name, "__dict__" | "__init__" | "__getattr__") {
+    if matches!(
+        name,
+        "__name__" | "__file__" | "__loader__" | "__package__" | "__path__" | "__spec__"
+    ) && explicit_ty.may_be_unbound(db)
+    {
         // TODO: this should be `KnownClass::ModuleType.to_instance()`,
         // but we don't yet support looking up attributes on instances
         let module_type = KnownClass::ModuleType.to_class(db);
