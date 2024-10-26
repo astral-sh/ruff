@@ -12,7 +12,8 @@ x = None if flag else 1
 if x != None:
     reveal_type(x)  # revealed: Literal[1]
 else:
-    reveal_type(x)  # revealed: None
+    # Type can't be narrowed down based on `==` comparison
+    reveal_type(x)  # revealed: None | Literal[1]
 ```
 
 ## `!=` for other singleton types
@@ -27,7 +28,8 @@ x = True if flag else False
 if x != False:
     reveal_type(x)  # revealed: Literal[True]
 else:
-    reveal_type(x)  # revealed: Literal[False]
+    # Type can't be narrowed down based on `==` comparison
+    reveal_type(x)  # revealed: bool
 ```
 
 ## `x != y` where `y` is of literal type
@@ -59,7 +61,8 @@ C = A if flag else B
 if C != A:
     reveal_type(C)  # revealed: Literal[B]
 else:
-    reveal_type(C)  # revealed: Literal[A]
+    # Type can't be narrowed down based on `==` comparison
+    reveal_type(C)  # revealed: Literal[A, B]
 ```
 
 ## `x != y` where `y` has multiple single-valued options
@@ -71,7 +74,8 @@ y = 2 if flag2 else 3
 if x != y:
     reveal_type(x)  # revealed: Literal[1, 2]
 else:
-    reveal_type(x)  # revealed: Literal[2]
+    # Type can't be narrowed down based on `==` comparison
+    reveal_type(x)  # revealed: Literal[1, 2]
 ```
 
 ## `!=` for non-single-valued types
