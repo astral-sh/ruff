@@ -2370,20 +2370,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 global_symbol_ty(self.db, self.file, name)
             };
 
-            // Still possibly unbound? All modules are instances of `types.ModuleType`;
-            // look it up there (with a few very special exceptions)
-            if ty.may_be_unbound(self.db)
-                && !matches!(&**name, "__dict__" | "__init__" | "__getattr__")
-            {
-                // TODO: this should be `KnownClass::ModuleType.to_instance()`,
-                // but we don't yet support looking up attributes on instances
-                let module_type = KnownClass::ModuleType.to_class(self.db);
-                let module_type_member_ty = module_type.member(self.db, name);
-                if !module_type_member_ty.is_unbound() {
-                    return ty.replace_unbound_with(self.db, module_type_member_ty);
-                }
-            }
-
             // Fallback to builtins (without infinite recursion if we're already in builtins.)
             if ty.may_be_unbound(self.db) && Some(self.scope()) != builtins_module_scope(self.db) {
                 let mut builtin_ty = builtins_symbol_ty(self.db, name);

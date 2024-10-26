@@ -90,7 +90,24 @@ fn symbol_ty<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Type<'db>
 
 /// Shorthand for `symbol_ty` that looks up a module-global symbol by name in a file.
 pub(crate) fn global_symbol_ty<'db>(db: &'db dyn Db, file: File, name: &str) -> Type<'db> {
-    symbol_ty(db, global_scope(db, file), name)
+    let explicit_ty = symbol_ty(db, global_scope(db, file), name);
+
+    // Not defined explicitly in the global scope?
+    // All modules are instances of `types.ModuleType`;
+    // look it up there (with a few very special exceptions)
+    if explicit_ty.may_be_unbound(db) && !matches!(name, "__dict__" | "__init__" | "__getattr__") {
+        // TODO: this should be `KnownClass::ModuleType.to_instance()`,
+        // but we don't yet support looking up attributes on instances
+        let module_type = KnownClass::ModuleType.to_class(db);
+        let module_type_member_ty = module_type.member(db, name);
+        if module_type_member_ty.is_unbound() {
+            explicit_ty
+        } else {
+            explicit_ty.replace_unbound_with(db, module_type_member_ty)
+        }
+    } else {
+        explicit_ty
+    }
 }
 
 /// Infer the type of a binding.

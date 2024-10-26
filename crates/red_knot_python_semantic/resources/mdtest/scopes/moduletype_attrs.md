@@ -20,7 +20,9 @@ reveal_type(__spec__)  # revealed: @Todo
 reveal_type(__path__)  # revealed: @Todo
 
 # TODO: this should probably be added to typeshed; not sure why it isn't?
-reveal_type(__doc__)  # revealed: Unbound
+# error: [unresolved-reference]
+# revealed: Unbound
+reveal_type(__doc__)
 
 class X:
     reveal_type(__name__)  # revealed: str
@@ -33,9 +35,28 @@ However, three attributes on `types.ModuleType` are not present as implicit
 module globals; these are excluded:
 
 ```py path=unbound_dunders.py
-reveal_type(__getattr__)  # revealed: Unbound
-reveal_type(__dict__)  # revealed: Unbound
-reveal_type(__init__)  # revealed: Unbound
+# error: [unresolved-reference]
+# revealed: Unbound
+reveal_type(__getattr__)
+
+# error: [unresolved-reference]
+# revealed: Unbound
+reveal_type(__dict__)
+
+# error: [unresolved-reference]
+# revealed: Unbound
+reveal_type(__init__)
+```
+
+## Accessed as attributes
+
+`ModuleType` attributes can also be accessed as attributes
+on module-literal inhabitants:
+
+```py
+import typing
+
+reveal_type(typing.__name__)  # revealed: str
 ```
 
 ## Conditionally global or `ModuleType` attribute
