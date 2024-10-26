@@ -261,6 +261,14 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                         ) {
                             continue;
                         }
+
+                        // If the re-definition is a class member, abort.
+                        // from bar import foo
+                        // class Test:
+                        //      bar = 10 # Okay
+                        if scope.kind.is_class() {
+                            continue;
+                        }
                     }
 
                     // If the bindings are in different forks, abort.
