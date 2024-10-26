@@ -131,7 +131,8 @@ class A:
 
 reveal_type(CheckContains() in A())  # revealed: bool
 
-# TODO: should emit diagnostic, need to check arg type, should not fall back to __iter__ or __getitem__
+# TODO: should emit diagnostic, need to check arg type,
+# should not fall back to __iter__ or __getitem__
 reveal_type(CheckIter() in A())  # revealed: bool
 reveal_type(CheckGetItem() in A())  # revealed: bool
 

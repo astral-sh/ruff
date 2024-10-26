@@ -313,7 +313,8 @@ reveal_type(1 >= 1.0)  # revealed: bool
 reveal_type(1 == 2j)  # revealed: bool
 reveal_type(1 != 2j)  # revealed: bool
 
-# TODO: should be Unknown and emit diagnostic, need to check arg type and should be failed
+# TODO: should be Unknown and emit diagnostic,
+# need to check arg type and should be failed
 reveal_type(1 < 2j)  # revealed: bool
 reveal_type(1 <= 2j)  # revealed: bool
 reveal_type(1 > 2j)  # revealed: bool

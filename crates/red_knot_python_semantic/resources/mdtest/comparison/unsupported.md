@@ -11,13 +11,13 @@ b = 0 not in 10  # error: "Operator `not in` is not supported for types `Literal
 reveal_type(b)  # revealed: bool
 
 # TODO: should error, once operand type check is implemented
-# it may be error: "Operator `<` is not supported for types `object` and `int`"
+# ("Operator `<` is not supported for types `object` and `int`")
 c = object() < 5
 # TODO: should be Unknown, once operand type check is implemented
 reveal_type(c)  # revealed: bool
 
 # TODO: should error, once operand type check is implemented
-# it may be error: "Operator `<` is not supported for types `int` and `object`"
+# ("Operator `<` is not supported for types `int` and `object`")
 d = 5 < object()
 # TODO: should be Unknown, once operand type check is implemented
 reveal_type(d)  # revealed: bool

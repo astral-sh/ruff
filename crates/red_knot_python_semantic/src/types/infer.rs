@@ -3633,6 +3633,7 @@ impl From<RichCompareOperator> for ast::CmpOp {
 }
 
 impl RichCompareOperator {
+    #[must_use]
     const fn dunder(self) -> &'static str {
         match self {
             RichCompareOperator::Eq => "__eq__",
@@ -3644,6 +3645,7 @@ impl RichCompareOperator {
         }
     }
 
+    #[must_use]
     const fn reflect(self) -> Self {
         match self {
             RichCompareOperator::Eq => RichCompareOperator::Eq,
