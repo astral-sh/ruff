@@ -822,7 +822,30 @@ impl<'db> Type<'db> {
                 // TODO: attribute lookup on function type
                 Type::Todo
             }
-            Type::ModuleLiteral(file) => global_symbol_ty(db, *file, name),
+            Type::ModuleLiteral(file) => {
+                if name == "__dict__" {
+                    return KnownClass::ModuleType
+                        .to_instance(db)
+                        .member(db, "__dict__");
+                }
+                let global_lookup = global_symbol_ty(db, *file, name);
+                // If it's unbound, check if it's present as an instance on `types.ModuleType`
+                // or `builtins.object`. *Except* if it's `__getattr__`; typeshed has a fake
+                // `__getattr__` on `types.ModuleType` to help out with dynamic imports;
+                // we shouldn't use it for `ModuleLiteral` types.
+                if name != "__getattr__" && global_lookup.may_be_unbound(db) {
+                    // TODO: this should use `.to_instance()`, but we don't understand instance attribute yet
+                    let module_type_instance_member =
+                        KnownClass::ModuleType.to_class(db).member(db, name);
+                    if module_type_instance_member.is_unbound() {
+                        global_lookup
+                    } else {
+                        global_lookup.replace_unbound_with(db, module_type_instance_member)
+                    }
+                } else {
+                    global_lookup
+                }
+            }
             Type::ClassLiteral(class) => class.class_member(db, name),
             Type::Instance(_) => {
                 // TODO MRO? get_own_instance_member, get_instance_member

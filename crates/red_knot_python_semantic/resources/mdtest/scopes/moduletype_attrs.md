@@ -50,13 +50,51 @@ reveal_type(__init__)
 
 ## Accessed as attributes
 
-`ModuleType` attributes can also be accessed as attributes
-on module-literal inhabitants:
+`ModuleType` attributes can also be accessed as attributes on module-literal types.
+The special attributes `__dict__` and `__init__`, and all attributes on
+`builtins.object`, can also be accessed as attributes on module-literal types,
+despite the fact that these are inaccessible as globals from inside the module:
 
 ```py
 import typing
 
 reveal_type(typing.__name__)  # revealed: str
+reveal_type(typing.__init__)  # revealed: Literal[__init__]
+
+# This one comes from `builtins.object`, not `types.ModuleType`:
+# TODO: we don't currently understand `types.ModuleType` as inheriting from `object`
+reveal_type(typing.__eq__)  # revealed: Unbound
+
+# TODO: needs support for attribute access on instances
+reveal_type(typing.__dict__)  # revealed: @Todo
+```
+
+Typeshed includes a fake `__getattr__` method in the stub for `types.ModuleType`
+to help out with dynamic imports; but we ignore that for module-literal types
+where we know exactly which module we're dealing with:
+
+```py path=__getattr__.py
+import typing
+
+reveal_type(typing.__getattr__)  # revealed: Unbound
+```
+
+## `types.ModuleType.__dict__` takes precedence over global variable `__dict__`
+
+It's impossible to override the `__dict__` attribute of `types.ModuleType`
+instances from inside the module; we should prioritise the attribute in
+the `types.ModuleType` stub over a variable named `__dict__` in the module's
+global namespace:
+
+```py path=foo.py
+__dict__ = "foo"
+```
+
+```py path=bar.py
+import foo
+
+# TODO: needs support for attribute access on instances
+reveal_type(foo.__dict__)  # revealed: @Todo
 ```
 
 ## Conditionally global or `ModuleType` attribute
