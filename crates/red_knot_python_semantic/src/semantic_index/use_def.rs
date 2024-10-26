@@ -165,7 +165,7 @@
 //! don't actually store these "list of visible definitions" as a vector of [`Definition`].
 //! Instead, [`SymbolBindings`] and [`SymbolDeclarations`] are structs which use bit-sets to track
 //! definitions (and constraints, in the case of bindings) in terms of [`ScopedDefinitionId`] and
-//! [`ScopedConstraintId`], which are indices into the `all_definitions` and `all_predicates`
+//! [`ScopedConstraintId`], which are indices into the `all_definitions` and `all_constraints`
 //! indexvecs in the [`UseDefMap`].
 //!
 //! There is another special kind of possible "definition" for a symbol: there might be a path from
@@ -231,7 +231,7 @@ use crate::semantic_index::symbol::ScopedSymbolId;
 use ruff_index::IndexVec;
 use rustc_hash::FxHashMap;
 
-use super::constraint::Predicate;
+use super::constraint::Constraint;
 
 mod bitset;
 mod symbol_state;
@@ -242,8 +242,8 @@ pub(crate) struct UseDefMap<'db> {
     /// Array of [`Definition`] in this scope.
     all_definitions: IndexVec<ScopedDefinitionId, Definition<'db>>,
 
-    /// Array of [`Predicate`] in this scope.
-    all_predicates: IndexVec<ScopedConstraintId, Predicate<'db>>,
+    /// Array of [`Constraint`] in this scope.
+    all_constraints: IndexVec<ScopedConstraintId, Constraint<'db>>,
 
     /// [`SymbolBindings`] reaching a [`ScopedUseId`].
     bindings_by_use: IndexVec<ScopedUseId, SymbolBindings>,
@@ -332,7 +332,7 @@ impl<'db> UseDefMap<'db> {
     ) -> BindingWithConstraintsIterator<'a, 'db> {
         BindingWithConstraintsIterator {
             all_definitions: &self.all_definitions,
-            all_predicates: &self.all_predicates,
+            all_constraints: &self.all_constraints,
             inner: bindings.iter(),
         }
     }
@@ -359,7 +359,7 @@ enum SymbolDefinitions {
 #[derive(Debug)]
 pub(crate) struct BindingWithConstraintsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, Definition<'db>>,
-    all_predicates: &'map IndexVec<ScopedConstraintId, Predicate<'db>>,
+    all_constraints: &'map IndexVec<ScopedConstraintId, Constraint<'db>>,
     inner: BindingIdWithConstraintsIterator<'map>,
 }
 
@@ -372,7 +372,7 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
             .map(|def_id_with_constraints| BindingWithConstraints {
                 binding: self.all_definitions[def_id_with_constraints.definition],
                 constraints: ConstraintsIterator {
-                    all_predicates: self.all_predicates,
+                    all_constraints: self.all_constraints,
                     constraint_ids: def_id_with_constraints.constraint_ids,
                 },
             })
@@ -387,17 +387,17 @@ pub(crate) struct BindingWithConstraints<'map, 'db> {
 }
 
 pub(crate) struct ConstraintsIterator<'map, 'db> {
-    all_predicates: &'map IndexVec<ScopedConstraintId, Predicate<'db>>,
+    all_constraints: &'map IndexVec<ScopedConstraintId, Constraint<'db>>,
     constraint_ids: ConstraintIdIterator<'map>,
 }
 
 impl<'map, 'db> Iterator for ConstraintsIterator<'map, 'db> {
-    type Item = Predicate<'db>;
+    type Item = Constraint<'db>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.constraint_ids
             .next()
-            .map(|constraint_id| self.all_predicates[constraint_id])
+            .map(|constraint_id| self.all_constraints[constraint_id])
     }
 }
 
@@ -436,8 +436,8 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Append-only array of [`Definition`].
     all_definitions: IndexVec<ScopedDefinitionId, Definition<'db>>,
 
-    /// Append-only array of [`Predicate`].
-    all_predicates: IndexVec<ScopedConstraintId, Predicate<'db>>,
+    /// Append-only array of [`Constraint`].
+    all_constraints: IndexVec<ScopedConstraintId, Constraint<'db>>,
 
     /// Live bindings at each so-far-recorded use.
     bindings_by_use: IndexVec<ScopedUseId, SymbolBindings>,
@@ -469,8 +469,8 @@ impl<'db> UseDefMapBuilder<'db> {
         symbol_state.record_binding(def_id);
     }
 
-    pub(super) fn record_predicate(&mut self, predicate: Predicate<'db>) {
-        let constraint_id = self.all_predicates.push(predicate);
+    pub(super) fn record_constraint(&mut self, constraint: Constraint<'db>) {
+        let constraint_id = self.all_constraints.push(constraint);
         for state in &mut self.symbol_states {
             state.record_constraint(constraint_id);
         }
@@ -559,14 +559,14 @@ impl<'db> UseDefMapBuilder<'db> {
 
     pub(super) fn finish(mut self) -> UseDefMap<'db> {
         self.all_definitions.shrink_to_fit();
-        self.all_predicates.shrink_to_fit();
+        self.all_constraints.shrink_to_fit();
         self.symbol_states.shrink_to_fit();
         self.bindings_by_use.shrink_to_fit();
         self.definitions_by_definition.shrink_to_fit();
 
         UseDefMap {
             all_definitions: self.all_definitions,
-            all_predicates: self.all_predicates,
+            all_constraints: self.all_constraints,
             bindings_by_use: self.bindings_by_use,
             public_symbols: self.symbol_states,
             definitions_by_definition: self.definitions_by_definition,

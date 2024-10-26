@@ -1,5 +1,5 @@
 use crate::semantic_index::ast_ids::HasScopedAstId;
-use crate::semantic_index::constraint::{PatternPredicate, Predicate, PredicateNode};
+use crate::semantic_index::constraint::{Constraint, ConstraintNode, PatternConstraint};
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, SymbolTable};
@@ -31,12 +31,12 @@ use std::sync::Arc;
 /// constraint is applied to that definition, so we'd just return `None`.
 pub(crate) fn narrowing_constraint<'db>(
     db: &'db dyn Db,
-    predicate: Predicate<'db>,
+    constraint: Constraint<'db>,
     definition: Definition<'db>,
 ) -> Option<Type<'db>> {
-    match predicate.node {
-        PredicateNode::Expression(expression) => {
-            if predicate.is_positive {
+    match constraint.node {
+        ConstraintNode::Expression(expression) => {
+            if constraint.is_positive {
                 all_narrowing_constraints_for_expression(db, expression)
                     .get(&definition.symbol(db))
                     .copied()
@@ -46,7 +46,7 @@ pub(crate) fn narrowing_constraint<'db>(
                     .copied()
             }
         }
-        PredicateNode::Pattern(pattern) => all_narrowing_constraints_for_pattern(db, pattern)
+        ConstraintNode::Pattern(pattern) => all_narrowing_constraints_for_pattern(db, pattern)
             .get(&definition.symbol(db))
             .copied(),
     }
@@ -55,9 +55,9 @@ pub(crate) fn narrowing_constraint<'db>(
 #[salsa::tracked(return_ref)]
 fn all_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
-    pattern: PatternPredicate<'db>,
+    pattern: PatternConstraint<'db>,
 ) -> NarrowingConstraints<'db> {
-    NarrowingConstraintsBuilder::new(db, PredicateNode::Pattern(pattern), true).finish()
+    NarrowingConstraintsBuilder::new(db, ConstraintNode::Pattern(pattern), true).finish()
 }
 
 #[salsa::tracked(return_ref)]
@@ -65,7 +65,7 @@ fn all_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
 ) -> NarrowingConstraints<'db> {
-    NarrowingConstraintsBuilder::new(db, PredicateNode::Expression(expression), true).finish()
+    NarrowingConstraintsBuilder::new(db, ConstraintNode::Expression(expression), true).finish()
 }
 
 #[salsa::tracked(return_ref)]
@@ -73,7 +73,7 @@ fn all_negative_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
 ) -> NarrowingConstraints<'db> {
-    NarrowingConstraintsBuilder::new(db, PredicateNode::Expression(expression), false).finish()
+    NarrowingConstraintsBuilder::new(db, ConstraintNode::Expression(expression), false).finish()
 }
 
 /// Generate a constraint from the *type* of the second argument of an `isinstance` call.
@@ -102,27 +102,27 @@ type NarrowingConstraints<'db> = FxHashMap<ScopedSymbolId, Type<'db>>;
 
 struct NarrowingConstraintsBuilder<'db> {
     db: &'db dyn Db,
-    predicate: PredicateNode<'db>,
+    constraint: ConstraintNode<'db>,
     is_positive: bool,
     constraints: NarrowingConstraints<'db>,
 }
 
 impl<'db> NarrowingConstraintsBuilder<'db> {
-    fn new(db: &'db dyn Db, predicate: PredicateNode<'db>, is_positive: bool) -> Self {
+    fn new(db: &'db dyn Db, constraint: ConstraintNode<'db>, is_positive: bool) -> Self {
         Self {
             db,
-            predicate,
+            constraint,
             is_positive,
             constraints: NarrowingConstraints::default(),
         }
     }
 
     fn finish(mut self) -> NarrowingConstraints<'db> {
-        match self.predicate {
-            PredicateNode::Expression(expression) => {
+        match self.constraint {
+            ConstraintNode::Expression(expression) => {
                 self.evaluate_expression_constraint(expression, self.is_positive);
             }
-            PredicateNode::Pattern(pattern) => self.evaluate_pattern_constraint(pattern),
+            ConstraintNode::Pattern(pattern) => self.evaluate_pattern_constraint(pattern),
         }
         self.constraints.shrink_to_fit();
         self.constraints
@@ -140,7 +140,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         }
     }
 
-    fn evaluate_pattern_constraint(&mut self, pattern: PatternPredicate<'db>) {
+    fn evaluate_pattern_constraint(&mut self, pattern: PatternConstraint<'db>) {
         let subject = pattern.subject(self.db);
 
         match pattern.pattern(self.db).node() {
@@ -176,9 +176,9 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
     }
 
     fn scope(&self) -> ScopeId<'db> {
-        match self.predicate {
-            PredicateNode::Expression(expression) => expression.scope(self.db),
-            PredicateNode::Pattern(pattern) => pattern.scope(self.db),
+        match self.constraint {
+            ConstraintNode::Expression(expression) => expression.scope(self.db),
+            ConstraintNode::Pattern(pattern) => pattern.scope(self.db),
         }
     }
 
