@@ -148,7 +148,7 @@ static HEADER_RE: LazyLock<Regex> =
 /// Matches a code block fenced by triple backticks, possibly with language and `key=val`
 /// configuration items following the opening backticks (in the "tag string" of the code block).
 static CODE_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^```(?<lang>(?-u:\w)+)?(?<config>(?: +\S+)*)\s*\n(?<code>(?:.|\n)*?)\n?```\s*\n")
+    Regex::new(r"^```(?<lang>(?-u:\w)+)?(?<config>(?: +\S+)*)\s*\n(?<code>(?:.|\n)*?)\n?```\s*\n?")
         .unwrap()
 });
 
@@ -403,6 +403,31 @@ mod tests {
             x = 1
             ```
             ",
+        );
+        let mf = super::parse("file.md", &source).unwrap();
+
+        let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
+            panic!("expected one test");
+        };
+
+        assert_eq!(test.name(), "file.md");
+
+        let [file] = test.files().collect::<Vec<_>>()[..] else {
+            panic!("expected one file");
+        };
+
+        assert_eq!(file.path, "test.py");
+        assert_eq!(file.lang, "py");
+        assert_eq!(file.code, "x = 1");
+    }
+
+    #[test]
+    fn no_new_line_at_eof() {
+        let source = dedent(
+            "
+            ```py
+            x = 1
+            ```",
         );
         let mf = super::parse("file.md", &source).unwrap();
 
