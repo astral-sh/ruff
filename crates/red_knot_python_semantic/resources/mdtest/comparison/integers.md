@@ -12,7 +12,7 @@ reveal_type(1 is 1)  # revealed: bool
 reveal_type(1 is not 1)  # revealed: bool
 reveal_type(1 is 2)  # revealed: Literal[False]
 reveal_type(1 is not 7)  # revealed: Literal[True]
-# TODO: should be Unknown, once type-checking for rich comparison operands is implemented
+# TODO: should be Unknown, and emit diagnostic, once we check call argument types
 reveal_type(1 <= "" and 0 < 1)  # revealed: bool
 ```
 

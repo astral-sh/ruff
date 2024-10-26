@@ -88,10 +88,10 @@ However, `==` and `!=` are exceptions and can still provide definite results.
 a = (1, 2)
 b = (1, "hello")
 
-# TODO: should be Literal[False], once type-checking for rich comparison operands is implemented
+# TODO: should be Literal[False], once we implement (in)equality for mismatched literals
 reveal_type(a == b)  # revealed: bool
 
-# TODO: should be Literal[True], once type-checking for rich comparison operands is implemented
+# TODO: should be Literal[True], once we implement (in)equality for mismatched literals
 reveal_type(a != b)  # revealed: bool
 
 # TODO: should be Unknown and add more informative diagnostics
@@ -186,7 +186,9 @@ c = (1, 2, 3)
 reveal_type(a is (1, 2))  # revealed: bool
 reveal_type(a is not (1, 2))  # revealed: bool
 
+# TODO should be Literal[False] once we implement comparison of mismatched literal types
 reveal_type(a is b)  # revealed: bool
+# TODO should be Literal[True] once we implement comparison of mismatched literal types
 reveal_type(a is not b)  # revealed: bool
 
 reveal_type(a is c)  # revealed: Literal[False]

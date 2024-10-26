@@ -18,7 +18,7 @@ class A:
 
 reveal_type("hello" in A())  # revealed: bool
 reveal_type("hello" not in A())  # revealed: bool
-# TODO: should be Unknown, need to check arg type and should be failed
+# TODO: should emit diagnostic, need to check arg type, will fail
 reveal_type(42 in A())  # revealed: bool
 reveal_type(42 not in A())  # revealed: bool
 ```
@@ -119,7 +119,7 @@ class A:
 
 reveal_type(CheckContains() in A())  # revealed: bool
 
-# TODO: should be `Unknown`, need to check arg type, and should not fall back to __iter__ or __getitem__
+# TODO: should emit diagnostic, need to check arg type, should not fall back to __iter__ or __getitem__
 reveal_type(CheckIter() in A())  # revealed: bool
 reveal_type(CheckGetItem() in A())  # revealed: bool
 
@@ -131,20 +131,21 @@ class B:
         return CheckGetItem()
 
 reveal_type(CheckIter() in B())  # revealed: bool
-# GetItem instance use `__iter__`, it's because `CheckIter` and `CheckGetItem` are comparable
+# Always use `__iter__`, regardless of iterated type; there's no NotImplemented
+# in this case, so there's no fallback to `__getitem__`
 reveal_type(CheckGetItem() in B())  # revealed: bool
 ```
 
 ## Invalid Old-Style Iteration
 
-If `__getitem__` is implemented but does not accept integer arguments, then membership test is not supported and should reveal Never.
+If `__getitem__` is implemented but does not accept integer arguments, then membership test is not supported and should emit a diagnostic.
 
 ```py
 class A:
     def __getitem__(self, key: str) -> str:
         return "foo"
 
-# TODO should be Never
+# TODO should emit a diagnostic
 reveal_type(42 in A())  # revealed: bool
 reveal_type("hello" in A())  # revealed: bool
 ```

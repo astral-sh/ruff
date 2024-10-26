@@ -3782,7 +3782,7 @@ fn perform_rich_comparison<'db>(
     })
 }
 
-/// Performs a membership test (`in` and `not in`) between two instances and returns the resulting type.
+/// Performs a membership test (`in` and `not in`) between two instances and returns the resulting type, or `None` if the test is unsupported.
 /// The behavior can be customized in Python by implementing `__contains__`, `__iter__`, or `__getitem__` methods.
 /// See `<https://docs.python.org/3/reference/datamodel.html#object.__contains__>`
 /// and `<https://docs.python.org/3/reference/expressions.html#membership-test-details>`

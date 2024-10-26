@@ -113,7 +113,7 @@ class B:
     def __ne__(self, other: str) -> B:
         return B()
 
-# TODO: should be `int` and `float`, need to check arg type and fall back to `rhs.__eq__` and `rhs.__ne__`
+# TODO: should be `int` and `float`, need to check arg type and fall back to `rhs.__eq__` and `rhs.__ne__`. Because `object.__eq__` and `object.__ne__` accept `object` in typeshed, this can only happen with an invalid override of these methods, but we still support it.
 reveal_type(B() == A())  # revealed: B
 reveal_type(B() != A())  # revealed: B
 
@@ -191,7 +191,7 @@ reveal_type(A() >= B())  # revealed: bytes
 
 ## Reflected Comparisons with Subclass But Falls Back to LHS
 
-In the case of a subclass, the right-hand side has pirority. However, if the overridden dunder method has an mismatched type to operand, the comparison will fall back to the left-hand side.
+In the case of a subclass, the right-hand side has priority. However, if the overridden dunder method has an mismatched type to operand, the comparison will fall back to the left-hand side.
 
 ```py
 from __future__ import annotations
@@ -254,6 +254,7 @@ Please refer to the [docs](https://docs.python.org/3/reference/datamodel.html#ob
 from __future__ import annotations
 
 class A:
+    # TODO both these overrides should emit invalid-override diagnostic
     def __eq__(self, other: int) -> A:
         return A()
 
@@ -275,7 +276,7 @@ reveal_type(A() != object())  # revealed: bool
 reveal_type(object() == A())  # revealed: bool
 reveal_type(object() != A())  # revealed: bool
 
-# error: "Operator `<` is not supported for types `A` and `object`"
+# error: [operator-unsupported] "Operator `<` is not supported for types `A` and `object`"
 # revealed: Unknown
 reveal_type(A() < object())
 ```
@@ -293,7 +294,7 @@ reveal_type(1 >= 1.0)  # revealed: bool
 reveal_type(1 == 2j)  # revealed: bool
 reveal_type(1 != 2j)  # revealed: bool
 
-# TODO: should be Unknown, need to check arg type and should be failed
+# TODO: should be Unknown and emit diagnostic, need to check arg type and should be failed
 reveal_type(1 < 2j)  # revealed: bool
 reveal_type(1 <= 2j)  # revealed: bool
 reveal_type(1 > 2j)  # revealed: bool
