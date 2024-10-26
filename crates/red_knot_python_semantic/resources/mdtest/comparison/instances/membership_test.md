@@ -1,13 +1,14 @@
 # Comparison: Membership Test
 
-In Python, "membership test operators" refer to `in` and `not in` operator. To
-customize their behavior, classes can implement methods like `__contains__`,
-`__iter__`, or `__getitem__`.
+In Python, the term "membership test operators" refers to the operators
+`in` and `not in`. To customize their behavior, classes can implement one of
+the special methods `__contains__`, `__iter__`, or `__getitem__`.
 
 For references, see:
 
 - <https://docs.python.org/3/reference/expressions.html#membership-test-details>
 - <https://docs.python.org/3/reference/datamodel.html#object.__contains__>
+- <https://snarky.ca/unravelling-membership-testing/>
 
 ## Implements `__contains__`
 
@@ -47,10 +48,11 @@ reveal_type(42 not in A())  # revealed: bool
 
 ## Implements `__getitems__`
 
-The final fallback is to implement `__getitem__` for integer keys: Python will
-call it with 0, 1, 2... until it either finds the needle (returning True for the
-membership test) or `__getitem__` raises IndexError, which is silenced and
-returns `False` for the membership test.
+The final fallback is to implement `__getitem__` for integer keys. Python will
+call `__getitem__` with `0`, `1`, `2`... until either the needle is found
+(leading the membership test to evaluate to `True`) or `__getitem__` raises
+`IndexError` (the raised exception is swallowed, but results in the membership
+test evaluating to `False`).
 
 ```py
 class A:
@@ -65,7 +67,7 @@ reveal_type(42 not in A())  # revealed: bool
 
 ## Wrong Return Type
 
-Python coerces the results of containment checks to bool, even if `__contains__`
+Python coerces the results of containment checks to `bool`, even if `__contains__`
 returns a non-bool:
 
 ```py
@@ -149,7 +151,7 @@ reveal_type(CheckGetItem() in B())  # revealed: bool
 ## Invalid Old-Style Iteration
 
 If `__getitem__` is implemented but does not accept integer arguments, then
-membership test is not supported and should emit a diagnostic.
+the membership test is not supported and should trigger a diagnostic.
 
 ```py
 class A:

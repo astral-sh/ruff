@@ -9,7 +9,7 @@ For references, see:
 - <https://docs.python.org/3/reference/datamodel.html#object.__lt__>
 - <https://snarky.ca/unravelling-rich-comparison-operators/>
 
-## Implements Rich Comparison Dunders For Same Class
+## Rich Comparison Dunder Implementations For Same Class
 
 Classes can support rich comparison by implementing dunder methods like
 `__eq__`, `__ne__`, etc. The most common case involves implementing these
@@ -45,7 +45,7 @@ reveal_type(A() > A())  # revealed: list
 reveal_type(A() >= A())  # revealed: set
 ```
 
-## Implements Rich Comparison Dunders for Other Class
+## Rich Comparison Dunder Implementations for Other Class
 
 In some cases, classes may implement rich comparison dunder methods for
 comparisons with a different type:
@@ -85,8 +85,8 @@ reveal_type(A() >= B())  # revealed: set
 ## Reflected Comparisons
 
 Fallback to the right-hand side’s comparison methods occurs when the left-hand
-side does not define them. Note: class B has its own `__eq__` and `__ne__`
-methods to override those of object, but these methods will be ignored here
+side does not define them. Note: class `B` has its own `__eq__` and `__ne__`
+methods to override those of `object`, but these methods will be ignored here
 because they require a mismatched operand type.
 
 ```py
@@ -119,7 +119,12 @@ class B:
     def __ne__(self, other: str) -> B:
         return B()
 
-# TODO: should be `int` and `float`, need to check arg type and fall back to `rhs.__eq__` and `rhs.__ne__`. Because `object.__eq__` and `object.__ne__` accept `object` in typeshed, this can only happen with an invalid override of these methods, but we still support it.
+# TODO: should be `int` and `float`.
+# Need to check arg type and fall back to `rhs.__eq__` and `rhs.__ne__`.
+#
+# Because `object.__eq__` and `object.__ne__` accept `object` in typeshed,
+# this can only happen with an invalid override of these methods,
+# but we still support it.
 reveal_type(B() == A())  # revealed: B
 reveal_type(B() != A())  # revealed: B
 
@@ -143,8 +148,8 @@ reveal_type(C() <= C())  # revealed: float
 ## Reflected Comparisons with Subclasses
 
 When subclasses override comparison methods, these overridden methods take
-precedence over those in the parent class. Class B inherits from A and redefines
-comparison methods to return types other than A.
+precedence over those in the parent class. Class `B` inherits from `A` and
+redefines comparison methods to return types other than `A`.
 
 ```py
 from __future__ import annotations
