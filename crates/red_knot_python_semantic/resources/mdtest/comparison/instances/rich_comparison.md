@@ -113,6 +113,7 @@ class A:
 
 class B:
     # To override builtins.object.__eq__ and builtins.object.__ne__
+    # TODO these should emit an invalid override diagnostic
     def __eq__(self, other: str) -> B:
         return B()
 
