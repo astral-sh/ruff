@@ -4,7 +4,7 @@
 //! constraints, referring to their location in the `all_definitions` and `all_predicates`
 //! indexvecs in [`super::UseDefMapBuilder`].
 //!
-//! We need to track arbitrary associations between bindings and constraints, not just a single set
+//! We need to track arbitrary associations between bindings and predicates, not just a single set
 //! of currently dominating constraints (where "dominating" means "control flow must have passed
 //! through it to reach this point"), because we can have dominating constraints that apply to some
 //! bindings but not others, as in this code:

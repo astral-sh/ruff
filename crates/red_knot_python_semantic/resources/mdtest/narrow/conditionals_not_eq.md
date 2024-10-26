@@ -12,7 +12,7 @@ x = None if flag else 1
 if x != None:
     reveal_type(x)  # revealed: Literal[1]
 else:
-    # Type can't be narrowed down based on `==` comparison
+    # TODO should be None
     reveal_type(x)  # revealed: None | Literal[1]
 ```
 
@@ -28,7 +28,7 @@ x = True if flag else False
 if x != False:
     reveal_type(x)  # revealed: Literal[True]
 else:
-    # Type can't be narrowed down based on `==` comparison
+    # TODO should be Literal[False]
     reveal_type(x)  # revealed: bool
 ```
 
@@ -61,7 +61,7 @@ C = A if flag else B
 if C != A:
     reveal_type(C)  # revealed: Literal[B]
 else:
-    # Type can't be narrowed down based on `==` comparison
+    # TODO should be Literal[A]
     reveal_type(C)  # revealed: Literal[A, B]
 ```
 
@@ -77,7 +77,7 @@ y = 2 if bool_instance() else 3
 if x != y:
     reveal_type(x)  # revealed: Literal[1, 2]
 else:
-    # Type can't be narrowed down based on `==` comparison
+    # TODO should be Literal[2]
     reveal_type(x)  # revealed: Literal[1, 2]
 ```
 

@@ -9,6 +9,7 @@ def int_instance() -> int:
 x = int_instance()
 
 if x == 1:
+    # cannot narrow; could be a subclass of `int`
     reveal_type(x)  # revealed: int
 elif x == 2:
     reveal_type(x)  # revealed: int & ~Literal[1]
@@ -25,8 +26,10 @@ def bool_instance() -> bool:
 x = 1 if bool_instance() else 2 if bool_instance() else 3
 
 if x == 1:
+    # TODO should be Literal[1]
     reveal_type(x)  # revealed: Literal[1, 2, 3]
 elif x == 2:
+    # TODO should be Literal[2]
     reveal_type(x)  # revealed: Literal[2, 3]
 else:
     reveal_type(x)  # revealed: Literal[3]
@@ -43,11 +46,12 @@ x = 1 if bool_instance() else 2 if bool_instance() else 3
 if x != 1:
     reveal_type(x)  # revealed: Literal[2, 3]
 elif x != 2:
-    # 1 is still a possibility here, as we don't narrow basing `==` check
+    # TODO should be `Literal[1]`
     reveal_type(x)  # revealed: Literal[1, 3]
 elif x == 3:
-    # 2 and 3 are still valid here, as we don't narrow basing `==` check
+    # TODO should be Never
     reveal_type(x)  # revealed: Literal[1, 2, 3]
 else:
+    # TODO should be Never
     reveal_type(x)  # revealed: Literal[1, 2]
 ```
