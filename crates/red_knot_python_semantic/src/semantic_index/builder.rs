@@ -27,7 +27,7 @@ use crate::semantic_index::use_def::{FlowSnapshot, UseDefMapBuilder};
 use crate::semantic_index::SemanticIndex;
 use crate::Db;
 
-use super::constraint::{Constraint, PatternConstraint};
+use super::constraint::{Constraint, ConstraintNode, PatternConstraint};
 use super::definition::{
     AssignmentKind, DefinitionCategory, ExceptHandlerDefinitionNodeRef,
     MatchPatternDefinitionNodeRef, WithItemDefinitionNodeRef,
@@ -243,12 +243,23 @@ impl<'db> SemanticIndexBuilder<'db> {
         definition
     }
 
-    fn add_expression_constraint(&mut self, constraint_node: &ast::Expr) -> Expression<'db> {
+    fn add_expression_constraint(&mut self, constraint_node: &ast::Expr) -> Constraint<'db> {
         let expression = self.add_standalone_expression(constraint_node);
-        self.current_use_def_map_mut()
-            .record_constraint(Constraint::Expression(expression));
+        let constraint = Constraint {
+            node: ConstraintNode::Expression(expression),
+            is_positive: true,
+        };
+        self.current_use_def_map_mut().record_constraint(constraint);
 
-        expression
+        constraint
+    }
+
+    fn add_negated_constraint(&mut self, constraint: Constraint<'db>) {
+        self.current_use_def_map_mut()
+            .record_constraint(Constraint {
+                node: constraint.node,
+                is_positive: false,
+            });
     }
 
     fn push_assignment(&mut self, assignment: CurrentAssignment<'db>) {
@@ -285,7 +296,10 @@ impl<'db> SemanticIndexBuilder<'db> {
             countme::Count::default(),
         );
         self.current_use_def_map_mut()
-            .record_constraint(Constraint::Pattern(pattern_constraint));
+            .record_constraint(Constraint {
+                node: ConstraintNode::Pattern(pattern_constraint),
+                is_positive: true,
+            });
         pattern_constraint
     }
 
@@ -639,7 +653,8 @@ where
             ast::Stmt::If(node) => {
                 self.visit_expr(&node.test);
                 let pre_if = self.flow_snapshot();
-                self.add_expression_constraint(&node.test);
+                let constraint = self.add_expression_constraint(&node.test);
+                let mut constraints = vec![constraint];
                 self.visit_body(&node.body);
                 let mut post_clauses: Vec<FlowSnapshot> = vec![];
                 for clause in &node.elif_else_clauses {
@@ -649,7 +664,14 @@ where
                     // we can only take an elif/else branch if none of the previous ones were
                     // taken, so the block entry state is always `pre_if`
                     self.flow_restore(pre_if.clone());
-                    self.visit_elif_else_clause(clause);
+                    for constraint in &constraints {
+                        self.add_negated_constraint(*constraint);
+                    }
+                    if let Some(elif_test) = &clause.test {
+                        self.visit_expr(elif_test);
+                        constraints.push(self.add_expression_constraint(elif_test));
+                    }
+                    self.visit_body(&clause.body);
                 }
                 for post_clause_state in post_clauses {
                     self.flow_merge(post_clause_state);

@@ -2415,7 +2415,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 } else {
                     None
                 };
-
                 let ty = bindings_ty(self.db, definitions, unbound_ty);
 
                 if ty.is_unbound() {

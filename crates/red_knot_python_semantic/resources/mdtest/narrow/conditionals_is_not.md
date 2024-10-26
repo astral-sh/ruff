@@ -13,6 +13,8 @@ x = None if flag else 1
 
 if x is not None:
     reveal_type(x)  # revealed: Literal[1]
+else:
+    reveal_type(x)  # revealed: None
 
 reveal_type(x)  # revealed: None | Literal[1]
 ```
@@ -29,6 +31,8 @@ reveal_type(x)  # revealed: bool
 
 if x is not False:
     reveal_type(x)  # revealed: Literal[True]
+else:
+    reveal_type(x)  # revealed: Literal[False]
 ```
 
 ## `is not` for non-singleton types
@@ -43,6 +47,27 @@ y = 345
 
 if x is not y:
     reveal_type(x)  # revealed: Literal[345]
+else:
+    reveal_type(x)  # revealed: Literal[345]
+```
+
+## `is not` for other types
+
+```py
+def bool_instance() -> bool:
+    return True
+
+class A: ...
+
+x = A()
+y = x if bool_instance() else None
+
+if y is not x:
+    reveal_type(y)  # revealed: A | None
+else:
+    reveal_type(y)  # revealed: A
+
+reveal_type(y)  # revealed: A | None
 ```
 
 ## `is not` in chained comparisons
@@ -62,5 +87,11 @@ reveal_type(y)  # revealed: bool
 
 if y is not x is not False:  # Interpreted as `(y is not x) and (x is not False)`
     reveal_type(x)  # revealed: Literal[True]
+    reveal_type(y)  # revealed: bool
+else:
+    # The negation of the clause above is (y is x) or (x is False)
+    # So we can't narrow the type of x or y here, because each arm of the `or` could be true
+
+    reveal_type(x)  # revealed: bool
     reveal_type(y)  # revealed: bool
 ```

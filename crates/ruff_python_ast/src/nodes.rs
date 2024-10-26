@@ -3071,6 +3071,22 @@ impl CmpOp {
             CmpOp::NotIn => "not in",
         }
     }
+
+    #[must_use]
+    pub const fn negate(&self) -> Self {
+        match self {
+            CmpOp::Eq => CmpOp::NotEq,
+            CmpOp::NotEq => CmpOp::Eq,
+            CmpOp::Lt => CmpOp::GtE,
+            CmpOp::LtE => CmpOp::Gt,
+            CmpOp::Gt => CmpOp::LtE,
+            CmpOp::GtE => CmpOp::Lt,
+            CmpOp::Is => CmpOp::IsNot,
+            CmpOp::IsNot => CmpOp::Is,
+            CmpOp::In => CmpOp::NotIn,
+            CmpOp::NotIn => CmpOp::In,
+        }
+    }
 }
 
 impl fmt::Display for CmpOp {
