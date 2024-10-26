@@ -59,7 +59,8 @@ reveal_type(c >= d)  # revealed: Literal[True]
 
 ```py
 def bool_instance() -> bool: ...
-def int_instance() -> int: ...
+def int_instance() -> int:
+    return 42
 
 a = (bool_instance(),)
 b = (int_instance(),)
@@ -159,7 +160,8 @@ reveal_type(a >= a)  # revealed: @Todo
 "Membership Test Comparisons" refers to the operators `in` and `not in`.
 
 ```py
-def int_instance() -> int: ...
+def int_instance() -> int:
+    return 42
 
 a = (1, 2)
 b = ((3, 4), (1, 2))

@@ -64,7 +64,11 @@ else:
 ## `is` in elif clause
 
 ```py
-x = None if flag else (1 if flag2 else True)
+def bool_instance() -> bool:
+    return True
+
+x = None if bool_instance() else (1 if bool_instance() else True)
+
 reveal_type(x)  # revealed: None | Literal[1] | Literal[True]
 if x is None:
     reveal_type(x)  # revealed: None

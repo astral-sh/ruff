@@ -54,10 +54,13 @@ else:
 ## `is not` for other types
 
 ```py
+def bool_instance() -> bool:
+    return True
+
 class A: ...
 
 x = A()
-y = x if flag else None
+y = x if bool_instance() else None
 
 if y is not x:
     reveal_type(y)  # revealed: A | None

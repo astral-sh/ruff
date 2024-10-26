@@ -3,7 +3,8 @@
 ## Positive contributions become negative in elif-else blocks
 
 ```py
-def int_instance() -> int: ...
+def int_instance() -> int:
+    return 42
 
 x = int_instance()
 
@@ -18,7 +19,10 @@ elif x != 3:
 ## Positive contributions become negative in elif-else blocks, with simplification
 
 ```py
-x = 1 if flag1 else 2 if flag2 else 3
+def bool_instance() -> bool:
+    return True
+
+x = 1 if bool_instance() else 2 if bool_instance() else 3
 
 if x == 1:
     reveal_type(x)  # revealed: Literal[1, 2, 3]
@@ -31,7 +35,10 @@ else:
 ## Multiple negative contributions using elif, with simplification
 
 ```py
-x = 1 if flag1 else 2 if flag2 else 3
+def bool_instance() -> bool:
+    return True
+
+x = 1 if bool_instance() else 2 if bool_instance() else 3
 
 if x != 1:
     reveal_type(x)  # revealed: Literal[2, 3]

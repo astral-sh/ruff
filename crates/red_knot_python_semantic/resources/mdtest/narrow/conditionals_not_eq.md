@@ -68,8 +68,11 @@ else:
 ## `x != y` where `y` has multiple single-valued options
 
 ```py
-x = 1 if flag1 else 2
-y = 2 if flag2 else 3
+def bool_instance() -> bool:
+    return True
+
+x = 1 if bool_instance() else 2
+y = 2 if bool_instance() else 3
 
 if x != y:
     reveal_type(x)  # revealed: Literal[1, 2]
@@ -100,10 +103,14 @@ if x != y:
 ## Mix of single-valued and non-single-valued types
 
 ```py
-def int_instance() -> int: ...
+def int_instance() -> int:
+    return 42
 
-x = 1 if flag1 else 2
-y = 2 if flag2 else int_instance()
+def bool_instance() -> bool:
+    return True
+
+x = 1 if bool_instance() else 2
+y = 2 if bool_instance() else int_instance()
 
 if x != y:
     reveal_type(x)  # revealed: Literal[1, 2]

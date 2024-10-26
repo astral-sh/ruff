@@ -3,7 +3,8 @@
 ## Multiple negative contributions
 
 ```py
-def int_instance() -> int: ...
+def int_instance() -> int:
+    return 42
 
 x = int_instance()
 
@@ -31,7 +32,10 @@ if x != 1:
 ## elif-else blocks
 
 ```py
-x = 1 if flag1 else 2 if flag2 else 3
+def bool_instance() -> bool:
+    return True
+
+x = 1 if bool_instance() else 2 if bool_instance() else 3
 
 if x != 1:
     reveal_type(x)  # revealed: Literal[2, 3]
