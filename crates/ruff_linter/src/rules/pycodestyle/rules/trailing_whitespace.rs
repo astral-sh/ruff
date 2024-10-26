@@ -100,7 +100,7 @@ pub(crate) fn trailing_whitespace(
                 diagnostic.set_fix(Fix::applicable_edit(
                     Edit::range_deletion(TextRange::new(
                         indexer
-                            .preceded_by_continuations(line.start(), locator)
+                            .preceded_by_continuations(line.start(), locator.contents())
                             .unwrap_or(range.start()),
                         range.end(),
                     )),

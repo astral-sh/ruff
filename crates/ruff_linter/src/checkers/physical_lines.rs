@@ -106,8 +106,8 @@ mod tests {
         let line = "'\u{4e9c}' * 2"; // 7 in UTF-32, 9 in UTF-8.
         let locator = Locator::new(line);
         let parsed = parse_module(line).unwrap();
-        let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
-        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+        let indexer = Indexer::from_tokens(parsed.tokens(), line);
+        let stylist = Stylist::from_tokens(parsed.tokens(), line);
 
         let check_with_max_line_length = |line_length: LineLength| {
             check_physical_lines(

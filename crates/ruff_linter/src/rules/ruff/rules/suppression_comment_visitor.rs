@@ -146,9 +146,11 @@ where
                 // We want `# fmt: on` to be considered a trailing comment of `func(x)` instead of a leading comment
                 // on `func2(y)`.
                 if line_position.is_own_line() {
-                    let comment_indent = comment_indentation_after(node, range, self.locator);
+                    let comment_indent =
+                        comment_indentation_after(node, range, self.locator.contents());
                     let node_indent = TextSize::of(
-                        indentation_at_offset(node.start(), self.locator).unwrap_or_default(),
+                        indentation_at_offset(node.start(), self.locator.contents())
+                            .unwrap_or_default(),
                     );
                     if node_indent >= comment_indent {
                         break;

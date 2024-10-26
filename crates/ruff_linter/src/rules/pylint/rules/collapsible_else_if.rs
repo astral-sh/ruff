@@ -113,7 +113,7 @@ fn convert_to_elif(
     let trivia_range = TextRange::new(else_line_end, inner_if_line_start);
 
     // Identify the indentation of the outer clause
-    let Some(indentation) = indentation(locator, else_clause) else {
+    let Some(indentation) = indentation(locator.contents(), else_clause) else {
         return Err(anyhow::anyhow!("`else` is expected to be on its own line"));
     };
 

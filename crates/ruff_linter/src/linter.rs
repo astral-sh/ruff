@@ -206,40 +206,53 @@ pub fn check_path(
             }
             let diagnostic = match test_rule {
                 Rule::StableTestRule => {
-                    test_rules::StableTestRule::diagnostic(locator, comment_ranges)
+                    test_rules::StableTestRule::diagnostic(locator.contents(), comment_ranges)
                 }
-                Rule::StableTestRuleSafeFix => {
-                    test_rules::StableTestRuleSafeFix::diagnostic(locator, comment_ranges)
-                }
-                Rule::StableTestRuleUnsafeFix => {
-                    test_rules::StableTestRuleUnsafeFix::diagnostic(locator, comment_ranges)
-                }
+                Rule::StableTestRuleSafeFix => test_rules::StableTestRuleSafeFix::diagnostic(
+                    locator.contents(),
+                    comment_ranges,
+                ),
+                Rule::StableTestRuleUnsafeFix => test_rules::StableTestRuleUnsafeFix::diagnostic(
+                    locator.contents(),
+                    comment_ranges,
+                ),
                 Rule::StableTestRuleDisplayOnlyFix => {
-                    test_rules::StableTestRuleDisplayOnlyFix::diagnostic(locator, comment_ranges)
+                    test_rules::StableTestRuleDisplayOnlyFix::diagnostic(
+                        locator.contents(),
+                        comment_ranges,
+                    )
                 }
                 Rule::PreviewTestRule => {
-                    test_rules::PreviewTestRule::diagnostic(locator, comment_ranges)
+                    test_rules::PreviewTestRule::diagnostic(locator.contents(), comment_ranges)
                 }
                 Rule::DeprecatedTestRule => {
-                    test_rules::DeprecatedTestRule::diagnostic(locator, comment_ranges)
+                    test_rules::DeprecatedTestRule::diagnostic(locator.contents(), comment_ranges)
                 }
                 Rule::AnotherDeprecatedTestRule => {
-                    test_rules::AnotherDeprecatedTestRule::diagnostic(locator, comment_ranges)
+                    test_rules::AnotherDeprecatedTestRule::diagnostic(
+                        locator.contents(),
+                        comment_ranges,
+                    )
                 }
                 Rule::RemovedTestRule => {
-                    test_rules::RemovedTestRule::diagnostic(locator, comment_ranges)
+                    test_rules::RemovedTestRule::diagnostic(locator.contents(), comment_ranges)
                 }
-                Rule::AnotherRemovedTestRule => {
-                    test_rules::AnotherRemovedTestRule::diagnostic(locator, comment_ranges)
-                }
+                Rule::AnotherRemovedTestRule => test_rules::AnotherRemovedTestRule::diagnostic(
+                    locator.contents(),
+                    comment_ranges,
+                ),
                 Rule::RedirectedToTestRule => {
-                    test_rules::RedirectedToTestRule::diagnostic(locator, comment_ranges)
+                    test_rules::RedirectedToTestRule::diagnostic(locator.contents(), comment_ranges)
                 }
-                Rule::RedirectedFromTestRule => {
-                    test_rules::RedirectedFromTestRule::diagnostic(locator, comment_ranges)
-                }
+                Rule::RedirectedFromTestRule => test_rules::RedirectedFromTestRule::diagnostic(
+                    locator.contents(),
+                    comment_ranges,
+                ),
                 Rule::RedirectedFromPrefixTestRule => {
-                    test_rules::RedirectedFromPrefixTestRule::diagnostic(locator, comment_ranges)
+                    test_rules::RedirectedFromPrefixTestRule::diagnostic(
+                        locator.contents(),
+                        comment_ranges,
+                    )
                 }
                 _ => unreachable!("All test rules must have an implementation"),
             };
@@ -335,10 +348,10 @@ pub fn add_noqa_to_path(
     let locator = Locator::new(source_kind.source_code());
 
     // Detect the current code style (lazily).
-    let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+    let stylist = Stylist::from_tokens(parsed.tokens(), source_kind.source_code());
 
     // Extra indices from the code.
-    let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
+    let indexer = Indexer::from_tokens(parsed.tokens(), source_kind.source_code());
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
     let directives = directives::extract_directives(
@@ -393,10 +406,10 @@ pub fn lint_only(
     let locator = Locator::new(source_kind.source_code());
 
     // Detect the current code style (lazily).
-    let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+    let stylist = Stylist::from_tokens(parsed.tokens(), source_kind.source_code());
 
     // Extra indices from the code.
-    let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
+    let indexer = Indexer::from_tokens(parsed.tokens(), source_kind.source_code());
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
     let directives = directives::extract_directives(
@@ -495,10 +508,10 @@ pub fn lint_fix<'a>(
         let locator = Locator::new(transformed.source_code());
 
         // Detect the current code style (lazily).
-        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+        let stylist = Stylist::from_tokens(parsed.tokens(), transformed.source_code());
 
         // Extra indices from the code.
-        let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
+        let indexer = Indexer::from_tokens(parsed.tokens(), transformed.source_code());
 
         // Extract the `# noqa` and `# isort: skip` directives from the source.
         let directives = directives::extract_directives(

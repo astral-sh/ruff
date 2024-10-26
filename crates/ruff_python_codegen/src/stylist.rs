@@ -5,12 +5,12 @@ use std::ops::Deref;
 
 use ruff_python_ast::str::Quote;
 use ruff_python_parser::{Token, TokenKind, Tokens};
-use ruff_source_file::{find_newline, LineEnding, Locator};
+use ruff_source_file::{find_newline, LineEnding, Located};
 use ruff_text_size::Ranged;
 
 #[derive(Debug, Clone)]
 pub struct Stylist<'a> {
-    locator: &'a Locator<'a>,
+    source: &'a str,
     indentation: Indentation,
     quote: Quote,
     line_ending: OnceCell<LineEnding>,
@@ -27,18 +27,17 @@ impl<'a> Stylist<'a> {
 
     pub fn line_ending(&'a self) -> LineEnding {
         *self.line_ending.get_or_init(|| {
-            let contents = self.locator.contents();
-            find_newline(contents)
+            find_newline(self.source)
                 .map(|(_, ending)| ending)
                 .unwrap_or_default()
         })
     }
 
-    pub fn from_tokens(tokens: &Tokens, locator: &'a Locator<'a>) -> Self {
-        let indentation = detect_indentation(tokens, locator);
+    pub fn from_tokens(tokens: &Tokens, source: &'a str) -> Self {
+        let indentation = detect_indentation(tokens, source);
 
         Self {
-            locator,
+            source,
             indentation,
             quote: detect_quote(tokens),
             line_ending: OnceCell::default(),
@@ -59,7 +58,7 @@ fn detect_quote(tokens: &[Token]) -> Quote {
     Quote::default()
 }
 
-fn detect_indentation(tokens: &[Token], locator: &Locator) -> Indentation {
+fn detect_indentation(tokens: &[Token], source: &str) -> Indentation {
     let indent_range = tokens.iter().find_map(|token| {
         if matches!(token.kind(), TokenKind::Indent) {
             Some(token.range())
@@ -69,7 +68,7 @@ fn detect_indentation(tokens: &[Token], locator: &Locator) -> Indentation {
     });
 
     if let Some(indent_range) = indent_range {
-        let mut whitespace = locator.slice(indent_range);
+        let mut whitespace = source.slice(indent_range);
         // https://docs.python.org/3/reference/lexical_analysis.html#indentation
         // > A formfeed character may be present at the start of the line; it will be ignored for
         // > the indentation calculations above. Formfeed characters occurring elsewhere in the
@@ -98,7 +97,7 @@ fn detect_indentation(tokens: &[Token], locator: &Locator) -> Indentation {
         // ```
         for token in tokens {
             if token.kind() == TokenKind::NonLogicalNewline {
-                let line = locator.line(token.end());
+                let line = source.line_str(token.end());
                 let indent_index = line.find(|c: char| !c.is_whitespace());
                 if let Some(indent_index) = indent_index {
                     if indent_index > 0 {
@@ -154,41 +153,36 @@ mod tests {
     use ruff_source_file::{find_newline, LineEnding};
 
     use super::{Indentation, Quote, Stylist};
-    use ruff_source_file::Locator;
 
     #[test]
     fn indentation() {
         let contents = r"x = 1";
-        let locator = Locator::new(contents);
         let parsed = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+        let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.indentation(), &Indentation::default());
 
         let contents = r"
 if True:
   pass
 ";
-        let locator = Locator::new(contents);
         let parsed = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+        let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.indentation(), &Indentation("  ".to_string()));
 
         let contents = r"
 if True:
     pass
 ";
-        let locator = Locator::new(contents);
         let parsed = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+        let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.indentation(), &Indentation("    ".to_string()));
 
         let contents = r"
 if True:
 	pass
 ";
-        let locator = Locator::new(contents);
         let parsed = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+        let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.indentation(), &Indentation("\t".to_string()));
 
         let contents = r"
@@ -198,9 +192,8 @@ x = (
   3,
 )
 ";
-        let locator = Locator::new(contents);
         let parsed = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+        let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.indentation(), &Indentation("  ".to_string()));
 
         // formfeed indent, see `detect_indentation` comment.
@@ -209,9 +202,8 @@ class FormFeedIndent:
    def __init__(self, a=[]):
         print(a)
 ";
-        let locator = Locator::new(contents);
         let parsed = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+        let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.indentation(), &Indentation(" ".to_string()));
     }
 
@@ -224,10 +216,9 @@ x = (
  3,
 )
 ";
-        let locator = Locator::new(contents);
         let parsed = parse_unchecked(contents, Mode::Module);
         assert_eq!(
-            Stylist::from_tokens(parsed.tokens(), &locator).indentation(),
+            Stylist::from_tokens(parsed.tokens(), contents).indentation(),
             &Indentation(" ".to_string())
         );
     }
@@ -235,39 +226,33 @@ x = (
     #[test]
     fn quote() {
         let contents = r"x = 1";
-        let locator = Locator::new(contents);
         let parsed = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+        let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.quote(), Quote::default());
 
         let contents = r"x = '1'";
-        let locator = Locator::new(contents);
         let parsed = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+        let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.quote(), Quote::Single);
 
         let contents = r"x = f'1'";
-        let locator = Locator::new(contents);
         let parsed = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+        let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.quote(), Quote::Single);
 
         let contents = r#"x = "1""#;
-        let locator = Locator::new(contents);
         let parsed = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+        let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.quote(), Quote::Double);
 
         let contents = r#"x = f"1""#;
-        let locator = Locator::new(contents);
         let parsed = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+        let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.quote(), Quote::Double);
 
         let contents = r#"s = "It's done.""#;
-        let locator = Locator::new(contents);
         let parsed = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+        let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.quote(), Quote::Double);
 
         // No style if only double quoted docstring (will take default Double)
@@ -276,9 +261,8 @@ def f():
     """Docstring."""
     pass
 "#;
-        let locator = Locator::new(contents);
         let parsed = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+        let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.quote(), Quote::default());
 
         // Detect from string literal appearing after docstring
@@ -287,9 +271,8 @@ def f():
 
 a = 'v'
 "#;
-        let locator = Locator::new(contents);
         let parsed = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+        let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.quote(), Quote::Single);
 
         let contents = r#"
@@ -297,9 +280,8 @@ a = 'v'
 
 a = "v"
 "#;
-        let locator = Locator::new(contents);
         let parsed = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+        let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.quote(), Quote::Double);
 
         // Detect from f-string appearing after docstring
@@ -308,9 +290,8 @@ a = "v"
 
 a = f'v'
 "#;
-        let locator = Locator::new(contents);
         let parsed = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+        let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.quote(), Quote::Single);
 
         let contents = r#"
@@ -318,17 +299,15 @@ a = f'v'
 
 a = f"v"
 "#;
-        let locator = Locator::new(contents);
         let parsed = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+        let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.quote(), Quote::Double);
 
         let contents = r"
 f'''Module docstring.'''
 ";
-        let locator = Locator::new(contents);
         let parsed = parse_module(contents).unwrap();
-        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+        let stylist = Stylist::from_tokens(parsed.tokens(), contents);
         assert_eq!(stylist.quote(), Quote::Single);
     }
 

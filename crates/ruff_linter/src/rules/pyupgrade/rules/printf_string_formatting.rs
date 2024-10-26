@@ -251,7 +251,7 @@ fn clean_params_dictionary(right: &Expr, locator: &Locator, stylist: &Stylist) -
                     seen.push(key_string.to_str());
                     if is_multi_line {
                         if indent.is_none() {
-                            indent = indentation(locator, key);
+                            indent = indentation(locator.contents(), key);
                         }
                     }
 

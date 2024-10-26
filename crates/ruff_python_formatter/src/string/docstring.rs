@@ -14,7 +14,6 @@ use ruff_python_trivia::CommentRanges;
 use {
     ruff_formatter::{write, FormatOptions, IndentStyle, LineWidth, Printed},
     ruff_python_trivia::{is_python_whitespace, PythonWhitespace},
-    ruff_source_file::Locator,
     ruff_text_size::{Ranged, TextLen, TextRange, TextSize},
 };
 
@@ -1592,9 +1591,8 @@ fn docstring_format_source(
     let comment_ranges = CommentRanges::from(parsed.tokens());
     let source_code = ruff_formatter::SourceCode::new(source);
     let comments = crate::Comments::from_ast(parsed.syntax(), source_code, &comment_ranges);
-    let locator = Locator::new(source);
 
-    let ctx = PyFormatContext::new(options, locator.contents(), comments, parsed.tokens())
+    let ctx = PyFormatContext::new(options, source, comments, parsed.tokens())
         .in_docstring(docstring_quote_style);
     let formatted = crate::format!(ctx, [parsed.syntax().format()])?;
     formatted

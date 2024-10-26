@@ -175,7 +175,7 @@ fn use_initvar(
         }
     };
 
-    let indentation = indentation_at_offset(post_init_def.start(), checker.locator())
+    let indentation = indentation_at_offset(post_init_def.start(), checker.source())
         .context("Failed to calculate leading indentation of `__post_init__` method")?;
     let content = textwrap::indent(&content, indentation);
 

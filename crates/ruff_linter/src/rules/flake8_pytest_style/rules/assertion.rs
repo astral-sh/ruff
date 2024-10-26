@@ -386,7 +386,7 @@ pub(crate) fn unittest_raises_assertion(
     );
     if !checker
         .comment_ranges()
-        .has_comments(call, checker.locator())
+        .has_comments(call, checker.source())
     {
         if let Some(args) = to_pytest_raises_args(checker, attr.as_str(), &call.arguments) {
             diagnostic.try_set_fix(|| {
@@ -622,8 +622,8 @@ fn parenthesize<'a>(expression: &Expression<'a>, parent: &Expression<'a>) -> Exp
 /// `assert a == "hello"` and `assert b == "world"`.
 fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) -> Result<Edit> {
     // Infer the indentation of the outer block.
-    let outer_indent =
-        whitespace::indentation(locator, stmt).context("Unable to fix multiline statement")?;
+    let outer_indent = whitespace::indentation(locator.contents(), stmt)
+        .context("Unable to fix multiline statement")?;
 
     // Extract the module text.
     let contents = locator.lines(stmt.range());
@@ -747,7 +747,7 @@ pub(crate) fn composite_condition(
             && !checker.comment_ranges().intersects(stmt.range())
             && !checker
                 .indexer()
-                .in_multi_statement_line(stmt, checker.locator())
+                .in_multi_statement_line(stmt, checker.source())
         {
             diagnostic.try_set_fix(|| {
                 fix_composite_condition(stmt, checker.locator(), checker.stylist())

@@ -1,7 +1,6 @@
 use std::path::Path;
 
 use itertools::{EitherOrBoth, Itertools};
-
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::whitespace::trailing_lines_end;
@@ -98,8 +97,9 @@ pub(crate) fn organize_imports(
 
     // Special-cases: there's leading or trailing content in the import block. These
     // are too hard to get right, and relatively rare, so flag but don't fix.
-    if indexer.preceded_by_multi_statement_line(block.imports.first().unwrap(), locator)
-        || indexer.followed_by_multi_statement_line(block.imports.last().unwrap(), locator)
+    if indexer.preceded_by_multi_statement_line(block.imports.first().unwrap(), locator.contents())
+        || indexer
+            .followed_by_multi_statement_line(block.imports.last().unwrap(), locator.contents())
     {
         return Some(Diagnostic::new(UnsortedImports, range));
     }
@@ -114,7 +114,7 @@ pub(crate) fn organize_imports(
     let trailing_line_end = if block.trailer.is_none() {
         locator.full_line_end(range.end())
     } else {
-        trailing_lines_end(block.imports.last().unwrap(), locator)
+        trailing_lines_end(block.imports.last().unwrap(), locator.contents())
     };
 
     // Generate the sorted import block.

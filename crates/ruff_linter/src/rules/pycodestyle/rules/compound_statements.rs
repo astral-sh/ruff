@@ -170,7 +170,7 @@ pub(crate) fn compound_statements(
                         let mut diagnostic = Diagnostic::new(UselessSemicolon, range);
                         diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
                             indexer
-                                .preceded_by_continuations(range.start(), locator)
+                                .preceded_by_continuations(range.start(), locator.contents())
                                 .unwrap_or(range.start()),
                             range.end(),
                         )));

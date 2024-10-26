@@ -453,7 +453,7 @@ fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
 
 fn add_return_none(checker: &mut Checker, stmt: &Stmt, range: TextRange) {
     let mut diagnostic = Diagnostic::new(ImplicitReturn, range);
-    if let Some(indent) = indentation(checker.locator(), stmt) {
+    if let Some(indent) = indentation(checker.source(), stmt) {
         let mut content = String::new();
         content.push_str(checker.stylist().line_ending().as_str());
         content.push_str(indent);
@@ -851,14 +851,14 @@ fn remove_else(
         };
 
         // get the indentation of the `else`, since that is the indent level we want to end with
-        let Some(desired_indentation) = indentation(locator, elif_else) else {
+        let Some(desired_indentation) = indentation(locator.contents(), elif_else) else {
             return Err(anyhow::anyhow!("Compound statement cannot be inlined"));
         };
 
         // If the statement is on the same line as the `else`, just remove the `else: `.
         // Ex) `else: return True` -> `return True`
         if let Some(first) = elif_else.body.first() {
-            if indexer.preceded_by_multi_statement_line(first, locator) {
+            if indexer.preceded_by_multi_statement_line(first, locator.contents()) {
                 return Ok(Fix::safe_edit(Edit::deletion(
                     elif_else.start(),
                     first.start(),

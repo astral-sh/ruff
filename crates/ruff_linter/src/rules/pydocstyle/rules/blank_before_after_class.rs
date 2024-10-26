@@ -240,7 +240,7 @@ pub(crate) fn blank_before_after_class(checker: &mut Checker, docstring: &Docstr
         if let Some(first_line) = &first_line {
             let trailing = first_line.as_str().trim_whitespace_start();
             if let Some(next_statement) = trailing.strip_prefix(';') {
-                let indentation = indentation_at_offset(docstring.start(), checker.locator())
+                let indentation = indentation_at_offset(docstring.start(), checker.source())
                     .expect("Own line docstring must have indentation");
                 let mut diagnostic = Diagnostic::new(OneBlankLineAfterClass, docstring.range());
                 let line_ending = checker.stylist().line_ending().as_str();

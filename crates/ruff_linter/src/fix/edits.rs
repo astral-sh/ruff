@@ -48,9 +48,11 @@ pub(crate) fn delete_stmt(
         if let Some(semicolon) = trailing_semicolon(stmt.end(), locator) {
             let next = next_stmt_break(semicolon, locator);
             Edit::deletion(stmt.start(), next)
-        } else if has_leading_content(stmt.start(), locator) {
+        } else if has_leading_content(stmt.start(), locator.contents()) {
             Edit::range_deletion(stmt.range())
-        } else if let Some(start) = indexer.preceded_by_continuations(stmt.start(), locator) {
+        } else if let Some(start) =
+            indexer.preceded_by_continuations(stmt.start(), locator.contents())
+        {
             Edit::deletion(start, stmt.end())
         } else {
             let range = locator.full_lines_range(stmt.range());
@@ -726,7 +728,7 @@ x = 1 \
         let locator = Locator::new(raw);
         let edits = {
             let parsed = parse_expression(raw)?;
-            let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+            let stylist = Stylist::from_tokens(parsed.tokens(), raw);
             add_to_dunder_all(names.iter().copied(), parsed.expr(), &stylist)
         };
         let diag = {

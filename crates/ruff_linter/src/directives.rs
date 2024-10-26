@@ -377,7 +377,7 @@ mod tests {
     fn noqa_mappings(contents: &str) -> NoqaMapping {
         let parsed = parse_module(contents).unwrap();
         let locator = Locator::new(contents);
-        let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
+        let indexer = Indexer::from_tokens(parsed.tokens(), contents);
 
         extract_noqa_line_for(parsed.tokens(), &locator, &indexer)
     }

@@ -352,6 +352,10 @@ impl<'a> Checker<'a> {
         self.locator
     }
 
+    pub(crate) const fn source(&self) -> &'a str {
+        self.locator.contents()
+    }
+
     /// The [`Stylist`] for the current file, which detects the current line ending, quote, and
     /// indentation style.
     pub(crate) const fn stylist(&self) -> &'a Stylist<'a> {

@@ -712,8 +712,8 @@ mod tests {
         let parsed =
             ruff_python_parser::parse_unchecked_source(source_kind.source_code(), source_type);
         let locator = Locator::new(&contents);
-        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
-        let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
+        let stylist = Stylist::from_tokens(parsed.tokens(), &contents);
+        let indexer = Indexer::from_tokens(parsed.tokens(), &contents);
         let directives = directives::extract_directives(
             parsed.tokens(),
             directives::Flags::from_settings(&settings),

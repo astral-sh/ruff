@@ -1,15 +1,6 @@
 use thiserror::Error;
 use tracing::Level;
 
-pub use range::format_range;
-use ruff_formatter::prelude::*;
-use ruff_formatter::{format, write, FormatError, Formatted, PrintError, Printed, SourceCode};
-use ruff_python_ast::AstNode;
-use ruff_python_ast::Mod;
-use ruff_python_parser::{parse, AsMode, ParseError, Parsed};
-use ruff_python_trivia::CommentRanges;
-use ruff_source_file::Locator;
-
 use crate::comments::{
     has_skip_comment, leading_comments, trailing_comments, Comments, SourceComment,
 };
@@ -21,6 +12,14 @@ pub use crate::options::{
 use crate::range::is_logical_line;
 pub use crate::shared_traits::{AsFormat, FormattedIter, FormattedIterExt, IntoFormat};
 use crate::verbatim::suppressed_node;
+pub use range::format_range;
+use ruff_formatter::prelude::*;
+use ruff_formatter::{format, write, FormatError, Formatted, PrintError, Printed, SourceCode};
+use ruff_python_ast::AstNode;
+use ruff_python_ast::Mod;
+use ruff_python_parser::{parse, AsMode, ParseError, Parsed};
+use ruff_python_trivia::CommentRanges;
+use ruff_source_file::Located;
 
 pub(crate) mod builders;
 pub mod cli;
@@ -127,10 +126,9 @@ pub fn format_module_ast<'a>(
 ) -> FormatResult<Formatted<PyFormatContext<'a>>> {
     let source_code = SourceCode::new(source);
     let comments = Comments::from_ast(parsed.syntax(), source_code, comment_ranges);
-    let locator = Locator::new(source);
 
     let formatted = format!(
-        PyFormatContext::new(options, locator.contents(), comments, parsed.tokens()),
+        PyFormatContext::new(options, source.as_str(), comments, parsed.tokens()),
         [parsed.syntax().format()]
     )?;
     formatted

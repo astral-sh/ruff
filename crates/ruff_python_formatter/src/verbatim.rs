@@ -7,7 +7,7 @@ use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::Stmt;
 use ruff_python_parser::{self as parser, TokenKind};
 use ruff_python_trivia::lines_before;
-use ruff_source_file::Locator;
+use ruff_source_file::Located;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::format::{empty_lines, format_comment};
@@ -647,7 +647,7 @@ struct Indentation(u32);
 
 impl Indentation {
     fn from_stmt(stmt: &Stmt, source: &str) -> Indentation {
-        let line_start = Locator::new(source).line_start(stmt.start());
+        let line_start = source.line_start(stmt.start());
 
         let mut indentation = 0u32;
         for c in source[TextRange::new(line_start, stmt.start())].chars() {
@@ -878,7 +878,7 @@ impl Format<PyFormatContext<'_>> for VerbatimText {
             },
         )));
 
-        match normalize_newlines(f.context().locator().slice(self.verbatim_range), ['\r']) {
+        match normalize_newlines(f.context().source().slice(self.verbatim_range), ['\r']) {
             Cow::Borrowed(_) => {
                 write!(f, [source_text_slice(self.verbatim_range)])?;
             }

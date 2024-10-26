@@ -1,6 +1,6 @@
 use ruff_formatter::write;
 use ruff_python_ast::{AnyStringFlags, FString, StringFlags};
-use ruff_source_file::Locator;
+use ruff_source_file::Located;
 
 use crate::prelude::*;
 use crate::preview::is_f_string_formatting_enabled;
@@ -27,8 +27,6 @@ impl<'a> FormatFString<'a> {
 
 impl Format<PyFormatContext<'_>> for FormatFString<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let locator = f.context().locator();
-
         // If the preview style is enabled, make the decision on what quotes to use locally for each
         // f-string instead of globally for the entire f-string expression.
         let quoting = if is_f_string_formatting_enabled(f.context()) {
@@ -66,7 +64,7 @@ impl Format<PyFormatContext<'_>> for FormatFString<'_> {
 
         let context = FStringContext::new(
             string_kind,
-            FStringLayout::from_f_string(self.value, &locator),
+            FStringLayout::from_f_string(self.value, f.context().source()),
         );
 
         // Starting prefix and quote
@@ -117,7 +115,7 @@ pub(crate) enum FStringLayout {
 }
 
 impl FStringLayout {
-    pub(crate) fn from_f_string(f_string: &FString, locator: &Locator) -> Self {
+    pub(crate) fn from_f_string(f_string: &FString, source: &str) -> Self {
         // Heuristic: Allow breaking the f-string expressions across multiple lines
         // only if there already is at least one multiline expression. This puts the
         // control in the hands of the user to decide if they want to break the
@@ -133,7 +131,7 @@ impl FStringLayout {
         if f_string
             .elements
             .expressions()
-            .any(|expr| memchr::memchr2(b'\n', b'\r', locator.slice(expr).as_bytes()).is_some())
+            .any(|expr| memchr::memchr2(b'\n', b'\r', source.slice(expr).as_bytes()).is_some())
         {
             Self::Multiline
         } else {

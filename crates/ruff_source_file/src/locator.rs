@@ -1,12 +1,11 @@
 //! Struct used to efficiently slice source code at (row, column) Locations.
 
-use memchr::{memchr2, memrchr2};
+use memchr::memrchr2;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use std::cell::OnceCell;
 use std::ops::Add;
 
-use crate::newlines::find_newline;
-use crate::{LineIndex, OneIndexed, SourceCode, SourceLocation};
+use crate::{LineIndex, Located, OneIndexed, SourceCode, SourceLocation};
 
 #[derive(Debug)]
 pub struct Locator<'a> {
@@ -91,18 +90,12 @@ impl<'a> Locator<'a> {
     /// Computes the start position of the file contents: either the first byte, or the byte after
     /// the BOM.
     pub fn contents_start(&self) -> TextSize {
-        if self.contents.starts_with('\u{feff}') {
-            // Skip the BOM.
-            '\u{feff}'.text_len()
-        } else {
-            // Start of file.
-            TextSize::default()
-        }
+        self.contents.contents_start()
     }
 
     /// Returns `true` if `offset` is at the start of a line.
     pub fn is_at_start_of_line(&self, offset: TextSize) -> bool {
-        self.line_start(offset) == offset
+        self.contents.is_at_start_of_line(offset)
     }
 
     /// Computes the offset that is right after the newline character that ends `offset`'s line.
@@ -124,12 +117,7 @@ impl<'a> Locator<'a> {
     ///
     /// If `offset` is passed the end of the content.
     pub fn full_line_end(&self, offset: TextSize) -> TextSize {
-        let slice = &self.contents[usize::from(offset)..];
-        if let Some((index, line_ending)) = find_newline(slice) {
-            offset + TextSize::try_from(index).unwrap() + line_ending.text_len()
-        } else {
-            self.contents.text_len()
-        }
+        self.contents.full_line_end(offset)
     }
 
     /// Computes the offset that is right before the newline character that ends `offset`'s line.
@@ -151,12 +139,7 @@ impl<'a> Locator<'a> {
     ///
     /// If `offset` is passed the end of the content.
     pub fn line_end(&self, offset: TextSize) -> TextSize {
-        let slice = &self.contents[usize::from(offset)..];
-        if let Some(index) = memchr2(b'\n', b'\r', slice.as_bytes()) {
-            offset + TextSize::try_from(index).unwrap()
-        } else {
-            self.contents.text_len()
-        }
+        self.contents.line_end(offset)
     }
 
     /// Computes the range of this `offset`s line.
@@ -180,7 +163,7 @@ impl<'a> Locator<'a> {
     /// ## Panics
     /// If `offset` is out of bounds.
     pub fn full_line_range(&self, offset: TextSize) -> TextRange {
-        TextRange::new(self.line_start(offset), self.full_line_end(offset))
+        self.contents.full_line_range(offset)
     }
 
     /// Computes the range of this `offset`s line ending before the newline character.
@@ -204,7 +187,7 @@ impl<'a> Locator<'a> {
     /// ## Panics
     /// If `offset` is out of bounds.
     pub fn line_range(&self, offset: TextSize) -> TextRange {
-        TextRange::new(self.line_start(offset), self.line_end(offset))
+        self.contents.line_range(offset)
     }
 
     /// Returns the text of the `offset`'s line.
@@ -227,7 +210,7 @@ impl<'a> Locator<'a> {
     /// ## Panics
     /// If `offset` is out of bounds.
     pub fn full_line(&self, offset: TextSize) -> &'a str {
-        &self.contents[self.full_line_range(offset)]
+        self.contents.full_line_str(offset)
     }
 
     /// Returns the text of the `offset`'s line.
@@ -250,7 +233,7 @@ impl<'a> Locator<'a> {
     /// ## Panics
     /// If `offset` is out of bounds.
     pub fn line(&self, offset: TextSize) -> &'a str {
-        &self.contents[self.line_range(offset)]
+        self.contents.line_str(offset)
     }
 
     /// Computes the range of all lines that this `range` covers.
@@ -279,10 +262,7 @@ impl<'a> Locator<'a> {
     /// ## Panics
     /// If the start or end of `range` is out of bounds.
     pub fn full_lines_range(&self, range: TextRange) -> TextRange {
-        TextRange::new(
-            self.line_start(range.start()),
-            self.full_line_end(range.end()),
-        )
+        self.contents.full_lines_range(range)
     }
 
     /// Computes the range of all lines that this `range` covers.
@@ -311,7 +291,7 @@ impl<'a> Locator<'a> {
     /// ## Panics
     /// If the start or end of `range` is out of bounds.
     pub fn lines_range(&self, range: TextRange) -> TextRange {
-        TextRange::new(self.line_start(range.start()), self.line_end(range.end()))
+        self.contents.lines_range(range)
     }
 
     /// Returns true if the text of `range` contains any line break.
@@ -333,8 +313,7 @@ impl<'a> Locator<'a> {
     /// ## Panics
     /// If the `range` is out of bounds.
     pub fn contains_line_break(&self, range: TextRange) -> bool {
-        let text = &self.contents[range];
-        text.contains(['\n', '\r'])
+        self.contents.contains_line_break(range)
     }
 
     /// Returns the text of all lines that include `range`.
@@ -360,6 +339,7 @@ impl<'a> Locator<'a> {
     /// ## Panics
     /// If the start or end of `range` is out of bounds.
     pub fn lines(&self, range: TextRange) -> &'a str {
+        // FIXME: `lines` collides with str.lines method
         &self.contents[self.lines_range(range)]
     }
 
@@ -388,19 +368,19 @@ impl<'a> Locator<'a> {
     /// ## Panics
     /// If the start or end of `range` is out of bounds.
     pub fn full_lines(&self, range: TextRange) -> &'a str {
-        &self.contents[self.full_lines_range(range)]
+        self.contents.full_lines_str(range)
     }
 
     /// Take the source code up to the given [`TextSize`].
     #[inline]
     pub fn up_to(&self, offset: TextSize) -> &'a str {
-        &self.contents[TextRange::up_to(offset)]
+        self.contents.up_to(offset)
     }
 
     /// Take the source code after the given [`TextSize`].
     #[inline]
     pub fn after(&self, offset: TextSize) -> &'a str {
-        &self.contents[usize::from(offset)..]
+        self.contents.after(offset)
     }
 
     /// Finds the closest [`TextSize`] not exceeding the offset for which `is_char_boundary` is
@@ -444,6 +424,7 @@ impl<'a> Locator<'a> {
     /// );
     /// ```
     pub fn floor_char_boundary(&self, offset: TextSize) -> TextSize {
+        // FIXME: Method collides with std method
         if offset >= self.text_len() {
             self.text_len()
         } else {
@@ -459,11 +440,11 @@ impl<'a> Locator<'a> {
     /// Take the source code between the given [`TextRange`].
     #[inline]
     pub fn slice<T: Ranged>(&self, ranged: T) -> &'a str {
-        &self.contents[ranged.range()]
+        self.contents.slice(ranged)
     }
 
     /// Return the underlying source code.
-    pub fn contents(&self) -> &'a str {
+    pub const fn contents(&self) -> &'a str {
         self.contents
     }
 

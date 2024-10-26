@@ -292,7 +292,7 @@ pub(super) fn collapse_nested_if(
     nested_if: NestedIf,
 ) -> Result<Edit> {
     // Infer the indentation of the outer block.
-    let Some(outer_indent) = whitespace::indentation(locator, &nested_if) else {
+    let Some(outer_indent) = whitespace::indentation(locator.contents(), &nested_if) else {
         bail!("Unable to fix multiline statement");
     };
 

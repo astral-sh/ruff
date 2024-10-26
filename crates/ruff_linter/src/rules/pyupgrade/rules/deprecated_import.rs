@@ -617,7 +617,7 @@ impl<'a> ImportReplacer<'a> {
             let fix = Some(matched);
             Some((operation, fix))
         } else {
-            let indentation = indentation(self.locator, self.import_from_stmt);
+            let indentation = indentation(self.locator.contents(), self.import_from_stmt);
 
             // If we have matched _and_ unmatched names, but the import is not on its own
             // line, we can't add a statement after it. For example, if we have

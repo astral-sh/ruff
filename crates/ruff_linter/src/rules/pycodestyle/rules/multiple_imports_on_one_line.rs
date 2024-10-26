@@ -68,7 +68,7 @@ fn split_imports(
     indexer: &Indexer,
     stylist: &Stylist,
 ) -> Fix {
-    if indexer.in_multi_statement_line(stmt, locator) {
+    if indexer.in_multi_statement_line(stmt, locator.contents()) {
         // Ex) `x = 1; import os, sys` (convert to `x = 1; import os; import sys`)
         let replacement = names
             .iter()
@@ -90,7 +90,8 @@ fn split_imports(
         Fix::safe_edit(Edit::range_replacement(replacement, stmt.range()))
     } else {
         // Ex) `import os, sys` (convert to `import os\nimport sys`)
-        let indentation = indentation_at_offset(stmt.start(), locator).unwrap_or_default();
+        let indentation =
+            indentation_at_offset(stmt.start(), locator.contents()).unwrap_or_default();
 
         // Generate newline-delimited imports.
         let replacement = names

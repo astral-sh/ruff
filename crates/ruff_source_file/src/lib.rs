@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 pub use crate::line_index::{LineIndex, OneIndexed};
+pub use crate::located::Located;
 pub use crate::locator::Locator;
 pub use crate::newlines::{
     find_newline, Line, LineEnding, NewlineWithTrailingNewline, UniversalNewlineIterator,
@@ -15,6 +16,7 @@ pub use crate::newlines::{
 };
 
 mod line_index;
+mod located;
 mod locator;
 mod newlines;
 

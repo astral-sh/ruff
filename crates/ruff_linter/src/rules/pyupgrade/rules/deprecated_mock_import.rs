@@ -282,7 +282,7 @@ pub(crate) fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                 .any(|name| &name.name == "mock" || &name.name == "mock.mock")
             {
                 // Generate the fix, if needed, which is shared between all `mock` imports.
-                let content = if let Some(indent) = indentation(checker.locator(), stmt) {
+                let content = if let Some(indent) = indentation(checker.source(), stmt) {
                     match format_import(stmt, indent, checker.locator(), checker.stylist()) {
                         Ok(content) => Some(content),
                         Err(e) => {
@@ -330,7 +330,7 @@ pub(crate) fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                     },
                     stmt.range(),
                 );
-                if let Some(indent) = indentation(checker.locator(), stmt) {
+                if let Some(indent) = indentation(checker.source(), stmt) {
                     diagnostic.try_set_fix(|| {
                         format_import_from(stmt, indent, checker.locator(), checker.stylist())
                             .map(|content| Edit::range_replacement(content, stmt.range()))

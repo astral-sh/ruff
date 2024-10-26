@@ -166,11 +166,14 @@ impl<'src, 'loc> UselessSuppressionComments<'src, 'loc> {
             {
                 if following.is_first_statement_in_alternate_body(enclosing) {
                     // check indentation
-                    let comment_indentation =
-                        comment_indentation_after(preceding, comment.range, self.locator);
+                    let comment_indentation = comment_indentation_after(
+                        preceding,
+                        comment.range,
+                        self.locator.contents(),
+                    );
 
                     let preceding_indentation =
-                        indentation_at_offset(preceding.start(), self.locator)
+                        indentation_at_offset(preceding.start(), self.locator.contents())
                             .unwrap_or_default()
                             .text_len();
                     if comment_indentation != preceding_indentation {

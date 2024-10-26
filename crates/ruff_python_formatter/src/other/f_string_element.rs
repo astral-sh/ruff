@@ -5,6 +5,7 @@ use ruff_python_ast::{
     AnyStringFlags, ConversionFlag, Expr, FStringElement, FStringExpressionElement,
     FStringLiteralElement, StringFlags,
 };
+use ruff_source_file::Located;
 use ruff_text_size::Ranged;
 
 use crate::comments::{dangling_open_parenthesis_comments, trailing_comments};
@@ -60,7 +61,7 @@ impl<'a> FormatFStringLiteralElement<'a> {
 
 impl Format<PyFormatContext<'_>> for FormatFStringLiteralElement<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let literal_content = f.context().locator().slice(self.element.range());
+        let literal_content = f.context().source().slice(self.element);
         let normalized =
             normalize_string(literal_content, 0, self.fstring_flags, false, false, true);
         match &normalized {

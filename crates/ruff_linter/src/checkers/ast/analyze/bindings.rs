@@ -26,11 +26,11 @@ pub(crate) fn bindings(checker: &mut Checker) {
                 && !checker
                     .settings
                     .dummy_variable_rgx
-                    .is_match(binding.name(checker.locator))
+                    .is_match(binding.name(checker.source()))
             {
                 let mut diagnostic = Diagnostic::new(
                     pyflakes::rules::UnusedVariable {
-                        name: binding.name(checker.locator).to_string(),
+                        name: binding.name(checker.source()).to_string(),
                     },
                     binding.range(),
                 );
@@ -52,7 +52,7 @@ pub(crate) fn bindings(checker: &mut Checker) {
             }
         }
         if checker.enabled(Rule::NonAsciiName) {
-            if let Some(diagnostic) = pylint::rules::non_ascii_name(binding, checker.locator) {
+            if let Some(diagnostic) = pylint::rules::non_ascii_name(binding, checker.source()) {
                 checker.diagnostics.push(diagnostic);
             }
         }

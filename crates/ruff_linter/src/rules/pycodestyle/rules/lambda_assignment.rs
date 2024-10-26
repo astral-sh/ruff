@@ -79,8 +79,8 @@ pub(crate) fn lambda_assignment(
         stmt.range(),
     );
 
-    if !has_leading_content(stmt.start(), checker.locator())
-        && !has_trailing_content(stmt.end(), checker.locator())
+    if !has_leading_content(stmt.start(), checker.source())
+        && !has_trailing_content(stmt.end(), checker.source())
     {
         let first_line = checker.locator().line(stmt.start());
         let indentation = leading_indentation(first_line);

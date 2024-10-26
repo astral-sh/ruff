@@ -6,7 +6,7 @@ use ruff_python_parser::{TokenKind, Tokens};
 use ruff_python_trivia::{
     has_leading_content, has_trailing_content, is_python_whitespace, CommentRanges,
 };
-use ruff_source_file::Locator;
+use ruff_source_file::Located;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::fstring_ranges::{FStringRanges, FStringRangesBuilder};
@@ -27,8 +27,8 @@ pub struct Indexer {
 }
 
 impl Indexer {
-    pub fn from_tokens(tokens: &Tokens, locator: &Locator<'_>) -> Self {
-        assert!(TextSize::try_from(locator.contents().len()).is_ok());
+    pub fn from_tokens(tokens: &Tokens, source: &str) -> Self {
+        assert!(TextSize::try_from(source.len()).is_ok());
 
         let mut fstring_ranges_builder = FStringRangesBuilder::default();
         let mut multiline_ranges_builder = MultilineRangesBuilder::default();
@@ -40,7 +40,7 @@ impl Indexer {
         let mut line_start = TextSize::default();
 
         for token in tokens {
-            let trivia = locator.slice(TextRange::new(prev_end, token.start()));
+            let trivia = source.slice(TextRange::new(prev_end, token.start()));
 
             // Get the trivia between the previous and the current token and detect any newlines.
             // This is necessary because `RustPython` doesn't emit `[Tok::Newline]` tokens
@@ -69,7 +69,7 @@ impl Indexer {
                 TokenKind::String => {
                     // If the previous token was a string, find the start of the line that contains
                     // the closing delimiter, since the token itself can span multiple lines.
-                    line_start = locator.line_start(token.end());
+                    line_start = source.line_start(token.end());
                 }
                 TokenKind::Comment => {
                     comment_ranges.push(token.range());
@@ -109,25 +109,20 @@ impl Indexer {
     }
 
     /// Returns `true` if the given offset is part of a continuation line.
-    pub fn is_continuation(&self, offset: TextSize, locator: &Locator) -> bool {
-        let line_start = locator.line_start(offset);
+    pub fn is_continuation(&self, offset: TextSize, source: &str) -> bool {
+        let line_start = source.line_start(offset);
         self.continuation_lines.binary_search(&line_start).is_ok()
     }
 
     /// Given an offset at the end of a line (including newlines), return the offset of the
     /// continuation at the end of that line.
-    fn find_continuation(&self, offset: TextSize, locator: &Locator) -> Option<TextSize> {
+    fn find_continuation(&self, offset: TextSize, source: &str) -> Option<TextSize> {
         let newline_pos = usize::from(offset).saturating_sub(1);
 
         // Skip the newline.
-        let newline_len = match locator.contents().as_bytes()[newline_pos] {
+        let newline_len = match source.as_bytes()[newline_pos] {
             b'\n' => {
-                if locator
-                    .contents()
-                    .as_bytes()
-                    .get(newline_pos.saturating_sub(1))
-                    == Some(&b'\r')
-                {
+                if source.as_bytes().get(newline_pos.saturating_sub(1)) == Some(&b'\r') {
                     2
                 } else {
                     1
@@ -138,7 +133,7 @@ impl Indexer {
             _ => return None,
         };
 
-        self.is_continuation(offset - TextSize::from(newline_len), locator)
+        self.is_continuation(offset - TextSize::from(newline_len), source)
             .then(|| offset - TextSize::from(newline_len) - TextSize::from(1))
     }
 
@@ -164,15 +159,11 @@ impl Indexer {
     ///
     /// When passed the offset of `y`, this function will again return the offset of the backslash at
     /// the end of the first line.
-    pub fn preceded_by_continuations(
-        &self,
-        offset: TextSize,
-        locator: &Locator,
-    ) -> Option<TextSize> {
+    pub fn preceded_by_continuations(&self, offset: TextSize, source: &str) -> Option<TextSize> {
         // Find the first preceding continuation. If the offset isn't the first non-whitespace
         // character on the line, then we can't have a continuation.
-        let previous_line_end = locator.line_start(offset);
-        if !locator
+        let previous_line_end = source.line_start(offset);
+        if !source
             .slice(TextRange::new(previous_line_end, offset))
             .chars()
             .all(is_python_whitespace)
@@ -180,19 +171,18 @@ impl Indexer {
             return None;
         }
 
-        let mut continuation = self.find_continuation(previous_line_end, locator)?;
+        let mut continuation = self.find_continuation(previous_line_end, source)?;
 
         // Continue searching for continuations, in the unlikely event that we have multiple
         // continuations in a row.
         loop {
-            let previous_line_end = locator.line_start(continuation);
-            if locator
+            let previous_line_end = source.line_start(continuation);
+            if source
                 .slice(TextRange::new(previous_line_end, continuation))
                 .chars()
                 .all(is_python_whitespace)
             {
-                if let Some(next_continuation) = self.find_continuation(previous_line_end, locator)
-                {
+                if let Some(next_continuation) = self.find_continuation(previous_line_end, source) {
                     continuation = next_continuation;
                     continue;
                 }
@@ -205,38 +195,37 @@ impl Indexer {
 
     /// Return `true` if a [`Stmt`] appears to be preceded by other statements in a multi-statement
     /// line.
-    pub fn preceded_by_multi_statement_line(&self, stmt: &Stmt, locator: &Locator) -> bool {
-        has_leading_content(stmt.start(), locator)
+    pub fn preceded_by_multi_statement_line(&self, stmt: &Stmt, source: &str) -> bool {
+        has_leading_content(stmt.start(), source)
             || self
-                .preceded_by_continuations(stmt.start(), locator)
+                .preceded_by_continuations(stmt.start(), source)
                 .is_some()
     }
 
     /// Return `true` if a [`Stmt`] appears to be followed by other statements in a multi-statement
     /// line.
-    pub fn followed_by_multi_statement_line(&self, stmt: &Stmt, locator: &Locator) -> bool {
-        has_trailing_content(stmt.end(), locator)
+    pub fn followed_by_multi_statement_line(&self, stmt: &Stmt, source: &str) -> bool {
+        has_trailing_content(stmt.end(), source)
     }
 
     /// Return `true` if a [`Stmt`] appears to be part of a multi-statement line.
-    pub fn in_multi_statement_line(&self, stmt: &Stmt, locator: &Locator) -> bool {
-        self.followed_by_multi_statement_line(stmt, locator)
-            || self.preceded_by_multi_statement_line(stmt, locator)
+    pub fn in_multi_statement_line(&self, stmt: &Stmt, source: &str) -> bool {
+        self.followed_by_multi_statement_line(stmt, source)
+            || self.preceded_by_multi_statement_line(stmt, source)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use ruff_python_parser::parse_module;
-    use ruff_source_file::Locator;
+
     use ruff_text_size::{TextRange, TextSize};
 
     use crate::Indexer;
 
     fn new_indexer(contents: &str) -> Indexer {
         let parsed = parse_module(contents).unwrap();
-        let locator = Locator::new(contents);
-        Indexer::from_tokens(parsed.tokens(), &locator)
+        Indexer::from_tokens(parsed.tokens(), contents)
     }
 
     #[test]

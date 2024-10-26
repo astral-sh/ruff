@@ -2,6 +2,7 @@ use std::borrow::Cow;
 
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{ExprNumberLiteral, Number};
+use ruff_source_file::Located;
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
@@ -15,7 +16,7 @@ impl FormatNodeRule<ExprNumberLiteral> for FormatExprNumberLiteral {
         match item.value {
             Number::Int(_) => {
                 let range = item.range();
-                let content = f.context().locator().slice(range);
+                let content = f.context().source().slice(range);
                 let normalized = normalize_integer(content);
 
                 match normalized {
@@ -25,7 +26,7 @@ impl FormatNodeRule<ExprNumberLiteral> for FormatExprNumberLiteral {
             }
             Number::Float(_) => {
                 let range = item.range();
-                let content = f.context().locator().slice(range);
+                let content = f.context().source().slice(range);
                 let normalized = normalize_floating_number(content);
 
                 match normalized {
@@ -35,7 +36,7 @@ impl FormatNodeRule<ExprNumberLiteral> for FormatExprNumberLiteral {
             }
             Number::Complex { .. } => {
                 let range = item.range();
-                let content = f.context().locator().slice(range);
+                let content = f.context().source().slice(range);
                 let normalized = normalize_floating_number(content.trim_end_matches(['j', 'J']));
 
                 match normalized {

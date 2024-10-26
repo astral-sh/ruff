@@ -18,7 +18,7 @@ pub(crate) fn fix_multiple_with_statements(
     with_stmt: &ast::StmtWith,
 ) -> Result<Edit> {
     // Infer the indentation of the outer block.
-    let Some(outer_indent) = whitespace::indentation(locator, with_stmt) else {
+    let Some(outer_indent) = whitespace::indentation(locator.contents(), with_stmt) else {
         bail!("Unable to fix multiline statement");
     };
 

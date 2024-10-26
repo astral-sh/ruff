@@ -369,7 +369,7 @@ impl<'a> FileNoqaDirectives<'a> {
                     warn!("Invalid `# ruff: noqa` directive at {path_display}:{line}: {err}");
                 }
                 Ok(Some(exemption)) => {
-                    if indentation_at_offset(range.start(), locator).is_none() {
+                    if indentation_at_offset(range.start(), contents).is_none() {
                         #[allow(deprecated)]
                         let line = locator.compute_line_index(range.start());
                         let path_display = relativize_path(path);

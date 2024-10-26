@@ -47,7 +47,7 @@ pub(crate) fn empty_comments(
     comment_ranges: &CommentRanges,
     locator: &Locator,
 ) {
-    let block_comments = comment_ranges.block_comments(locator);
+    let block_comments = comment_ranges.block_comments(locator.contents());
 
     for range in comment_ranges {
         // Ignore comments that are part of multi-line "comment blocks".

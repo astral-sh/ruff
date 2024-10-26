@@ -75,7 +75,7 @@ pub(crate) fn unnecessary_coding_comment(
         // x = 2
         // ```
         if indexer
-            .preceded_by_continuations(line_range.start(), locator)
+            .preceded_by_continuations(line_range.start(), locator.contents())
             .is_some()
         {
             continue;

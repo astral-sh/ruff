@@ -7,6 +7,7 @@ use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
 use ruff_python_ast::{
     str::Quote, AnyStringFlags, BytesLiteral, FString, StringFlags, StringLikePart, StringLiteral,
 };
+use ruff_source_file::Located;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::context::FStringState;
@@ -152,7 +153,7 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
 
     /// Computes the strings preferred quotes.
     pub(crate) fn choose_quotes(&self, string: StringLikePart) -> QuoteSelection {
-        let raw_content = self.context.locator().slice(string.content_range());
+        let raw_content = self.context.source().slice(string.content_range());
         let first_quote_or_normalized_char_offset = raw_content
             .bytes()
             .position(|b| matches!(b, b'\\' | b'"' | b'\'' | b'\r' | b'{'));
@@ -196,7 +197,7 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
 
     /// Computes the strings preferred quotes and normalizes its content.
     pub(crate) fn normalize(&self, string: StringLikePart) -> NormalizedString<'src> {
-        let raw_content = self.context.locator().slice(string.content_range());
+        let raw_content = self.context.source().slice(string.content_range());
         let quote_selection = self.choose_quotes(string);
 
         let normalized = if let Some(first_quote_or_escape_offset) =
@@ -256,7 +257,7 @@ impl QuoteMetadata {
     ) -> Self {
         match part {
             StringLikePart::String(_) | StringLikePart::Bytes(_) => {
-                let text = context.locator().slice(part.content_range());
+                let text = context.source().slice(part.content_range());
 
                 Self::from_str(text, part.flags(), preferred_quote)
             }
@@ -277,7 +278,7 @@ impl QuoteMetadata {
                     };
 
                     let mut metadata = QuoteMetadata::from_str(
-                        context.locator().slice(first.range()),
+                        context.source().slice(first),
                         fstring.flags.into(),
                         preferred_quote,
                     );
@@ -285,7 +286,7 @@ impl QuoteMetadata {
                     for literal in literals {
                         metadata = metadata
                             .merge(&QuoteMetadata::from_str(
-                                context.locator().slice(literal.range()),
+                                context.source().slice(literal),
                                 fstring.flags.into(),
                                 preferred_quote,
                             ))
@@ -294,7 +295,7 @@ impl QuoteMetadata {
 
                     metadata
                 } else {
-                    let text = context.locator().slice(part.content_range());
+                    let text = context.source().slice(part.content_range());
 
                     Self::from_str(text, part.flags(), preferred_quote)
                 }
@@ -893,7 +894,7 @@ pub(super) fn is_fstring_with_quoted_debug_expression(
 ) -> bool {
     if fstring.elements.expressions().any(|expression| {
         if expression.debug_text.is_some() {
-            let content = context.locator().slice(expression.range());
+            let content = context.source().slice(expression);
             match fstring.flags.quote_style() {
                 Quote::Single => {
                     if fstring.flags.is_triple_quoted() {
@@ -970,7 +971,7 @@ pub(super) fn is_fstring_with_triple_quoted_literal_expression_containing_quotes
 
         fn contains_quote(&self, range: TextRange, flags: AnyStringFlags) -> bool {
             self.context
-                .locator()
+                .source()
                 .slice(range)
                 .contains(flags.quote_style().as_char())
         }

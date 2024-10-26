@@ -105,7 +105,7 @@ pub(crate) fn unnecessary_placeholder(checker: &mut Checker, body: &[Stmt]) {
         };
 
         let mut diagnostic = Diagnostic::new(UnnecessaryPlaceholder { kind }, stmt.range());
-        let edit = if let Some(index) = trailing_comment_start_offset(stmt, checker.locator()) {
+        let edit = if let Some(index) = trailing_comment_start_offset(stmt, checker.source()) {
             Edit::range_deletion(stmt.range().add_end(index))
         } else {
             fix::edits::delete_stmt(stmt, None, checker.locator(), checker.indexer())

@@ -3,7 +3,6 @@ use std::fmt;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::{Binding, BindingKind};
-use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 /// ## What it does
@@ -43,8 +42,8 @@ impl Violation for NonAsciiName {
 }
 
 /// PLC2401
-pub(crate) fn non_ascii_name(binding: &Binding, locator: &Locator) -> Option<Diagnostic> {
-    let name = binding.name(locator);
+pub(crate) fn non_ascii_name(binding: &Binding, source: &str) -> Option<Diagnostic> {
+    let name = binding.name(source);
     if name.is_ascii() {
         return None;
     }

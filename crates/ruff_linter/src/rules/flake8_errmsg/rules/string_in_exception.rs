@@ -190,7 +190,7 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
                             let mut diagnostic =
                                 Diagnostic::new(RawStringInException, first.range());
                             if let Some(indentation) =
-                                whitespace::indentation(checker.locator(), stmt)
+                                whitespace::indentation(checker.source(), stmt)
                             {
                                 diagnostic.set_fix(generate_fix(
                                     stmt,
@@ -208,8 +208,7 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
                 Expr::FString(_) => {
                     if checker.enabled(Rule::FStringInException) {
                         let mut diagnostic = Diagnostic::new(FStringInException, first.range());
-                        if let Some(indentation) = whitespace::indentation(checker.locator(), stmt)
-                        {
+                        if let Some(indentation) = whitespace::indentation(checker.source(), stmt) {
                             diagnostic.set_fix(generate_fix(
                                 stmt,
                                 first,
@@ -231,7 +230,7 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
                                 let mut diagnostic =
                                     Diagnostic::new(DotFormatInException, first.range());
                                 if let Some(indentation) =
-                                    whitespace::indentation(checker.locator(), stmt)
+                                    whitespace::indentation(checker.source(), stmt)
                                 {
                                     diagnostic.set_fix(generate_fix(
                                         stmt,

@@ -6,6 +6,7 @@ use ruff_python_ast::str_prefix::{
     AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix,
 };
 use ruff_python_ast::{AnyStringFlags, FStringElement, StringFlags, StringLike, StringLikePart};
+use ruff_source_file::Located;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{leading_comments, trailing_comments};
@@ -72,7 +73,7 @@ impl<'a> FormatImplicitConcatenatedStringExpanded<'a> {
 impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringExpanded<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         let comments = f.context().comments().clone();
-        let quoting = self.string.quoting(&f.context().locator());
+        let quoting = self.string.quoting(f.context().source());
 
         let join_implicit_concatenated_string_enabled =
             is_join_implicit_concatenated_string_enabled(f.context());
@@ -158,10 +159,9 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                 if let StringLikePart::FString(fstring) = part {
                     if fstring.elements.iter().any(|element| match element {
                         // Same as for other literals. Multiline literals can't fit on a single line.
-                        FStringElement::Literal(literal) => context
-                            .locator()
-                            .slice(literal.range())
-                            .contains(['\n', '\r']),
+                        FStringElement::Literal(literal) => {
+                            context.source().slice(literal).contains(['\n', '\r'])
+                        }
                         FStringElement::Expression(expression) => {
                             if is_f_string_formatting_enabled(context) {
                                 // Expressions containing comments can't be joined.
@@ -169,7 +169,7 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                             } else {
                                 // Multiline f-string expressions can't be joined if the f-string formatting is disabled because
                                 // the string gets inserted in verbatim preserving the newlines.
-                                context.locator().slice(expression).contains(['\n', '\r'])
+                                context.source().slice(expression).contains(['\n', '\r'])
                             }
                         }
                     }) {
@@ -270,7 +270,7 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
                 assert!(part.is_string_literal());
 
                 if f.context()
-                    .locator()
+                    .source()
                     .slice(part.content_range())
                     .trim()
                     .is_empty()
@@ -300,7 +300,7 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
                     if first_non_empty {
                         first_non_empty = f
                             .context()
-                            .locator()
+                            .source()
                             .slice(part.content_range())
                             .trim_start()
                             .is_empty();
@@ -328,7 +328,7 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
                                         self.flags,
                                         FStringLayout::from_f_string(
                                             f_string,
-                                            &f.context().locator(),
+                                            f.context().source(),
                                         ),
                                     );
 
@@ -365,7 +365,7 @@ struct FormatLiteralContent {
 
 impl Format<PyFormatContext<'_>> for FormatLiteralContent {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let content = f.context().locator().slice(self.range);
+        let content = f.context().source().slice(self.range);
         let mut normalized = normalize_string(
             content,
             0,

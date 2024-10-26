@@ -4,7 +4,7 @@ use std::path::Path;
 use rustc_hash::FxHashMap;
 
 use ruff_python_trivia::{indentation_at_offset, CommentRanges, SimpleTokenKind, SimpleTokenizer};
-use ruff_source_file::Locator;
+use ruff_source_file::Located;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::name::{Name, QualifiedName, QualifiedNameBuilder};
@@ -1333,19 +1333,16 @@ pub fn generate_comparison(
     comparators: &[Expr],
     parent: AnyNodeRef,
     comment_ranges: &CommentRanges,
-    locator: &Locator,
+    source: &str,
 ) -> String {
     let start = left.start();
     let end = comparators.last().map_or_else(|| left.end(), Ranged::end);
     let mut contents = String::with_capacity(usize::from(end - start));
 
     // Add the left side of the comparison.
-    contents.push_str(
-        locator.slice(
-            parenthesized_range(left.into(), parent, comment_ranges, locator.contents())
-                .unwrap_or(left.range()),
-        ),
-    );
+    contents.push_str(source.slice(
+        parenthesized_range(left.into(), parent, comment_ranges, source).unwrap_or(left.range()),
+    ));
 
     for (op, comparator) in ops.iter().zip(comparators) {
         // Add the operator.
@@ -1364,14 +1361,9 @@ pub fn generate_comparison(
 
         // Add the right side of the comparison.
         contents.push_str(
-            locator.slice(
-                parenthesized_range(
-                    comparator.into(),
-                    parent,
-                    comment_ranges,
-                    locator.contents(),
-                )
-                .unwrap_or(comparator.range()),
+            source.slice(
+                parenthesized_range(comparator.into(), parent, comment_ranges, source)
+                    .unwrap_or(comparator.range()),
             ),
         );
     }
@@ -1512,17 +1504,17 @@ pub fn typing_union(elts: &[Expr], binding: Name) -> Expr {
 pub fn comment_indentation_after(
     preceding: AnyNodeRef,
     comment_range: TextRange,
-    locator: &Locator,
+    source: &str,
 ) -> TextSize {
     let tokenizer = SimpleTokenizer::new(
-        locator.contents(),
-        TextRange::new(locator.full_line_end(preceding.end()), comment_range.end()),
+        source,
+        TextRange::new(source.full_line_end(preceding.end()), comment_range.end()),
     );
 
     tokenizer
         .filter_map(|token| {
             if token.kind() == SimpleTokenKind::Comment {
-                indentation_at_offset(token.start(), locator).map(TextLen::text_len)
+                indentation_at_offset(token.start(), source).map(TextLen::text_len)
             } else {
                 None
             }

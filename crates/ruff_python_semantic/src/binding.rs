@@ -8,7 +8,7 @@ use ruff_index::{newtype_index, IndexSlice, IndexVec};
 use ruff_python_ast::helpers::extract_handled_exceptions;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Stmt};
-use ruff_source_file::Locator;
+use ruff_source_file::Located;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::context::ExecutionContext;
@@ -228,8 +228,8 @@ impl<'a> Binding<'a> {
     }
 
     /// Returns the name of the binding (e.g., `x` in `x = 1`).
-    pub fn name<'b>(&self, locator: &Locator<'b>) -> &'b str {
-        locator.slice(self.range)
+    pub fn name<'b>(&self, source: &'b str) -> &'b str {
+        source.slice(self.range)
     }
 
     /// Returns the statement in which the binding was defined.

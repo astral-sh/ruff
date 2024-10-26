@@ -17,7 +17,7 @@ pub(crate) fn unresolved_references(checker: &mut Checker) {
             if checker.enabled(Rule::UndefinedLocalWithImportStarUsage) {
                 checker.diagnostics.push(Diagnostic::new(
                     pyflakes::rules::UndefinedLocalWithImportStarUsage {
-                        name: reference.name(checker.locator).to_string(),
+                        name: reference.name(checker.source()).to_string(),
                     },
                     reference.range(),
                 ));
@@ -31,12 +31,12 @@ pub(crate) fn unresolved_references(checker: &mut Checker) {
 
                 // Allow __path__.
                 if checker.path.ends_with("__init__.py") {
-                    if reference.name(checker.locator) == "__path__" {
+                    if reference.name(checker.source()) == "__path__" {
                         continue;
                     }
                 }
 
-                let symbol_name = reference.name(checker.locator);
+                let symbol_name = reference.name(checker.source());
 
                 checker.diagnostics.push(Diagnostic::new(
                     pyflakes::rules::UndefinedName {

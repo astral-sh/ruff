@@ -76,7 +76,7 @@ impl InlineFileAssertions {
     }
 
     fn is_own_line_comment(&self, ranged_assertion: &AssertionWithRange) -> bool {
-        CommentRanges::is_own_line(ranged_assertion.start(), &self.locator())
+        CommentRanges::is_own_line(ranged_assertion.start(), self.source.as_str())
     }
 }
 

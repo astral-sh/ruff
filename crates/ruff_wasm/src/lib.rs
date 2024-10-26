@@ -167,10 +167,10 @@ impl Workspace {
         let locator = Locator::new(contents);
 
         // Detect the current code style (lazily).
-        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+        let stylist = Stylist::from_tokens(parsed.tokens(), contents);
 
         // Extra indices from the code.
-        let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
+        let indexer = Indexer::from_tokens(parsed.tokens(), contents);
 
         // Extract the `# noqa` and `# isort: skip` directives from the source.
         let directives = directives::extract_directives(

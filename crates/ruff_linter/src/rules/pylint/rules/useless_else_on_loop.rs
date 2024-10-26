@@ -146,7 +146,7 @@ fn remove_else(
         return Err(anyhow::anyhow!("Empty `else` clause"));
     };
 
-    let start_indentation = indentation(locator, start);
+    let start_indentation = indentation(locator.contents(), start);
     if start_indentation.is_none() {
         // Inline `else` block (e.g., `else: x = 1`).
         Ok(Fix::safe_edit(Edit::deletion(
@@ -155,7 +155,7 @@ fn remove_else(
         )))
     } else {
         // Identify the indentation of the loop itself (e.g., the `while` or `for`).
-        let Some(desired_indentation) = indentation(locator, stmt) else {
+        let Some(desired_indentation) = indentation(locator.contents(), stmt) else {
             return Err(anyhow::anyhow!("Compound statement cannot be inlined"));
         };
 
