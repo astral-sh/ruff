@@ -3568,10 +3568,48 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::NumberLiteral(_literal) => Type::Todo,
             ast::Expr::BooleanLiteral(_literal) => Type::Todo,
 
-            // TODO: this may be a place we need to revisit with special forms.
             ast::Expr::Subscript(subscript) => {
-                self.infer_subscript_expression(subscript);
-                Type::Todo
+                let ast::ExprSubscript {
+                    value,
+                    slice,
+                    ctx: _,
+                    range: _,
+                } = subscript;
+
+                let value_ty = self.infer_expression(value);
+
+                if value_ty
+                    .into_class_literal_type()
+                    .is_some_and(|class| class.is_known(self.db, KnownClass::Tuple))
+                {
+                    // TODO:
+                    // - homogeneous tuples
+                    // - PEP 646
+                    match &**slice {
+                        ast::Expr::Tuple(tuple) => {
+                            let mut elements = vec![];
+                            let mut return_todo = false;
+                            for element in tuple {
+                                let element_ty = self.infer_type_expression(element);
+                                return_todo |= element_ty.is_todo();
+                                elements.push(element_ty);
+                            }
+                            if return_todo {
+                                Type::Todo
+                            } else {
+                                Type::Tuple(TupleType::new(self.db, elements.into_boxed_slice()))
+                            }
+                        }
+                        _ => match self.infer_type_expression(slice) {
+                            Type::Todo => Type::Todo,
+                            slice_ty => Type::Tuple(TupleType::new(self.db, Box::from([slice_ty]))),
+                        },
+                    }
+                } else {
+                    self.infer_type_expression(slice);
+                    // TODO: many other kinds of subscripts
+                    Type::Todo
+                }
             }
 
             ast::Expr::BinOp(binary) => {
@@ -3589,6 +3627,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                         Type::Unknown
                     }
                 }
+            }
+
+            // TODO PEP 646
+            ast::Expr::Starred(starred) => {
+                self.infer_starred_expression(starred);
+                Type::Todo
             }
 
             // Forms which are invalid in the context of annotation expressions: we infer their
@@ -3665,10 +3709,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             //
             ast::Expr::Attribute(attribute) => {
                 self.infer_attribute_expression(attribute);
-                Type::Unknown
-            }
-            ast::Expr::Starred(starred) => {
-                self.infer_starred_expression(starred);
                 Type::Unknown
             }
             ast::Expr::List(list) => {

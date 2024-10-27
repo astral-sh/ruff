@@ -16,10 +16,11 @@ class MyBox[T]:
     def __init__(self, data: T):
         self.data = data
 
-# TODO not error (should be subscriptable)
-box: MyBox[int] = MyBox(5)  # error: [non-subscriptable]
-# TODO error differently (str and int don't unify)
-wrong_innards: MyBox[int] = MyBox("five")  # error: [non-subscriptable]
+box: MyBox[int] = MyBox(5)
+
+# TODO should emit a diagnostic here (str and int don't unify)
+wrong_innards: MyBox[int] = MyBox("five")
+
 # TODO reveal int
 reveal_type(box.data)  # revealed: @Todo
 

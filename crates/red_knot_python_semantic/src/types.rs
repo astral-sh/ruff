@@ -469,6 +469,16 @@ impl<'db> Type<'db> {
             {
                 true
             }
+            (Type::Tuple(self_tuple), Type::Tuple(target_tuple)) => {
+                self_tuple.len(db) == target_tuple.len(db)
+                    && self_tuple
+                        .elements(db)
+                        .iter()
+                        .zip(target_tuple.elements(db))
+                        .all(|(self_element, target_element)| {
+                            self_element.is_subtype_of(db, *target_element)
+                        })
+            }
             (Type::ClassLiteral(..), Type::Instance(class))
                 if class.is_known(db, KnownClass::Type) =>
             {
@@ -1981,6 +1991,11 @@ mod tests {
     #[test_case(Ty::Union(vec![Ty::BuiltinInstance("str"), Ty::BuiltinInstance("int")]), Ty::BuiltinInstance("object"))]
     #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2), Ty::IntLiteral(3)]))]
     #[test_case(Ty::BuiltinInstance("TypeError"), Ty::BuiltinInstance("Exception"))]
+    #[test_case(Ty::Tuple(vec![]), Ty::Tuple(vec![]))]
+    #[test_case(Ty::Tuple(vec![Ty::IntLiteral(42)]), Ty::Tuple(vec![Ty::BuiltinInstance("int")]))]
+    #[test_case(Ty::Tuple(vec![Ty::IntLiteral(42), Ty::StringLiteral("foo")]), Ty::Tuple(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")]))]
+    #[test_case(Ty::Tuple(vec![Ty::BuiltinInstance("int"), Ty::StringLiteral("foo")]), Ty::Tuple(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")]))]
+    #[test_case(Ty::Tuple(vec![Ty::IntLiteral(42), Ty::BuiltinInstance("str")]), Ty::Tuple(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")]))]
     fn is_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
@@ -1997,6 +2012,8 @@ mod tests {
     #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(3)]))]
     #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str"))]
     #[test_case(Ty::BuiltinInstance("int"), Ty::IntLiteral(1))]
+    #[test_case(Ty::Tuple(vec![]), Ty::Tuple(vec![Ty::IntLiteral(1)]))]
+    #[test_case(Ty::Tuple(vec![Ty::IntLiteral(42)]), Ty::Tuple(vec![Ty::BuiltinInstance("str")]))]
     fn is_not_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(!from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
