@@ -1106,7 +1106,11 @@ where
                     },
                 );
             }
-            ast::Expr::BoolOp(ast::ExprBoolOp { values, .. }) => {
+            ast::Expr::BoolOp(ast::ExprBoolOp {
+                values,
+                range: _,
+                op: _,
+            }) => {
                 // TODO detect statically known truthy or falsy values (via type inference, not naive
                 // AST inspection, so we can't simplify here, need to record test expression for
                 // later checking)
