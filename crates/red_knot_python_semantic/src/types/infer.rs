@@ -1380,19 +1380,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             let class = instance.class_type(self.db);
             if class.is_known(self.db, KnownClass::SpecialForm) {
                 if let Some(name_expr) = target.as_name_expr() {
-                    let target_name = name_expr.id.clone();
-                    let new_class = ClassType::new(
-                        self.db,
-                        target_name,
-                        class.definition(self.db),
-                        class.body_scope(self.db),
-                        Some(KnownClass::SpecialForm),
-                    );
-                    annotation_ty = Type::Instance(InstanceType::new(
-                        self.db,
-                        new_class,
-                        Some(KnownInstance::Literal),
-                    ));
+                    if name_expr.id == KnownInstance::Literal.as_str() {
+                        annotation_ty = Type::Instance(InstanceType::new(
+                            self.db,
+                            class,
+                            Some(KnownInstance::Literal),
+                        ));
+                    }
                 }
             }
         }
@@ -3477,29 +3471,60 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = subscript;
 
         let value_ty = self.infer_type_expression(value);
-        let slice_ty = self.infer_type_expression(slice);
 
         // Handling of Special Forms
-        match (value_ty, slice_ty) {
-            (Type::Instance(class), slice_ty)
-                if class.is_known(self.db, KnownClass::SpecialForm) =>
-            {
-                match class.known_instance(self.db) {
-                    Some(s) => match s {
-                        KnownInstance::Literal => match slice_ty {
-                            // TODO: not correct logic
+        match value_ty {
+            Type::Instance(class) if class.is_known(self.db, KnownClass::SpecialForm) => {
+                let Some(s) = class.known_instance(self.db) else {
+                    return Type::Todo;
+                };
+                // NOTE: slice_ty is treated as expression because Literal accepts expression
+                // inside the []
+                let slice_ty = self.infer_expression(slice);
+                match s {
+                    KnownInstance::Literal => {
+                        match **slice {
+                    ruff_python_ast::Expr::StringLiteral(_)
+                    | ruff_python_ast::Expr::BytesLiteral(_)
+                    | ruff_python_ast::Expr::NumberLiteral(_)
+                    | ruff_python_ast::Expr::BooleanLiteral(_)
+                    | ruff_python_ast::Expr::Tuple(_)
+                    // For enum values
+                    | ruff_python_ast::Expr::Attribute(_)
+                    // For Another Literal inside this Literal
+                    | ruff_python_ast::Expr::Subscript(_)
+                    | ruff_python_ast::Expr::NoneLiteral(_) => {}
+                    // for negative numbers
+                    ruff_python_ast::Expr::UnaryOp(ref u) if (u.op == UnaryOp::USub || u.op == UnaryOp::UAdd) && u.operand.is_number_literal_expr() => {}
+                    _ => {
+                        self.add_diagnostic(
+                        slice.as_ref().into(),
+                        "invalid-literal-parameter",
+                        format_args!(
+                            "Type arguments for `Literal` must be None, a literal value (int, bool, str, or bytes), or an enum value",
+                        ),
+                    );
+                        return Type::Unknown;
+                    }
+                    };
+                        match slice_ty {
                             Type::Tuple(tuple) => {
                                 let elts = tuple.elements(self.db);
                                 Type::Union(UnionType::new(self.db, elts))
                             }
                             ty => ty,
-                        },
-                    },
-                    None => todo!(),
+                        }
+                    }
                 }
             }
-            // TODO: emit diagnostic
-            _ => Type::Todo,
+            value_ty => {
+                let value_node = value.as_ref();
+                let slice_ty = self.infer_expression(slice);
+                // TODO: currently the logic to get the type of type of a subscript in type
+                // annotation with where value is a slice is defined in the
+                // subscript_expression_types. Once it's complete call that logic from here.
+                self.infer_subscript_expression_types(value_node, value_ty, slice_ty)
+            }
         }
     }
 }
@@ -3528,8 +3553,6 @@ impl<'db> TypeInferenceBuilder<'db> {
 impl<'db> TypeInferenceBuilder<'db> {
     fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
         // https://typing.readthedocs.io/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
-        // TODO: this does not include any of the special forms, and is only a
-        //   stub of the forms other than a standalone name in scope.
 
         let ty = match expression {
             ast::Expr::Name(name) => {
@@ -3841,13 +3864,17 @@ fn perform_rich_comparison<'db>(
     // TODO: this currently gives the return type even if the arg types are invalid
     // (e.g. int.__lt__ with string instance should be errored, currently bool)
 
-    let left_instance = Type::Instance(InstanceType::new(db, left_class, None));
-    let right_instance = Type::Instance(InstanceType::new(db, right_class, None));
     let call_dunder =
         |op: RichCompareOperator, left_class: ClassType<'db>, right_class: ClassType<'db>| {
             left_class
                 .class_member(db, op.dunder())
-                .call(db, &[left_instance, right_instance])
+                .call(
+                    db,
+                    &[
+                        Type::Instance(InstanceType::new(db, left_class, None)),
+                        Type::Instance(InstanceType::new(db, right_class, None)),
+                    ],
+                )
                 .return_ty(db)
         };
 
@@ -3871,8 +3898,8 @@ fn perform_rich_comparison<'db>(
     })
     .ok_or_else(|| CompareUnsupportedError {
         op: op.into(),
-        left_ty: left_instance,
-        right_ty: right_instance,
+        left_ty: Type::Instance(InstanceType::new(db, left_class, None)),
+        right_ty: Type::Instance(InstanceType::new(db, right_class, None)),
     })
 }
 

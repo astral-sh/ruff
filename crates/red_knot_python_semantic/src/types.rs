@@ -1047,10 +1047,16 @@ impl<'db> Type<'db> {
             Type::Intersection(_) => Type::Todo,
             // TODO: calling `.to_instance()` on any of these should result in a diagnostic,
             // since they already indicate that the object is an instance of some kind:
+            Type::Instance(instance) => {
+                if instance.known_instance(db).is_some() {
+                    *self
+                } else {
+                    Type::Unknown
+                }
+            }
             Type::BooleanLiteral(_)
             | Type::BytesLiteral(_)
             | Type::FunctionLiteral(_)
-            | Type::Instance(_)
             | Type::ModuleLiteral(_)
             | Type::IntLiteral(_)
             | Type::StringLiteral(_)
@@ -1277,6 +1283,14 @@ impl<'db> KnownClass {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum KnownInstance {
     Literal,
+}
+
+impl KnownInstance {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            KnownInstance::Literal => "Literal",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
