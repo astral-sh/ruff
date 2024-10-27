@@ -1106,6 +1106,27 @@ where
                     },
                 );
             }
+            ast::Expr::BoolOp(ast::ExprBoolOp {
+                values,
+                range: _,
+                op: _,
+            }) => {
+                // TODO detect statically known truthy or falsy values (via type inference, not naive
+                // AST inspection, so we can't simplify here, need to record test expression for
+                // later checking)
+                let mut snapshots = vec![];
+
+                for (index, value) in values.iter().enumerate() {
+                    // The first item of BoolOp is always evaluated
+                    if index > 0 {
+                        snapshots.push(self.flow_snapshot());
+                    }
+                    self.visit_expr(value);
+                }
+                for snapshot in snapshots {
+                    self.flow_merge(snapshot);
+                }
+            }
             _ => {
                 walk_expr(self, expr);
             }
