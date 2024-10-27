@@ -47,17 +47,22 @@ impl Symbol {
     pub fn is_bound(&self) -> bool {
         self.flags.contains(SymbolFlags::IS_BOUND)
     }
+
+    pub fn is_declared(&self) -> bool {
+        self.flags.contains(SymbolFlags::IS_DECLARED)
+    }
 }
 
 bitflags! {
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
     struct SymbolFlags: u8 {
         const IS_USED         = 1 << 0;
-        const IS_BOUND      = 1 << 1;
+        const IS_BOUND        = 1 << 1;
+        const IS_DECLARED     = 1 << 2;
         /// TODO: This flag is not yet set by anything
-        const MARKED_GLOBAL   = 1 << 2;
+        const MARKED_GLOBAL   = 1 << 3;
         /// TODO: This flag is not yet set by anything
-        const MARKED_NONLOCAL = 1 << 3;
+        const MARKED_NONLOCAL = 1 << 4;
     }
 }
 
@@ -296,6 +301,10 @@ impl SymbolTableBuilder {
 
     pub(super) fn mark_symbol_bound(&mut self, id: ScopedSymbolId) {
         self.table.symbols[id].insert_flags(SymbolFlags::IS_BOUND);
+    }
+
+    pub(super) fn mark_symbol_declared(&mut self, id: ScopedSymbolId) {
+        self.table.symbols[id].insert_flags(SymbolFlags::IS_DECLARED);
     }
 
     pub(super) fn mark_symbol_used(&mut self, id: ScopedSymbolId) {

@@ -195,6 +195,10 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_symbol_table().mark_symbol_bound(id);
     }
 
+    fn mark_symbol_declared(&mut self, id: ScopedSymbolId) {
+        self.current_symbol_table().mark_symbol_declared(id);
+    }
+
     fn mark_symbol_used(&mut self, id: ScopedSymbolId) {
         self.current_symbol_table().mark_symbol_used(id);
     }
@@ -225,6 +229,9 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         if category.is_binding() {
             self.mark_symbol_bound(symbol);
+        }
+        if category.is_declaration() {
+            self.mark_symbol_declared(symbol);
         }
 
         let use_def = self.current_use_def_map_mut();
@@ -359,6 +366,7 @@ impl<'db> SemanticIndexBuilder<'db> {
                 // note that the "bound" on the typevar is a totally different thing than whether
                 // or not a name is "bound" by a typevar declaration; the latter is always true.
                 self.mark_symbol_bound(symbol);
+                self.mark_symbol_declared(symbol);
                 if let Some(bounds) = bound {
                     self.visit_expr(bounds);
                 }

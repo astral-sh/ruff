@@ -88,30 +88,64 @@ fn symbol_ty<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Type<'db>
         .unwrap_or(Type::Unbound)
 }
 
-/// Shorthand for `symbol_ty` that looks up a module-global symbol by name in a file.
+/// Return a list of the symbols that typeshed declares in the scope of `types.ModuleType`
+#[salsa::tracked(return_ref)]
+fn module_type_symbols<'db>(db: &'db dyn Db) -> Box<[Box<str>]> {
+    let Some(module_type) = KnownClass::ModuleType
+        .to_class(db)
+        .into_class_literal_type()
+    else {
+        return Box::default();
+    };
+
+    let module_type_scope = module_type.body_scope(db);
+    let module_type_symbol_table = symbol_table(db, module_type_scope);
+
+    // `__dict__` and `__init__` are very special members that can be accessed as attributes
+    // on the module when imported, but cannot be accessed as globals *inside* the module.
+    //
+    // `__getattr__` is even more special: it doesn't exist at runtime, but typeshed includes it
+    // to reduce false positives associated with functions that dynamically import modules
+    // and return `Instance(types.ModuleType)`. We should ignore it for any known module-literal type.
+    let module_type_symbols: Box<[Box<str>]> = module_type_symbol_table
+        .symbols()
+        .filter(|symbol| symbol.is_declared())
+        .map(|symbol| &**symbol.name())
+        .filter(|symbol_name| !matches!(*symbol_name, "__dict__" | "__getattr__" | "__init__"))
+        .map(Box::from)
+        .collect();
+
+    // Make sure it contains declared symbols in the `types.ModuleType` scope,
+    // but not other random symbols that are only *referenced* in the `types.ModuleType` scope
+    debug_assert!(module_type_symbols.contains(&Box::from("__name__")));
+    debug_assert!(!module_type_symbols.contains(&Box::from("property")));
+
+    module_type_symbols
+}
+
+/// Looks up a module-global symbol by name in a file.
 pub(crate) fn global_symbol_ty<'db>(db: &'db dyn Db, file: File, name: &str) -> Type<'db> {
     let explicit_ty = symbol_ty(db, global_scope(db, file), name);
+    if !explicit_ty.may_be_unbound(db) {
+        return explicit_ty;
+    }
 
     // Not defined explicitly in the global scope?
     // All modules are instances of `types.ModuleType`;
     // look it up there (with a few very special exceptions)
-    if matches!(
-        name,
-        "__name__" | "__file__" | "__loader__" | "__package__" | "__path__" | "__spec__"
-    ) && explicit_ty.may_be_unbound(db)
+    if module_type_symbols(db)
+        .iter()
+        .any(|module_type_member| &**module_type_member == name)
     {
-        // TODO: this should be `KnownClass::ModuleType.to_instance()`,
-        // but we don't yet support looking up attributes on instances
-        let module_type = KnownClass::ModuleType.to_class(db);
-        let module_type_member_ty = module_type.member(db, name);
-        if module_type_member_ty.is_unbound() {
-            explicit_ty
-        } else {
-            explicit_ty.replace_unbound_with(db, module_type_member_ty)
+        // TODO: this should use `.to_instance(db)`. but we don't understand attribute access
+        // on instance types yet.
+        let module_type_member = KnownClass::ModuleType.to_class(db).member(db, name);
+        if !module_type_member.is_unbound() {
+            return explicit_ty.replace_unbound_with(db, module_type_member);
         }
-    } else {
-        explicit_ty
     }
+
+    explicit_ty
 }
 
 /// Infer the type of a binding.
@@ -823,16 +857,32 @@ impl<'db> Type<'db> {
                 Type::Todo
             }
             Type::ModuleLiteral(file) => {
+                // `__dict__` is a very special member that is never overridden by module globals;
+                // we should always look it up directly as an attribute on `types.ModuleType`,
+                // never in the global scope of the module.
                 if name == "__dict__" {
                     return KnownClass::ModuleType
                         .to_instance(db)
                         .member(db, "__dict__");
                 }
-                let global_lookup = global_symbol_ty(db, *file, name);
+
+                let global_lookup = symbol_ty(db, global_scope(db, *file), name);
+
                 // If it's unbound, check if it's present as an instance on `types.ModuleType`
-                // or `builtins.object`. *Except* if it's `__getattr__`; typeshed has a fake
-                // `__getattr__` on `types.ModuleType` to help out with dynamic imports;
-                // we shouldn't use it for `ModuleLiteral` types.
+                // or `builtins.object`.
+                //
+                // We do a more limited version of this in `global_symbol_ty`,
+                // but there are two crucial differences here:
+                // - If a member is looked up as an attribute, `__init__` is also available
+                //   on the module, but it isn't available as a global from inside the module
+                // - If a member is looked up as an attribute, members on `builtins.object`
+                //   are also available (because `types.ModuleType` inherits from `object`);
+                //   these attributes are also not available as globals from inside the module.
+                //
+                // The same way as in `global_symbol_ty`, however, we need to be careful to
+                // ignore `__getattr__`. Typeshed has a fake `__getattr__` on `types.ModuleType`
+                // to help out with dynamic imports; we shouldn't use it for `ModuleLiteral` types
+                // where we know exactly which module we're dealing with.
                 if name != "__getattr__" && global_lookup.may_be_unbound(db) {
                     // TODO: this should use `.to_instance()`, but we don't understand instance attribute yet
                     let module_type_instance_member =
