@@ -115,10 +115,9 @@ impl<T> PySlice for &[T] {
 
         let len = self.len();
         if len == 0 {
-            #[allow(
-                clippy::iter_skip_zero,
-                reason = "The iterator needs to have the same type as the step>0 case below."
-            )]
+            // The iterator needs to have the same type as the step>0 case below,
+            // so we need to use `.skip(0)`.
+            #[allow(clippy::iter_skip_zero)]
             return Either::Left(self.iter().skip(0).take(0).step_by(1));
         }
 
