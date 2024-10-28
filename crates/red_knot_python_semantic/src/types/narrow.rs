@@ -129,12 +129,29 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
     }
 
     fn evaluate_expression_constraint(&mut self, expression: Expression<'db>, is_positive: bool) {
-        match expression.node_ref(self.db).node() {
+        let expression_node = expression.node_ref(self.db).node();
+        self.evaluate_expression_node_constraint(expression_node, expression, is_positive);
+    }
+
+    fn evaluate_expression_node_constraint(
+        &mut self,
+        expression_node: &ruff_python_ast::Expr,
+        expression: Expression<'db>,
+        is_positive: bool,
+    ) {
+        match expression_node {
             ast::Expr::Compare(expr_compare) => {
                 self.add_expr_compare(expr_compare, expression, is_positive);
             }
             ast::Expr::Call(expr_call) => {
                 self.add_expr_call(expr_call, expression, is_positive);
+            }
+            ast::Expr::UnaryOp(unary_op) if unary_op.op == ast::UnaryOp::Not => {
+                self.evaluate_expression_node_constraint(
+                    &unary_op.operand,
+                    expression,
+                    !is_positive,
+                );
             }
             _ => {} // TODO other test expression kinds
         }
