@@ -56,7 +56,7 @@ use crate::types::{
     KnownClass, KnownFunction, SliceLiteralType, StringLiteralType, Truthiness, TupleType, Type,
     TypeArrayDisplay, UnionBuilder, UnionType,
 };
-use crate::util::subscript::{PyIndex, PySlice};
+use crate::util::subscript::{PyIndex, PySlice, StepSizeZeroError};
 use crate::Db;
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
@@ -1496,6 +1496,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                 "Cannot subscript object of type `{}` with no `{method}` method",
                 non_subscriptable_ty.display(self.db)
             ),
+        );
+    }
+
+    pub(super) fn slice_step_size_zero_diagnostic(&mut self, node: AnyNodeRef) {
+        self.add_diagnostic(
+            node,
+            "slice-step-zero",
+            format_args!("Slice step size can not be zero"),
         );
     }
 
@@ -3218,19 +3226,16 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let stop = slice_ty.stop(self.db);
                 let step = slice_ty.step(self.db);
 
-                if let Ok(new_elements) = elements.iter().py_slice(start, stop, step) {
-                    let new_elements: Vec<_> = new_elements.copied().collect();
-                    Type::Tuple(TupleType::new(self.db, new_elements.into_boxed_slice()))
-                } else {
-                    self.index_out_of_bounds_diagnostic(
-                        "tuple",
-                        value_node.into(),
-                        value_ty,
-                        elements.len(),
-                        100, // TODO
-                    );
+                match elements.iter().py_slice(start, stop, step) {
+                    Ok(new_elements) => {
+                        let new_elements: Vec<_> = new_elements.copied().collect();
+                        Type::Tuple(TupleType::new(self.db, new_elements.into_boxed_slice()))
+                    }
+                    Err(StepSizeZeroError) => {
+                        self.slice_step_size_zero_diagnostic(value_node.into());
 
-                    Type::Unknown
+                        Type::Unknown
+                    }
                 }
             }
             // Ex) Given `("a", "b", "c", "d")[True]`, return `"b"`
