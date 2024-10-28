@@ -319,7 +319,7 @@ impl<'db> Display for DisplayTypeArray<'_, 'db> {
 
 #[cfg(test)]
 mod tests {
-    use std::num::NonZero;
+    use std::num::NonZeroI32;
 
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
@@ -436,7 +436,7 @@ mod tests {
                 &db,
                 Some(1),
                 Some(5),
-                Some(NonZero::new(2).unwrap())
+                Some(NonZeroI32::new(2).unwrap())
             ))
             .display(&db)
             .to_string(),
@@ -447,7 +447,7 @@ mod tests {
                 &db,
                 None,
                 None,
-                Some(NonZero::new(2).unwrap())
+                Some(NonZeroI32::new(2).unwrap())
             ))
             .display(&db)
             .to_string(),

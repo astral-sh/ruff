@@ -1,4 +1,4 @@
-use std::num::NonZero;
+use std::num::NonZeroI32;
 
 use infer::TypeInferenceBuilder;
 use ruff_db::files::File;
@@ -1828,7 +1828,7 @@ pub struct BytesLiteralType<'db> {
 pub struct SliceLiteralType<'db> {
     start: Option<i32>,
     stop: Option<i32>,
-    step: Option<NonZero<i32>>,
+    step: Option<NonZeroI32>,
 }
 
 #[salsa::interned]

@@ -28,7 +28,7 @@
 //! definitions once the rest of the types in the scope have been inferred.
 use itertools::Itertools;
 use std::borrow::Cow;
-use std::num::{NonZero, NonZeroU32};
+use std::num::{NonZeroI32, NonZeroU32};
 
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
@@ -3420,7 +3420,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             type_to_slice_argument(ty_step),
         ) {
             (SliceArg::Arg(lower), SliceArg::Arg(upper), SliceArg::Arg(step)) => {
-                match step.map(NonZero::new) {
+                match step.map(NonZeroI32::new) {
                     Some(Some(step)) => {
                         Type::SliceLiteral(SliceLiteralType::new(self.db, lower, upper, Some(step)))
                     }

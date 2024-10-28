@@ -2,7 +2,7 @@
 //! operations (`PySlice`) on iterators, following the semantics of equivalent
 //! operations in Python.
 
-use std::{cmp::Ordering, num::NonZero};
+use std::{cmp::Ordering, num::NonZeroI32};
 
 use itertools::Either;
 
@@ -79,7 +79,7 @@ pub(crate) trait PySlice {
         &self,
         start: Option<i32>,
         stop: Option<i32>,
-        step: Option<NonZero<i32>>,
+        step: Option<NonZeroI32>,
     ) -> Either<impl Iterator<Item = &Self::Item>, impl Iterator<Item = &Self::Item>>;
 }
 
@@ -90,9 +90,9 @@ impl<T> PySlice for &[T] {
         &self,
         start: Option<i32>,
         stop: Option<i32>,
-        step_int: Option<NonZero<i32>>,
+        step_int: Option<NonZeroI32>,
     ) -> Either<impl Iterator<Item = &Self::Item>, impl Iterator<Item = &Self::Item>> {
-        let step_int = step_int.unwrap_or(NonZero::new(1).unwrap());
+        let step_int = step_int.unwrap_or(NonZeroI32::new(1).unwrap());
 
         let len = self.len();
         if len == 0 {
@@ -146,7 +146,7 @@ impl<T> PySlice for &[T] {
 #[cfg(test)]
 #[allow(clippy::redundant_clone)]
 mod tests {
-    use std::num::NonZero;
+    use std::num::NonZeroI32;
 
     use crate::util::subscript::OutOfBoundsError;
 
@@ -214,7 +214,7 @@ mod tests {
         assert_equal(
             input
                 .as_slice()
-                .py_slice(start, stop, step.map(|s| NonZero::new(s).unwrap())),
+                .py_slice(start, stop, step.map(|s| NonZeroI32::new(s).unwrap())),
             expected.iter(),
         );
     }
