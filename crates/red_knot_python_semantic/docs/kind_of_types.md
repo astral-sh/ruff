@@ -172,7 +172,7 @@ For a Python type `T` to be categorised as a single-value type:
 - For any two inhabitants of `T` named `x` and `y`, `x == y`.
 
 Nearly all singleton types are single-value types, but the reverse is not true.
-Many single-value types exists that are not singleton types: examples include
+Many single-value types exist that are not singleton types: examples include
 `Literal[123456]`, `Literal[b"foo"]`, `tuple[Literal[True], Literal[False]]`, and `Literal["foo"]`.
 All runtime inhabitants of the `Literal["foo"]` type are equal to the string `"foo"`.
 However, they are not necessarily the *same* object in terms of identity;
