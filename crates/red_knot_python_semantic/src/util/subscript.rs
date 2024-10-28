@@ -47,9 +47,11 @@ impl Nth {
     }
 
     fn to_nonnegative_index(&self, len: usize) -> usize {
+        debug_assert!(len > 0);
+
         match self {
             Nth::FromStart(nth) => *nth,
-            Nth::FromEnd(nth_rev) => len - (*nth_rev).min(len - 1) - 1,
+            Nth::FromEnd(nth_rev) => (len - 1).saturating_sub(*nth_rev),
         }
     }
 }
@@ -105,45 +107,38 @@ where
         }
 
         let len = self.len();
-
         if len == 0 {
             return Ok(Box::new(std::iter::empty()));
         }
 
+        let to_nonnegative_index = |index| Nth::from_index(index).to_nonnegative_index(len);
+
         if step_int > 0 {
-            let start = start
-                .map(|start| Nth::from_index(start).to_nonnegative_index(len))
-                .unwrap_or(0)
-                .clamp(0, len);
-            let stop = stop
-                .map(|stop| Nth::from_index(stop).to_nonnegative_index(len))
-                .unwrap_or(len)
-                .clamp(0, len);
+            let start = start.map(to_nonnegative_index).unwrap_or(0).clamp(0, len);
+            let stop = stop.map(to_nonnegative_index).unwrap_or(len).clamp(0, len);
 
             let step = from_nonnegative_i32(step_int);
             let (skip, take_n, step) = match start.cmp(&stop) {
-                Ordering::Equal => (start, 0, step),
                 Ordering::Less => (start, stop - start, step),
-                Ordering::Greater => (stop + 1, 0, step),
+                Ordering::Equal | Ordering::Greater => (start, 0, step),
             };
 
             Ok(Box::new(self.skip(skip).take(take_n).step_by(step)))
         } else {
             let start = start
-                .map(|start| Nth::from_index(start).to_nonnegative_index(len))
+                .map(to_nonnegative_index)
                 .unwrap_or(len)
                 .clamp(0, len - 1);
             let stop = stop
-                .map(|stop| Nth::from_index(stop).to_nonnegative_index(len))
+                .map(to_nonnegative_index)
                 .map(|index| index.clamp(0, len - 1));
 
             let step = from_negative_i32(step_int);
 
             let (skip, take_n, step) = if let Some(stop) = stop {
                 match start.cmp(&stop) {
-                    Ordering::Equal => (start, 0, step),
-                    Ordering::Less => (len - start, 0, step),
                     Ordering::Greater => ((len - 1) - start, start - stop, step),
+                    Ordering::Less | Ordering::Equal => (len - start, 0, step),
                 }
             } else {
                 ((len - 1) - start, len, step)
