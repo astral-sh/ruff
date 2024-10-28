@@ -4,7 +4,7 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::any_over_expr;
-use ruff_python_semantic::analyze::typing::is_list;
+use ruff_python_semantic::{analyze::typing::is_list, Binding};
 use ruff_text_size::TextRange;
 
 use anyhow::{anyhow, Result};
@@ -203,19 +203,17 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
         return;
     }
 
-    let Some(binding_stmt) = binding
+    let binding_stmt = binding
         .statement(checker.semantic())
-        .and_then(|stmt| stmt.as_assign_stmt())
-    else {
-        return;
-    };
+        .and_then(|stmt| stmt.as_assign_stmt());
 
     // If the variable is an empty list literal, then we might be able to replace it with a full list comprehension
     // otherwise, it has to be replaced with a `list.extend`
-    let binding_is_empty_list = match binding_stmt.value.as_list_expr() {
-        Some(list_expr) => list_expr.elts.is_empty(),
-        None => false,
-    };
+    let binding_is_empty_list =
+        binding_stmt.is_some_and(|binding_stmt| match binding_stmt.value.as_list_expr() {
+            Some(list_expr) => list_expr.elts.is_empty(),
+            None => false,
+        });
 
     let comprehension_type = if binding_is_empty_list {
         ComprehensionType::ListComprehension
@@ -224,27 +222,33 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
     };
 
     // If the for loop does not have the same parent element as the binding, then it cannot always be
-    // deleted and replaced with a list comprehension.
+    // deleted and replaced with a list comprehension. This does not apply when using an extend.
     let assignment_in_same_statement = {
         let for_loop_parent = checker.semantic().current_statement_parent_id();
-        let Some(binding_source) = binding.source else {
-            return;
-        };
-        let binding_parent = checker.semantic().parent_statement_id(binding_source);
-        for_loop_parent == binding_parent
+
+        binding.source.is_some_and(|binding_source| {
+            let binding_parent = checker.semantic().parent_statement_id(binding_source);
+            for_loop_parent == binding_parent
+        })
     };
 
     // If the binding is not a single name expression, it could be replaced with a list comprehension,
-    // but not necessarily, so this needs to be manually fixed
+    // but not necessarily, so this needs to be manually fixed. This does not apply when using an extend.
     let binding_has_one_target = {
-        let only_target = binding_stmt.targets.len() == 1;
-        let is_name = binding_stmt.targets[0].is_name_expr();
+        let only_target = binding_stmt.is_some_and(|binding_stmt| binding_stmt.targets.len() == 1);
+        let is_name =
+            binding_stmt.is_some_and(|binding_stmt| binding_stmt.targets[0].is_name_expr());
         only_target && is_name
     };
 
-    let comprehension_type = Some(comprehension_type)
-        .filter(|_| assignment_in_same_statement)
-        .filter(|_| binding_has_one_target);
+    // A list extend works in every context, while a list comprehension only works when all the criteria are true
+    let comprehension_type =
+        Some(comprehension_type).filter(|comprehension_type| match comprehension_type {
+            ComprehensionType::ListComprehension => {
+                binding_stmt.is_some() && assignment_in_same_statement && binding_has_one_target
+            }
+            ComprehensionType::Extend => true,
+        });
 
     let mut diagnostic = Diagnostic::new(
         ManualListComprehension {
@@ -257,7 +261,7 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
     diagnostic.try_set_optional_fix(|| match comprehension_type {
         Some(comprehension_type) => convert_to_list_extend(
             comprehension_type,
-            binding_stmt,
+            binding,
             for_stmt,
             if_test.map(std::convert::AsRef::as_ref),
             arg,
@@ -272,7 +276,7 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
 
 fn convert_to_list_extend(
     fix_type: ComprehensionType,
-    binding_stmt: &ast::StmtAssign,
+    binding: &Binding,
     for_stmt: &ast::StmtFor,
     if_test: Option<&ast::Expr>,
     to_append: &Expr,
@@ -294,14 +298,14 @@ fn convert_to_list_extend(
                 range: TextRange::default(),
             };
 
-            let [variable_name] = &binding_stmt.targets[..] else {
-                return Err(anyhow!(
-                    "Binding now has multiple targets when it previously had one"
-                ));
-            };
+            let variable_name = binding.name(checker.locator());
 
             let extend = ast::ExprAttribute {
-                value: Box::new(variable_name.clone()),
+                value: Box::new(Expr::Name(ast::ExprName {
+                    id: ast::name::Name::new(variable_name),
+                    ctx: ast::ExprContext::Load,
+                    range: TextRange::default(),
+                })),
                 attr: ast::Identifier::new("extend", TextRange::default()),
                 ctx: ast::ExprContext::Load,
                 range: TextRange::default(),
@@ -325,19 +329,25 @@ fn convert_to_list_extend(
             )))
         }
         ComprehensionType::ListComprehension => {
-            let Expr::List(assignment_value) = binding_stmt.value.as_ref() else {
-                return Err(anyhow!(
-                    "Assignment value changed from list literal into another type"
-                ));
-            };
+            let binding_stmt = binding
+                .statement(checker.semantic())
+                .and_then(|stmt| stmt.as_assign_stmt())
+                .ok_or(anyhow!(
+                    "Binding must have a statement to convert into a list comprehension"
+                ))?;
+            let empty_list_to_replace = binding_stmt.value.as_list_expr().ok_or(anyhow!(
+                "Assignment value must be an empty list literal in order to replace with a list comprehension"
+            ))?;
+
             let list_comp = ast::ExprListComp {
                 elt: Box::new(to_append.clone()),
                 generators: vec![comprehension],
                 range: TextRange::default(),
             };
+
             let comprehension_body = checker.generator().expr(&Expr::ListComp(list_comp));
             Ok(Fix::unsafe_edits(
-                Edit::range_replacement(comprehension_body, assignment_value.range),
+                Edit::range_replacement(comprehension_body, empty_list_to_replace.range),
                 [Edit::range_deletion(for_stmt.range)],
             ))
         }
