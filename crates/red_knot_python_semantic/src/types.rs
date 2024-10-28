@@ -283,7 +283,7 @@ pub enum Type<'db> {
     LiteralString,
     /// A bytes literal
     BytesLiteral(BytesLiteralType<'db>),
-    /// A slice sliteral, e.g. `1:5`, `10:0:-1` or `:`
+    /// A slice literal, e.g. `1:5`, `10:0:-1` or `:`
     SliceLiteral(SliceLiteralType<'db>),
     /// A heterogeneous tuple type, with elements of the given types in source order.
     // TODO: Support variable length homogeneous tuple type like `tuple[int, ...]`.

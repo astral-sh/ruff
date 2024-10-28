@@ -93,10 +93,19 @@ impl Display for DisplayRepresentation<'_> {
             Type::SliceLiteral(slice) => {
                 write!(
                     f,
-                    "slice[{start:?}, {stop:?}, {step:?}]", // TODO
-                    start = slice.start(self.db),
-                    stop = slice.stop(self.db),
-                    step = slice.step(self.db),
+                    "slice[{start}, {stop}, {step}]",
+                    start = slice
+                        .start(self.db)
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(String::new),
+                    stop = slice
+                        .stop(self.db)
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(String::new),
+                    step = slice
+                        .step(self.db)
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(String::new)
                 )
             }
             Type::Tuple(tuple) => {
