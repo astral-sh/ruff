@@ -1,6 +1,6 @@
-# Bytes subscript
+# Bytes subscripts
 
-## Simple
+## Indexing
 
 ```py
 b = b"\x00abc\xff"
@@ -21,6 +21,18 @@ reveal_type(x)  # revealed: Unknown
 
 y = b[-6]  # error: [index-out-of-bounds] "Index -6 is out of bounds for bytes literal `Literal[b"\x00abc\xff"]` with length 5"
 reveal_type(y)  # revealed: Unknown
+```
+
+## Slices
+
+```py
+b = b"\x00abc\xff"
+
+reveal_type(b[0:2])  # revealed: Literal[b"\x00a"]
+reveal_type(b[-3:])  # revealed: Literal[b"bc\xff"]
+
+a = b[::0]  # error: [slice-step-zero]
+reveal_type(a)  # revealed: Unknown
 ```
 
 ## Function return

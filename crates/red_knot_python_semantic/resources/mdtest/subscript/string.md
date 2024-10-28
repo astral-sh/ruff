@@ -1,6 +1,6 @@
-# Subscript on strings
+# String subscripts
 
-## Simple
+## Indexing
 
 ```py
 s = "abcde"

@@ -3239,12 +3239,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Type::Unknown
                 }
             }
-            // Ex) Given `("a", "b", "c", "d")[True]`, return `"b"`
-            (Type::Tuple(_), Type::BooleanLiteral(bool)) => self.infer_subscript_expression_types(
-                value_node,
-                value_ty,
-                Type::IntLiteral(i64::from(bool)),
-            ),
             // Ex) Given `"value"[1]`, return `"a"`
             (Type::StringLiteral(literal_ty), Type::IntLiteral(int))
                 if i32::try_from(int).is_ok() =>
@@ -3311,13 +3305,31 @@ impl<'db> TypeInferenceBuilder<'db> {
                         Type::Unknown
                     })
             }
+            // Ex) Given `b"value"[1:3]`, return `b"al"`
+            (Type::BytesLiteral(literal_ty), Type::SliceLiteral(slice_ty)) => {
+                let literal_value = literal_ty.value(self.db);
+                let start = slice_ty.start(self.db);
+                let stop = slice_ty.stop(self.db);
+                let step = slice_ty.step(self.db);
+
+                if let Ok(new_bytes) = literal_value.iter().py_slice(start, stop, step) {
+                    let new_bytes: Vec<u8> = new_bytes.copied().collect();
+                    Type::BytesLiteral(BytesLiteralType::new(self.db, new_bytes.into_boxed_slice()))
+                } else {
+                    self.slice_step_size_zero_diagnostic(value_node.into());
+
+                    Type::Unknown
+                }
+            }
             // Ex) Given `"value"[True]`, return `"a"`
-            (Type::StringLiteral(_) | Type::BytesLiteral(_), Type::BooleanLiteral(bool)) => self
-                .infer_subscript_expression_types(
-                    value_node,
-                    value_ty,
-                    Type::IntLiteral(i64::from(bool)),
-                ),
+            (
+                Type::Tuple(_) | Type::StringLiteral(_) | Type::BytesLiteral(_),
+                Type::BooleanLiteral(bool),
+            ) => self.infer_subscript_expression_types(
+                value_node,
+                value_ty,
+                Type::IntLiteral(i64::from(bool)),
+            ),
             (value_ty, slice_ty) => {
                 // Resolve the value to its class.
                 let value_meta_ty = value_ty.to_meta_type(self.db);

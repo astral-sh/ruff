@@ -1,6 +1,6 @@
 # Tuple subscripts
 
-## Basic
+## Indexing
 
 ```py
 t = (1, "a", "b")
@@ -9,6 +9,9 @@ reveal_type(t[0])  # revealed: Literal[1]
 reveal_type(t[1])  # revealed: Literal["a"]
 reveal_type(t[-1])  # revealed: Literal["b"]
 reveal_type(t[-2])  # revealed: Literal["a"]
+
+reveal_type(t[False])  # revealed: Literal[1]
+reveal_type(t[True])  # revealed: Literal["a"]
 
 a = t[4]  # error: [index-out-of-bounds]
 reveal_type(a)  # revealed: Unknown
