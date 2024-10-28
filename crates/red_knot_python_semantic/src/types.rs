@@ -1824,9 +1824,9 @@ pub struct BytesLiteralType<'db> {
 
 #[salsa::interned]
 pub struct SliceLiteralType<'db> {
-    start: Option<i64>,
-    stop: Option<i64>,
-    step: Option<i64>,
+    start: Option<i32>,
+    stop: Option<i32>,
+    step: Option<i32>,
 }
 
 #[salsa::interned]

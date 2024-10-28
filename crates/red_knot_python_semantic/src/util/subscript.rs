@@ -6,7 +6,7 @@ pub(crate) struct OutOfBoundsError;
 pub(crate) trait PyIndex {
     type Item;
 
-    fn py_index(&mut self, index: i64) -> Result<Self::Item, OutOfBoundsError>;
+    fn py_index(&mut self, index: i32) -> Result<Self::Item, OutOfBoundsError>;
 }
 
 enum Nth {
@@ -14,32 +14,31 @@ enum Nth {
     FromEnd(usize),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-struct ExceedsUsizeBoundsError;
+fn from_nonnegative_i32(index: i32) -> usize {
+    static_assertions::const_assert!(usize::BITS >= 32);
+    debug_assert!(index >= 0);
 
-fn from_nonnegative_i64(index: i64) -> Result<usize, ExceedsUsizeBoundsError> {
-    usize::try_from(index).map_err(|_| ExceedsUsizeBoundsError)
+    // SAFETY: `index` is non-negative, and `usize` is at least 32 bits.
+    index as usize
 }
 
-fn from_negative_i64(index: i64) -> Result<usize, ExceedsUsizeBoundsError> {
-    Ok(index
-        .checked_neg()
-        .map(from_nonnegative_i64)
-        .transpose()?
-        .unwrap_or({
-            // The 'checked_neg' above only fails for i64::MIN. We can not
-            // represent -i64::MIN as a i64, but we can represent it as a
-            // usize (on 64bit platforms):
-            from_nonnegative_i64(i64::MAX)? + 1
-        }))
+fn from_negative_i32(index: i32) -> usize {
+    static_assertions::const_assert!(usize::BITS >= 32);
+
+    index.checked_neg().map(from_nonnegative_i32).unwrap_or({
+        // 'checked_neg' only fails for i32::MIN. We can not
+        // represent -i32::MIN as a i32, but we can represent
+        // it as a usize, since usize is at least 32 bits.
+        from_nonnegative_i32(i32::MAX) + 1
+    })
 }
 
 impl Nth {
-    fn from_index(index: i64) -> Result<Self, ExceedsUsizeBoundsError> {
+    fn from_index(index: i32) -> Self {
         if index >= 0 {
-            Ok(Nth::FromStart(from_nonnegative_i64(index)?))
+            Nth::FromStart(from_nonnegative_i32(index))
         } else {
-            Ok(Nth::FromEnd(from_negative_i64(index)? - 1))
+            Nth::FromEnd(from_negative_i32(index) - 1)
         }
     }
 
@@ -57,9 +56,8 @@ where
 {
     type Item = I;
 
-    fn py_index(&mut self, index: i64) -> Result<I, OutOfBoundsError> {
-        match Nth::from_index(index).map_err(|ExceedsUsizeBoundsError| OutOfBoundsError)? // TODO: this is an assumption that might be unjustified
-        {
+    fn py_index(&mut self, index: i32) -> Result<I, OutOfBoundsError> {
+        match Nth::from_index(index) {
             Nth::FromStart(nth) => self.nth(nth).ok_or(OutOfBoundsError),
             Nth::FromEnd(nth_rev) => self.rev().nth(nth_rev).ok_or(OutOfBoundsError),
         }
@@ -74,9 +72,9 @@ pub(crate) trait PySlice {
 
     fn py_slice<'a>(
         &'a mut self,
-        start: Option<i64>,
-        stop: Option<i64>,
-        step: Option<i64>,
+        start: Option<i32>,
+        stop: Option<i32>,
+        step: Option<i32>,
     ) -> Result<Box<dyn Iterator<Item = Self::Item> + 'a>, StepSizeZeroError>
     where
         Self::Item: 'a;
@@ -90,9 +88,9 @@ where
 
     fn py_slice<'a>(
         &'a mut self,
-        start: Option<i64>,
-        stop: Option<i64>,
-        step_int: Option<i64>,
+        start: Option<i32>,
+        stop: Option<i32>,
+        step_int: Option<i32>,
     ) -> Result<Box<dyn Iterator<Item = I> + 'a>, StepSizeZeroError>
     where
         I: 'a,
@@ -110,21 +108,15 @@ where
 
         if step_int > 0 {
             let start = start
-                .map(Nth::from_index)
-                .transpose()
-                .unwrap() // TODO
-                .map(|start| start.to_nonnegative_index(len))
+                .map(|start| Nth::from_index(start).to_nonnegative_index(len))
                 .unwrap_or(0)
                 .clamp(0, len);
             let stop = stop
-                .map(Nth::from_index)
-                .transpose()
-                .unwrap() // TODO
-                .map(|stop| stop.to_nonnegative_index(len))
+                .map(|stop| Nth::from_index(stop).to_nonnegative_index(len))
                 .unwrap_or(len)
                 .clamp(0, len);
 
-            let step = from_nonnegative_i64(step_int).unwrap(); // TODO
+            let step = from_nonnegative_i32(step_int);
             let (skip, take_n, step) = match start.cmp(&stop) {
                 Ordering::Equal => (start, 0, step),
                 Ordering::Less => (start, stop - start, step),
@@ -134,20 +126,14 @@ where
             Ok(Box::new(self.skip(skip).take(take_n).step_by(step)))
         } else {
             let start = start
-                .map(Nth::from_index)
-                .transpose()
-                .unwrap() // TODO
-                .map(|start| start.to_nonnegative_index(len))
+                .map(|start| Nth::from_index(start).to_nonnegative_index(len))
                 .unwrap_or(len)
                 .clamp(0, len - 1);
             let stop = stop
-                .map(Nth::from_index)
-                .transpose()
-                .unwrap() // TODO
-                .map(|stop| stop.to_nonnegative_index(len))
+                .map(|stop| Nth::from_index(stop).to_nonnegative_index(len))
                 .map(|index| index.clamp(0, len - 1));
 
-            let step = from_negative_i64(step_int).unwrap(); // TODO
+            let step = from_negative_i32(step_int);
 
             let (skip, take_n, step) = if let Some(stop) = stop {
                 match start.cmp(&stop) {
@@ -179,8 +165,8 @@ mod tests {
         assert_eq!(iter.clone().py_index(0), Err(OutOfBoundsError));
         assert_eq!(iter.clone().py_index(1), Err(OutOfBoundsError));
         assert_eq!(iter.clone().py_index(-1), Err(OutOfBoundsError));
-        assert_eq!(iter.clone().py_index(i64::MIN), Err(OutOfBoundsError));
-        assert_eq!(iter.clone().py_index(i64::MAX), Err(OutOfBoundsError));
+        assert_eq!(iter.clone().py_index(i32::MIN), Err(OutOfBoundsError));
+        assert_eq!(iter.clone().py_index(i32::MAX), Err(OutOfBoundsError));
     }
 
     #[test]
@@ -210,39 +196,24 @@ mod tests {
 
     #[test]
     fn py_index_uses_full_index_range() {
-        let iter = 0..=u64::MAX;
+        let iter = 0..=u32::MAX;
 
-        // u64::MAX - |i64::MIN| + 1 = 2^64 - 1 - 2^63 + 1 = 2^63
-        assert_eq!(iter.clone().py_index(i64::MIN), Ok(2u64.pow(63)));
-        assert_eq!(iter.clone().py_index(-2), Ok(u64::MAX - 2 + 1));
-        assert_eq!(iter.clone().py_index(-1), Ok(u64::MAX - 1 + 1));
+        // u32::MAX - |i32::MIN| + 1 = 2^32 - 1 - 2^31 + 1 = 2^31
+        assert_eq!(iter.clone().py_index(i32::MIN), Ok(2u32.pow(31)));
+        assert_eq!(iter.clone().py_index(-2), Ok(u32::MAX - 2 + 1));
+        assert_eq!(iter.clone().py_index(-1), Ok(u32::MAX - 1 + 1));
 
         assert_eq!(iter.clone().py_index(0), Ok(0));
         assert_eq!(iter.clone().py_index(1), Ok(1));
-        assert_eq!(iter.clone().py_index(i64::MAX), Ok(i64::MAX as u64));
-    }
-
-    #[cfg(target_pointer_width = "32")]
-    #[test]
-    fn py_index_uses_full_index_range_32bit() {
-        let iter = 0..=u64::MAX;
-
-        assert_eq!(
-            iter.clone().py_index(i64::MAX),
-            Err(OutOfBoundsError::ExceedsUsizeBounds)
-        );
-        assert_eq!(
-            iter.clone().py_index(i64::MIN),
-            Err(OutOfBoundsError::ExceedsUsizeBounds)
-        );
+        assert_eq!(iter.clone().py_index(i32::MAX), Ok(i32::MAX as u32));
     }
 
     #[track_caller]
     fn assert_eq_slice<const N: usize, const M: usize>(
         input: &[char; N],
-        start: Option<i64>,
-        stop: Option<i64>,
-        step: Option<i64>,
+        start: Option<i32>,
+        stop: Option<i32>,
+        step: Option<i32>,
         expected: &[char; M],
     ) {
         assert_equal(
@@ -254,9 +225,9 @@ mod tests {
     #[track_caller]
     fn assert_slice_returns_none<const N: usize>(
         input: &[char; N],
-        start: Option<i64>,
-        stop: Option<i64>,
-        step: Option<i64>,
+        start: Option<i32>,
+        stop: Option<i32>,
+        step: Option<i32>,
     ) {
         assert!(matches!(
             input.iter().py_slice(start, stop, step),

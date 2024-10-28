@@ -96,15 +96,15 @@ impl Display for DisplayRepresentation<'_> {
                     "slice[{start}, {stop}{step}]",
                     start = slice
                         .start(self.db)
-                        .map(|s| format!("Literal[{}], ", s))
+                        .map(|s| format!("Literal[{}]", s))
                         .unwrap_or("None".into()),
                     stop = slice
                         .stop(self.db)
-                        .map(|s| format!("Literal[{}], ", s))
+                        .map(|s| format!("Literal[{}]", s))
                         .unwrap_or("None".into()),
                     step = slice
                         .step(self.db)
-                        .map(|s| format!(", {}", s))
+                        .map(|s| format!(", Literal[{}]", s))
                         .unwrap_or_default()
                 )
             }

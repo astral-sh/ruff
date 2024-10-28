@@ -3206,18 +3206,22 @@ impl<'db> TypeInferenceBuilder<'db> {
     ) -> Type<'db> {
         match (value_ty, slice_ty) {
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
-            (Type::Tuple(tuple_ty), Type::IntLiteral(int)) => {
+            (Type::Tuple(tuple_ty), Type::IntLiteral(int)) if i32::try_from(int).is_ok() => {
                 let elements = tuple_ty.elements(self.db);
-                elements.iter().py_index(int).copied().unwrap_or_else(|_| {
-                    self.index_out_of_bounds_diagnostic(
-                        "tuple",
-                        value_node.into(),
-                        value_ty,
-                        elements.len(),
-                        int,
-                    );
-                    Type::Unknown
-                })
+                elements
+                    .iter()
+                    .py_index(int as i32)
+                    .copied()
+                    .unwrap_or_else(|_| {
+                        self.index_out_of_bounds_diagnostic(
+                            "tuple",
+                            value_node.into(),
+                            value_ty,
+                            elements.len(),
+                            int,
+                        );
+                        Type::Unknown
+                    })
             }
             // Ex) Given `("a", 1, Null)[0:2]`, return `("a", 1)`
             (Type::Tuple(tuple_ty), Type::SliceLiteral(slice_ty)) => {
@@ -3245,11 +3249,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::IntLiteral(i64::from(bool)),
             ),
             // Ex) Given `"value"[1]`, return `"a"`
-            (Type::StringLiteral(literal_ty), Type::IntLiteral(int)) => {
+            (Type::StringLiteral(literal_ty), Type::IntLiteral(int))
+                if i32::try_from(int).is_ok() =>
+            {
                 let literal_value = literal_ty.value(self.db);
                 literal_value
                     .chars()
-                    .py_index(int)
+                    .py_index(int as i32)
                     .map(|ch| {
                         Type::StringLiteral(StringLiteralType::new(
                             self.db,
@@ -3293,11 +3299,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
             // Ex) Given `b"value"[1]`, return `b"a"`
-            (Type::BytesLiteral(literal_ty), Type::IntLiteral(int)) => {
+            (Type::BytesLiteral(literal_ty), Type::IntLiteral(int))
+                if i32::try_from(int).is_ok() =>
+            {
                 let literal_value = literal_ty.value(self.db);
                 literal_value
                     .iter()
-                    .py_index(int)
+                    .py_index(int as i32)
                     .map(|byte| {
                         Type::BytesLiteral(BytesLiteralType::new(self.db, [*byte].as_slice()))
                     })
@@ -3395,7 +3403,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_slice_expression(&mut self, slice: &ast::ExprSlice) -> Type<'db> {
         enum SliceArg {
-            Arg(Option<i64>),
+            Arg(Option<i32>),
             Unsupported,
         }
 
@@ -3411,8 +3419,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ty_step = self.infer_optional_expression(step.as_deref());
 
         let type_to_slice_argument = |ty: Option<Type<'db>>| match ty {
-            Some(Type::IntLiteral(n)) => SliceArg::Arg(Some(n)),
-            Some(Type::BooleanLiteral(b)) => SliceArg::Arg(Some(i64::from(b))),
+            Some(Type::IntLiteral(n)) if i32::try_from(n).is_ok() => SliceArg::Arg(Some(n as i32)),
+            Some(Type::BooleanLiteral(b)) => SliceArg::Arg(Some(i32::from(b))),
             Some(Type::None) => SliceArg::Arg(None),
             Some(Type::Instance(class)) if class.is_known(self.db, KnownClass::NoneType) => {
                 SliceArg::Arg(None)
