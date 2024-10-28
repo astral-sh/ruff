@@ -3270,12 +3270,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let start = slice_ty.start(self.db);
                 let stop = slice_ty.stop(self.db);
                 let step = slice_ty.step(self.db);
+
                 let chars: Vec<_> = literal_value.chars().collect();
                 if let Ok(new_chars) = chars.into_iter().py_slice(start, stop, step) {
-                    let new_literal = new_chars.collect::<String>();
                     Type::StringLiteral(StringLiteralType::new(
                         self.db,
-                        new_literal.into_boxed_str(),
+                        new_chars.collect::<String>().into_boxed_str(),
                     ))
                 } else {
                     self.slice_step_size_zero_diagnostic(value_node.into());

@@ -1,3 +1,7 @@
+//! This module provides utility functions for indexing (`PyIndex`) and slicing
+//! operations (`PySlice`) on iterators, following the semantics of equivalent
+//! operations in Python.
+
 use std::cmp::Ordering;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
