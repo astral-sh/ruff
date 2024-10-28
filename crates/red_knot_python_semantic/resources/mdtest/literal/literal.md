@@ -7,9 +7,7 @@ from enum import Enum
 mode: Literal["w", "r"]
 
 mode2: Literal["w"] | Literal["r"]
-# TODO: PEP-604 unions
-# union_var: Literal[Literal[Literal[1, 2, 3], "foo"], 5, None]
-# reveal_type(union_var) # revealed: Literal[1, 2, 3, "foo", 5, None]
+union_var: Literal[Literal[Literal[1, 2, 3], "foo"], 5, None]
 
 a: Literal[26]
 a2: Literal[0x1A]
@@ -44,6 +42,8 @@ def f():
     reveal_type(a10)  # revealed: Literal["w", "r", "w+"]
     # TODO: This should be Color.RED
     reveal_type(a11)  # revealed: Literal[0]
+    # TODO: revealed: Literal[1, 2, 3, "foo", 5] | None
+    reveal_type(union_var)  # revealed: Literal[1, 2, 3] | Literal["foo"] | Literal[5] | None
 
 # error: [invalid-literal-parameter] "Type arguments for `Literal` must be None, a literal value (int, bool, str, or bytes), or an enum value"
 invalid1: Literal[3 + 4]
