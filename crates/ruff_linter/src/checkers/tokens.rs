@@ -10,7 +10,6 @@ use ruff_diagnostics::Diagnostic;
 use ruff_python_index::Indexer;
 use ruff_python_parser::Tokens;
 use ruff_source_file::Locator;
-use ruff_text_size::Ranged;
 
 use crate::directives::TodoComment;
 use crate::registry::{AsRule, Rule};
@@ -93,11 +92,12 @@ pub(crate) fn check_tokens(
         Rule::InvalidCharacterNul,
         Rule::InvalidCharacterZeroWidthSpace,
     ]) {
+        let mut last_fstring_start = None;
         for token in tokens {
             pylint::rules::invalid_string_characters(
                 &mut diagnostics,
-                token.kind(),
-                token.range(),
+                token,
+                &mut last_fstring_start,
                 locator,
             );
         }
