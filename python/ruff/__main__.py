@@ -57,20 +57,21 @@ def find_ruff_bin() -> str:
     #
     # See: https://github.com/pypa/pip/blob/102d8187a1f5a4cd5de7a549fd8a9af34e89a54f/src/pip/_internal/build_env.py#L87
     paths = os.environ.get("PATH", "").split(os.pathsep)
-    maybe_overlay = get_last_three_path_parts(paths[0])
-    maybe_normal = get_last_three_path_parts(paths[1])
-    if (
-        len(maybe_normal) >= 3
-        and maybe_normal[-1].startswith("pip-build-env-")
-        and maybe_normal[-2] == "normal"
-        and len(maybe_overlay) >= 3
-        and maybe_overlay[-1].startswith("pip-build-env-")
-        and maybe_overlay[-2] == "overlay"
-    ):
-        # The overlay must contain the ruff binary.
-        candidate = os.path.join(paths[0], ruff_exe)
-        if os.path.isfile(candidate):
-            return candidate
+    if len(paths) >= 2:
+        maybe_overlay = get_last_three_path_parts(paths[0])
+        maybe_normal = get_last_three_path_parts(paths[1])
+        if (
+            len(maybe_normal) >= 3
+            and maybe_normal[-1].startswith("pip-build-env-")
+            and maybe_normal[-2] == "normal"
+            and len(maybe_overlay) >= 3
+            and maybe_overlay[-1].startswith("pip-build-env-")
+            and maybe_overlay[-2] == "overlay"
+        ):
+            # The overlay must contain the ruff binary.
+            candidate = os.path.join(paths[0], ruff_exe)
+            if os.path.isfile(candidate):
+                return candidate
 
     raise FileNotFoundError(scripts_path)
 
