@@ -1,6 +1,6 @@
 # Narrowing for `not` conditionals
 
-Not operator negating the constraints made by other conditionals
+The `not` operator negates a constraint.
 
 ## `not is None`
 
