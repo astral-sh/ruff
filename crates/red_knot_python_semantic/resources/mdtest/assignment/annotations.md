@@ -55,8 +55,9 @@ reveal_type(g)  # revealed: @Todo
 
 # TODO: support more kinds of type expressions in annotations
 reveal_type(h)  # revealed: @Todo
-reveal_type(i)  # revealed: tuple[@Todo, @Todo]
-reveal_type(j)  # revealed: tuple[@Todo]
+
+reveal_type(i)  # revealed: tuple[str | int, str | int]
+reveal_type(j)  # revealed: tuple[str | int]
 ```
 
 ## Incorrect tuple annotations are complained about
@@ -67,6 +68,9 @@ a: tuple[()] = (1, 2)
 
 # error: [invalid-assignment] "Object of type `tuple[Literal["foo"]]` is not assignable to `tuple[int]`"
 b: tuple[int] = ("foo",)
+
+# error: [invalid-assignment] "Object of type `tuple[list, Literal["foo"]]` is not assignable to `tuple[str | int, str]`"
+c: tuple[str | int, str] = ([], "foo")
 ```
 
 ## PEP-604 annotations are supported
