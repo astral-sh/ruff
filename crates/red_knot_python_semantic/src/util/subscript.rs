@@ -15,11 +15,6 @@ pub(crate) trait PyIndex {
     fn py_index(&mut self, index: i32) -> Result<Self::Item, OutOfBoundsError>;
 }
 
-enum Nth {
-    FromStart(usize),
-    FromEnd(usize),
-}
-
 fn from_nonnegative_i32(index: i32) -> usize {
     static_assertions::const_assert!(usize::BITS >= 32);
     debug_assert!(index >= 0);
@@ -37,6 +32,11 @@ fn from_negative_i32(index: i32) -> usize {
         // it as a usize, since usize is at least 32 bits.
         from_nonnegative_i32(i32::MAX) + 1
     })
+}
+
+enum Nth {
+    FromStart(usize),
+    FromEnd(usize),
 }
 
 impl Nth {
