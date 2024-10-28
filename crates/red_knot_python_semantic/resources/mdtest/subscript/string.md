@@ -18,6 +18,12 @@ reveal_type(a)  # revealed: Unknown
 
 b = s[-8]  # error: [index-out-of-bounds] "Index -8 is out of bounds for string `Literal["abcde"]` with length 5"
 reveal_type(b)  # revealed: Unknown
+
+def int_instance() -> int: ...
+
+a = "abcde"[int_instance()]
+# TODO: Support overloads... Should be `str`
+reveal_type(a)  # revealed: @Todo
 ```
 
 ## Slices
@@ -67,15 +73,16 @@ s[0:4:0]  # error: [zero-stepsize-in-slice]
 s[:4:0]  # error: [zero-stepsize-in-slice]
 s[0::0]  # error: [zero-stepsize-in-slice]
 s[::0]  # error: [zero-stepsize-in-slice]
-```
 
-## Function return
+def int_instance() -> int: ...
 
-```py
-def int_instance() -> int:
-    return 42
+substring1 = s[int_instance() : int_instance()]
+# TODO: Support overloads... Should be `LiteralString`
+reveal_type(substring1)  # revealed: @Todo
 
-a = "abcde"[int_instance()]
+def str_instance() -> str: ...
+
+substring2 = str_instance()[0:5]
 # TODO: Support overloads... Should be `str`
-reveal_type(a)  # revealed: @Todo
+reveal_type(substring2)  # revealed: @Todo
 ```

@@ -66,4 +66,10 @@ t[0:4:0]  # error: [zero-stepsize-in-slice]
 t[:4:0]  # error: [zero-stepsize-in-slice]
 t[0::0]  # error: [zero-stepsize-in-slice]
 t[::0]  # error: [zero-stepsize-in-slice]
+
+def int_instance() -> int: ...
+
+tuple_slice = t[int_instance() : int_instance()]
+# TODO: Support overloads... Should be `tuple[Literal[1, 'a', b"b"] | None, ...]`
+reveal_type(tuple_slice)  # revealed: @Todo
 ```
