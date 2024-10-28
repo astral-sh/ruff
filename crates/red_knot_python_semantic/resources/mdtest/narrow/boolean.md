@@ -1,4 +1,10 @@
-# Narrowing in boolean expression
+# Narrowing in boolean expressions
+
+In `or` expressions, the right-hand side is evaluated only if the left-hand side is **falsy**.
+So when the right-hand side is evaluated, we know the left side has failed.
+
+Similarly, in `and` expressions, the right-hand side is evaluated only if the left-hand side is **truthy**.
+So when the right-hand side is evaluated, we know the left side has succeeded.
 
 ## Narrowing in `or`
 
