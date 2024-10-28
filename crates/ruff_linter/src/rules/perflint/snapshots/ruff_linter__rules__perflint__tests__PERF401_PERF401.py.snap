@@ -1,34 +1,89 @@
 ---
 source: crates/ruff_linter/src/rules/perflint/mod.rs
+snapshot_kind: text
 ---
-PERF401.py:6:13: PERF401 Use a list comprehension to create a transformed list
+PERF401.py:6:13: PERF401 [*] Use a list comprehension to create a transformed list
   |
 4 |     for i in items:
 5 |         if i % 2:
 6 |             result.append(i)  # PERF401
   |             ^^^^^^^^^^^^^^^^ PERF401
   |
+  = help: Replace for loop with list comprehension
 
-PERF401.py:13:9: PERF401 Use a list comprehension to create a transformed list
+ℹ Unsafe fix
+1 1 | def f():
+2 2 |     items = [1, 2, 3, 4]
+3   |-    result = []
+4   |-    for i in items:
+5   |-        if i % 2:
+6   |-            result.append(i)  # PERF401
+  3 |+    result = [i for i in items if i % 2]
+  4 |+      # PERF401
+7 5 | 
+8 6 | 
+9 7 | def f():
+
+PERF401.py:13:9: PERF401 [*] Use a list comprehension to create a transformed list
    |
 11 |     result = []
 12 |     for i in items:
 13 |         result.append(i * i)  # PERF401
    |         ^^^^^^^^^^^^^^^^^^^^ PERF401
    |
+   = help: Replace for loop with list comprehension
 
-PERF401.py:82:13: PERF401 Use an async list comprehension to create a transformed list
+ℹ Unsafe fix
+8  8  | 
+9  9  | def f():
+10 10 |     items = [1, 2, 3, 4]
+11    |-    result = []
+12    |-    for i in items:
+13    |-        result.append(i * i)  # PERF401
+   11 |+    result = [i * i for i in items]
+   12 |+      # PERF401
+14 13 | 
+15 14 | 
+16 15 | def f():
+
+PERF401.py:82:13: PERF401 [*] Use an async list comprehension to create a transformed list
    |
 80 |     async for i in items:
 81 |         if i % 2:
 82 |             result.append(i)  # PERF401
    |             ^^^^^^^^^^^^^^^^ PERF401
    |
+   = help: Replace for loop with list comprehension
 
-PERF401.py:89:9: PERF401 Use an async list comprehension to create a transformed list
+ℹ Unsafe fix
+76 76 | 
+77 77 | def f():
+78 78 |     items = [1, 2, 3, 4]
+79    |-    result = []
+80    |-    async for i in items:
+81    |-        if i % 2:
+82    |-            result.append(i)  # PERF401
+   79 |+    result = [i async for i in items if i % 2]
+   80 |+      # PERF401
+83 81 | 
+84 82 | 
+85 83 | def f():
+
+PERF401.py:89:9: PERF401 [*] Use an async list comprehension to create a transformed list
    |
 87 |     result = []
 88 |     async for i in items:
 89 |         result.append(i)  # PERF401
    |         ^^^^^^^^^^^^^^^^ PERF401
    |
+   = help: Replace for loop with list comprehension
+
+ℹ Unsafe fix
+84 84 | 
+85 85 | def f():
+86 86 |     items = [1, 2, 3, 4]
+87    |-    result = []
+88    |-    async for i in items:
+89    |-        result.append(i)  # PERF401
+   87 |+    result = [i async for i in items]
+   88 |+      # PERF401

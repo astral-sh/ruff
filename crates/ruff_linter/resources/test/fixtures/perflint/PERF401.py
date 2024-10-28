@@ -87,3 +87,16 @@ def f():
     result = []
     async for i in items:
         result.append(i)  # PERF401
+
+
+def f():
+    result, _ = [1,2,3,4], ...
+    for i in range(10):
+        result.append(i*2)  # PERF401
+
+def f():
+    result = []
+    if True:
+        for i in range(10):
+            if i % 2:
+                result.append(i) # PERF401

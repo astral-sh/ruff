@@ -142,7 +142,6 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
     if attr.as_str() != "append" {
         return;
     }
-
     // Ignore direct list copies (e.g., `for x in y: filtered.append(x)`), unless it's async, which
     // `manual-list-copy` doesn't cover.
     if !for_stmt.is_async {
@@ -204,23 +203,27 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
         return;
     }
 
-    let Some(Stmt::Assign(binding_stmt)) = binding.statement(checker.semantic()) else {
+    let Some(binding_stmt) = binding
+        .statement(checker.semantic())
+        .and_then(|stmt| stmt.as_assign_stmt())
+    else {
         return;
     };
 
     // If the variable is an empty list literal, then we might be able to replace it with a full list comprehension
     // otherwise, it has to be replaced with a `list.extend`
-    let binding_is_empty_list = match binding_stmt.value.as_ref() {
-        Expr::List(ast::ExprList { elts, .. }) => elts.is_empty(),
-        _ => false,
+    let binding_is_empty_list = match binding_stmt.value.as_list_expr() {
+        Some(list_expr) => list_expr.elts.is_empty(),
+        None => false,
     };
+
     let comprehension_type = if binding_is_empty_list {
         ComprehensionType::ListComprehension
     } else {
         ComprehensionType::Extend
     };
 
-    // If the for loop does not have the same parent element as the binding, then it cannot be
+    // If the for loop does not have the same parent element as the binding, then it cannot always be
     // deleted and replaced with a list comprehension.
     let assignment_in_same_statement = {
         let for_loop_parent = checker.semantic().current_statement_parent_id();
@@ -231,7 +234,17 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, for_stmt: &ast::S
         for_loop_parent == binding_parent
     };
 
-    let comprehension_type = Some(comprehension_type).filter(|_| assignment_in_same_statement);
+    // If the binding is not a single name expression, it could be replaced with a list comprehension,
+    // but not necessarily, so this needs to be manually fixed
+    let binding_has_one_target = {
+        let only_target = binding_stmt.targets.len() == 1;
+        let is_name = binding_stmt.targets[0].is_name_expr();
+        only_target && is_name
+    };
+
+    let comprehension_type = Some(comprehension_type)
+        .filter(|_| assignment_in_same_statement)
+        .filter(|_| binding_has_one_target);
 
     let mut diagnostic = Diagnostic::new(
         ManualListComprehension {
