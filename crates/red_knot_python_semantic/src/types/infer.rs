@@ -3483,8 +3483,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let value_node = value.as_ref();
                 let slice_ty = self.infer_expression(slice);
                 // TODO: currently the logic to get the type of type of a subscript in type
-                // annotation with where value is a slice is defined in the
-                // subscript_expression_types. Once it's complete call that logic from here.
+                // annotation is defined in the subscript_expression_types.
+                // instead we need to define a new method for type annotations and call that here.
                 self.infer_subscript_expression_types(value_node, value_ty, slice_ty)
             }
         }
