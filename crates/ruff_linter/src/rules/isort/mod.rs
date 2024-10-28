@@ -1143,7 +1143,7 @@ mod tests {
             },
         )?;
         diagnostics.sort_by_key(Ranged::start);
-        assert_messages!(*snapshot, diagnostics);
+        assert_messages!(&*snapshot, diagnostics);
         Ok(())
     }
 
