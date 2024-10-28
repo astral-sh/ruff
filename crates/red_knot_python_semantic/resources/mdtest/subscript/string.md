@@ -41,6 +41,9 @@ reveal_type(s[:1])  # revealed: Literal["a"]
 reveal_type(s[:5])  # revealed: Literal["abcde"]
 
 reveal_type(s[:])  # revealed: Literal["abcde"]
+
+a = s[0:5:0]  # error: [slice-step-zero]
+reveal_type(a)  # revealed: Unknown
 ```
 
 ## Function return

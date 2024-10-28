@@ -56,7 +56,7 @@ use crate::types::{
     KnownClass, KnownFunction, SliceLiteralType, StringLiteralType, Truthiness, TupleType, Type,
     TypeArrayDisplay, UnionBuilder, UnionType,
 };
-use crate::util::subscript::{PyIndex, PySlice, StepSizeZeroError};
+use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
@@ -3210,7 +3210,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let elements = tuple_ty.elements(self.db);
                 elements
                     .iter()
-                    .py_index(int as i32)
+                    .py_index(i32::try_from(int).unwrap())
                     .copied()
                     .unwrap_or_else(|_| {
                         self.index_out_of_bounds_diagnostic(
@@ -3230,16 +3230,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let stop = slice_ty.stop(self.db);
                 let step = slice_ty.step(self.db);
 
-                match elements.iter().py_slice(start, stop, step) {
-                    Ok(new_elements) => {
-                        let new_elements: Vec<_> = new_elements.copied().collect();
-                        Type::Tuple(TupleType::new(self.db, new_elements.into_boxed_slice()))
-                    }
-                    Err(StepSizeZeroError) => {
-                        self.slice_step_size_zero_diagnostic(value_node.into());
+                if let Ok(new_elements) = elements.iter().py_slice(start, stop, step) {
+                    let new_elements: Vec<_> = new_elements.copied().collect();
+                    Type::Tuple(TupleType::new(self.db, new_elements.into_boxed_slice()))
+                } else {
+                    self.slice_step_size_zero_diagnostic(value_node.into());
 
-                        Type::Unknown
-                    }
+                    Type::Unknown
                 }
             }
             // Ex) Given `("a", "b", "c", "d")[True]`, return `"b"`
@@ -3255,7 +3252,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let literal_value = literal_ty.value(self.db);
                 literal_value
                     .chars()
-                    .py_index(int as i32)
+                    .py_index(i32::try_from(int).unwrap())
                     .map(|ch| {
                         Type::StringLiteral(StringLiteralType::new(
                             self.db,
@@ -3287,13 +3284,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         new_literal.into_boxed_str(),
                     ))
                 } else {
-                    self.index_out_of_bounds_diagnostic(
-                        "string",
-                        value_node.into(),
-                        value_ty,
-                        literal_value.chars().count(),
-                        100, // TODO
-                    );
+                    self.slice_step_size_zero_diagnostic(value_node.into());
 
                     Type::Unknown
                 }
@@ -3305,7 +3296,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let literal_value = literal_ty.value(self.db);
                 literal_value
                     .iter()
-                    .py_index(int as i32)
+                    .py_index(i32::try_from(int).unwrap())
                     .map(|byte| {
                         Type::BytesLiteral(BytesLiteralType::new(self.db, [*byte].as_slice()))
                     })
@@ -3419,7 +3410,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ty_step = self.infer_optional_expression(step.as_deref());
 
         let type_to_slice_argument = |ty: Option<Type<'db>>| match ty {
-            Some(Type::IntLiteral(n)) if i32::try_from(n).is_ok() => SliceArg::Arg(Some(n as i32)),
+            Some(Type::IntLiteral(n)) if i32::try_from(n).is_ok() => {
+                SliceArg::Arg(Some(i32::try_from(n).unwrap()))
+            }
             Some(Type::BooleanLiteral(b)) => SliceArg::Arg(Some(i32::from(b))),
             Some(Type::None) => SliceArg::Arg(None),
             Some(Type::Instance(class)) if class.is_known(self.db, KnownClass::NoneType) => {

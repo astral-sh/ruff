@@ -19,7 +19,7 @@ fn from_nonnegative_i32(index: i32) -> usize {
     debug_assert!(index >= 0);
 
     // SAFETY: `index` is non-negative, and `usize` is at least 32 bits.
-    index as usize
+    usize::try_from(index).unwrap()
 }
 
 fn from_negative_i32(index: i32) -> usize {
