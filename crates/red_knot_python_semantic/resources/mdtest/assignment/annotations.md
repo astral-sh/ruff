@@ -26,29 +26,37 @@ x = "foo"  # error: [invalid-assignment] "Object of type `Literal["foo"]` is not
 ## Tuple annotations are understood
 
 ```py path=module.py
+from typing_extensions import Unpack
+
 a: tuple[()] = ()
 b: tuple[int] = (42,)
 c: tuple[str, int] = ("42", 42)
 d: tuple[tuple[str, str], tuple[int, int]] = (("foo", "foo"), (42, 42))
 e: tuple[str, ...] = ()
 f: tuple[str, *tuple[int, ...], bytes] = ("42", b"42")
-g: tuple[list[int], list[int]] = ([], [])
+g: tuple[str, Unpack[tuple[int, ...]], bytes] = ("42", b"42")
+h: tuple[list[int], list[int]] = ([], [])
+i: tuple[str | int, str | int] = (42, 42)
+j: tuple[str | int] = (42,)
 ```
 
 ```py path=script.py
-from module import a, b, c, d, e, f, g
+from module import a, b, c, d, e, f, g, h, i, j
 
 reveal_type(a)  # revealed: tuple[()]
 reveal_type(b)  # revealed: tuple[int]
 reveal_type(c)  # revealed: tuple[str, int]
 reveal_type(d)  # revealed: tuple[tuple[str, str], tuple[int, int]]
 
-# TODO: homogenous tuples
+# TODO: homogenous tuples, PEP-646 tuples
 reveal_type(e)  # revealed: @Todo
 reveal_type(f)  # revealed: @Todo
+reveal_type(g)  # revealed: @Todo
 
 # TODO: support more kinds of type expressions in annotations
-reveal_type(g)  # revealed: @Todo
+reveal_type(h)  # revealed: @Todo
+reveal_type(i)  # revealed: tuple[@Todo, @Todo]
+reveal_type(j)  # revealed: tuple[@Todo]
 ```
 
 ## Incorrect tuple annotations are complained about

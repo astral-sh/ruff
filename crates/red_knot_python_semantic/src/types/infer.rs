@@ -3582,29 +3582,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     .into_class_literal_type()
                     .is_some_and(|class| class.is_known(self.db, KnownClass::Tuple))
                 {
-                    // TODO:
-                    // - homogeneous tuples
-                    // - PEP 646
-                    match &**slice {
-                        ast::Expr::Tuple(tuple) => {
-                            let mut elements = vec![];
-                            let mut return_todo = false;
-                            for element in tuple {
-                                let element_ty = self.infer_type_expression(element);
-                                return_todo |= element_ty.is_todo();
-                                elements.push(element_ty);
-                            }
-                            if return_todo {
-                                Type::Todo
-                            } else {
-                                Type::Tuple(TupleType::new(self.db, elements.into_boxed_slice()))
-                            }
-                        }
-                        _ => match self.infer_type_expression(slice) {
-                            Type::Todo => Type::Todo,
-                            slice_ty => Type::Tuple(TupleType::new(self.db, Box::from([slice_ty]))),
-                        },
-                    }
+                    self.infer_tuple_type_expression(slice)
                 } else {
                     self.infer_type_expression(slice);
                     // TODO: many other kinds of subscripts
@@ -3732,6 +3710,56 @@ impl<'db> TypeInferenceBuilder<'db> {
         assert!(previous.is_none());
 
         ty
+    }
+
+    fn infer_tuple_type_expression(&mut self, tuple_slice: &ast::Expr) -> Type<'db> {
+        /// In most cases, if a subelement of the tuple is inferred as `Todo`,
+        /// we should only infer `Todo` for that specific subelement.
+        /// Certain specific AST nodes can however change the meaning of the entire tuple,
+        /// however: `tuple[int, ...]` or `tuple[int, *tuple[str, ...]]` change the tuple
+        /// into a homogeneous tuple or partly homogeneous tuple (respectively) -- neither
+        /// is supported by us right now, so we should infer `Todo` for the *entire* tuple
+        /// if we encounter one of those elements
+        fn element_could_alter_type_of_whole_tuple(element: &ast::Expr, element_ty: Type) -> bool {
+            element_ty.is_todo()
+                && matches!(
+                    element,
+                    ast::Expr::EllipsisLiteral(_) | ast::Expr::Starred(_) | ast::Expr::Subscript(_)
+                )
+        }
+
+        // TODO:
+        // - homogeneous tuples
+        // - PEP 646
+        match tuple_slice {
+            ast::Expr::Tuple(elements) => {
+                let mut element_types = Vec::with_capacity(elements.len());
+
+                // Whether to infer `Todo` for the whole tuple
+                // (see docstring for `element_could_alter_type_of_whole_tuple`)
+                let mut return_todo = false;
+
+                for element in elements {
+                    let element_ty = self.infer_type_expression(element);
+                    return_todo |= element_could_alter_type_of_whole_tuple(element, element_ty);
+                    element_types.push(element_ty);
+                }
+
+                if return_todo {
+                    Type::Todo
+                } else {
+                    Type::Tuple(TupleType::new(self.db, element_types.into_boxed_slice()))
+                }
+            }
+            single_element => {
+                let single_element_ty = self.infer_type_expression(single_element);
+                if element_could_alter_type_of_whole_tuple(single_element, single_element_ty) {
+                    Type::Todo
+                } else {
+                    Type::Tuple(TupleType::new(self.db, Box::from([single_element_ty])))
+                }
+            }
+        }
     }
 }
 

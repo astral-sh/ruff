@@ -470,14 +470,14 @@ impl<'db> Type<'db> {
                 true
             }
             (Type::Tuple(self_tuple), Type::Tuple(target_tuple)) => {
-                self_tuple.len(db) == target_tuple.len(db)
-                    && self_tuple
-                        .elements(db)
-                        .iter()
-                        .zip(target_tuple.elements(db))
-                        .all(|(self_element, target_element)| {
+                let self_elements = self_tuple.elements(db);
+                let target_elements = target_tuple.elements(db);
+                self_elements.len() == target_elements.len()
+                    && self_elements.iter().zip(target_elements).all(
+                        |(self_element, target_element)| {
                             self_element.is_subtype_of(db, *target_element)
-                        })
+                        },
+                    )
             }
             (Type::ClassLiteral(..), Type::Instance(class))
                 if class.is_known(db, KnownClass::Type) =>
@@ -514,6 +514,16 @@ impl<'db> Type<'db> {
                 .elements(db)
                 .iter()
                 .any(|&elem_ty| ty.is_assignable_to(db, elem_ty)),
+            (Type::Tuple(self_tuple), Type::Tuple(target_tuple)) => {
+                let self_elements = self_tuple.elements(db);
+                let target_elements = target_tuple.elements(db);
+                self_elements.len() == target_elements.len()
+                    && self_elements.iter().zip(target_elements).all(
+                        |(self_element, target_element)| {
+                            self_element.is_assignable_to(db, *target_element)
+                        },
+                    )
+            }
             // TODO other types containing gradual forms (e.g. generics containing Any/Unknown)
             _ => self.is_subtype_of(db, target),
         }
@@ -1897,6 +1907,7 @@ mod tests {
         Unknown,
         None,
         Any,
+        Todo,
         IntLiteral(i64),
         BooleanLiteral(bool),
         StringLiteral(&'static str),
@@ -1915,6 +1926,7 @@ mod tests {
                 Ty::Unknown => Type::Unknown,
                 Ty::None => Type::None,
                 Ty::Any => Type::Any,
+                Ty::Todo => Type::Todo,
                 Ty::IntLiteral(n) => Type::IntLiteral(n),
                 Ty::StringLiteral(s) => Type::StringLiteral(StringLiteralType::new(db, s)),
                 Ty::BooleanLiteral(b) => Type::BooleanLiteral(b),
@@ -1957,6 +1969,8 @@ mod tests {
     #[test_case(Ty::IntLiteral(1), Ty::Union(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")]))]
     #[test_case(Ty::IntLiteral(1), Ty::Union(vec![Ty::Unknown, Ty::BuiltinInstance("str")]))]
     #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]))]
+    #[test_case(Ty::Tuple(vec![Ty::Todo]), Ty::Tuple(vec![Ty::IntLiteral(2)]))]
+    #[test_case(Ty::Tuple(vec![Ty::IntLiteral(2)]), Ty::Tuple(vec![Ty::Todo]))]
     fn is_assignable_to(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_assignable_to(&db, to.into_type(&db)));
@@ -2014,6 +2028,8 @@ mod tests {
     #[test_case(Ty::BuiltinInstance("int"), Ty::IntLiteral(1))]
     #[test_case(Ty::Tuple(vec![]), Ty::Tuple(vec![Ty::IntLiteral(1)]))]
     #[test_case(Ty::Tuple(vec![Ty::IntLiteral(42)]), Ty::Tuple(vec![Ty::BuiltinInstance("str")]))]
+    #[test_case(Ty::Tuple(vec![Ty::Todo]), Ty::Tuple(vec![Ty::IntLiteral(2)]))]
+    #[test_case(Ty::Tuple(vec![Ty::IntLiteral(2)]), Ty::Tuple(vec![Ty::Todo]))]
     fn is_not_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(!from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
