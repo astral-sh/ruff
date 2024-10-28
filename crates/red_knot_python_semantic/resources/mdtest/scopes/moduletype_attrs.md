@@ -9,12 +9,10 @@ before deciding that the name is unbound.
 
 ```py
 reveal_type(__name__)  # revealed: str
-
-# TODO: infer types from PEP-604 union annotations
-reveal_type(__file__)  # revealed: @Todo
-reveal_type(__loader__)  # revealed: @Todo
-reveal_type(__package__)  # revealed: @Todo
-reveal_type(__spec__)  # revealed: @Todo
+reveal_type(__file__)  # revealed: str | None
+reveal_type(__loader__)  # revealed: LoaderProtocol | None
+reveal_type(__package__)  # revealed: str | None
+reveal_type(__spec__)  # revealed: ModuleSpec | None
 
 # TODO: generics
 reveal_type(__path__)  # revealed: @Todo
@@ -61,11 +59,15 @@ import typing
 reveal_type(typing.__name__)  # revealed: str
 reveal_type(typing.__init__)  # revealed: Literal[__init__]
 
-# This one comes from `builtins.object`, not `types.ModuleType`:
-# TODO: we don't currently understand `types.ModuleType` as inheriting from `object`
+# These come from `builtins.object`, not `types.ModuleType`:
+# TODO: we don't currently understand `types.ModuleType` as inheriting from `object`;
+# these should not reveal `Unbound`:
 reveal_type(typing.__eq__)  # revealed: Unbound
+reveal_type(typing.__class__)  # revealed: Unbound
+reveal_type(typing.__module__)  # revealed: Unbound
 
-# TODO: needs support for attribute access on instances
+# TODO: needs support for attribute access on instances, properties and generics;
+# should be `dict[str, Any]`
 reveal_type(typing.__dict__)  # revealed: @Todo
 ```
 
@@ -88,13 +90,18 @@ global namespace:
 
 ```py path=foo.py
 __dict__ = "foo"
+
+reveal_type(__dict__)  # revealed: Literal["foo"]
 ```
 
 ```py path=bar.py
 import foo
+from foo import __dict__ as foo_dict
 
-# TODO: needs support for attribute access on instances
+# TODO: needs support for attribute access on instances, properties, and generics;
+# should be `dict[str, Any]` for both of these:
 reveal_type(foo.__dict__)  # revealed: @Todo
+reveal_type(foo_dict)  # revealed: @Todo
 ```
 
 ## Conditionally global or `ModuleType` attribute

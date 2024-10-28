@@ -5,7 +5,7 @@ use ruff_python_ast as ast;
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::ast_ids::HasScopedAstId;
 use crate::semantic_index::definition::{Definition, DefinitionKind};
-use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId};
+use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, Symbol};
 use crate::semantic_index::{
     global_scope, semantic_index, symbol_table, use_def_map, BindingWithConstraints,
     BindingWithConstraintsIterator, DeclarationsIterator,
@@ -88,14 +88,21 @@ fn symbol_ty<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Type<'db>
         .unwrap_or(Type::Unbound)
 }
 
-/// Return a list of the symbols that typeshed declares in the scope of `types.ModuleType`
+/// Return a list of the symbols that typeshed declares in the body scope of
+/// the stub for the class `types.ModuleType`.
+///
+/// Conceptually this could be a `Set` rather than a list,
+/// but the number of symbols declared in this scope is likely to be very small,
+/// so the cost of hashing the names is likely to be more expensive than it's worth.
 #[salsa::tracked(return_ref)]
-fn module_type_symbols<'db>(db: &'db dyn Db) -> Box<[Box<str>]> {
+fn module_type_symbols<'db>(db: &'db dyn Db) -> smallvec::SmallVec<[ast::name::Name; 8]> {
     let Some(module_type) = KnownClass::ModuleType
         .to_class(db)
         .into_class_literal_type()
     else {
-        return Box::default();
+        // The most likely way we get here is if a user specified a `--custom-typeshed-dir`
+        // without a `types.pyi` stub in the `stdlib/` directory
+        return smallvec::SmallVec::default();
     };
 
     let module_type_scope = module_type.body_scope(db);
@@ -107,20 +114,13 @@ fn module_type_symbols<'db>(db: &'db dyn Db) -> Box<[Box<str>]> {
     // `__getattr__` is even more special: it doesn't exist at runtime, but typeshed includes it
     // to reduce false positives associated with functions that dynamically import modules
     // and return `Instance(types.ModuleType)`. We should ignore it for any known module-literal type.
-    let module_type_symbols: Box<[Box<str>]> = module_type_symbol_table
+    module_type_symbol_table
         .symbols()
         .filter(|symbol| symbol.is_declared())
-        .map(|symbol| &**symbol.name())
-        .filter(|symbol_name| !matches!(*symbol_name, "__dict__" | "__getattr__" | "__init__"))
-        .map(Box::from)
-        .collect();
-
-    // Make sure it contains declared symbols in the `types.ModuleType` scope,
-    // but not other random symbols that are only *referenced* in the `types.ModuleType` scope
-    debug_assert!(module_type_symbols.contains(&Box::from("__name__")));
-    debug_assert!(!module_type_symbols.contains(&Box::from("property")));
-
-    module_type_symbols
+        .map(Symbol::name)
+        .filter(|symbol_name| !matches!(&***symbol_name, "__dict__" | "__getattr__" | "__init__"))
+        .cloned()
+        .collect()
 }
 
 /// Looks up a module-global symbol by name in a file.
@@ -1942,15 +1942,13 @@ impl<'db> TupleType<'db> {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        builtins_symbol_ty, BytesLiteralType, IntersectionBuilder, StringLiteralType, Truthiness,
-        TupleType, Type, UnionType,
-    };
+    use super::*;
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
     use crate::ProgramSettings;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+    use ruff_python_ast as ast;
     use test_case::test_case;
 
     fn setup_db() -> TestDb {
@@ -2316,5 +2314,17 @@ mod tests {
         let db = setup_db();
 
         assert_eq!(ty.into_type(&db).repr(&db), expected.into_type(&db));
+    }
+
+    #[test]
+    fn module_type_symbols_includes_declared_types_but_not_referenced_types() {
+        let db = setup_db();
+        let symbol_names = module_type_symbols(&db);
+
+        let dunder_name_symbol_name = ast::name::Name::new_static("__name__");
+        assert!(symbol_names.contains(&dunder_name_symbol_name));
+
+        let property_symbol_name = ast::name::Name::new_static("property");
+        assert!(!symbol_names.contains(&property_symbol_name));
     }
 }

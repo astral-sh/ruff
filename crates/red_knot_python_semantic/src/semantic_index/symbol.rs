@@ -48,12 +48,17 @@ impl Symbol {
         self.flags.contains(SymbolFlags::IS_BOUND)
     }
 
+    /// Is the symbol declared in its containing scope?
     pub fn is_declared(&self) -> bool {
         self.flags.contains(SymbolFlags::IS_DECLARED)
     }
 }
 
 bitflags! {
+    /// Flags that can be queried to obtain information about a symbol in a given scope.
+    ///
+    /// See the doc-comment at the top of [`super::use_def`] for explanations of what it
+    /// means for a symbol to be *bound* as opposed to *declared*.
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
     struct SymbolFlags: u8 {
         const IS_USED         = 1 << 0;
