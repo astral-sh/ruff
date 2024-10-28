@@ -75,27 +75,31 @@ where
 pub(crate) trait PySlice {
     type Item;
 
-    fn py_slice<'a>(
-        &'a self,
+    fn py_slice(
+        &self,
         start: Option<i32>,
         stop: Option<i32>,
         step: Option<NonZero<i32>>,
-    ) -> Either<impl Iterator<Item = &'a Self::Item>, impl Iterator<Item = &'a Self::Item>>;
+    ) -> Either<impl Iterator<Item = &Self::Item>, impl Iterator<Item = &Self::Item>>;
 }
 
 impl<T> PySlice for &[T] {
     type Item = T;
 
-    fn py_slice<'a>(
-        &'a self,
+    fn py_slice(
+        &self,
         start: Option<i32>,
         stop: Option<i32>,
         step_int: Option<NonZero<i32>>,
-    ) -> Either<impl Iterator<Item = &'a Self::Item>, impl Iterator<Item = &'a Self::Item>> {
+    ) -> Either<impl Iterator<Item = &Self::Item>, impl Iterator<Item = &Self::Item>> {
         let step_int = step_int.unwrap_or(NonZero::new(1).unwrap());
 
         let len = self.len();
         if len == 0 {
+            #[allow(
+                clippy::iter_skip_zero,
+                reason = "The iterator needs to have the same type as the step>0 case below."
+            )]
             return Either::Left(self.iter().skip(0).take(0).step_by(1));
         }
 
