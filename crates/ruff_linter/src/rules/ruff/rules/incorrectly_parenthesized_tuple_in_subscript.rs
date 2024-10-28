@@ -34,7 +34,9 @@ use crate::{checkers::ast::Checker, settings::types::PythonVersion};
 /// directions = {(0, 1): "North", (1, 0): "East", (0, -1): "South", (-1, 0): "West"}
 /// directions[0, 1]
 /// ```
-
+///
+/// ## Options
+/// - `lint.ruff.parenthesize-tuple-in-subscript`
 #[violation]
 pub struct IncorrectlyParenthesizedTupleInSubscript {
     prefer_parentheses: bool,
