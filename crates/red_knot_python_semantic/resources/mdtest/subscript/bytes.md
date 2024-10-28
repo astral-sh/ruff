@@ -31,8 +31,10 @@ b = b"\x00abc\xff"
 reveal_type(b[0:2])  # revealed: Literal[b"\x00a"]
 reveal_type(b[-3:])  # revealed: Literal[b"bc\xff"]
 
-a = b[::0]  # error: [slice-step-zero]
-reveal_type(a)  # revealed: Unknown
+b[0:4:0]  # error: [zero-stepsize-in-slice]
+b[:4:0]  # error: [zero-stepsize-in-slice]
+b[0::0]  # error: [zero-stepsize-in-slice]
+b[::0]  # error: [zero-stepsize-in-slice]
 ```
 
 ## Function return

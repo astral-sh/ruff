@@ -63,8 +63,10 @@ reveal_type(s[start:stop:step])  # revealed: Literal["bd"]
 reveal_type(s[False:True])  # revealed: Literal["a"]
 reveal_type(s[True:3])  # revealed: Literal["bc"]
 
-a = s[0:5:0]  # error: [slice-step-zero]
-reveal_type(a)  # revealed: Unknown
+s[0:4:0]  # error: [zero-stepsize-in-slice]
+s[:4:0]  # error: [zero-stepsize-in-slice]
+s[0::0]  # error: [zero-stepsize-in-slice]
+s[::0]  # error: [zero-stepsize-in-slice]
 ```
 
 ## Function return

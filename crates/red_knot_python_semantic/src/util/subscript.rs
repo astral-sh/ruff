@@ -2,7 +2,7 @@
 //! operations (`PySlice`) on iterators, following the semantics of equivalent
 //! operations in Python.
 
-use std::cmp::Ordering;
+use std::{cmp::Ordering, num::NonZero};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct OutOfBoundsError;
@@ -70,9 +70,6 @@ where
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub(crate) struct StepSizeZeroError;
-
 pub(crate) trait PySlice {
     type Item;
 
@@ -80,8 +77,8 @@ pub(crate) trait PySlice {
         &'a mut self,
         start: Option<i32>,
         stop: Option<i32>,
-        step: Option<i32>,
-    ) -> Result<Box<dyn Iterator<Item = Self::Item> + 'a>, StepSizeZeroError>
+        step: Option<NonZero<i32>>,
+    ) -> Box<dyn Iterator<Item = Self::Item> + 'a>
     where
         Self::Item: 'a;
 }
@@ -96,25 +93,22 @@ where
         &'a mut self,
         start: Option<i32>,
         stop: Option<i32>,
-        step_int: Option<i32>,
-    ) -> Result<Box<dyn Iterator<Item = I> + 'a>, StepSizeZeroError>
+        step_int: Option<NonZero<i32>>,
+    ) -> Box<dyn Iterator<Item = I> + 'a>
     where
         I: 'a,
     {
-        let step_int = step_int.unwrap_or(1);
-        if step_int == 0 {
-            return Err(StepSizeZeroError);
-        }
+        let step_int = step_int.unwrap_or(NonZero::new(1).unwrap());
 
         let len = self.len();
         if len == 0 {
-            return Ok(Box::new(std::iter::empty()));
+            return Box::new(std::iter::empty());
         }
 
         let to_nonnegative_index = |index| Nth::from_index(index).to_nonnegative_index(len);
 
-        if step_int > 0 {
-            let step = from_nonnegative_i32(step_int);
+        if step_int.is_positive() {
+            let step = from_nonnegative_i32(step_int.get());
             let start = start.map(to_nonnegative_index).unwrap_or(0).clamp(0, len);
             let stop = stop.map(to_nonnegative_index).unwrap_or(len).clamp(0, len);
 
@@ -123,9 +117,9 @@ where
                 Ordering::Equal | Ordering::Greater => (start, 0, step),
             };
 
-            Ok(Box::new(self.skip(skip).take(take).step_by(step)))
+            Box::new(self.skip(skip).take(take).step_by(step))
         } else {
-            let step = from_negative_i32(step_int);
+            let step = from_negative_i32(step_int.get());
             let start = start
                 .map(to_nonnegative_index)
                 .unwrap_or(len)
@@ -146,7 +140,7 @@ where
                 }
             };
 
-            Ok(Box::new(self.rev().skip(skip).take(take).step_by(step)))
+            Box::new(self.rev().skip(skip).take(take).step_by(step))
         }
     }
 }
@@ -154,7 +148,9 @@ where
 #[cfg(test)]
 #[allow(clippy::redundant_clone)]
 mod tests {
-    use crate::util::subscript::{OutOfBoundsError, StepSizeZeroError};
+    use std::num::NonZero;
+
+    use crate::util::subscript::OutOfBoundsError;
 
     use super::{PyIndex, PySlice};
     use itertools::assert_equal;
@@ -218,7 +214,9 @@ mod tests {
         expected: &[char; M],
     ) {
         assert_equal(
-            input.iter().py_slice(start, stop, step).unwrap(),
+            input
+                .iter()
+                .py_slice(start, stop, step.map(|s| NonZero::new(s).unwrap())),
             expected.iter(),
         );
     }
@@ -388,20 +386,6 @@ mod tests {
     fn py_slice_step_forward() {
         // indices:   0    1    2    3    4    5    6
         let input = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
-
-        // Step size zero is invalid:
-        assert!(matches!(
-            input.iter().py_slice(None, None, Some(0)),
-            Err(StepSizeZeroError)
-        ));
-        assert!(matches!(
-            input.iter().py_slice(Some(0), Some(5), Some(0)),
-            Err(StepSizeZeroError)
-        ));
-        assert!(matches!(
-            input.iter().py_slice(Some(0), Some(0), Some(0)),
-            Err(StepSizeZeroError)
-        ));
 
         assert_eq_slice(&input, Some(0), Some(8), Some(2), &['a', 'c', 'e', 'g']);
         assert_eq_slice(&input, Some(0), Some(7), Some(2), &['a', 'c', 'e', 'g']);

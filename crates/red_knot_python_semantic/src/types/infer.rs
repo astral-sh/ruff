@@ -28,7 +28,7 @@
 //! definitions once the rest of the types in the scope have been inferred.
 use itertools::Itertools;
 use std::borrow::Cow;
-use std::num::NonZeroU32;
+use std::num::{NonZero, NonZeroU32};
 
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
@@ -1496,14 +1496,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 "Cannot subscript object of type `{}` with no `{method}` method",
                 non_subscriptable_ty.display(self.db)
             ),
-        );
-    }
-
-    pub(super) fn slice_step_size_zero_diagnostic(&mut self, node: AnyNodeRef) {
-        self.add_diagnostic(
-            node,
-            "slice-step-zero",
-            format_args!("Slice step size can not be zero"),
         );
     }
 
@@ -3230,14 +3222,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let stop = slice_ty.stop(self.db);
                 let step = slice_ty.step(self.db);
 
-                if let Ok(new_elements) = elements.iter().py_slice(start, stop, step) {
-                    let new_elements: Vec<_> = new_elements.copied().collect();
-                    Type::Tuple(TupleType::new(self.db, new_elements.into_boxed_slice()))
-                } else {
-                    self.slice_step_size_zero_diagnostic(value_node.into());
-
-                    Type::Unknown
-                }
+                let new_elements: Vec<_> = elements
+                    .iter()
+                    .py_slice(start, stop, step)
+                    .copied()
+                    .collect();
+                Type::Tuple(TupleType::new(self.db, new_elements.into_boxed_slice()))
             }
             // Ex) Given `"value"[1]`, return `"a"`
             (Type::StringLiteral(literal_ty), Type::IntLiteral(int))
@@ -3271,17 +3261,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let stop = slice_ty.stop(self.db);
                 let step = slice_ty.step(self.db);
 
-                let chars: Vec<_> = literal_value.chars().collect();
-                if let Ok(new_chars) = chars.into_iter().py_slice(start, stop, step) {
-                    Type::StringLiteral(StringLiteralType::new(
-                        self.db,
-                        new_chars.collect::<String>().into_boxed_str(),
-                    ))
-                } else {
-                    self.slice_step_size_zero_diagnostic(value_node.into());
-
-                    Type::Unknown
-                }
+                let mut chars = literal_value.chars().collect::<Vec<_>>().into_iter();
+                let new_chars = chars.py_slice(start, stop, step);
+                Type::StringLiteral(StringLiteralType::new(
+                    self.db,
+                    new_chars.collect::<String>().into_boxed_str(),
+                ))
             }
             // Ex) Given `b"value"[1]`, return `b"a"`
             (Type::BytesLiteral(literal_ty), Type::IntLiteral(int))
@@ -3312,14 +3297,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let stop = slice_ty.stop(self.db);
                 let step = slice_ty.step(self.db);
 
-                if let Ok(new_bytes) = literal_value.iter().py_slice(start, stop, step) {
-                    let new_bytes: Vec<u8> = new_bytes.copied().collect();
-                    Type::BytesLiteral(BytesLiteralType::new(self.db, new_bytes.into_boxed_slice()))
-                } else {
-                    self.slice_step_size_zero_diagnostic(value_node.into());
-
-                    Type::Unknown
-                }
+                let new_bytes: Vec<u8> = literal_value
+                    .iter()
+                    .py_slice(start, stop, step)
+                    .copied()
+                    .collect();
+                Type::BytesLiteral(BytesLiteralType::new(self.db, new_bytes.into_boxed_slice()))
             }
             // Ex) Given `"value"[True]`, return `"a"`
             (
@@ -3440,7 +3423,20 @@ impl<'db> TypeInferenceBuilder<'db> {
             type_to_slice_argument(ty_step),
         ) {
             (SliceArg::Arg(lower), SliceArg::Arg(upper), SliceArg::Arg(step)) => {
-                Type::SliceLiteral(SliceLiteralType::new(self.db, lower, upper, step))
+                match step.map(NonZero::new) {
+                    Some(Some(step)) => {
+                        Type::SliceLiteral(SliceLiteralType::new(self.db, lower, upper, Some(step)))
+                    }
+                    None => Type::SliceLiteral(SliceLiteralType::new(self.db, lower, upper, None)),
+                    Some(None) => {
+                        self.add_diagnostic(
+                            AnyNodeRef::ExprSlice(slice), // TODO
+                            "zero-stepsize-in-slice",
+                            format_args!("Slice step size can not be zero"),
+                        );
+                        Type::Unknown
+                    }
+                }
             }
             _ => KnownClass::Slice.to_instance(self.db),
         }

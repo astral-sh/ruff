@@ -62,6 +62,8 @@ reveal_type(t[start:stop:step])  # revealed: tuple[Literal["a"], Literal[b"b"]]
 reveal_type(t[False:True])  # revealed: tuple[Literal[1]]
 reveal_type(t[True:3])  # revealed: tuple[Literal["a"], None]
 
-a = t[0:4:0]  # error: [slice-step-zero]
-reveal_type(a)  # revealed: Unknown
+t[0:4:0]  # error: [zero-stepsize-in-slice]
+t[:4:0]  # error: [zero-stepsize-in-slice]
+t[0::0]  # error: [zero-stepsize-in-slice]
+t[::0]  # error: [zero-stepsize-in-slice]
 ```
