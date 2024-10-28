@@ -447,29 +447,33 @@ impl<'db> Type<'db> {
             (_, Type::Unknown | Type::Any | Type::Todo) => false,
             (Type::Never, _) => true,
             (_, Type::Never) => false,
-            (_, Type::Instance(class)) if class.is_known(db, KnownClass::Object) => true,
-            (Type::Instance(class), _) if class.is_known(db, KnownClass::Object) => false,
+            (_, Type::Instance(instance)) if instance.is_known_class(db, KnownClass::Object) => {
+                true
+            }
+            (Type::Instance(class), _) if class.is_known_class(db, KnownClass::Object) => false,
             (Type::BooleanLiteral(_), Type::Instance(class))
-                if class.is_known(db, KnownClass::Bool) =>
+                if class.is_known_class(db, KnownClass::Bool) =>
             {
                 true
             }
-            (Type::IntLiteral(_), Type::Instance(class)) if class.is_known(db, KnownClass::Int) => {
+            (Type::IntLiteral(_), Type::Instance(class))
+                if class.is_known_class(db, KnownClass::Int) =>
+            {
                 true
             }
             (Type::StringLiteral(_), Type::LiteralString) => true,
             (Type::StringLiteral(_) | Type::LiteralString, Type::Instance(class))
-                if class.is_known(db, KnownClass::Str) =>
+                if class.is_known_class(db, KnownClass::Str) =>
             {
                 true
             }
             (Type::BytesLiteral(_), Type::Instance(class))
-                if class.is_known(db, KnownClass::Bytes) =>
+                if class.is_known_class(db, KnownClass::Bytes) =>
             {
                 true
             }
             (Type::ClassLiteral(..), Type::Instance(class))
-                if class.is_known(db, KnownClass::Type) =>
+                if class.is_known_class(db, KnownClass::Type) =>
             {
                 true
             }
@@ -1789,8 +1793,12 @@ pub struct InstanceType<'db> {
 }
 
 impl<'db> InstanceType<'db> {
-    pub fn is_known(&self, db: &'db dyn Db, known_class: KnownClass) -> bool {
+    pub fn is_known_class(&self, db: &'db dyn Db, known_class: KnownClass) -> bool {
         return self.class_type(db).is_known(db, known_class);
+    }
+
+    pub fn is_known(&self, db: &'db dyn Db, known_instance: KnownInstance) -> bool {
+        return self.known_instance(db).is_some_and(|k| k == known_instance);
     }
 }
 

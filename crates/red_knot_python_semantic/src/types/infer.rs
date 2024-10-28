@@ -545,7 +545,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             Type::Instance(cls)
                 if [KnownClass::Float, KnownClass::Int, KnownClass::Bool]
                     .iter()
-                    .any(|&k| cls.is_known(self.db, k)) => {}
+                    .any(|&k| cls.is_known_class(self.db, k)) => {}
             _ => return,
         };
 
@@ -3474,48 +3474,10 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         // Handling of Special Forms
         match value_ty {
-            Type::Instance(class) if class.is_known(self.db, KnownClass::SpecialForm) => {
-                let Some(s) = class.known_instance(self.db) else {
-                    return Type::Todo;
-                };
-                // NOTE: slice_ty is treated as expression because Literal accepts expression
-                // inside the []
-                let slice_ty = self.infer_expression(slice);
-                match s {
-                    KnownInstance::Literal => {
-                        match **slice {
-                    ruff_python_ast::Expr::StringLiteral(_)
-                    | ruff_python_ast::Expr::BytesLiteral(_)
-                    | ruff_python_ast::Expr::NumberLiteral(_)
-                    | ruff_python_ast::Expr::BooleanLiteral(_)
-                    | ruff_python_ast::Expr::Tuple(_)
-                    // For enum values
-                    | ruff_python_ast::Expr::Attribute(_)
-                    // For Another Literal inside this Literal
-                    | ruff_python_ast::Expr::Subscript(_)
-                    | ruff_python_ast::Expr::NoneLiteral(_) => {}
-                    // for negative numbers
-                    ruff_python_ast::Expr::UnaryOp(ref u) if (u.op == UnaryOp::USub || u.op == UnaryOp::UAdd) && u.operand.is_number_literal_expr() => {}
-                    _ => {
-                        self.add_diagnostic(
-                        slice.as_ref().into(),
-                        "invalid-literal-parameter",
-                        format_args!(
-                            "Type arguments for `Literal` must be None, a literal value (int, bool, str, or bytes), or an enum value",
-                        ),
-                    );
-                        return Type::Unknown;
-                    }
-                    };
-                        match slice_ty {
-                            Type::Tuple(tuple) => {
-                                let elts = tuple.elements(self.db);
-                                Type::Union(UnionType::new(self.db, elts))
-                            }
-                            ty => ty,
-                        }
-                    }
-                }
+            Type::Instance(instance)
+                if instance.is_known_class(self.db, KnownClass::SpecialForm) =>
+            {
+                self.infer_parameterized_known_instance_type_expression(instance, slice)
             }
             value_ty => {
                 let value_node = value.as_ref();
@@ -3525,6 +3487,112 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // subscript_expression_types. Once it's complete call that logic from here.
                 self.infer_subscript_expression_types(value_node, value_ty, slice_ty)
             }
+        }
+    }
+
+    fn infer_parameterized_known_instance_type_expression(
+        &mut self,
+        instance: InstanceType,
+        parameters: &ast::Expr,
+    ) -> Type<'db> {
+        // slice_ty is treated as expression because Literal accepts expression
+        // inside the []
+        let Some(known_instance) = instance.known_instance(self.db) else {
+            return Type::Todo;
+        };
+        match known_instance {
+            KnownInstance::Literal => {
+                match parameters {
+                    ruff_python_ast::Expr::StringLiteral(_)
+                    | ruff_python_ast::Expr::BytesLiteral(_)
+                    | ruff_python_ast::Expr::BooleanLiteral(_)
+                    // For enum values
+                    | ruff_python_ast::Expr::Attribute(_)
+                    // For Another Literal inside this Literal
+                    | ruff_python_ast::Expr::Subscript(_)
+                    | ruff_python_ast::Expr::NoneLiteral(_) => {}
+                    // for negative numbers
+                    ruff_python_ast::Expr::UnaryOp(ref u) if (u.op == UnaryOp::USub || u.op == UnaryOp::UAdd) && u.operand.is_number_literal_expr() => {}
+                    ruff_python_ast::Expr::NumberLiteral(ref number) if number.value.is_int() => {}
+                    ruff_python_ast::Expr::Tuple(ref t) if !t.parenthesized => {}
+                    _ => {
+                        self.add_diagnostic(
+                            parameters.into(),
+                            "invalid-literal-parameter",
+                            format_args!(
+                                "Type arguments for `Literal` must be None, a literal value (int, bool, str, or bytes), or an enum value",
+                            ),
+                        );
+                        return Type::Unknown;
+                    }
+                };
+
+                let slice_ty = self.infer_literal_parameter_type(parameters);
+
+                match slice_ty {
+                    Type::Never
+                    | Type::Unknown
+                    | Type::Unbound
+                    | Type::Todo
+                    | Type::FunctionLiteral(_)
+                    | Type::ModuleLiteral(_)
+                    | Type::ClassLiteral(_)
+                    | Type::Union(_)
+                    | Type::Intersection(_)
+                    | Type::Any => {
+                        self.add_diagnostic(
+                                    parameters.into(),
+                                    "invalid-literal-parameter",
+                                    format_args!(
+                                        "Type arguments for `Literal` must be None, a literal value (int, bool, str, or bytes), or an enum value",
+                                    ),
+                                );
+                        Type::Unknown
+                    }
+                    Type::Tuple(tuple) => {
+                        let elts = tuple.elements(self.db);
+                        Type::Union(UnionType::new(self.db, elts))
+                    }
+                    ty => ty,
+                }
+            }
+        }
+    }
+
+    fn infer_literal_parameter_type(&mut self, parameters: &ast::Expr) -> Type<'db> {
+        // If the slice itself is another subscript and it is another Literal then flatten
+        // the values
+        match parameters {
+            ruff_python_ast::Expr::Subscript(inner_literal_subscript) => {
+                let inner_subscript_value = self.infer_expression(&inner_literal_subscript.value);
+                if let Type::Instance(inner_instance) = inner_subscript_value {
+                    if inner_instance.is_known(self.db, KnownInstance::Literal) {
+                        self.infer_parameterized_known_instance_type_expression(
+                            inner_instance,
+                            &inner_literal_subscript.slice,
+                        )
+                    } else {
+                        return Type::Unknown;
+                    }
+                } else {
+                    self.add_diagnostic(
+                                        parameters.into(),
+                                        "invalid-literal-parameter",
+                                        format_args!(
+                                            "Type arguments for `Literal` must be None, a literal value (int, bool, str, or bytes), or an enum value",
+                                        ),
+                                    );
+                    return Type::Unknown;
+                }
+            }
+            ruff_python_ast::Expr::Tuple(t) => {
+                let mut elts = vec![];
+                for elm in t.elts.iter() {
+                    elts.push(self.infer_literal_parameter_type(elm));
+                }
+                Type::Tuple(TupleType::new(self.db, elts.into_boxed_slice()))
+            }
+            _ => self.infer_expression(parameters),
         }
     }
 }
