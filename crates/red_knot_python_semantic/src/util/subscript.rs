@@ -4,6 +4,8 @@
 
 use std::{cmp::Ordering, num::NonZero};
 
+use itertools::Either;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct OutOfBoundsError;
 
@@ -78,7 +80,7 @@ pub(crate) trait PySlice {
         start: Option<i32>,
         stop: Option<i32>,
         step: Option<NonZero<i32>>,
-    ) -> Box<dyn Iterator<Item = &'a Self::Item> + 'a>;
+    ) -> Either<impl Iterator<Item = &'a Self::Item>, impl Iterator<Item = &'a Self::Item>>;
 }
 
 impl<T> PySlice for &[T] {
@@ -89,12 +91,12 @@ impl<T> PySlice for &[T] {
         start: Option<i32>,
         stop: Option<i32>,
         step_int: Option<NonZero<i32>>,
-    ) -> Box<dyn Iterator<Item = &'a T> + 'a> {
+    ) -> Either<impl Iterator<Item = &'a Self::Item>, impl Iterator<Item = &'a Self::Item>> {
         let step_int = step_int.unwrap_or(NonZero::new(1).unwrap());
 
         let len = self.len();
         if len == 0 {
-            return Box::new(std::iter::empty());
+            return Either::Left(self.iter().skip(0).take(0).step_by(1));
         }
 
         let to_nonnegative_index = |index| Nth::from_index(index).to_nonnegative_index(len);
@@ -109,7 +111,7 @@ impl<T> PySlice for &[T] {
                 Ordering::Equal | Ordering::Greater => (start, 0, step),
             };
 
-            Box::new(self.iter().skip(skip).take(take).step_by(step))
+            Either::Left(self.iter().skip(skip).take(take).step_by(step))
         } else {
             let step = from_negative_i32(step_int.get());
             let start = start
@@ -132,7 +134,7 @@ impl<T> PySlice for &[T] {
                 }
             };
 
-            Box::new(self.iter().rev().skip(skip).take(take).step_by(step))
+            Either::Right(self.iter().rev().skip(skip).take(take).step_by(step))
         }
     }
 }
