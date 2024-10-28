@@ -1,7 +1,7 @@
 # Kinds of types
 
-This document provides definitions for various kinds of types,
-with examples of Python types that satisfy these definitions.
+This document provides definitions for various kinds of types and classes,
+with examples of Python types and classes that satisfy these definitions.
 
 It doesn't attempt to be exhaustive.
 Definitions should only be added to this document if they are:
@@ -216,46 +216,40 @@ class Ham(Enum):
         return False
 ```
 
-## Final types
+## Final classes
 
-A final type in Python is a [nominal type](https://docs.python.org/3/library/typing.html#nominal-vs-structural-subtyping)
-defined as the instances of a certain runtime class that it is known cannot be subclassed.
-Most final types in Python are associated with class definitions that are decorated with
-[`@typing.final`](https://docs.python.org/3/library/typing.html#typing.final).
-This is a special decorator which indicates to the type checker that the tool
-should assume the class cannot be subclassed, and that the tool should emit an error
-if it detects an attempt to do so.
-
-There are fewer ways in which final types can be subtyped when compared to most other types.
-For any two nominal types `X` and `Y`, if `X` is `@final` and `X` is not a subtype of `Y`,
-the intersection `X & Y` is equivalent to `Never`, the empty set.
-However, a final type in Python still has subtypes, just no *nominal* subtypes.
-For the following two types `X` and `Truthy`, the intersection `X & Truthy` is non-empty,
-since `Truthy` is a structural type:
-
-```py
-from typing import final, Protocol, Literal
-
-class Truthy(Protocol):
-    """Any object `x` inhabits this type if `bool(x)` always returns `True`"""
-
-    def __bool__(self) -> Literal[True]: ...
-
-@final
-class X[T: bool]:
-    def __init__(self, bool_val: T):
-        self.bool_val = bool_val
-
-    def __bool__(self) -> T:
-        return self.bool_val
-```
-
-Not all final types are decorated with `@final`. The most common example of this
-is enum classes. Any enum class that has at least one member is considered
+A "final class" in Python is a class that can be statically inferred as being unsubclassable.
+Most final classes are decorated with [`@typing.final`](https://docs.python.org/3/library/typing.html#typing.final),
+a special decorator that indicates to the type checker that the tool should assume
+the class cannot be subclassed, and that the tool should emit an error
+if it detects an attempt to do so. Not all final classes are decorated with `@final`, however.
+The most common example of this is enum classes. Any enum class that has at least one member is considered
 implicitly final, as attempting to subclass such a class will fail at runtime.
 
-All singleton types and sealed types are final types,
-but not all final types are singleton types or sealed types.
+For any two classes `X` and `Y`, if `X` is `@final` and `X` is not a subclass of `Y`,
+the intersection of the types `X & Y` is equivalent to `Never`, the empty set.
+This therefore means that for a type defined as being "all instances of the final class `X`",
+there are fewer ways of subtyping such a type than for most types in Python.
+However, types associated with final classes can still have non-`Never` proper subtypes.
+Enums again provide a good example here: `Literal[Animals.LION]` is a proper subtype
+of the `Animals` type here, despite the fact that the `Animals` class cannot be subclassed:
+
+```py
+from enum import Enum, auto
+
+class Animals(Enum):
+    LION = auto()
+    LEOPARD = auto()
+    CHEETAH = auto()
+```
+
+Many singleton and sealed types are associated with final classes: the classes
+`types.EllipsisType`, `types.NotImplementedType`, `types.NoneType`, `bool`,
+and all enum classes are final classes. However, there are also many singleton
+and sealed types (some representable, but some merely theoretical)
+that cannot be defined as "all instances of a specific final class `X`".
+In the above enum, `Literal[Animals.LION]` is a singleton type and a sealed type,
+but would not fit this definition.
 
 [^2]: For a given type `X`, a "proper subtype" of `X` is defined
     as a type that is strictly narrower than `X`. The set of proper subtypes of `X` includes
