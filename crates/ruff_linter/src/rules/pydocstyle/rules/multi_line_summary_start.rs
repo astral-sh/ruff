@@ -2,7 +2,7 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{is_triple_quote, leading_quote};
 use ruff_python_semantic::Definition;
-use ruff_source_file::{NewlineWithTrailingNewline, UniversalNewlineIterator};
+use ruff_source_file::{LineRanges, NewlineWithTrailingNewline, UniversalNewlineIterator};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;

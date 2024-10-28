@@ -8,6 +8,7 @@ use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::stmt_if::{if_elif_branches, BranchKind, IfElifBranch};
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{self as ast, CmpOp, ElifElseClause, Expr, Int, StmtIf};
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -299,7 +300,7 @@ fn fix_always_false_branch(
             }) => {
                 let start = body.first()?;
                 let end = body.last()?;
-                if indentation(checker.locator(), start).is_none() {
+                if indentation(checker.source(), start).is_none() {
                     // Inline `else` block (e.g., `else: x = 1`).
                     Some(Fix::unsafe_edit(Edit::range_replacement(
                         checker
@@ -309,7 +310,7 @@ fn fix_always_false_branch(
                         stmt_if.range(),
                     )))
                 } else {
-                    indentation(checker.locator(), stmt_if)
+                    indentation(checker.source(), stmt_if)
                         .and_then(|indentation| {
                             adjust_indentation(
                                 TextRange::new(
@@ -377,7 +378,7 @@ fn fix_always_true_branch(
             // the rest.
             let start = branch.body.first()?;
             let end = branch.body.last()?;
-            if indentation(checker.locator(), start).is_none() {
+            if indentation(checker.source(), start).is_none() {
                 // Inline `if` block (e.g., `if ...: x = 1`).
                 Some(Fix::unsafe_edit(Edit::range_replacement(
                     checker
@@ -387,7 +388,7 @@ fn fix_always_true_branch(
                     stmt_if.range,
                 )))
             } else {
-                indentation(checker.locator(), &stmt_if)
+                indentation(checker.source(), &stmt_if)
                     .and_then(|indentation| {
                         adjust_indentation(
                             TextRange::new(checker.locator().line_start(start.start()), end.end()),

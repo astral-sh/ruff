@@ -2,14 +2,12 @@
 
 use std::path::Path;
 
+use ruff_diagnostics::Diagnostic;
 use ruff_notebook::CellOffsets;
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
-
-use ruff_diagnostics::Diagnostic;
 use ruff_python_index::Indexer;
 use ruff_python_parser::Tokens;
-use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 use crate::directives::TodoComment;
@@ -20,6 +18,7 @@ use crate::rules::{
     flake8_pyi, flake8_todos, pycodestyle, pygrep_hooks, pylint, pyupgrade, ruff,
 };
 use crate::settings::LinterSettings;
+use crate::Locator;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn check_tokens(

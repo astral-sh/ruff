@@ -5,13 +5,13 @@ use ruff_python_ast::{
     self as ast, Expr, Operator, ParameterWithDefault, Parameters, Stmt, UnaryOp,
 };
 use ruff_python_semantic::{analyze::class::is_enumeration, ScopeKind, SemanticModel};
-use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::rules::flake8_pyi::rules::TypingModule;
 use crate::settings::types::PythonVersion;
+use crate::Locator;
 
 /// ## What it does
 /// Checks for typed function arguments in stubs with complex default values.

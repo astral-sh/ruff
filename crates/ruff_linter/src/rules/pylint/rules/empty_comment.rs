@@ -1,8 +1,10 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_trivia::{is_python_whitespace, CommentRanges};
-use ruff_source_file::Locator;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{TextRange, TextSize};
+
+use crate::Locator;
 
 /// ## What it does
 /// Checks for a # symbol appearing on a line not followed by an actual comment.
@@ -47,7 +49,7 @@ pub(crate) fn empty_comments(
     comment_ranges: &CommentRanges,
     locator: &Locator,
 ) {
-    let block_comments = comment_ranges.block_comments(locator);
+    let block_comments = comment_ranges.block_comments(locator.contents());
 
     for range in comment_ranges {
         // Ignore comments that are part of multi-line "comment blocks".

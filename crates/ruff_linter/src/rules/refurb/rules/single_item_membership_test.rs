@@ -84,7 +84,7 @@ pub(crate) fn single_item_membership_test(
                 &[item.clone()],
                 expr.into(),
                 checker.comment_ranges(),
-                checker.locator(),
+                checker.source(),
             ),
             expr.range(),
             checker.locator(),

@@ -13,13 +13,13 @@ use order::order_imports;
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::Tokens;
-use ruff_source_file::Locator;
 use settings::Settings;
 use types::EitherImport::{Import, ImportFrom};
 use types::{AliasData, ImportBlock, TrailingComma};
 
 use crate::line_width::{LineLength, LineWidthBuilder};
 use crate::settings::types::PythonVersion;
+use crate::Locator;
 
 mod annotate;
 pub(crate) mod block;
@@ -282,10 +282,11 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use ruff_python_semantic::{MemberNameImport, ModuleNameImport, NameImport};
-    use ruff_text_size::Ranged;
     use rustc_hash::{FxHashMap, FxHashSet};
     use test_case::test_case;
+
+    use ruff_python_semantic::{MemberNameImport, ModuleNameImport, NameImport};
+    use ruff_text_size::Ranged;
 
     use crate::assert_messages;
     use crate::registry::Rule;

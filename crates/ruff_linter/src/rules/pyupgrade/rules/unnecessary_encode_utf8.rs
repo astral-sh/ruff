@@ -2,11 +2,11 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Arguments, Expr, Keyword};
 use ruff_python_parser::{TokenKind, Tokens};
-use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{pad, remove_argument, Parentheses};
+use crate::Locator;
 
 /// ## What it does
 /// Checks for unnecessary calls to `encode` as UTF-8.

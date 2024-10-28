@@ -73,7 +73,7 @@ pub(crate) fn unaliased_collections_abc_set_import(
         return None;
     }
 
-    let name = binding.name(checker.locator());
+    let name = binding.name(checker.source());
     if name == "AbstractSet" {
         return None;
     }

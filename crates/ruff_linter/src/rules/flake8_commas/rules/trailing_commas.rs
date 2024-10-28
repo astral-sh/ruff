@@ -3,8 +3,9 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_index::Indexer;
 use ruff_python_parser::{TokenKind, Tokens};
-use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
+
+use crate::Locator;
 
 /// Simplified token type.
 #[derive(Copy, Clone, PartialEq, Eq)]

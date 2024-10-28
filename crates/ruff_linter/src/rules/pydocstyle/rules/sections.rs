@@ -1464,7 +1464,7 @@ fn blanks_and_section_underline(
                         // Otherwise, documentation generators will not recognize the directive.
                         let is_sphinx = checker
                             .locator()
-                            .line(blank_lines_after_dashes_end)
+                            .line_str(blank_lines_after_dashes_end)
                             .trim_start()
                             .starts_with(".. ");
 
@@ -1569,7 +1569,7 @@ fn blanks_and_section_underline(
                     // Otherwise, documentation generators will not recognize the directive.
                     let is_sphinx = checker
                         .locator()
-                        .line(blank_lines_end)
+                        .line_str(blank_lines_end)
                         .trim_start()
                         .starts_with(".. ");
 

@@ -8,10 +8,10 @@ use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::Expr;
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::Locator;
 
 /// ## What it does
 /// Checks for ternary `if` expressions that can be replaced with the `or`

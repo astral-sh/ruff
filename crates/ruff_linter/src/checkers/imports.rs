@@ -8,13 +8,13 @@ use ruff_python_ast::{ModModule, PySourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::Parsed;
-use ruff_source_file::Locator;
 
 use crate::directives::IsortDirectives;
 use crate::registry::Rule;
 use crate::rules::isort;
 use crate::rules::isort::block::{Block, BlockBuilder};
 use crate::settings::LinterSettings;
+use crate::Locator;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn check_imports(

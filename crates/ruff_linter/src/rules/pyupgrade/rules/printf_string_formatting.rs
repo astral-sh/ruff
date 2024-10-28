@@ -10,12 +10,12 @@ use ruff_python_literal::cformat::{
 };
 use ruff_python_parser::TokenKind;
 use ruff_python_stdlib::identifiers::is_identifier;
-use ruff_source_file::Locator;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-
 use crate::rules::pyupgrade::helpers::curly_escape;
+use crate::Locator;
 
 /// ## What it does
 /// Checks for `printf`-style string formatting, and offers to replace it with
@@ -251,7 +251,7 @@ fn clean_params_dictionary(right: &Expr, locator: &Locator, stylist: &Stylist) -
                     seen.push(key_string.to_str());
                     if is_multi_line {
                         if indent.is_none() {
-                            indent = indentation(locator, key);
+                            indent = indentation(locator.contents(), key);
                         }
                     }
 

@@ -98,7 +98,6 @@ pub(crate) use format::{
 use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_trivia::{CommentLinePosition, CommentRanges, SuppressionKind};
-use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 pub(crate) use visitor::collect_comments;
 
@@ -258,8 +257,7 @@ impl<'a> Comments<'a> {
             let map = if comment_ranges.is_empty() {
                 CommentsMap::new()
             } else {
-                let mut builder =
-                    CommentsMapBuilder::new(Locator::new(source_code.as_str()), comment_ranges);
+                let mut builder = CommentsMapBuilder::new(source_code.as_str(), comment_ranges);
                 CommentsVisitor::new(source_code, comment_ranges, &mut builder).visit(root);
                 builder.finish()
             };

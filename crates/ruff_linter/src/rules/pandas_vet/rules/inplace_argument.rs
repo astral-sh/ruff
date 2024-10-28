@@ -4,11 +4,11 @@ use ruff_python_ast::helpers::is_const_true;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Keyword, Stmt};
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{remove_argument, Parentheses};
+use crate::Locator;
 
 /// ## What it does
 /// Checks for `inplace=True` usages in `pandas` function and method

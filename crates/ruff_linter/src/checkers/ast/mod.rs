@@ -59,7 +59,7 @@ use ruff_python_semantic::{
 };
 use ruff_python_stdlib::builtins::{python_builtins, MAGIC_GLOBALS};
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::{Locator, OneIndexed, SourceRow};
+use ruff_source_file::{OneIndexed, SourceRow};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::annotation::AnnotationContext;
@@ -69,7 +69,7 @@ use crate::noqa::NoqaMapping;
 use crate::registry::Rule;
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::{flags, LinterSettings};
-use crate::{docstrings, noqa};
+use crate::{docstrings, noqa, Locator};
 
 mod analyze;
 mod annotation;
@@ -350,6 +350,10 @@ impl<'a> Checker<'a> {
     /// offsets.
     pub(crate) const fn locator(&self) -> &'a Locator<'a> {
         self.locator
+    }
+
+    pub(crate) const fn source(&self) -> &'a str {
+        self.locator.contents()
     }
 
     /// The [`Stylist`] for the current file, which detects the current line ending, quote, and

@@ -40,7 +40,7 @@ use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{line_index, source_text, SourceText};
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::{LineIndex, Locator, OneIndexed};
+use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::{Ranged, TextRange};
 use smallvec::SmallVec;
 use std::ops::Deref;
@@ -67,16 +67,12 @@ impl InlineFileAssertions {
         }
     }
 
-    fn locator(&self) -> Locator {
-        Locator::with_index(&self.source, self.lines.clone())
-    }
-
     fn line_number(&self, range: &impl Ranged) -> OneIndexed {
         self.lines.line_index(range.start())
     }
 
     fn is_own_line_comment(&self, ranged_assertion: &AssertionWithRange) -> bool {
-        CommentRanges::is_own_line(ranged_assertion.start(), &self.locator())
+        CommentRanges::is_own_line(ranged_assertion.start(), self.source.as_str())
     }
 }
 
@@ -131,10 +127,9 @@ impl<'a> Iterator for AssertionWithRangeIterator<'a> {
     type Item = AssertionWithRange<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let locator = self.file_assertions.locator();
         loop {
             let inner_next = self.inner.next()?;
-            let comment = locator.slice(inner_next);
+            let comment = &self.file_assertions.source[inner_next];
             if let Some(assertion) = Assertion::from_comment(comment) {
                 return Some(AssertionWithRange(assertion, inner_next));
             };

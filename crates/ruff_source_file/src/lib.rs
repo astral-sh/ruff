@@ -8,14 +8,14 @@ use serde::{Deserialize, Serialize};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 pub use crate::line_index::{LineIndex, OneIndexed};
-pub use crate::locator::Locator;
+pub use crate::line_ranges::LineRanges;
 pub use crate::newlines::{
     find_newline, Line, LineEnding, NewlineWithTrailingNewline, UniversalNewlineIterator,
     UniversalNewlines,
 };
 
 mod line_index;
-mod locator;
+mod line_ranges;
 mod newlines;
 
 /// Gives access to the source code of a file and allows mapping between [`TextSize`] and [`SourceLocation`].

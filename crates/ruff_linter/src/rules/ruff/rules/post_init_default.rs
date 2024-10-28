@@ -5,6 +5,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_semantic::{Scope, ScopeKind};
 use ruff_python_trivia::{indentation_at_offset, textwrap};
+use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
 use crate::{checkers::ast::Checker, importer::ImportRequest};
@@ -175,7 +176,7 @@ fn use_initvar(
         }
     };
 
-    let indentation = indentation_at_offset(post_init_def.start(), checker.locator())
+    let indentation = indentation_at_offset(post_init_def.start(), checker.source())
         .context("Failed to calculate leading indentation of `__post_init__` method")?;
     let content = textwrap::indent(&content, indentation);
 

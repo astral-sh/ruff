@@ -1,8 +1,9 @@
 use ruff_python_ast as ast;
 use ruff_python_ast::Stmt;
+use ruff_source_file::UniversalNewlines;
 use ruff_text_size::{Ranged, TextSize};
 
-use ruff_source_file::{Locator, UniversalNewlines};
+use crate::Locator;
 
 /// Return `true` if a function's return statement include at least one
 /// non-`None` value.

@@ -1,7 +1,6 @@
 use std::path::Path;
 
 use js_sys::Error;
-use ruff_python_trivia::CommentRanges;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -14,12 +13,14 @@ use ruff_linter::registry::AsRule;
 use ruff_linter::settings::types::PythonVersion;
 use ruff_linter::settings::{flags, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX};
 use ruff_linter::source_kind::SourceKind;
+use ruff_linter::Locator;
 use ruff_python_ast::{Mod, PySourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_formatter::{format_module_ast, pretty_comments, PyFormatContext, QuoteStyle};
 use ruff_python_index::Indexer;
 use ruff_python_parser::{parse, parse_unchecked, parse_unchecked_source, Mode, Parsed};
-use ruff_source_file::{Locator, SourceLocation};
+use ruff_python_trivia::CommentRanges;
+use ruff_source_file::SourceLocation;
 use ruff_text_size::Ranged;
 use ruff_workspace::configuration::Configuration;
 use ruff_workspace::options::{FormatOptions, LintCommonOptions, LintOptions, Options};
@@ -167,10 +168,10 @@ impl Workspace {
         let locator = Locator::new(contents);
 
         // Detect the current code style (lazily).
-        let stylist = Stylist::from_tokens(parsed.tokens(), &locator);
+        let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
 
         // Extra indices from the code.
-        let indexer = Indexer::from_tokens(parsed.tokens(), &locator);
+        let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());
 
         // Extract the `# noqa` and `# isort: skip` directives from the source.
         let directives = directives::extract_directives(

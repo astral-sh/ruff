@@ -1,10 +1,12 @@
-use regex::Regex;
-use ruff_python_trivia::CommentRanges;
-use ruff_source_file::Locator;
 use std::sync::LazyLock;
+
+use regex::Regex;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_trivia::CommentRanges;
+
+use crate::Locator;
 
 /// ## What it does
 /// Checks for the use of type comments (e.g., `x = 1  # type: int`) in stub

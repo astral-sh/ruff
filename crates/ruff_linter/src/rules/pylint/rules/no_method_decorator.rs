@@ -175,7 +175,7 @@ fn get_undecorated_methods(checker: &mut Checker, class_stmt: &Stmt, method_type
                 TextRange::new(stmt.range().start(), stmt.range().start()),
             );
 
-            let indentation = indentation_at_offset(stmt.range().start(), checker.locator());
+            let indentation = indentation_at_offset(stmt.range().start(), checker.source());
 
             match indentation {
                 Some(indentation) => {

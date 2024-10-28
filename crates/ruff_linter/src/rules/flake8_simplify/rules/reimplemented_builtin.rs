@@ -7,6 +7,7 @@ use ruff_python_ast::{
     self as ast, Arguments, CmpOp, Comprehension, Expr, ExprContext, Stmt, UnaryOp,
 };
 use ruff_python_codegen::Generator;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;

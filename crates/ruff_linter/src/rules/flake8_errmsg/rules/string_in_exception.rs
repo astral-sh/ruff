@@ -1,14 +1,14 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
-use ruff_source_file::Locator;
-use ruff_text_size::Ranged;
-
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::whitespace;
+use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 use ruff_python_codegen::Stylist;
+use ruff_source_file::LineRanges;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
+use crate::Locator;
 
 /// ## What it does
 /// Checks for the use of string literals in exception constructors.
@@ -190,7 +190,7 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
                             let mut diagnostic =
                                 Diagnostic::new(RawStringInException, first.range());
                             if let Some(indentation) =
-                                whitespace::indentation(checker.locator(), stmt)
+                                whitespace::indentation(checker.source(), stmt)
                             {
                                 diagnostic.set_fix(generate_fix(
                                     stmt,
@@ -208,8 +208,7 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
                 Expr::FString(_) => {
                     if checker.enabled(Rule::FStringInException) {
                         let mut diagnostic = Diagnostic::new(FStringInException, first.range());
-                        if let Some(indentation) = whitespace::indentation(checker.locator(), stmt)
-                        {
+                        if let Some(indentation) = whitespace::indentation(checker.source(), stmt) {
                             diagnostic.set_fix(generate_fix(
                                 stmt,
                                 first,
@@ -231,7 +230,7 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
                                 let mut diagnostic =
                                     Diagnostic::new(DotFormatInException, first.range());
                                 if let Some(indentation) =
-                                    whitespace::indentation(checker.locator(), stmt)
+                                    whitespace::indentation(checker.source(), stmt)
                                 {
                                     diagnostic.set_fix(generate_fix(
                                         stmt,

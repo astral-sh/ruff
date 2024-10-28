@@ -65,7 +65,7 @@ pub(crate) fn unconventional_import_alias(
     let qualified_name = import.qualified_name().to_string();
     let expected_alias = conventions.get(qualified_name.as_str())?;
 
-    let name = binding.name(checker.locator());
+    let name = binding.name(checker.source());
     if name == expected_alias {
         return None;
     }

@@ -1,9 +1,9 @@
-use ruff_python_ast::{self as ast, ExceptHandler, Expr, Stmt};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::identifier::except;
-use ruff_source_file::Locator;
+use ruff_python_ast::{self as ast, ExceptHandler, Expr, Stmt};
+
+use crate::Locator;
 
 /// ## What it does
 /// Checks for bare `except` catches in `try`-`except` statements.

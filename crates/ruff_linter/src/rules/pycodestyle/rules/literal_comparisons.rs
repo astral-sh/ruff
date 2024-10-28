@@ -336,7 +336,7 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
             &compare.comparators,
             compare.into(),
             checker.comment_ranges(),
-            checker.locator(),
+            checker.source(),
         );
         for diagnostic in &mut diagnostics {
             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(

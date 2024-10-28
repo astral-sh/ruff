@@ -8,7 +8,6 @@ use ruff_python_ast::AstNode;
 use ruff_python_ast::Mod;
 use ruff_python_parser::{parse, AsMode, ParseError, Parsed};
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::Locator;
 
 use crate::comments::{
     has_skip_comment, leading_comments, trailing_comments, Comments, SourceComment,
@@ -127,10 +126,9 @@ pub fn format_module_ast<'a>(
 ) -> FormatResult<Formatted<PyFormatContext<'a>>> {
     let source_code = SourceCode::new(source);
     let comments = Comments::from_ast(parsed.syntax(), source_code, comment_ranges);
-    let locator = Locator::new(source);
 
     let formatted = format!(
-        PyFormatContext::new(options, locator.contents(), comments, parsed.tokens()),
+        PyFormatContext::new(options, source, comments, parsed.tokens()),
         [parsed.syntax().format()]
     )?;
     formatted

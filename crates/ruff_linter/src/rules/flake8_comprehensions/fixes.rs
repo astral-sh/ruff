@@ -14,13 +14,13 @@ use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::SemanticModel;
-use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::cst::helpers::{negate, space};
 use crate::fix::codemods::CodegenStylist;
 use crate::fix::edits::pad;
 use crate::rules::flake8_comprehensions::rules::ObjectType;
+use crate::Locator;
 use crate::{
     checkers::ast::Checker,
     cst::matchers::{
