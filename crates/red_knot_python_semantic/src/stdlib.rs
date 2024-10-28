@@ -10,6 +10,7 @@ use crate::Db;
 enum CoreStdlibModule {
     Builtins,
     Types,
+    Typing,
     Typeshed,
     TypingExtensions,
 }
@@ -19,6 +20,7 @@ impl CoreStdlibModule {
         let module_name = match self {
             Self::Builtins => "builtins",
             Self::Types => "types",
+            Self::Typing => "typing",
             Self::Typeshed => "_typeshed",
             Self::TypingExtensions => "typing_extensions",
         };
@@ -63,6 +65,13 @@ pub(crate) fn types_symbol_ty<'db>(db: &'db dyn Db, symbol: &str) -> Type<'db> {
     core_module_symbol_ty(db, CoreStdlibModule::Types, symbol)
 }
 
+/// Lookup the type of `symbol` in the `typing` module namespace.
+///
+/// Returns `Unbound` if the `types` module isn't available for some reason.
+#[inline]
+pub(crate) fn typing_symbol_ty<'db>(db: &'db dyn Db, symbol: &str) -> Type<'db> {
+    core_module_symbol_ty(db, CoreStdlibModule::Typing, symbol)
+}
 /// Lookup the type of `symbol` in the `_typeshed` module namespace.
 ///
 /// Returns `Unbound` if the `_typeshed` module isn't available for some reason.

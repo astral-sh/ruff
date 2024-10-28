@@ -12,6 +12,7 @@ use crate::semantic_index::{
 };
 use crate::stdlib::{
     builtins_symbol_ty, types_symbol_ty, typeshed_symbol_ty, typing_extensions_symbol_ty,
+    typing_symbol_ty,
 };
 use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet, HasTy, Module, SemanticModel};
@@ -740,7 +741,9 @@ impl<'db> Type<'db> {
                     | KnownClass::Dict
                     | KnownClass::GenericAlias
                     | KnownClass::ModuleType
-                    | KnownClass::FunctionType,
+                    | KnownClass::FunctionType
+                    | KnownClass::Sized
+                    | KnownClass::Hashable,
                 ) => false,
                 None => false,
             },
@@ -1132,6 +1135,9 @@ pub enum KnownClass {
     GenericAlias,
     ModuleType,
     FunctionType,
+    // Typing
+    Sized,
+    Hashable,
     // Typeshed
     NoneType, // Part of `types` for Python >= 3.10
 }
@@ -1153,6 +1159,8 @@ impl<'db> KnownClass {
             Self::GenericAlias => "GenericAlias",
             Self::ModuleType => "ModuleType",
             Self::FunctionType => "FunctionType",
+            Self::Sized => "Sized",
+            Self::Hashable => "Hashable",
             Self::NoneType => "NoneType",
         }
     }
@@ -1177,6 +1185,8 @@ impl<'db> KnownClass {
             Self::GenericAlias | Self::ModuleType | Self::FunctionType => {
                 types_symbol_ty(db, self.as_str())
             }
+            Self::Sized | Self::Hashable => typing_symbol_ty(db, self.as_str()),
+
             Self::NoneType => typeshed_symbol_ty(db, self.as_str()),
         }
     }
@@ -1210,6 +1220,8 @@ impl<'db> KnownClass {
             "NoneType" => Some(Self::NoneType),
             "ModuleType" => Some(Self::ModuleType),
             "FunctionType" => Some(Self::FunctionType),
+            "Sized" => Some(Self::Sized),
+            "Hashable" => Some(Self::Hashable),
             _ => None,
         }
     }
@@ -1232,6 +1244,9 @@ impl<'db> KnownClass {
             | Self::Set
             | Self::Dict => module.name() == "builtins",
             Self::GenericAlias | Self::ModuleType | Self::FunctionType => module.name() == "types",
+            Self::Sized | Self::Hashable => {
+                matches!(module.name().as_str(), "typing" | "collections.abc")
+            }
             Self::NoneType => matches!(module.name().as_str(), "_typeshed" | "types"),
         }
     }
