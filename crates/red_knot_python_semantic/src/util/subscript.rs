@@ -74,30 +74,22 @@ pub(crate) trait PySlice {
     type Item;
 
     fn py_slice<'a>(
-        &'a mut self,
+        &'a self,
         start: Option<i32>,
         stop: Option<i32>,
         step: Option<NonZero<i32>>,
-    ) -> Box<dyn Iterator<Item = Self::Item> + 'a>
-    where
-        Self::Item: 'a;
+    ) -> Box<dyn Iterator<Item = &'a Self::Item> + 'a>;
 }
 
-impl<I, T> PySlice for T
-where
-    T: DoubleEndedIterator<Item = I> + ExactSizeIterator<Item = I> + Iterator<Item = I>,
-{
-    type Item = I;
+impl<T> PySlice for &[T] {
+    type Item = T;
 
     fn py_slice<'a>(
-        &'a mut self,
+        &'a self,
         start: Option<i32>,
         stop: Option<i32>,
         step_int: Option<NonZero<i32>>,
-    ) -> Box<dyn Iterator<Item = I> + 'a>
-    where
-        I: 'a,
-    {
+    ) -> Box<dyn Iterator<Item = &'a T> + 'a> {
         let step_int = step_int.unwrap_or(NonZero::new(1).unwrap());
 
         let len = self.len();
@@ -117,7 +109,7 @@ where
                 Ordering::Equal | Ordering::Greater => (start, 0, step),
             };
 
-            Box::new(self.skip(skip).take(take).step_by(step))
+            Box::new(self.iter().skip(skip).take(take).step_by(step))
         } else {
             let step = from_negative_i32(step_int.get());
             let start = start
@@ -140,7 +132,7 @@ where
                 }
             };
 
-            Box::new(self.rev().skip(skip).take(take).step_by(step))
+            Box::new(self.iter().rev().skip(skip).take(take).step_by(step))
         }
     }
 }
@@ -215,7 +207,7 @@ mod tests {
     ) {
         assert_equal(
             input
-                .iter()
+                .as_slice()
                 .py_slice(start, stop, step.map(|s| NonZero::new(s).unwrap())),
             expected.iter(),
         );

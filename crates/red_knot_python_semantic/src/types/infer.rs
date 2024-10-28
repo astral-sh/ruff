@@ -3223,7 +3223,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let step = slice_ty.step(self.db);
 
                 let new_elements: Vec<_> = elements
-                    .iter()
+                    .as_ref()
                     .py_slice(start, stop, step)
                     .copied()
                     .collect();
@@ -3261,12 +3261,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let stop = slice_ty.stop(self.db);
                 let step = slice_ty.step(self.db);
 
-                let mut chars = literal_value.chars().collect::<Vec<_>>().into_iter();
-                let new_chars = chars.py_slice(start, stop, step);
-                Type::StringLiteral(StringLiteralType::new(
-                    self.db,
-                    new_chars.collect::<String>().into_boxed_str(),
-                ))
+                let chars: Vec<_> = literal_value.chars().collect();
+                let literal: String = chars.as_slice().py_slice(start, stop, step).collect();
+                Type::StringLiteral(StringLiteralType::new(self.db, literal.into_boxed_str()))
             }
             // Ex) Given `b"value"[1]`, return `b"a"`
             (Type::BytesLiteral(literal_ty), Type::IntLiteral(int))
@@ -3298,7 +3295,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let step = slice_ty.step(self.db);
 
                 let new_bytes: Vec<u8> = literal_value
-                    .iter()
+                    .as_ref()
                     .py_slice(start, stop, step)
                     .copied()
                     .collect();
