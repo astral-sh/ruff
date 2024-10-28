@@ -60,7 +60,7 @@ reveal_type(i)  # revealed: tuple[str | int, str | int]
 reveal_type(j)  # revealed: tuple[str | int]
 ```
 
-## Incorrect tuple annotations are complained about
+## Incorrect tuple assignments are complained about
 
 ```py
 # error: [invalid-assignment] "Object of type `tuple[Literal[1], Literal[2]]` is not assignable to `tuple[()]`"

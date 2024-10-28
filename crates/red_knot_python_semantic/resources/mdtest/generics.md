@@ -18,7 +18,7 @@ class MyBox[T]:
 
 box: MyBox[int] = MyBox(5)
 
-# TODO should emit a diagnostic here (str and int don't unify)
+# TODO should emit a diagnostic here (str is not assignable to int)
 wrong_innards: MyBox[int] = MyBox("five")
 
 # TODO reveal int
