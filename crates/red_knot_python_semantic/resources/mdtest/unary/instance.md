@@ -20,7 +20,6 @@ a = Number()
 
 reveal_type(+a)  # revealed: int
 reveal_type(-a)  # revealed: int
-# TODO: this should be True
 reveal_type(~a)  # revealed: Literal[True]
 
 class NoDunder: ...
