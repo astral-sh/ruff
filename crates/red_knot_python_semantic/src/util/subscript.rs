@@ -114,28 +114,26 @@ where
         let to_nonnegative_index = |index| Nth::from_index(index).to_nonnegative_index(len);
 
         if step_int > 0 {
+            let step = from_nonnegative_i32(step_int);
             let start = start.map(to_nonnegative_index).unwrap_or(0).clamp(0, len);
             let stop = stop.map(to_nonnegative_index).unwrap_or(len).clamp(0, len);
 
-            let step = from_nonnegative_i32(step_int);
-            let (skip, take_n, step) = match start.cmp(&stop) {
+            let (skip, take, step) = match start.cmp(&stop) {
                 Ordering::Less => (start, stop - start, step),
                 Ordering::Equal | Ordering::Greater => (start, 0, step),
             };
 
-            Ok(Box::new(self.skip(skip).take(take_n).step_by(step)))
+            Ok(Box::new(self.skip(skip).take(take).step_by(step)))
         } else {
+            let step = from_negative_i32(step_int);
             let start = start
                 .map(to_nonnegative_index)
                 .unwrap_or(len)
                 .clamp(0, len - 1);
-            let stop = stop
-                .map(to_nonnegative_index)
-                .map(|index| index.clamp(0, len - 1));
 
-            let step = from_negative_i32(step_int);
+            let (skip, take, step) = if let Some(stop) = stop {
+                let stop = to_nonnegative_index(stop).clamp(0, len - 1);
 
-            let (skip, take_n, step) = if let Some(stop) = stop {
                 match start.cmp(&stop) {
                     Ordering::Greater => ((len - 1) - start, start - stop, step),
                     Ordering::Less | Ordering::Equal => (len - start, 0, step),
@@ -144,7 +142,7 @@ where
                 ((len - 1) - start, len, step)
             };
 
-            Ok(Box::new(self.rev().skip(skip).take(take_n).step_by(step)))
+            Ok(Box::new(self.rev().skip(skip).take(take).step_by(step)))
         }
     }
 }
