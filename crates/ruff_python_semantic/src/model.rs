@@ -524,6 +524,7 @@ impl<'a> SemanticModel<'a> {
         let mut result = None;
         let mut is_name_exist = false;
         let mut already_checked_imports: HashSet<String> = HashSet::new();
+        let mut is_submodule = false;
 
         while let Expr::Attribute(expr_attr) = &current_expr {
             full_name = format!("{}.{}", expr_attr.attr.id, full_name);
@@ -549,12 +550,22 @@ impl<'a> SemanticModel<'a> {
         for (_index, scope_id) in ancestor_scope_ids.into_iter().enumerate() {
             for binding_id in self.scopes[scope_id].get_all(name_expr.unwrap().id.as_str()){
                 binding_ids.push((binding_id, scope_id));
+                for reference_id in self.bindings[binding_id].references() {
+                    if self.resolved_references[reference_id].range()
+                        .contains_range(name_expr.unwrap().range)
+                    {
+                        return ReadResult::Resolved(binding_id);
+                    }
+                }
             }
         }
 
         for (binding_id, scope_id) in binding_ids.iter() {
             if let BindingKind::SubmoduleImport(binding_kind) = &self.binding(*binding_id).kind
             {
+                if binding_kind.qualified_name.to_string().contains(name_expr.unwrap().id.as_str()) {
+                    is_submodule = true;
+                }
                 if binding_kind.qualified_name.to_string() == full_name {
                     if let Some(result) = self.resolve_binding(
                         *binding_id,
@@ -567,6 +578,25 @@ impl<'a> SemanticModel<'a> {
             }
             if let BindingKind::Import(_) = &self.binding(*binding_id).kind {
                 is_name_exist = true;
+            }
+        }
+
+        full_name = full_name.rsplit_once(".").map_or(full_name.clone(), |(left, _)| left.to_string());
+        for (binding_id, scope_id) in binding_ids.iter() {
+            if let BindingKind::SubmoduleImport(binding_kind) = &self.binding(*binding_id).kind
+            {
+                if binding_kind.qualified_name.to_string().contains(name_expr.unwrap().id.as_str()) {
+                    is_submodule = true;
+                }
+                if binding_kind.qualified_name.to_string() == full_name {
+                    if let Some(result) = self.resolve_binding(
+                        *binding_id,
+                        &name_expr.unwrap(),
+                        scope_id,
+                    ) {
+                        return result;
+                    }
+                }
             }
         }
 
@@ -610,6 +640,13 @@ impl<'a> SemanticModel<'a> {
         // end check module import
 
         if result.is_none() {
+            if is_submodule {
+                self.unresolved_references.push(
+                    attribute.range,
+                    self.exceptions(),
+                    UnresolvedReferenceFlags::empty(),
+                );
+            }
             ReadResult::NotFound
         } else {
             result.unwrap()
