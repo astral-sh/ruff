@@ -1,0 +1,176 @@
+use std::borrow::Cow;
+
+use ruff_db::files::File;
+use ruff_python_ast::{self as ast, AnyNodeRef};
+use rustc_hash::FxHashMap;
+
+use crate::semantic_index::ast_ids::{HasScopedAstId, ScopedExpressionId};
+use crate::semantic_index::definition::UnpackTarget;
+use crate::semantic_index::symbol::{FileScopeId, ScopeId};
+use crate::types::{TupleType, Type, TypeCheckDiagnostics, TypeCheckDiagnosticsBuilder};
+use crate::Db;
+
+#[salsa::tracked]
+pub struct Unpack<'db> {
+    #[id]
+    pub(crate) file: File,
+
+    #[id]
+    pub(crate) file_scope: FileScopeId,
+
+    #[no_eq]
+    #[return_ref]
+    pub(crate) target: UnpackTarget,
+
+    #[no_eq]
+    pub(crate) value_ty: Type<'db>,
+
+    #[no_eq]
+    count: countme::Count<Unpack<'static>>,
+}
+
+impl<'db> Unpack<'db> {
+    pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
+        self.file_scope(db).to_scope_id(db, self.file(db))
+    }
+}
+
+pub(crate) struct Unpacker<'db> {
+    db: &'db dyn Db,
+    targets: FxHashMap<ScopedExpressionId, Type<'db>>,
+    diagnostics: TypeCheckDiagnosticsBuilder<'db>,
+}
+
+impl<'db> Unpacker<'db> {
+    pub(crate) fn new(db: &'db dyn Db, file: File) -> Self {
+        Self {
+            db,
+            targets: FxHashMap::default(),
+            diagnostics: TypeCheckDiagnosticsBuilder::new(db, file),
+        }
+    }
+
+    pub(crate) fn unpack(&mut self, unpack: Unpack<'db>) {
+        self.unpack_inner(
+            unpack.target(self.db).node(),
+            unpack.value_ty(self.db),
+            unpack.scope(self.db),
+        );
+    }
+
+    fn unpack_inner(&mut self, target: &ast::Expr, value_ty: Type<'db>, scope: ScopeId<'db>) {
+        match target {
+            ast::Expr::Name(target_name) => {
+                self.targets
+                    .insert(target_name.scoped_ast_id(self.db, scope), value_ty);
+            }
+            ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
+                self.unpack_inner(value, value_ty, scope);
+            }
+            ast::Expr::List(ast::ExprList { elts, .. })
+            | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => match value_ty {
+                Type::Tuple(tuple_ty) => {
+                    let starred_index = elts.iter().position(ast::Expr::is_starred_expr);
+
+                    let element_types = if let Some(starred_index) = starred_index {
+                        if tuple_ty.len(self.db) >= elts.len() - 1 {
+                            let mut element_types = Vec::with_capacity(elts.len());
+                            element_types.extend_from_slice(
+                                // SAFETY: Safe because of the length check above.
+                                &tuple_ty.elements(self.db)[..starred_index],
+                            );
+
+                            // E.g., in `(a, *b, c, d) = ...`, the index of starred element `b`
+                            // is 1 and the remaining elements after that are 2.
+                            let remaining = elts.len() - (starred_index + 1);
+                            // This index represents the type of the last element that belongs
+                            // to the starred expression, in an exclusive manner.
+                            let starred_end_index = tuple_ty.len(self.db) - remaining;
+                            // SAFETY: Safe because of the length check above.
+                            let _starred_element_types =
+                                &tuple_ty.elements(self.db)[starred_index..starred_end_index];
+                            // TODO: Combine the types into a list type. If the
+                            // starred_element_types is empty, then it should be `List[Any]`.
+                            // combine_types(starred_element_types);
+                            element_types.push(Type::Todo);
+
+                            element_types.extend_from_slice(
+                                // SAFETY: Safe because of the length check above.
+                                &tuple_ty.elements(self.db)[starred_end_index..],
+                            );
+                            Cow::Owned(element_types)
+                        } else {
+                            let mut element_types = tuple_ty.elements(self.db).to_vec();
+                            // Subtract 1 to insert the starred expression type at the correct
+                            // index.
+                            element_types.resize(elts.len() - 1, Type::Unknown);
+                            // TODO: This should be `list[Unknown]`
+                            element_types.insert(starred_index, Type::Todo);
+                            Cow::Owned(element_types)
+                        }
+                    } else {
+                        Cow::Borrowed(tuple_ty.elements(self.db).as_ref())
+                    };
+
+                    for (index, element) in elts.iter().enumerate() {
+                        self.unpack_inner(
+                            element,
+                            element_types.get(index).copied().unwrap_or(Type::Unknown),
+                            scope,
+                        );
+                    }
+                }
+                Type::StringLiteral(string_literal_ty) => {
+                    // Deconstruct the string literal to delegate the inference back to the
+                    // tuple type for correct handling of starred expressions. We could go
+                    // further and deconstruct to an array of `StringLiteral` with each
+                    // individual character, instead of just an array of `LiteralString`, but
+                    // there would be a cost and it's not clear that it's worth it.
+                    let value_ty = Type::Tuple(TupleType::new(
+                        self.db,
+                        vec![Type::LiteralString; string_literal_ty.len(self.db)]
+                            .into_boxed_slice(),
+                    ));
+                    self.unpack_inner(target, value_ty, scope);
+                }
+                _ => {
+                    let value_ty = if value_ty.is_literal_string() {
+                        Type::LiteralString
+                    } else {
+                        value_ty
+                            .iterate(self.db)
+                            .unwrap_with_diagnostic(AnyNodeRef::from(target), &mut self.diagnostics)
+                    };
+                    for element in elts {
+                        self.unpack_inner(element, value_ty, scope);
+                    }
+                }
+            },
+            _ => {}
+        }
+    }
+
+    pub(crate) fn finish(mut self) -> UnpackResult<'db> {
+        self.targets.shrink_to_fit();
+        UnpackResult {
+            diagnostics: self.diagnostics.finish(),
+            targets: self.targets,
+        }
+    }
+}
+
+#[derive(Debug, Default, PartialEq, Eq)]
+pub(crate) struct UnpackResult<'db> {
+    targets: FxHashMap<ScopedExpressionId, Type<'db>>,
+    diagnostics: TypeCheckDiagnostics,
+}
+
+impl<'db> UnpackResult<'db> {
+    pub(crate) fn get(&self, expr_id: ScopedExpressionId) -> Option<Type<'db>> {
+        self.targets.get(&expr_id).copied()
+    }
+
+    pub(crate) fn diagnostics(&self) -> &TypeCheckDiagnostics {
+        &self.diagnostics
+    }
+}

@@ -401,6 +401,24 @@ pub enum DefinitionKind {
 }
 
 impl DefinitionKind {
+    pub(crate) fn as_unpack_target(&self) -> Option<UnpackTarget> {
+        match self {
+            DefinitionKind::Assignment(AssignmentDefinitionKind {
+                assignment,
+                target_index,
+                ..
+            }) => Some(UnpackTarget::Assignment(UnpackTargetAssignment {
+                assignment: assignment.clone(),
+                target_index: *target_index,
+            })),
+            DefinitionKind::For(ForStmtDefinitionKind { .. }) => {
+                // TODO
+                None
+            }
+            _ => None,
+        }
+    }
+
     pub(crate) fn category(&self) -> DefinitionCategory {
         match self {
             // functions, classes, and imports always bind, and we consider them declarations
@@ -516,10 +534,6 @@ pub struct AssignmentDefinitionKind {
 impl AssignmentDefinitionKind {
     pub(crate) fn value(&self) -> &ast::Expr {
         &self.assignment.node().value
-    }
-
-    pub(crate) fn target(&self) -> &ast::Expr {
-        &self.assignment.node().targets[self.target_index]
     }
 
     pub(crate) fn name(&self) -> &ast::ExprName {
@@ -672,5 +686,32 @@ impl From<&ast::Identifier> for DefinitionNodeKey {
 impl From<&ast::ExceptHandlerExceptHandler> for DefinitionNodeKey {
     fn from(handler: &ast::ExceptHandlerExceptHandler) -> Self {
         Self(NodeKey::from_node(handler))
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum UnpackTarget {
+    Assignment(UnpackTargetAssignment),
+    For(AstNodeRef<ast::Expr>),
+}
+
+impl UnpackTarget {
+    pub(crate) fn node(&self) -> &ast::Expr {
+        match self {
+            UnpackTarget::Assignment(assignment) => assignment.target(),
+            UnpackTarget::For(target) => target,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct UnpackTargetAssignment {
+    assignment: AstNodeRef<ast::StmtAssign>,
+    target_index: usize,
+}
+
+impl UnpackTargetAssignment {
+    pub(crate) fn target(&self) -> &ast::Expr {
+        &self.assignment.targets[self.target_index]
     }
 }
