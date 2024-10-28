@@ -32,11 +32,16 @@ static EXPECTED_DIAGNOSTICS: &[&str] = &[
     "/src/tomllib/_parser.py:98:12: Name `char` used when possibly not defined",
     "/src/tomllib/_parser.py:101:12: Name `char` used when possibly not defined",
     "/src/tomllib/_parser.py:104:14: Name `char` used when possibly not defined",
+    "/src/tomllib/_parser.py:108:17: Conflicting declared types for `second_char`: Unknown, str | None",
     "/src/tomllib/_parser.py:115:14: Name `char` used when possibly not defined",
     "/src/tomllib/_parser.py:126:12: Name `char` used when possibly not defined",
+    "/src/tomllib/_parser.py:267:9: Conflicting declared types for `char`: Unknown, str | None",
     "/src/tomllib/_parser.py:348:20: Name `nest` used when possibly not defined",
     "/src/tomllib/_parser.py:353:5: Name `nest` used when possibly not defined",
     "/src/tomllib/_parser.py:353:5: Method `__getitem__` of type `Unbound | @Todo` is not callable on object of type `Unbound | @Todo`",
+    "/src/tomllib/_parser.py:364:9: Conflicting declared types for `char`: Unknown, str | None",
+    "/src/tomllib/_parser.py:381:13: Conflicting declared types for `char`: Unknown, str | None",
+    "/src/tomllib/_parser.py:395:9: Conflicting declared types for `char`: Unknown, str | None",
     "/src/tomllib/_parser.py:453:24: Name `nest` used when possibly not defined",
     "/src/tomllib/_parser.py:455:9: Name `nest` used when possibly not defined",
     "/src/tomllib/_parser.py:455:9: Method `__getitem__` of type `Unbound | @Todo` is not callable on object of type `Unbound | @Todo`",
@@ -45,7 +50,8 @@ static EXPECTED_DIAGNOSTICS: &[&str] = &[
     "/src/tomllib/_parser.py:573:12: Name `char` used when possibly not defined",
     "/src/tomllib/_parser.py:579:12: Name `char` used when possibly not defined",
     "/src/tomllib/_parser.py:580:63: Name `char` used when possibly not defined",
-    "/src/tomllib/_parser.py:629:38: Name `datetime_obj` used when possibly not defined"
+    "/src/tomllib/_parser.py:590:9: Conflicting declared types for `char`: Unknown, str | None",
+    "/src/tomllib/_parser.py:629:38: Name `datetime_obj` used when possibly not defined",
 ];
 
 fn get_test_file(name: &str) -> TestFile {
