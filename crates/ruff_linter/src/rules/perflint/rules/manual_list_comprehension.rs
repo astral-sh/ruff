@@ -298,7 +298,7 @@ fn convert_to_list_extend(
                 range: TextRange::default(),
             };
 
-            let variable_name = binding.name(checker.locator());
+            let variable_name = checker.locator().slice(binding.range);
 
             let extend = ast::ExprAttribute {
                 value: Box::new(Expr::Name(ast::ExprName {
