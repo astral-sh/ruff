@@ -23,7 +23,7 @@ x: int
 x = "foo"  # error: [invalid-assignment] "Object of type `Literal["foo"]` is not assignable to `int`"
 ```
 
-## PEP-604 annotations not yet supported
+## PEP-604 annotations are supported
 
 ```py
 def f() -> int | None:
