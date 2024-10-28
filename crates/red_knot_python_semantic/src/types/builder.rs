@@ -177,6 +177,33 @@ impl<'db> IntersectionBuilder<'db> {
                 self = self.add_negative(*elem);
             }
             self
+        } else if let Type::Intersection(intersection) = ty {
+            // (A | B) & !(C & !D) -> (A | B) & (!C | D)
+            // -> ((A | B) & !C) | ((A | B) & D)
+            //
+            // i.e. if we have an intersection of positive constraints C
+            // and negative constraints D, then our new intersection
+            // is (existing & !C) | (existing & D)
+
+            let positive_side = intersection
+                .positive(self.db)
+                .iter()
+                // we negate all the positive constraints while distributing
+                .map(|elem| self.clone().add_negative(*elem));
+
+            let negative_side = intersection
+                .negative(self.db)
+                .iter()
+                // all negative constraints end up becoming positive constraints
+                .map(|elem| self.clone().add_positive(*elem));
+
+            positive_side.chain(negative_side).fold(
+                IntersectionBuilder::empty(self.db),
+                |mut builder, sub| {
+                    builder.intersections.extend(sub.intersections);
+                    builder
+                },
+            )
         } else {
             for inner in &mut self.intersections {
                 inner.add_negative(self.db, ty);
@@ -368,9 +395,16 @@ mod tests {
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
     use crate::types::{KnownClass, StringLiteralType, UnionBuilder};
+    use crate::Db;
     use crate::ProgramSettings;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
     use test_case::test_case;
+
+    impl<'db> IntersectionBuilder<'db> {
+        fn negation_of(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+            IntersectionBuilder::new(db).add_negative(ty).build()
+        }
+    }
 
     fn setup_db() -> TestDb {
         let db = TestDb::new();
@@ -591,6 +625,32 @@ mod tests {
         assert_eq!(i1.pos_vec(&db), &[ta, t1]);
     }
 
+    #[test]
+    fn intersection_negation_distributes_over_union() {
+        let db = setup_db();
+        let st = KnownClass::Sized.to_instance(&db);
+        let ht = KnownClass::Hashable.to_instance(&db);
+        // sh_t: Sized & Hashable
+        let sh_t = IntersectionBuilder::new(&db)
+            .add_positive(st)
+            .add_positive(ht)
+            .build()
+            .expect_intersection();
+        assert_eq!(sh_t.pos_vec(&db), &[st, ht]);
+        assert_eq!(sh_t.neg_vec(&db), &[]);
+
+        // !sh_t => not Sized or not Hashable
+        let not_s_h_t = IntersectionBuilder::new(&db)
+            .add_negative(Type::Intersection(sh_t))
+            .build()
+            .expect_union();
+
+        // should have (not Sized) or (not Hashable)
+        let not_st = IntersectionBuilder::negation_of(&db, st);
+        let not_ht = IntersectionBuilder::negation_of(&db, ht);
+
+        assert_eq!(not_s_h_t.elements(&db), &[not_st, not_ht]);
+    }
     #[test]
     fn build_intersection_self_negation() {
         let db = setup_db();
