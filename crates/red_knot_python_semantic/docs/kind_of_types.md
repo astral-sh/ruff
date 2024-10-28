@@ -4,13 +4,16 @@ This document provides definitions for various kinds of types,
 with examples of Python types that satisfy these definitions.
 
 It doesn't attempt to be exhaustive.
-Only definitions that are useful for red-knot developers should be added to this document.
+Definitions should only be added to this document if they are:
+
+1. Not covered by the ["Type system concepts" section of the Python typing spec](https://typing.readthedocs.io/en/latest/spec/concepts.html)
+1. Definitions that would be useful for developers working on red-knot.
 
 ## Types
 
 A static Python type represents a set of possible values at runtime.
 The number of ways in which possible Python objects could be categorised into sets and subsets is infinite;
-thus, there is an infinite number of possible types in Python.[^3]
+thus, there is an infinite number of possible types in Python.
 
 The [typing spec](https://typing.readthedocs.io/en/latest/spec/) specifies various kinds of types
 that all Python type checkers should support,
@@ -20,15 +23,9 @@ There are more kinds of types in Python than are included in the spec,
 and many kinds of types that are left unspecified must be understood by a type checker
 in order for the type checker to accurately and precisely model Python's runtime semantics.
 
-A runtime object in Python can be said to "inhabit" a static type if the object satisfies
-the conditions by which the type is defined. For example, the `str` type can be defined
-as "all runtime objects which are instances of the class `builtins.str`".
-According to this definition, the runtime strings `"foo"` and `"bar"`
-both inhabit the `str` type.
-
 Some types in Python have a known size.
-Most, however, have an infinite number of possible inhabitants and subtypes.[^3]
-For any type `T`, the union of all of the subtypes of `T` is exactly equal to `T`.
+Most, however, have an infinite number of possible inhabitants and subtypes.
+For any type `T`, the union of all of the proper subtypes[^2] of `T` is exactly equal to `T`.
 
 ## Singleton types
 
@@ -115,7 +112,7 @@ Examples of sealed types (other than the singleton types listed above) are:
 - `bool`:
 
     - The only inhabitants of `bool` at runtime are the constants `True` and `False`.
-    - The only proper subtypes[^2] of `bool` are `Literal[True]`, `Literal[False]`, and `Never`.
+    - The only proper subtypes of `bool` are `Literal[True]`, `Literal[False]`, and `Never`.
 
 - Enums: consider the following enum class:
 
@@ -216,7 +213,7 @@ class Ham(Enum):
     C = auto()
 
     def __eq__(self, other):
-        return True
+        return False
 ```
 
 ## Final types
@@ -255,14 +252,10 @@ class X[T: bool]:
 
 Not all final types are decorated with `@final`. The most common example of this
 is enum classes. Any enum class that has at least one member is considered
-implicitly final, as attempting to subclass such a class will fail at runtime:
+implicitly final, as attempting to subclass such a class will fail at runtime.
 
 All singleton types and sealed types are final types,
 but not all final types are singleton types or sealed types.
-
-[^3]: More details on the set-theoretic nature of types, subtyping, and gradual types
-    can be found in the
-    ["Type system concepts" section of the Python typing spec](https://typing.readthedocs.io/en/latest/spec/concepts.html).
 
 [^2]: For a given type `X`, a "proper subtype" of `X` is defined
     as a type that is strictly narrower than `X`. The set of proper subtypes of `X` includes
