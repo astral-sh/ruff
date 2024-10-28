@@ -30,7 +30,7 @@ For any type `T`, the union of all of the proper subtypes[^2] of `T` is exactly 
 ## Singleton types
 
 A singleton type is a type for which it is known that there is
-(and can only ever be) exactly one known inhabitant of the type at runtime:
+(and can only ever be) exactly one inhabitant of the type at runtime:
 a set of runtime values with size exactly 1.
 For any singleton type in Python, the type's sole inhabitant will always exist
 at the same memory address for the entire duration of a Python program.
