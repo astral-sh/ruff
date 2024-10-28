@@ -65,7 +65,7 @@ where
     fn py_index(&mut self, index: i32) -> Result<I, OutOfBoundsError> {
         match Nth::from_index(index) {
             Nth::FromStart(nth) => self.nth(nth).ok_or(OutOfBoundsError),
-            Nth::FromEnd(nth_rev) => self.rev().nth(nth_rev).ok_or(OutOfBoundsError),
+            Nth::FromEnd(nth_rev) => self.nth_back(nth_rev).ok_or(OutOfBoundsError),
         }
     }
 }
