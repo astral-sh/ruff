@@ -395,16 +395,9 @@ mod tests {
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
     use crate::types::{KnownClass, StringLiteralType, UnionBuilder};
-    use crate::Db;
     use crate::ProgramSettings;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
     use test_case::test_case;
-
-    impl<'db> IntersectionBuilder<'db> {
-        fn negation_of(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
-            IntersectionBuilder::new(db).add_negative(ty).build()
-        }
-    }
 
     fn setup_db() -> TestDb {
         let db = TestDb::new();
@@ -591,18 +584,29 @@ mod tests {
         let ta = Type::Any;
         let t1 = Type::IntLiteral(1);
         let t2 = KnownClass::Int.to_instance(&db);
+        // i0 = Any & ~Literal[1]
         let i0 = IntersectionBuilder::new(&db)
             .add_positive(ta)
             .add_negative(t1)
             .build();
+        // intersection = int & ~(Any & ~Literal[1])
+        // -> int & (~Any  | Literal[1])
+        // (~Any is treated as Any for adding purposes)
+        // -> (int & Any) | (int & Literal[1])
+        // -> (int & Any) | Literal[1]
         let intersection = IntersectionBuilder::new(&db)
             .add_positive(t2)
             .add_negative(i0)
             .build()
-            .expect_intersection();
+            .expect_union();
 
-        assert_eq!(intersection.pos_vec(&db), &[ta, t1]);
-        assert_eq!(intersection.neg_vec(&db), &[]);
+        // int & Any
+        let i_and_a = IntersectionBuilder::new(&db)
+            .add_positive(t2)
+            .add_positive(ta)
+            .build();
+
+        assert_eq!(intersection.elements(&db), &[i_and_a, t1,]);
     }
 
     #[test]
@@ -646,9 +650,8 @@ mod tests {
             .expect_union();
 
         // should have (not Sized) or (not Hashable)
-        let not_st = IntersectionBuilder::negation_of(&db, st);
-        let not_ht = IntersectionBuilder::negation_of(&db, ht);
-
+        let not_st = st.negate(&db);
+        let not_ht = ht.negate(&db);
         assert_eq!(not_s_h_t.elements(&db), &[not_st, not_ht]);
     }
     #[test]
