@@ -3572,7 +3572,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             &inner_literal_subscript.slice,
                         )
                     } else {
-                        return Type::Unknown;
+                        Type::Unknown
                     }
                 } else {
                     self.add_diagnostic(
@@ -3582,12 +3582,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                                             "Type arguments for `Literal` must be None, a literal value (int, bool, str, or bytes), or an enum value",
                                         ),
                                     );
-                    return Type::Unknown;
+                    Type::Unknown
                 }
             }
             ruff_python_ast::Expr::Tuple(t) => {
                 let mut elts = vec![];
-                for elm in t.elts.iter() {
+                for elm in &t.elts {
                     elts.push(self.infer_literal_parameter_type(elm));
                 }
                 Type::Tuple(TupleType::new(self.db, elts.into_boxed_slice()))

@@ -1798,7 +1798,7 @@ impl<'db> InstanceType<'db> {
     }
 
     pub fn is_known(&self, db: &'db dyn Db, known_instance: KnownInstance) -> bool {
-        return self.known_instance(db).is_some_and(|k| k == known_instance);
+        self.known_instance(db).is_some_and(|k| k == known_instance)
     }
 }
 
