@@ -2,7 +2,7 @@
 //! operations (`PySlice`) on iterators, following the semantics of equivalent
 //! operations in Python.
 
-use std::{cmp::Ordering, num::NonZeroI32};
+use std::num::NonZeroI32;
 
 use itertools::Either;
 
@@ -34,6 +34,13 @@ fn from_negative_i32(index: i32) -> usize {
     })
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+enum Position {
+    BeforeStart,
+    AtIndex(usize),
+    AfterEnd,
+}
+
 enum Nth {
     FromStart(usize),
     FromEnd(usize),
@@ -48,12 +55,24 @@ impl Nth {
         }
     }
 
-    fn to_nonnegative_index(&self, len: usize) -> usize {
+    fn to_position(&self, len: usize) -> Position {
         debug_assert!(len > 0);
 
         match self {
-            Nth::FromStart(nth) => *nth,
-            Nth::FromEnd(nth_rev) => (len - 1).saturating_sub(*nth_rev),
+            Nth::FromStart(nth) => {
+                if *nth < len {
+                    Position::AtIndex(*nth)
+                } else {
+                    Position::AfterEnd
+                }
+            }
+            Nth::FromEnd(nth_rev) => {
+                if *nth_rev < len {
+                    Position::AtIndex(len - 1 - *nth_rev)
+                } else {
+                    Position::BeforeStart
+                }
+            }
         }
     }
 }
@@ -103,39 +122,55 @@ impl<T> PySlice for &[T] {
             return Either::Left(self.iter().skip(0).take(0).step_by(1));
         }
 
-        let to_nonnegative_index = |index| Nth::from_index(index).to_nonnegative_index(len);
+        let to_position = |index| Nth::from_index(index).to_position(len);
 
         if step_int.is_positive() {
             let step = from_nonnegative_i32(step_int.get());
-            let start = start.map(to_nonnegative_index).unwrap_or(0).clamp(0, len);
-            let stop = stop.map(to_nonnegative_index).unwrap_or(len).clamp(0, len);
 
-            let (skip, take, step) = match start.cmp(&stop) {
-                Ordering::Less => (start, stop - start, step),
-                Ordering::Equal | Ordering::Greater => (start, 0, step),
+            let start = start.map(to_position).unwrap_or(Position::BeforeStart);
+            let stop = stop.map(to_position).unwrap_or(Position::AfterEnd);
+
+            let (skip, take, step) = if start < stop {
+                let skip = match start {
+                    Position::BeforeStart => 0,
+                    Position::AtIndex(start_index) => start_index,
+                    Position::AfterEnd => len,
+                };
+
+                let take = match stop {
+                    Position::BeforeStart => 0,
+                    Position::AtIndex(stop_index) => stop_index - skip,
+                    Position::AfterEnd => len - skip,
+                };
+
+                (skip, take, step)
+            } else {
+                (0, 0, step)
             };
 
             Either::Left(self.iter().skip(skip).take(take).step_by(step))
         } else {
             let step = from_negative_i32(step_int.get());
-            let start = start
-                .map(to_nonnegative_index)
-                .unwrap_or(len)
-                .clamp(0, len - 1);
 
-            let (skip, take, step) = match stop {
-                Some(stop) if i32::try_from(len).map(|len| stop < -len).unwrap_or(false) => {
-                    ((len - 1) - start, len, step)
-                }
-                None => ((len - 1) - start, len, step),
-                Some(stop) => {
-                    let stop = to_nonnegative_index(stop).clamp(0, len - 1);
+            let start = start.map(to_position).unwrap_or(Position::AfterEnd);
+            let stop = stop.map(to_position).unwrap_or(Position::BeforeStart);
 
-                    match start.cmp(&stop) {
-                        Ordering::Greater => ((len - 1) - start, start - stop, step),
-                        Ordering::Less | Ordering::Equal => (len - start, 0, step),
-                    }
-                }
+            let (skip, take, step) = if start <= stop {
+                (0, 0, step)
+            } else {
+                let skip = match start {
+                    Position::BeforeStart => len,
+                    Position::AtIndex(start_index) => len - 1 - start_index,
+                    Position::AfterEnd => 0,
+                };
+
+                let take = match stop {
+                    Position::BeforeStart => len - skip,
+                    Position::AtIndex(stop_index) => (len - 1) - skip - stop_index,
+                    Position::AfterEnd => 0,
+                };
+
+                (skip, take, step)
             };
 
             Either::Right(self.iter().rev().skip(skip).take(take).step_by(step))
@@ -435,5 +470,13 @@ mod tests {
         assert_eq_slice(&input, Some(-6), Some(-8), Some(-1), &['b', 'a']);
         assert_eq_slice(&input, Some(-6), Some(-7), Some(-1), &['b']);
         assert_eq_slice(&input, Some(-6), Some(-6), Some(-1), &[]);
+
+        assert_eq_slice(&input, Some(-7), Some(-9), Some(-1), &['a']);
+
+        assert_eq_slice(&input, Some(-8), Some(-9), Some(-1), &[]);
+        assert_eq_slice(&input, Some(-9), Some(-9), Some(-1), &[]);
+
+        assert_eq_slice(&input, Some(-6), Some(-2), Some(-1), &[]);
+        assert_eq_slice(&input, Some(-9), Some(-6), Some(-1), &[]);
     }
 }
