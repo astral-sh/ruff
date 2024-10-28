@@ -3210,7 +3210,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let elements = tuple_ty.elements(self.db);
                 elements
                     .iter()
-                    .py_index(i32::try_from(int).unwrap())
+                    .py_index(i32::try_from(int).expect("checked in branch arm"))
                     .copied()
                     .unwrap_or_else(|_| {
                         self.index_out_of_bounds_diagnostic(
@@ -3246,7 +3246,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let literal_value = literal_ty.value(self.db);
                 literal_value
                     .chars()
-                    .py_index(i32::try_from(int).unwrap())
+                    .py_index(i32::try_from(int).expect("checked in branch arm"))
                     .map(|ch| {
                         Type::StringLiteral(StringLiteralType::new(
                             self.db,
@@ -3290,7 +3290,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let literal_value = literal_ty.value(self.db);
                 literal_value
                     .iter()
-                    .py_index(i32::try_from(int).unwrap())
+                    .py_index(i32::try_from(int).expect("checked in branch arm"))
                     .map(|byte| {
                         Type::BytesLiteral(BytesLiteralType::new(self.db, [*byte].as_slice()))
                     })
@@ -3423,7 +3423,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let type_to_slice_argument = |ty: Option<Type<'db>>| match ty {
             Some(Type::IntLiteral(n)) if i32::try_from(n).is_ok() => {
-                SliceArg::Arg(Some(i32::try_from(n).unwrap()))
+                SliceArg::Arg(Some(i32::try_from(n).expect("checked in branch arm")))
             }
             Some(Type::BooleanLiteral(b)) => SliceArg::Arg(Some(i32::from(b))),
             Some(Type::None) => SliceArg::Arg(None),
