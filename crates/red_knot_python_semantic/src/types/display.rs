@@ -91,22 +91,26 @@ impl Display for DisplayRepresentation<'_> {
                 escape.bytes_repr().write(f)
             }
             Type::SliceLiteral(slice) => {
-                write!(
-                    f,
-                    "slice[{start}, {stop}{step}]",
-                    start = slice
-                        .start(self.db)
-                        .map(|s| format!("Literal[{s}]"))
-                        .unwrap_or("None".into()),
-                    stop = slice
-                        .stop(self.db)
-                        .map(|s| format!("Literal[{s}]"))
-                        .unwrap_or("None".into()),
-                    step = slice
-                        .step(self.db)
-                        .map(|s| format!(", Literal[{s}]"))
-                        .unwrap_or_default()
-                )
+                f.write_str("slice[")?;
+                if let Some(start) = slice.start(self.db) {
+                    write!(f, "Literal[{start}]")?;
+                } else {
+                    f.write_str("None")?;
+                }
+
+                f.write_str(", ")?;
+
+                if let Some(stop) = slice.stop(self.db) {
+                    write!(f, "Literal[{stop}]")?;
+                } else {
+                    f.write_str("None")?;
+                }
+
+                if let Some(step) = slice.step(self.db) {
+                    write!(f, ", Literal[{step}]")?;
+                }
+
+                f.write_str("]")
             }
             Type::Tuple(tuple) => {
                 f.write_str("tuple[")?;
