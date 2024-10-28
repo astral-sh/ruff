@@ -26,8 +26,8 @@ x = "foo"  # error: [invalid-assignment] "Object of type `Literal["foo"]` is not
 ## PEP-604 annotations are supported
 
 ```py
-def f() -> int | None:
+def f() -> str | int | None:
     return None
 
-reveal_type(f())  # revealed: int | None
+reveal_type(f())  # revealed: str | int | None
 ```
