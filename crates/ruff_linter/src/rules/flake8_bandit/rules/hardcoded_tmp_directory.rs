@@ -31,6 +31,9 @@ use crate::checkers::ast::Checker;
 ///     ...
 /// ```
 ///
+/// ## Options
+/// - `lint.flake8-bandit.hardcoded-tmp-directory`
+///
 /// ## References
 /// - [Common Weakness Enumeration: CWE-377](https://cwe.mitre.org/data/definitions/377.html)
 /// - [Common Weakness Enumeration: CWE-379](https://cwe.mitre.org/data/definitions/379.html)
