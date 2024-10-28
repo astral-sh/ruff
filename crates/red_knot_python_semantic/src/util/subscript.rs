@@ -95,15 +95,15 @@ where
     where
         I: 'a,
     {
+        let step_int = step_int.unwrap_or(1);
+        if step_int == 0 {
+            return Err(StepSizeZeroError);
+        }
+
         let len = self.len();
 
         if len == 0 {
             return Ok(Box::new(std::iter::empty()));
-        }
-
-        let step_int = step_int.unwrap_or(1);
-        if step_int == 0 {
-            return Err(StepSizeZeroError);
         }
 
         if step_int > 0 {
