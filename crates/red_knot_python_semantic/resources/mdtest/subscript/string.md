@@ -29,24 +29,39 @@ reveal_type(s[0:0])  # revealed: Literal[""]
 reveal_type(s[0:1])  # revealed: Literal["a"]
 reveal_type(s[0:2])  # revealed: Literal["ab"]
 reveal_type(s[0:5])  # revealed: Literal["abcde"]
+reveal_type(s[0:6])  # revealed: Literal["abcde"]
+reveal_type(s[1:3])  # revealed: Literal["bc"]
 
 reveal_type(s[-3:5])  # revealed: Literal["cde"]
+reveal_type(s[-4:-2])  # revealed: Literal["bc"]
+reveal_type(s[-10:10])  # revealed: Literal["abcde"]
 
 reveal_type(s[0:])  # revealed: Literal["abcde"]
-reveal_type(s[1:])  # revealed: Literal["bcde"]
+reveal_type(s[2:])  # revealed: Literal["cde"]
 reveal_type(s[5:])  # revealed: Literal[""]
-
+reveal_type(s[:2])  # revealed: Literal["ab"]
 reveal_type(s[:0])  # revealed: Literal[""]
-reveal_type(s[:1])  # revealed: Literal["a"]
-reveal_type(s[:5])  # revealed: Literal["abcde"]
-
+reveal_type(s[:2])  # revealed: Literal["ab"]
+reveal_type(s[:10])  # revealed: Literal["abcde"]
 reveal_type(s[:])  # revealed: Literal["abcde"]
 
 reveal_type(s[::-1])  # revealed: Literal["edcba"]
-reveal_type(s[-2:-5:-1])  # revealed: Literal["dcb"]
 reveal_type(s[::2])  # revealed: Literal["ace"]
+reveal_type(s[-2:-5:-1])  # revealed: Literal["dcb"]
 reveal_type(s[::-2])  # revealed: Literal["eca"]
 reveal_type(s[-1::-3])  # revealed: Literal["eb"]
+
+reveal_type(s[None:2:None])  # revealed: Literal["ab"]
+reveal_type(s[1:None:1])  # revealed: Literal["bcde"]
+reveal_type(s[None:None:None])  # revealed: Literal["abcde"]
+
+start = 1
+stop = None
+step = 2
+reveal_type(s[start:stop:step])  # revealed: Literal["bd"]
+
+reveal_type(s[False:True])  # revealed: Literal["a"]
+reveal_type(s[True:3])  # revealed: Literal["bc"]
 
 a = s[0:5:0]  # error: [slice-step-zero]
 reveal_type(a)  # revealed: Unknown

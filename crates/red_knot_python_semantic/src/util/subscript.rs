@@ -131,15 +131,19 @@ where
                 .unwrap_or(len)
                 .clamp(0, len - 1);
 
-            let (skip, take, step) = if let Some(stop) = stop {
-                let stop = to_nonnegative_index(stop).clamp(0, len - 1);
-
-                match start.cmp(&stop) {
-                    Ordering::Greater => ((len - 1) - start, start - stop, step),
-                    Ordering::Less | Ordering::Equal => (len - start, 0, step),
+            let (skip, take, step) = match stop {
+                Some(stop) if i32::try_from(len).map(|len| stop < -len).unwrap_or(false) => {
+                    ((len - 1) - start, len, step)
                 }
-            } else {
-                ((len - 1) - start, len, step)
+                None => ((len - 1) - start, len, step),
+                Some(stop) => {
+                    let stop = to_nonnegative_index(stop).clamp(0, len - 1);
+
+                    match start.cmp(&stop) {
+                        Ordering::Greater => ((len - 1) - start, start - stop, step),
+                        Ordering::Less | Ordering::Equal => (len - start, 0, step),
+                    }
+                }
             };
 
             Ok(Box::new(self.rev().skip(skip).take(take).step_by(step)))
@@ -444,5 +448,10 @@ mod tests {
         assert_eq_slice(&input, Some(6), Some(0), Some(-3), &['g', 'd']);
 
         assert_eq_slice(&input, Some(7), None, Some(-10), &['g']);
+
+        assert_eq_slice(&input, Some(-6), Some(-9), Some(-1), &['b', 'a']);
+        assert_eq_slice(&input, Some(-6), Some(-8), Some(-1), &['b', 'a']);
+        assert_eq_slice(&input, Some(-6), Some(-7), Some(-1), &['b']);
+        assert_eq_slice(&input, Some(-6), Some(-6), Some(-1), &[]);
     }
 }
