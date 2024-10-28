@@ -219,19 +219,6 @@ mod tests {
         );
     }
 
-    #[track_caller]
-    fn assert_slice_returns_none<const N: usize>(
-        input: &[char; N],
-        start: Option<i32>,
-        stop: Option<i32>,
-        step: Option<i32>,
-    ) {
-        assert!(matches!(
-            input.iter().py_slice(start, stop, step),
-            Err(StepSizeZeroError)
-        ));
-    }
-
     #[test]
     fn py_slice_empty_input() {
         let input = [];
@@ -399,8 +386,18 @@ mod tests {
         let input = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
 
         // Step size zero is invalid:
-        assert_slice_returns_none(&input, Some(0), Some(5), Some(0));
-        assert_slice_returns_none(&input, Some(0), Some(0), Some(0));
+        assert!(matches!(
+            input.iter().py_slice(None, None, Some(0)),
+            Err(StepSizeZeroError)
+        ));
+        assert!(matches!(
+            input.iter().py_slice(Some(0), Some(5), Some(0)),
+            Err(StepSizeZeroError)
+        ));
+        assert!(matches!(
+            input.iter().py_slice(Some(0), Some(0), Some(0)),
+            Err(StepSizeZeroError)
+        ));
 
         assert_eq_slice(&input, Some(0), Some(8), Some(2), &['a', 'c', 'e', 'g']);
         assert_eq_slice(&input, Some(0), Some(7), Some(2), &['a', 'c', 'e', 'g']);
@@ -415,6 +412,8 @@ mod tests {
 
         assert_eq_slice(&input, Some(0), Some(7), Some(3), &['a', 'd', 'g']);
         assert_eq_slice(&input, Some(0), Some(6), Some(3), &['a', 'd']);
+
+        assert_eq_slice(&input, Some(0), None, Some(10), &['a']);
     }
 
     #[test]
@@ -440,5 +439,10 @@ mod tests {
         assert_eq_slice(&input, Some(5), Some(3), Some(-2), &['f']);
         assert_eq_slice(&input, Some(5), Some(4), Some(-2), &['f']);
         assert_eq_slice(&input, Some(5), Some(5), Some(-2), &[]);
+
+        assert_eq_slice(&input, Some(6), None, Some(-3), &['g', 'd', 'a']);
+        assert_eq_slice(&input, Some(6), Some(0), Some(-3), &['g', 'd']);
+
+        assert_eq_slice(&input, Some(7), None, Some(-10), &['g']);
     }
 }
