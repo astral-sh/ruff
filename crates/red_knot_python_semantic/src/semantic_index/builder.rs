@@ -9,7 +9,7 @@ use ruff_index::IndexVec;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
-use ruff_python_ast::AnyParameterRef;
+use ruff_python_ast::{AnyParameterRef, BoolOp, Expr};
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
@@ -244,14 +244,21 @@ impl<'db> SemanticIndexBuilder<'db> {
     }
 
     fn add_expression_constraint(&mut self, constraint_node: &ast::Expr) -> Constraint<'db> {
+        let constraint = self.build_constraint(constraint_node);
+        self.add_constraint(constraint);
+        constraint
+    }
+
+    fn add_constraint(&mut self, constraint: Constraint<'db>) {
+        self.current_use_def_map_mut().record_constraint(constraint);
+    }
+
+    fn build_constraint(&mut self, constraint_node: &Expr) -> Constraint<'db> {
         let expression = self.add_standalone_expression(constraint_node);
-        let constraint = Constraint {
+        Constraint {
             node: ConstraintNode::Expression(expression),
             is_positive: true,
-        };
-        self.current_use_def_map_mut().record_constraint(constraint);
-
-        constraint
+        }
     }
 
     fn add_negated_constraint(&mut self, constraint: Constraint<'db>) {
@@ -1109,7 +1116,7 @@ where
             ast::Expr::BoolOp(ast::ExprBoolOp {
                 values,
                 range: _,
-                op: _,
+                op,
             }) => {
                 // TODO detect statically known truthy or falsy values (via type inference, not naive
                 // AST inspection, so we can't simplify here, need to record test expression for
@@ -1117,11 +1124,17 @@ where
                 let mut snapshots = vec![];
 
                 for (index, value) in values.iter().enumerate() {
-                    // The first item of BoolOp is always evaluated
-                    if index > 0 {
-                        snapshots.push(self.flow_snapshot());
-                    }
                     self.visit_expr(value);
+                    // In the last value we don't need to take a snapshot nor add a constraint
+                    if index < values.len() - 1 {
+                        // Snapshot is taken after visiting the expression but before adding the constraint.
+                        snapshots.push(self.flow_snapshot());
+                        let constraint = self.build_constraint(value);
+                        match op {
+                            BoolOp::And => self.add_constraint(constraint),
+                            BoolOp::Or => self.add_negated_constraint(constraint),
+                        }
+                    }
                 }
                 for snapshot in snapshots {
                     self.flow_merge(snapshot);
