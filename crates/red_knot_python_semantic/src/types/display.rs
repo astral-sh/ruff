@@ -93,19 +93,19 @@ impl Display for DisplayRepresentation<'_> {
             Type::SliceLiteral(slice) => {
                 write!(
                     f,
-                    "slice[{start}, {stop}, {step}]",
+                    "slice[{start}, {stop}{step}]",
                     start = slice
                         .start(self.db)
-                        .map(|s| s.to_string())
-                        .unwrap_or_else(String::new),
+                        .map(|s| format!("Literal[{}], ", s))
+                        .unwrap_or("None".into()),
                     stop = slice
                         .stop(self.db)
-                        .map(|s| s.to_string())
-                        .unwrap_or_else(String::new),
+                        .map(|s| format!("Literal[{}], ", s))
+                        .unwrap_or("None".into()),
                     step = slice
                         .step(self.db)
-                        .map(|s| s.to_string())
-                        .unwrap_or_else(String::new)
+                        .map(|s| format!(", {}", s))
+                        .unwrap_or_default()
                 )
             }
             Type::Tuple(tuple) => {
@@ -319,7 +319,9 @@ mod tests {
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
     use crate::db::tests::TestDb;
-    use crate::types::{global_symbol_ty, BytesLiteralType, StringLiteralType, Type, UnionType};
+    use crate::types::{
+        global_symbol_ty, BytesLiteralType, SliceLiteralType, StringLiteralType, Type, UnionType,
+    };
     use crate::{Program, ProgramSettings, PythonVersion, SearchPathSettings};
 
     fn setup_db() -> TestDb {
@@ -393,5 +395,47 @@ mod tests {
             )
         );
         Ok(())
+    }
+
+    #[test]
+    fn test_slice_literal_display() {
+        let db = setup_db();
+
+        assert_eq!(
+            Type::SliceLiteral(SliceLiteralType::new(&db, None, None, None))
+                .display(&db)
+                .to_string(),
+            "slice[None, None]"
+        );
+        assert_eq!(
+            Type::SliceLiteral(SliceLiteralType::new(&db, Some(1), None, None))
+                .display(&db)
+                .to_string(),
+            "slice[Literal[1], None]"
+        );
+        assert_eq!(
+            Type::SliceLiteral(SliceLiteralType::new(&db, None, Some(2), None))
+                .display(&db)
+                .to_string(),
+            "slice[None, Literal[2]]"
+        );
+        assert_eq!(
+            Type::SliceLiteral(SliceLiteralType::new(&db, Some(1), Some(5), None))
+                .display(&db)
+                .to_string(),
+            "slice[Literal[1], Literal[5]]"
+        );
+        assert_eq!(
+            Type::SliceLiteral(SliceLiteralType::new(&db, Some(1), Some(5), Some(2)))
+                .display(&db)
+                .to_string(),
+            "slice[Literal[1], Literal[5], Literal[2]]"
+        );
+        assert_eq!(
+            Type::SliceLiteral(SliceLiteralType::new(&db, None, None, Some(2)))
+                .display(&db)
+                .to_string(),
+            "slice[None, None, Literal[2]]"
+        );
     }
 }
