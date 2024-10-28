@@ -243,13 +243,13 @@ impl<'db> SemanticIndexBuilder<'db> {
         definition
     }
 
-    fn add_expression_constraint(&mut self, constraint_node: &ast::Expr) -> Constraint<'db> {
+    fn record_expression_constraint(&mut self, constraint_node: &ast::Expr) -> Constraint<'db> {
         let constraint = self.build_constraint(constraint_node);
-        self.add_constraint(constraint);
+        self.record_constraint(constraint);
         constraint
     }
 
-    fn add_constraint(&mut self, constraint: Constraint<'db>) {
+    fn record_constraint(&mut self, constraint: Constraint<'db>) {
         self.current_use_def_map_mut().record_constraint(constraint);
     }
 
@@ -261,7 +261,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         }
     }
 
-    fn add_negated_constraint(&mut self, constraint: Constraint<'db>) {
+    fn record_negated_constraint(&mut self, constraint: Constraint<'db>) {
         self.current_use_def_map_mut()
             .record_constraint(Constraint {
                 node: constraint.node,
@@ -660,7 +660,7 @@ where
             ast::Stmt::If(node) => {
                 self.visit_expr(&node.test);
                 let pre_if = self.flow_snapshot();
-                let constraint = self.add_expression_constraint(&node.test);
+                let constraint = self.record_expression_constraint(&node.test);
                 let mut constraints = vec![constraint];
                 self.visit_body(&node.body);
                 let mut post_clauses: Vec<FlowSnapshot> = vec![];
@@ -672,11 +672,11 @@ where
                     // taken, so the block entry state is always `pre_if`
                     self.flow_restore(pre_if.clone());
                     for constraint in &constraints {
-                        self.add_negated_constraint(*constraint);
+                        self.record_negated_constraint(*constraint);
                     }
                     if let Some(elif_test) = &clause.test {
                         self.visit_expr(elif_test);
-                        constraints.push(self.add_expression_constraint(elif_test));
+                        constraints.push(self.record_expression_constraint(elif_test));
                     }
                     self.visit_body(&clause.body);
                 }
@@ -1131,8 +1131,8 @@ where
                         snapshots.push(self.flow_snapshot());
                         let constraint = self.build_constraint(value);
                         match op {
-                            BoolOp::And => self.add_constraint(constraint),
-                            BoolOp::Or => self.add_negated_constraint(constraint),
+                            BoolOp::And => self.record_constraint(constraint),
+                            BoolOp::Or => self.record_negated_constraint(constraint),
                         }
                     }
                 }
