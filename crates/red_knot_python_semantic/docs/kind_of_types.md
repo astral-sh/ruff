@@ -165,17 +165,18 @@ For a Python type `T` to be categorised as a single-value type:
 
 - All inhabitants of `T` must be instances of the same runtime class `U`
 - `U` must have `__eq__` and `__ne__` methods such that the equality relation between instances of `U`
-    is reflexive, symmetric, and transitive.
+    is reflexive, symmetric, and transitive (satisfying the definition of
+    an equivalence relation.)
 - For any two inhabitants of `T` named `x` and `y`, `x == y`.
 
 Nearly all singleton types are single-value types, but the reverse is not true.
 Many single-value types exist that are not singleton types: examples include
 `Literal[123456]`, `Literal[b"foo"]`, `tuple[Literal[True], Literal[False]]`, and `Literal["foo"]`.
 All runtime inhabitants of the `Literal["foo"]` type are equal to the string `"foo"`.
-However, they are not necessarily the *same* object in terms of identity;
+However, they are not necessarily the *same* object;
 multiple `str` instances equal to `"foo"` can exist at runtime at different memory addresses.[^1]
 This means that it is not safe to narrow a single-value type by identity unless it is also known
-that the type is a singleton type.
+that the type is a sealed type.
 
 Single-value types in unions can be safely narrowed using inequality (but not using equality):
 
@@ -226,11 +227,11 @@ if it detects an attempt to do so. Not all final classes are decorated with `@fi
 The most common example of this is enum classes. Any enum class that has at least one member is considered
 implicitly final, as attempting to subclass such a class will fail at runtime.
 
-For any two classes `X` and `Y`, if `X` is `@final` and `X` is not a subclass of `Y`,
+For any two classes `X` and `Y`, if `X` is final and `X` is not a subclass of `Y`,
 the intersection of the types `X & Y` is equivalent to `Never`, the empty set.
 This therefore means that for a type defined as being "all instances of the final class `X`",
 there are fewer ways of subtyping such a type than for most types in Python.
-However, types associated with final classes can still have non-`Never` proper subtypes.
+However, final class types can still have non-`Never` proper subtypes.
 Enums again provide a good example here: `Literal[Animals.LION]` is a proper subtype
 of the `Animals` type here, despite the fact that the `Animals` class cannot be subclassed:
 
