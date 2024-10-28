@@ -6,9 +6,6 @@
 use std::borrow::Cow;
 use std::cmp::Ordering;
 
-use is_macro;
-use natord;
-
 use ruff_python_ast as ast;
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::{TokenKind, Tokens};

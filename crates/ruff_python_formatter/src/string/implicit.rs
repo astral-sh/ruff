@@ -7,7 +7,7 @@ use ruff_python_ast::str_prefix::{
 };
 use ruff_python_ast::{AnyStringFlags, FStringElement, StringFlags, StringLike, StringLikePart};
 use ruff_source_file::LineRanges;
-use ruff_text_size::{Ranged, TextRange, TextSlice};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{leading_comments, trailing_comments};
 use crate::expression::parentheses::in_parentheses_only_soft_line_break_or_space;
@@ -269,12 +269,7 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
             for part in self.string.parts().rev() {
                 assert!(part.is_string_literal());
 
-                if f.context()
-                    .source()
-                    .slice(part.content_range())
-                    .trim()
-                    .is_empty()
-                {
+                if f.context().source()[part.content_range()].trim().is_empty() {
                     // Don't format the part.
                     parts.next_back();
                 } else {
@@ -298,10 +293,7 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
                     .fmt(f)?;
 
                     if first_non_empty {
-                        first_non_empty = f
-                            .context()
-                            .source()
-                            .slice(part.content_range())
+                        first_non_empty = f.context().source()[part.content_range()]
                             .trim_start()
                             .is_empty();
                     }
@@ -365,7 +357,7 @@ struct FormatLiteralContent {
 
 impl Format<PyFormatContext<'_>> for FormatLiteralContent {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let content = f.context().source().slice(self.range);
+        let content = &f.context().source()[self.range];
         let mut normalized = normalize_string(
             content,
             0,

@@ -10,7 +10,7 @@ use ruff_python_trivia::{
     CommentRanges, SimpleToken, SimpleTokenKind, SimpleTokenizer,
 };
 use ruff_source_file::LineRanges;
-use ruff_text_size::{Ranged, TextLen, TextRange, TextSlice};
+use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
 use crate::expression::expr_slice::{assign_comment_in_slice, ExprSliceCommentSection};
@@ -146,7 +146,7 @@ fn handle_parenthesized_comment<'a>(
             debug_assert!(
                 !matches!(token.kind, SimpleTokenKind::Bogus),
                 "Unexpected token between nodes: `{:?}`",
-                source.slice(range)
+                &source[range]
             );
             token.kind() == SimpleTokenKind::LParen
         })
@@ -177,7 +177,7 @@ fn handle_parenthesized_comment<'a>(
             debug_assert!(
                 !matches!(token.kind, SimpleTokenKind::Bogus),
                 "Unexpected token between nodes: `{:?}`",
-                source.slice(range)
+                &source[range]
             );
             token.kind() == SimpleTokenKind::RParen
         })
@@ -533,7 +533,7 @@ fn handle_own_line_comment_between_statements<'a>(
     //
     // y = 2
     // ```
-    if max_empty_lines(source.slice(TextRange::new(comment.end(), following.start()))) == 0 {
+    if max_empty_lines(&source[TextRange::new(comment.end(), following.start())]) == 0 {
         CommentPlacement::leading(following, comment)
     } else {
         CommentPlacement::trailing(preceding, comment)
@@ -1006,7 +1006,7 @@ fn handle_module_level_own_line_comment_before_class_or_function_comment<'a>(
     }
 
     // Make the comment a leading comment if there's no empty line between the comment and the function / class header
-    if max_empty_lines(source.slice(TextRange::new(comment.end(), following.start()))) == 0 {
+    if max_empty_lines(&source[TextRange::new(comment.end(), following.start())]) == 0 {
         CommentPlacement::leading(following, comment)
     } else {
         // Otherwise attach the comment as trailing comment to the previous statement

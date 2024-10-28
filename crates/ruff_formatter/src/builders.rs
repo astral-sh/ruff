@@ -372,7 +372,7 @@ impl std::fmt::Debug for Text<'_> {
 }
 
 /// Emits a text as it is written in the source document. Optimized to avoid allocations.
-pub fn source_text_slice(range: TextRange) -> SourceTextSliceBuilder {
+pub const fn source_text_slice(range: TextRange) -> SourceTextSliceBuilder {
     SourceTextSliceBuilder { range }
 }
 

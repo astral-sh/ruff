@@ -67,10 +67,6 @@ impl InlineFileAssertions {
         }
     }
 
-    fn range_text(&self, range: impl Ranged) -> &str {
-        &self.source[range.range()]
-    }
-
     fn line_number(&self, range: &impl Ranged) -> OneIndexed {
         self.lines.line_index(range.start())
     }
@@ -133,7 +129,7 @@ impl<'a> Iterator for AssertionWithRangeIterator<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             let inner_next = self.inner.next()?;
-            let comment = self.file_assertions.range_text(inner_next);
+            let comment = &self.file_assertions.source[inner_next];
             if let Some(assertion) = Assertion::from_comment(comment) {
                 return Some(AssertionWithRange(assertion, inner_next));
             };
