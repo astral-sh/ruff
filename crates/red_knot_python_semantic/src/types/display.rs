@@ -74,7 +74,7 @@ impl Display for DisplayRepresentation<'_> {
             }
             // TODO functions and classes should display using a fully qualified name
             Type::ClassLiteral(class) => f.write_str(class.name(self.db)),
-            Type::Instance(instance) => f.write_str(instance.class_type(self.db).name(self.db)),
+            Type::Instance(instance) => f.write_str(instance.class.name(self.db)),
             Type::FunctionLiteral(function) => f.write_str(function.name(self.db)),
             Type::Union(union) => union.display(self.db).fmt(f),
             Type::Intersection(intersection) => intersection.display(self.db).fmt(f),

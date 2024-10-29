@@ -1061,15 +1061,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             // anything else is invalid and should lead to a diagnostic being reported --Alex
             match node_ty {
                 Type::Any | Type::Unknown => node_ty,
-                Type::ClassLiteral(class_ty) => {
-                    Type::Instance(InstanceType::new(self.db, class_ty, None))
-                }
+                Type::ClassLiteral(class_ty) => class_ty.to_instance(),
                 Type::Tuple(tuple) => UnionType::from_elements(
                     self.db,
                     tuple.elements(self.db).iter().map(|ty| {
-                        ty.into_class_literal_type().map_or(Type::Todo, |c| {
-                            Type::Instance(InstanceType::new(self.db, c, None))
-                        })
+                        ty.into_class_literal_type()
+                            .map_or(Type::Todo, ClassType::to_instance)
                     }),
                 ),
                 _ => Type::Todo,
@@ -1377,14 +1374,12 @@ impl<'db> TypeInferenceBuilder<'db> {
         // If the variable is annotation with SpecialForm then create a new class with name of the
         // variable.
         if let Type::Instance(instance) = annotation_ty {
-            let class = instance.class_type(self.db);
-            if class.is_known(self.db, KnownClass::SpecialForm) {
+            if instance.is_known_class(self.db, KnownClass::SpecialForm) {
                 if let Some(name_expr) = target.as_name_expr() {
                     if name_expr.id == KnownInstance::Literal.as_str() {
-                        annotation_ty = Type::Instance(InstanceType::new(
-                            self.db,
-                            class,
-                            Some(KnownInstance::Literal),
+                        annotation_ty = Type::Instance(InstanceType::known(
+                            instance.class,
+                            KnownInstance::Literal,
                         ));
                     }
                 }
@@ -2507,8 +2502,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         unreachable!("Not operator is handled in its own case");
                     }
                 };
-                let class = instance.class_type(self.db);
-                let class_member = class.class_member(self.db, unary_dunder_method);
+                let class_member = instance.class.class_member(self.db, unary_dunder_method);
                 let call = class_member.call(self.db, &[operand_type]);
 
                 match call.return_ty_result(self.db, AnyNodeRef::ExprUnaryOp(unary), self) {
@@ -2727,8 +2721,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             ),
 
             (Type::Instance(left_instance), Type::Instance(right_instance), op) => {
-                let left_class = left_instance.class_type(self.db);
-                let right_class = right_instance.class_type(self.db);
+                let left_class = left_instance.class;
+                let right_class = right_instance.class;
                 if left_class != right_class && right_class.is_subclass_of(self.db, left_class) {
                     let reflected_dunder = op.reflected_dunder();
                     let rhs_reflected = right_class.class_member(self.db, reflected_dunder);
@@ -3126,8 +3120,8 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             // Lookup the rich comparison `__dunder__` methods on instances
             (Type::Instance(left_instance), Type::Instance(right_instance)) => {
-                let left_class = left_instance.class_type(self.db);
-                let right_class = right_instance.class_type(self.db);
+                let left_class = left_instance.class;
+                let right_class = right_instance.class;
                 let rich_comparison =
                     |op| perform_rich_comparison(self.db, left_class, right_class, op);
                 let membership_test_comparison =
@@ -3474,11 +3468,10 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         // Handling of Special Forms
         match value_ty {
-            Type::Instance(instance)
-                if instance.is_known_class(self.db, KnownClass::SpecialForm) =>
-            {
-                self.infer_parameterized_known_instance_type_expression(instance, slice)
-            }
+            Type::Instance(InstanceType {
+                class: _,
+                known: Some(known_instance),
+            }) => self.infer_parameterized_known_instance_type_expression(known_instance, slice),
             value_ty => {
                 let value_node = value.as_ref();
                 let slice_ty = self.infer_expression(slice);
@@ -3492,14 +3485,11 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_parameterized_known_instance_type_expression(
         &mut self,
-        instance: InstanceType,
+        known_instance: KnownInstance,
         parameters: &ast::Expr,
     ) -> Type<'db> {
         // slice_ty is treated as expression because Literal accepts expression
         // inside the []
-        let Some(known_instance) = instance.known_instance(self.db) else {
-            return Type::Todo;
-        };
         match known_instance {
             KnownInstance::Literal => {
                 match parameters {
@@ -3566,9 +3556,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             ruff_python_ast::Expr::Subscript(inner_literal_subscript) => {
                 let inner_subscript_value = self.infer_expression(&inner_literal_subscript.value);
                 if let Type::Instance(inner_instance) = inner_subscript_value {
-                    if inner_instance.is_known(self.db, KnownInstance::Literal) {
+                    if inner_instance.is_known(KnownInstance::Literal) {
                         self.infer_parameterized_known_instance_type_expression(
-                            inner_instance,
+                            KnownInstance::Literal,
                             &inner_literal_subscript.slice,
                         )
                     } else {
@@ -3936,13 +3926,7 @@ fn perform_rich_comparison<'db>(
         |op: RichCompareOperator, left_class: ClassType<'db>, right_class: ClassType<'db>| {
             left_class
                 .class_member(db, op.dunder())
-                .call(
-                    db,
-                    &[
-                        Type::Instance(InstanceType::new(db, left_class, None)),
-                        Type::Instance(InstanceType::new(db, right_class, None)),
-                    ],
-                )
+                .call(db, &[left_class.to_instance(), right_class.to_instance()])
                 .return_ty(db)
         };
 
@@ -3966,8 +3950,8 @@ fn perform_rich_comparison<'db>(
     })
     .ok_or_else(|| CompareUnsupportedError {
         op: op.into(),
-        left_ty: Type::Instance(InstanceType::new(db, left_class, None)),
-        right_ty: Type::Instance(InstanceType::new(db, right_class, None)),
+        left_ty: left_class.to_instance(),
+        right_ty: right_class.to_instance(),
     })
 }
 
@@ -3981,10 +3965,7 @@ fn perform_membership_test_comparison<'db>(
     right_class: ClassType<'db>,
     op: MembershipTestCompareOperator,
 ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
-    let (left_instance, right_instance) = (
-        Type::Instance(InstanceType::new(db, left_class, None)),
-        Type::Instance(InstanceType::new(db, right_class, None)),
-    );
+    let (left_instance, right_instance) = (left_class.to_instance(), right_class.to_instance());
 
     let contains_dunder = right_class.class_member(db, "__contains__");
 

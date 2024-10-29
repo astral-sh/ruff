@@ -13,8 +13,6 @@ use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
 
-use super::InstanceType;
-
 /// Return the type constraint that `test` (if true) would place on `definition`, if any.
 ///
 /// For example, if we have this code:
@@ -88,7 +86,7 @@ fn generate_isinstance_constraint<'db>(
     classinfo: &Type<'db>,
 ) -> Option<Type<'db>> {
     match classinfo {
-        Type::ClassLiteral(class) => Some(Type::Instance(InstanceType::new(db, class, None))),
+        Type::ClassLiteral(class) => Some(class.to_instance()),
         Type::Tuple(tuple) => {
             let mut builder = UnionBuilder::new(db);
             for element in tuple.elements(db) {

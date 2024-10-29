@@ -485,11 +485,9 @@ impl<'db> Type<'db> {
                 .elements(db)
                 .iter()
                 .any(|&elem_ty| ty.is_subtype_of(db, elem_ty)),
-            (Type::Instance(self_instance), Type::Instance(target_instance)) => {
-                let self_class = self_instance.class_type(db);
-                let target_class = target_instance.class_type(db);
-                self_class.is_subclass_of(db, target_class)
-            }
+            (Type::Instance(self_instance), Type::Instance(target_instance)) => self_instance
+                .class
+                .is_subclass_of(db, target_instance.class),
             // TODO
             _ => false,
         }
@@ -573,65 +571,49 @@ impl<'db> Type<'db> {
                 | Type::ClassLiteral(..)),
             ) => left != right,
 
-            (Type::None, Type::Instance(class_type)) | (Type::Instance(class_type), Type::None) => {
-                !matches!(
-                    class_type.class_type(db).known(db),
-                    Some(KnownClass::NoneType | KnownClass::Object)
-                )
-            }
+            (Type::None, Type::Instance(instance_type))
+            | (Type::Instance(instance_type), Type::None) => !matches!(
+                instance_type.class.known(db),
+                Some(KnownClass::NoneType | KnownClass::Object)
+            ),
             (Type::None, _) | (_, Type::None) => true,
 
             (Type::BooleanLiteral(..), Type::Instance(instance_type))
-            | (Type::Instance(instance_type), Type::BooleanLiteral(..)) => {
-                let class_type = instance_type.class_type(db);
-                !matches!(
-                    class_type.known(db),
-                    Some(KnownClass::Bool | KnownClass::Int | KnownClass::Object)
-                )
-            }
+            | (Type::Instance(instance_type), Type::BooleanLiteral(..)) => !matches!(
+                instance_type.class.known(db),
+                Some(KnownClass::Bool | KnownClass::Int | KnownClass::Object)
+            ),
             (Type::BooleanLiteral(..), _) | (_, Type::BooleanLiteral(..)) => true,
 
             (Type::IntLiteral(..), Type::Instance(instance_type))
-            | (Type::Instance(instance_type), Type::IntLiteral(..)) => {
-                let class_type = instance_type.class_type(db);
-                !matches!(
-                    class_type.known(db),
-                    Some(KnownClass::Int | KnownClass::Object)
-                )
-            }
+            | (Type::Instance(instance_type), Type::IntLiteral(..)) => !matches!(
+                instance_type.class.known(db),
+                Some(KnownClass::Int | KnownClass::Object)
+            ),
             (Type::IntLiteral(..), _) | (_, Type::IntLiteral(..)) => true,
 
             (Type::StringLiteral(..), Type::LiteralString)
             | (Type::LiteralString, Type::StringLiteral(..)) => false,
             (Type::StringLiteral(..), Type::Instance(instance_type))
-            | (Type::Instance(instance_type), Type::StringLiteral(..)) => {
-                let class_type = instance_type.class_type(db);
-                !matches!(
-                    class_type.known(db),
-                    Some(KnownClass::Str | KnownClass::Object)
-                )
-            }
+            | (Type::Instance(instance_type), Type::StringLiteral(..)) => !matches!(
+                instance_type.class.known(db),
+                Some(KnownClass::Str | KnownClass::Object)
+            ),
             (Type::StringLiteral(..), _) | (_, Type::StringLiteral(..)) => true,
 
             (Type::LiteralString, Type::LiteralString) => false,
             (Type::LiteralString, Type::Instance(instance_type))
-            | (Type::Instance(instance_type), Type::LiteralString) => {
-                let class_type = instance_type.class_type(db);
-                !matches!(
-                    class_type.known(db),
-                    Some(KnownClass::Str | KnownClass::Object)
-                )
-            }
+            | (Type::Instance(instance_type), Type::LiteralString) => !matches!(
+                instance_type.class.known(db),
+                Some(KnownClass::Str | KnownClass::Object)
+            ),
             (Type::LiteralString, _) | (_, Type::LiteralString) => true,
 
             (Type::BytesLiteral(..), Type::Instance(instance_type))
-            | (Type::Instance(instance_type), Type::BytesLiteral(..)) => {
-                let class_type = instance_type.class_type(db);
-                !matches!(
-                    class_type.known(db),
-                    Some(KnownClass::Bytes | KnownClass::Object)
-                )
-            }
+            | (Type::Instance(instance_type), Type::BytesLiteral(..)) => !matches!(
+                instance_type.class.known(db),
+                Some(KnownClass::Bytes | KnownClass::Object)
+            ),
             (Type::BytesLiteral(..), _) | (_, Type::BytesLiteral(..)) => true,
 
             (
@@ -641,10 +623,7 @@ impl<'db> Type<'db> {
             | (
                 Type::Instance(instance_type),
                 Type::FunctionLiteral(..) | Type::ModuleLiteral(..) | Type::ClassLiteral(..),
-            ) => {
-                let class_type = instance_type.class_type(db);
-                !class_type.is_known(db, KnownClass::Object)
-            }
+            ) => !instance_type.is_known_class(db, KnownClass::Object),
 
             (Type::Instance(..), Type::Instance(..)) => {
                 // TODO: once we have support for `final`, there might be some cases where
@@ -749,30 +728,27 @@ impl<'db> Type<'db> {
                 .iter()
                 .all(|elem| elem.is_single_valued(db)),
 
-            Type::Instance(instance_type) => {
-                let class_type = instance_type.class_type(db);
-                match class_type.known(db) {
-                    Some(KnownClass::NoneType) => true,
-                    Some(
-                        KnownClass::Bool
-                        | KnownClass::Object
-                        | KnownClass::Bytes
-                        | KnownClass::Type
-                        | KnownClass::Int
-                        | KnownClass::Float
-                        | KnownClass::Str
-                        | KnownClass::List
-                        | KnownClass::Tuple
-                        | KnownClass::Set
-                        | KnownClass::Dict
-                        | KnownClass::GenericAlias
-                        | KnownClass::ModuleType
-                        | KnownClass::FunctionType
-                        | KnownClass::SpecialForm,
-                    ) => false,
-                    None => false,
-                }
-            }
+            Type::Instance(instance_type) => match instance_type.class.known(db) {
+                Some(KnownClass::NoneType) => true,
+                Some(
+                    KnownClass::Bool
+                    | KnownClass::Object
+                    | KnownClass::Bytes
+                    | KnownClass::Type
+                    | KnownClass::Int
+                    | KnownClass::Float
+                    | KnownClass::Str
+                    | KnownClass::List
+                    | KnownClass::Tuple
+                    | KnownClass::Set
+                    | KnownClass::Dict
+                    | KnownClass::GenericAlias
+                    | KnownClass::ModuleType
+                    | KnownClass::FunctionType
+                    | KnownClass::SpecialForm,
+                ) => false,
+                None => false,
+            },
 
             Type::Any
             | Type::Never
@@ -933,15 +909,14 @@ impl<'db> Type<'db> {
                         .first()
                         .map(|arg| arg.bool(db).into_type(db))
                         .unwrap_or(Type::BooleanLiteral(false)),
-                    _ => Type::Instance(InstanceType::new(db, class, None)),
+                    _ => class.to_instance(),
                 })
             }
 
             Type::Instance(instance) => {
                 // Since `__call__` is a dunder, we need to access it as an attribute on the class
                 // rather than the instance (matching runtime semantics).
-                let class = instance.class_type(db);
-                let dunder_call_method = class.class_member(db, "__call__");
+                let dunder_call_method = instance.class.class_member(db, "__call__");
                 if dunder_call_method.is_unbound() {
                     CallOutcome::not_callable(self)
                 } else {
@@ -1045,14 +1020,14 @@ impl<'db> Type<'db> {
             Type::Unknown => Type::Unknown,
             Type::Unbound => Type::Unknown,
             Type::Never => Type::Never,
-            Type::ClassLiteral(class) => Type::Instance(InstanceType::new(db, *class, None)),
+            Type::ClassLiteral(class) => class.to_instance(),
             Type::Union(union) => union.map(db, |element| element.to_instance(db)),
             // TODO: we can probably do better here: --Alex
             Type::Intersection(_) => Type::Todo,
             // TODO: calling `.to_instance()` on any of these should result in a diagnostic,
             // since they already indicate that the object is an instance of some kind:
             Type::Instance(instance) => {
-                if instance.known_instance(db).is_some() {
+                if instance.known.is_some() {
                     *self
                 } else {
                     Type::Unknown
@@ -1077,7 +1052,7 @@ impl<'db> Type<'db> {
         match self {
             Type::Unbound => Type::Unbound,
             Type::Never => Type::Never,
-            Type::Instance(instance) => Type::ClassLiteral(instance.class_type(db)),
+            Type::Instance(instance) => Type::ClassLiteral(instance.class),
             Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
             Type::BooleanLiteral(_) => KnownClass::Bool.to_class(db),
             Type::BytesLiteral(_) => KnownClass::Bytes.to_class(db),
@@ -1703,6 +1678,10 @@ pub struct ClassType<'db> {
 }
 
 impl<'db> ClassType<'db> {
+    pub fn to_instance(self) -> Type<'db> {
+        Type::Instance(InstanceType::anonymous(self))
+    }
+
     pub fn is_known(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
         match self.known(db) {
             Some(known) => known == known_class,
@@ -1786,19 +1765,30 @@ impl<'db> ClassType<'db> {
     }
 }
 
-#[salsa::interned]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct InstanceType<'db> {
-    class_type: ClassType<'db>,
-    known_instance: Option<KnownInstance>,
+    class: ClassType<'db>,
+    known: Option<KnownInstance>,
 }
 
 impl<'db> InstanceType<'db> {
-    pub fn is_known_class(&self, db: &'db dyn Db, known_class: KnownClass) -> bool {
-        return self.class_type(db).is_known(db, known_class);
+    pub fn anonymous(class: ClassType<'db>) -> Self {
+        Self { class, known: None }
     }
 
-    pub fn is_known(&self, db: &'db dyn Db, known_instance: KnownInstance) -> bool {
-        self.known_instance(db).is_some_and(|k| k == known_instance)
+    pub fn known(class: ClassType<'db>, known: KnownInstance) -> Self {
+        Self {
+            class,
+            known: Some(known),
+        }
+    }
+
+    pub fn is_known_class(&self, db: &'db dyn Db, known_class: KnownClass) -> bool {
+        self.class.is_known(db, known_class)
+    }
+
+    pub fn is_known(&self, known_instance: KnownInstance) -> bool {
+        self.known.is_some_and(|k| k == known_instance)
     }
 }
 
