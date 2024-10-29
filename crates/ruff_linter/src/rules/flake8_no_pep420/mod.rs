@@ -13,14 +13,15 @@ mod tests {
     use crate::settings::LinterSettings;
     use crate::test::{test_path, test_resource_path};
 
-    #[test_case(Path::new("test_pass_init"), Path::new("example.py"))]
     #[test_case(Path::new("test_fail_empty"), Path::new("example.py"))]
     #[test_case(Path::new("test_fail_nonempty"), Path::new("example.py"))]
-    #[test_case(Path::new("test_pass_shebang"), Path::new("example.py"))]
     #[test_case(Path::new("test_ignored"), Path::new("example.py"))]
+    #[test_case(Path::new("test_pass_init"), Path::new("example.py"))]
     #[test_case(Path::new("test_pass_namespace_package"), Path::new("example.py"))]
+    #[test_case(Path::new("test_pass_pep723"), Path::new("script.py"))]
     #[test_case(Path::new("test_pass_pyi"), Path::new("example.pyi"))]
     #[test_case(Path::new("test_pass_script"), Path::new("script"))]
+    #[test_case(Path::new("test_pass_shebang"), Path::new("example.py"))]
     fn test_flake8_no_pep420(path: &Path, filename: &Path) -> Result<()> {
         let snapshot = format!("{}", path.to_string_lossy());
         let p = PathBuf::from(format!(

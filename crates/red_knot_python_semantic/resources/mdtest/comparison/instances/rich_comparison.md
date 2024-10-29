@@ -295,7 +295,7 @@ reveal_type(A() != object())  # revealed: bool
 reveal_type(object() == A())  # revealed: bool
 reveal_type(object() != A())  # revealed: bool
 
-# error: [operator-unsupported] "Operator `<` is not supported for types `A` and `object`"
+# error: [unsupported-operator] "Operator `<` is not supported for types `A` and `object`"
 # revealed: Unknown
 reveal_type(A() < object())
 ```

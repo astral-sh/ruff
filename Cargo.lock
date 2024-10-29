@@ -2620,6 +2620,7 @@ dependencies = [
  "compact_str",
  "is-macro",
  "itertools 0.13.0",
+ "memchr",
  "ruff_cache",
  "ruff_macros",
  "ruff_python_trivia",
