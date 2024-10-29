@@ -5,7 +5,7 @@ use ruff_python_ast as ast;
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::ast_ids::HasScopedAstId;
 use crate::semantic_index::definition::{Definition, DefinitionKind};
-use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId};
+use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, Symbol};
 use crate::semantic_index::{
     global_scope, semantic_index, symbol_table, use_def_map, BindingWithConstraints,
     BindingWithConstraintsIterator, DeclarationsIterator,
@@ -88,9 +88,64 @@ fn symbol_ty<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Type<'db>
         .unwrap_or(Type::Unbound)
 }
 
-/// Shorthand for `symbol_ty` that looks up a module-global symbol by name in a file.
+/// Return a list of the symbols that typeshed declares in the body scope of
+/// the stub for the class `types.ModuleType`.
+///
+/// Conceptually this could be a `Set` rather than a list,
+/// but the number of symbols declared in this scope is likely to be very small,
+/// so the cost of hashing the names is likely to be more expensive than it's worth.
+#[salsa::tracked(return_ref)]
+fn module_type_symbols<'db>(db: &'db dyn Db) -> smallvec::SmallVec<[ast::name::Name; 8]> {
+    let Some(module_type) = KnownClass::ModuleType
+        .to_class(db)
+        .into_class_literal_type()
+    else {
+        // The most likely way we get here is if a user specified a `--custom-typeshed-dir`
+        // without a `types.pyi` stub in the `stdlib/` directory
+        return smallvec::SmallVec::default();
+    };
+
+    let module_type_scope = module_type.body_scope(db);
+    let module_type_symbol_table = symbol_table(db, module_type_scope);
+
+    // `__dict__` and `__init__` are very special members that can be accessed as attributes
+    // on the module when imported, but cannot be accessed as globals *inside* the module.
+    //
+    // `__getattr__` is even more special: it doesn't exist at runtime, but typeshed includes it
+    // to reduce false positives associated with functions that dynamically import modules
+    // and return `Instance(types.ModuleType)`. We should ignore it for any known module-literal type.
+    module_type_symbol_table
+        .symbols()
+        .filter(|symbol| symbol.is_declared())
+        .map(Symbol::name)
+        .filter(|symbol_name| !matches!(&***symbol_name, "__dict__" | "__getattr__" | "__init__"))
+        .cloned()
+        .collect()
+}
+
+/// Looks up a module-global symbol by name in a file.
 pub(crate) fn global_symbol_ty<'db>(db: &'db dyn Db, file: File, name: &str) -> Type<'db> {
-    symbol_ty(db, global_scope(db, file), name)
+    let explicit_ty = symbol_ty(db, global_scope(db, file), name);
+    if !explicit_ty.may_be_unbound(db) {
+        return explicit_ty;
+    }
+
+    // Not defined explicitly in the global scope?
+    // All modules are instances of `types.ModuleType`;
+    // look it up there (with a few very special exceptions)
+    if module_type_symbols(db)
+        .iter()
+        .any(|module_type_member| &**module_type_member == name)
+    {
+        // TODO: this should use `.to_instance(db)`. but we don't understand attribute access
+        // on instance types yet.
+        let module_type_member = KnownClass::ModuleType.to_class(db).member(db, name);
+        if !module_type_member.is_unbound() {
+            return explicit_ty.replace_unbound_with(db, module_type_member);
+        }
+    }
+
+    explicit_ty
 }
 
 /// Infer the type of a binding.
@@ -821,7 +876,46 @@ impl<'db> Type<'db> {
                 // TODO: attribute lookup on function type
                 Type::Todo
             }
-            Type::ModuleLiteral(file) => global_symbol_ty(db, *file, name),
+            Type::ModuleLiteral(file) => {
+                // `__dict__` is a very special member that is never overridden by module globals;
+                // we should always look it up directly as an attribute on `types.ModuleType`,
+                // never in the global scope of the module.
+                if name == "__dict__" {
+                    return KnownClass::ModuleType
+                        .to_instance(db)
+                        .member(db, "__dict__");
+                }
+
+                let global_lookup = symbol_ty(db, global_scope(db, *file), name);
+
+                // If it's unbound, check if it's present as an instance on `types.ModuleType`
+                // or `builtins.object`.
+                //
+                // We do a more limited version of this in `global_symbol_ty`,
+                // but there are two crucial differences here:
+                // - If a member is looked up as an attribute, `__init__` is also available
+                //   on the module, but it isn't available as a global from inside the module
+                // - If a member is looked up as an attribute, members on `builtins.object`
+                //   are also available (because `types.ModuleType` inherits from `object`);
+                //   these attributes are also not available as globals from inside the module.
+                //
+                // The same way as in `global_symbol_ty`, however, we need to be careful to
+                // ignore `__getattr__`. Typeshed has a fake `__getattr__` on `types.ModuleType`
+                // to help out with dynamic imports; we shouldn't use it for `ModuleLiteral` types
+                // where we know exactly which module we're dealing with.
+                if name != "__getattr__" && global_lookup.may_be_unbound(db) {
+                    // TODO: this should use `.to_instance()`, but we don't understand instance attribute yet
+                    let module_type_instance_member =
+                        KnownClass::ModuleType.to_class(db).member(db, name);
+                    if module_type_instance_member.is_unbound() {
+                        global_lookup
+                    } else {
+                        global_lookup.replace_unbound_with(db, module_type_instance_member)
+                    }
+                } else {
+                    global_lookup
+                }
+            }
             Type::ClassLiteral(class) => class.class_member(db, name),
             Type::Instance(_) => {
                 // TODO MRO? get_own_instance_member, get_instance_member
@@ -1868,15 +1962,13 @@ impl<'db> TupleType<'db> {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        builtins_symbol_ty, BytesLiteralType, IntersectionBuilder, StringLiteralType, Truthiness,
-        TupleType, Type, UnionType,
-    };
+    use super::*;
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
     use crate::ProgramSettings;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+    use ruff_python_ast as ast;
     use test_case::test_case;
 
     fn setup_db() -> TestDb {
@@ -2255,5 +2347,17 @@ mod tests {
         let db = setup_db();
 
         assert_eq!(ty.into_type(&db).repr(&db), expected.into_type(&db));
+    }
+
+    #[test]
+    fn module_type_symbols_includes_declared_types_but_not_referenced_types() {
+        let db = setup_db();
+        let symbol_names = module_type_symbols(&db);
+
+        let dunder_name_symbol_name = ast::name::Name::new_static("__name__");
+        assert!(symbol_names.contains(&dunder_name_symbol_name));
+
+        let property_symbol_name = ast::name::Name::new_static("property");
+        assert!(!symbol_names.contains(&property_symbol_name));
     }
 }
