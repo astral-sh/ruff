@@ -1371,7 +1371,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let mut annotation_ty = self.infer_annotation_expression(annotation);
 
-        // If the variable is annotation with SpecialForm then create a new class with name of the
+        // If the variable is annotated with SpecialForm then create a new class with name of the
         // variable.
         if let Type::Instance(instance) = annotation_ty {
             if instance.is_known_class(self.db, KnownClass::SpecialForm) {
