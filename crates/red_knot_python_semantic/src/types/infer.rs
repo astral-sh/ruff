@@ -3712,14 +3712,17 @@ impl<'db> TypeInferenceBuilder<'db> {
         ty
     }
 
+    /// Given the slice of a `tuple[]` annotation, return the type that the annotation represents
     fn infer_tuple_type_expression(&mut self, tuple_slice: &ast::Expr) -> Type<'db> {
         /// In most cases, if a subelement of the tuple is inferred as `Todo`,
         /// we should only infer `Todo` for that specific subelement.
         /// Certain specific AST nodes can however change the meaning of the entire tuple,
-        /// however: `tuple[int, ...]` or `tuple[int, *tuple[str, ...]]` change the tuple
-        /// into a homogeneous tuple or partly homogeneous tuple (respectively) -- neither
-        /// is supported by us right now, so we should infer `Todo` for the *entire* tuple
-        /// if we encounter one of those elements
+        /// however: for example, `tuple[int, ...]` or `tuple[int, *tuple[str, ...]]` are a
+        /// homogeneous tuple and a partly homogeneous tuple (respectively) due to the `...`
+        /// and the starred expression (respectively), Neither is supported by us right now,
+        /// so we should infer `Todo` for the *entire* tuple if we encounter one of those elements.
+        /// Even a subscript subelement could alter the type of the entire tuple
+        /// if the subscript is `Unpack[]` (which again, we don't yet support).
         fn element_could_alter_type_of_whole_tuple(element: &ast::Expr, element_ty: Type) -> bool {
             element_ty.is_todo()
                 && matches!(
