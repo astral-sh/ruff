@@ -178,12 +178,12 @@ impl<'db> IntersectionBuilder<'db> {
             }
             self
         } else if let Type::Intersection(intersection) = ty {
-            // (A | B) & !(C & !D) -> (A | B) & (!C | D)
-            // -> ((A | B) & !C) | ((A | B) & D)
-            //
+            // (A | B) & ~(C & ~D)
+            // -> (A | B) & (~C | D)
+            // -> ((A | B) & ~C) | ((A | B) & D)
             // i.e. if we have an intersection of positive constraints C
             // and negative constraints D, then our new intersection
-            // is (existing & !C) | (existing & D)
+            // is (existing & ~C) | (existing & D)
 
             let positive_side = intersection
                 .positive(self.db)
@@ -643,17 +643,61 @@ mod tests {
         assert_eq!(sh_t.pos_vec(&db), &[st, ht]);
         assert_eq!(sh_t.neg_vec(&db), &[]);
 
-        // !sh_t => not Sized or not Hashable
+        // ~sh_t => ~Sized | ~Hashable
         let not_s_h_t = IntersectionBuilder::new(&db)
             .add_negative(Type::Intersection(sh_t))
             .build()
             .expect_union();
 
-        // should have (not Sized) or (not Hashable)
+        // should have as elements: (~Sized),(~Hashable)
         let not_st = st.negate(&db);
         let not_ht = ht.negate(&db);
         assert_eq!(not_s_h_t.elements(&db), &[not_st, not_ht]);
     }
+
+    #[test]
+    fn mixed_intersection_negation_distributes_over_union() {
+        let db = setup_db();
+        let it = KnownClass::Int.to_instance(&db);
+        let st = KnownClass::Sized.to_instance(&db);
+        let ht = KnownClass::Hashable.to_instance(&db);
+        // sh_t: Sized & ~Hashable
+        let s_not_h_t = IntersectionBuilder::new(&db)
+            .add_positive(st)
+            .add_negative(ht)
+            .build()
+            .expect_intersection();
+        assert_eq!(s_not_h_t.pos_vec(&db), &[st]);
+        assert_eq!(s_not_h_t.neg_vec(&db), &[ht]);
+
+        // let's build Int & ~(Sized & ~Hashable)
+        let tt = IntersectionBuilder::new(&db)
+            .add_positive(it)
+            .add_negative(Type::Intersection(s_not_h_t))
+            .build();
+
+        // Int & ~(Sized & ~Hashable)
+        // -> Int & (~Sized | Hashable)
+        // -> (Int & ~Sized) | (Int & Hashable)
+        let tt = tt.expect_union();
+
+        assert_eq!(
+            tt.elements(&db),
+            &[
+                // Int & ~Sized
+                IntersectionBuilder::new(&db)
+                    .add_positive(it)
+                    .add_negative(st)
+                    .build(),
+                // Int & Hashable
+                IntersectionBuilder::new(&db)
+                    .add_positive(it)
+                    .add_positive(ht)
+                    .build(),
+            ]
+        );
+    }
+
     #[test]
     fn build_intersection_self_negation() {
         let db = setup_db();
