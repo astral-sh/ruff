@@ -12,11 +12,11 @@ if flag:
 
 x = y  # error: [possibly-unresolved-reference]
 
-# revealed: Unbound | Literal[3]
+# revealed: Literal[3]
 # error: [possibly-unresolved-reference]
 reveal_type(x)
 
-# revealed: Unbound | Literal[3]
+# revealed: Literal[3]
 # error: [possibly-unresolved-reference]
 reveal_type(y)
 ```
@@ -40,11 +40,11 @@ if flag:
     y: int = 3
 x = y  # error: [possibly-unresolved-reference]
 
-# revealed: Unbound | Literal[3]
+# revealed: Literal[3]
 # error: [possibly-unresolved-reference]
 reveal_type(x)
 
-# revealed: Unbound | Literal[3]
+# revealed: Literal[3]
 # error: [possibly-unresolved-reference]
 reveal_type(y)
 ```

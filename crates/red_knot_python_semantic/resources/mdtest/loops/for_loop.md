@@ -14,7 +14,7 @@ class IntIterable:
 for x in IntIterable():
     pass
 
-# revealed: Unbound | int
+# revealed: int
 # error: [possibly-unresolved-reference]
 reveal_type(x)
 ```
@@ -87,7 +87,7 @@ class OldStyleIterable:
 for x in OldStyleIterable():
     pass
 
-# revealed: Unbound | int
+# revealed: int
 # error: [possibly-unresolved-reference]
 reveal_type(x)
 ```
@@ -98,7 +98,7 @@ reveal_type(x)
 for x in (1, "a", b"foo"):
     pass
 
-# revealed: Unbound | Literal[1] | Literal["a"] | Literal[b"foo"]
+# revealed: Literal[1] | Literal["a"] | Literal[b"foo"]
 # error: [possibly-unresolved-reference]
 reveal_type(x)
 ```
@@ -120,7 +120,7 @@ class NotIterable:
 for x in NotIterable():  # error: "Object of type `NotIterable` is not iterable"
     pass
 
-# revealed: Unbound | Unknown
+# revealed: Unknown
 # error: [possibly-unresolved-reference]
 reveal_type(x)
 ```

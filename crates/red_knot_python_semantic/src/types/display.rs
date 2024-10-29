@@ -64,7 +64,6 @@ impl Display for DisplayRepresentation<'_> {
             Type::Any => f.write_str("Any"),
             Type::Never => f.write_str("Never"),
             Type::Unknown => f.write_str("Unknown"),
-            Type::Unbound => f.write_str("Unbound"),
             Type::None => f.write_str("None"),
             // `[Type::Todo]`'s display should be explicit that is not a valid display of
             // any other type
@@ -370,16 +369,16 @@ mod tests {
         let union_elements = &[
             Type::Unknown,
             Type::IntLiteral(-1),
-            global_symbol_ty(&db, mod_file, "A"),
+            global_symbol_ty(&db, mod_file, "A").expect_bound(),
             Type::StringLiteral(StringLiteralType::new(&db, "A")),
             Type::BytesLiteral(BytesLiteralType::new(&db, [0u8].as_slice())),
             Type::BytesLiteral(BytesLiteralType::new(&db, [7u8].as_slice())),
             Type::IntLiteral(0),
             Type::IntLiteral(1),
             Type::StringLiteral(StringLiteralType::new(&db, "B")),
-            global_symbol_ty(&db, mod_file, "foo"),
-            global_symbol_ty(&db, mod_file, "bar"),
-            global_symbol_ty(&db, mod_file, "B"),
+            global_symbol_ty(&db, mod_file, "foo").expect_bound(),
+            global_symbol_ty(&db, mod_file, "bar").expect_bound(),
+            global_symbol_ty(&db, mod_file, "B").expect_bound(),
             Type::BooleanLiteral(true),
             Type::None,
         ];
