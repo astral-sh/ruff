@@ -106,7 +106,7 @@ pub(crate) trait PySlice {
     >;
 }
 
-impl<T> PySlice for &[T] {
+impl<T> PySlice for [T] {
     type Item = T;
 
     fn py_slice(
@@ -257,10 +257,7 @@ mod tests {
         step: Option<i32>,
         expected: &[char; M],
     ) {
-        assert_equal(
-            input.as_slice().py_slice(start, stop, step).unwrap(),
-            expected.iter(),
-        );
+        assert_equal(input.py_slice(start, stop, step).unwrap(), expected.iter());
     }
 
     #[test]
@@ -431,15 +428,15 @@ mod tests {
 
         // Step size zero is invalid:
         assert!(matches!(
-            input.as_slice().py_slice(None, None, Some(0)),
+            input.py_slice(None, None, Some(0)),
             Err(StepSizeZeroError)
         ));
         assert!(matches!(
-            input.as_slice().py_slice(Some(0), Some(5), Some(0)),
+            input.py_slice(Some(0), Some(5), Some(0)),
             Err(StepSizeZeroError)
         ));
         assert!(matches!(
-            input.as_slice().py_slice(Some(0), Some(0), Some(0)),
+            input.py_slice(Some(0), Some(0), Some(0)),
             Err(StepSizeZeroError)
         ));
 
