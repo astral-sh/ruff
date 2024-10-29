@@ -1330,7 +1330,7 @@ impl<'db> KnownClass {
             }
 
             Self::NoneType => typeshed_symbol_ty(db, self.as_str()),
-            Self::SpecialForm => typing_symbol_ty(db, self.as_str())
+            Self::SpecialForm => typing_symbol_ty(db, self.as_str()),
         }
     }
 

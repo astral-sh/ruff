@@ -543,10 +543,10 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn check_division_by_zero(&mut self, expr: &ast::ExprBinOp, left: Type<'db>) {
         match left {
             Type::BooleanLiteral(_) | Type::IntLiteral(_) => {}
-            Type::Instance(cls)
+            Type::Instance(instance)
                 if [KnownClass::Float, KnownClass::Int, KnownClass::Bool]
                     .iter()
-                    .any(|&k| cls.is_known_class(self.db, k)) => {}
+                    .any(|&k| instance.is_known_class(self.db, k)) => {}
             _ => return,
         };
 
@@ -3445,7 +3445,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             Some(Type::BooleanLiteral(b)) => SliceArg::Arg(Some(i32::from(b))),
             Some(Type::None) => SliceArg::Arg(None),
-            Some(Type::Instance(class)) if class.is_known(self.db, KnownClass::NoneType) => {
+            Some(Type::Instance(instanec)) if instanec.is_known(self.db, KnownClass::NoneType) => {
                 SliceArg::Arg(None)
             }
             None => SliceArg::Arg(None),
@@ -3738,7 +3738,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 {
                     self.infer_tuple_type_expression(slice)
                 } else {
-                  self.infer_subscript_type_expression(subscript)
+                    self.infer_subscript_type_expression(subscript)
                 }
             }
 
