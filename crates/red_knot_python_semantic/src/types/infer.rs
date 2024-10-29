@@ -3228,7 +3228,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let elements = tuple_ty.elements(self.db);
                 let (start, stop, step) = slice_ty.as_tuple(self.db);
 
-                if let Ok(new_elements) = elements.as_ref().py_slice(start, stop, step) {
+                if let Ok(new_elements) = elements.py_slice(start, stop, step) {
                     let new_elements: Vec<_> = new_elements.copied().collect();
                     Type::Tuple(TupleType::new(self.db, new_elements.into_boxed_slice()))
                 } else {
@@ -3267,7 +3267,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let (start, stop, step) = slice_ty.as_tuple(self.db);
 
                 let chars: Vec<_> = literal_value.chars().collect();
-                let result = if let Ok(new_chars) = chars.as_slice().py_slice(start, stop, step) {
+                let result = if let Ok(new_chars) = chars.py_slice(start, stop, step) {
                     let literal: String = new_chars.collect();
                     Type::StringLiteral(StringLiteralType::new(self.db, literal.into_boxed_str()))
                 } else {
@@ -3303,7 +3303,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let literal_value = literal_ty.value(self.db);
                 let (start, stop, step) = slice_ty.as_tuple(self.db);
 
-                if let Ok(new_bytes) = literal_value.as_ref().py_slice(start, stop, step) {
+                if let Ok(new_bytes) = literal_value.py_slice(start, stop, step) {
                     let new_bytes: Vec<u8> = new_bytes.copied().collect();
                     Type::BytesLiteral(BytesLiteralType::new(self.db, new_bytes.into_boxed_slice()))
                 } else {
