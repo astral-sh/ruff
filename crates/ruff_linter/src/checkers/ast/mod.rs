@@ -768,15 +768,19 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     }
                 }
                 if let Some(expr) = returns {
-                    match annotation {
-                        AnnotationContext::RuntimeRequired => {
-                            self.visit_runtime_required_annotation(expr);
-                        }
-                        AnnotationContext::RuntimeEvaluated => {
-                            self.visit_runtime_evaluated_annotation(expr);
-                        }
-                        AnnotationContext::TypingOnly => {
-                            self.visit_annotation(expr);
+                    if singledispatch {
+                        self.visit_runtime_required_annotation(expr);
+                    } else {
+                        match annotation {
+                            AnnotationContext::RuntimeRequired => {
+                                self.visit_runtime_required_annotation(expr);
+                            }
+                            AnnotationContext::RuntimeEvaluated => {
+                                self.visit_runtime_evaluated_annotation(expr);
+                            }
+                            AnnotationContext::TypingOnly => {
+                                self.visit_annotation(expr);
+                            }
                         }
                     }
                 }
