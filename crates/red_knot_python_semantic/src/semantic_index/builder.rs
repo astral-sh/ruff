@@ -955,6 +955,12 @@ where
                 };
                 let symbol = self.add_symbol(id.clone());
 
+                if is_use {
+                    self.mark_symbol_used(symbol);
+                    let use_id = self.current_ast_ids().record_use(expr);
+                    self.current_use_def_map_mut().record_use(symbol, use_id);
+                }
+
                 if is_definition {
                     match self.current_assignment().copied() {
                         Some(CurrentAssignment::Assign {
@@ -1016,12 +1022,6 @@ where
                         }
                         None => {}
                     }
-                }
-
-                if is_use {
-                    self.mark_symbol_used(symbol);
-                    let use_id = self.current_ast_ids().record_use(expr);
-                    self.current_use_def_map_mut().record_use(symbol, use_id);
                 }
 
                 walk_expr(self, expr);
