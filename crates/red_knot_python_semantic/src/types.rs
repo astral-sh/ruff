@@ -1177,6 +1177,7 @@ impl<'db> KnownClass {
             Self::GenericAlias | Self::ModuleType | Self::FunctionType => {
                 types_symbol_ty(db, self.as_str())
             }
+
             Self::NoneType => typeshed_symbol_ty(db, self.as_str()),
         }
     }
