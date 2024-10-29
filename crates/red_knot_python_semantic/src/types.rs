@@ -1944,6 +1944,11 @@ pub struct SliceLiteralType<'db> {
     step: Option<i32>,
 }
 
+impl<'db> SliceLiteralType<'db> {
+    fn as_tuple(self, db: &dyn Db) -> (Option<i32>, Option<i32>, Option<i32>) {
+        (self.start(db), self.stop(db), self.step(db))
+    }
+}
 #[salsa::interned]
 pub struct TupleType<'db> {
     #[return_ref]
