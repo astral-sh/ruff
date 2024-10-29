@@ -17,8 +17,8 @@ fn from_nonnegative_i32(index: i32) -> usize {
     static_assertions::const_assert!(usize::BITS >= 32);
     debug_assert!(index >= 0);
 
-    // SAFETY: `index` is non-negative, and `usize` is at least 32 bits.
-    usize::try_from(index).unwrap()
+    usize::try_from(index)
+        .expect("Should only ever pass a positive integer to `from_nonnegative_i32`")
 }
 
 fn from_negative_i32(index: i32) -> usize {
