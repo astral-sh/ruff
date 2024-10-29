@@ -319,8 +319,6 @@ impl<'db> Display for DisplayTypeArray<'_, 'db> {
 
 #[cfg(test)]
 mod tests {
-    use std::num::NonZeroI32;
-
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
 
@@ -432,25 +430,15 @@ mod tests {
             "slice[Literal[1], Literal[5]]"
         );
         assert_eq!(
-            Type::SliceLiteral(SliceLiteralType::new(
-                &db,
-                Some(1),
-                Some(5),
-                Some(NonZeroI32::new(2).unwrap())
-            ))
-            .display(&db)
-            .to_string(),
+            Type::SliceLiteral(SliceLiteralType::new(&db, Some(1), Some(5), Some(2)))
+                .display(&db)
+                .to_string(),
             "slice[Literal[1], Literal[5], Literal[2]]"
         );
         assert_eq!(
-            Type::SliceLiteral(SliceLiteralType::new(
-                &db,
-                None,
-                None,
-                Some(NonZeroI32::new(2).unwrap())
-            ))
-            .display(&db)
-            .to_string(),
+            Type::SliceLiteral(SliceLiteralType::new(&db, None, None, Some(2)))
+                .display(&db)
+                .to_string(),
             "slice[None, None, Literal[2]]"
         );
     }

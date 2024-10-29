@@ -2,8 +2,6 @@
 //! operations (`PySlice`) on iterators, following the semantics of equivalent
 //! operations in Python.
 
-use std::num::NonZeroI32;
-
 use itertools::Either;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -91,6 +89,9 @@ where
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct StepSizeZeroError;
+
 pub(crate) trait PySlice {
     type Item;
 
@@ -98,8 +99,11 @@ pub(crate) trait PySlice {
         &self,
         start: Option<i32>,
         stop: Option<i32>,
-        step: Option<NonZeroI32>,
-    ) -> Either<impl Iterator<Item = &Self::Item>, impl Iterator<Item = &Self::Item>>;
+        step: Option<i32>,
+    ) -> Result<
+        Either<impl Iterator<Item = &Self::Item>, impl Iterator<Item = &Self::Item>>,
+        StepSizeZeroError,
+    >;
 }
 
 impl<T> PySlice for &[T] {
@@ -109,22 +113,28 @@ impl<T> PySlice for &[T] {
         &self,
         start: Option<i32>,
         stop: Option<i32>,
-        step_int: Option<NonZeroI32>,
-    ) -> Either<impl Iterator<Item = &Self::Item>, impl Iterator<Item = &Self::Item>> {
-        let step_int = step_int.unwrap_or(NonZeroI32::new(1).unwrap());
+        step_int: Option<i32>,
+    ) -> Result<
+        Either<impl Iterator<Item = &Self::Item>, impl Iterator<Item = &Self::Item>>,
+        StepSizeZeroError,
+    > {
+        let step_int = step_int.unwrap_or(1);
+        if step_int == 0 {
+            return Err(StepSizeZeroError);
+        }
 
         let len = self.len();
         if len == 0 {
             // The iterator needs to have the same type as the step>0 case below,
             // so we need to use `.skip(0)`.
             #[allow(clippy::iter_skip_zero)]
-            return Either::Left(self.iter().skip(0).take(0).step_by(1));
+            return Ok(Either::Left(self.iter().skip(0).take(0).step_by(1)));
         }
 
         let to_position = |index| Nth::from_index(index).to_position(len);
 
         if step_int.is_positive() {
-            let step = from_nonnegative_i32(step_int.get());
+            let step = from_nonnegative_i32(step_int);
 
             let start = start.map(to_position).unwrap_or(Position::BeforeStart);
             let stop = stop.map(to_position).unwrap_or(Position::AfterEnd);
@@ -147,9 +157,11 @@ impl<T> PySlice for &[T] {
                 (0, 0, step)
             };
 
-            Either::Left(self.iter().skip(skip).take(take).step_by(step))
+            Ok(Either::Left(
+                self.iter().skip(skip).take(take).step_by(step),
+            ))
         } else {
-            let step = from_negative_i32(step_int.get());
+            let step = from_negative_i32(step_int);
 
             let start = start.map(to_position).unwrap_or(Position::AfterEnd);
             let stop = stop.map(to_position).unwrap_or(Position::BeforeStart);
@@ -172,7 +184,9 @@ impl<T> PySlice for &[T] {
                 (skip, take, step)
             };
 
-            Either::Right(self.iter().rev().skip(skip).take(take).step_by(step))
+            Ok(Either::Right(
+                self.iter().rev().skip(skip).take(take).step_by(step),
+            ))
         }
     }
 }
@@ -180,9 +194,7 @@ impl<T> PySlice for &[T] {
 #[cfg(test)]
 #[allow(clippy::redundant_clone)]
 mod tests {
-    use std::num::NonZeroI32;
-
-    use crate::util::subscript::OutOfBoundsError;
+    use crate::util::subscript::{OutOfBoundsError, StepSizeZeroError};
 
     use super::{PyIndex, PySlice};
     use itertools::assert_equal;
@@ -246,9 +258,7 @@ mod tests {
         expected: &[char; M],
     ) {
         assert_equal(
-            input
-                .as_slice()
-                .py_slice(start, stop, step.map(|s| NonZeroI32::new(s).unwrap())),
+            input.as_slice().py_slice(start, stop, step).unwrap(),
             expected.iter(),
         );
     }
@@ -418,6 +428,20 @@ mod tests {
     fn py_slice_step_forward() {
         // indices:   0    1    2    3    4    5    6
         let input = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
+
+        // Step size zero is invalid:
+        assert!(matches!(
+            input.as_slice().py_slice(None, None, Some(0)),
+            Err(StepSizeZeroError)
+        ));
+        assert!(matches!(
+            input.as_slice().py_slice(Some(0), Some(5), Some(0)),
+            Err(StepSizeZeroError)
+        ));
+        assert!(matches!(
+            input.as_slice().py_slice(Some(0), Some(0), Some(0)),
+            Err(StepSizeZeroError)
+        ));
 
         assert_eq_slice(&input, Some(0), Some(8), Some(2), &['a', 'c', 'e', 'g']);
         assert_eq_slice(&input, Some(0), Some(7), Some(2), &['a', 'c', 'e', 'g']);

@@ -1,5 +1,3 @@
-use std::num::NonZeroI32;
-
 use infer::TypeInferenceBuilder;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
@@ -1828,7 +1826,7 @@ pub struct BytesLiteralType<'db> {
 pub struct SliceLiteralType<'db> {
     start: Option<i32>,
     stop: Option<i32>,
-    step: Option<NonZeroI32>,
+    step: Option<i32>,
 }
 
 #[salsa::interned]
