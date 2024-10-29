@@ -1191,11 +1191,7 @@ impl<'db> KnownClass {
                 types_symbol_ty(db, self.as_str())
             }
             Self::NoneType => typeshed_symbol_ty(db, self.as_str()),
-            Self::SpecialForm => {
-                let t = typing_symbol_ty(db, self.as_str());
-                debug_assert!(t.is_unbound(), "special form not found");
-                t
-            }
+            Self::SpecialForm => typing_symbol_ty(db, self.as_str())
         }
     }
 
