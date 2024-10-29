@@ -3412,9 +3412,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ty_step = self.infer_optional_expression(step.as_deref());
 
         let type_to_slice_argument = |ty: Option<Type<'db>>| match ty {
-            Some(Type::IntLiteral(n)) if i32::try_from(n).is_ok() => {
-                SliceArg::Arg(Some(i32::try_from(n).expect("checked in branch arm")))
-            }
+            Some(Type::IntLiteral(n)) => match i32::try_from(n) {
+                Ok(n) => SliceArg::Arg(Some(n)),
+                Err(_) => SliceArg::Unsupported,
+            },
             Some(Type::BooleanLiteral(b)) => SliceArg::Arg(Some(i32::from(b))),
             Some(Type::None) => SliceArg::Arg(None),
             Some(Type::Instance(class)) if class.is_known(self.db, KnownClass::NoneType) => {
