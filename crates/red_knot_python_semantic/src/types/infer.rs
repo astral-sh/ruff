@@ -3568,10 +3568,26 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::NumberLiteral(_literal) => Type::Todo,
             ast::Expr::BooleanLiteral(_literal) => Type::Todo,
 
-            // TODO: this may be a place we need to revisit with special forms.
             ast::Expr::Subscript(subscript) => {
-                self.infer_subscript_expression(subscript);
-                Type::Todo
+                let ast::ExprSubscript {
+                    value,
+                    slice,
+                    ctx: _,
+                    range: _,
+                } = subscript;
+
+                let value_ty = self.infer_expression(value);
+
+                if value_ty
+                    .into_class_literal_type()
+                    .is_some_and(|class| class.is_known(self.db, KnownClass::Tuple))
+                {
+                    self.infer_tuple_type_expression(slice)
+                } else {
+                    self.infer_type_expression(slice);
+                    // TODO: many other kinds of subscripts
+                    Type::Todo
+                }
             }
 
             ast::Expr::BinOp(binary) => {
@@ -3589,6 +3605,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                         Type::Unknown
                     }
                 }
+            }
+
+            // TODO PEP 646
+            ast::Expr::Starred(starred) => {
+                self.infer_starred_expression(starred);
+                Type::Todo
             }
 
             // Forms which are invalid in the context of annotation expressions: we infer their
@@ -3667,10 +3689,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_attribute_expression(attribute);
                 Type::Unknown
             }
-            ast::Expr::Starred(starred) => {
-                self.infer_starred_expression(starred);
-                Type::Unknown
-            }
             ast::Expr::List(list) => {
                 self.infer_list_expression(list);
                 Type::Unknown
@@ -3692,6 +3710,59 @@ impl<'db> TypeInferenceBuilder<'db> {
         assert!(previous.is_none());
 
         ty
+    }
+
+    /// Given the slice of a `tuple[]` annotation, return the type that the annotation represents
+    fn infer_tuple_type_expression(&mut self, tuple_slice: &ast::Expr) -> Type<'db> {
+        /// In most cases, if a subelement of the tuple is inferred as `Todo`,
+        /// we should only infer `Todo` for that specific subelement.
+        /// Certain specific AST nodes can however change the meaning of the entire tuple,
+        /// however: for example, `tuple[int, ...]` or `tuple[int, *tuple[str, ...]]` are a
+        /// homogeneous tuple and a partly homogeneous tuple (respectively) due to the `...`
+        /// and the starred expression (respectively), Neither is supported by us right now,
+        /// so we should infer `Todo` for the *entire* tuple if we encounter one of those elements.
+        /// Even a subscript subelement could alter the type of the entire tuple
+        /// if the subscript is `Unpack[]` (which again, we don't yet support).
+        fn element_could_alter_type_of_whole_tuple(element: &ast::Expr, element_ty: Type) -> bool {
+            element_ty.is_todo()
+                && matches!(
+                    element,
+                    ast::Expr::EllipsisLiteral(_) | ast::Expr::Starred(_) | ast::Expr::Subscript(_)
+                )
+        }
+
+        // TODO:
+        // - homogeneous tuples
+        // - PEP 646
+        match tuple_slice {
+            ast::Expr::Tuple(elements) => {
+                let mut element_types = Vec::with_capacity(elements.len());
+
+                // Whether to infer `Todo` for the whole tuple
+                // (see docstring for `element_could_alter_type_of_whole_tuple`)
+                let mut return_todo = false;
+
+                for element in elements {
+                    let element_ty = self.infer_type_expression(element);
+                    return_todo |= element_could_alter_type_of_whole_tuple(element, element_ty);
+                    element_types.push(element_ty);
+                }
+
+                if return_todo {
+                    Type::Todo
+                } else {
+                    Type::Tuple(TupleType::new(self.db, element_types.into_boxed_slice()))
+                }
+            }
+            single_element => {
+                let single_element_ty = self.infer_type_expression(single_element);
+                if element_could_alter_type_of_whole_tuple(single_element, single_element_ty) {
+                    Type::Todo
+                } else {
+                    Type::Tuple(TupleType::new(self.db, Box::from([single_element_ty])))
+                }
+            }
+        }
     }
 }
 
