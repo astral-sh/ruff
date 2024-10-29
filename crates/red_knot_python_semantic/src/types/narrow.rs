@@ -34,21 +34,20 @@ pub(crate) fn narrowing_constraint<'db>(
     constraint: Constraint<'db>,
     definition: Definition<'db>,
 ) -> Option<Type<'db>> {
-    match constraint.node {
+    let constraints = match constraint.node {
         ConstraintNode::Expression(expression) => {
             if constraint.is_positive {
                 all_narrowing_constraints_for_expression(db, expression)
-                    .get(&definition.symbol(db))
-                    .copied()
             } else {
                 all_negative_narrowing_constraints_for_expression(db, expression)
-                    .get(&definition.symbol(db))
-                    .copied()
             }
         }
-        ConstraintNode::Pattern(pattern) => all_narrowing_constraints_for_pattern(db, pattern)
-            .get(&definition.symbol(db))
-            .copied(),
+        ConstraintNode::Pattern(pattern) => all_narrowing_constraints_for_pattern(db, pattern),
+    };
+    if let Some(constraints) = constraints {
+        constraints.get(&definition.symbol(db)).copied()
+    } else {
+        None
     }
 }
 
@@ -56,7 +55,7 @@ pub(crate) fn narrowing_constraint<'db>(
 fn all_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternConstraint<'db>,
-) -> NarrowingConstraints<'db> {
+) -> Option<NarrowingConstraints<'db>> {
     NarrowingConstraintsBuilder::new(db, ConstraintNode::Pattern(pattern), true).finish()
 }
 
@@ -64,7 +63,7 @@ fn all_narrowing_constraints_for_pattern<'db>(
 fn all_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
-) -> NarrowingConstraints<'db> {
+) -> Option<NarrowingConstraints<'db>> {
     NarrowingConstraintsBuilder::new(db, ConstraintNode::Expression(expression), true).finish()
 }
 
@@ -72,7 +71,7 @@ fn all_narrowing_constraints_for_expression<'db>(
 fn all_negative_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
-) -> NarrowingConstraints<'db> {
+) -> Option<NarrowingConstraints<'db>> {
     NarrowingConstraintsBuilder::new(db, ConstraintNode::Expression(expression), false).finish()
 }
 
@@ -104,7 +103,6 @@ struct NarrowingConstraintsBuilder<'db> {
     db: &'db dyn Db,
     constraint: ConstraintNode<'db>,
     is_positive: bool,
-    constraints: NarrowingConstraints<'db>,
 }
 
 impl<'db> NarrowingConstraintsBuilder<'db> {
@@ -113,24 +111,31 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             db,
             constraint,
             is_positive,
-            constraints: NarrowingConstraints::default(),
         }
     }
 
-    fn finish(mut self) -> NarrowingConstraints<'db> {
-        match self.constraint {
+    fn finish(mut self) -> Option<NarrowingConstraints<'db>> {
+        let constraints: Option<NarrowingConstraints<'db>> = match self.constraint {
             ConstraintNode::Expression(expression) => {
-                self.evaluate_expression_constraint(expression, self.is_positive);
+                self.evaluate_expression_constraint(expression, self.is_positive)
             }
             ConstraintNode::Pattern(pattern) => self.evaluate_pattern_constraint(pattern),
+        };
+        if let Some(mut constraints) = constraints {
+            constraints.shrink_to_fit();
+            Some(constraints)
+        } else {
+            None
         }
-        self.constraints.shrink_to_fit();
-        self.constraints
     }
 
-    fn evaluate_expression_constraint(&mut self, expression: Expression<'db>, is_positive: bool) {
+    fn evaluate_expression_constraint(
+        &mut self,
+        expression: Expression<'db>,
+        is_positive: bool,
+    ) -> Option<NarrowingConstraints<'db>> {
         let expression_node = expression.node_ref(self.db).node();
-        self.evaluate_expression_node_constraint(expression_node, expression, is_positive);
+        self.evaluate_expression_node_constraint(expression_node, expression, is_positive)
     }
 
     fn evaluate_expression_node_constraint(
@@ -138,52 +143,48 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         expression_node: &ruff_python_ast::Expr,
         expression: Expression<'db>,
         is_positive: bool,
-    ) {
+    ) -> Option<NarrowingConstraints<'db>> {
         match expression_node {
             ast::Expr::Compare(expr_compare) => {
-                self.add_expr_compare(expr_compare, expression, is_positive);
+                self.add_expr_compare(expr_compare, expression, is_positive)
             }
-            ast::Expr::Call(expr_call) => {
-                self.add_expr_call(expr_call, expression, is_positive);
-            }
-            ast::Expr::UnaryOp(unary_op) if unary_op.op == ast::UnaryOp::Not => {
-                self.evaluate_expression_node_constraint(
-                    &unary_op.operand,
-                    expression,
-                    !is_positive,
-                );
-            }
-            _ => {} // TODO other test expression kinds
+            ast::Expr::Call(expr_call) => self.add_expr_call(expr_call, expression, is_positive),
+            ast::Expr::UnaryOp(unary_op) if unary_op.op == ast::UnaryOp::Not => self
+                .evaluate_expression_node_constraint(&unary_op.operand, expression, !is_positive),
+            _ => None, // TODO other test expression kinds
         }
     }
 
-    fn evaluate_pattern_constraint(&mut self, pattern: PatternConstraint<'db>) {
+    fn evaluate_pattern_constraint(
+        &mut self,
+        pattern: PatternConstraint<'db>,
+    ) -> Option<NarrowingConstraints<'db>> {
         let subject = pattern.subject(self.db);
 
         match pattern.pattern(self.db).node() {
             ast::Pattern::MatchValue(_) => {
-                // TODO
+                None // TODO
             }
             ast::Pattern::MatchSingleton(singleton_pattern) => {
-                self.add_match_pattern_singleton(subject, singleton_pattern);
+                self.add_match_pattern_singleton(subject, singleton_pattern)
             }
             ast::Pattern::MatchSequence(_) => {
-                // TODO
+                None // TODO
             }
             ast::Pattern::MatchMapping(_) => {
-                // TODO
+                None // TODO
             }
             ast::Pattern::MatchClass(_) => {
-                // TODO
+                None // TODO
             }
             ast::Pattern::MatchStar(_) => {
-                // TODO
+                None // TODO
             }
             ast::Pattern::MatchAs(_) => {
-                // TODO
+                None // TODO
             }
             ast::Pattern::MatchOr(_) => {
-                // TODO
+                None // TODO
             }
         }
     }
@@ -204,7 +205,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         expr_compare: &ast::ExprCompare,
         expression: Expression<'db>,
         is_positive: bool,
-    ) {
+    ) -> Option<NarrowingConstraints<'db>> {
         let ast::ExprCompare {
             range: _,
             left,
@@ -214,14 +215,14 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         if !left.is_name_expr() && comparators.iter().all(|c| !c.is_name_expr()) {
             // If none of the comparators are name expressions,
             // we have no symbol to narrow down the type of.
-            return;
+            return None;
         }
         if !is_positive && comparators.len() > 1 {
             // We can't negate a constraint made by a multi-comparator expression, since we can't
             // know which comparison part is the one being negated.
             // For example, the negation of  `x is 1 is y is 2`, would be `(x is not 1) or (y is not 1) or (y is not 2)`
             // and that requires cross-symbol constraints, which we don't support yet.
-            return;
+            return None;
         }
         let scope = self.scope();
         let inference = infer_expression_types(self.db, expression);
@@ -229,6 +230,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         let comparator_tuples = std::iter::once(&**left)
             .chain(comparators)
             .tuple_windows::<(&ruff_python_ast::Expr, &ruff_python_ast::Expr)>();
+        let mut constraints = NarrowingConstraints::default();
         for (op, (left, right)) in std::iter::zip(&**ops, comparator_tuples) {
             if let ast::Expr::Name(ast::ExprName {
                 range: _,
@@ -246,20 +248,20 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                             let ty = IntersectionBuilder::new(self.db)
                                 .add_negative(rhs_ty)
                                 .build();
-                            self.constraints.insert(symbol, ty);
+                            constraints.insert(symbol, ty);
                         } else {
                             // Non-singletons cannot be safely narrowed using `is not`
                         }
                     }
                     ast::CmpOp::Is => {
-                        self.constraints.insert(symbol, rhs_ty);
+                        constraints.insert(symbol, rhs_ty);
                     }
                     ast::CmpOp::NotEq => {
                         if rhs_ty.is_single_valued(self.db) {
                             let ty = IntersectionBuilder::new(self.db)
                                 .add_negative(rhs_ty)
                                 .build();
-                            self.constraints.insert(symbol, ty);
+                            constraints.insert(symbol, ty);
                         }
                     }
                     _ => {
@@ -268,6 +270,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                 }
             }
         }
+        Some(constraints)
     }
 
     fn add_expr_call(
@@ -275,7 +278,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         expr_call: &ast::ExprCall,
         expression: Expression<'db>,
         is_positive: bool,
-    ) {
+    ) -> Option<NarrowingConstraints<'db>> {
         let scope = self.scope();
         let inference = infer_expression_types(self.db, expression);
 
@@ -299,18 +302,21 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                         if !is_positive {
                             constraint = constraint.negate(self.db);
                         }
-                        self.constraints.insert(symbol, constraint);
+                        let mut constraints = NarrowingConstraints::default();
+                        constraints.insert(symbol, constraint);
+                        return Some(constraints);
                     }
                 }
             }
         }
+        None
     }
 
     fn add_match_pattern_singleton(
         &mut self,
         subject: &ast::Expr,
         pattern: &ast::PatternMatchSingleton,
-    ) {
+    ) -> Option<NarrowingConstraints<'db>> {
         if let Some(ast::ExprName { id, .. }) = subject.as_name_expr() {
             // SAFETY: we should always have a symbol for every Name node.
             let symbol = self.symbols().symbol_id_by_name(id).unwrap();
@@ -320,7 +326,11 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                 ast::Singleton::True => Type::BooleanLiteral(true),
                 ast::Singleton::False => Type::BooleanLiteral(false),
             };
-            self.constraints.insert(symbol, ty);
+            let mut constraints = NarrowingConstraints::default();
+            constraints.insert(symbol, ty);
+            Some(constraints)
+        } else {
+            None
         }
     }
 }
