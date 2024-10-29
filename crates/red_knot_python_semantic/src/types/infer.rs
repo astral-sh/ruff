@@ -2839,7 +2839,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             // Handle unsupported operators (diagnostic, `bool`/`Unknown` outcome)
                             self.add_diagnostic(
                                 AnyNodeRef::ExprCompare(compare),
-                                "operator-unsupported",
+                                "unsupported-operator",
                                 format_args!(
                                     "Operator `{}` is not supported for types `{}` and `{}`{}",
                                     error.op,
