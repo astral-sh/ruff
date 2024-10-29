@@ -325,7 +325,7 @@ pub(crate) fn print_jupyter_messages(
     path: &Path,
     notebook: &Notebook,
 ) -> String {
-    let mut output = Vec::new();
+    let mut writer = anstream::StripStream::new(Vec::new());
 
     TextEmitter::default()
         .with_show_fix_status(true)
@@ -333,7 +333,7 @@ pub(crate) fn print_jupyter_messages(
         .with_show_source(true)
         .with_unsafe_fixes(UnsafeFixes::Enabled)
         .emit(
-            &mut output,
+            &mut writer,
             messages,
             &EmitterContext::new(&FxHashMap::from_iter([(
                 path.file_name().unwrap().to_string_lossy().to_string(),
@@ -342,11 +342,11 @@ pub(crate) fn print_jupyter_messages(
         )
         .unwrap();
 
-    String::from_utf8(output).unwrap()
+    String::from_utf8(writer.into_inner()).unwrap()
 }
 
 pub(crate) fn print_messages(messages: &[Message]) -> String {
-    let mut output = Vec::new();
+    let mut writer = anstream::StripStream::new(Vec::new());
 
     TextEmitter::default()
         .with_show_fix_status(true)
@@ -354,13 +354,13 @@ pub(crate) fn print_messages(messages: &[Message]) -> String {
         .with_show_source(true)
         .with_unsafe_fixes(UnsafeFixes::Enabled)
         .emit(
-            &mut output,
+            &mut writer,
             messages,
             &EmitterContext::new(&FxHashMap::default()),
         )
         .unwrap();
 
-    String::from_utf8(output).unwrap()
+    String::from_utf8(writer.into_inner()).unwrap()
 }
 
 #[macro_export]

@@ -277,18 +277,19 @@ mod test {
             UnsafeFixes::Enabled,
         )
         .unwrap();
-        let mut output = Vec::new();
+
+        let mut writer = anstream::StripStream::new(Vec::new());
 
         TextEmitter::default()
             .with_show_fix_status(true)
             .emit(
-                &mut output,
+                &mut writer,
                 &diagnostics.messages,
                 &EmitterContext::new(&FxHashMap::default()),
             )
             .unwrap();
 
-        let messages = String::from_utf8(output).unwrap();
+        let messages = String::from_utf8(writer.into_inner()).unwrap();
 
         insta::with_settings!({
             omit_expression => true,

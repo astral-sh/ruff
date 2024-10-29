@@ -513,10 +513,10 @@ def foo():
     ) -> String {
         let notebook_indexes = FxHashMap::default();
         let context = EmitterContext::new(&notebook_indexes);
-        let mut output: Vec<u8> = Vec::new();
-        emitter.emit(&mut output, messages, &context).unwrap();
+        let mut writer = anstream::StripStream::new(Vec::new());
+        emitter.emit(&mut writer, messages, &context).unwrap();
 
-        String::from_utf8(output).expect("Output to be valid UTF-8")
+        String::from_utf8(writer.into_inner()).expect("Output to be valid UTF-8")
     }
 
     pub(super) fn capture_emitter_notebook_output(
@@ -525,9 +525,9 @@ def foo():
         notebook_indexes: &FxHashMap<String, NotebookIndex>,
     ) -> String {
         let context = EmitterContext::new(notebook_indexes);
-        let mut output: Vec<u8> = Vec::new();
-        emitter.emit(&mut output, messages, &context).unwrap();
+        let mut writer = anstream::StripStream::new(Vec::new());
+        emitter.emit(&mut writer, messages, &context).unwrap();
 
-        String::from_utf8(output).expect("Output to be valid UTF-8")
+        String::from_utf8(writer.into_inner()).expect("Output to be valid UTF-8")
     }
 }

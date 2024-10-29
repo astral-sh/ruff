@@ -46,7 +46,7 @@ invalid_characters.py:55:21: PLE2510 [*] Invalid unescaped character backspace, 
    |
 53 | zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
 54 | 
-55 | nested_fstrings = f'␈{f'{f'␛'}'}'
+55 | nested_fstrings = f'␈{f'{f'␛'}'}'
    |                     ^ PLE2510
 56 | 
 57 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998106
@@ -57,8 +57,8 @@ invalid_characters.py:55:21: PLE2510 [*] Invalid unescaped character backspace, 
 52 52 | zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
 53 53 | zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
 54 54 | 
-55    |-nested_fstrings = f'␈{f'{f'␛'}'}'
-   55 |+nested_fstrings = f'\b{f'{f'␛'}'}'
+55    |-nested_fstrings = f'␈{f'{f'␛'}'}'
+   55 |+nested_fstrings = f'\b{f'{f'␛'}'}'
 56 56 | 
 57 57 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998106
-58 58 | x = f"""}}ab"""
+58 58 | x = f"""}}ab"""

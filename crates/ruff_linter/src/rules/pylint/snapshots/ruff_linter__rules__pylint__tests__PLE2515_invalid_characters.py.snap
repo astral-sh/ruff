@@ -100,7 +100,7 @@ invalid_characters.py:52:60: PLE2515 [*] Invalid unescaped character zero-width-
    52 |+zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ \u200b​"
 53 53 | zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
 54 54 | 
-55 55 | nested_fstrings = f'␈{f'{f'␛'}'}'
+55 55 | nested_fstrings = f'␈{f'{f'␛'}'}'
 
 invalid_characters.py:52:61: PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
    |
@@ -120,7 +120,7 @@ invalid_characters.py:52:61: PLE2515 [*] Invalid unescaped character zero-width-
    52 |+zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​\u200b"
 53 53 | zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
 54 54 | 
-55 55 | nested_fstrings = f'␈{f'{f'␛'}'}'
+55 55 | nested_fstrings = f'␈{f'{f'␛'}'}'
 
 invalid_characters.py:53:61: PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
    |
@@ -129,7 +129,7 @@ invalid_characters.py:53:61: PLE2515 [*] Invalid unescaped character zero-width-
 53 | zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
    |                                                         PLE2515
 54 | 
-55 | nested_fstrings = f'␈{f'{f'␛'}'}'
+55 | nested_fstrings = f'␈{f'{f'␛'}'}'
    |
    = help: Replace with escape sequence
 
@@ -140,7 +140,7 @@ invalid_characters.py:53:61: PLE2515 [*] Invalid unescaped character zero-width-
 53    |-zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
    53 |+zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ \u200b​"
 54 54 | 
-55 55 | nested_fstrings = f'␈{f'{f'␛'}'}'
+55 55 | nested_fstrings = f'␈{f'{f'␛'}'}'
 56 56 | 
 
 invalid_characters.py:53:62: PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
@@ -150,7 +150,7 @@ invalid_characters.py:53:62: PLE2515 [*] Invalid unescaped character zero-width-
 53 | zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
    |                                                         PLE2515
 54 | 
-55 | nested_fstrings = f'␈{f'{f'␛'}'}'
+55 | nested_fstrings = f'␈{f'{f'␛'}'}'
    |
    = help: Replace with escape sequence
 
@@ -161,5 +161,5 @@ invalid_characters.py:53:62: PLE2515 [*] Invalid unescaped character zero-width-
 53    |-zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
    53 |+zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​\u200b"
 54 54 | 
-55 55 | nested_fstrings = f'␈{f'{f'␛'}'}'
+55 55 | nested_fstrings = f'␈{f'{f'␛'}'}'
 56 56 |

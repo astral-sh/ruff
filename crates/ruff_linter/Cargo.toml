@@ -47,8 +47,8 @@ log = { workspace = true }
 memchr = { workspace = true }
 natord = { workspace = true }
 path-absolutize = { workspace = true, features = [
-    "once_cell_cache",
-    "use_unix_paths_on_wasm",
+  "once_cell_cache",
+  "use_unix_paths_on_wasm",
 ] }
 pathdiff = { workspace = true }
 pep440_rs = { workspace = true }
@@ -72,10 +72,13 @@ unicode-normalization = { workspace = true }
 url = { workspace = true }
 
 [dev-dependencies]
+anstream = { version = "0.6.17" }
+colored = { workspace = true }
 insta = { workspace = true, features = ["filters", "json", "redactions"] }
 test-case = { workspace = true }
-# Disable colored output in tests
-colored = { workspace = true, features = ["no-color"] }
+
+[target.'cfg(fuzzing)'.dependencies]
+anstream = { version = "0.6.17" }
 
 [features]
 default = []
