@@ -73,9 +73,9 @@ pub(crate) fn typeshed_symbol_ty<'db>(db: &'db dyn Db, symbol: &str) -> Type<'db
     core_module_symbol_ty(db, CoreStdlibModule::Typeshed, symbol)
 }
 
-/// Lookup the type of `symbol` in the `_typeshed` module namespace.
+/// Lookup the type of `symbol` in the `typing` module namespace.
 ///
-/// Returns `Unbound` if the `_typeshed` module isn't available for some reason.
+/// Returns `Unbound` if the `typing` module isn't available for some reason.
 #[inline]
 pub(crate) fn typing_symbol_ty<'db>(db: &'db dyn Db, symbol: &str) -> Type<'db> {
     core_module_symbol_ty(db, CoreStdlibModule::Typing, symbol)
