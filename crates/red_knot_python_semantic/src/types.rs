@@ -283,6 +283,8 @@ pub enum Type<'db> {
     LiteralString,
     /// A bytes literal
     BytesLiteral(BytesLiteralType<'db>),
+    /// A slice literal, e.g. `1:5`, `10:0:-1` or `:`
+    SliceLiteral(SliceLiteralType<'db>),
     /// A heterogeneous tuple type, with elements of the given types in source order.
     // TODO: Support variable length homogeneous tuple type like `tuple[int, ...]`.
     Tuple(TupleType<'db>),
@@ -553,6 +555,7 @@ impl<'db> Type<'db> {
                 | Type::IntLiteral(..)
                 | Type::StringLiteral(..)
                 | Type::BytesLiteral(..)
+                | Type::SliceLiteral(..)
                 | Type::FunctionLiteral(..)
                 | Type::ModuleLiteral(..)
                 | Type::ClassLiteral(..)),
@@ -561,6 +564,7 @@ impl<'db> Type<'db> {
                 | Type::IntLiteral(..)
                 | Type::StringLiteral(..)
                 | Type::BytesLiteral(..)
+                | Type::SliceLiteral(..)
                 | Type::FunctionLiteral(..)
                 | Type::ModuleLiteral(..)
                 | Type::ClassLiteral(..)),
@@ -611,6 +615,13 @@ impl<'db> Type<'db> {
                 Some(KnownClass::Bytes | KnownClass::Object)
             ),
             (Type::BytesLiteral(..), _) | (_, Type::BytesLiteral(..)) => true,
+
+            (Type::SliceLiteral(..), Type::Instance(class_type))
+            | (Type::Instance(class_type), Type::SliceLiteral(..)) => !matches!(
+                class_type.known(db),
+                Some(KnownClass::Slice | KnownClass::Object)
+            ),
+            (Type::SliceLiteral(..), _) | (_, Type::SliceLiteral(..)) => true,
 
             (
                 Type::FunctionLiteral(..) | Type::ModuleLiteral(..) | Type::ClassLiteral(..),
@@ -673,6 +684,7 @@ impl<'db> Type<'db> {
             | Type::IntLiteral(..)
             | Type::StringLiteral(..)
             | Type::BytesLiteral(..)
+            | Type::SliceLiteral(..)
             | Type::LiteralString => {
                 // Note: The literal types included in this pattern are not true singletons.
                 // There can be multiple Python objects (at different memory locations) that
@@ -717,7 +729,8 @@ impl<'db> Type<'db> {
             | Type::IntLiteral(..)
             | Type::BooleanLiteral(..)
             | Type::StringLiteral(..)
-            | Type::BytesLiteral(..) => true,
+            | Type::BytesLiteral(..)
+            | Type::SliceLiteral(..) => true,
 
             Type::Tuple(tuple) => tuple
                 .elements(db)
@@ -738,6 +751,7 @@ impl<'db> Type<'db> {
                     | KnownClass::Tuple
                     | KnownClass::Set
                     | KnownClass::Dict
+                    | KnownClass::Slice
                     | KnownClass::GenericAlias
                     | KnownClass::ModuleType
                     | KnownClass::FunctionType,
@@ -818,6 +832,10 @@ impl<'db> Type<'db> {
                 // TODO defer to Type::Instance(<bytes from typeshed>).member
                 Type::Todo
             }
+            Type::SliceLiteral(_) => {
+                // TODO defer to `builtins.slice` methods
+                Type::Todo
+            }
             Type::Tuple(_) => {
                 // TODO: implement tuple methods
                 Type::Todo
@@ -872,6 +890,7 @@ impl<'db> Type<'db> {
             Type::StringLiteral(str) => Truthiness::from(!str.value(db).is_empty()),
             Type::LiteralString => Truthiness::Ambiguous,
             Type::BytesLiteral(bytes) => Truthiness::from(!bytes.value(db).is_empty()),
+            Type::SliceLiteral(_) => Truthiness::AlwaysTrue,
             Type::Tuple(items) => Truthiness::from(!items.elements(db).is_empty()),
         }
     }
@@ -1028,6 +1047,7 @@ impl<'db> Type<'db> {
             | Type::ModuleLiteral(_)
             | Type::IntLiteral(_)
             | Type::StringLiteral(_)
+            | Type::SliceLiteral(_)
             | Type::Tuple(_)
             | Type::LiteralString
             | Type::None => Type::Unknown,
@@ -1045,6 +1065,7 @@ impl<'db> Type<'db> {
             Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
             Type::BooleanLiteral(_) => KnownClass::Bool.to_class(db),
             Type::BytesLiteral(_) => KnownClass::Bytes.to_class(db),
+            Type::SliceLiteral(_) => KnownClass::Slice.to_class(db),
             Type::IntLiteral(_) => KnownClass::Int.to_class(db),
             Type::FunctionLiteral(_) => KnownClass::FunctionType.to_class(db),
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class(db),
@@ -1128,6 +1149,7 @@ pub enum KnownClass {
     Tuple,
     Set,
     Dict,
+    Slice,
     // Types
     GenericAlias,
     ModuleType,
@@ -1150,6 +1172,7 @@ impl<'db> KnownClass {
             Self::Dict => "dict",
             Self::List => "list",
             Self::Type => "type",
+            Self::Slice => "slice",
             Self::GenericAlias => "GenericAlias",
             Self::ModuleType => "ModuleType",
             Self::FunctionType => "FunctionType",
@@ -1173,7 +1196,8 @@ impl<'db> KnownClass {
             | Self::List
             | Self::Tuple
             | Self::Set
-            | Self::Dict => builtins_symbol_ty(db, self.as_str()),
+            | Self::Dict
+            | Self::Slice => builtins_symbol_ty(db, self.as_str()),
             Self::GenericAlias | Self::ModuleType | Self::FunctionType => {
                 types_symbol_ty(db, self.as_str())
             }
@@ -1207,6 +1231,7 @@ impl<'db> KnownClass {
             "set" => Some(Self::Set),
             "dict" => Some(Self::Dict),
             "list" => Some(Self::List),
+            "slice" => Some(Self::Slice),
             "GenericAlias" => Some(Self::GenericAlias),
             "NoneType" => Some(Self::NoneType),
             "ModuleType" => Some(Self::ModuleType),
@@ -1231,7 +1256,8 @@ impl<'db> KnownClass {
             | Self::List
             | Self::Tuple
             | Self::Set
-            | Self::Dict => module.name() == "builtins",
+            | Self::Dict
+            | Self::Slice => module.name() == "builtins",
             Self::GenericAlias | Self::ModuleType | Self::FunctionType => module.name() == "types",
             Self::NoneType => matches!(module.name().as_str(), "_typeshed" | "types"),
         }
@@ -1795,6 +1821,13 @@ impl<'db> StringLiteralType<'db> {
 pub struct BytesLiteralType<'db> {
     #[return_ref]
     value: Box<[u8]>,
+}
+
+#[salsa::interned]
+pub struct SliceLiteralType<'db> {
+    start: Option<i32>,
+    stop: Option<i32>,
+    step: Option<i32>,
 }
 
 #[salsa::interned]
