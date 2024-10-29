@@ -3,23 +3,6 @@ import sys
 import sysconfig
 
 
-def get_last_three_path_parts(path: str) -> list[str]:
-    """Return a list of up to the last three parts of a path."""
-    parts, idx = [], 0
-
-    while idx < 3:
-        new_path, base = os.path.split(path)
-        if base or new_path != path:
-            parts.append(base)
-            path = new_path
-            idx += 1
-        else:
-            parts.append(path)
-            break
-
-    return parts
-
-
 def find_ruff_bin() -> str:
     """Return the ruff binary path."""
 
@@ -58,6 +41,22 @@ def find_ruff_bin() -> str:
     # See: https://github.com/pypa/pip/blob/102d8187a1f5a4cd5de7a549fd8a9af34e89a54f/src/pip/_internal/build_env.py#L87
     paths = os.environ.get("PATH", "").split(os.pathsep)
     if len(paths) >= 2:
+
+        def get_last_three_path_parts(path: str) -> list[str]:
+            """Return a list of up to the last three parts of a path."""
+            parts = []
+
+            while len(parts) < 3:
+                head, tail = os.path.split(path)
+                if tail or head != path:
+                    parts.append(tail)
+                    path = head
+                else:
+                    parts.append(path)
+                    break
+
+            return parts
+
         maybe_overlay = get_last_three_path_parts(paths[0])
         maybe_normal = get_last_three_path_parts(paths[1])
         if (
