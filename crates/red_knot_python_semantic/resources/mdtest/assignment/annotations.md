@@ -91,3 +91,20 @@ def baz() -> str | str:
 
 reveal_type(baz())  # revealed: str
 ```
+
+## Attribute expressions in type annotations are understood
+
+```py
+import builtins
+
+int = "foo"
+a: builtins.int = 42
+
+# error: [invalid-assignment] "Object of type `Literal["bar"]` is not assignable to `int`"
+b: builtins.int = "bar"
+
+c: builtins.tuple[builtins.tuple[builtins.int, builtins.int], builtins.int] = ((42, 42), 42)
+
+# error: [invalid-assignment] "Object of type `Literal["foo"]` is not assignable to `tuple[tuple[int, int], int]`"
+c: builtins.tuple[builtins.tuple[builtins.int, builtins.int], builtins.int] = "foo"
+```

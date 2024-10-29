@@ -3542,13 +3542,14 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let ty = match expression {
             ast::Expr::Name(name) => {
-                debug_assert!(
-                    name.ctx.is_load(),
-                    "name in a type expression is always 'load' but got: '{:?}'",
-                    name.ctx
-                );
-
+                debug_assert_eq!(name.ctx, ast::ExprContext::Load);
                 self.infer_name_expression(name).to_instance(self.db)
+            }
+
+            ast::Expr::Attribute(attribute_expression) => {
+                debug_assert_eq!(attribute_expression.ctx, ast::ExprContext::Load);
+                self.infer_attribute_expression(attribute_expression)
+                    .to_instance(self.db)
             }
 
             ast::Expr::NoneLiteral(_literal) => Type::None,
@@ -3682,11 +3683,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             ast::Expr::FString(fstring) => {
                 self.infer_fstring_expression(fstring);
-                Type::Unknown
-            }
-            //
-            ast::Expr::Attribute(attribute) => {
-                self.infer_attribute_expression(attribute);
                 Type::Unknown
             }
             ast::Expr::List(list) => {
