@@ -394,6 +394,7 @@ mod tests {
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
+    use crate::stdlib::typing_symbol_ty;
     use crate::types::{KnownClass, StringLiteralType, UnionBuilder};
     use crate::ProgramSettings;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
@@ -589,24 +590,17 @@ mod tests {
             .add_positive(ta)
             .add_negative(t1)
             .build();
-        // intersection = int & ~(Any & ~Literal[1])
+        // ta_not_i0 = int & ~(Any & ~Literal[1])
         // -> int & (~Any  | Literal[1])
-        // (~Any is treated as Any for adding purposes)
+        // (~Any is equivalent to Any)
         // -> (int & Any) | (int & Literal[1])
         // -> (int & Any) | Literal[1]
-        let intersection = IntersectionBuilder::new(&db)
+        let ta_not_i0 = IntersectionBuilder::new(&db)
             .add_positive(t2)
             .add_negative(i0)
-            .build()
-            .expect_union();
-
-        // int & Any
-        let i_and_a = IntersectionBuilder::new(&db)
-            .add_positive(t2)
-            .add_positive(ta)
             .build();
 
-        assert_eq!(intersection.elements(&db), &[i_and_a, t1,]);
+        assert_eq!(ta_not_i0.display(&db).to_string(), "int & Any | Literal[1]");
     }
 
     #[test]
@@ -632,8 +626,8 @@ mod tests {
     #[test]
     fn intersection_negation_distributes_over_union() {
         let db = setup_db();
-        let st = KnownClass::Sized.to_instance(&db);
-        let ht = KnownClass::Hashable.to_instance(&db);
+        let st = typing_symbol_ty(&db, "Sized").to_instance(&db);
+        let ht = typing_symbol_ty(&db, "Hashable").to_instance(&db);
         // sh_t: Sized & Hashable
         let sh_t = IntersectionBuilder::new(&db)
             .add_positive(st)
@@ -659,9 +653,9 @@ mod tests {
     fn mixed_intersection_negation_distributes_over_union() {
         let db = setup_db();
         let it = KnownClass::Int.to_instance(&db);
-        let st = KnownClass::Sized.to_instance(&db);
-        let ht = KnownClass::Hashable.to_instance(&db);
-        // sh_t: Sized & ~Hashable
+        let st = typing_symbol_ty(&db, "Sized").to_instance(&db);
+        let ht = typing_symbol_ty(&db, "Hashable").to_instance(&db);
+        // s_not_h_t: Sized & ~Hashable
         let s_not_h_t = IntersectionBuilder::new(&db)
             .add_positive(st)
             .add_negative(ht)
@@ -670,32 +664,16 @@ mod tests {
         assert_eq!(s_not_h_t.pos_vec(&db), &[st]);
         assert_eq!(s_not_h_t.neg_vec(&db), &[ht]);
 
-        // let's build Int & ~(Sized & ~Hashable)
+        // let's build int & ~(Sized & ~Hashable)
         let tt = IntersectionBuilder::new(&db)
             .add_positive(it)
             .add_negative(Type::Intersection(s_not_h_t))
             .build();
 
-        // Int & ~(Sized & ~Hashable)
-        // -> Int & (~Sized | Hashable)
-        // -> (Int & ~Sized) | (Int & Hashable)
-        let tt = tt.expect_union();
-
-        assert_eq!(
-            tt.elements(&db),
-            &[
-                // Int & ~Sized
-                IntersectionBuilder::new(&db)
-                    .add_positive(it)
-                    .add_negative(st)
-                    .build(),
-                // Int & Hashable
-                IntersectionBuilder::new(&db)
-                    .add_positive(it)
-                    .add_positive(ht)
-                    .build(),
-            ]
-        );
+        // int & ~(Sized & ~Hashable)
+        // -> int & (~Sized | Hashable)
+        // -> (int & ~Sized) | (int & Hashable)
+        assert_eq!(tt.display(&db).to_string(), "int & ~Sized | int & Hashable");
     }
 
     #[test]
