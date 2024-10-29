@@ -3226,9 +3226,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             // Ex) Given `("a", 1, Null)[0:2]`, return `("a", 1)`
             (Type::Tuple(tuple_ty), Type::SliceLiteral(slice_ty)) => {
                 let elements = tuple_ty.elements(self.db);
-                let start = slice_ty.start(self.db);
-                let stop = slice_ty.stop(self.db);
-                let step = slice_ty.step(self.db);
+                let (start, stop, step) = slice_ty.as_tuple(self.db);
 
                 if let Ok(new_elements) = elements.as_ref().py_slice(start, stop, step) {
                     let new_elements: Vec<_> = new_elements.copied().collect();
@@ -3266,9 +3264,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             // Ex) Given `"value"[1:3]`, return `"al"`
             (Type::StringLiteral(literal_ty), Type::SliceLiteral(slice_ty)) => {
                 let literal_value = literal_ty.value(self.db);
-                let start = slice_ty.start(self.db);
-                let stop = slice_ty.stop(self.db);
-                let step = slice_ty.step(self.db);
+                let (start, stop, step) = slice_ty.as_tuple(self.db);
 
                 let chars: Vec<_> = literal_value.chars().collect();
                 let result = if let Ok(new_chars) = chars.as_slice().py_slice(start, stop, step) {
@@ -3305,9 +3301,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             // Ex) Given `b"value"[1:3]`, return `b"al"`
             (Type::BytesLiteral(literal_ty), Type::SliceLiteral(slice_ty)) => {
                 let literal_value = literal_ty.value(self.db);
-                let start = slice_ty.start(self.db);
-                let stop = slice_ty.stop(self.db);
-                let step = slice_ty.step(self.db);
+                let (start, stop, step) = slice_ty.as_tuple(self.db);
 
                 if let Ok(new_bytes) = literal_value.as_ref().py_slice(start, stop, step) {
                     let new_bytes: Vec<u8> = new_bytes.copied().collect();
@@ -3418,9 +3412,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ty_step = self.infer_optional_expression(step.as_deref());
 
         let type_to_slice_argument = |ty: Option<Type<'db>>| match ty {
-            Some(Type::IntLiteral(n)) if i32::try_from(n).is_ok() => {
-                SliceArg::Arg(Some(i32::try_from(n).expect("checked in branch arm")))
-            }
+            Some(Type::IntLiteral(n)) => match i32::try_from(n) {
+                Ok(n) => SliceArg::Arg(Some(n)),
+                Err(_) => SliceArg::Unsupported,
+            },
             Some(Type::BooleanLiteral(b)) => SliceArg::Arg(Some(i32::from(b))),
             Some(Type::None) => SliceArg::Arg(None),
             Some(Type::Instance(class)) if class.is_known(self.db, KnownClass::NoneType) => {
