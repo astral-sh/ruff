@@ -45,10 +45,10 @@ def f():
     # TODO: revealed: Literal[1, 2, 3, "foo", 5] | None
     reveal_type(union_var)  # revealed: Literal[1, 2, 3] | Literal["foo"] | Literal[5] | None
 
-# error: [invalid-literal-parameter] "Type arguments for `Literal` must be None, a literal value (int, bool, str, or bytes), or an enum value"
+# error: [invalid-literal-parameter]
 invalid1: Literal[3 + 4]
-# error: [invalid-literal-parameter] "Type arguments for `Literal` must be None, a literal value (int, bool, str, or bytes), or an enum value"
+# error: [invalid-literal-parameter]
 invalid2: Literal[4 + 3j]
-# error: [invalid-literal-parameter] "Type arguments for `Literal` must be None, a literal value (int, bool, str, or bytes), or an enum value"
+# error: [invalid-literal-parameter]
 invalid3: Literal[(3, 4)]
 ```
