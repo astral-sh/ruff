@@ -1166,7 +1166,7 @@ impl<'db> KnownClass {
             Self::ModuleType => "ModuleType",
             Self::FunctionType => "FunctionType",
             Self::NoneType => "NoneType",
-            Self::SpecialForm => "SpecialForm",
+            Self::SpecialForm => "_SpecialForm",
         }
     }
 
