@@ -1,6 +1,7 @@
 """Test module."""
 from __future__ import annotations
 
+from collections.abc import Set
 from functools import singledispatch
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -36,19 +37,19 @@ def _(a: DataFrame) -> DataFrame:
 
 
 @singledispatch
-def process_path(a: int | str, p: Path) -> int:
+def process_path(a: int | str, p: Path) -> Set:
     """Convert arg to array or leaves it as sparse matrix."""
     msg = f"Unhandled type {type(a)}"
     raise NotImplementedError(msg)
 
 
 @process_path.register
-def _(a: int, p: Path) -> int:
+def _(a: int, p: Path) -> Set:
     return asarray(a)
 
 
 @process_path.register
-def _(a: str, p: Path) -> int:
+def _(a: str, p: Path) -> Set:
     return a
 
 

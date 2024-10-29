@@ -23,8 +23,6 @@ struct Case {
 const TOMLLIB_312_URL: &str = "https://raw.githubusercontent.com/python/cpython/8e8a4baf652f6e1cee7acde9d78c4b6154539748/Lib/tomllib";
 
 static EXPECTED_DIAGNOSTICS: &[&str] = &[
-    // We don't support `ModuleType`-attributes as globals yet:
-    "/src/tomllib/__init__.py:10:30: Name `__name__` used when not defined",
     // We don't support `*` imports yet:
     "/src/tomllib/_parser.py:7:29: Module `collections.abc` has no member `Iterable`",
     // We don't support terminal statements in control flow yet:

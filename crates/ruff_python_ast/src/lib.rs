@@ -18,6 +18,7 @@ mod node;
 mod nodes;
 pub mod parenthesize;
 pub mod relocate;
+pub mod script;
 pub mod statement_visitor;
 pub mod stmt_if;
 pub mod str;

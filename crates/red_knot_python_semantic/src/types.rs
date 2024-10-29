@@ -5,7 +5,7 @@ use ruff_python_ast as ast;
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::ast_ids::HasScopedAstId;
 use crate::semantic_index::definition::{Definition, DefinitionKind};
-use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId};
+use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, Symbol};
 use crate::semantic_index::{
     global_scope, semantic_index, symbol_table, use_def_map, BindingWithConstraints,
     BindingWithConstraintsIterator, DeclarationsIterator,
@@ -89,9 +89,64 @@ fn symbol_ty<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Type<'db>
         .unwrap_or(Type::Unbound)
 }
 
-/// Shorthand for `symbol_ty` that looks up a module-global symbol by name in a file.
+/// Return a list of the symbols that typeshed declares in the body scope of
+/// the stub for the class `types.ModuleType`.
+///
+/// Conceptually this could be a `Set` rather than a list,
+/// but the number of symbols declared in this scope is likely to be very small,
+/// so the cost of hashing the names is likely to be more expensive than it's worth.
+#[salsa::tracked(return_ref)]
+fn module_type_symbols<'db>(db: &'db dyn Db) -> smallvec::SmallVec<[ast::name::Name; 8]> {
+    let Some(module_type) = KnownClass::ModuleType
+        .to_class(db)
+        .into_class_literal_type()
+    else {
+        // The most likely way we get here is if a user specified a `--custom-typeshed-dir`
+        // without a `types.pyi` stub in the `stdlib/` directory
+        return smallvec::SmallVec::default();
+    };
+
+    let module_type_scope = module_type.body_scope(db);
+    let module_type_symbol_table = symbol_table(db, module_type_scope);
+
+    // `__dict__` and `__init__` are very special members that can be accessed as attributes
+    // on the module when imported, but cannot be accessed as globals *inside* the module.
+    //
+    // `__getattr__` is even more special: it doesn't exist at runtime, but typeshed includes it
+    // to reduce false positives associated with functions that dynamically import modules
+    // and return `Instance(types.ModuleType)`. We should ignore it for any known module-literal type.
+    module_type_symbol_table
+        .symbols()
+        .filter(|symbol| symbol.is_declared())
+        .map(Symbol::name)
+        .filter(|symbol_name| !matches!(&***symbol_name, "__dict__" | "__getattr__" | "__init__"))
+        .cloned()
+        .collect()
+}
+
+/// Looks up a module-global symbol by name in a file.
 pub(crate) fn global_symbol_ty<'db>(db: &'db dyn Db, file: File, name: &str) -> Type<'db> {
-    symbol_ty(db, global_scope(db, file), name)
+    let explicit_ty = symbol_ty(db, global_scope(db, file), name);
+    if !explicit_ty.may_be_unbound(db) {
+        return explicit_ty;
+    }
+
+    // Not defined explicitly in the global scope?
+    // All modules are instances of `types.ModuleType`;
+    // look it up there (with a few very special exceptions)
+    if module_type_symbols(db)
+        .iter()
+        .any(|module_type_member| &**module_type_member == name)
+    {
+        // TODO: this should use `.to_instance(db)`. but we don't understand attribute access
+        // on instance types yet.
+        let module_type_member = KnownClass::ModuleType.to_class(db).member(db, name);
+        if !module_type_member.is_unbound() {
+            return explicit_ty.replace_unbound_with(db, module_type_member);
+        }
+    }
+
+    explicit_ty
 }
 
 /// Infer the type of a binding.
@@ -284,6 +339,8 @@ pub enum Type<'db> {
     LiteralString,
     /// A bytes literal
     BytesLiteral(BytesLiteralType<'db>),
+    /// A slice literal, e.g. `1:5`, `10:0:-1` or `:`
+    SliceLiteral(SliceLiteralType<'db>),
     /// A heterogeneous tuple type, with elements of the given types in source order.
     // TODO: Support variable length homogeneous tuple type like `tuple[int, ...]`.
     Tuple(TupleType<'db>),
@@ -472,6 +529,16 @@ impl<'db> Type<'db> {
             {
                 true
             }
+            (Type::Tuple(self_tuple), Type::Tuple(target_tuple)) => {
+                let self_elements = self_tuple.elements(db);
+                let target_elements = target_tuple.elements(db);
+                self_elements.len() == target_elements.len()
+                    && self_elements.iter().zip(target_elements).all(
+                        |(self_element, target_element)| {
+                            self_element.is_subtype_of(db, *target_element)
+                        },
+                    )
+            }
             (Type::ClassLiteral(..), Type::Instance(class))
                 if class.is_known_class(db, KnownClass::Type) =>
             {
@@ -507,6 +574,16 @@ impl<'db> Type<'db> {
                 .elements(db)
                 .iter()
                 .any(|&elem_ty| ty.is_assignable_to(db, elem_ty)),
+            (Type::Tuple(self_tuple), Type::Tuple(target_tuple)) => {
+                let self_elements = self_tuple.elements(db);
+                let target_elements = target_tuple.elements(db);
+                self_elements.len() == target_elements.len()
+                    && self_elements.iter().zip(target_elements).all(
+                        |(self_element, target_element)| {
+                            self_element.is_assignable_to(db, *target_element)
+                        },
+                    )
+            }
             // TODO other types containing gradual forms (e.g. generics containing Any/Unknown)
             _ => self.is_subtype_of(db, target),
         }
@@ -558,6 +635,7 @@ impl<'db> Type<'db> {
                 | Type::IntLiteral(..)
                 | Type::StringLiteral(..)
                 | Type::BytesLiteral(..)
+                | Type::SliceLiteral(..)
                 | Type::FunctionLiteral(..)
                 | Type::ModuleLiteral(..)
                 | Type::ClassLiteral(..)),
@@ -566,6 +644,7 @@ impl<'db> Type<'db> {
                 | Type::IntLiteral(..)
                 | Type::StringLiteral(..)
                 | Type::BytesLiteral(..)
+                | Type::SliceLiteral(..)
                 | Type::FunctionLiteral(..)
                 | Type::ModuleLiteral(..)
                 | Type::ClassLiteral(..)),
@@ -615,6 +694,13 @@ impl<'db> Type<'db> {
                 Some(KnownClass::Bytes | KnownClass::Object)
             ),
             (Type::BytesLiteral(..), _) | (_, Type::BytesLiteral(..)) => true,
+
+            (Type::SliceLiteral(..), Type::Instance(class_type))
+            | (Type::Instance(class_type), Type::SliceLiteral(..)) => !matches!(
+                class_type.known(db),
+                Some(KnownClass::Slice | KnownClass::Object)
+            ),
+            (Type::SliceLiteral(..), _) | (_, Type::SliceLiteral(..)) => true,
 
             (
                 Type::FunctionLiteral(..) | Type::ModuleLiteral(..) | Type::ClassLiteral(..),
@@ -677,6 +763,7 @@ impl<'db> Type<'db> {
             | Type::IntLiteral(..)
             | Type::StringLiteral(..)
             | Type::BytesLiteral(..)
+            | Type::SliceLiteral(..)
             | Type::LiteralString => {
                 // Note: The literal types included in this pattern are not true singletons.
                 // There can be multiple Python objects (at different memory locations) that
@@ -721,7 +808,8 @@ impl<'db> Type<'db> {
             | Type::IntLiteral(..)
             | Type::BooleanLiteral(..)
             | Type::StringLiteral(..)
-            | Type::BytesLiteral(..) => true,
+            | Type::BytesLiteral(..)
+            | Type::SliceLiteral(..) => true,
 
             Type::Tuple(tuple) => tuple
                 .elements(db)
@@ -742,6 +830,7 @@ impl<'db> Type<'db> {
                     | KnownClass::Tuple
                     | KnownClass::Set
                     | KnownClass::Dict
+                    | KnownClass::Slice
                     | KnownClass::GenericAlias
                     | KnownClass::ModuleType
                     | KnownClass::FunctionType
@@ -792,7 +881,46 @@ impl<'db> Type<'db> {
                 // TODO: attribute lookup on function type
                 Type::Todo
             }
-            Type::ModuleLiteral(file) => global_symbol_ty(db, *file, name),
+            Type::ModuleLiteral(file) => {
+                // `__dict__` is a very special member that is never overridden by module globals;
+                // we should always look it up directly as an attribute on `types.ModuleType`,
+                // never in the global scope of the module.
+                if name == "__dict__" {
+                    return KnownClass::ModuleType
+                        .to_instance(db)
+                        .member(db, "__dict__");
+                }
+
+                let global_lookup = symbol_ty(db, global_scope(db, *file), name);
+
+                // If it's unbound, check if it's present as an instance on `types.ModuleType`
+                // or `builtins.object`.
+                //
+                // We do a more limited version of this in `global_symbol_ty`,
+                // but there are two crucial differences here:
+                // - If a member is looked up as an attribute, `__init__` is also available
+                //   on the module, but it isn't available as a global from inside the module
+                // - If a member is looked up as an attribute, members on `builtins.object`
+                //   are also available (because `types.ModuleType` inherits from `object`);
+                //   these attributes are also not available as globals from inside the module.
+                //
+                // The same way as in `global_symbol_ty`, however, we need to be careful to
+                // ignore `__getattr__`. Typeshed has a fake `__getattr__` on `types.ModuleType`
+                // to help out with dynamic imports; we shouldn't use it for `ModuleLiteral` types
+                // where we know exactly which module we're dealing with.
+                if name != "__getattr__" && global_lookup.may_be_unbound(db) {
+                    // TODO: this should use `.to_instance()`, but we don't understand instance attribute yet
+                    let module_type_instance_member =
+                        KnownClass::ModuleType.to_class(db).member(db, name);
+                    if module_type_instance_member.is_unbound() {
+                        global_lookup
+                    } else {
+                        global_lookup.replace_unbound_with(db, module_type_instance_member)
+                    }
+                } else {
+                    global_lookup
+                }
+            }
             Type::ClassLiteral(class) => class.class_member(db, name),
             Type::Instance(_) => {
                 // TODO MRO? get_own_instance_member, get_instance_member
@@ -821,6 +949,10 @@ impl<'db> Type<'db> {
             }
             Type::BytesLiteral(_) => {
                 // TODO defer to Type::Instance(<bytes from typeshed>).member
+                Type::Todo
+            }
+            Type::SliceLiteral(_) => {
+                // TODO defer to `builtins.slice` methods
                 Type::Todo
             }
             Type::Tuple(_) => {
@@ -877,6 +1009,7 @@ impl<'db> Type<'db> {
             Type::StringLiteral(str) => Truthiness::from(!str.value(db).is_empty()),
             Type::LiteralString => Truthiness::Ambiguous,
             Type::BytesLiteral(bytes) => Truthiness::from(!bytes.value(db).is_empty()),
+            Type::SliceLiteral(_) => Truthiness::AlwaysTrue,
             Type::Tuple(items) => Truthiness::from(!items.elements(db).is_empty()),
         }
     }
@@ -1039,6 +1172,7 @@ impl<'db> Type<'db> {
             | Type::ModuleLiteral(_)
             | Type::IntLiteral(_)
             | Type::StringLiteral(_)
+            | Type::SliceLiteral(_)
             | Type::Tuple(_)
             | Type::LiteralString
             | Type::None => Type::Unknown,
@@ -1056,6 +1190,7 @@ impl<'db> Type<'db> {
             Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
             Type::BooleanLiteral(_) => KnownClass::Bool.to_class(db),
             Type::BytesLiteral(_) => KnownClass::Bytes.to_class(db),
+            Type::SliceLiteral(_) => KnownClass::Slice.to_class(db),
             Type::IntLiteral(_) => KnownClass::Int.to_class(db),
             Type::FunctionLiteral(_) => KnownClass::FunctionType.to_class(db),
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class(db),
@@ -1139,6 +1274,7 @@ pub enum KnownClass {
     Tuple,
     Set,
     Dict,
+    Slice,
     // Types
     GenericAlias,
     ModuleType,
@@ -1162,6 +1298,7 @@ impl<'db> KnownClass {
             Self::Dict => "dict",
             Self::List => "list",
             Self::Type => "type",
+            Self::Slice => "slice",
             Self::GenericAlias => "GenericAlias",
             Self::ModuleType => "ModuleType",
             Self::FunctionType => "FunctionType",
@@ -1186,10 +1323,12 @@ impl<'db> KnownClass {
             | Self::List
             | Self::Tuple
             | Self::Set
-            | Self::Dict => builtins_symbol_ty(db, self.as_str()),
+            | Self::Dict
+            | Self::Slice => builtins_symbol_ty(db, self.as_str()),
             Self::GenericAlias | Self::ModuleType | Self::FunctionType => {
                 types_symbol_ty(db, self.as_str())
             }
+
             Self::NoneType => typeshed_symbol_ty(db, self.as_str()),
             Self::SpecialForm => typing_symbol_ty(db, self.as_str())
         }
@@ -1220,6 +1359,7 @@ impl<'db> KnownClass {
             "set" => Some(Self::Set),
             "dict" => Some(Self::Dict),
             "list" => Some(Self::List),
+            "slice" => Some(Self::Slice),
             "GenericAlias" => Some(Self::GenericAlias),
             "NoneType" => Some(Self::NoneType),
             "ModuleType" => Some(Self::ModuleType),
@@ -1245,7 +1385,8 @@ impl<'db> KnownClass {
             | Self::List
             | Self::Tuple
             | Self::Set
-            | Self::Dict => module.name() == "builtins",
+            | Self::Dict
+            | Self::Slice => module.name() == "builtins",
             Self::GenericAlias | Self::ModuleType | Self::FunctionType => module.name() == "types",
             Self::NoneType => matches!(module.name().as_str(), "_typeshed" | "types"),
             Self::SpecialForm => {
@@ -1859,6 +2000,13 @@ pub struct BytesLiteralType<'db> {
 }
 
 #[salsa::interned]
+pub struct SliceLiteralType<'db> {
+    start: Option<i32>,
+    stop: Option<i32>,
+    step: Option<i32>,
+}
+
+#[salsa::interned]
 pub struct TupleType<'db> {
     #[return_ref]
     elements: Box<[Type<'db>]>,
@@ -1876,15 +2024,13 @@ impl<'db> TupleType<'db> {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        builtins_symbol_ty, BytesLiteralType, IntersectionBuilder, StringLiteralType, Truthiness,
-        TupleType, Type, UnionType,
-    };
+    use super::*;
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
     use crate::ProgramSettings;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
+    use ruff_python_ast as ast;
     use test_case::test_case;
 
     #[cfg(target_pointer_width = "64")]
@@ -1922,6 +2068,7 @@ mod tests {
         Unknown,
         None,
         Any,
+        Todo,
         IntLiteral(i64),
         BooleanLiteral(bool),
         StringLiteral(&'static str),
@@ -1940,6 +2087,7 @@ mod tests {
                 Ty::Unknown => Type::Unknown,
                 Ty::None => Type::None,
                 Ty::Any => Type::Any,
+                Ty::Todo => Type::Todo,
                 Ty::IntLiteral(n) => Type::IntLiteral(n),
                 Ty::StringLiteral(s) => Type::StringLiteral(StringLiteralType::new(db, s)),
                 Ty::BooleanLiteral(b) => Type::BooleanLiteral(b),
@@ -1982,6 +2130,8 @@ mod tests {
     #[test_case(Ty::IntLiteral(1), Ty::Union(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")]))]
     #[test_case(Ty::IntLiteral(1), Ty::Union(vec![Ty::Unknown, Ty::BuiltinInstance("str")]))]
     #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]))]
+    #[test_case(Ty::Tuple(vec![Ty::Todo]), Ty::Tuple(vec![Ty::IntLiteral(2)]))]
+    #[test_case(Ty::Tuple(vec![Ty::IntLiteral(2)]), Ty::Tuple(vec![Ty::Todo]))]
     fn is_assignable_to(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_assignable_to(&db, to.into_type(&db)));
@@ -2016,6 +2166,11 @@ mod tests {
     #[test_case(Ty::Union(vec![Ty::BuiltinInstance("str"), Ty::BuiltinInstance("int")]), Ty::BuiltinInstance("object"))]
     #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2), Ty::IntLiteral(3)]))]
     #[test_case(Ty::BuiltinInstance("TypeError"), Ty::BuiltinInstance("Exception"))]
+    #[test_case(Ty::Tuple(vec![]), Ty::Tuple(vec![]))]
+    #[test_case(Ty::Tuple(vec![Ty::IntLiteral(42)]), Ty::Tuple(vec![Ty::BuiltinInstance("int")]))]
+    #[test_case(Ty::Tuple(vec![Ty::IntLiteral(42), Ty::StringLiteral("foo")]), Ty::Tuple(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")]))]
+    #[test_case(Ty::Tuple(vec![Ty::BuiltinInstance("int"), Ty::StringLiteral("foo")]), Ty::Tuple(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")]))]
+    #[test_case(Ty::Tuple(vec![Ty::IntLiteral(42), Ty::BuiltinInstance("str")]), Ty::Tuple(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")]))]
     fn is_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
@@ -2032,6 +2187,10 @@ mod tests {
     #[test_case(Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(2)]), Ty::Union(vec![Ty::IntLiteral(1), Ty::IntLiteral(3)]))]
     #[test_case(Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str"))]
     #[test_case(Ty::BuiltinInstance("int"), Ty::IntLiteral(1))]
+    #[test_case(Ty::Tuple(vec![]), Ty::Tuple(vec![Ty::IntLiteral(1)]))]
+    #[test_case(Ty::Tuple(vec![Ty::IntLiteral(42)]), Ty::Tuple(vec![Ty::BuiltinInstance("str")]))]
+    #[test_case(Ty::Tuple(vec![Ty::Todo]), Ty::Tuple(vec![Ty::IntLiteral(2)]))]
+    #[test_case(Ty::Tuple(vec![Ty::IntLiteral(2)]), Ty::Tuple(vec![Ty::Todo]))]
     fn is_not_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(!from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));
@@ -2257,5 +2416,17 @@ mod tests {
         let db = setup_db();
 
         assert_eq!(ty.into_type(&db).repr(&db), expected.into_type(&db));
+    }
+
+    #[test]
+    fn module_type_symbols_includes_declared_types_but_not_referenced_types() {
+        let db = setup_db();
+        let symbol_names = module_type_symbols(&db);
+
+        let dunder_name_symbol_name = ast::name::Name::new_static("__name__");
+        assert!(symbol_names.contains(&dunder_name_symbol_name));
+
+        let property_symbol_name = ast::name::Name::new_static("property");
+        assert!(!symbol_names.contains(&property_symbol_name));
     }
 }

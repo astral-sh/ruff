@@ -9,7 +9,7 @@ use ruff_index::IndexVec;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
-use ruff_python_ast::AnyParameterRef;
+use ruff_python_ast::{AnyParameterRef, BoolOp, Expr};
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
@@ -195,6 +195,10 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_symbol_table().mark_symbol_bound(id);
     }
 
+    fn mark_symbol_declared(&mut self, id: ScopedSymbolId) {
+        self.current_symbol_table().mark_symbol_declared(id);
+    }
+
     fn mark_symbol_used(&mut self, id: ScopedSymbolId) {
         self.current_symbol_table().mark_symbol_used(id);
     }
@@ -226,6 +230,9 @@ impl<'db> SemanticIndexBuilder<'db> {
         if category.is_binding() {
             self.mark_symbol_bound(symbol);
         }
+        if category.is_declaration() {
+            self.mark_symbol_declared(symbol);
+        }
 
         let use_def = self.current_use_def_map_mut();
         match category {
@@ -243,18 +250,25 @@ impl<'db> SemanticIndexBuilder<'db> {
         definition
     }
 
-    fn add_expression_constraint(&mut self, constraint_node: &ast::Expr) -> Constraint<'db> {
-        let expression = self.add_standalone_expression(constraint_node);
-        let constraint = Constraint {
-            node: ConstraintNode::Expression(expression),
-            is_positive: true,
-        };
-        self.current_use_def_map_mut().record_constraint(constraint);
-
+    fn record_expression_constraint(&mut self, constraint_node: &ast::Expr) -> Constraint<'db> {
+        let constraint = self.build_constraint(constraint_node);
+        self.record_constraint(constraint);
         constraint
     }
 
-    fn add_negated_constraint(&mut self, constraint: Constraint<'db>) {
+    fn record_constraint(&mut self, constraint: Constraint<'db>) {
+        self.current_use_def_map_mut().record_constraint(constraint);
+    }
+
+    fn build_constraint(&mut self, constraint_node: &Expr) -> Constraint<'db> {
+        let expression = self.add_standalone_expression(constraint_node);
+        Constraint {
+            node: ConstraintNode::Expression(expression),
+            is_positive: true,
+        }
+    }
+
+    fn record_negated_constraint(&mut self, constraint: Constraint<'db>) {
         self.current_use_def_map_mut()
             .record_constraint(Constraint {
                 node: constraint.node,
@@ -352,6 +366,7 @@ impl<'db> SemanticIndexBuilder<'db> {
                 // note that the "bound" on the typevar is a totally different thing than whether
                 // or not a name is "bound" by a typevar declaration; the latter is always true.
                 self.mark_symbol_bound(symbol);
+                self.mark_symbol_declared(symbol);
                 if let Some(bounds) = bound {
                     self.visit_expr(bounds);
                 }
@@ -653,7 +668,7 @@ where
             ast::Stmt::If(node) => {
                 self.visit_expr(&node.test);
                 let pre_if = self.flow_snapshot();
-                let constraint = self.add_expression_constraint(&node.test);
+                let constraint = self.record_expression_constraint(&node.test);
                 let mut constraints = vec![constraint];
                 self.visit_body(&node.body);
                 let mut post_clauses: Vec<FlowSnapshot> = vec![];
@@ -665,11 +680,11 @@ where
                     // taken, so the block entry state is always `pre_if`
                     self.flow_restore(pre_if.clone());
                     for constraint in &constraints {
-                        self.add_negated_constraint(*constraint);
+                        self.record_negated_constraint(*constraint);
                     }
                     if let Some(elif_test) = &clause.test {
                         self.visit_expr(elif_test);
-                        constraints.push(self.add_expression_constraint(elif_test));
+                        constraints.push(self.record_expression_constraint(elif_test));
                     }
                     self.visit_body(&clause.body);
                 }
@@ -1109,7 +1124,7 @@ where
             ast::Expr::BoolOp(ast::ExprBoolOp {
                 values,
                 range: _,
-                op: _,
+                op,
             }) => {
                 // TODO detect statically known truthy or falsy values (via type inference, not naive
                 // AST inspection, so we can't simplify here, need to record test expression for
@@ -1117,11 +1132,17 @@ where
                 let mut snapshots = vec![];
 
                 for (index, value) in values.iter().enumerate() {
-                    // The first item of BoolOp is always evaluated
-                    if index > 0 {
-                        snapshots.push(self.flow_snapshot());
-                    }
                     self.visit_expr(value);
+                    // In the last value we don't need to take a snapshot nor add a constraint
+                    if index < values.len() - 1 {
+                        // Snapshot is taken after visiting the expression but before adding the constraint.
+                        snapshots.push(self.flow_snapshot());
+                        let constraint = self.build_constraint(value);
+                        match op {
+                            BoolOp::And => self.record_constraint(constraint),
+                            BoolOp::Or => self.record_negated_constraint(constraint),
+                        }
+                    }
                 }
                 for snapshot in snapshots {
                     self.flow_merge(snapshot);

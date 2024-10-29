@@ -35,22 +35,40 @@ def find_ruff_bin() -> str:
 
     # Search for pip-specific build environments.
     #
+    # Expect to find ruff in <prefix>/pip-build-env-<rand>/overlay/bin/ruff
+    # Expect to find a "normal" folder at <prefix>/pip-build-env-<rand>/normal
+    #
     # See: https://github.com/pypa/pip/blob/102d8187a1f5a4cd5de7a549fd8a9af34e89a54f/src/pip/_internal/build_env.py#L87
     paths = os.environ.get("PATH", "").split(os.pathsep)
     if len(paths) >= 2:
-        first, second = os.path.split(paths[0]), os.path.split(paths[1])
-        # Search for both an `overlay` and `normal` folder within a `pip-build-env-{random}` folder. (The final segment
-        # of the path is the `bin` directory.)
+
+        def get_last_three_path_parts(path: str) -> list[str]:
+            """Return a list of up to the last three parts of a path."""
+            parts = []
+
+            while len(parts) < 3:
+                head, tail = os.path.split(path)
+                if tail or head != path:
+                    parts.append(tail)
+                    path = head
+                else:
+                    parts.append(path)
+                    break
+
+            return parts
+
+        maybe_overlay = get_last_three_path_parts(paths[0])
+        maybe_normal = get_last_three_path_parts(paths[1])
         if (
-            len(first) >= 3
-            and len(second) >= 3
-            and first[-3].startswith("pip-build-env-")
-            and first[-2] == "overlay"
-            and second[-3].startswith("pip-build-env-")
-            and second[-2] == "normal"
+            len(maybe_normal) >= 3
+            and maybe_normal[-1].startswith("pip-build-env-")
+            and maybe_normal[-2] == "normal"
+            and len(maybe_overlay) >= 3
+            and maybe_overlay[-1].startswith("pip-build-env-")
+            and maybe_overlay[-2] == "overlay"
         ):
             # The overlay must contain the ruff binary.
-            candidate = os.path.join(first, ruff_exe)
+            candidate = os.path.join(paths[0], ruff_exe)
             if os.path.isfile(candidate):
                 return candidate
 
