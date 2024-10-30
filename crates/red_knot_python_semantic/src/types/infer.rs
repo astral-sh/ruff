@@ -3666,7 +3666,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             ast::Expr::BinOp(binary) => {
-                #[allow(clippy::single_match_else)]
                 match binary.op {
                     // PEP-604 unions are okay, e.g., `int | str`
                     ast::Operator::BitOr => {
