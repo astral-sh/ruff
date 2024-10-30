@@ -31,8 +31,8 @@ mod narrow;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Boundedness {
-    DefinitelyBound,
-    MaybeUnbound,
+    Bound,
+    MayBeUnbound,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -52,22 +52,23 @@ impl<'db> SymbolLookupResult<'db> {
         db: &'db dyn Db,
         replacement: Type<'db>,
     ) -> SymbolLookupResult<'db> {
-        match self {
-            r @ SymbolLookupResult::Type(_, Boundedness::DefinitelyBound) => r,
-            SymbolLookupResult::Type(ty, Boundedness::MaybeUnbound) => {
-                let union = UnionType::from_elements(db, [replacement, ty]);
-                SymbolLookupResult::Type(union, Boundedness::DefinitelyBound)
-            }
-            SymbolLookupResult::Unbound => {
-                SymbolLookupResult::Type(replacement, Boundedness::DefinitelyBound)
-            }
-        }
+        SymbolLookupResult::Type(
+            match self {
+                SymbolLookupResult::Type(ty, Boundedness::Bound) => ty,
+                SymbolLookupResult::Type(ty, Boundedness::MayBeUnbound) => {
+                    UnionType::from_elements(db, [replacement, ty])
+                }
+                SymbolLookupResult::Unbound => replacement,
+            },
+            Boundedness::Bound,
+        )
     }
 
+    #[cfg(test)]
     #[track_caller]
     fn expect_bound(self) -> Type<'db> {
         match self {
-            SymbolLookupResult::Type(ty, Boundedness::DefinitelyBound) => ty,
+            SymbolLookupResult::Type(ty, Boundedness::Bound) => ty,
             _ => {
                 panic!("Expected a bound type")
             }
@@ -87,9 +88,9 @@ impl<'db> SymbolLookupResult<'db> {
 
     fn may_be_unbound(&self) -> bool {
         match self {
-            SymbolLookupResult::Type(_, Boundedness::MaybeUnbound)
+            SymbolLookupResult::Type(_, Boundedness::MayBeUnbound)
             | SymbolLookupResult::Unbound => true,
-            SymbolLookupResult::Type(_, Boundedness::DefinitelyBound) => false,
+            SymbolLookupResult::Type(_, Boundedness::Bound) => false,
         }
     }
 
@@ -98,7 +99,7 @@ impl<'db> SymbolLookupResult<'db> {
             SymbolLookupResult::Type(ty, boundedness) => SymbolLookupResult::Type(
                 *ty,
                 if yes {
-                    Boundedness::MaybeUnbound
+                    Boundedness::MayBeUnbound
                 } else {
                     *boundedness
                 },
@@ -154,7 +155,7 @@ fn symbol_ty_by_id<'db>(
             ),
             None => SymbolLookupResult::Type(
                 declarations_ty(db, declarations, None).unwrap_or_else(|(ty, _)| ty),
-                Boundedness::DefinitelyBound,
+                Boundedness::Bound,
             ),
             Some(SymbolLookupResult::Unbound) => SymbolLookupResult::Unbound,
         }
@@ -318,10 +319,10 @@ where
         if let Some(second) = def_types.next() {
             SymbolLookupResult::Type(
                 UnionType::from_elements(db, [first, second].into_iter().chain(def_types)),
-                Boundedness::DefinitelyBound,
+                Boundedness::Bound,
             )
         } else {
-            SymbolLookupResult::Type(first, Boundedness::DefinitelyBound)
+            SymbolLookupResult::Type(first, Boundedness::Bound)
         }
     } else {
         SymbolLookupResult::Unbound
@@ -914,14 +915,6 @@ impl<'db> Type<'db> {
     /// For example, if `foo` is `Type::Instance(<Bar>)`,
     /// `foo.member(&db, "baz")` returns the type of `baz` attributes
     /// as accessed from instances of the `Bar` class.
-    ///
-    /// TODO: use of this method currently requires manually checking
-    /// whether the returned type is `Unknown`/`Unbound`
-    /// (or a union with `Unknown`/`Unbound`) in many places.
-    /// Ideally we'd use a more type-safe pattern, such as returning
-    /// an `Option` or a `Result` from this method, which would force
-    /// us to explicitly consider whether to handle an error or propagate
-    /// it up the call stack.
     #[must_use]
     pub fn member(&self, db: &'db dyn Db, name: &str) -> SymbolLookupResult<'db> {
         match self {
@@ -985,16 +978,38 @@ impl<'db> Type<'db> {
                 Type::Todo.into()
             }
             Type::Union(union) => {
-                let any_unbound = union
-                    .elements(db)
-                    .iter()
-                    .any(|ty| ty.member(db, name).is_unbound());
-                if any_unbound {
-                    SymbolLookupResult::Unbound // TODO
+                let mut builder = UnionBuilder::new(db);
+
+                let mut all_unbound = true;
+                let mut may_be_unbound = false;
+                for ty in union.elements(db) {
+                    let ty_member = ty.member(db, name);
+                    match ty_member {
+                        SymbolLookupResult::Unbound => {
+                            may_be_unbound = true;
+                        }
+                        SymbolLookupResult::Type(ty_member, member_boundness) => {
+                            // TODO: raise a diagnostic if member_boundness indicates potential unboundness
+                            if member_boundness == Boundedness::MayBeUnbound {
+                                may_be_unbound = true;
+                            }
+
+                            all_unbound = false;
+                            builder = builder.add(ty_member);
+                        }
+                    }
+                }
+
+                if all_unbound {
+                    SymbolLookupResult::Unbound
                 } else {
                     SymbolLookupResult::Type(
-                        union.map(db, |ty| ty.member(db, name).expect_bound()),
-                        Boundedness::DefinitelyBound,
+                        builder.build(),
+                        if may_be_unbound {
+                            Boundedness::MayBeUnbound
+                        } else {
+                            Boundedness::Bound
+                        },
                     )
                 }
             }
@@ -1314,7 +1329,7 @@ impl<'db> From<&Type<'db>> for Type<'db> {
 
 impl<'db> From<Type<'db>> for SymbolLookupResult<'db> {
     fn from(value: Type<'db>) -> Self {
-        SymbolLookupResult::Type(value, Boundedness::DefinitelyBound)
+        SymbolLookupResult::Type(value, Boundedness::Bound)
     }
 }
 

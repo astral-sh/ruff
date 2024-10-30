@@ -3521,6 +3521,17 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if value_ty.is_subtype_of(self.db, KnownClass::Type.to_instance(self.db)) {
                     let dunder_class_getitem_method = value_ty.member(self.db, "__class_getitem__");
                     if !dunder_class_getitem_method.is_unbound() {
+                        if dunder_class_getitem_method.may_be_unbound() {
+                            self.add_diagnostic(
+                                value_node.into(),
+                                "call-potentially-unbound-method",
+                                format_args!(
+                                    "Method `__class_getitem__` of type `{}` is potentially unbound",
+                                    value_ty.display(self.db),
+                                ),
+                            );
+                        }
+
                         return dunder_class_getitem_method
                             .unwrap_or(Type::Never)
                             .call(self.db, &[slice_ty])
