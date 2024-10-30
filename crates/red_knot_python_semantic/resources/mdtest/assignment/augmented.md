@@ -86,7 +86,7 @@ f += "Hello, world!"
 reveal_type(f)  # revealed: int
 ```
 
-## Partially-bound with `__add__`
+## Partially bound with `__add__`
 
 ```py
 def bool_instance() -> bool:
