@@ -42,7 +42,7 @@ use crate::checkers::ast::Checker;
 /// the same key. However, `min(data, key=itemgetter(0))` will return the _first_
 /// "minimum" element in the list in the same scenario.
 ///
-/// AS such, this rule's fix is marked as unsafe when the `reverse` keyword is used.
+/// As such, this rule's fix is marked as unsafe when the `reverse` keyword is used.
 ///
 /// ## References
 /// - [Python documentation: `min`](https://docs.python.org/3/library/functions.html#min)
