@@ -40,6 +40,7 @@ impl<'db> SymbolLookupResult<'db> {
         matches!(self, SymbolLookupResult::Unbound)
     }
 
+    #[must_use]
     pub fn replace_unbound_with(self, replacement: Type<'db>) -> SymbolLookupResult<'db> {
         match self {
             r @ SymbolLookupResult::Bound(_) => r,
@@ -55,6 +56,7 @@ impl<'db> SymbolLookupResult<'db> {
         }
     }
 
+    #[cfg(test)]
     #[track_caller]
     fn expect_bound(self) -> Type<'db> {
         match self {
@@ -943,7 +945,7 @@ impl<'db> Type<'db> {
                     global_lookup
                 }
             }
-            Type::ClassLiteral(class) => class.class_member(db, name).into(),
+            Type::ClassLiteral(class) => class.class_member(db, name),
             Type::Instance(_) => {
                 // TODO MRO? get_own_instance_member, get_instance_member
                 Type::Todo.into()

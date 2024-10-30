@@ -2463,7 +2463,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     builtin_ty = typing_extensions_symbol_ty(self.db, name);
                 }
 
-                builtin_ty.into()
+                builtin_ty
             } else {
                 ty
             }
