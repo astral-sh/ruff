@@ -41,7 +41,12 @@ except EXCEPTIONS as f:
 ## Dynamic exception types
 
 ```py
-def foo(x: type[AttributeError], y: tuple[type[OSError], type[RuntimeError]], z: tuple[type[BaseException], ...]):
+# TODO: we should not emit those errors `call-potentially-unbound-method` errors
+def foo(
+    x: type[AttributeError],
+    y: tuple[type[OSError], type[RuntimeError]],  # error: [call-potentially-unbound-method]
+    z: tuple[type[BaseException], ...],  # error: [call-potentially-unbound-method]
+):
     try:
         help()
     except x as e:

@@ -1944,7 +1944,7 @@ impl<'db> ClassType<'db> {
         let member = self.own_class_member(db, name);
         if !member.is_unbound() {
             // TODO diagnostic if maybe unbound?
-            return member.replace_unbound_with(db, Type::Never);
+            return member;
         }
 
         self.inherited_class_member(db, name)

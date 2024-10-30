@@ -80,9 +80,9 @@ class Foo:
             return 42
 
 f = Foo()
+# error: [call-potentially-unbound-method] "Call to potentially unbound method `__iadd__` on object of type `Foo`"
 f += "Hello, world!"
 
-# TODO should emit a diagnostic warning that `Foo` might not have an `__iadd__` method
 reveal_type(f)  # revealed: int
 ```
 
@@ -100,6 +100,7 @@ class Foo:
             return 42
 
 f = Foo()
+# error: [call-potentially-unbound-method] "Call to potentially unbound method `__iadd__` on object of type `Foo`"
 f += "Hello, world!"
 
 # TODO(charlie): This should be `int | str`, since `__iadd__` may be unbound.

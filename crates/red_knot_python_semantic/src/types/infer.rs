@@ -1521,7 +1521,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                 SymbolLookupResult::Unbound => {}
                 SymbolLookupResult::Type(class_member, boundedness) => {
                     if boundedness == Boundedness::MayBeUnbound {
-                        // TODO
+                        self.diagnostics.add(
+                            assignment.into(),
+                            "call-potentially-unbound-method",
+                            format_args!(
+                                "Call to potentially unbound method `{}` on object of type `{}`",
+                                op.in_place_dunder(),
+                                target_type.display(self.db)
+                            ),
+                        );
                     }
 
                     let call = class_member.call(self.db, &[target_type, value_type]);
