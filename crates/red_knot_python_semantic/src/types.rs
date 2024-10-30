@@ -1131,14 +1131,14 @@ impl<'db> Type<'db> {
             Type::Instance(class) => {
                 // Since `__call__` is a dunder, we need to access it as an attribute on the class
                 // rather than the instance (matching runtime semantics).
-                let dunder_call_method = class.class_member(db, "__call__");
-                if dunder_call_method.is_unbound() {
-                    CallOutcome::not_callable(self)
-                } else {
-                    let args = std::iter::once(self)
-                        .chain(arg_types.iter().copied())
-                        .collect::<Vec<_>>();
-                    dunder_call_method.unwrap_or(Type::Never).call(db, &args)
+                match class.class_member(db, "__call__") {
+                    SymbolLookupResult::Type(dunder_call_method, Boundedness::Bound) => {
+                        let args = std::iter::once(self)
+                            .chain(arg_types.iter().copied())
+                            .collect::<Vec<_>>();
+                        dunder_call_method.call(db, &args)
+                    }
+                    _ => CallOutcome::not_callable(self),
                 }
             }
 
@@ -1197,17 +1197,22 @@ impl<'db> Type<'db> {
                 };
             };
 
-            let dunder_next_method = iterator_ty
-                .to_meta_type(db)
-                .member(db, "__next__")
-                .unwrap_or(Type::Never);
-            return dunder_next_method
-                .call(db, &[iterator_ty])
-                .return_ty(db)
-                .map(|element_ty| IterationOutcome::Iterable { element_ty })
-                .unwrap_or(IterationOutcome::NotIterable {
-                    not_iterable_ty: self,
-                });
+            match iterator_ty.to_meta_type(db).member(db, "__next__") {
+                SymbolLookupResult::Type(dunder_next_method, Boundedness::Bound) => {
+                    return dunder_next_method
+                        .call(db, &[iterator_ty])
+                        .return_ty(db)
+                        .map(|element_ty| IterationOutcome::Iterable { element_ty })
+                        .unwrap_or(IterationOutcome::NotIterable {
+                            not_iterable_ty: self,
+                        });
+                }
+                _ => {
+                    return IterationOutcome::NotIterable {
+                        not_iterable_ty: self,
+                    };
+                }
+            }
         }
 
         // Although it's not considered great practice,
@@ -1216,17 +1221,20 @@ impl<'db> Type<'db> {
         //
         // TODO(Alex) this is only valid if the `__getitem__` method is annotated as
         // accepting `int` or `SupportsIndex`
-        let dunder_get_item_method = iterable_meta_type
-            .member(db, "__getitem__")
-            .unwrap_or(Type::Never);
-
-        dunder_get_item_method
-            .call(db, &[self, KnownClass::Int.to_instance(db)])
-            .return_ty(db)
-            .map(|element_ty| IterationOutcome::Iterable { element_ty })
-            .unwrap_or(IterationOutcome::NotIterable {
+        match iterable_meta_type.member(db, "__getitem__") {
+            SymbolLookupResult::Type(dunder_get_item_method, Boundedness::Bound) => {
+                dunder_get_item_method
+                    .call(db, &[self, KnownClass::Int.to_instance(db)])
+                    .return_ty(db)
+                    .map(|element_ty| IterationOutcome::Iterable { element_ty })
+                    .unwrap_or(IterationOutcome::NotIterable {
+                        not_iterable_ty: self,
+                    })
+            }
+            _ => IterationOutcome::NotIterable {
                 not_iterable_ty: self,
-            })
+            },
+        }
     }
 
     #[must_use]

@@ -61,6 +61,8 @@ use crate::types::{
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
 
+use super::Boundedness;
+
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
 /// scope.
@@ -1515,30 +1517,35 @@ impl<'db> TypeInferenceBuilder<'db> {
         // If the target defines, e.g., `__iadd__`, infer the augmented assignment as a call to that
         // dunder.
         if let Type::Instance(class) = target_type {
-            let class_member = class.class_member(self.db, op.in_place_dunder());
-            if !class_member.is_unbound() {
-                let call = class_member
-                    .unwrap_or(Type::Never)
-                    .call(self.db, &[target_type, value_type]);
-                return match call.return_ty_result(
-                    self.db,
-                    AnyNodeRef::StmtAugAssign(assignment),
-                    &mut self.diagnostics,
-                ) {
-                    Ok(t) => t,
-                    Err(e) => {
-                        self.diagnostics.add(
-                            assignment.into(),
-                            "unsupported-operator",
-                            format_args!(
-                                "Operator `{op}=` is unsupported between objects of type `{}` and `{}`",
-                                target_type.display(self.db),
-                                value_type.display(self.db)
-                            ),
-                        );
-                        e.return_ty()
+            match class.class_member(self.db, op.in_place_dunder()) {
+                SymbolLookupResult::Unbound => {}
+                SymbolLookupResult::Type(class_member, boundedness) => {
+                    if boundedness == Boundedness::MayBeUnbound {
+                        // TODO
                     }
-                };
+
+                    let call = class_member.call(self.db, &[target_type, value_type]);
+
+                    return match call.return_ty_result(
+                        self.db,
+                        AnyNodeRef::StmtAugAssign(assignment),
+                        &mut self.diagnostics,
+                    ) {
+                        Ok(t) => t,
+                        Err(e) => {
+                            self.diagnostics.add(
+                                assignment.into(),
+                                "unsupported-operator",
+                                format_args!(
+                                    "Operator `{op}=` is unsupported between objects of type `{}` and `{}`",
+                                    target_type.display(self.db),
+                                    value_type.display(self.db)
+                                ),
+                            );
+                            e.return_ty()
+                        }
+                    };
+                }
             }
         }
 
@@ -3489,10 +3496,21 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // If the class defines `__getitem__`, return its return type.
                 //
                 // See: https://docs.python.org/3/reference/datamodel.html#class-getitem-versus-getitem
-                let dunder_getitem_method = value_meta_ty.member(self.db, "__getitem__");
-                if !dunder_getitem_method.is_unbound() {
-                    return dunder_getitem_method
-                        .unwrap_or(Type::Never)
+                match value_meta_ty.member(self.db, "__getitem__") {
+                    SymbolLookupResult::Unbound => {}
+                    SymbolLookupResult::Type(dunder_getitem_method, boundedness) => {
+                        if boundedness == Boundedness::MayBeUnbound {
+                            self.diagnostics.add(
+                                value_node.into(),
+                                "call-potentially-unbound-method",
+                                format_args!(
+                                    "Method `__getitem__` of type `{}` is potentially unbound",
+                                    value_ty.display(self.db),
+                                ),
+                            );
+                        }
+
+                        return dunder_getitem_method
                         .call(self.db, &[slice_ty])
                         .return_ty_result(self.db, value_node.into(), &mut self.diagnostics)
                         .unwrap_or_else(|err| {
@@ -3507,6 +3525,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             );
                             err.return_ty()
                         });
+                    }
                 }
 
                 // Otherwise, if the value is itself a class and defines `__class_getitem__`,
@@ -3520,34 +3539,37 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // method in these `sys.version_info` branches.
                 if value_ty.is_subtype_of(self.db, KnownClass::Type.to_instance(self.db)) {
                     let dunder_class_getitem_method = value_ty.member(self.db, "__class_getitem__");
-                    if !dunder_class_getitem_method.is_unbound() {
-                        if dunder_class_getitem_method.may_be_unbound() {
-                            self.add_diagnostic(
-                                value_node.into(),
-                                "call-potentially-unbound-method",
-                                format_args!(
-                                    "Method `__class_getitem__` of type `{}` is potentially unbound",
-                                    value_ty.display(self.db),
-                                ),
-                            );
-                        }
 
-                        return dunder_class_getitem_method
-                            .unwrap_or(Type::Never)
-                            .call(self.db, &[slice_ty])
-                            .return_ty_result(self.db, value_node.into(), &mut self.diagnostics)
-                            .unwrap_or_else(|err| {
+                    match dunder_class_getitem_method {
+                        SymbolLookupResult::Unbound => {}
+                        SymbolLookupResult::Type(ty, boundedness) => {
+                            if boundedness == Boundedness::MayBeUnbound {
                                 self.diagnostics.add(
                                     value_node.into(),
-                                    "call-non-callable",
+                                    "call-potentially-unbound-method",
                                     format_args!(
-                                        "Method `__class_getitem__` of type `{}` is not callable on object of type `{}`",
-                                        err.called_ty().display(self.db),
+                                        "Method `__class_getitem__` of type `{}` is potentially unbound",
                                         value_ty.display(self.db),
                                     ),
                                 );
-                                err.return_ty()
-                            });
+                            }
+
+                            return ty
+                                .call(self.db, &[slice_ty])
+                                .return_ty_result(self.db, value_node.into(), &mut self.diagnostics)
+                                .unwrap_or_else(|err| {
+                                    self.diagnostics.add(
+                                        value_node.into(),
+                                        "call-non-callable",
+                                        format_args!(
+                                            "Method `__class_getitem__` of type `{}` is not callable on object of type `{}`",
+                                            err.called_ty().display(self.db),
+                                            value_ty.display(self.db),
+                                        ),
+                                    );
+                                    err.return_ty()
+                                });
+                        }
                     }
 
                     if matches!(value_ty, Type::ClassLiteral(class) if class.is_known(self.db, KnownClass::Type))
@@ -4070,14 +4092,17 @@ fn perform_rich_comparison<'db>(
 
     let call_dunder =
         |op: RichCompareOperator, left_class: ClassType<'db>, right_class: ClassType<'db>| {
-            left_class
-                .class_member(db, op.dunder())
-                .unwrap_or(Type::Never)
-                .call(
-                    db,
-                    &[Type::Instance(left_class), Type::Instance(right_class)],
-                )
-                .return_ty(db)
+            match left_class.class_member(db, op.dunder()) {
+                SymbolLookupResult::Type(class_member_dunder, Boundedness::Bound) => {
+                    class_member_dunder
+                        .call(
+                            db,
+                            &[Type::Instance(left_class), Type::Instance(right_class)],
+                        )
+                        .return_ty(db)
+                }
+                _ => None,
+            }
         };
 
     // The reflected dunder has priority if the right-hand side is a strict subclass of the left-hand side.
@@ -4118,19 +4143,20 @@ fn perform_membership_test_comparison<'db>(
     let (left_instance, right_instance) = (Type::Instance(left_class), Type::Instance(right_class));
 
     let contains_dunder = right_class.class_member(db, "__contains__");
-
-    let compare_result_opt = if contains_dunder.is_unbound() {
-        // iteration-based membership test
-        match right_instance.iterate(db) {
-            IterationOutcome::Iterable { .. } => Some(KnownClass::Bool.to_instance(db)),
-            IterationOutcome::NotIterable { .. } => None,
+    let compare_result_opt = match contains_dunder {
+        SymbolLookupResult::Type(contains_dunder, Boundedness::Bound) => {
+            // If `__contains__` is available, it is used directly for the membership test.
+            contains_dunder
+                .call(db, &[right_instance, left_instance])
+                .return_ty(db)
         }
-    } else {
-        // If `__contains__` is available, it is used directly for the membership test.
-        contains_dunder
-            .unwrap_or(Type::Never)
-            .call(db, &[right_instance, left_instance])
-            .return_ty(db)
+        _ => {
+            // iteration-based membership test
+            match right_instance.iterate(db) {
+                IterationOutcome::Iterable { .. } => Some(KnownClass::Bool.to_instance(db)),
+                IterationOutcome::NotIterable { .. } => None,
+            }
+        }
     };
 
     compare_result_opt
