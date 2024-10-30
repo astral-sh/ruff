@@ -14,16 +14,20 @@ use crate::{checkers::ast::Checker, settings::types::PythonVersion};
 /// `typing.Unpack` syntax.
 ///
 /// ## Example
+///
 /// ```python
 /// from typing import Unpack
 ///
 ///
-/// def foo(*args: Unpack[tuple[int, ...]]) -> None: pass
+/// def foo(*args: Unpack[tuple[int, ...]]) -> None:
+///     pass
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
-/// def foo(*args: *tuple[int, ...]) -> None: pass
+/// def foo(*args: *tuple[int, ...]) -> None:
+///     pass
 /// ```
 ///
 /// ## References
