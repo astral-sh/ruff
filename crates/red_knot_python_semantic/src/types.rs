@@ -29,9 +29,15 @@ mod display;
 mod infer;
 mod narrow;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Boundedness {
+    DefinitelyBound,
+    MaybeUnbound,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SymbolLookupResult<'db> {
-    Bound(Type<'db>),
+    Bound(Type<'db>, Boundedness),
     Unbound,
 }
 
@@ -41,17 +47,27 @@ impl<'db> SymbolLookupResult<'db> {
     }
 
     #[must_use]
-    pub fn replace_unbound_with(self, replacement: Type<'db>) -> SymbolLookupResult<'db> {
+    pub fn replace_unbound_with(
+        self,
+        db: &'db dyn Db,
+        replacement: Type<'db>,
+    ) -> SymbolLookupResult<'db> {
         match self {
-            r @ SymbolLookupResult::Bound(_) => r,
-            SymbolLookupResult::Unbound => SymbolLookupResult::Bound(replacement),
+            r @ SymbolLookupResult::Bound(_, Boundedness::DefinitelyBound) => r,
+            SymbolLookupResult::Bound(ty, Boundedness::MaybeUnbound) => {
+                let union = UnionType::from_elements(db, [ty, replacement]);
+                SymbolLookupResult::Bound(union, Boundedness::DefinitelyBound)
+            }
+            SymbolLookupResult::Unbound => {
+                SymbolLookupResult::Bound(replacement, Boundedness::DefinitelyBound)
+            }
         }
     }
 
     #[track_caller]
     fn todo_unwrap_type(&self) -> Type<'db> {
         match self {
-            SymbolLookupResult::Bound(ty) => *ty,
+            SymbolLookupResult::Bound(ty, _) => *ty,
             SymbolLookupResult::Unbound => todo!(),
         }
     }
@@ -59,20 +75,44 @@ impl<'db> SymbolLookupResult<'db> {
     #[track_caller]
     fn expect_bound(self) -> Type<'db> {
         match self {
-            SymbolLookupResult::Bound(ty) => ty,
-            SymbolLookupResult::Unbound => panic!("Expected a bound type"),
+            SymbolLookupResult::Bound(ty, Boundedness::DefinitelyBound) => ty,
+            _ => {
+                panic!("Expected a bound type")
+            }
         }
     }
 
     fn unwrap_or(&self, other: Type<'db>) -> Type<'db> {
         match self {
-            SymbolLookupResult::Bound(ty) => *ty,
+            SymbolLookupResult::Bound(ty, _) => *ty,
             SymbolLookupResult::Unbound => other,
         }
     }
 
     fn unwrap_or_unknown(&self) -> Type<'db> {
         self.unwrap_or(Type::Unknown)
+    }
+
+    fn may_be_unbound(&self) -> bool {
+        match self {
+            SymbolLookupResult::Bound(_, Boundedness::MaybeUnbound)
+            | SymbolLookupResult::Unbound => true,
+            SymbolLookupResult::Bound(_, Boundedness::DefinitelyBound) => false,
+        }
+    }
+
+    fn and_may_be_unbound(&self, yes: bool) -> SymbolLookupResult<'db> {
+        match self {
+            SymbolLookupResult::Bound(ty, boundedness) => SymbolLookupResult::Bound(
+                *ty,
+                if yes {
+                    Boundedness::MaybeUnbound
+                } else {
+                    *boundedness
+                },
+            ),
+            SymbolLookupResult::Unbound => SymbolLookupResult::Unbound,
+        }
     }
 }
 
@@ -106,23 +146,50 @@ fn symbol_ty_by_id<'db>(
         let declarations = use_def.public_declarations(symbol);
         // If the symbol is undeclared in some paths, include the inferred type in the public type.
         let undeclared_ty = if declarations.may_be_undeclared() {
-            Some(bindings_ty(db, use_def.public_bindings(symbol)).unwrap_or_unknown())
+            // Some(bindings_ty(
+            //     db,
+            //     use_def.public_bindings(symbol),
+            //     use_def
+            //         .public_may_be_unbound(symbol)
+            //         .then_some(Type::Unbound),
+            // ))
+
+            match bindings_ty(db, use_def.public_bindings(symbol)) {
+                SymbolLookupResult::Bound(ty, boundedness) => {
+                    // TODO: do something with boundedness
+                    if use_def.public_may_be_unbound(symbol) {
+                        Some(SymbolLookupResult::Bound(ty, Boundedness::MaybeUnbound))
+                    } else {
+                        Some(SymbolLookupResult::Bound(ty, boundedness))
+                    }
+                }
+                SymbolLookupResult::Unbound => Some(SymbolLookupResult::Unbound),
+            }
         } else {
             None
         };
         // Intentionally ignore conflicting declared types; that's not our problem, it's the
         // problem of the module we are importing from.
         SymbolLookupResult::Bound(
-            declarations_ty(db, declarations, undeclared_ty).unwrap_or_else(|(ty, _)| ty),
+            declarations_ty(
+                db,
+                declarations,
+                undeclared_ty.map(|ty| ty.todo_unwrap_type()),
+            )
+            .unwrap_or_else(|(ty, _)| ty),
+            Boundedness::DefinitelyBound,
         )
     } else {
-        bindings_ty(
-            db,
-            use_def.public_bindings(symbol),
-            // use_def
-            //     .public_may_be_unbound(symbol)
-            //     .then_some(Type::Unbound),
-        )
+        // bindings_ty(
+        //     db,
+        //     use_def.public_bindings(symbol),
+        //     use_def
+        //         .public_may_be_unbound(symbol)
+        //         .then_some(Type::Unbound),
+        // )
+
+        bindings_ty(db, use_def.public_bindings(symbol))
+            .and_may_be_unbound(use_def.public_may_be_unbound(symbol))
     }
 }
 
@@ -270,12 +337,12 @@ fn bindings_ty<'db>(
 
     if let Some(first) = def_types.next() {
         if let Some(second) = def_types.next() {
-            SymbolLookupResult::Bound(UnionType::from_elements(
-                db,
-                [first, second].into_iter().chain(def_types),
-            ))
+            SymbolLookupResult::Bound(
+                UnionType::from_elements(db, [first, second].into_iter().chain(def_types)),
+                Boundedness::DefinitelyBound,
+            )
         } else {
-            SymbolLookupResult::Bound(first)
+            SymbolLookupResult::Bound(first, Boundedness::DefinitelyBound)
         }
     } else {
         SymbolLookupResult::Unbound
@@ -924,10 +991,10 @@ impl<'db> Type<'db> {
                     // TODO: this should use `.to_instance()`, but we don't understand instance attribute yet
                     let module_type_instance_member =
                         KnownClass::ModuleType.to_class(db).member(db, name);
-                    if let SymbolLookupResult::Bound(module_type_instance_member) =
+                    if let SymbolLookupResult::Bound(module_type_instance_member, _) =
                         module_type_instance_member
                     {
-                        global_lookup.replace_unbound_with(module_type_instance_member)
+                        global_lookup.replace_unbound_with(db, module_type_instance_member)
                     } else {
                         global_lookup
                     }
@@ -950,6 +1017,7 @@ impl<'db> Type<'db> {
                 } else {
                     SymbolLookupResult::Bound(
                         union.map(db, |ty| ty.member(db, name).expect_bound()),
+                        Boundedness::DefinitelyBound,
                     )
                 }
             }
@@ -1130,12 +1198,8 @@ impl<'db> Type<'db> {
         let iterable_meta_type = self.to_meta_type(db);
 
         let dunder_iter_method = iterable_meta_type.member(db, "__iter__");
-        if !dunder_iter_method.is_unbound() {
-            let Some(iterator_ty) = dunder_iter_method
-                .todo_unwrap_type()
-                .call(db, &[self])
-                .return_ty(db)
-            else {
+        if let SymbolLookupResult::Bound(dunder_iter_method, _) = dunder_iter_method {
+            let Some(iterator_ty) = dunder_iter_method.call(db, &[self]).return_ty(db) else {
                 return IterationOutcome::NotIterable {
                     not_iterable_ty: self,
                 };
@@ -1273,7 +1337,7 @@ impl<'db> From<&Type<'db>> for Type<'db> {
 
 impl<'db> From<Type<'db>> for SymbolLookupResult<'db> {
     fn from(value: Type<'db>) -> Self {
-        SymbolLookupResult::Bound(value)
+        SymbolLookupResult::Bound(value, Boundedness::DefinitelyBound)
     }
 }
 
@@ -1880,7 +1944,7 @@ impl<'db> ClassType<'db> {
         let member = self.own_class_member(db, name);
         if !member.is_unbound() {
             // TODO diagnostic if maybe unbound?
-            return member.replace_unbound_with(Type::Never);
+            return member.replace_unbound_with(db, Type::Never);
         }
 
         self.inherited_class_member(db, name)

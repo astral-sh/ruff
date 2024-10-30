@@ -1782,7 +1782,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                     let member_ty = module_ty.member(self.db, &ast::name::Name::new(&name.id));
 
-                    if let SymbolLookupResult::Bound(member_ty) = member_ty {
+                    if let SymbolLookupResult::Bound(member_ty, _) = member_ty {
                         // For possibly-unbound names, just eliminate Unbound from the type; we
                         // must be in a bound path. TODO diagnostic for maybe-unbound import?
                         member_ty
@@ -2503,14 +2503,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         let has_definitions = definitions2.count() > 0;
 
         let bindings_ty = bindings_ty(self.db, definitions);
-        // dbg!(name);
-        // dbg!(may_be_unbound);
-        // dbg!(has_definitions);
 
         if may_be_unbound {
             match self.lookup_name(name) {
-                SymbolLookupResult::Bound(ty) => match bindings_ty {
-                    SymbolLookupResult::Bound(bindings_ty) => {
+                SymbolLookupResult::Bound(ty, ty_boundedness) => match bindings_ty {
+                    SymbolLookupResult::Bound(bindings_ty, _) => {
                         UnionType::from_elements(self.db, [bindings_ty, ty])
                     }
                     SymbolLookupResult::Unbound => ty,
@@ -2534,7 +2531,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         } else {
             match bindings_ty {
-                SymbolLookupResult::Bound(ty) => ty,
+                SymbolLookupResult::Bound(ty, _) => ty,
                 SymbolLookupResult::Unbound => {
                     self.diagnostics.add(
                         name.into(),
@@ -2626,7 +2623,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                 let db = self.db;
 
-                if let SymbolLookupResult::Bound(class_member) =
+                if let SymbolLookupResult::Bound(class_member, _) =
                     class.class_member(self.db, unary_dunder_method)
                 {
                     let call = class_member.call(self.db, &[operand_type]);
@@ -2883,7 +2880,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 }
 
-                let call_on_left_instance = if let SymbolLookupResult::Bound(class_member) =
+                let call_on_left_instance = if let SymbolLookupResult::Bound(class_member, _) =
                     left_class.class_member(self.db, op.dunder())
                 {
                     class_member
@@ -2897,7 +2894,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     if left_class == right_class {
                         None
                     } else {
-                        if let SymbolLookupResult::Bound(class_member) =
+                        if let SymbolLookupResult::Bound(class_member, _) =
                             right_class.class_member(self.db, op.reflected_dunder())
                         {
                             class_member
