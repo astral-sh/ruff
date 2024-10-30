@@ -567,7 +567,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         );
         if !bound_ty.is_assignable_to(self.db, declared_ty) {
             self.diagnostics
-                .invalid_assignment(node, declared_ty, bound_ty);
+                .add_invalid_assignment(node, declared_ty, bound_ty);
             // allow declarations to override inference in case of invalid assignment
             bound_ty = declared_ty;
         };
@@ -611,7 +611,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             inferred_ty
         } else {
             self.diagnostics
-                .invalid_assignment(node, declared_ty, inferred_ty);
+                .add_invalid_assignment(node, declared_ty, inferred_ty);
             // if the assignment is invalid, fall back to assuming the annotation is correct
             declared_ty
         };
@@ -1542,7 +1542,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             if let Some(module) = self.module_ty_from_name(&module_name) {
                 module
             } else {
-                self.diagnostics.unresolved_module(alias, 0, Some(name));
+                self.diagnostics.add_unresolved_module(alias, 0, Some(name));
                 Type::Unknown
             }
         } else {
@@ -1684,7 +1684,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 } else {
                     self.diagnostics
-                        .unresolved_module(import_from, *level, module);
+                        .add_unresolved_module(import_from, *level, module);
                     Type::Unknown
                 }
             }
@@ -1699,7 +1699,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     format_import_from_module(*level, module),
                 );
                 self.diagnostics
-                    .unresolved_module(import_from, *level, module);
+                    .add_unresolved_module(import_from, *level, module);
                 Type::Unknown
             }
             Err(ModuleNameResolutionError::UnknownCurrentModule) => {
@@ -1709,7 +1709,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     self.file.path(self.db)
                 );
                 self.diagnostics
-                    .unresolved_module(import_from, *level, module);
+                    .add_unresolved_module(import_from, *level, module);
                 Type::Unknown
             }
         };
@@ -3205,7 +3205,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     .py_index(i32::try_from(int).expect("checked in branch arm"))
                     .copied()
                     .unwrap_or_else(|_| {
-                        self.diagnostics.index_out_of_bounds(
+                        self.diagnostics.add_index_out_of_bounds(
                             "tuple",
                             value_node.into(),
                             value_ty,
@@ -3224,7 +3224,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     let new_elements: Vec<_> = new_elements.copied().collect();
                     Type::Tuple(TupleType::new(self.db, new_elements.into_boxed_slice()))
                 } else {
-                    self.diagnostics.slice_step_size_zero(value_node.into());
+                    self.diagnostics.add_slice_step_size_zero(value_node.into());
                     Type::Unknown
                 }
             }
@@ -3243,7 +3243,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         ))
                     })
                     .unwrap_or_else(|_| {
-                        self.diagnostics.index_out_of_bounds(
+                        self.diagnostics.add_index_out_of_bounds(
                             "string",
                             value_node.into(),
                             value_ty,
@@ -3263,7 +3263,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     let literal: String = new_chars.collect();
                     Type::StringLiteral(StringLiteralType::new(self.db, literal.into_boxed_str()))
                 } else {
-                    self.diagnostics.slice_step_size_zero(value_node.into());
+                    self.diagnostics.add_slice_step_size_zero(value_node.into());
                     Type::Unknown
                 };
                 result
@@ -3280,7 +3280,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         Type::BytesLiteral(BytesLiteralType::new(self.db, [*byte].as_slice()))
                     })
                     .unwrap_or_else(|_| {
-                        self.diagnostics.index_out_of_bounds(
+                        self.diagnostics.add_index_out_of_bounds(
                             "bytes literal",
                             value_node.into(),
                             value_ty,
@@ -3299,7 +3299,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     let new_bytes: Vec<u8> = new_bytes.copied().collect();
                     Type::BytesLiteral(BytesLiteralType::new(self.db, new_bytes.into_boxed_slice()))
                 } else {
-                    self.diagnostics.slice_step_size_zero(value_node.into());
+                    self.diagnostics.add_slice_step_size_zero(value_node.into());
                     Type::Unknown
                 }
             }
@@ -3372,14 +3372,17 @@ impl<'db> TypeInferenceBuilder<'db> {
                         return KnownClass::GenericAlias.to_instance(self.db);
                     }
 
-                    self.diagnostics.non_subscriptable(
+                    self.diagnostics.add_non_subscriptable(
                         value_node.into(),
                         value_ty,
                         "__class_getitem__",
                     );
                 } else {
-                    self.diagnostics
-                        .non_subscriptable(value_node.into(), value_ty, "__getitem__");
+                    self.diagnostics.add_non_subscriptable(
+                        value_node.into(),
+                        value_ty,
+                        "__getitem__",
+                    );
                 }
 
                 Type::Unknown

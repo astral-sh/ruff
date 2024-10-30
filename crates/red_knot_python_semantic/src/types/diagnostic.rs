@@ -130,7 +130,7 @@ impl<'db> TypeCheckDiagnosticsBuilder<'db> {
     }
 
     /// Emit a diagnostic declaring that the object represented by `node` is not iterable
-    pub(super) fn not_iterable(&mut self, node: AnyNodeRef, not_iterable_ty: Type<'db>) {
+    pub(super) fn add_not_iterable(&mut self, node: AnyNodeRef, not_iterable_ty: Type<'db>) {
         self.add(
             node,
             "not-iterable",
@@ -142,7 +142,7 @@ impl<'db> TypeCheckDiagnosticsBuilder<'db> {
     }
 
     /// Emit a diagnostic declaring that an index is out of bounds for a tuple.
-    pub(super) fn index_out_of_bounds(
+    pub(super) fn add_index_out_of_bounds(
         &mut self,
         kind: &'static str,
         node: AnyNodeRef,
@@ -161,7 +161,7 @@ impl<'db> TypeCheckDiagnosticsBuilder<'db> {
     }
 
     /// Emit a diagnostic declaring that a type does not support subscripting.
-    pub(super) fn non_subscriptable(
+    pub(super) fn add_non_subscriptable(
         &mut self,
         node: AnyNodeRef,
         non_subscriptable_ty: Type<'db>,
@@ -177,7 +177,7 @@ impl<'db> TypeCheckDiagnosticsBuilder<'db> {
         );
     }
 
-    pub(super) fn unresolved_module(
+    pub(super) fn add_unresolved_module(
         &mut self,
         import_node: impl Into<AnyNodeRef<'db>>,
         level: u32,
@@ -194,7 +194,7 @@ impl<'db> TypeCheckDiagnosticsBuilder<'db> {
         );
     }
 
-    pub(super) fn slice_step_size_zero(&mut self, node: AnyNodeRef) {
+    pub(super) fn add_slice_step_size_zero(&mut self, node: AnyNodeRef) {
         self.add(
             node,
             "zero-stepsize-in-slice",
@@ -202,7 +202,7 @@ impl<'db> TypeCheckDiagnosticsBuilder<'db> {
         );
     }
 
-    pub(super) fn invalid_assignment(
+    pub(super) fn add_invalid_assignment(
         &mut self,
         node: AnyNodeRef,
         declared_ty: Type<'db>,

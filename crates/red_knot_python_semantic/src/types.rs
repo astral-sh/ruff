@@ -1645,7 +1645,7 @@ impl<'db> IterationOutcome<'db> {
         match self {
             Self::Iterable { element_ty } => element_ty,
             Self::NotIterable { not_iterable_ty } => {
-                diagnostics.not_iterable(iterable_node, not_iterable_ty);
+                diagnostics.add_not_iterable(iterable_node, not_iterable_ty);
                 Type::Unknown
             }
         }
