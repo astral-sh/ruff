@@ -1407,6 +1407,33 @@ impl KnownInstance {
             KnownInstance::Literal => "Literal",
         }
     }
+
+    pub fn maybe_from_module(module: &Module, instance_name: &str) -> Option<Self> {
+        let candidate = Self::from_name(instance_name)?;
+        if candidate.check_module(module) {
+            Some(candidate)
+        } else {
+            None
+        }
+    }
+
+    fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "Literal" => Some(Self::Literal),
+            _ => None,
+        }
+    }
+
+    fn check_module(self, module: &Module) -> bool {
+        if !module.search_path().is_standard_library() {
+            return false;
+        }
+        match self {
+            Self::Literal => {
+                matches!(module.name().as_str(), "typing" | "typing_extensions")
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

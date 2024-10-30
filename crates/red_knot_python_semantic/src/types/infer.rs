@@ -1370,16 +1370,19 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let mut annotation_ty = self.infer_annotation_expression(annotation);
 
-        // If the variable is annotated with SpecialForm then we treat these instances differently
+        // If the declared variable is annotated with SpecialForm then we treat it instances differently
         // by assigning known instances.
         if let Type::Instance(instance) = annotation_ty {
             if instance.is_known_class(self.db, KnownClass::SpecialForm) {
                 if let Some(name_expr) = target.as_name_expr() {
-                    if name_expr.id == KnownInstance::Literal.as_str() {
-                        annotation_ty = Type::Instance(InstanceType::known(
-                            instance.class,
-                            KnownInstance::Literal,
-                        ));
+                    let maybe_known_instance = file_to_module(self.db, definition.file(self.db))
+                        .as_ref()
+                        .and_then(|module| {
+                            KnownInstance::maybe_from_module(module, name_expr.id.as_str())
+                        });
+                    if let Some(known_instance) = maybe_known_instance {
+                        annotation_ty =
+                            Type::Instance(InstanceType::known(instance.class, known_instance));
                     }
                 }
             }
@@ -3541,7 +3544,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     ) -> Type<'db> {
         let ast::ExprSubscript {
             range: _,
-            value,
+            value: _,
             slice,
             ctx: _,
         } = subscript;
