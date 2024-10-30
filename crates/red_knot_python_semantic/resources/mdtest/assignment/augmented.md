@@ -82,6 +82,7 @@ class Foo:
 f = Foo()
 f += "Hello, world!"
 
+# TODO should emit a diagnostic warning that `Foo` might not have an `__iadd__` method
 reveal_type(f)  # revealed: int
 ```
 
