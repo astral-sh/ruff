@@ -92,7 +92,7 @@ def bool_instance() -> bool:
     return True
 
 class Foo:
-    def __add__(self, other: int) -> str:
+    def __add__(self, other: str) -> str:
         return "Hello, world!"
     if bool_instance():
         def __iadd__(self, other: str) -> int:
