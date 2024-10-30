@@ -144,3 +144,27 @@ class NotIterable:
 for x in NotIterable():  # error: "Object of type `NotIterable` is not iterable"
     pass
 ```
+
+## Union type as iterable
+
+```py
+class TestIter:
+    def __next__(self) -> int:
+        return 42
+
+class Test:
+    def __iter__(self) -> TestIter:
+        return TestIter()
+
+class Test2:
+    def __iter__(self) -> TestIter:
+        return TestIter()
+
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
+
+for x in (Test() if flag else Test2()):
+    reveal_type(x)  # revealed: int
+```
