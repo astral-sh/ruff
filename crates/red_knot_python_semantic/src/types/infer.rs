@@ -52,14 +52,12 @@ use crate::stdlib::builtins_module_scope;
 use crate::types::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
 use crate::types::{
     bindings_ty, builtins_symbol_ty, declarations_ty, global_symbol_ty, symbol_ty,
-    typing_extensions_symbol_ty, BytesLiteralType, ClassType, FunctionType, IterationOutcome,
-    KnownClass, KnownFunction, SliceLiteralType, StringLiteralType, Truthiness, TupleType, Type,
-    TypeArrayDisplay, UnionBuilder, UnionType,
+    typing_extensions_symbol_ty, BytesLiteralType, ClassType, FunctionType, InstanceType,
+    IterationOutcome, KnownClass, KnownFunction, KnownInstance, SliceLiteralType,
+    StringLiteralType, Truthiness, TupleType, Type, TypeArrayDisplay, UnionBuilder, UnionType,
 };
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
-
-use super::{InstanceType, IterationOutcome, KnownClass, KnownInstance, UnionBuilder};
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -1372,8 +1370,8 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let mut annotation_ty = self.infer_annotation_expression(annotation);
 
-        // If the variable is annotated with SpecialForm then create a new class with name of the
-        // variable.
+        // If the variable is annotated with SpecialForm then we treat these instances differently
+        // by assigning known instances.
         if let Type::Instance(instance) = annotation_ty {
             if instance.is_known_class(self.db, KnownClass::SpecialForm) {
                 if let Some(name_expr) = target.as_name_expr() {
@@ -3445,7 +3443,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             Some(Type::BooleanLiteral(b)) => SliceArg::Arg(Some(i32::from(b))),
             Some(Type::None) => SliceArg::Arg(None),
-            Some(Type::Instance(instanec)) if instanec.is_known(self.db, KnownClass::NoneType) => {
+            Some(Type::Instance(instanec))
+                if instanec.is_known_class(self.db, KnownClass::NoneType) =>
+            {
                 SliceArg::Arg(None)
             }
             None => SliceArg::Arg(None),
@@ -3537,6 +3537,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_subscript_type_expression(
         &mut self,
         subscript: &ruff_python_ast::ExprSubscript,
+        value_ty: Type<'db>,
     ) -> Type<'db> {
         let ast::ExprSubscript {
             range: _,
@@ -3545,22 +3546,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             ctx: _,
         } = subscript;
 
-        let value_ty = self.infer_type_expression(value);
-
-        // Handling of Special Forms
         match value_ty {
             Type::Instance(InstanceType {
                 class: _,
                 known: Some(known_instance),
             }) => self.infer_parameterized_known_instance_type_expression(known_instance, slice),
-            value_ty => {
-                let value_node = value.as_ref();
-                let slice_ty = self.infer_expression(slice);
-                // TODO: currently the logic to get the type of type of a subscript in type
-                // annotation is defined in the subscript_expression_types.
-                // instead we need to define a new method for type annotations and call that here.
-                self.infer_subscript_expression_types(value_node, value_ty, slice_ty)
-            }
+            _ => Type::Todo,
         }
     }
 
@@ -3738,7 +3729,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 {
                     self.infer_tuple_type_expression(slice)
                 } else {
-                    self.infer_subscript_type_expression(subscript)
+                    self.infer_subscript_type_expression(subscript, value_ty)
                 }
             }
 

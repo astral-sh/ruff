@@ -10,9 +10,6 @@ use crate::Db;
 enum CoreStdlibModule {
     Builtins,
     Types,
-    // the Typing enum is currently only used in tests
-    #[allow(dead_code)]
-    Typing,
     Typeshed,
     TypingExtensions,
     Typing,
@@ -26,7 +23,6 @@ impl CoreStdlibModule {
             Self::Typing => "typing",
             Self::Typeshed => "_typeshed",
             Self::TypingExtensions => "typing_extensions",
-            Self::Typing => "typing",
         };
         ModuleName::new_static(module_name)
             .unwrap_or_else(|| panic!("{module_name} should be a valid module name!"))
@@ -83,14 +79,6 @@ pub(crate) fn typing_symbol_ty<'db>(db: &'db dyn Db, symbol: &str) -> Type<'db> 
 #[inline]
 pub(crate) fn typeshed_symbol_ty<'db>(db: &'db dyn Db, symbol: &str) -> Type<'db> {
     core_module_symbol_ty(db, CoreStdlibModule::Typeshed, symbol)
-}
-
-/// Lookup the type of `symbol` in the `typing` module namespace.
-///
-/// Returns `Unbound` if the `typing` module isn't available for some reason.
-#[inline]
-pub(crate) fn typing_symbol_ty<'db>(db: &'db dyn Db, symbol: &str) -> Type<'db> {
-    core_module_symbol_ty(db, CoreStdlibModule::Typing, symbol)
 }
 
 /// Lookup the type of `symbol` in the `typing_extensions` module namespace.

@@ -695,9 +695,9 @@ impl<'db> Type<'db> {
             ),
             (Type::BytesLiteral(..), _) | (_, Type::BytesLiteral(..)) => true,
 
-            (Type::SliceLiteral(..), Type::Instance(class_type))
-            | (Type::Instance(class_type), Type::SliceLiteral(..)) => !matches!(
-                class_type.known(db),
+            (Type::SliceLiteral(..), Type::Instance(instance_type))
+            | (Type::Instance(instance_type), Type::SliceLiteral(..)) => !matches!(
+                instance_type.class.known(db),
                 Some(KnownClass::Slice | KnownClass::Object)
             ),
             (Type::SliceLiteral(..), _) | (_, Type::SliceLiteral(..)) => true,
