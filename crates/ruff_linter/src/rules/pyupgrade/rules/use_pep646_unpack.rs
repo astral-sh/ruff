@@ -73,12 +73,10 @@ pub(crate) fn use_pep646_unpack(checker: &mut Checker, expr: &ExprSubscript) {
 
     let inner = checker.locator().slice(slice.as_ref());
 
-    if checker.settings.preview.is_enabled() {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            format!("*{inner}"),
-            *range,
-        )));
-    }
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        format!("*{inner}"),
+        *range,
+    )));
 
     checker.diagnostics.push(diagnostic);
 }
