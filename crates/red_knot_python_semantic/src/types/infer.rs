@@ -2623,28 +2623,43 @@ impl<'db> TypeInferenceBuilder<'db> {
                         unreachable!("Not operator is handled in its own case");
                     }
                 };
-                let class_member = class.class_member(self.db, unary_dunder_method);
-                let call = class_member
-                    .todo_unwrap_type()
-                    .call(self.db, &[operand_type]);
 
-                match call.return_ty_result(
-                    self.db,
-                    AnyNodeRef::ExprUnaryOp(unary),
-                    &mut self.diagnostics,
-                ) {
-                    Ok(t) => t,
-                    Err(e) => {
-                        self.diagnostics.add(
-                            unary.into(),
-                            "unsupported-operator",
-                            format_args!(
-                                "Unary operator `{op}` is unsupported for type `{}`",
-                                operand_type.display(self.db),
-                            ),
-                        );
-                        e.return_ty()
+                let db = self.db;
+
+                if let SymbolLookupResult::Bound(class_member) =
+                    class.class_member(self.db, unary_dunder_method)
+                {
+                    let call = class_member.call(self.db, &[operand_type]);
+
+                    match call.return_ty_result(
+                        self.db,
+                        AnyNodeRef::ExprUnaryOp(unary),
+                        &mut self.diagnostics,
+                    ) {
+                        Ok(t) => t,
+                        Err(e) => {
+                            self.diagnostics.add(
+                                unary.into(),
+                                "unsupported-operator",
+                                format_args!(
+                                    "Unary operator `{op}` is unsupported for type `{}`",
+                                    operand_type.display(db),
+                                ),
+                            );
+                            e.return_ty()
+                        }
                     }
+                } else {
+                    self.diagnostics.add(
+                        unary.into(),
+                        "unsupported-operator",
+                        format_args!(
+                            "Unary operator `{op}` is unsupported for type `{}`",
+                            operand_type.display(db),
+                        ),
+                    );
+
+                    Type::Unknown
                 }
             }
             _ => Type::Todo, // TODO other unary op types
