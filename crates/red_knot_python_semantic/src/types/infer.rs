@@ -5024,7 +5024,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn comprehension_with_not_iterable_iter_in_second_comprehension() -> anyhow::Result<()> {
         let mut db = setup_db();
 
@@ -5226,7 +5225,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn starred_expressions_must_be_iterable() {
         let mut db = setup_db();
 
