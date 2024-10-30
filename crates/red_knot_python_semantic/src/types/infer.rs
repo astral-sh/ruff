@@ -1414,11 +1414,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         // Resolve the target type, assuming a load context.
         let target_type = match &**target {
             Expr::Name(name) => {
-                self.store_expression_type(target, Type::None);
+                self.store_expression_type(target, Type::Never);
                 self.infer_name_load(name)
             }
             Expr::Attribute(attr) => {
-                self.store_expression_type(target, Type::None);
+                self.store_expression_type(target, Type::Never);
                 self.infer_attribute_load(attr)
             }
             _ => self.infer_expression(target),
@@ -2501,7 +2501,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_name_expression(&mut self, name: &ast::ExprName) -> Type<'db> {
         match name.ctx {
             ExprContext::Load => self.infer_name_load(name),
-            ExprContext::Store | ExprContext::Del => Type::None,
+            ExprContext::Store | ExprContext::Del => Type::Never,
             ExprContext::Invalid => Type::Unknown,
         }
     }
@@ -2533,7 +2533,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             ExprContext::Load => self.infer_attribute_load(attribute),
             ExprContext::Store | ExprContext::Del => {
                 self.infer_expression(value);
-                Type::None
+                Type::Never
             }
             ExprContext::Invalid => {
                 self.infer_expression(value);
