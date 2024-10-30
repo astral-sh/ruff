@@ -2466,7 +2466,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
 
                 // ty.replace_unbound_with(self.db, builtin_ty)
-                ty.replace_unbound_with(self.db, builtin_ty.todo_unwrap_type())
+                // ty.replace_unbound_with(self.db, builtin_ty.unwrap_or_unknown())
+                // ty.merge_unbound_with(self.db, builtin_ty)
+
+                match builtin_ty {
+                    SymbolLookupResult::Bound(builtin_ty, boundedness) => {
+                        ty.replace_unbound_with(self.db, builtin_ty)
+                    }
+                    SymbolLookupResult::Unbound => ty,
+                }
             } else {
                 ty
             }
@@ -4072,7 +4080,7 @@ fn perform_rich_comparison<'db>(
         |op: RichCompareOperator, left_class: ClassType<'db>, right_class: ClassType<'db>| {
             left_class
                 .class_member(db, op.dunder())
-                .todo_unwrap_type()
+                .unwrap_or(Type::Never)
                 .call(
                     db,
                     &[Type::Instance(left_class), Type::Instance(right_class)],

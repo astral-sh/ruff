@@ -14,7 +14,7 @@ use crate::stdlib::{
 };
 use crate::types::diagnostic::TypeCheckDiagnosticsBuilder;
 use crate::types::narrow::narrowing_constraint;
-use crate::{Db, FxOrderSet, HasTy, Module, SemanticModel};
+use crate::{db, Db, FxOrderSet, HasTy, Module, SemanticModel};
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
 pub use self::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
@@ -61,6 +61,30 @@ impl<'db> SymbolLookupResult<'db> {
             SymbolLookupResult::Unbound => {
                 SymbolLookupResult::Bound(replacement, Boundedness::DefinitelyBound)
             }
+        }
+    }
+
+    pub fn merge_unbound_with(
+        self,
+        db: &'db dyn Db,
+        replacement: SymbolLookupResult<'db>,
+    ) -> SymbolLookupResult<'db> {
+        match (self, replacement) {
+            (r @ SymbolLookupResult::Bound(_, Boundedness::DefinitelyBound), _) => r,
+            (SymbolLookupResult::Unbound, other) => other,
+            (SymbolLookupResult::Bound(ty, Boundedness::MaybeUnbound), other) => match other {
+                SymbolLookupResult::Bound(other_ty, Boundedness::DefinitelyBound) => {
+                    let union = UnionType::from_elements(db, [other_ty, ty]);
+                    SymbolLookupResult::Bound(union, Boundedness::MaybeUnbound)
+                }
+                SymbolLookupResult::Bound(other_ty, Boundedness::MaybeUnbound) => {
+                    let union = UnionType::from_elements(db, [other_ty, ty]);
+                    SymbolLookupResult::Bound(union, Boundedness::MaybeUnbound)
+                }
+                SymbolLookupResult::Unbound => {
+                    SymbolLookupResult::Bound(ty, Boundedness::MaybeUnbound)
+                }
+            },
         }
     }
 
@@ -1243,7 +1267,7 @@ impl<'db> Type<'db> {
         // accepting `int` or `SupportsIndex`
         let dunder_get_item_method = iterable_meta_type
             .member(db, "__getitem__")
-            .todo_unwrap_type();
+            .unwrap_or(Type::Never);
 
         dunder_get_item_method
             .call(db, &[self, KnownClass::Int.to_instance(db)])

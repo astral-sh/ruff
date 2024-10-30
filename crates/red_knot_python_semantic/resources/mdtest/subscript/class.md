@@ -68,8 +68,8 @@ if flag:
 else:
     class Spam: ...
 
-# error: [call-non-callable] "Method `__class_getitem__` of type `Literal[__class_getitem__] | Unbound` is not callable on object of type `Literal[Spam, Spam]`"
-# revealed: str | Unknown
+# error: [non-subscriptable] "Cannot subscript object of type `Literal[Spam, Spam]` with no `__class_getitem__` method"
+# revealed: Unknown
 reveal_type(Spam[42])
 ```
 

@@ -120,7 +120,7 @@ if returns_bool():
     __name__ = 1
 
 reveal_type(__file__)  # revealed: Literal[42]
-reveal_type(__name__)  # revealed: str | Literal[1]
+reveal_type(__name__)  # revealed: Literal[1] | str
 ```
 
 ## Conditionally global or `ModuleType` attribute, with annotation
@@ -137,5 +137,5 @@ if returns_bool():
     __name__: int = 1
 
 reveal_type(__file__)  # revealed: Literal[42]
-reveal_type(__name__)  # revealed: str | Literal[1]
+reveal_type(__name__)  # revealed: Literal[1] | str
 ```
