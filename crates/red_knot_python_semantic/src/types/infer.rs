@@ -1425,26 +1425,32 @@ impl<'db> TypeInferenceBuilder<'db> {
         };
         let value_type = self.infer_expression(value);
 
+        // If the target defines, e.g., `__iadd__`, infer the augmented assignment as a call to that
+        // dunder.
         if let Type::Instance(class) = target_type {
             let class_member = class.class_member(self.db, op.in_place_dunder());
-            let call = class_member.call(self.db, &[target_type, value_type]);
-
-            return match call.return_ty_result(self.db, AnyNodeRef::StmtAugAssign(assignment), self)
-            {
-                Ok(t) => t,
-                Err(e) => {
-                    self.add_diagnostic(
-                        assignment.into(),
-                        "unsupported-operator",
-                        format_args!(
-                            "Operator `{op}=` is unsupported between objects of type `{}` and `{}`",
-                            target_type.display(self.db),
-                            value_type.display(self.db)
-                        ),
-                    );
-                    e.return_ty()
-                }
-            };
+            if !class_member.is_unbound() {
+                let call = class_member.call(self.db, &[target_type, value_type]);
+                return match call.return_ty_result(
+                    self.db,
+                    AnyNodeRef::StmtAugAssign(assignment),
+                    self,
+                ) {
+                    Ok(t) => t,
+                    Err(e) => {
+                        self.add_diagnostic(
+                            assignment.into(),
+                            "unsupported-operator",
+                            format_args!(
+                                "Operator `{op}=` is unsupported between objects of type `{}` and `{}`",
+                                target_type.display(self.db),
+                                value_type.display(self.db)
+                            ),
+                        );
+                        e.return_ty()
+                    }
+                };
+            }
         }
 
         let left_ty = target_type;
