@@ -147,6 +147,6 @@ else:
     f = 42.0
 f += 12
 
-# TODO(charlie): This should be `str | int`.
+# TODO(charlie): This should be `str | float`.
 reveal_type(f)  # revealed: @Todo
 ```
