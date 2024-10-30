@@ -2448,8 +2448,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                 global_symbol_ty(self.db, self.file, name)
             };
 
+            // if let SymbolLookupResult::Bound(ty, _) = ty {
+            //     dbg!(ty.display(self.db));
+            // }
+
             // Fallback to builtins (without infinite recursion if we're already in builtins.)
-            if ty.is_unbound() && Some(self.scope()) != builtins_module_scope(self.db) {
+            if ty.may_be_unbound() && Some(self.scope()) != builtins_module_scope(self.db) {
                 let mut builtin_ty = builtins_symbol_ty(self.db, name);
                 if builtin_ty.is_unbound() && name == "reveal_type" {
                     self.diagnostics.add(
@@ -2461,7 +2465,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                     builtin_ty = typing_extensions_symbol_ty(self.db, name);
                 }
 
-                builtin_ty
+                // ty.replace_unbound_with(self.db, builtin_ty)
+                ty.replace_unbound_with(self.db, builtin_ty.todo_unwrap_type())
             } else {
                 ty
             }
@@ -2503,8 +2508,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         let has_definitions = definitions2.count() > 0;
 
         let bindings_ty = bindings_ty(self.db, definitions);
+        // dbg!("==============================");
+        // dbg!(name);
+        // dbg!(may_be_unbound);
+        // dbg!(has_definitions);
 
         if may_be_unbound {
+            // dbg!(self.lookup_name(name).todo_unwrap_type().display(self.db));
+
             match self.lookup_name(name) {
                 SymbolLookupResult::Bound(ty, ty_boundedness) => match bindings_ty {
                     SymbolLookupResult::Bound(bindings_ty, _) => {

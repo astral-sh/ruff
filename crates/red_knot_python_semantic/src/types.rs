@@ -55,7 +55,7 @@ impl<'db> SymbolLookupResult<'db> {
         match self {
             r @ SymbolLookupResult::Bound(_, Boundedness::DefinitelyBound) => r,
             SymbolLookupResult::Bound(ty, Boundedness::MaybeUnbound) => {
-                let union = UnionType::from_elements(db, [ty, replacement]);
+                let union = UnionType::from_elements(db, [replacement, ty]);
                 SymbolLookupResult::Bound(union, Boundedness::DefinitelyBound)
             }
             SymbolLookupResult::Unbound => {
@@ -157,11 +157,20 @@ fn symbol_ty_by_id<'db>(
             match bindings_ty(db, use_def.public_bindings(symbol)) {
                 SymbolLookupResult::Bound(ty, boundedness) => {
                     // TODO: do something with boundedness
-                    if use_def.public_may_be_unbound(symbol) {
-                        Some(SymbolLookupResult::Bound(ty, Boundedness::MaybeUnbound))
-                    } else {
-                        Some(SymbolLookupResult::Bound(ty, boundedness))
-                    }
+
+                    // dbg!(boundedness);
+                    // dbg!(use_def.public_may_be_unbound(symbol));
+
+                    Some(
+                        SymbolLookupResult::Bound(ty, boundedness)
+                            .and_may_be_unbound(use_def.public_may_be_unbound(symbol)),
+                    )
+
+                    // if use_def.public_may_be_unbound(symbol) {
+                    //     Some(SymbolLookupResult::Bound(ty, Boundedness::MaybeUnbound))
+                    // } else {
+                    //     Some(SymbolLookupResult::Bound(ty, boundedness))
+                    // }
                 }
                 SymbolLookupResult::Unbound => Some(SymbolLookupResult::Unbound),
             }
@@ -170,15 +179,17 @@ fn symbol_ty_by_id<'db>(
         };
         // Intentionally ignore conflicting declared types; that's not our problem, it's the
         // problem of the module we are importing from.
-        SymbolLookupResult::Bound(
-            declarations_ty(
-                db,
-                declarations,
-                undeclared_ty.map(|ty| ty.todo_unwrap_type()),
-            )
-            .unwrap_or_else(|(ty, _)| ty),
-            Boundedness::DefinitelyBound,
-        )
+        match undeclared_ty {
+            Some(SymbolLookupResult::Bound(ty, boundedness)) => SymbolLookupResult::Bound(
+                declarations_ty(db, declarations, Some(ty)).unwrap_or_else(|(ty, _)| ty),
+                boundedness,
+            ),
+            Some(SymbolLookupResult::Unbound) => SymbolLookupResult::Unbound,
+            None => SymbolLookupResult::Bound(
+                declarations_ty(db, declarations, None).unwrap_or_else(|(ty, _)| ty),
+                Boundedness::DefinitelyBound,
+            ),
+        }
     } else {
         // bindings_ty(
         //     db,
@@ -244,7 +255,13 @@ pub(crate) fn global_symbol_ty<'db>(
     name: &str,
 ) -> SymbolLookupResult<'db> {
     let explicit_ty = symbol_ty(db, global_scope(db, file), name);
-    if !explicit_ty.is_unbound() {
+
+    // if let SymbolLookupResult::Bound(ty, b) = explicit_ty {
+    //     dbg!(ty.display(db));
+    //     dbg!(b);
+    // }
+
+    if !explicit_ty.may_be_unbound() {
         return explicit_ty;
     }
 
