@@ -337,7 +337,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .declarations
             .extend(inference.declarations.iter());
         self.types.expressions.extend(inference.expressions.iter());
-        self.types.diagnostics.extend(&inference.diagnostics);
+        self.diagnostics.extend(&inference.diagnostics);
         self.types.has_deferred |= inference.has_deferred;
     }
 
@@ -3472,7 +3472,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     pub(super) fn finish(mut self) -> TypeInference<'db> {
         self.infer_region();
-        self.types.diagnostics.extend(self.diagnostics.finish());
+        self.types.diagnostics = self.diagnostics.finish();
         self.types.shrink_to_fit();
         self.types
     }

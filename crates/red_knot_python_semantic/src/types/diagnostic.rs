@@ -255,6 +255,10 @@ impl<'db> TypeCheckDiagnosticsBuilder<'db> {
         });
     }
 
+    pub(super) fn extend(&mut self, diagnostics: &TypeCheckDiagnostics) {
+        self.diagnostics.extend(diagnostics);
+    }
+
     pub(super) fn finish(mut self) -> TypeCheckDiagnostics {
         self.diagnostics.shrink_to_fit();
         self.diagnostics
