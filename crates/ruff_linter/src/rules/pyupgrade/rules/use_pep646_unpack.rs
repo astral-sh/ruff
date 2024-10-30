@@ -69,6 +69,11 @@ pub(crate) fn use_pep646_unpack(checker: &mut Checker, expr: &ExprSubscript) {
         return;
     }
 
+    if slice.is_bin_op_expr() {
+        // fixing this would introduce a syntax error
+        return;
+    }
+
     let mut diagnostic = Diagnostic::new(NonPEP646Unpack, *range);
 
     let inner = checker.locator().slice(slice.as_ref());

@@ -47,6 +47,8 @@ UP044.py:11:14: UP044 [*] Use `*` for unpacking
 10 | 
 11 | def f(*args: Unpack[tuple[int, ...]]): pass
    |              ^^^^^^^^^^^^^^^^^^^^^^^ UP044
+12 | 
+13 | def foo(*args: Unpack[int | str]) -> None: pass  # not supported
    |
    = help: Convert to `*` for unpacking
 
@@ -56,3 +58,5 @@ UP044.py:11:14: UP044 [*] Use `*` for unpacking
 10 10 | 
 11    |-def f(*args: Unpack[tuple[int, ...]]): pass
    11 |+def f(*args: *tuple[int, ...]): pass
+12 12 | 
+13 13 | def foo(*args: Unpack[int | str]) -> None: pass  # not supported

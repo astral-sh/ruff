@@ -9,3 +9,5 @@ class D(Generic[Unpack  [Shape]]):
     pass
 
 def f(*args: Unpack[tuple[int, ...]]): pass
+
+def foo(*args: Unpack[int | str]) -> None: pass  # not supported
