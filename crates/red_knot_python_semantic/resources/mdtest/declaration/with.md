@@ -120,3 +120,21 @@ context_expr = Manager1() if coinflip() else NotAContextManager()
 with context_expr as f:
     reveal_type(f)  # revealed: str | Unknown
 ```
+
+## Context expression with "sometimes" callable `__enter__` method
+
+```py
+def coinflip() -> bool:
+    return True
+
+class Manager:
+    if coinflip():
+        def __enter__(self) -> str:
+            return "abcd"
+
+    def __exit__(self, *args): ...
+
+with Manager() as f:
+    # TODO: This should emit an error that `__enter__` is possibly unbound.
+    reveal_type(f)  # revealed: str
+```
