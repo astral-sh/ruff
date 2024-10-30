@@ -1426,8 +1426,8 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         // If the target defines, e.g., `__iadd__`, infer the augmented assignment as a call to that
         // dunder.
-        if let Type::Instance(class) = target_type {
-            let class_member = class.class_member(self.db, op.in_place_dunder());
+        if let Type::Instance(instance) = target_type {
+            let class_member = instance.class.class_member(self.db, op.in_place_dunder());
             if !class_member.is_unbound() {
                 let call = class_member.call(self.db, &[target_type, value_type]);
                 return match call.return_ty_result(
@@ -3550,12 +3550,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                     ruff_python_ast::Expr::NumberLiteral(ref number) if number.value.is_int() => {}
                     ruff_python_ast::Expr::Tuple(ref t) if !t.parenthesized => {}
                     _ => {
-                        self.add_diagnostic(
+                        self.diagnostics.add(
                             parameters.into(),
                             "invalid-literal-parameter",
-                            format_args!(
-                                "Type arguments for `Literal` must be None, a literal value (int, bool, str, or bytes), or an enum value",
-                            ),
+                            format_args!(""),
                         );
                         return Type::Unknown;
                     }
@@ -3574,13 +3572,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                     | Type::Union(_)
                     | Type::Intersection(_)
                     | Type::Any => {
-                        self.add_diagnostic(
-                                    parameters.into(),
-                                    "invalid-literal-parameter",
-                                    format_args!(
-                                        "Type arguments for `Literal` must be None, a literal value (int, bool, str, or bytes), or an enum value",
-                                    ),
-                                );
+                        self.diagnostics.add(
+                            parameters.into(),
+                            "invalid-literal-parameter",
+                            format_args!(""),
+                        );
                         Type::Unknown
                     }
                     Type::Tuple(tuple) => {
@@ -3609,13 +3605,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                         Type::Unknown
                     }
                 } else {
-                    self.add_diagnostic(
-                                        parameters.into(),
-                                        "invalid-literal-parameter",
-                                        format_args!(
-                                            "Type arguments for `Literal` must be None, a literal value (int, bool, str, or bytes), or an enum value",
-                                        ),
-                                    );
+                    self.diagnostics.add(
+                        parameters.into(),
+                        "invalid-literal-parameter",
+                        format_args!(""),
+                    );
                     Type::Unknown
                 }
             }
