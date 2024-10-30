@@ -107,16 +107,7 @@ fn symbol_ty_by_id<'db>(
         let declarations = use_def.public_declarations(symbol);
         // If the symbol is undeclared in some paths, include the inferred type in the public type.
         let undeclared_ty = if declarations.may_be_undeclared() {
-            Some(
-                bindings_ty(
-                    db,
-                    use_def.public_bindings(symbol),
-                    // use_def
-                    //     .public_may_be_unbound(symbol)
-                    //     .then_some(Type::Unbound),
-                )
-                .todo_unwrap_type(),
-            )
+            Some(bindings_ty(db, use_def.public_bindings(symbol)).unwrap_or_unknown())
         } else {
             None
         };
