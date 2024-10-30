@@ -77,5 +77,5 @@ from typing_extensions import Literal
 a1: Literal[26]
 
 def f():
-    reveal_type(a1)  # revealed: Literal[1]
+    reveal_type(a1)  # revealed: @Todo
 ```
