@@ -13,7 +13,6 @@ if flag:
 x = y  # error: [possibly-unresolved-reference]
 
 # revealed: Literal[3]
-# error: [possibly-unresolved-reference]
 reveal_type(x)
 
 # revealed: Literal[3]
@@ -41,7 +40,6 @@ if flag:
 x = y  # error: [possibly-unresolved-reference]
 
 # revealed: Literal[3]
-# error: [possibly-unresolved-reference]
 reveal_type(x)
 
 # revealed: Literal[3]

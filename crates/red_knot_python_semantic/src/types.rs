@@ -56,7 +56,6 @@ impl<'db> SymbolLookupResult<'db> {
         }
     }
 
-    #[cfg(test)]
     #[track_caller]
     fn expect_bound(self) -> Type<'db> {
         match self {
@@ -941,9 +940,19 @@ impl<'db> Type<'db> {
                 // TODO MRO? get_own_instance_member, get_instance_member
                 Type::Todo.into()
             }
-            Type::Union(union) => union
-                .map(db, |element| element.member(db, name).todo_unwrap_type())
-                .into(),
+            Type::Union(union) => {
+                let any_unbound = union
+                    .elements(db)
+                    .iter()
+                    .any(|ty| ty.member(db, name).is_unbound());
+                if any_unbound {
+                    SymbolLookupResult::Unbound // TODO
+                } else {
+                    SymbolLookupResult::Bound(
+                        union.map(db, |ty| ty.member(db, name).expect_bound()),
+                    )
+                }
+            }
             Type::Intersection(_) => {
                 // TODO perform the get_member on each type in the intersection
                 // TODO return the intersection of those results

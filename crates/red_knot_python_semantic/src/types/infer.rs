@@ -55,13 +55,11 @@ use crate::types::diagnostic::{
 use crate::types::{
     bindings_ty, builtins_symbol_ty, declarations_ty, global_symbol_ty, symbol_ty,
     typing_extensions_symbol_ty, BytesLiteralType, ClassType, FunctionType, IterationOutcome,
-    KnownClass, KnownFunction, SliceLiteralType, StringLiteralType, Truthiness, TupleType, Type,
-    TypeArrayDisplay, UnionBuilder, UnionType,
+    KnownClass, KnownFunction, SliceLiteralType, StringLiteralType, SymbolLookupResult, Truthiness,
+    TupleType, Type, TypeArrayDisplay, UnionBuilder, UnionType,
 };
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
-
-use super::SymbolLookupResult;
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -2501,26 +2499,47 @@ impl<'db> TypeInferenceBuilder<'db> {
             )
         };
 
-        match bindings_ty(self.db, definitions) {
-            SymbolLookupResult::Bound(ty) => ty,
-            SymbolLookupResult::Unbound => {
-                if may_be_unbound {
-                    match self.lookup_name(name) {
-                        SymbolLookupResult::Bound(ty) => ty,
-                        SymbolLookupResult::Unbound => {
-                            self.diagnostics.add(
-                                name.into(),
-                                "unresolved-reference",
-                                format_args!("Name `{id}` used when not defined"),
-                            );
-                            Type::Unknown
-                        }
+        let definitions2 = definitions.clone();
+        let has_definitions = definitions2.count() > 0;
+
+        let bindings_ty = bindings_ty(self.db, definitions);
+        // dbg!(name);
+        // dbg!(may_be_unbound);
+        // dbg!(has_definitions);
+
+        if may_be_unbound {
+            match self.lookup_name(name) {
+                SymbolLookupResult::Bound(ty) => match bindings_ty {
+                    SymbolLookupResult::Bound(bindings_ty) => {
+                        UnionType::from_elements(self.db, [bindings_ty, ty])
                     }
-                } else {
+                    SymbolLookupResult::Unbound => ty,
+                },
+                SymbolLookupResult::Unbound => {
+                    if has_definitions {
+                        self.diagnostics.add(
+                            name.into(),
+                            "possibly-unresolved-reference",
+                            format_args!("Name `{id}` used when possibly not defined"),
+                        );
+                    } else {
+                        self.diagnostics.add(
+                            name.into(),
+                            "unresolved-reference",
+                            format_args!("Name `{id}` used when not defined"),
+                        );
+                    }
+                    bindings_ty.unwrap_or_unknown()
+                }
+            }
+        } else {
+            match bindings_ty {
+                SymbolLookupResult::Bound(ty) => ty,
+                SymbolLookupResult::Unbound => {
                     self.diagnostics.add(
                         name.into(),
-                        "possibly-unresolved-reference",
-                        format_args!("Name `{id}` used when possibly not defined"),
+                        "unresolved-reference",
+                        format_args!("Name `{id}` used when not defined"),
                     );
                     Type::Unknown
                 }
@@ -2548,7 +2567,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         let value_ty = self.infer_expression(value);
         value_ty
             .member(self.db, &Name::new(&attr.id))
-            .todo_unwrap_type()
+            .unwrap_or_unknown();
+
+        member_ty
     }
 
     fn infer_attribute_expression(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {

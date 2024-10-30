@@ -122,7 +122,7 @@ impl<const B: usize> BitSet<B> {
 }
 
 /// Iterator over values in a [`BitSet`].
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(super) struct BitSetIterator<'a, const B: usize> {
     /// The blocks we are iterating over.
     blocks: &'a [u64],
