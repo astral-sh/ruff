@@ -2972,6 +2972,7 @@ impl Operator {
         }
     }
 
+    /// Returns the dunder method name for the operator.
     pub const fn dunder(self) -> &'static str {
         match self {
             Operator::Add => "__add__",
@@ -2990,6 +2991,26 @@ impl Operator {
         }
     }
 
+    /// Returns the in-place dunder method name for the operator.
+    pub const fn in_place_dunder(self) -> &'static str {
+        match self {
+            Operator::Add => "__iadd__",
+            Operator::Sub => "__isub__",
+            Operator::Mult => "__imul__",
+            Operator::MatMult => "__imatmul__",
+            Operator::Div => "__itruediv__",
+            Operator::Mod => "__imod__",
+            Operator::Pow => "__ipow__",
+            Operator::LShift => "__ilshift__",
+            Operator::RShift => "__irshift__",
+            Operator::BitOr => "__ior__",
+            Operator::BitXor => "__ixor__",
+            Operator::BitAnd => "__iand__",
+            Operator::FloorDiv => "__ifloordiv__",
+        }
+    }
+
+    /// Returns the reflected dunder method name for the operator.
     pub const fn reflected_dunder(self) -> &'static str {
         match self {
             Operator::Add => "__radd__",

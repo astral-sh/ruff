@@ -144,3 +144,82 @@ class NotIterable:
 for x in NotIterable():  # error: "Object of type `NotIterable` is not iterable"
     pass
 ```
+
+## Union type as iterable
+
+```py
+class TestIter:
+    def __next__(self) -> int:
+        return 42
+
+class Test:
+    def __iter__(self) -> TestIter:
+        return TestIter()
+
+class Test2:
+    def __iter__(self) -> TestIter:
+        return TestIter()
+
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
+
+for x in Test() if flag else Test2():
+    reveal_type(x)  # revealed: int
+```
+
+## Union type as iterator
+
+```py
+class TestIter:
+    def __next__(self) -> int:
+        return 42
+
+class TestIter2:
+    def __next__(self) -> int:
+        return 42
+
+class Test:
+    def __iter__(self) -> TestIter | TestIter2:
+        return TestIter()
+
+for x in Test():
+    reveal_type(x)  # revealed: int
+```
+
+## Union type as iterable and union type as iterator
+
+```py
+class TestIter:
+    def __next__(self) -> int | Exception:
+        return 42
+
+class TestIter2:
+    def __next__(self) -> str | tuple[int, int]:
+        return "42"
+
+class TestIter3:
+    def __next__(self) -> bytes:
+        return b"42"
+
+class TestIter4:
+    def __next__(self) -> memoryview:
+        return memoryview(b"42")
+
+class Test:
+    def __iter__(self) -> TestIter | TestIter2:
+        return TestIter()
+
+class Test2:
+    def __iter__(self) -> TestIter3 | TestIter4:
+        return TestIter3()
+
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
+
+for x in Test() if flag else Test2():
+    reveal_type(x)  # revealed: int | Exception | str | tuple[int, int] | bytes | memoryview
+```
