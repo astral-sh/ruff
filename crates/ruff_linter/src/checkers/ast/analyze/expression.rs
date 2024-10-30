@@ -384,6 +384,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 Rule::StaticJoinToFString,
                 // refurb
                 Rule::HashlibDigestHex,
+                // ruff
+                Rule::SplitOfStaticString,
             ]) {
                 if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
                     let attr = attr.as_str();
@@ -398,6 +400,16 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                                 flynt::rules::static_join_to_fstring(
                                     checker,
                                     expr,
+                                    string_value.to_str(),
+                                );
+                            }
+                        } else if attr == "split" || attr == "rsplit" {
+                            // "...".split(...) call
+                            if checker.enabled(Rule::SplitOfStaticString) {
+                                ruff::rules::split_of_static_string(
+                                    checker,
+                                    attr,
+                                    call,
                                     string_value.to_str(),
                                 );
                             }

@@ -79,3 +79,6 @@ pub(crate) enum Context {
 pub(crate) use post_init_default::*;
 
 mod post_init_default;
+pub(crate) use split_of_static_string::*;
+
+mod split_of_static_string;

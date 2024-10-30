@@ -963,6 +963,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "032") => (RuleGroup::Preview, rules::ruff::rules::DecimalFromFloatLiteral),
         (Ruff, "033") => (RuleGroup::Preview, rules::ruff::rules::PostInitDefault),
         (Ruff, "034") => (RuleGroup::Preview, rules::ruff::rules::UselessIfElse),
+        (Ruff, "035") => (RuleGroup::Preview, rules::ruff::rules::SplitOfStaticString),
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
         (Ruff, "101") => (RuleGroup::Stable, rules::ruff::rules::RedirectedNOQA),
 

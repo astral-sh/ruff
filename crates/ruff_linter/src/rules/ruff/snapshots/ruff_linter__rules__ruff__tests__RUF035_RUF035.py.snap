@@ -1,0 +1,346 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF035.py:6:1: RUF035 [*] Consider using a list instead of string split
+   |
+ 5 |   # positives
+ 6 | / """
+ 7 | |     itemA
+ 8 | |     itemB
+ 9 | |     itemC
+10 | | """.split()
+   | |___________^ RUF035
+11 |   
+12 |   "a,b,c,d".split(",")
+   |
+   = help: Replace string split with list literal
+
+ℹ Unsafe fix
+3  3  | no_sep = None
+4  4  | 
+5  5  | # positives
+6     |-"""
+7     |-	itemA
+8     |-	itemB
+9     |-	itemC
+10    |-""".split()
+   6  |+["itemA", "itemB", "itemC"]
+11 7  | 
+12 8  | "a,b,c,d".split(",")
+13 9  | "a,b,c,d".split(None)
+
+RUF035.py:12:1: RUF035 [*] Consider using a list instead of string split
+   |
+10 | """.split()
+11 | 
+12 | "a,b,c,d".split(",")
+   | ^^^^^^^^^^^^^^^^^^^^ RUF035
+13 | "a,b,c,d".split(None)
+14 | "a,b,c,d".split(",", 1)
+   |
+   = help: Replace string split with list literal
+
+ℹ Unsafe fix
+9  9  | 	itemC
+10 10 | """.split()
+11 11 | 
+12    |-"a,b,c,d".split(",")
+   12 |+["a", "b", "c", "d"]
+13 13 | "a,b,c,d".split(None)
+14 14 | "a,b,c,d".split(",", 1)
+15 15 | "a,b,c,d".split(None, 1)
+
+RUF035.py:13:1: RUF035 [*] Consider using a list instead of string split
+   |
+12 | "a,b,c,d".split(",")
+13 | "a,b,c,d".split(None)
+   | ^^^^^^^^^^^^^^^^^^^^^ RUF035
+14 | "a,b,c,d".split(",", 1)
+15 | "a,b,c,d".split(None, 1)
+   |
+   = help: Replace string split with list literal
+
+ℹ Unsafe fix
+10 10 | """.split()
+11 11 | 
+12 12 | "a,b,c,d".split(",")
+13    |-"a,b,c,d".split(None)
+   13 |+["a,b,c,d"]
+14 14 | "a,b,c,d".split(",", 1)
+15 15 | "a,b,c,d".split(None, 1)
+16 16 | "a,b,c,d".split(sep=",")
+
+RUF035.py:14:1: RUF035 [*] Consider using a list instead of string split
+   |
+12 | "a,b,c,d".split(",")
+13 | "a,b,c,d".split(None)
+14 | "a,b,c,d".split(",", 1)
+   | ^^^^^^^^^^^^^^^^^^^^^^^ RUF035
+15 | "a,b,c,d".split(None, 1)
+16 | "a,b,c,d".split(sep=",")
+   |
+   = help: Replace string split with list literal
+
+ℹ Unsafe fix
+11 11 | 
+12 12 | "a,b,c,d".split(",")
+13 13 | "a,b,c,d".split(None)
+14    |-"a,b,c,d".split(",", 1)
+   14 |+["a", "b,c,d"]
+15 15 | "a,b,c,d".split(None, 1)
+16 16 | "a,b,c,d".split(sep=",")
+17 17 | "a,b,c,d".split(sep=None)
+
+RUF035.py:15:1: RUF035 Consider using a list instead of string split
+   |
+13 | "a,b,c,d".split(None)
+14 | "a,b,c,d".split(",", 1)
+15 | "a,b,c,d".split(None, 1)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ RUF035
+16 | "a,b,c,d".split(sep=",")
+17 | "a,b,c,d".split(sep=None)
+   |
+   = help: Replace string split with list literal
+
+RUF035.py:16:1: RUF035 [*] Consider using a list instead of string split
+   |
+14 | "a,b,c,d".split(",", 1)
+15 | "a,b,c,d".split(None, 1)
+16 | "a,b,c,d".split(sep=",")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ RUF035
+17 | "a,b,c,d".split(sep=None)
+18 | "a,b,c,d".split(sep=",", maxsplit=1)
+   |
+   = help: Replace string split with list literal
+
+ℹ Unsafe fix
+13 13 | "a,b,c,d".split(None)
+14 14 | "a,b,c,d".split(",", 1)
+15 15 | "a,b,c,d".split(None, 1)
+16    |-"a,b,c,d".split(sep=",")
+   16 |+["a", "b", "c", "d"]
+17 17 | "a,b,c,d".split(sep=None)
+18 18 | "a,b,c,d".split(sep=",", maxsplit=1)
+19 19 | "a,b,c,d".split(sep=None, maxsplit=1)
+
+RUF035.py:17:1: RUF035 [*] Consider using a list instead of string split
+   |
+15 | "a,b,c,d".split(None, 1)
+16 | "a,b,c,d".split(sep=",")
+17 | "a,b,c,d".split(sep=None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF035
+18 | "a,b,c,d".split(sep=",", maxsplit=1)
+19 | "a,b,c,d".split(sep=None, maxsplit=1)
+   |
+   = help: Replace string split with list literal
+
+ℹ Unsafe fix
+14 14 | "a,b,c,d".split(",", 1)
+15 15 | "a,b,c,d".split(None, 1)
+16 16 | "a,b,c,d".split(sep=",")
+17    |-"a,b,c,d".split(sep=None)
+   17 |+["a,b,c,d"]
+18 18 | "a,b,c,d".split(sep=",", maxsplit=1)
+19 19 | "a,b,c,d".split(sep=None, maxsplit=1)
+20 20 | "a,b,c,d".split(maxsplit=1, sep=",")
+
+RUF035.py:18:1: RUF035 [*] Consider using a list instead of string split
+   |
+16 | "a,b,c,d".split(sep=",")
+17 | "a,b,c,d".split(sep=None)
+18 | "a,b,c,d".split(sep=",", maxsplit=1)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF035
+19 | "a,b,c,d".split(sep=None, maxsplit=1)
+20 | "a,b,c,d".split(maxsplit=1, sep=",")
+   |
+   = help: Replace string split with list literal
+
+ℹ Unsafe fix
+15 15 | "a,b,c,d".split(None, 1)
+16 16 | "a,b,c,d".split(sep=",")
+17 17 | "a,b,c,d".split(sep=None)
+18    |-"a,b,c,d".split(sep=",", maxsplit=1)
+   18 |+["a", "b,c,d"]
+19 19 | "a,b,c,d".split(sep=None, maxsplit=1)
+20 20 | "a,b,c,d".split(maxsplit=1, sep=",")
+21 21 | "a,b,c,d".split(maxsplit=1, sep=None)
+
+RUF035.py:19:1: RUF035 Consider using a list instead of string split
+   |
+17 | "a,b,c,d".split(sep=None)
+18 | "a,b,c,d".split(sep=",", maxsplit=1)
+19 | "a,b,c,d".split(sep=None, maxsplit=1)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF035
+20 | "a,b,c,d".split(maxsplit=1, sep=",")
+21 | "a,b,c,d".split(maxsplit=1, sep=None)
+   |
+   = help: Replace string split with list literal
+
+RUF035.py:20:1: RUF035 [*] Consider using a list instead of string split
+   |
+18 | "a,b,c,d".split(sep=",", maxsplit=1)
+19 | "a,b,c,d".split(sep=None, maxsplit=1)
+20 | "a,b,c,d".split(maxsplit=1, sep=",")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF035
+21 | "a,b,c,d".split(maxsplit=1, sep=None)
+22 | "a,b,c,d".split(",", maxsplit=1)
+   |
+   = help: Replace string split with list literal
+
+ℹ Unsafe fix
+17 17 | "a,b,c,d".split(sep=None)
+18 18 | "a,b,c,d".split(sep=",", maxsplit=1)
+19 19 | "a,b,c,d".split(sep=None, maxsplit=1)
+20    |-"a,b,c,d".split(maxsplit=1, sep=",")
+   20 |+["a", "b,c,d"]
+21 21 | "a,b,c,d".split(maxsplit=1, sep=None)
+22 22 | "a,b,c,d".split(",", maxsplit=1)
+23 23 | "a,b,c,d".split(None, maxsplit=1)
+
+RUF035.py:21:1: RUF035 Consider using a list instead of string split
+   |
+19 | "a,b,c,d".split(sep=None, maxsplit=1)
+20 | "a,b,c,d".split(maxsplit=1, sep=",")
+21 | "a,b,c,d".split(maxsplit=1, sep=None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF035
+22 | "a,b,c,d".split(",", maxsplit=1)
+23 | "a,b,c,d".split(None, maxsplit=1)
+   |
+   = help: Replace string split with list literal
+
+RUF035.py:22:1: RUF035 [*] Consider using a list instead of string split
+   |
+20 | "a,b,c,d".split(maxsplit=1, sep=",")
+21 | "a,b,c,d".split(maxsplit=1, sep=None)
+22 | "a,b,c,d".split(",", maxsplit=1)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF035
+23 | "a,b,c,d".split(None, maxsplit=1)
+24 | "a,b,c,d".split(maxsplit=1)
+   |
+   = help: Replace string split with list literal
+
+ℹ Unsafe fix
+19 19 | "a,b,c,d".split(sep=None, maxsplit=1)
+20 20 | "a,b,c,d".split(maxsplit=1, sep=",")
+21 21 | "a,b,c,d".split(maxsplit=1, sep=None)
+22    |-"a,b,c,d".split(",", maxsplit=1)
+   22 |+["a", "b,c,d"]
+23 23 | "a,b,c,d".split(None, maxsplit=1)
+24 24 | "a,b,c,d".split(maxsplit=1)
+25 25 | "a,b,c,d".split(maxsplit=1.0)
+
+RUF035.py:23:1: RUF035 Consider using a list instead of string split
+   |
+21 | "a,b,c,d".split(maxsplit=1, sep=None)
+22 | "a,b,c,d".split(",", maxsplit=1)
+23 | "a,b,c,d".split(None, maxsplit=1)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF035
+24 | "a,b,c,d".split(maxsplit=1)
+25 | "a,b,c,d".split(maxsplit=1.0)
+   |
+   = help: Replace string split with list literal
+
+RUF035.py:24:1: RUF035 Consider using a list instead of string split
+   |
+22 | "a,b,c,d".split(",", maxsplit=1)
+23 | "a,b,c,d".split(None, maxsplit=1)
+24 | "a,b,c,d".split(maxsplit=1)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF035
+25 | "a,b,c,d".split(maxsplit=1.0)
+26 | "a,b,c,d".split(maxsplit=1)
+   |
+   = help: Replace string split with list literal
+
+RUF035.py:26:1: RUF035 Consider using a list instead of string split
+   |
+24 | "a,b,c,d".split(maxsplit=1)
+25 | "a,b,c,d".split(maxsplit=1.0)
+26 | "a,b,c,d".split(maxsplit=1)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF035
+27 | "a,b,c,d".split(maxsplit=0)
+28 | "VERB AUX PRON ADP DET".split(" ")
+   |
+   = help: Replace string split with list literal
+
+RUF035.py:27:1: RUF035 [*] Consider using a list instead of string split
+   |
+25 | "a,b,c,d".split(maxsplit=1.0)
+26 | "a,b,c,d".split(maxsplit=1)
+27 | "a,b,c,d".split(maxsplit=0)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF035
+28 | "VERB AUX PRON ADP DET".split(" ")
+29 | '   1   2   3   '.split()
+   |
+   = help: Replace string split with list literal
+
+ℹ Unsafe fix
+24 24 | "a,b,c,d".split(maxsplit=1)
+25 25 | "a,b,c,d".split(maxsplit=1.0)
+26 26 | "a,b,c,d".split(maxsplit=1)
+27    |-"a,b,c,d".split(maxsplit=0)
+   27 |+["a,b,c,d"]
+28 28 | "VERB AUX PRON ADP DET".split(" ")
+29 29 | '   1   2   3   '.split()
+30 30 | '1<>2<>3<4'.split('<>')
+
+RUF035.py:28:1: RUF035 [*] Consider using a list instead of string split
+   |
+26 | "a,b,c,d".split(maxsplit=1)
+27 | "a,b,c,d".split(maxsplit=0)
+28 | "VERB AUX PRON ADP DET".split(" ")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF035
+29 | '   1   2   3   '.split()
+30 | '1<>2<>3<4'.split('<>')
+   |
+   = help: Replace string split with list literal
+
+ℹ Unsafe fix
+25 25 | "a,b,c,d".split(maxsplit=1.0)
+26 26 | "a,b,c,d".split(maxsplit=1)
+27 27 | "a,b,c,d".split(maxsplit=0)
+28    |-"VERB AUX PRON ADP DET".split(" ")
+   28 |+["VERB", "AUX", "PRON", "ADP", "DET"]
+29 29 | '   1   2   3   '.split()
+30 30 | '1<>2<>3<4'.split('<>')
+31 31 | 
+
+RUF035.py:29:1: RUF035 [*] Consider using a list instead of string split
+   |
+27 | "a,b,c,d".split(maxsplit=0)
+28 | "VERB AUX PRON ADP DET".split(" ")
+29 | '   1   2   3   '.split()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF035
+30 | '1<>2<>3<4'.split('<>')
+   |
+   = help: Replace string split with list literal
+
+ℹ Unsafe fix
+26 26 | "a,b,c,d".split(maxsplit=1)
+27 27 | "a,b,c,d".split(maxsplit=0)
+28 28 | "VERB AUX PRON ADP DET".split(" ")
+29    |-'   1   2   3   '.split()
+   29 |+["1", "2", "3"]
+30 30 | '1<>2<>3<4'.split('<>')
+31 31 | 
+32 32 | # negatives
+
+RUF035.py:30:1: RUF035 [*] Consider using a list instead of string split
+   |
+28 | "VERB AUX PRON ADP DET".split(" ")
+29 | '   1   2   3   '.split()
+30 | '1<>2<>3<4'.split('<>')
+   | ^^^^^^^^^^^^^^^^^^^^^^^ RUF035
+31 | 
+32 | # negatives
+   |
+   = help: Replace string split with list literal
+
+ℹ Unsafe fix
+27 27 | "a,b,c,d".split(maxsplit=0)
+28 28 | "VERB AUX PRON ADP DET".split(" ")
+29 29 | '   1   2   3   '.split()
+30    |-'1<>2<>3<4'.split('<>')
+   30 |+["1", "2", "3<4"]
+31 31 | 
+32 32 | # negatives
+33 33 |
