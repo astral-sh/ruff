@@ -1438,7 +1438,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         assignment.into(),
                         "unsupported-operator",
                         format_args!(
-                            "Operator `{op}=` is unsupported for type `{}` with type `{}`",
+                            "Operator `{op}=` is unsupported between objects of type `{}` and `{}`",
                             target_type.display(self.db),
                             value_type.display(self.db)
                         ),
@@ -1457,7 +1457,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     assignment.into(),
                     "unsupported-operator",
                     format_args!(
-                        "Operator `{op}` is unsupported between objects of type `{}` and `{}`",
+                        "Operator `{op}=` is unsupported between objects of type `{}` and `{}`",
                         left_ty.display(self.db),
                         right_ty.display(self.db)
                     ),
