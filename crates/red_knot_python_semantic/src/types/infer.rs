@@ -359,6 +359,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// Get the already-inferred type of an expression node.
     ///
     /// PANIC if no type has been inferred for this node.
+    #[track_caller]
     fn expression_ty(&self, expr: &ast::Expr) -> Type<'db> {
         self.types
             .expression_ty(expr.scoped_ast_id(self.db, self.scope()))
@@ -978,13 +979,20 @@ impl<'db> TypeInferenceBuilder<'db> {
             body,
         } = with_statement;
 
+        // TODO: Handle async with statements. For async with statements, the value returned
+        // by `__enter__` must be awaited.
+
         for item in items {
             let target = item.optional_vars.as_deref();
             if let Some(ast::Expr::Name(name)) = target {
                 self.infer_definition(name);
             } else {
                 // TODO infer definitions in unpacking assignment
-                self.infer_expression(&item.context_expr);
+
+                // Call into the context expression inference to validate that it evaluates
+                // to a valid context manager.
+                let context_expression_ty = self.infer_expression(&item.context_expr);
+                self.infer_context_expression(&item.context_expr, context_expression_ty);
                 self.infer_optional_expression(target);
             }
         }
@@ -998,18 +1006,104 @@ impl<'db> TypeInferenceBuilder<'db> {
         with_item: &ast::WithItem,
         definition: Definition<'db>,
     ) {
-        let expression = self.index.expression(&with_item.context_expr);
-        let result = infer_expression_types(self.db, expression);
-        self.extend(result);
+        let context_expr = self.index.expression(&with_item.context_expr);
+        self.extend(infer_expression_types(self.db, context_expr));
 
-        // TODO(dhruvmanila): The correct type inference here is the return type of the __enter__
-        // method of the context manager.
-        let context_expr_ty = self.expression_ty(&with_item.context_expr);
+        let target_ty = self.infer_context_expression(
+            &with_item.context_expr,
+            self.expression_ty(&with_item.context_expr),
+        );
 
         self.types
             .expressions
-            .insert(target.scoped_ast_id(self.db, self.scope()), context_expr_ty);
-        self.add_binding(target.into(), definition, context_expr_ty);
+            .insert(target.scoped_ast_id(self.db, self.scope()), target_ty);
+        self.add_binding(target.into(), definition, target_ty);
+    }
+
+    /// Infers the type of a context expression (`with expr`) and returns the target's type
+    ///
+    /// Returns [`Type::Unknown`] if the context expression doesn't implement the context manager protocol.
+    ///
+    /// ## Terminology
+    /// See [PEP343](https://peps.python.org/pep-0343/#standard-terminology).
+    fn infer_context_expression(
+        &mut self,
+        context_expression: &ast::Expr,
+        context_expression_ty: Type<'db>,
+    ) -> Type<'db> {
+        let context_manager_ty = context_expression_ty.to_meta_type(self.db);
+
+        let enter_ty = context_manager_ty.member(self.db, "__enter__");
+        let exit_ty = context_manager_ty.member(self.db, "__exit__");
+
+        // TODO: The checks here should be simplified to checking if context manager implements the `contextlib.AbstractContextManager` protocol.
+        if enter_ty.is_unbound() && exit_ty.is_unbound() {
+            self.add_diagnostic(
+                context_expression.into(),
+                "invalid-context-manager",
+                format_args!(
+                    "Object of type {} cannot be used with `with` because it doesn't implement `__enter__` and `__exit__`",
+                    context_expression_ty.display(self.db)
+                ),
+            );
+            Type::Unknown
+        } else if enter_ty.is_unbound() {
+            self.add_diagnostic(
+                context_expression.into(),
+                "invalid-context-manager",
+                format_args!(
+                    "Object of type {} cannot be used with `with` because it doesn't implement `__enter__`",
+                    context_expression_ty.display(self.db)
+                ),
+            );
+            Type::Unknown
+        } else {
+            let target_ty = enter_ty
+                .call(self.db, &[context_expression_ty])
+                .return_ty_result(self.db, context_expression.into(), self)
+                .unwrap_or_else(|err| {
+                    self.add_diagnostic(
+                        context_expression.into(),
+                        "invalid-context-manager",
+                        format_args!("
+                            Object of type {context_expression} cannot be used with `with` because the method `__enter__` of type {enter_ty} is not callable",
+                            context_expression = context_expression_ty.display(self.db),
+                            enter_ty = enter_ty.display(self.db)
+                        ),
+                    );
+                    err.return_ty()
+                });
+
+            if exit_ty.is_unbound() {
+                self.add_diagnostic(
+                    context_expression.into(),
+                    "invalid-context-manager",
+                    format_args!(
+                        "Object of type {} cannot be used with `with` because it doesn't implement `__exit__`",
+                        context_expression_ty.display(self.db)
+                    ),
+                );
+            } else if exit_ty
+                .call(
+                    self.db,
+                    &[context_manager_ty, Type::None, Type::None, Type::None],
+                )
+                .return_ty_result(self.db, context_expression.into(), self)
+                .is_err()
+            {
+                self.add_diagnostic(
+                    context_expression.into(),
+                    "invalid-context-manager",
+                    format_args!(
+                        "Object of type {context_expression} cannot be used with `with` because the method `__exit__` of type {exit_ty} is not callable",
+                        context_expression = context_expression_ty.display(self.db),
+                        exit_ty = exit_ty.display(self.db),
+                    ),
+                );
+            }
+
+            target_ty
+        }
     }
 
     fn infer_except_handler_definition(
