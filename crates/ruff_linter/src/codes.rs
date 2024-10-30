@@ -528,6 +528,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pyupgrade, "041") => (RuleGroup::Stable, rules::pyupgrade::rules::TimeoutErrorAlias),
         (Pyupgrade, "042") => (RuleGroup::Preview, rules::pyupgrade::rules::ReplaceStrEnum),
         (Pyupgrade, "043") => (RuleGroup::Preview, rules::pyupgrade::rules::UnnecessaryDefaultTypeArgs),
+        (Pyupgrade, "044") => (RuleGroup::Preview, rules::pyupgrade::rules::NonPEP646Unpack),
 
         // pydocstyle
         (Pydocstyle, "100") => (RuleGroup::Stable, rules::pydocstyle::rules::UndocumentedPublicModule),

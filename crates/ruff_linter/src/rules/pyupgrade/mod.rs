@@ -235,4 +235,18 @@ mod tests {
         assert_messages!(diagnostics);
         Ok(())
     }
+
+    #[test]
+    fn unpack_pep_646_py311() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyupgrade/UP044.py"),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                target_version: PythonVersion::Py311,
+                ..settings::LinterSettings::for_rule(Rule::NonPEP646Unpack)
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
 }
