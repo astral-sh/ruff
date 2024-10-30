@@ -5,7 +5,7 @@ use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{
     parenthesized, parse::Parse, spanned::Spanned, Attribute, Error, Expr, ExprCall, ExprMatch,
-    Ident, ItemFn, LitStr, Pat, Path, Stmt, Token,
+    Ident, ItemFn, LitStr, Pat, Path, PathSegment, Stmt, Token,
 };
 
 use crate::rule_code_prefix::{get_prefix_ident, intersection_all};
@@ -22,6 +22,8 @@ struct Rule {
     code: LitStr,
     /// The rule group identifier, e.g., `RuleGroup::Preview`.
     group: Path,
+    /// The rule category identifier, e.g., `RuleCategory::Performance`
+    category: Path,
     /// The path to the struct implementing the rule, e.g.
     /// `rules::pycodestyle::rules::logical_lines::NoIndentedBlock`
     path: Path,
@@ -76,7 +78,7 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
     let linter_idents: Vec<_> = linter_to_rules.keys().collect();
 
     let all_rules = linter_to_rules.values().flat_map(BTreeMap::values);
-    let mut output = register_rules(all_rules);
+    let mut output = register_rules(all_rules.clone());
 
     output.extend(quote! {
         #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -198,6 +200,24 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
         }
     });
 
+    let mut category_match_arms = quote!();
+    let category_to_rules = rules_by_category(all_rules);
+    for (category, rules) in &category_to_rules {
+        let rule_paths = rules
+            .iter()
+            .map(|(name, attrs)| quote!(#(#attrs)* Rule::#name));
+        category_match_arms.extend(quote! {
+            Self::#category => vec![#(#rule_paths,)*].into_iter(),
+        });
+    }
+    output.extend(quote! {
+        impl RuleCategory {
+            pub fn rules(&self) -> ::std::vec::IntoIter<Rule>{
+                match self { #category_match_arms }
+            }
+        }
+    });
+
     let rule_to_code = generate_rule_to_code(&linter_to_rules);
     output.extend(rule_to_code);
 
@@ -232,6 +252,29 @@ fn rules_by_prefix(
     rules_by_prefix
 }
 
+/// Group rules by their category
+fn rules_by_category<'a>(
+    rules: impl Iterator<Item = &'a Rule>,
+) -> HashMap<PathSegment, Vec<(Ident, Vec<Attribute>)>> {
+    let mut rules_by_category: HashMap<PathSegment, Vec<(Ident, Vec<Attribute>)>> = HashMap::new();
+
+    for rule in rules {
+        rules_by_category
+            .entry(
+                rule.category
+                    .clone()
+                    .segments
+                    .last()
+                    .expect("Must have last segment")
+                    .clone(),
+            )
+            .or_default()
+            .push((rule.name.clone(), rule.attrs.clone()));
+    }
+
+    rules_by_category
+}
+
 /// Map from rule to codes that can be used to select it.
 /// This abstraction exists to support a one-to-many mapping, whereby a single rule could map
 /// to multiple codes (e.g., if it existed in multiple linters, like Pylint and Flake8, under
@@ -255,6 +298,7 @@ fn generate_rule_to_code(linter_to_rules: &BTreeMap<Ident, BTreeMap<String, Rule
 
     let mut rule_noqa_code_match_arms = quote!();
     let mut rule_group_match_arms = quote!();
+    let mut rule_category_match_arms = quote!();
 
     for (rule, codes) in rule_to_codes {
         let rule_name = rule.segments.last().unwrap();
@@ -280,6 +324,7 @@ See also https://github.com/astral-sh/ruff/issues/2186.
             linter,
             code,
             group,
+            category,
             attrs,
             ..
         } = codes
@@ -294,6 +339,10 @@ See also https://github.com/astral-sh/ruff/issues/2186.
 
         rule_group_match_arms.extend(quote! {
             #(#attrs)* Rule::#rule_name => #group,
+        });
+
+        rule_category_match_arms.extend(quote! {
+            #(#attrs)* Rule::#rule_name => #category,
         });
     }
 
@@ -312,6 +361,14 @@ See also https://github.com/astral-sh/ruff/issues/2186.
 
                 match self {
                     #rule_group_match_arms
+                }
+            }
+
+            pub fn category(&self) -> RuleCategory {
+                use crate::registry::RuleNamespace;
+
+                match self {
+                    #rule_category_match_arms
                 }
             }
 
@@ -478,7 +535,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
 }
 
 impl Parse for Rule {
-    /// Parses a match arm such as `(Pycodestyle, "E112") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::NoIndentedBlock),`
+    /// Parses a match arm such as `(Pycodestyle, "E112") => (RuleGroup::Preview, RuleCategory::Suspicious, rules::pycodestyle::rules::logical_lines::NoIndentedBlock),`
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let attrs = Attribute::parse_outer(input)?;
         let pat_tuple;
@@ -491,6 +548,8 @@ impl Parse for Rule {
         parenthesized!(pat_tuple in input);
         let group: Path = pat_tuple.parse()?;
         let _: Token!(,) = pat_tuple.parse()?;
+        let category: Path = pat_tuple.parse()?;
+        let _: Token!(,) = pat_tuple.parse()?;
         let rule_path: Path = pat_tuple.parse()?;
         let _: Token!(,) = input.parse()?;
         let rule_name = rule_path.segments.last().unwrap().ident.clone();
@@ -499,6 +558,7 @@ impl Parse for Rule {
             linter,
             code,
             group,
+            category,
             path: rule_path,
             attrs,
         })

@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use itertools::Itertools;
 use regex::{Captures, Regex};
+use ruff_linter::codes::RuleCategory;
 use strum::IntoEnumIterator;
 
 use ruff_diagnostics::FixAvailability;
@@ -88,6 +89,13 @@ pub(crate) fn main(args: &Args) -> Result<()> {
                 output.push_str(
                     r"This rule is unstable and in [preview](../preview.md). The `--preview` flag is required for use.",
                 );
+                output.push('\n');
+                output.push('\n');
+            }
+
+            let category = rule.category();
+            if !matches!(category, RuleCategory::Uncategorized) {
+                output.push_str(&format!(r"Category: {category}."));
                 output.push('\n');
                 output.push('\n');
             }

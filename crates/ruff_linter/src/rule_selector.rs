@@ -6,7 +6,7 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use crate::codes::RuleIter;
-use crate::codes::{RuleCodePrefix, RuleGroup};
+use crate::codes::{RuleCategory, RuleCodePrefix, RuleGroup};
 use crate::registry::{Linter, Rule, RuleNamespace};
 use crate::rule_redirects::get_redirect;
 use crate::settings::types::PreviewMode;
@@ -21,6 +21,8 @@ pub enum RuleSelector {
     /// Legacy category to select both the `flake8-debugger` and `flake8-print` linters
     /// via a single selector.
     T,
+    /// Select all rules for a given category
+    Category(RuleCategory),
     /// Select all rules for a given linter.
     Linter(Linter),
     /// Select all rules for a given linter with a given prefix.
@@ -65,11 +67,20 @@ impl FromStr for RuleSelector {
             "C" => Ok(Self::C),
             "T" => Ok(Self::T),
             _ => {
+                // Redirect
                 let (s, redirected_from) = match get_redirect(s) {
                     Some((from, target)) => (target, Some(from)),
                     None => (s, None),
                 };
 
+                // Category
+                if let Ok(c) = RuleCategory::from_str(s) {
+                    if !matches!(c, RuleCategory::Uncategorized) {
+                        return Ok(Self::Category(c));
+                    }
+                }
+
+                // Linter
                 let (linter, code) =
                     Linter::parse_code(s).ok_or_else(|| ParseError::Unknown(s.to_string()))?;
 
@@ -77,6 +88,7 @@ impl FromStr for RuleSelector {
                     return Ok(Self::Linter(linter));
                 }
 
+                // Prefix and single rule code
                 let prefix = RuleCodePrefix::parse(&linter, code)
                     .map_err(|_| ParseError::Unknown(s.to_string()))?;
 
@@ -131,6 +143,8 @@ impl RuleSelector {
                 (prefix.linter().common_prefix(), prefix.short_code())
             }
             RuleSelector::Linter(l) => (l.common_prefix(), ""),
+            // TODO(SB): implement
+            RuleSelector::Category(..) => ("", ""),
         }
     }
 }
@@ -198,6 +212,7 @@ impl RuleSelector {
             RuleSelector::Prefix { prefix, .. } | RuleSelector::Rule { prefix, .. } => {
                 RuleSelectorIter::Vec(prefix.clone().rules())
             }
+            RuleSelector::Category(category) => RuleSelectorIter::Vec(category.rules()),
         }
     }
 
@@ -338,6 +353,7 @@ impl RuleSelector {
             RuleSelector::All => Specificity::All,
             RuleSelector::T => Specificity::LinterGroup,
             RuleSelector::C => Specificity::LinterGroup,
+            RuleSelector::Category(..) => Specificity::LinterCategory,
             RuleSelector::Linter(..) => Specificity::Linter,
             RuleSelector::Rule { .. } => Specificity::Rule,
             RuleSelector::Prefix { prefix, .. } => {
@@ -361,6 +377,14 @@ impl RuleSelector {
             "C" => Ok(Self::C),
             "T" => Ok(Self::T),
             _ => {
+                // Category
+                if let Ok(c) = RuleCategory::from_str(s) {
+                    if !matches!(c, RuleCategory::Uncategorized) {
+                        return Ok(Self::Category(c));
+                    }
+                }
+
+                // Linter
                 let (linter, code) =
                     Linter::parse_code(s).ok_or_else(|| ParseError::Unknown(s.to_string()))?;
 
@@ -368,6 +392,7 @@ impl RuleSelector {
                     return Ok(Self::Linter(linter));
                 }
 
+                // Prefix and single rule code
                 let prefix = RuleCodePrefix::parse(&linter, code)
                     .map_err(|_| ParseError::Unknown(s.to_string()))?;
 
@@ -393,6 +418,8 @@ pub enum Specificity {
     All,
     /// The specificity when selecting a legacy linter group (e.g., `--select C` or `--select T`).
     LinterGroup,
+    /// The specificity when selecting a linter category (e.g., `--select correctness` or `--select suspicious`).
+    LinterCategory,
     /// The specificity when selecting a linter (e.g., `--select PLE` or `--select UP`).
     Linter,
     /// The specificity when selecting via a rule prefix with a one-character code (e.g., `--select PLE1`).
