@@ -356,7 +356,7 @@ enum SymbolDefinitions {
     Declarations(SymbolDeclarations),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) struct BindingWithConstraintsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, Definition<'db>>,
     all_constraints: &'map IndexVec<ScopedConstraintId, Constraint<'db>>,

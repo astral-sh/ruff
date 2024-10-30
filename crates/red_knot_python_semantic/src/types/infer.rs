@@ -2512,8 +2512,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             )
         };
 
-        let definitions2 = definitions.clone();
-        let has_definitions = definitions2.count() > 0;
+        let mut definitions = definitions.peekable();
+        let has_definitions = definitions.peek().is_some();
 
         let bindings_ty = bindings_ty(self.db, definitions);
         // dbg!("==============================");

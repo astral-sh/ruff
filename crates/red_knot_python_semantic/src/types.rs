@@ -7,14 +7,14 @@ use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, Symbol};
 use crate::semantic_index::{
     global_scope, semantic_index, symbol_table, use_def_map, BindingWithConstraints,
-    BindingWithConstraintsIterator, DeclarationsIterator,
+    DeclarationsIterator,
 };
 use crate::stdlib::{
     builtins_symbol_ty, types_symbol_ty, typeshed_symbol_ty, typing_extensions_symbol_ty,
 };
 use crate::types::diagnostic::TypeCheckDiagnosticsBuilder;
 use crate::types::narrow::narrowing_constraint;
-use crate::{db, Db, FxOrderSet, HasTy, Module, SemanticModel};
+use crate::{Db, FxOrderSet, HasTy, Module, SemanticModel};
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
 pub use self::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
@@ -349,10 +349,13 @@ fn definition_expression_ty<'db>(
 /// Will panic if called with zero bindings and no `unbound_ty`. This is a logic error, as any
 /// symbol with zero visible bindings clearly may be unbound, and the caller should provide an
 /// `unbound_ty`.
-fn bindings_ty<'db>(
+fn bindings_ty<'map, 'db>(
     db: &'db dyn Db,
-    bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
-) -> SymbolLookupResult<'db> {
+    bindings_with_constraints: impl Iterator<Item = BindingWithConstraints<'map, 'db>>,
+) -> SymbolLookupResult<'db>
+where
+    'db: 'map,
+{
     let mut def_types = bindings_with_constraints.map(
         |BindingWithConstraints {
              binding,

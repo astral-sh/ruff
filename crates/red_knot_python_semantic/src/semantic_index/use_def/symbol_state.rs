@@ -355,7 +355,7 @@ pub(super) struct BindingIdWithConstraints<'a> {
     pub(super) constraint_ids: ConstraintIdIterator<'a>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(super) struct BindingIdWithConstraintsIterator<'a> {
     definitions: BindingsIterator<'a>,
     constraints: ConstraintsIterator<'a>,
