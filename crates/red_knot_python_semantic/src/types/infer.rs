@@ -33,7 +33,7 @@ use itertools::Itertools;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, AnyNodeRef, Expr, ExprContext, Operator, UnaryOp};
+use ruff_python_ast::{self as ast, AnyNodeRef, Expr, ExprContext, UnaryOp};
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
 use salsa;
@@ -1425,10 +1425,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         };
         let value_type = self.infer_expression(value);
 
-        // TODO(charlie): Add remaining branches for different types of augmented assignments.
-        if let (Operator::Sub, Type::Instance(class)) = (*op, target_type) {
-            let class_member = class.class_member(self.db, "__isub__");
-            let call = class_member.call(self.db, &[value_type]);
+        if let Type::Instance(class) = target_type {
+            let class_member = class.class_member(self.db, op.in_place_dunder());
+            let call = class_member.call(self.db, &[target_type, value_type]);
 
             return match call.return_ty_result(self.db, AnyNodeRef::StmtAugAssign(assignment), self)
             {
@@ -2516,9 +2515,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = attribute;
 
         let value_ty = self.infer_expression(value);
-        let member_ty = value_ty.member(self.db, &Name::new(&attr.id));
-
-        member_ty
+        value_ty.member(self.db, &Name::new(&attr.id))
     }
 
     fn infer_attribute_expression(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {

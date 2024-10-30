@@ -18,6 +18,14 @@ class C:
 x = C()
 x -= 1
 reveal_type(x)  # revealed: str
+
+class C:
+    def __iadd__(self, other: str) -> float:
+        return "Hello, world!"
+
+x = C()
+x += "Hello"
+reveal_type(x)  # revealed: float
 ```
 
 ## Unsupported types
