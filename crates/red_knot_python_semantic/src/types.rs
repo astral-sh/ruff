@@ -89,14 +89,6 @@ impl<'db> SymbolLookupResult<'db> {
     }
 
     #[track_caller]
-    fn todo_unwrap_type(&self) -> Type<'db> {
-        match self {
-            SymbolLookupResult::Bound(ty, _) => *ty,
-            SymbolLookupResult::Unbound => todo!(),
-        }
-    }
-
-    #[track_caller]
     fn expect_bound(self) -> Type<'db> {
         match self {
             SymbolLookupResult::Bound(ty, Boundedness::DefinitelyBound) => ty,
@@ -1190,7 +1182,7 @@ impl<'db> Type<'db> {
                     let args = std::iter::once(self)
                         .chain(arg_types.iter().copied())
                         .collect::<Vec<_>>();
-                    dunder_call_method.todo_unwrap_type().call(db, &args)
+                    dunder_call_method.unwrap_or(Type::Never).call(db, &args)
                 }
             }
 
@@ -1252,7 +1244,7 @@ impl<'db> Type<'db> {
             let dunder_next_method = iterator_ty
                 .to_meta_type(db)
                 .member(db, "__next__")
-                .todo_unwrap_type();
+                .unwrap_or(Type::Never);
             return dunder_next_method
                 .call(db, &[iterator_ty])
                 .return_ty(db)

@@ -1135,7 +1135,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             // TODO should infer `ExceptionGroup` if all caught exceptions
             // are subclasses of `Exception` --Alex
             builtins_symbol_ty(self.db, "BaseExceptionGroup")
-                .todo_unwrap_type()
+                .unwrap_or_unknown()
                 .to_instance(self.db)
         } else {
             // TODO: anything that's a consistent subtype of
@@ -1518,7 +1518,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             let class_member = class.class_member(self.db, op.in_place_dunder());
             if !class_member.is_unbound() {
                 let call = class_member
-                    .todo_unwrap_type()
+                    .unwrap_or(Type::Never)
                     .call(self.db, &[target_type, value_type]);
                 return match call.return_ty_result(
                     self.db,
@@ -2522,8 +2522,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         // dbg!(has_definitions);
 
         if may_be_unbound {
-            // dbg!(self.lookup_name(name).todo_unwrap_type().display(self.db));
-
             match self.lookup_name(name) {
                 SymbolLookupResult::Bound(ty, ty_boundedness) => match bindings_ty {
                     SymbolLookupResult::Bound(bindings_ty, _) => {
@@ -2886,13 +2884,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                         && rhs_reflected != left_class.class_member(self.db, reflected_dunder)
                     {
                         return rhs_reflected
-                            .todo_unwrap_type()
+                            .unwrap_or(Type::Never)
                             .call(self.db, &[right_ty, left_ty])
                             .return_ty(self.db)
                             .or_else(|| {
                                 left_class
                                     .class_member(self.db, op.dunder())
-                                    .todo_unwrap_type()
+                                    .unwrap_or(Type::Never)
                                     .call(self.db, &[left_ty, right_ty])
                                     .return_ty(self.db)
                             });
@@ -3511,7 +3509,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let dunder_getitem_method = value_meta_ty.member(self.db, "__getitem__");
                 if !dunder_getitem_method.is_unbound() {
                     return dunder_getitem_method
-                        .todo_unwrap_type()
+                        .unwrap_or(Type::Never)
                         .call(self.db, &[slice_ty])
                         .return_ty_result(self.db, value_node.into(), &mut self.diagnostics)
                         .unwrap_or_else(|err| {
@@ -3541,7 +3539,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     let dunder_class_getitem_method = value_ty.member(self.db, "__class_getitem__");
                     if !dunder_class_getitem_method.is_unbound() {
                         return dunder_class_getitem_method
-                            .todo_unwrap_type()
+                            .unwrap_or(Type::Never)
                             .call(self.db, &[slice_ty])
                             .return_ty_result(self.db, value_node.into(), &mut self.diagnostics)
                             .unwrap_or_else(|err| {
@@ -4136,7 +4134,7 @@ fn perform_membership_test_comparison<'db>(
     } else {
         // If `__contains__` is available, it is used directly for the membership test.
         contains_dunder
-            .todo_unwrap_type()
+            .unwrap_or(Type::Never)
             .call(db, &[right_instance, left_instance])
             .return_ty(db)
     };
