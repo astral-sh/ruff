@@ -1,4 +1,8 @@
-## Literal
+# Literal
+
+<https://typing.readthedocs.io/en/latest/spec/literal.html#literals>
+
+## Parameterization
 
 ```py
 from typing import Literal
@@ -49,4 +53,29 @@ invalid1: Literal[3 + 4]
 invalid2: Literal[4 + 3j]
 # error: [invalid-literal-parameter]
 invalid3: Literal[(3, 4)]
+```
+
+## Detecting typing.Literal
+
+Only Literal that is defined in typing module is detected as the special Literal.
+
+```py
+from typing import _SpecialForm
+
+Literal: _SpecialForm
+a1: Literal[26]
+
+def f():
+    reveal_type(a1)  # revealed: @Todo
+```
+
+## Detecting typing_extensions.Literal
+
+```py
+from typing_extensions import Literal
+
+a1: Literal[26]
+
+def f():
+    reveal_type(a1)  # revealed: Literal[1]
 ```
