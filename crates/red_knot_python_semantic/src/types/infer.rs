@@ -2623,8 +2623,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 };
 
-                let db = self.db;
-
                 if let SymbolLookupResult::Bound(class_member, _) =
                     class.class_member(self.db, unary_dunder_method)
                 {
@@ -2642,7 +2640,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 "unsupported-operator",
                                 format_args!(
                                     "Unary operator `{op}` is unsupported for type `{}`",
-                                    operand_type.display(db),
+                                    operand_type.display(self.db),
                                 ),
                             );
                             e.return_ty()
@@ -2654,7 +2652,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         "unsupported-operator",
                         format_args!(
                             "Unary operator `{op}` is unsupported for type `{}`",
-                            operand_type.display(db),
+                            operand_type.display(self.db),
                         ),
                     );
 

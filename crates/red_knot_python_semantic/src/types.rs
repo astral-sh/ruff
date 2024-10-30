@@ -2218,8 +2218,7 @@ mod tests {
             "
             class A: ...
             class B: ...
-            def flag() -> bool: ...
-            U = A if flag() else B
+            U = A if flag else B
         ",
         )
         .unwrap();
