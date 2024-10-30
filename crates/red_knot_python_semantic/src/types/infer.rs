@@ -1780,9 +1780,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                         asname: _,
                     } = alias;
 
-                    let member_ty = module_ty.member(self.db, &ast::name::Name::new(&name.id));
-
-                    if let SymbolLookupResult::Bound(member_ty, _) = member_ty {
+                    if let SymbolLookupResult::Bound(member_ty, _) =
+                        module_ty.member(self.db, &ast::name::Name::new(&name.id))
+                    {
                         // For possibly-unbound names, just eliminate Unbound from the type; we
                         // must be in a bound path. TODO diagnostic for maybe-unbound import?
                         member_ty
@@ -2448,10 +2448,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 global_symbol_ty(self.db, self.file, name)
             };
 
-            // if let SymbolLookupResult::Bound(ty, _) = ty {
-            //     dbg!(ty.display(self.db));
-            // }
-
             // Fallback to builtins (without infinite recursion if we're already in builtins.)
             if ty.may_be_unbound() && Some(self.scope()) != builtins_module_scope(self.db) {
                 let mut builtin_ty = builtins_symbol_ty(self.db, name);
@@ -2465,12 +2461,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                     builtin_ty = typing_extensions_symbol_ty(self.db, name);
                 }
 
-                // ty.replace_unbound_with(self.db, builtin_ty)
-                // ty.replace_unbound_with(self.db, builtin_ty.unwrap_or_unknown())
-                // ty.merge_unbound_with(self.db, builtin_ty)
-
                 match builtin_ty {
-                    SymbolLookupResult::Bound(builtin_ty, boundedness) => {
+                    SymbolLookupResult::Bound(builtin_ty, _) => {
                         ty.replace_unbound_with(self.db, builtin_ty)
                     }
                     SymbolLookupResult::Unbound => ty,
@@ -2516,14 +2508,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         let has_definitions = definitions.peek().is_some();
 
         let bindings_ty = bindings_ty(self.db, definitions);
-        // dbg!("==============================");
-        // dbg!(name);
-        // dbg!(may_be_unbound);
-        // dbg!(has_definitions);
-
         if may_be_unbound {
             match self.lookup_name(name) {
-                SymbolLookupResult::Bound(ty, ty_boundedness) => match bindings_ty {
+                SymbolLookupResult::Bound(ty, _) => match bindings_ty {
                     SymbolLookupResult::Bound(bindings_ty, _) => {
                         UnionType::from_elements(self.db, [bindings_ty, ty])
                     }
@@ -2581,9 +2568,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let value_ty = self.infer_expression(value);
         value_ty
             .member(self.db, &Name::new(&attr.id))
-            .unwrap_or_unknown();
-
-        member_ty
+            .unwrap_or_unknown()
     }
 
     fn infer_attribute_expression(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {

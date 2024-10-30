@@ -162,34 +162,10 @@ fn symbol_ty_by_id<'db>(
         let declarations = use_def.public_declarations(symbol);
         // If the symbol is undeclared in some paths, include the inferred type in the public type.
         let undeclared_ty = if declarations.may_be_undeclared() {
-            // Some(bindings_ty(
-            //     db,
-            //     use_def.public_bindings(symbol),
-            //     use_def
-            //         .public_may_be_unbound(symbol)
-            //         .then_some(Type::Unbound),
-            // ))
-
-            match bindings_ty(db, use_def.public_bindings(symbol)) {
-                SymbolLookupResult::Bound(ty, boundedness) => {
-                    // TODO: do something with boundedness
-
-                    // dbg!(boundedness);
-                    // dbg!(use_def.public_may_be_unbound(symbol));
-
-                    Some(
-                        SymbolLookupResult::Bound(ty, boundedness)
-                            .and_may_be_unbound(use_def.public_may_be_unbound(symbol)),
-                    )
-
-                    // if use_def.public_may_be_unbound(symbol) {
-                    //     Some(SymbolLookupResult::Bound(ty, Boundedness::MaybeUnbound))
-                    // } else {
-                    //     Some(SymbolLookupResult::Bound(ty, boundedness))
-                    // }
-                }
-                SymbolLookupResult::Unbound => Some(SymbolLookupResult::Unbound),
-            }
+            Some(
+                bindings_ty(db, use_def.public_bindings(symbol))
+                    .and_may_be_unbound(use_def.public_may_be_unbound(symbol)),
+            )
         } else {
             None
         };
@@ -200,21 +176,13 @@ fn symbol_ty_by_id<'db>(
                 declarations_ty(db, declarations, Some(ty)).unwrap_or_else(|(ty, _)| ty),
                 boundedness,
             ),
-            Some(SymbolLookupResult::Unbound) => SymbolLookupResult::Unbound,
             None => SymbolLookupResult::Bound(
                 declarations_ty(db, declarations, None).unwrap_or_else(|(ty, _)| ty),
                 Boundedness::DefinitelyBound,
             ),
+            Some(SymbolLookupResult::Unbound) => SymbolLookupResult::Unbound,
         }
     } else {
-        // bindings_ty(
-        //     db,
-        //     use_def.public_bindings(symbol),
-        //     use_def
-        //         .public_may_be_unbound(symbol)
-        //         .then_some(Type::Unbound),
-        // )
-
         bindings_ty(db, use_def.public_bindings(symbol))
             .and_may_be_unbound(use_def.public_may_be_unbound(symbol))
     }
@@ -272,11 +240,6 @@ pub(crate) fn global_symbol_ty<'db>(
 ) -> SymbolLookupResult<'db> {
     let explicit_ty = symbol_ty(db, global_scope(db, file), name);
 
-    // if let SymbolLookupResult::Bound(ty, b) = explicit_ty {
-    //     dbg!(ty.display(db));
-    //     dbg!(b);
-    // }
-
     if !explicit_ty.may_be_unbound() {
         return explicit_ty;
     }
@@ -290,7 +253,11 @@ pub(crate) fn global_symbol_ty<'db>(
     {
         // TODO: this should use `.to_instance(db)`. but we don't understand attribute access
         // on instance types yet.
-        return KnownClass::ModuleType.to_class(db).member(db, name);
+        if let SymbolLookupResult::Bound(module_type_member, _) =
+            KnownClass::ModuleType.to_class(db).member(db, name)
+        {
+            return explicit_ty.replace_unbound_with(db, module_type_member);
+        }
     }
 
     explicit_ty
@@ -1023,12 +990,10 @@ impl<'db> Type<'db> {
                 // ignore `__getattr__`. Typeshed has a fake `__getattr__` on `types.ModuleType`
                 // to help out with dynamic imports; we shouldn't use it for `ModuleLiteral` types
                 // where we know exactly which module we're dealing with.
-                if name != "__getattr__" && global_lookup.is_unbound() {
+                if name != "__getattr__" && global_lookup.may_be_unbound() {
                     // TODO: this should use `.to_instance()`, but we don't understand instance attribute yet
-                    let module_type_instance_member =
-                        KnownClass::ModuleType.to_class(db).member(db, name);
                     if let SymbolLookupResult::Bound(module_type_instance_member, _) =
-                        module_type_instance_member
+                        KnownClass::ModuleType.to_class(db).member(db, name)
                     {
                         global_lookup.replace_unbound_with(db, module_type_instance_member)
                     } else {
