@@ -480,7 +480,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_parameter_with_default_definition(parameter_with_default, definition);
             }
             DefinitionKind::WithItem(with_item) => {
-                self.infer_with_item_definition(with_item.target(), with_item.node(), definition);
+                self.infer_with_item_definition(
+                    with_item.target(),
+                    with_item.node(),
+                    with_item.is_async(),
+                    definition,
+                );
             }
             DefinitionKind::MatchPattern(match_pattern) => {
                 self.infer_match_pattern_definition(
@@ -974,14 +979,10 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_with_statement(&mut self, with_statement: &ast::StmtWith) {
         let ast::StmtWith {
             range: _,
-            is_async: _,
+            is_async,
             items,
             body,
         } = with_statement;
-
-        // TODO: Handle async with statements. For async with statements, the value returned
-        // by `__enter__` must be awaited.
-
         for item in items {
             let target = item.optional_vars.as_deref();
             if let Some(ast::Expr::Name(name)) = target {
@@ -992,7 +993,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // Call into the context expression inference to validate that it evaluates
                 // to a valid context manager.
                 let context_expression_ty = self.infer_expression(&item.context_expr);
-                self.infer_context_expression(&item.context_expr, context_expression_ty);
+                self.infer_context_expression(&item.context_expr, context_expression_ty, *is_async);
                 self.infer_optional_expression(target);
             }
         }
@@ -1004,6 +1005,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         target: &ast::ExprName,
         with_item: &ast::WithItem,
+        is_async: bool,
         definition: Definition<'db>,
     ) {
         let context_expr = self.index.expression(&with_item.context_expr);
@@ -1012,6 +1014,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let target_ty = self.infer_context_expression(
             &with_item.context_expr,
             self.expression_ty(&with_item.context_expr),
+            is_async,
         );
 
         self.types
@@ -1030,7 +1033,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         context_expression: &ast::Expr,
         context_expression_ty: Type<'db>,
+        is_async: bool,
     ) -> Type<'db> {
+        // TODO: Handle async with statements (they use `aenter` and `aexit`)
+        if is_async {
+            return Type::Todo;
+        }
+
         let context_manager_ty = context_expression_ty.to_meta_type(self.db);
 
         let enter_ty = context_manager_ty.member(self.db, "__enter__");

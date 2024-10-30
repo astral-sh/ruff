@@ -734,12 +734,20 @@ where
                     self.flow_merge(break_state);
                 }
             }
-            ast::Stmt::With(ast::StmtWith { items, body, .. }) => {
+            ast::Stmt::With(ast::StmtWith {
+                items,
+                body,
+                is_async,
+                ..
+            }) => {
                 for item in items {
                     self.visit_expr(&item.context_expr);
                     if let Some(optional_vars) = item.optional_vars.as_deref() {
                         self.add_standalone_expression(&item.context_expr);
-                        self.push_assignment(item.into());
+                        self.push_assignment(CurrentAssignment::WithItem {
+                            item,
+                            is_async: *is_async,
+                        });
                         self.visit_expr(optional_vars);
                         self.pop_assignment();
                     }
@@ -1011,12 +1019,13 @@ where
                                 },
                             );
                         }
-                        Some(CurrentAssignment::WithItem(with_item)) => {
+                        Some(CurrentAssignment::WithItem { item, is_async }) => {
                             self.add_definition(
                                 symbol,
                                 WithItemDefinitionNodeRef {
-                                    node: with_item,
+                                    node: item,
                                     target: name_node,
+                                    is_async,
                                 },
                             );
                         }
@@ -1232,7 +1241,10 @@ enum CurrentAssignment<'a> {
         node: &'a ast::Comprehension,
         first: bool,
     },
-    WithItem(&'a ast::WithItem),
+    WithItem {
+        item: &'a ast::WithItem,
+        is_async: bool,
+    },
 }
 
 impl<'a> From<&'a ast::StmtAnnAssign> for CurrentAssignment<'a> {
@@ -1256,12 +1268,6 @@ impl<'a> From<&'a ast::StmtFor> for CurrentAssignment<'a> {
 impl<'a> From<&'a ast::ExprNamed> for CurrentAssignment<'a> {
     fn from(value: &'a ast::ExprNamed) -> Self {
         Self::Named(value)
-    }
-}
-
-impl<'a> From<&'a ast::WithItem> for CurrentAssignment<'a> {
-    fn from(value: &'a ast::WithItem) -> Self {
-        Self::WithItem(value)
     }
 }
 
