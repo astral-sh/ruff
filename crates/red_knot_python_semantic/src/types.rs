@@ -1104,10 +1104,7 @@ impl<'db> Type<'db> {
 
         let dunder_iter_method = iterable_meta_type.member(db, "__iter__");
         if !dunder_iter_method.is_unbound() {
-            let CallOutcome::Callable {
-                return_ty: iterator_ty,
-            } = dunder_iter_method.call(db, &[self])
-            else {
+            let Some(iterator_ty) = dunder_iter_method.call(db, &[self]).return_ty(db) else {
                 return IterationOutcome::NotIterable {
                     not_iterable_ty: self,
                 };
@@ -1115,7 +1112,7 @@ impl<'db> Type<'db> {
 
             let dunder_next_method = iterator_ty.to_meta_type(db).member(db, "__next__");
             return dunder_next_method
-                .call(db, &[self])
+                .call(db, &[iterator_ty])
                 .return_ty(db)
                 .map(|element_ty| IterationOutcome::Iterable { element_ty })
                 .unwrap_or(IterationOutcome::NotIterable {
