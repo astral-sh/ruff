@@ -1,4 +1,3 @@
-use infer::TypeInferenceBuilder;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 
@@ -14,6 +13,7 @@ use crate::stdlib::{
     builtins_symbol_ty, types_symbol_ty, typeshed_symbol_ty, typing_extensions_symbol_ty,
     typing_symbol_ty,
 };
+use crate::types::diagnostic::TypeCheckDiagnosticsBuilder;
 use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet, HasTy, Module, SemanticModel};
 
@@ -1109,10 +1109,7 @@ impl<'db> Type<'db> {
 
         let dunder_iter_method = iterable_meta_type.member(db, "__iter__");
         if !dunder_iter_method.is_unbound() {
-            let CallOutcome::Callable {
-                return_ty: iterator_ty,
-            } = dunder_iter_method.call(db, &[self])
-            else {
+            let Some(iterator_ty) = dunder_iter_method.call(db, &[self]).return_ty(db) else {
                 return IterationOutcome::NotIterable {
                     not_iterable_ty: self,
                 };
@@ -1120,7 +1117,7 @@ impl<'db> Type<'db> {
 
             let dunder_next_method = iterator_ty.to_meta_type(db).member(db, "__next__");
             return dunder_next_method
-                .call(db, &[self])
+                .call(db, &[iterator_ty])
                 .return_ty(db)
                 .map(|element_ty| IterationOutcome::Iterable { element_ty })
                 .unwrap_or(IterationOutcome::NotIterable {
@@ -1517,15 +1514,15 @@ impl<'db> CallOutcome<'db> {
         &self,
         db: &'db dyn Db,
         node: ast::AnyNodeRef,
-        builder: &'a mut TypeInferenceBuilder<'db>,
+        diagnostics: &'a mut TypeCheckDiagnosticsBuilder<'db>,
     ) -> Type<'db> {
-        match self.return_ty_result(db, node, builder) {
+        match self.return_ty_result(db, node, diagnostics) {
             Ok(return_ty) => return_ty,
             Err(NotCallableError::Type {
                 not_callable_ty,
                 return_ty,
             }) => {
-                builder.add_diagnostic(
+                diagnostics.add(
                     node,
                     "call-non-callable",
                     format_args!(
@@ -1540,7 +1537,7 @@ impl<'db> CallOutcome<'db> {
                 called_ty,
                 return_ty,
             }) => {
-                builder.add_diagnostic(
+                diagnostics.add(
                     node,
                     "call-non-callable",
                     format_args!(
@@ -1556,7 +1553,7 @@ impl<'db> CallOutcome<'db> {
                 called_ty,
                 return_ty,
             }) => {
-                builder.add_diagnostic(
+                diagnostics.add(
                     node,
                     "call-non-callable",
                     format_args!(
@@ -1575,7 +1572,7 @@ impl<'db> CallOutcome<'db> {
         &self,
         db: &'db dyn Db,
         node: ast::AnyNodeRef,
-        builder: &'a mut TypeInferenceBuilder<'db>,
+        diagnostics: &'a mut TypeCheckDiagnosticsBuilder<'db>,
     ) -> Result<Type<'db>, NotCallableError<'db>> {
         match self {
             Self::Callable { return_ty } => Ok(*return_ty),
@@ -1583,7 +1580,7 @@ impl<'db> CallOutcome<'db> {
                 return_ty,
                 revealed_ty,
             } => {
-                builder.add_diagnostic(
+                diagnostics.add(
                     node,
                     "revealed-type",
                     format_args!("Revealed type is `{}`", revealed_ty.display(db)),
@@ -1615,10 +1612,10 @@ impl<'db> CallOutcome<'db> {
                                 *return_ty
                             } else {
                                 revealed = true;
-                                outcome.unwrap_with_diagnostic(db, node, builder)
+                                outcome.unwrap_with_diagnostic(db, node, diagnostics)
                             }
                         }
-                        _ => outcome.unwrap_with_diagnostic(db, node, builder),
+                        _ => outcome.unwrap_with_diagnostic(db, node, diagnostics),
                     };
                     union_builder = union_builder.add(return_ty);
                 }
@@ -1701,12 +1698,12 @@ impl<'db> IterationOutcome<'db> {
     fn unwrap_with_diagnostic(
         self,
         iterable_node: ast::AnyNodeRef,
-        inference_builder: &mut TypeInferenceBuilder<'db>,
+        diagnostics: &mut TypeCheckDiagnosticsBuilder<'db>,
     ) -> Type<'db> {
         match self {
             Self::Iterable { element_ty } => element_ty,
             Self::NotIterable { not_iterable_ty } => {
-                inference_builder.not_iterable_diagnostic(iterable_node, not_iterable_ty);
+                diagnostics.add_not_iterable(iterable_node, not_iterable_ty);
                 Type::Unknown
             }
         }
@@ -2033,6 +2030,11 @@ pub struct SliceLiteralType<'db> {
     step: Option<i32>,
 }
 
+impl<'db> SliceLiteralType<'db> {
+    fn as_tuple(self, db: &dyn Db) -> (Option<i32>, Option<i32>, Option<i32>) {
+        (self.start(db), self.stop(db), self.step(db))
+    }
+}
 #[salsa::interned]
 pub struct TupleType<'db> {
     #[return_ref]

@@ -86,3 +86,14 @@ substring2 = str_instance()[0:5]
 # TODO: Support overloads... Should be `str`
 reveal_type(substring2)  # revealed: @Todo
 ```
+
+## Unsupported slice types
+
+```py
+# TODO: It would be great if we raised an error here. This can be done once
+# we have support for overloads and generics, and once typeshed has a more
+# precise annotation for `str.__getitem__`, that makes use of the generic
+# `slice[..]` type. We could then infer `slice[str, str]` here and see that
+# it doesn't match the signature of `str.__getitem__`.
+"foo"["bar":"baz"]
+```
