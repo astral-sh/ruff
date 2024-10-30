@@ -1257,6 +1257,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 Cow::Owned(element_types)
                             } else {
                                 let mut element_types = tuple_ty.elements(builder.db).to_vec();
+                                // Subtract 1 to insert the starred expression type at the correct
+                                // index.
+                                element_types.resize(elts.len() - 1, Type::Unknown);
+                                // TODO: This should be `list[Unknown]`
                                 element_types.insert(starred_index, Type::Todo);
                                 Cow::Owned(element_types)
                             }
