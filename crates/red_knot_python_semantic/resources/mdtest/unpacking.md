@@ -130,6 +130,19 @@ reveal_type(b)  # revealed: Literal[2]
 reveal_type(c)  # revealed: @Todo
 ```
 
+### Starred expression (6)
+
+```py
+# TODO: Add diagnostic (need more values to unpack)
+(a, b, c, *d, e, f) = (1,)
+reveal_type(a)  # revealed: Literal[1]
+reveal_type(b)  # revealed: Unknown
+reveal_type(c)  # revealed: Unknown
+reveal_type(d)  # revealed: @Todo
+reveal_type(e)  # revealed: Unknown
+reveal_type(f)  # revealed: Unknown
+```
+
 ### Non-iterable unpacking
 
 TODO: Remove duplicate diagnostics. This is happening because for a sequence-like
