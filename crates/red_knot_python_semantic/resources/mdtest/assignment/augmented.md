@@ -6,6 +6,10 @@
 x = 3
 x -= 1
 reveal_type(x)  # revealed: Literal[2]
+
+x = 1.0
+x /= 2
+reveal_type(x)  # revealed: float
 ```
 
 ## Dunder methods
