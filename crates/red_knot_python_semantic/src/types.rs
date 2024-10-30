@@ -64,30 +64,6 @@ impl<'db> SymbolLookupResult<'db> {
         }
     }
 
-    pub fn merge_unbound_with(
-        self,
-        db: &'db dyn Db,
-        replacement: SymbolLookupResult<'db>,
-    ) -> SymbolLookupResult<'db> {
-        match (self, replacement) {
-            (r @ SymbolLookupResult::Bound(_, Boundedness::DefinitelyBound), _) => r,
-            (SymbolLookupResult::Unbound, other) => other,
-            (SymbolLookupResult::Bound(ty, Boundedness::MaybeUnbound), other) => match other {
-                SymbolLookupResult::Bound(other_ty, Boundedness::DefinitelyBound) => {
-                    let union = UnionType::from_elements(db, [other_ty, ty]);
-                    SymbolLookupResult::Bound(union, Boundedness::MaybeUnbound)
-                }
-                SymbolLookupResult::Bound(other_ty, Boundedness::MaybeUnbound) => {
-                    let union = UnionType::from_elements(db, [other_ty, ty]);
-                    SymbolLookupResult::Bound(union, Boundedness::MaybeUnbound)
-                }
-                SymbolLookupResult::Unbound => {
-                    SymbolLookupResult::Bound(ty, Boundedness::MaybeUnbound)
-                }
-            },
-        }
-    }
-
     #[track_caller]
     fn expect_bound(self) -> Type<'db> {
         match self {
