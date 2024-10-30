@@ -106,7 +106,7 @@ f += "Hello, world!"
 reveal_type(f)  # revealed: int
 ```
 
-## Partially-bound target union
+## Partially bound target union
 
 ```py
 def bool_instance() -> bool:
