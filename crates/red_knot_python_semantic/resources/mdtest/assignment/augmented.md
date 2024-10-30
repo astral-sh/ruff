@@ -116,7 +116,7 @@ class Foo:
     def __add__(self, other: int) -> str:
         return "Hello, world!"
     if bool_instance():
-        def __iadd__(self, other: str) -> int:
+        def __iadd__(self, other: int) -> int:
             return 42
 
 if bool_instance():
