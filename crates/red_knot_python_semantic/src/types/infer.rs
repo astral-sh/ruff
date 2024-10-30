@@ -2882,22 +2882,32 @@ impl<'db> TypeInferenceBuilder<'db> {
                             });
                     }
                 }
-                left_class
-                    .class_member(self.db, op.dunder())
-                    .todo_unwrap_type()
-                    .call(self.db, &[left_ty, right_ty])
-                    .return_ty(self.db)
-                    .or_else(|| {
-                        if left_class == right_class {
-                            None
-                        } else {
-                            right_class
-                                .class_member(self.db, op.reflected_dunder())
-                                .todo_unwrap_type()
+
+                let call_on_left_instance = if let SymbolLookupResult::Bound(class_member) =
+                    left_class.class_member(self.db, op.dunder())
+                {
+                    class_member
+                        .call(self.db, &[left_ty, right_ty])
+                        .return_ty(self.db)
+                } else {
+                    None
+                };
+
+                call_on_left_instance.or_else(|| {
+                    if left_class == right_class {
+                        None
+                    } else {
+                        if let SymbolLookupResult::Bound(class_member) =
+                            right_class.class_member(self.db, op.reflected_dunder())
+                        {
+                            class_member
                                 .call(self.db, &[right_ty, left_ty])
                                 .return_ty(self.db)
+                        } else {
+                            None
                         }
-                    })
+                    }
+                })
             }
 
             (
