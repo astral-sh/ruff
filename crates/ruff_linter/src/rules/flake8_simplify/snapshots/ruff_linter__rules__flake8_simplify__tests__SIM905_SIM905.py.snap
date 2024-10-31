@@ -1,7 +1,7 @@
 ---
-source: crates/ruff_linter/src/rules/ruff/mod.rs
+source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
 ---
-RUF035.py:6:1: RUF035 [*] Consider using a list instead of `str.split`
+SIM905.py:6:1: SIM905 [*] Consider using a list instead of `str.split`
    |
  5 |   # positives
  6 | / """
@@ -9,7 +9,7 @@ RUF035.py:6:1: RUF035 [*] Consider using a list instead of `str.split`
  8 | |     itemB
  9 | |     itemC
 10 | | """.split()
-   | |___________^ RUF035
+   | |___________^ SIM905
 11 |   
 12 |   "a,b,c,d".split(",")
    |
@@ -29,12 +29,12 @@ RUF035.py:6:1: RUF035 [*] Consider using a list instead of `str.split`
 12 8  | "a,b,c,d".split(",")
 13 9  | "a,b,c,d".split(None)
 
-RUF035.py:12:1: RUF035 [*] Consider using a list instead of `str.split`
+SIM905.py:12:1: SIM905 [*] Consider using a list instead of `str.split`
    |
 10 | """.split()
 11 | 
 12 | "a,b,c,d".split(",")
-   | ^^^^^^^^^^^^^^^^^^^^ RUF035
+   | ^^^^^^^^^^^^^^^^^^^^ SIM905
 13 | "a,b,c,d".split(None)
 14 | "a,b,c,d".split(",", 1)
    |
@@ -50,11 +50,11 @@ RUF035.py:12:1: RUF035 [*] Consider using a list instead of `str.split`
 14 14 | "a,b,c,d".split(",", 1)
 15 15 | "a,b,c,d".split(None, 1)
 
-RUF035.py:13:1: RUF035 [*] Consider using a list instead of `str.split`
+SIM905.py:13:1: SIM905 [*] Consider using a list instead of `str.split`
    |
 12 | "a,b,c,d".split(",")
 13 | "a,b,c,d".split(None)
-   | ^^^^^^^^^^^^^^^^^^^^^ RUF035
+   | ^^^^^^^^^^^^^^^^^^^^^ SIM905
 14 | "a,b,c,d".split(",", 1)
 15 | "a,b,c,d".split(None, 1)
    |
@@ -70,12 +70,12 @@ RUF035.py:13:1: RUF035 [*] Consider using a list instead of `str.split`
 15 15 | "a,b,c,d".split(None, 1)
 16 16 | "a,b,c,d".split(sep=",")
 
-RUF035.py:14:1: RUF035 [*] Consider using a list instead of `str.split`
+SIM905.py:14:1: SIM905 [*] Consider using a list instead of `str.split`
    |
 12 | "a,b,c,d".split(",")
 13 | "a,b,c,d".split(None)
 14 | "a,b,c,d".split(",", 1)
-   | ^^^^^^^^^^^^^^^^^^^^^^^ RUF035
+   | ^^^^^^^^^^^^^^^^^^^^^^^ SIM905
 15 | "a,b,c,d".split(None, 1)
 16 | "a,b,c,d".split(sep=",")
    |
@@ -91,23 +91,23 @@ RUF035.py:14:1: RUF035 [*] Consider using a list instead of `str.split`
 16 16 | "a,b,c,d".split(sep=",")
 17 17 | "a,b,c,d".split(sep=None)
 
-RUF035.py:15:1: RUF035 Consider using a list instead of `str.split`
+SIM905.py:15:1: SIM905 Consider using a list instead of `str.split`
    |
 13 | "a,b,c,d".split(None)
 14 | "a,b,c,d".split(",", 1)
 15 | "a,b,c,d".split(None, 1)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^ RUF035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ SIM905
 16 | "a,b,c,d".split(sep=",")
 17 | "a,b,c,d".split(sep=None)
    |
    = help: Replace `str.split` with list literal
 
-RUF035.py:16:1: RUF035 [*] Consider using a list instead of `str.split`
+SIM905.py:16:1: SIM905 [*] Consider using a list instead of `str.split`
    |
 14 | "a,b,c,d".split(",", 1)
 15 | "a,b,c,d".split(None, 1)
 16 | "a,b,c,d".split(sep=",")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^ RUF035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ SIM905
 17 | "a,b,c,d".split(sep=None)
 18 | "a,b,c,d".split(sep=",", maxsplit=1)
    |
@@ -123,12 +123,12 @@ RUF035.py:16:1: RUF035 [*] Consider using a list instead of `str.split`
 18 18 | "a,b,c,d".split(sep=",", maxsplit=1)
 19 19 | "a,b,c,d".split(sep=None, maxsplit=1)
 
-RUF035.py:17:1: RUF035 [*] Consider using a list instead of `str.split`
+SIM905.py:17:1: SIM905 [*] Consider using a list instead of `str.split`
    |
 15 | "a,b,c,d".split(None, 1)
 16 | "a,b,c,d".split(sep=",")
 17 | "a,b,c,d".split(sep=None)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM905
 18 | "a,b,c,d".split(sep=",", maxsplit=1)
 19 | "a,b,c,d".split(sep=None, maxsplit=1)
    |
@@ -144,12 +144,12 @@ RUF035.py:17:1: RUF035 [*] Consider using a list instead of `str.split`
 19 19 | "a,b,c,d".split(sep=None, maxsplit=1)
 20 20 | "a,b,c,d".split(maxsplit=1, sep=",")
 
-RUF035.py:18:1: RUF035 [*] Consider using a list instead of `str.split`
+SIM905.py:18:1: SIM905 [*] Consider using a list instead of `str.split`
    |
 16 | "a,b,c,d".split(sep=",")
 17 | "a,b,c,d".split(sep=None)
 18 | "a,b,c,d".split(sep=",", maxsplit=1)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM905
 19 | "a,b,c,d".split(sep=None, maxsplit=1)
 20 | "a,b,c,d".split(maxsplit=1, sep=",")
    |
@@ -165,23 +165,23 @@ RUF035.py:18:1: RUF035 [*] Consider using a list instead of `str.split`
 20 20 | "a,b,c,d".split(maxsplit=1, sep=",")
 21 21 | "a,b,c,d".split(maxsplit=1, sep=None)
 
-RUF035.py:19:1: RUF035 Consider using a list instead of `str.split`
+SIM905.py:19:1: SIM905 Consider using a list instead of `str.split`
    |
 17 | "a,b,c,d".split(sep=None)
 18 | "a,b,c,d".split(sep=",", maxsplit=1)
 19 | "a,b,c,d".split(sep=None, maxsplit=1)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM905
 20 | "a,b,c,d".split(maxsplit=1, sep=",")
 21 | "a,b,c,d".split(maxsplit=1, sep=None)
    |
    = help: Replace `str.split` with list literal
 
-RUF035.py:20:1: RUF035 [*] Consider using a list instead of `str.split`
+SIM905.py:20:1: SIM905 [*] Consider using a list instead of `str.split`
    |
 18 | "a,b,c,d".split(sep=",", maxsplit=1)
 19 | "a,b,c,d".split(sep=None, maxsplit=1)
 20 | "a,b,c,d".split(maxsplit=1, sep=",")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM905
 21 | "a,b,c,d".split(maxsplit=1, sep=None)
 22 | "a,b,c,d".split(",", maxsplit=1)
    |
@@ -197,23 +197,23 @@ RUF035.py:20:1: RUF035 [*] Consider using a list instead of `str.split`
 22 22 | "a,b,c,d".split(",", maxsplit=1)
 23 23 | "a,b,c,d".split(None, maxsplit=1)
 
-RUF035.py:21:1: RUF035 Consider using a list instead of `str.split`
+SIM905.py:21:1: SIM905 Consider using a list instead of `str.split`
    |
 19 | "a,b,c,d".split(sep=None, maxsplit=1)
 20 | "a,b,c,d".split(maxsplit=1, sep=",")
 21 | "a,b,c,d".split(maxsplit=1, sep=None)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM905
 22 | "a,b,c,d".split(",", maxsplit=1)
 23 | "a,b,c,d".split(None, maxsplit=1)
    |
    = help: Replace `str.split` with list literal
 
-RUF035.py:22:1: RUF035 [*] Consider using a list instead of `str.split`
+SIM905.py:22:1: SIM905 [*] Consider using a list instead of `str.split`
    |
 20 | "a,b,c,d".split(maxsplit=1, sep=",")
 21 | "a,b,c,d".split(maxsplit=1, sep=None)
 22 | "a,b,c,d".split(",", maxsplit=1)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM905
 23 | "a,b,c,d".split(None, maxsplit=1)
 24 | "a,b,c,d".split(maxsplit=1)
    |
@@ -229,45 +229,45 @@ RUF035.py:22:1: RUF035 [*] Consider using a list instead of `str.split`
 24 24 | "a,b,c,d".split(maxsplit=1)
 25 25 | "a,b,c,d".split(maxsplit=1.0)
 
-RUF035.py:23:1: RUF035 Consider using a list instead of `str.split`
+SIM905.py:23:1: SIM905 Consider using a list instead of `str.split`
    |
 21 | "a,b,c,d".split(maxsplit=1, sep=None)
 22 | "a,b,c,d".split(",", maxsplit=1)
 23 | "a,b,c,d".split(None, maxsplit=1)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM905
 24 | "a,b,c,d".split(maxsplit=1)
 25 | "a,b,c,d".split(maxsplit=1.0)
    |
    = help: Replace `str.split` with list literal
 
-RUF035.py:24:1: RUF035 Consider using a list instead of `str.split`
+SIM905.py:24:1: SIM905 Consider using a list instead of `str.split`
    |
 22 | "a,b,c,d".split(",", maxsplit=1)
 23 | "a,b,c,d".split(None, maxsplit=1)
 24 | "a,b,c,d".split(maxsplit=1)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM905
 25 | "a,b,c,d".split(maxsplit=1.0)
 26 | "a,b,c,d".split(maxsplit=1)
    |
    = help: Replace `str.split` with list literal
 
-RUF035.py:26:1: RUF035 Consider using a list instead of `str.split`
+SIM905.py:26:1: SIM905 Consider using a list instead of `str.split`
    |
 24 | "a,b,c,d".split(maxsplit=1)
 25 | "a,b,c,d".split(maxsplit=1.0)
 26 | "a,b,c,d".split(maxsplit=1)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM905
 27 | "a,b,c,d".split(maxsplit=0)
 28 | "VERB AUX PRON ADP DET".split(" ")
    |
    = help: Replace `str.split` with list literal
 
-RUF035.py:27:1: RUF035 [*] Consider using a list instead of `str.split`
+SIM905.py:27:1: SIM905 [*] Consider using a list instead of `str.split`
    |
 25 | "a,b,c,d".split(maxsplit=1.0)
 26 | "a,b,c,d".split(maxsplit=1)
 27 | "a,b,c,d".split(maxsplit=0)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM905
 28 | "VERB AUX PRON ADP DET".split(" ")
 29 | '   1   2   3   '.split()
    |
@@ -283,12 +283,12 @@ RUF035.py:27:1: RUF035 [*] Consider using a list instead of `str.split`
 29 29 | '   1   2   3   '.split()
 30 30 | '1<>2<>3<4'.split('<>')
 
-RUF035.py:28:1: RUF035 [*] Consider using a list instead of `str.split`
+SIM905.py:28:1: SIM905 [*] Consider using a list instead of `str.split`
    |
 26 | "a,b,c,d".split(maxsplit=1)
 27 | "a,b,c,d".split(maxsplit=0)
 28 | "VERB AUX PRON ADP DET".split(" ")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM905
 29 | '   1   2   3   '.split()
 30 | '1<>2<>3<4'.split('<>')
    |
@@ -304,12 +304,12 @@ RUF035.py:28:1: RUF035 [*] Consider using a list instead of `str.split`
 30 30 | '1<>2<>3<4'.split('<>')
 31 31 | 
 
-RUF035.py:29:1: RUF035 [*] Consider using a list instead of `str.split`
+SIM905.py:29:1: SIM905 [*] Consider using a list instead of `str.split`
    |
 27 | "a,b,c,d".split(maxsplit=0)
 28 | "VERB AUX PRON ADP DET".split(" ")
 29 | '   1   2   3   '.split()
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM905
 30 | '1<>2<>3<4'.split('<>')
    |
    = help: Replace `str.split` with list literal
@@ -324,12 +324,12 @@ RUF035.py:29:1: RUF035 [*] Consider using a list instead of `str.split`
 31 31 | 
 32 32 | " a*a a*a a ".split("*", -1)  # [' a', 'a a', 'a a ']
 
-RUF035.py:30:1: RUF035 [*] Consider using a list instead of `str.split`
+SIM905.py:30:1: SIM905 [*] Consider using a list instead of `str.split`
    |
 28 | "VERB AUX PRON ADP DET".split(" ")
 29 | '   1   2   3   '.split()
 30 | '1<>2<>3<4'.split('<>')
-   | ^^^^^^^^^^^^^^^^^^^^^^^ RUF035
+   | ^^^^^^^^^^^^^^^^^^^^^^^ SIM905
 31 | 
 32 | " a*a a*a a ".split("*", -1)  # [' a', 'a a', 'a a ']
    |
@@ -345,12 +345,12 @@ RUF035.py:30:1: RUF035 [*] Consider using a list instead of `str.split`
 32 32 | " a*a a*a a ".split("*", -1)  # [' a', 'a a', 'a a ']
 33 33 | "".split()  # []
 
-RUF035.py:32:1: RUF035 [*] Consider using a list instead of `str.split`
+SIM905.py:32:1: SIM905 [*] Consider using a list instead of `str.split`
    |
 30 | '1<>2<>3<4'.split('<>')
 31 | 
 32 | " a*a a*a a ".split("*", -1)  # [' a', 'a a', 'a a ']
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF035
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM905
 33 | "".split()  # []
 34 | """     
    |
@@ -366,11 +366,11 @@ RUF035.py:32:1: RUF035 [*] Consider using a list instead of `str.split`
 34 34 | """ 	
 35 35 | """.split()  # []
 
-RUF035.py:33:1: RUF035 [*] Consider using a list instead of `str.split`
+SIM905.py:33:1: SIM905 [*] Consider using a list instead of `str.split`
    |
 32 | " a*a a*a a ".split("*", -1)  # [' a', 'a a', 'a a ']
 33 | "".split()  # []
-   | ^^^^^^^^^^ RUF035
+   | ^^^^^^^^^^ SIM905
 34 | """     
 35 | """.split()  # []
    |
@@ -386,13 +386,13 @@ RUF035.py:33:1: RUF035 [*] Consider using a list instead of `str.split`
 35 35 | """.split()  # []
 36 36 | "   	".split()  # []
 
-RUF035.py:34:1: RUF035 [*] Consider using a list instead of `str.split`
+SIM905.py:34:1: SIM905 [*] Consider using a list instead of `str.split`
    |
 32 |   " a*a a*a a ".split("*", -1)  # [' a', 'a a', 'a a ']
 33 |   "".split()  # []
 34 | / """     
 35 | | """.split()  # []
-   | |___________^ RUF035
+   | |___________^ SIM905
 36 |   "       ".split()  # []
 37 |   "/abc/".split() # ['/abc/']
    |
@@ -409,12 +409,12 @@ RUF035.py:34:1: RUF035 [*] Consider using a list instead of `str.split`
 37 36 | "/abc/".split() # ['/abc/']
 38 37 | ("a,b,c"
 
-RUF035.py:36:1: RUF035 [*] Consider using a list instead of `str.split`
+SIM905.py:36:1: SIM905 [*] Consider using a list instead of `str.split`
    |
 34 | """     
 35 | """.split()  # []
 36 | "       ".split()  # []
-   | ^^^^^^^^^^^^^^^^^ RUF035
+   | ^^^^^^^^^^^^^^^^^ SIM905
 37 | "/abc/".split() # ['/abc/']
 38 | ("a,b,c"
    |
@@ -430,12 +430,12 @@ RUF035.py:36:1: RUF035 [*] Consider using a list instead of `str.split`
 38 38 | ("a,b,c"
 39 39 | # comment
 
-RUF035.py:37:1: RUF035 [*] Consider using a list instead of `str.split`
+SIM905.py:37:1: SIM905 [*] Consider using a list instead of `str.split`
    |
 35 | """.split()  # []
 36 | "       ".split()  # []
 37 | "/abc/".split() # ['/abc/']
-   | ^^^^^^^^^^^^^^^ RUF035
+   | ^^^^^^^^^^^^^^^ SIM905
 38 | ("a,b,c"
 39 | # comment
    |
@@ -451,7 +451,7 @@ RUF035.py:37:1: RUF035 [*] Consider using a list instead of `str.split`
 39 39 | # comment
 40 40 | .split()
 
-RUF035.py:38:2: RUF035 [*] Consider using a list instead of `str.split`
+SIM905.py:38:2: SIM905 [*] Consider using a list instead of `str.split`
    |
 36 |   "       ".split()  # []
 37 |   "/abc/".split() # ['/abc/']
@@ -459,7 +459,7 @@ RUF035.py:38:2: RUF035 [*] Consider using a list instead of `str.split`
    |  __^
 39 | | # comment
 40 | | .split()
-   | |________^ RUF035
+   | |________^ SIM905
 41 |   )  # ['a,b,c']
 42 |   ("a,b,c"
    |
@@ -477,7 +477,7 @@ RUF035.py:38:2: RUF035 [*] Consider using a list instead of `str.split`
 42 40 | ("a,b,c"
 43 41 | # comment
 
-RUF035.py:42:2: RUF035 [*] Consider using a list instead of `str.split`
+SIM905.py:42:2: SIM905 [*] Consider using a list instead of `str.split`
    |
 40 |   .split()
 41 |   )  # ['a,b,c']
@@ -485,7 +485,7 @@ RUF035.py:42:2: RUF035 [*] Consider using a list instead of `str.split`
    |  __^
 43 | | # comment
 44 | | .split(",")
-   | |___________^ RUF035
+   | |___________^ SIM905
 45 |   ) # ['a', 'b', 'c']
 46 |   ("a,"
    |
@@ -503,7 +503,7 @@ RUF035.py:42:2: RUF035 [*] Consider using a list instead of `str.split`
 46 44 | ("a,"
 47 45 | # comment
 
-RUF035.py:46:2: RUF035 [*] Consider using a list instead of `str.split`
+SIM905.py:46:2: SIM905 [*] Consider using a list instead of `str.split`
    |
 44 |   .split(",")
 45 |   ) # ['a', 'b', 'c']
@@ -513,7 +513,7 @@ RUF035.py:46:2: RUF035 [*] Consider using a list instead of `str.split`
 48 | | "b,"
 49 | | "c"
 50 | | .split(",")
-   | |___________^ RUF035
+   | |___________^ SIM905
 51 |   ) # ['a', 'b', 'c']
    |
    = help: Replace `str.split` with list literal
@@ -532,13 +532,13 @@ RUF035.py:46:2: RUF035 [*] Consider using a list instead of `str.split`
 52 48 | 
 53 49 | "hello "\
 
-RUF035.py:53:1: RUF035 [*] Consider using a list instead of `str.split`
+SIM905.py:53:1: SIM905 [*] Consider using a list instead of `str.split`
    |
 51 |   ) # ['a', 'b', 'c']
 52 |   
 53 | / "hello "\
 54 | |     "world".split()
-   | |___________________^ RUF035
+   | |___________________^ SIM905
 55 |   # ['hello', 'world']
    |
    = help: Replace `str.split` with list literal
@@ -554,11 +554,11 @@ RUF035.py:53:1: RUF035 [*] Consider using a list instead of `str.split`
 56 55 | 
 57 56 | # prefixes and isc
 
-RUF035.py:58:1: RUF035 [*] Consider using a list instead of `str.split`
+SIM905.py:58:1: SIM905 [*] Consider using a list instead of `str.split`
    |
 57 | # prefixes and isc
 58 | u"a b".split()  # ['a', 'b']
-   | ^^^^^^^^^^^^^^ RUF035
+   | ^^^^^^^^^^^^^^ SIM905
 59 | r"a \n b".split()  # ['a', '\\n', 'b']
 60 | ("a " "b").split()  # ['a', 'b']
    |
@@ -574,12 +574,12 @@ RUF035.py:58:1: RUF035 [*] Consider using a list instead of `str.split`
 60 60 | ("a " "b").split()  # ['a', 'b']
 61 61 | "a " "b".split()  # ['a', 'b']
 
-RUF035.py:59:1: RUF035 [*] Consider using a list instead of `str.split`
+SIM905.py:59:1: SIM905 [*] Consider using a list instead of `str.split`
    |
 57 | # prefixes and isc
 58 | u"a b".split()  # ['a', 'b']
 59 | r"a \n b".split()  # ['a', '\\n', 'b']
-   | ^^^^^^^^^^^^^^^^^ RUF035
+   | ^^^^^^^^^^^^^^^^^ SIM905
 60 | ("a " "b").split()  # ['a', 'b']
 61 | "a " "b".split()  # ['a', 'b']
    |
@@ -595,12 +595,12 @@ RUF035.py:59:1: RUF035 [*] Consider using a list instead of `str.split`
 61 61 | "a " "b".split()  # ['a', 'b']
 62 62 | u"a " "b".split()  # ['a', 'b']
 
-RUF035.py:60:1: RUF035 [*] Consider using a list instead of `str.split`
+SIM905.py:60:1: SIM905 [*] Consider using a list instead of `str.split`
    |
 58 | u"a b".split()  # ['a', 'b']
 59 | r"a \n b".split()  # ['a', '\\n', 'b']
 60 | ("a " "b").split()  # ['a', 'b']
-   | ^^^^^^^^^^^^^^^^^^ RUF035
+   | ^^^^^^^^^^^^^^^^^^ SIM905
 61 | "a " "b".split()  # ['a', 'b']
 62 | u"a " "b".split()  # ['a', 'b']
    |
@@ -616,12 +616,12 @@ RUF035.py:60:1: RUF035 [*] Consider using a list instead of `str.split`
 62 62 | u"a " "b".split()  # ['a', 'b']
 63 63 | "a " u"b".split()  # ['a', 'b']
 
-RUF035.py:61:1: RUF035 [*] Consider using a list instead of `str.split`
+SIM905.py:61:1: SIM905 [*] Consider using a list instead of `str.split`
    |
 59 | r"a \n b".split()  # ['a', '\\n', 'b']
 60 | ("a " "b").split()  # ['a', 'b']
 61 | "a " "b".split()  # ['a', 'b']
-   | ^^^^^^^^^^^^^^^^ RUF035
+   | ^^^^^^^^^^^^^^^^ SIM905
 62 | u"a " "b".split()  # ['a', 'b']
 63 | "a " u"b".split()  # ['a', 'b']
    |
@@ -637,12 +637,12 @@ RUF035.py:61:1: RUF035 [*] Consider using a list instead of `str.split`
 63 63 | "a " u"b".split()  # ['a', 'b']
 64 64 | u"a " r"\n".split()  # ['a', '\\n']
 
-RUF035.py:62:1: RUF035 [*] Consider using a list instead of `str.split`
+SIM905.py:62:1: SIM905 [*] Consider using a list instead of `str.split`
    |
 60 | ("a " "b").split()  # ['a', 'b']
 61 | "a " "b".split()  # ['a', 'b']
 62 | u"a " "b".split()  # ['a', 'b']
-   | ^^^^^^^^^^^^^^^^^ RUF035
+   | ^^^^^^^^^^^^^^^^^ SIM905
 63 | "a " u"b".split()  # ['a', 'b']
 64 | u"a " r"\n".split()  # ['a', '\\n']
    |
@@ -658,12 +658,12 @@ RUF035.py:62:1: RUF035 [*] Consider using a list instead of `str.split`
 64 64 | u"a " r"\n".split()  # ['a', '\\n']
 65 65 | r"\n " u"\n".split()  # ['\\n']
 
-RUF035.py:63:1: RUF035 [*] Consider using a list instead of `str.split`
+SIM905.py:63:1: SIM905 [*] Consider using a list instead of `str.split`
    |
 61 | "a " "b".split()  # ['a', 'b']
 62 | u"a " "b".split()  # ['a', 'b']
 63 | "a " u"b".split()  # ['a', 'b']
-   | ^^^^^^^^^^^^^^^^^ RUF035
+   | ^^^^^^^^^^^^^^^^^ SIM905
 64 | u"a " r"\n".split()  # ['a', '\\n']
 65 | r"\n " u"\n".split()  # ['\\n']
    |
@@ -679,12 +679,12 @@ RUF035.py:63:1: RUF035 [*] Consider using a list instead of `str.split`
 65 65 | r"\n " u"\n".split()  # ['\\n']
 66 66 | r"\n " "\n".split()  # ['\\n']
 
-RUF035.py:64:1: RUF035 [*] Consider using a list instead of `str.split`
+SIM905.py:64:1: SIM905 [*] Consider using a list instead of `str.split`
    |
 62 | u"a " "b".split()  # ['a', 'b']
 63 | "a " u"b".split()  # ['a', 'b']
 64 | u"a " r"\n".split()  # ['a', '\\n']
-   | ^^^^^^^^^^^^^^^^^^^ RUF035
+   | ^^^^^^^^^^^^^^^^^^^ SIM905
 65 | r"\n " u"\n".split()  # ['\\n']
 66 | r"\n " "\n".split()  # ['\\n']
    |
@@ -700,12 +700,12 @@ RUF035.py:64:1: RUF035 [*] Consider using a list instead of `str.split`
 66 66 | r"\n " "\n".split()  # ['\\n']
 67 67 | "a " r"\n".split()  # ['a', '\\n']
 
-RUF035.py:65:1: RUF035 [*] Consider using a list instead of `str.split`
+SIM905.py:65:1: SIM905 [*] Consider using a list instead of `str.split`
    |
 63 | "a " u"b".split()  # ['a', 'b']
 64 | u"a " r"\n".split()  # ['a', '\\n']
 65 | r"\n " u"\n".split()  # ['\\n']
-   | ^^^^^^^^^^^^^^^^^^^^ RUF035
+   | ^^^^^^^^^^^^^^^^^^^^ SIM905
 66 | r"\n " "\n".split()  # ['\\n']
 67 | "a " r"\n".split()  # ['a', '\\n']
    |
@@ -721,12 +721,12 @@ RUF035.py:65:1: RUF035 [*] Consider using a list instead of `str.split`
 67 67 | "a " r"\n".split()  # ['a', '\\n']
 68 68 | 
 
-RUF035.py:66:1: RUF035 [*] Consider using a list instead of `str.split`
+SIM905.py:66:1: SIM905 [*] Consider using a list instead of `str.split`
    |
 64 | u"a " r"\n".split()  # ['a', '\\n']
 65 | r"\n " u"\n".split()  # ['\\n']
 66 | r"\n " "\n".split()  # ['\\n']
-   | ^^^^^^^^^^^^^^^^^^^ RUF035
+   | ^^^^^^^^^^^^^^^^^^^ SIM905
 67 | "a " r"\n".split()  # ['a', '\\n']
    |
    = help: Replace `str.split` with list literal
@@ -741,12 +741,12 @@ RUF035.py:66:1: RUF035 [*] Consider using a list instead of `str.split`
 68 68 | 
 69 69 | # negatives
 
-RUF035.py:67:1: RUF035 [*] Consider using a list instead of `str.split`
+SIM905.py:67:1: SIM905 [*] Consider using a list instead of `str.split`
    |
 65 | r"\n " u"\n".split()  # ['\\n']
 66 | r"\n " "\n".split()  # ['\\n']
 67 | "a " r"\n".split()  # ['a', '\\n']
-   | ^^^^^^^^^^^^^^^^^^ RUF035
+   | ^^^^^^^^^^^^^^^^^^ SIM905
 68 | 
 69 | # negatives
    |

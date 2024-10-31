@@ -384,7 +384,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 Rule::StaticJoinToFString,
                 // refurb
                 Rule::HashlibDigestHex,
-                // ruff
+                // flake8-simplify
                 Rule::SplitOfStaticString,
             ]) {
                 if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
@@ -406,7 +406,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                         } else if matches!(attr, "split" | "rsplit") {
                             // "...".split(...) call
                             if checker.enabled(Rule::SplitOfStaticString) {
-                                ruff::rules::split_of_static_string(
+                                flake8_simplify::rules::split_of_static_string(
                                     checker,
                                     attr,
                                     call,

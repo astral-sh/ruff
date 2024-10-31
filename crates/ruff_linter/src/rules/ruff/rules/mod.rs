@@ -18,6 +18,7 @@ pub(crate) use mutable_dataclass_default::*;
 pub(crate) use mutable_fromkeys_value::*;
 pub(crate) use never_union::*;
 pub(crate) use parenthesize_logical_operators::*;
+pub(crate) use post_init_default::*;
 pub(crate) use quadratic_list_summation::*;
 pub(crate) use redirected_noqa::*;
 pub(crate) use sort_dunder_all::*;
@@ -54,6 +55,7 @@ mod mutable_dataclass_default;
 mod mutable_fromkeys_value;
 mod never_union;
 mod parenthesize_logical_operators;
+mod post_init_default;
 mod quadratic_list_summation;
 mod redirected_noqa;
 mod sequence_sorting;
@@ -76,9 +78,3 @@ pub(crate) enum Context {
     Docstring,
     Comment,
 }
-pub(crate) use post_init_default::*;
-
-mod post_init_default;
-pub(crate) use split_of_static_string::*;
-
-mod split_of_static_string;
