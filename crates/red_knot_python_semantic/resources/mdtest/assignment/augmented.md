@@ -102,7 +102,6 @@ class Foo:
             return 42
 
 f = Foo()
-
 f += "Hello, world!"
 
 # TODO(charlie): This should be `int | str`, since `__iadd__` may be unbound.
