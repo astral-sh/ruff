@@ -223,3 +223,61 @@ flag = bool_instance()
 for x in Test() if flag else Test2():
     reveal_type(x)  # revealed: int | Exception | str | tuple[int, int] | bytes | memoryview
 ```
+
+## Union type as iterable where one union element has no `__iter__` method
+
+```py
+class TestIter:
+    def __next__(self) -> int:
+        return 42
+
+class Test:
+    def __iter__(self) -> TestIter:
+        return TestIter()
+
+def coinflip() -> bool:
+    return True
+
+# TODO: we should emit a diagnostic here (it might not be iterable)
+for x in Test() if coinflip() else 42:
+    reveal_type(x)  # revealed: int | Unknown
+```
+
+## Union type as iterable where one union element has invalid `__iter__` method
+
+```py
+class TestIter:
+    def __next__(self) -> int:
+        return 42
+
+class Test:
+    def __iter__(self) -> TestIter:
+        return TestIter()
+
+class Test2:
+    def __iter__(self) -> int:
+        return 42
+
+def coinflip() -> bool:
+    return True
+
+# TODO: we should emit a diagnostic here (it might not be iterable)
+for x in Test() if coinflip() else Test2():
+    reveal_type(x)  # revealed: int | Unknown
+```
+
+## Union type as iterator where one union element has no `__next__` method
+
+```py
+class TestIter:
+    def __next__(self) -> int:
+        return 42
+
+class Test:
+    def __iter__(self) -> TestIter | int:
+        return TestIter()
+
+# TODO: we should emit a diagnostic here (it might not be iterable)
+for x in Test():
+    reveal_type(x)  # revealed: int | Unknown
+```
