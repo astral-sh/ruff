@@ -48,6 +48,14 @@ use crate::registry::Rule;
 ///     """
 /// ```
 ///
+/// ## Options
+/// - `lint.pydocstyle.convention`
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
+///
 /// [D213]: https://docs.astral.sh/ruff/rules/multi-line-summary-second-line
 /// [PEP 257]: https://peps.python.org/pep-0257
 #[violation]
@@ -102,6 +110,14 @@ impl AlwaysFixableViolation for MultiLineSummaryFirstLine {
 ///     sort algorithm.
 ///     """
 /// ```
+///
+/// ## Options
+/// - `lint.pydocstyle.convention`
+///
+/// ## References
+/// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
+/// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 ///
 /// [D212]: https://docs.astral.sh/ruff/rules/multi-line-summary-first-line
 /// [PEP 257]: https://peps.python.org/pep-0257
