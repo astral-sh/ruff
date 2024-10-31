@@ -323,7 +323,7 @@ mod tests {
 
     use crate::db::tests::TestDb;
     use crate::types::{
-        global_symbol_ty, BytesLiteralType, SliceLiteralType, StringLiteralType, Type, UnionType,
+        global_symbol, BytesLiteralType, SliceLiteralType, StringLiteralType, Type, UnionType,
     };
     use crate::{Program, ProgramSettings, PythonVersion, SearchPathSettings};
 
@@ -369,16 +369,16 @@ mod tests {
         let union_elements = &[
             Type::Unknown,
             Type::IntLiteral(-1),
-            global_symbol_ty(&db, mod_file, "A").expect_type(),
+            global_symbol(&db, mod_file, "A").expect_type(),
             Type::StringLiteral(StringLiteralType::new(&db, "A")),
             Type::BytesLiteral(BytesLiteralType::new(&db, [0u8].as_slice())),
             Type::BytesLiteral(BytesLiteralType::new(&db, [7u8].as_slice())),
             Type::IntLiteral(0),
             Type::IntLiteral(1),
             Type::StringLiteral(StringLiteralType::new(&db, "B")),
-            global_symbol_ty(&db, mod_file, "foo").expect_type(),
-            global_symbol_ty(&db, mod_file, "bar").expect_type(),
-            global_symbol_ty(&db, mod_file, "B").expect_type(),
+            global_symbol(&db, mod_file, "foo").expect_type(),
+            global_symbol(&db, mod_file, "bar").expect_type(),
+            global_symbol(&db, mod_file, "B").expect_type(),
             Type::BooleanLiteral(true),
             Type::None,
         ];

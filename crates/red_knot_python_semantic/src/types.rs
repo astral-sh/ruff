@@ -9,9 +9,7 @@ use crate::semantic_index::{
     global_scope, semantic_index, symbol_table, use_def_map, BindingWithConstraints,
     BindingWithConstraintsIterator, DeclarationsIterator,
 };
-use crate::stdlib::{
-    builtins_symbol_ty, types_symbol_ty, typeshed_symbol_ty, typing_extensions_symbol_ty,
-};
+use crate::stdlib::{builtins_symbol, types_symbol, typeshed_symbol, typing_extensions_symbol};
 use crate::symbol::{Boundness, Symbol};
 use crate::types::diagnostic::TypeCheckDiagnosticsBuilder;
 use crate::types::narrow::narrowing_constraint;
@@ -45,11 +43,7 @@ pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
 }
 
 /// Infer the public type of a symbol (its type as seen from outside its scope).
-fn symbol_ty_by_id<'db>(
-    db: &'db dyn Db,
-    scope: ScopeId<'db>,
-    symbol: ScopedSymbolId,
-) -> Symbol<'db> {
+fn symbol_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymbolId) -> Symbol<'db> {
     let _span = tracing::trace_span!("symbol_ty_by_id", ?symbol).entered();
 
     let use_def = use_def_map(db, scope);
@@ -87,12 +81,12 @@ fn symbol_ty_by_id<'db>(
     }
 }
 
-/// Shorthand for `symbol_ty_by_id` that takes a symbol name instead of an ID.
-fn symbol_ty<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> {
+/// Shorthand for `symbol_by_id` that takes a symbol name instead of an ID.
+fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> {
     let table = symbol_table(db, scope);
     table
         .symbol_id_by_name(name)
-        .map(|symbol| symbol_ty_by_id(db, scope, symbol))
+        .map(|symbol| symbol_by_id(db, scope, symbol))
         .unwrap_or(Symbol::Unbound)
 }
 
@@ -132,11 +126,11 @@ fn module_type_symbols<'db>(db: &'db dyn Db) -> smallvec::SmallVec<[ast::name::N
 }
 
 /// Looks up a module-global symbol by name in a file.
-pub(crate) fn global_symbol_ty<'db>(db: &'db dyn Db, file: File, name: &str) -> Symbol<'db> {
-    let explicit_ty = symbol_ty(db, global_scope(db, file), name);
+pub(crate) fn global_symbol<'db>(db: &'db dyn Db, file: File, name: &str) -> Symbol<'db> {
+    let explicit_symbol = symbol(db, global_scope(db, file), name);
 
-    if !explicit_ty.may_be_unbound() {
-        return explicit_ty;
+    if !explicit_symbol.may_be_unbound() {
+        return explicit_symbol;
     }
 
     // Not defined explicitly in the global scope?
@@ -149,10 +143,10 @@ pub(crate) fn global_symbol_ty<'db>(db: &'db dyn Db, file: File, name: &str) -> 
         // TODO: this should use `.to_instance(db)`. but we don't understand attribute access
         // on instance types yet.
         let module_type_member = KnownClass::ModuleType.to_class(db).member(db, name);
-        return explicit_ty.replace_unbound_with(db, &module_type_member);
+        return explicit_symbol.replace_unbound_with(db, &module_type_member);
     }
 
-    explicit_ty
+    explicit_symbol
 }
 
 /// Infer the type of a binding.
@@ -842,7 +836,7 @@ impl<'db> Type<'db> {
                         .member(db, "__dict__");
                 }
 
-                let global_lookup = symbol_ty(db, global_scope(db, *file), name);
+                let global_lookup = symbol(db, global_scope(db, *file), name);
 
                 // If it's unbound, check if it's present as an instance on `types.ModuleType`
                 // or `builtins.object`.
@@ -1306,12 +1300,12 @@ impl<'db> KnownClass {
             | Self::Tuple
             | Self::Set
             | Self::Dict
-            | Self::Slice => builtins_symbol_ty(db, self.as_str()).unwrap_or_unknown(),
+            | Self::Slice => builtins_symbol(db, self.as_str()).unwrap_or_unknown(),
             Self::GenericAlias | Self::ModuleType | Self::FunctionType => {
-                types_symbol_ty(db, self.as_str()).unwrap_or_unknown()
+                types_symbol(db, self.as_str()).unwrap_or_unknown()
             }
 
-            Self::NoneType => typeshed_symbol_ty(db, self.as_str()).unwrap_or_unknown(),
+            Self::NoneType => typeshed_symbol(db, self.as_str()).unwrap_or_unknown(),
         }
     }
 
@@ -1846,7 +1840,7 @@ impl<'db> ClassType<'db> {
     /// Returns the inferred type of the class member named `name`.
     pub(crate) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         let scope = self.body_scope(db);
-        symbol_ty(db, scope, name)
+        symbol(db, scope, name)
     }
 
     pub(crate) fn inherited_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
@@ -2023,7 +2017,7 @@ mod tests {
                 Ty::BooleanLiteral(b) => Type::BooleanLiteral(b),
                 Ty::LiteralString => Type::LiteralString,
                 Ty::BytesLiteral(s) => Type::BytesLiteral(BytesLiteralType::new(db, s.as_bytes())),
-                Ty::BuiltinInstance(s) => builtins_symbol_ty(db, s).expect_type().to_instance(db),
+                Ty::BuiltinInstance(s) => builtins_symbol(db, s).expect_type().to_instance(db),
                 Ty::Union(tys) => {
                     UnionType::from_elements(db, tys.into_iter().map(|ty| ty.into_type(db)))
                 }
@@ -2140,8 +2134,8 @@ mod tests {
         .unwrap();
         let module = ruff_db::files::system_path_to_file(&db, "/src/module.py").unwrap();
 
-        let type_a = super::global_symbol_ty(&db, module, "A").expect_type();
-        let type_u = super::global_symbol_ty(&db, module, "U").expect_type();
+        let type_a = super::global_symbol(&db, module, "A").expect_type();
+        let type_u = super::global_symbol(&db, module, "U").expect_type();
 
         assert!(type_a.is_class_literal());
         assert!(type_a.is_subtype_of(&db, Ty::BuiltinInstance("type").into_type(&db)));
@@ -2240,8 +2234,8 @@ mod tests {
         .unwrap();
         let module = ruff_db::files::system_path_to_file(&db, "/src/module.py").unwrap();
 
-        let type_a = super::global_symbol_ty(&db, module, "A").expect_type();
-        let type_u = super::global_symbol_ty(&db, module, "U").expect_type();
+        let type_a = super::global_symbol(&db, module, "A").expect_type();
+        let type_u = super::global_symbol(&db, module, "U").expect_type();
 
         assert!(type_a.is_class_literal());
         assert!(type_u.is_union());

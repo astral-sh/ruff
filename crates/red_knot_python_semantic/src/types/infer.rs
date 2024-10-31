@@ -53,10 +53,10 @@ use crate::types::diagnostic::{
     TypeCheckDiagnostic, TypeCheckDiagnostics, TypeCheckDiagnosticsBuilder,
 };
 use crate::types::{
-    bindings_ty, builtins_symbol_ty, declarations_ty, global_symbol_ty, symbol_ty,
-    typing_extensions_symbol_ty, Boundness, BytesLiteralType, ClassType, FunctionType,
-    IterationOutcome, KnownClass, KnownFunction, SliceLiteralType, StringLiteralType, Symbol,
-    Truthiness, TupleType, Type, TypeArrayDisplay, UnionBuilder, UnionType,
+    bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, typing_extensions_symbol,
+    Boundness, BytesLiteralType, ClassType, FunctionType, IterationOutcome, KnownClass,
+    KnownFunction, SliceLiteralType, StringLiteralType, Symbol, Truthiness, TupleType, Type,
+    TypeArrayDisplay, UnionBuilder, UnionType,
 };
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
@@ -1169,7 +1169,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             //
             // TODO should infer `ExceptionGroup` if all caught exceptions
             // are subclasses of `Exception` --Alex
-            builtins_symbol_ty(self.db, "BaseExceptionGroup")
+            builtins_symbol(self.db, "BaseExceptionGroup")
                 .unwrap_or_unknown()
                 .to_instance(self.db)
         } else {
@@ -1980,7 +1980,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .map(Type::IntLiteral)
                 .unwrap_or_else(|| KnownClass::Int.to_instance(self.db)),
             ast::Number::Float(_) => KnownClass::Float.to_instance(self.db),
-            ast::Number::Complex { .. } => builtins_symbol_ty(self.db, "complex")
+            ast::Number::Complex { .. } => builtins_symbol(self.db, "complex")
                 .unwrap_or_unknown()
                 .to_instance(self.db),
         }
@@ -2062,7 +2062,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         _literal: &ast::ExprEllipsisLiteral,
     ) -> Type<'db> {
-        builtins_symbol_ty(self.db, "Ellipsis").unwrap_or_unknown()
+        builtins_symbol(self.db, "Ellipsis").unwrap_or_unknown()
     }
 
     fn infer_tuple_expression(&mut self, tuple: &ast::ExprTuple) -> Type<'db> {
@@ -2472,34 +2472,36 @@ impl<'db> TypeInferenceBuilder<'db> {
                     // runtime, it is the scope that creates the cell for our closure.) If the name
                     // isn't bound in that scope, we should get an unbound name, not continue
                     // falling back to other scopes / globals / builtins.
-                    return symbol_ty(self.db, enclosing_scope_id, name);
+                    return symbol(self.db, enclosing_scope_id, name);
                 }
             }
 
             // No nonlocal binding, check module globals. Avoid infinite recursion if `self.scope`
             // already is module globals.
-            let ty = if file_scope_id.is_global() {
+            let global_symbol = if file_scope_id.is_global() {
                 Symbol::Unbound
             } else {
-                global_symbol_ty(self.db, self.file, name)
+                global_symbol(self.db, self.file, name)
             };
 
             // Fallback to builtins (without infinite recursion if we're already in builtins.)
-            if ty.may_be_unbound() && Some(self.scope()) != builtins_module_scope(self.db) {
-                let mut builtin_ty = builtins_symbol_ty(self.db, name);
-                if builtin_ty.is_unbound() && name == "reveal_type" {
+            if global_symbol.may_be_unbound()
+                && Some(self.scope()) != builtins_module_scope(self.db)
+            {
+                let mut symbol = builtins_symbol(self.db, name);
+                if symbol.is_unbound() && name == "reveal_type" {
                     self.diagnostics.add(
                         name_node.into(),
                         "undefined-reveal",
                         format_args!(
                             "`reveal_type` used without importing it; this is allowed for debugging convenience but will fail at runtime"),
                     );
-                    builtin_ty = typing_extensions_symbol_ty(self.db, name);
+                    symbol = typing_extensions_symbol(self.db, name);
                 }
 
-                ty.replace_unbound_with(self.db, &builtin_ty)
+                global_symbol.replace_unbound_with(self.db, &symbol)
             } else {
-                ty
+                global_symbol
             }
         } else {
             Symbol::Unbound
@@ -4194,7 +4196,7 @@ mod tests {
     use crate::semantic_index::symbol::FileScopeId;
     use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
     use crate::types::{
-        check_types, global_symbol_ty, infer_definition_types, symbol_ty, TypeCheckDiagnostics,
+        check_types, global_symbol, infer_definition_types, symbol, TypeCheckDiagnostics,
     };
     use crate::{HasTy, ProgramSettings, SemanticModel};
     use ruff_db::files::{system_path_to_file, File};
@@ -4254,7 +4256,7 @@ mod tests {
     fn assert_public_ty(db: &TestDb, file_name: &str, symbol_name: &str, expected: &str) {
         let file = system_path_to_file(db, file_name).expect("file to exist");
 
-        let ty = global_symbol_ty(db, file, symbol_name).expect_type();
+        let ty = global_symbol(db, file, symbol_name).expect_type();
         assert_eq!(
             ty.display(db).to_string(),
             expected,
@@ -4284,7 +4286,7 @@ mod tests {
             assert_eq!(scope.name(db), *expected_scope_name);
         }
 
-        let ty = symbol_ty(db, scope, symbol_name).unwrap_or_unknown();
+        let ty = symbol(db, scope, symbol_name).unwrap_or_unknown();
         assert_eq!(ty.display(db).to_string(), expected);
     }
 
@@ -4331,7 +4333,7 @@ mod tests {
         )?;
 
         let mod_file = system_path_to_file(&db, "src/mod.py").expect("file to exist");
-        let ty = global_symbol_ty(&db, mod_file, "Sub").expect_type();
+        let ty = global_symbol(&db, mod_file, "Sub").expect_type();
 
         let class = ty.expect_class_literal();
 
@@ -4358,7 +4360,7 @@ mod tests {
         )?;
 
         let mod_file = system_path_to_file(&db, "src/mod.py").unwrap();
-        let ty = global_symbol_ty(&db, mod_file, "C").expect_type();
+        let ty = global_symbol(&db, mod_file, "C").expect_type();
         let class_id = ty.expect_class_literal();
         let member_ty = class_id
             .class_member(&db, &Name::new_static("f"))
@@ -4541,7 +4543,7 @@ mod tests {
         db.write_file("src/a.py", "def example() -> int: return 42")?;
 
         let mod_file = system_path_to_file(&db, "src/a.py").unwrap();
-        let function = global_symbol_ty(&db, mod_file, "example")
+        let function = global_symbol(&db, mod_file, "example")
             .expect_type()
             .expect_function_literal();
         let returns = function.return_type(&db);
@@ -4571,7 +4573,7 @@ mod tests {
         )?;
 
         let a = system_path_to_file(&db, "src/a.py").expect("file to exist");
-        let c_ty = global_symbol_ty(&db, a, "C").expect_type();
+        let c_ty = global_symbol(&db, a, "C").expect_type();
         let c_class = c_ty.expect_class_literal();
         let mut c_bases = c_class.bases(&db);
         let b_ty = c_bases.next().unwrap();
@@ -4608,8 +4610,8 @@ mod tests {
             .unwrap()
             .0
             .to_scope_id(&db, file);
-        let y_ty = symbol_ty(&db, function_scope, "y").expect_type();
-        let x_ty = symbol_ty(&db, function_scope, "x").expect_type();
+        let y_ty = symbol(&db, function_scope, "y").expect_type();
+        let x_ty = symbol(&db, function_scope, "x").expect_type();
 
         assert_eq!(y_ty.display(&db).to_string(), "Unknown");
         assert_eq!(x_ty.display(&db).to_string(), "Literal[2]");
@@ -4640,10 +4642,10 @@ mod tests {
             .0
             .to_scope_id(&db, file);
 
-        let x_ty = symbol_ty(&db, function_scope, "x");
+        let x_ty = symbol(&db, function_scope, "x");
         assert!(x_ty.is_unbound());
 
-        let y_ty = symbol_ty(&db, function_scope, "y").expect_type();
+        let y_ty = symbol(&db, function_scope, "y").expect_type();
         assert_eq!(y_ty.display(&db).to_string(), "Literal[1]");
 
         Ok(())
@@ -4727,7 +4729,7 @@ mod tests {
         let mut db = setup_db();
         db.write_file("/src/a.pyi", "class C(object): pass")?;
         let file = system_path_to_file(&db, "/src/a.pyi").unwrap();
-        let ty = global_symbol_ty(&db, file, "C").expect_type();
+        let ty = global_symbol(&db, file, "C").expect_type();
 
         let base = ty
             .expect_class_literal()
@@ -5279,7 +5281,7 @@ mod tests {
         ])?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
-        let x_ty = global_symbol_ty(&db, a, "x").expect_type();
+        let x_ty = global_symbol(&db, a, "x").expect_type();
 
         assert_eq!(x_ty.display(&db).to_string(), "Literal[10]");
 
@@ -5288,7 +5290,7 @@ mod tests {
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
 
-        let x_ty_2 = global_symbol_ty(&db, a, "x").expect_type();
+        let x_ty_2 = global_symbol(&db, a, "x").expect_type();
 
         assert_eq!(x_ty_2.display(&db).to_string(), "Literal[20]");
 
@@ -5305,7 +5307,7 @@ mod tests {
         ])?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
-        let x_ty = global_symbol_ty(&db, a, "x").expect_type();
+        let x_ty = global_symbol(&db, a, "x").expect_type();
 
         assert_eq!(x_ty.display(&db).to_string(), "Literal[10]");
 
@@ -5315,7 +5317,7 @@ mod tests {
 
         db.clear_salsa_events();
 
-        let x_ty_2 = global_symbol_ty(&db, a, "x").expect_type();
+        let x_ty_2 = global_symbol(&db, a, "x").expect_type();
 
         assert_eq!(x_ty_2.display(&db).to_string(), "Literal[10]");
 
@@ -5341,7 +5343,7 @@ mod tests {
         ])?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
-        let x_ty = global_symbol_ty(&db, a, "x").expect_type();
+        let x_ty = global_symbol(&db, a, "x").expect_type();
 
         assert_eq!(x_ty.display(&db).to_string(), "Literal[10]");
 
@@ -5351,7 +5353,7 @@ mod tests {
 
         db.clear_salsa_events();
 
-        let x_ty_2 = global_symbol_ty(&db, a, "x").expect_type();
+        let x_ty_2 = global_symbol(&db, a, "x").expect_type();
 
         assert_eq!(x_ty_2.display(&db).to_string(), "Literal[10]");
 

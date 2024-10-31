@@ -385,7 +385,7 @@ mod tests {
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
-    use crate::stdlib::typing_symbol_ty;
+    use crate::stdlib::typing_symbol;
     use crate::types::{KnownClass, StringLiteralType, UnionBuilder};
     use crate::ProgramSettings;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
@@ -617,10 +617,8 @@ mod tests {
     #[test]
     fn intersection_negation_distributes_over_union() {
         let db = setup_db();
-        let st = typing_symbol_ty(&db, "Sized")
-            .expect_type()
-            .to_instance(&db);
-        let ht = typing_symbol_ty(&db, "Hashable")
+        let st = typing_symbol(&db, "Sized").expect_type().to_instance(&db);
+        let ht = typing_symbol(&db, "Hashable")
             .expect_type()
             .to_instance(&db);
         // sh_t: Sized & Hashable
@@ -648,10 +646,8 @@ mod tests {
     fn mixed_intersection_negation_distributes_over_union() {
         let db = setup_db();
         let it = KnownClass::Int.to_instance(&db);
-        let st = typing_symbol_ty(&db, "Sized")
-            .expect_type()
-            .to_instance(&db);
-        let ht = typing_symbol_ty(&db, "Hashable")
+        let st = typing_symbol(&db, "Sized").expect_type().to_instance(&db);
+        let ht = typing_symbol(&db, "Hashable")
             .expect_type()
             .to_instance(&db);
         // s_not_h_t: Sized & ~Hashable
