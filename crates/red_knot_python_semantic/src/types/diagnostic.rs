@@ -1,5 +1,5 @@
 use ruff_db::files::File;
-use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
 use std::fmt::Formatter;
 use std::ops::Deref;
@@ -231,6 +231,26 @@ impl<'db> TypeCheckDiagnosticsBuilder<'db> {
                 );
             }
         }
+    }
+
+    pub(super) fn add_possibly_unresolved_reference(&mut self, expr_name_node: &ast::ExprName) {
+        let ast::ExprName { id, .. } = expr_name_node;
+
+        self.add(
+            expr_name_node.into(),
+            "possibly-unresolved-reference",
+            format_args!("Name `{id}` used when possibly not defined"),
+        );
+    }
+
+    pub(super) fn add_unresolved_reference(&mut self, expr_name_node: &ast::ExprName) {
+        let ast::ExprName { id, .. } = expr_name_node;
+
+        self.add(
+            expr_name_node.into(),
+            "unresolved-reference",
+            format_args!("Name `{id}` used when not defined"),
+        );
     }
 
     /// Adds a new diagnostic.

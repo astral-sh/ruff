@@ -2543,39 +2543,26 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         if boundness == Boundness::MayBeUnbound {
             match self.lookup_name(name) {
-                SymbolLookupResult::Type(ty, _) => match bindings_ty {
-                    Some(bindings_ty) => UnionType::from_elements(self.db, [bindings_ty, ty]),
-                    None => ty,
-                },
+                SymbolLookupResult::Type(looked_up_ty, looked_up_boundness) => {
+                    if looked_up_boundness == Boundness::MayBeUnbound {
+                        self.diagnostics.add_possibly_unresolved_reference(name);
+                    }
+
+                    bindings_ty
+                        .map(|ty| UnionType::from_elements(self.db, [ty, looked_up_ty]))
+                        .unwrap_or(looked_up_ty)
+                }
                 SymbolLookupResult::Unbound => {
                     if bindings_ty.is_some() {
-                        self.diagnostics.add(
-                            name.into(),
-                            "possibly-unresolved-reference",
-                            format_args!("Name `{id}` used when possibly not defined"),
-                        );
+                        self.diagnostics.add_possibly_unresolved_reference(name);
                     } else {
-                        self.diagnostics.add(
-                            name.into(),
-                            "unresolved-reference",
-                            format_args!("Name `{id}` used when not defined"),
-                        );
+                        self.diagnostics.add_unresolved_reference(name);
                     }
                     bindings_ty.unwrap_or(Type::Unknown)
                 }
             }
         } else {
-            match bindings_ty {
-                Some(ty) => ty,
-                None => {
-                    self.diagnostics.add(
-                        name.into(),
-                        "unresolved-reference",
-                        format_args!("Name `{id}` used when not defined"),
-                    );
-                    Type::Unknown
-                }
-            }
+            bindings_ty.unwrap_or(Type::Unknown)
         }
     }
 

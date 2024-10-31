@@ -39,3 +39,22 @@ class C:
 reveal_type(C.x)  # revealed: Literal[2]
 reveal_type(C.y)  # revealed: Literal[1]
 ```
+
+## Possibly unbound in class and global scope
+
+```py
+def bool_instance() -> bool:
+    return True
+
+if bool_instance():
+    x = "abc"
+
+class C:
+    if bool_instance():
+        x = 1
+
+    # error: [possibly-unresolved-reference]
+    y = x
+
+reveal_type(C.y)  # revealed: Literal[1] | Literal["abc"]
+```
