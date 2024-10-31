@@ -307,8 +307,6 @@ pub enum Type<'db> {
     /// Unknown type (either no annotation, or some kind of type error).
     /// Equivalent to Any, or possibly to object in strict mode
     Unknown,
-    /// The None object -- TODO remove this in favor of Instance(types.NoneType)
-    None,
     /// Temporary type for symbols that can't be inferred yet because of missing implementations.
     /// Behaves equivalently to `Any`.
     ///
@@ -525,6 +523,11 @@ impl<'db> Type<'db> {
                 .elements(db)
                 .iter()
                 .any(|&elem_ty| ty.is_subtype_of(db, elem_ty)),
+            (Type::Instance(self_class), Type::Instance(target_class))
+                if self_class.is_known(db, KnownClass::NoneType) =>
+            {
+                target_class.is_known(db, KnownClass::NoneType)
+            }
             (Type::Instance(self_class), Type::Instance(target_class)) => {
                 self_class.is_subclass_of(db, target_class)
             }
@@ -602,8 +605,7 @@ impl<'db> Type<'db> {
             }
 
             (
-                left @ (Type::None
-                | Type::BooleanLiteral(..)
+                left @ (Type::BooleanLiteral(..)
                 | Type::IntLiteral(..)
                 | Type::StringLiteral(..)
                 | Type::BytesLiteral(..)
@@ -611,8 +613,7 @@ impl<'db> Type<'db> {
                 | Type::FunctionLiteral(..)
                 | Type::ModuleLiteral(..)
                 | Type::ClassLiteral(..)),
-                right @ (Type::None
-                | Type::BooleanLiteral(..)
+                right @ (Type::BooleanLiteral(..)
                 | Type::IntLiteral(..)
                 | Type::StringLiteral(..)
                 | Type::BytesLiteral(..)
@@ -622,13 +623,20 @@ impl<'db> Type<'db> {
                 | Type::ClassLiteral(..)),
             ) => left != right,
 
-            (Type::None, Type::Instance(class_type)) | (Type::Instance(class_type), Type::None) => {
+            (Type::Instance(class_none), Type::Instance(class_other))
+            | (Type::Instance(class_other), Type::Instance(class_none))
+                if class_none.is_known(db, KnownClass::NoneType) =>
+            {
                 !matches!(
-                    class_type.known(db),
+                    class_other.known(db),
                     Some(KnownClass::NoneType | KnownClass::Object)
                 )
             }
-            (Type::None, _) | (_, Type::None) => true,
+            (Type::Instance(class_none), _) | (_, Type::Instance(class_none))
+                if class_none.is_known(db, KnownClass::NoneType) =>
+            {
+                true
+            }
 
             (Type::BooleanLiteral(..), Type::Instance(class_type))
             | (Type::Instance(class_type), Type::BooleanLiteral(..)) => !matches!(
@@ -725,13 +733,12 @@ impl<'db> Type<'db> {
     ///
     /// Note: This function aims to have no false positives, but might return `false`
     /// for more complicated types that are actually singletons.
-    pub(crate) fn is_singleton(self) -> bool {
+    pub(crate) fn is_singleton(self, db: &'db dyn Db) -> bool {
         match self {
             Type::Any
             | Type::Never
             | Type::Unknown
             | Type::Todo
-            | Type::Instance(..) // TODO some instance types can be singleton types (EllipsisType, NotImplementedType)
             | Type::IntLiteral(..)
             | Type::StringLiteral(..)
             | Type::BytesLiteral(..)
@@ -742,7 +749,14 @@ impl<'db> Type<'db> {
                 // are both of type Literal[345], for example.
                 false
             }
-            Type::None | Type::BooleanLiteral(_) | Type::FunctionLiteral(..) | Type::ClassLiteral(..) | Type::ModuleLiteral(..) => true,
+            Type::BooleanLiteral(_)
+            | Type::FunctionLiteral(..)
+            | Type::ClassLiteral(..)
+            | Type::ModuleLiteral(..) => true,
+            Type::Instance(class) => {
+                // TODO some more instance types can be singleton types (EllipsisType, NotImplementedType)
+                matches!(class.known(db), Some(KnownClass::NoneType))
+            }
             Type::Tuple(..) => {
                 // The empty tuple is a singleton on CPython and PyPy, but not on other Python
                 // implementations such as GraalPy. Its *use* as a singleton is discouraged and
@@ -773,8 +787,7 @@ impl<'db> Type<'db> {
     /// Return true if this type is non-empty and all inhabitants of this type compare equal.
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         match self {
-            Type::None
-            | Type::FunctionLiteral(..)
+            Type::FunctionLiteral(..)
             | Type::ModuleLiteral(..)
             | Type::ClassLiteral(..)
             | Type::IntLiteral(..)
@@ -834,10 +847,6 @@ impl<'db> Type<'db> {
                 Type::Todo.into()
             }
             Type::Unknown => Type::Unknown.into(),
-            Type::None => {
-                // TODO: attribute lookup on None type
-                Type::Todo.into()
-            }
             Type::FunctionLiteral(_) => {
                 // TODO: attribute lookup on function type
                 Type::Todo.into()
@@ -962,7 +971,6 @@ impl<'db> Type<'db> {
     fn bool(&self, db: &'db dyn Db) -> Truthiness {
         match self {
             Type::Any | Type::Todo | Type::Never | Type::Unknown => Truthiness::Ambiguous,
-            Type::None => Truthiness::AlwaysFalse,
             Type::FunctionLiteral(_) => Truthiness::AlwaysTrue,
             Type::ModuleLiteral(_) => Truthiness::AlwaysTrue,
             Type::ClassLiteral(_) => {
@@ -970,10 +978,15 @@ impl<'db> Type<'db> {
                 // More info in https://docs.python.org/3/library/stdtypes.html#truth-value-testing
                 Truthiness::Ambiguous
             }
-            Type::Instance(_) => {
+            Type::Instance(class) => {
                 // TODO: lookup `__bool__` and `__len__` methods on the instance's class
                 // More info in https://docs.python.org/3/library/stdtypes.html#truth-value-testing
-                Truthiness::Ambiguous
+                // For now, we only special-case some builtin classes
+                if class.is_known(db, KnownClass::NoneType) {
+                    Truthiness::AlwaysFalse
+                } else {
+                    Truthiness::Ambiguous
+                }
             }
             Type::Union(union) => {
                 let union_elements = union.elements(db);
@@ -1163,9 +1176,13 @@ impl<'db> Type<'db> {
             | Type::StringLiteral(_)
             | Type::SliceLiteral(_)
             | Type::Tuple(_)
-            | Type::LiteralString
-            | Type::None => Type::Unknown,
+            | Type::LiteralString => Type::Unknown,
         }
+    }
+
+    /// The type `NoneType` / `None`
+    pub fn none(db: &'db dyn Db) -> Type<'db> {
+        KnownClass::NoneType.to_instance(db)
     }
 
     /// Given a type that is assumed to represent an instance of a class,
@@ -1183,7 +1200,6 @@ impl<'db> Type<'db> {
             Type::FunctionLiteral(_) => KnownClass::FunctionType.to_class(db),
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class(db),
             Type::Tuple(_) => KnownClass::Tuple.to_class(db),
-            Type::None => KnownClass::NoneType.to_class(db),
             // TODO not accurate if there's a custom metaclass...
             Type::ClassLiteral(_) => KnownClass::Type.to_class(db),
             // TODO can we do better here? `type[LiteralString]`?
@@ -2025,7 +2041,7 @@ mod tests {
             match self {
                 Ty::Never => Type::Never,
                 Ty::Unknown => Type::Unknown,
-                Ty::None => Type::None,
+                Ty::None => Type::none(db),
                 Ty::Any => Type::Any,
                 Ty::Todo => Type::Todo,
                 Ty::IntLiteral(n) => Type::IntLiteral(n),
@@ -2265,7 +2281,7 @@ mod tests {
     fn is_singleton(from: Ty) {
         let db = setup_db();
 
-        assert!(from.into_type(&db).is_singleton());
+        assert!(from.into_type(&db).is_singleton(&db));
     }
 
     #[test_case(Ty::None)]
@@ -2303,7 +2319,7 @@ mod tests {
     fn is_not_singleton(from: Ty) {
         let db = setup_db();
 
-        assert!(!from.into_type(&db).is_singleton());
+        assert!(!from.into_type(&db).is_singleton(&db));
     }
 
     #[test_case(Ty::IntLiteral(1); "is_int_literal_truthy")]

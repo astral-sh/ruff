@@ -242,7 +242,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
 
                 match if is_positive { *op } else { op.negate() } {
                     ast::CmpOp::IsNot => {
-                        if rhs_ty.is_singleton() {
+                        if rhs_ty.is_singleton(self.db) {
                             let ty = IntersectionBuilder::new(self.db)
                                 .add_negative(rhs_ty)
                                 .build();
@@ -316,7 +316,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             let symbol = self.symbols().symbol_id_by_name(id).unwrap();
 
             let ty = match pattern.value {
-                ast::Singleton::None => Type::None,
+                ast::Singleton::None => Type::none(self.db),
                 ast::Singleton::True => Type::BooleanLiteral(true),
                 ast::Singleton::False => Type::BooleanLiteral(false),
             };
