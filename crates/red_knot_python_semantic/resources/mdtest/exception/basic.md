@@ -41,7 +41,7 @@ except EXCEPTIONS as f:
 ## Dynamic exception types
 
 ```py
-# TODO: we should not emit those errors `call-potentially-unbound-method` errors
+# TODO: we should not emit these `call-potentially-unbound-method` errors for `tuple.__class_getitem__`
 def foo(
     x: type[AttributeError],
     y: tuple[type[OSError], type[RuntimeError]],  # error: [call-potentially-unbound-method]
