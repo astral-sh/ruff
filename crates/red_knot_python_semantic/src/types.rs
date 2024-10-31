@@ -1092,7 +1092,7 @@ impl<'db> Type<'db> {
             };
         }
 
-        if let Type::Unknown | Type::Any = self {
+        if matches!(self, Type::Unknown | Type::Any | Type::Todo) {
             // Explicit handling of `Unknown` and `Any` necessary until `type[Unknown]` and
             // `type[Any]` are not defined as `Todo` anymore.
             return IterationOutcome::Iterable { element_ty: self };
@@ -1187,9 +1187,9 @@ impl<'db> Type<'db> {
             // TODO can we do better here? `type[LiteralString]`?
             Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class(db),
             // TODO: `type[Any]`?
-            Type::Any => Type::Todo,
+            Type::Any => Type::Any,
             // TODO: `type[Unknown]`?
-            Type::Unknown => Type::Todo,
+            Type::Unknown => Type::Unknown,
             // TODO intersections
             Type::Intersection(_) => Type::Todo,
             Type::Todo => Type::Todo,
