@@ -385,7 +385,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 // refurb
                 Rule::HashlibDigestHex,
                 // flake8-simplify
-                Rule::SplitOfStaticString,
+                Rule::SplitStaticString,
             ]) {
                 if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
                     let attr = attr.as_str();
@@ -405,8 +405,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                             }
                         } else if matches!(attr, "split" | "rsplit") {
                             // "...".split(...) call
-                            if checker.enabled(Rule::SplitOfStaticString) {
-                                flake8_simplify::rules::split_of_static_string(
+                            if checker.enabled(Rule::SplitStaticString) {
+                                flake8_simplify::rules::split_static_string(
                                     checker,
                                     attr,
                                     call,

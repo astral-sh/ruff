@@ -9,7 +9,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for str.split calls that can be replaced with a `list` literal.
+/// Checks for `str.split` calls that can be replaced with a list literal.
 ///
 /// ## Why is this bad?
 /// List literals are more readable and do not require the overhead of calling `str.split`.
@@ -30,9 +30,9 @@ use crate::checkers::ast::Checker;
 ///
 /// ```
 #[violation]
-pub struct SplitOfStaticString;
+pub struct SplitStaticString;
 
-impl Violation for SplitOfStaticString {
+impl Violation for SplitStaticString {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -97,8 +97,8 @@ fn split_sep(str_value: &str, sep_value: &str, max_split: usize, direction_left:
     construct_replacement(&list_items)
 }
 
-/// RUF035
-pub(crate) fn split_of_static_string(
+/// SIM905
+pub(crate) fn split_static_string(
     checker: &mut Checker,
     attr: &str,
     call: &ExprCall,
@@ -161,7 +161,7 @@ pub(crate) fn split_of_static_string(
         split_default(str_value, maxsplit_value)
     };
 
-    let mut diagnostic = Diagnostic::new(SplitOfStaticString, call.range());
+    let mut diagnostic = Diagnostic::new(SplitStaticString, call.range());
     if let Some(ref replacement_expr) = split_replacement {
         // Construct replacement list
         let replacement = checker.generator().expr(replacement_expr);

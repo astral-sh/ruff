@@ -46,7 +46,7 @@ mod tests {
     #[test_case(Rule::ExprAndFalse, Path::new("SIM223.py"))]
     #[test_case(Rule::YodaConditions, Path::new("SIM300.py"))]
     #[test_case(Rule::IfElseBlockInsteadOfDictGet, Path::new("SIM401.py"))]
-    #[test_case(Rule::SplitOfStaticString, Path::new("SIM905.py"))]
+    #[test_case(Rule::SplitStaticString, Path::new("SIM905.py"))]
     #[test_case(Rule::DictGetWithNoneDefault, Path::new("SIM910.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
