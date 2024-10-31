@@ -12,6 +12,7 @@ use crate::semantic_index::{
 use crate::stdlib::{
     builtins_symbol_ty, types_symbol_ty, typeshed_symbol_ty, typing_extensions_symbol_ty,
 };
+use crate::symbol::{Boundness, Symbol};
 use crate::types::diagnostic::TypeCheckDiagnosticsBuilder;
 use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet, HasTy, Module, SemanticModel};
@@ -28,77 +29,6 @@ mod diagnostic;
 mod display;
 mod infer;
 mod narrow;
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Boundness {
-    Bound,
-    MayBeUnbound,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Symbol<'db> {
-    Type(Type<'db>, Boundness),
-    Unbound,
-}
-
-impl<'db> Symbol<'db> {
-    pub fn is_unbound(&self) -> bool {
-        matches!(self, Symbol::Unbound)
-    }
-
-    #[must_use]
-    pub fn replace_unbound_with(self, db: &'db dyn Db, replacement: &Symbol<'db>) -> Symbol<'db> {
-        match replacement {
-            Symbol::Type(replacement, _) => Symbol::Type(
-                match self {
-                    Symbol::Type(ty, Boundness::Bound) => ty,
-                    Symbol::Type(ty, Boundness::MayBeUnbound) => {
-                        UnionType::from_elements(db, [*replacement, ty])
-                    }
-                    Symbol::Unbound => *replacement,
-                },
-                Boundness::Bound,
-            ),
-            Symbol::Unbound => self,
-        }
-    }
-
-    #[cfg(test)]
-    #[track_caller]
-    fn expect_bound(self) -> Type<'db> {
-        match self {
-            Symbol::Type(ty, Boundness::Bound) => ty,
-            _ => {
-                panic!("Expected a bound type")
-            }
-        }
-    }
-
-    fn unwrap_or(&self, other: Type<'db>) -> Type<'db> {
-        match self {
-            Symbol::Type(ty, _) => *ty,
-            Symbol::Unbound => other,
-        }
-    }
-
-    fn as_type(&self) -> Option<Type<'db>> {
-        match self {
-            Symbol::Type(ty, _) => Some(*ty),
-            Symbol::Unbound => None,
-        }
-    }
-
-    fn unwrap_or_unknown(&self) -> Type<'db> {
-        self.unwrap_or(Type::Unknown)
-    }
-
-    fn may_be_unbound(&self) -> bool {
-        match self {
-            Symbol::Type(_, Boundness::MayBeUnbound) | Symbol::Unbound => true,
-            Symbol::Type(_, Boundness::Bound) => false,
-        }
-    }
-}
 
 pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
     let _span = tracing::trace_span!("check_types", file=?file.path(db)).entered();
@@ -898,7 +828,7 @@ impl<'db> Type<'db> {
     /// `foo.member(&db, "baz")` returns the type of `baz` attributes
     /// as accessed from instances of the `Bar` class.
     #[must_use]
-    pub fn member(&self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+    pub(crate) fn member(&self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         match self {
             Type::Any => Type::Any.into(),
             Type::Never => {
@@ -1916,7 +1846,7 @@ impl<'db> ClassType<'db> {
     /// Returns the class member of this class named `name`.
     ///
     /// The member resolves to a member of the class itself or any of its bases.
-    pub fn class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+    pub(crate) fn class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         let member = self.own_class_member(db, name);
         if !member.is_unbound() {
             return member;
@@ -1926,12 +1856,12 @@ impl<'db> ClassType<'db> {
     }
 
     /// Returns the inferred type of the class member named `name`.
-    pub fn own_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+    pub(crate) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         let scope = self.body_scope(db);
         symbol_ty(db, scope, name)
     }
 
-    pub fn inherited_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+    pub(crate) fn inherited_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         for base in self.bases(db) {
             let member = base.member(db, name);
             if !member.is_unbound() {
@@ -2105,7 +2035,7 @@ mod tests {
                 Ty::BooleanLiteral(b) => Type::BooleanLiteral(b),
                 Ty::LiteralString => Type::LiteralString,
                 Ty::BytesLiteral(s) => Type::BytesLiteral(BytesLiteralType::new(db, s.as_bytes())),
-                Ty::BuiltinInstance(s) => builtins_symbol_ty(db, s).expect_bound().to_instance(db),
+                Ty::BuiltinInstance(s) => builtins_symbol_ty(db, s).expect_type().to_instance(db),
                 Ty::Union(tys) => {
                     UnionType::from_elements(db, tys.into_iter().map(|ty| ty.into_type(db)))
                 }
@@ -2222,8 +2152,8 @@ mod tests {
         .unwrap();
         let module = ruff_db::files::system_path_to_file(&db, "/src/module.py").unwrap();
 
-        let type_a = super::global_symbol_ty(&db, module, "A").expect_bound();
-        let type_u = super::global_symbol_ty(&db, module, "U").expect_bound();
+        let type_a = super::global_symbol_ty(&db, module, "A").expect_type();
+        let type_u = super::global_symbol_ty(&db, module, "U").expect_type();
 
         assert!(type_a.is_class_literal());
         assert!(type_a.is_subtype_of(&db, Ty::BuiltinInstance("type").into_type(&db)));
@@ -2322,8 +2252,8 @@ mod tests {
         .unwrap();
         let module = ruff_db::files::system_path_to_file(&db, "/src/module.py").unwrap();
 
-        let type_a = super::global_symbol_ty(&db, module, "A").expect_bound();
-        let type_u = super::global_symbol_ty(&db, module, "U").expect_bound();
+        let type_a = super::global_symbol_ty(&db, module, "A").expect_type();
+        let type_u = super::global_symbol_ty(&db, module, "U").expect_type();
 
         assert!(type_a.is_class_literal());
         assert!(type_u.is_union());

@@ -228,7 +228,7 @@ use self::symbol_state::{
 use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::ScopedSymbolId;
-use crate::types::Boundness;
+use crate::symbol::Boundness;
 use ruff_index::IndexVec;
 use rustc_hash::FxHashMap;
 

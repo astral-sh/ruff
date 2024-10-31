@@ -2,7 +2,8 @@ use crate::module_name::ModuleName;
 use crate::module_resolver::resolve_module;
 use crate::semantic_index::global_scope;
 use crate::semantic_index::symbol::ScopeId;
-use crate::types::{global_symbol_ty, Symbol};
+use crate::symbol::Symbol;
+use crate::types::global_symbol_ty;
 use crate::Db;
 
 /// Enumeration of various core stdlib modules, for which we have dedicated Salsa queries.

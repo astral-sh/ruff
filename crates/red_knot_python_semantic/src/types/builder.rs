@@ -618,10 +618,10 @@ mod tests {
     fn intersection_negation_distributes_over_union() {
         let db = setup_db();
         let st = typing_symbol_ty(&db, "Sized")
-            .expect_bound()
+            .expect_type()
             .to_instance(&db);
         let ht = typing_symbol_ty(&db, "Hashable")
-            .expect_bound()
+            .expect_type()
             .to_instance(&db);
         // sh_t: Sized & Hashable
         let sh_t = IntersectionBuilder::new(&db)
@@ -649,10 +649,10 @@ mod tests {
         let db = setup_db();
         let it = KnownClass::Int.to_instance(&db);
         let st = typing_symbol_ty(&db, "Sized")
-            .expect_bound()
+            .expect_type()
             .to_instance(&db);
         let ht = typing_symbol_ty(&db, "Hashable")
-            .expect_bound()
+            .expect_type()
             .to_instance(&db);
         // s_not_h_t: Sized & ~Hashable
         let s_not_h_t = IntersectionBuilder::new(&db)

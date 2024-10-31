@@ -20,6 +20,7 @@ pub mod semantic_index;
 mod semantic_model;
 pub(crate) mod site_packages;
 mod stdlib;
+pub(crate) mod symbol;
 pub mod types;
 mod util;
 

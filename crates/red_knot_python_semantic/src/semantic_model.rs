@@ -8,7 +8,7 @@ use crate::module_name::ModuleName;
 use crate::module_resolver::{resolve_module, Module};
 use crate::semantic_index::ast_ids::HasScopedAstId;
 use crate::semantic_index::semantic_index;
-use crate::types::{binding_ty, global_symbol_ty, infer_scope_types, Symbol, Type};
+use crate::types::{binding_ty, infer_scope_types, Type};
 use crate::Db;
 
 pub struct SemanticModel<'db> {
@@ -37,10 +37,6 @@ impl<'db> SemanticModel<'db> {
 
     pub fn resolve_module(&self, module_name: &ModuleName) -> Option<Module> {
         resolve_module(self.db, module_name)
-    }
-
-    pub fn global_symbol_ty(&self, module: &Module, symbol_name: &str) -> Symbol<'db> {
-        global_symbol_ty(self.db, module.file(), symbol_name)
     }
 }
 

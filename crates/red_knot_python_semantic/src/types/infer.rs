@@ -4254,7 +4254,7 @@ mod tests {
     fn assert_public_ty(db: &TestDb, file_name: &str, symbol_name: &str, expected: &str) {
         let file = system_path_to_file(db, file_name).expect("file to exist");
 
-        let ty = global_symbol_ty(db, file, symbol_name).expect_bound();
+        let ty = global_symbol_ty(db, file, symbol_name).expect_type();
         assert_eq!(
             ty.display(db).to_string(),
             expected,
@@ -4331,7 +4331,7 @@ mod tests {
         )?;
 
         let mod_file = system_path_to_file(&db, "src/mod.py").expect("file to exist");
-        let ty = global_symbol_ty(&db, mod_file, "Sub").expect_bound();
+        let ty = global_symbol_ty(&db, mod_file, "Sub").expect_type();
 
         let class = ty.expect_class_literal();
 
@@ -4358,11 +4358,11 @@ mod tests {
         )?;
 
         let mod_file = system_path_to_file(&db, "src/mod.py").unwrap();
-        let ty = global_symbol_ty(&db, mod_file, "C").expect_bound();
+        let ty = global_symbol_ty(&db, mod_file, "C").expect_type();
         let class_id = ty.expect_class_literal();
         let member_ty = class_id
             .class_member(&db, &Name::new_static("f"))
-            .expect_bound();
+            .expect_type();
         let func = member_ty.expect_function_literal();
 
         assert_eq!(func.name(&db), "f");
@@ -4542,7 +4542,7 @@ mod tests {
 
         let mod_file = system_path_to_file(&db, "src/a.py").unwrap();
         let function = global_symbol_ty(&db, mod_file, "example")
-            .expect_bound()
+            .expect_type()
             .expect_function_literal();
         let returns = function.return_type(&db);
         assert_eq!(returns.display(&db).to_string(), "int");
@@ -4571,7 +4571,7 @@ mod tests {
         )?;
 
         let a = system_path_to_file(&db, "src/a.py").expect("file to exist");
-        let c_ty = global_symbol_ty(&db, a, "C").expect_bound();
+        let c_ty = global_symbol_ty(&db, a, "C").expect_type();
         let c_class = c_ty.expect_class_literal();
         let mut c_bases = c_class.bases(&db);
         let b_ty = c_bases.next().unwrap();
@@ -4608,8 +4608,8 @@ mod tests {
             .unwrap()
             .0
             .to_scope_id(&db, file);
-        let y_ty = symbol_ty(&db, function_scope, "y").expect_bound();
-        let x_ty = symbol_ty(&db, function_scope, "x").expect_bound();
+        let y_ty = symbol_ty(&db, function_scope, "y").expect_type();
+        let x_ty = symbol_ty(&db, function_scope, "x").expect_type();
 
         assert_eq!(y_ty.display(&db).to_string(), "Unknown");
         assert_eq!(x_ty.display(&db).to_string(), "Literal[2]");
@@ -4643,7 +4643,7 @@ mod tests {
         let x_ty = symbol_ty(&db, function_scope, "x");
         assert!(x_ty.is_unbound());
 
-        let y_ty = symbol_ty(&db, function_scope, "y").expect_bound();
+        let y_ty = symbol_ty(&db, function_scope, "y").expect_type();
         assert_eq!(y_ty.display(&db).to_string(), "Literal[1]");
 
         Ok(())
@@ -4727,7 +4727,7 @@ mod tests {
         let mut db = setup_db();
         db.write_file("/src/a.pyi", "class C(object): pass")?;
         let file = system_path_to_file(&db, "/src/a.pyi").unwrap();
-        let ty = global_symbol_ty(&db, file, "C").expect_bound();
+        let ty = global_symbol_ty(&db, file, "C").expect_type();
 
         let base = ty
             .expect_class_literal()
@@ -5279,7 +5279,7 @@ mod tests {
         ])?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
-        let x_ty = global_symbol_ty(&db, a, "x").expect_bound();
+        let x_ty = global_symbol_ty(&db, a, "x").expect_type();
 
         assert_eq!(x_ty.display(&db).to_string(), "Literal[10]");
 
@@ -5288,7 +5288,7 @@ mod tests {
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
 
-        let x_ty_2 = global_symbol_ty(&db, a, "x").expect_bound();
+        let x_ty_2 = global_symbol_ty(&db, a, "x").expect_type();
 
         assert_eq!(x_ty_2.display(&db).to_string(), "Literal[20]");
 
@@ -5305,7 +5305,7 @@ mod tests {
         ])?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
-        let x_ty = global_symbol_ty(&db, a, "x").expect_bound();
+        let x_ty = global_symbol_ty(&db, a, "x").expect_type();
 
         assert_eq!(x_ty.display(&db).to_string(), "Literal[10]");
 
@@ -5315,7 +5315,7 @@ mod tests {
 
         db.clear_salsa_events();
 
-        let x_ty_2 = global_symbol_ty(&db, a, "x").expect_bound();
+        let x_ty_2 = global_symbol_ty(&db, a, "x").expect_type();
 
         assert_eq!(x_ty_2.display(&db).to_string(), "Literal[10]");
 
@@ -5341,7 +5341,7 @@ mod tests {
         ])?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
-        let x_ty = global_symbol_ty(&db, a, "x").expect_bound();
+        let x_ty = global_symbol_ty(&db, a, "x").expect_type();
 
         assert_eq!(x_ty.display(&db).to_string(), "Literal[10]");
 
@@ -5351,7 +5351,7 @@ mod tests {
 
         db.clear_salsa_events();
 
-        let x_ty_2 = global_symbol_ty(&db, a, "x").expect_bound();
+        let x_ty_2 = global_symbol_ty(&db, a, "x").expect_type();
 
         assert_eq!(x_ty_2.display(&db).to_string(), "Literal[10]");
 
