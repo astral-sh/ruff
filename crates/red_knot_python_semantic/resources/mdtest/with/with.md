@@ -99,7 +99,7 @@ with Manager():
     ...
 ```
 
-## Context expression with potentially-unbound union variants
+## Context expression with possibly-unbound union variants
 
 ```py
 def coinflip() -> bool:
@@ -115,8 +115,8 @@ class NotAContextManager: ...
 
 context_expr = Manager1() if coinflip() else NotAContextManager()
 
-# error: [invalid-context-manager] "Object of type `Manager1 | NotAContextManager` cannot be used with `with` because the method `__enter__` is potentially unbound"
-# error: [invalid-context-manager] "Object of type `Manager1 | NotAContextManager` cannot be used with `with` because the method `__exit__` is potentially unbound"
+# error: [invalid-context-manager] "Object of type `Manager1 | NotAContextManager` cannot be used with `with` because the method `__enter__` is possibly unbound"
+# error: [invalid-context-manager] "Object of type `Manager1 | NotAContextManager` cannot be used with `with` because the method `__exit__` is possibly unbound"
 with context_expr as f:
     reveal_type(f)  # revealed: str
 ```
@@ -134,7 +134,7 @@ class Manager:
 
     def __exit__(self, *args): ...
 
-# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because the method `__enter__` is potentially unbound"
+# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because the method `__enter__` is possibly unbound"
 with Manager() as f:
     reveal_type(f)  # revealed: str
 ```

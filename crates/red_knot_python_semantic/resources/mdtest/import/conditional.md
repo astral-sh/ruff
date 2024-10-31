@@ -58,7 +58,7 @@ reveal_type(y)  # revealed: int
 
 ## Maybe undeclared
 
-Importing a potentially undeclared name still gives us its maybe-declared type:
+Importing a possibly undeclared name still gives us its declared type:
 
 ```py path=maybe_undeclared.py
 def bool_instance() -> bool:

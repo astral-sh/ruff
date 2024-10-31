@@ -1075,7 +1075,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         context_expression.into(),
                         "invalid-context-manager",
                         format_args!(
-                            "Object of type `{context_expression}` cannot be used with `with` because the method `__enter__` is potentially unbound",
+                            "Object of type `{context_expression}` cannot be used with `with` because the method `__enter__` is possibly unbound",
                             context_expression = context_expression_ty.display(self.db),
                         ),
                     );
@@ -1116,7 +1116,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 context_expression.into(),
                                 "invalid-context-manager",
                                 format_args!(
-                                    "Object of type `{context_expression}` cannot be used with `with` because the method `__exit__` is potentially unbound",
+                                    "Object of type `{context_expression}` cannot be used with `with` because the method `__exit__` is possibly unbound",
                                     context_expression = context_expression_ty.display(self.db),
                                 ),
                             );
@@ -1555,7 +1555,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 SymbolLookupResult::Type(class_member, _boundedness) => {
                     // TODO: Handle the case where boundness is `MayBeUnbound`: fall back
                     // to the binary-op behavior below and union the result with calling
-                    // the potentially-unbound in-place dunder.
+                    // the possibly-unbound in-place dunder.
 
                     let call = class_member.call(self.db, &[target_type, value_type]);
 
@@ -3513,9 +3513,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                         if boundedness == Boundness::MayBeUnbound {
                             self.diagnostics.add(
                                 value_node.into(),
-                                "call-potentially-unbound-method",
+                                "call-possibly-unbound-method",
                                 format_args!(
-                                    "Method `__getitem__` of type `{}` is potentially unbound",
+                                    "Method `__getitem__` of type `{}` is possibly unbound",
                                     value_ty.display(self.db),
                                 ),
                             );
@@ -3557,9 +3557,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                             if boundedness == Boundness::MayBeUnbound {
                                 self.diagnostics.add(
                                     value_node.into(),
-                                    "call-potentially-unbound-method",
+                                    "call-possibly-unbound-method",
                                     format_args!(
-                                        "Method `__class_getitem__` of type `{}` is potentially unbound",
+                                        "Method `__class_getitem__` of type `{}` is possibly unbound",
                                         value_ty.display(self.db),
                                     ),
                                 );
