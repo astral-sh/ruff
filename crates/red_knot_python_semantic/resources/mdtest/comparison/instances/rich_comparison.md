@@ -1,8 +1,7 @@
 # Comparison: Rich Comparison
 
-Rich comparison operations (`==`, `!=`, `<`, `<=`, `>`, `>=`) in Python are
-implemented through double-underscore methods that allow customization of
-comparison behavior.
+Rich comparison operations (`==`, `!=`, `<`, `<=`, `>`, `>=`) in Python are implemented through
+double-underscore methods that allow customization of comparison behavior.
 
 For references, see:
 
@@ -11,9 +10,8 @@ For references, see:
 
 ## Rich Comparison Dunder Implementations For Same Class
 
-Classes can support rich comparison by implementing dunder methods like
-`__eq__`, `__ne__`, etc. The most common case involves implementing these
-methods for the same type:
+Classes can support rich comparison by implementing dunder methods like `__eq__`, `__ne__`, etc. The
+most common case involves implementing these methods for the same type:
 
 ```py
 from __future__ import annotations
@@ -47,8 +45,8 @@ reveal_type(A() >= A())  # revealed: set
 
 ## Rich Comparison Dunder Implementations for Other Class
 
-In some cases, classes may implement rich comparison dunder methods for
-comparisons with a different type:
+In some cases, classes may implement rich comparison dunder methods for comparisons with a different
+type:
 
 ```py
 from __future__ import annotations
@@ -84,10 +82,9 @@ reveal_type(A() >= B())  # revealed: set
 
 ## Reflected Comparisons
 
-Fallback to the right-hand side’s comparison methods occurs when the left-hand
-side does not define them. Note: class `B` has its own `__eq__` and `__ne__`
-methods to override those of `object`, but these methods will be ignored here
-because they require a mismatched operand type.
+Fallback to the right-hand side’s comparison methods occurs when the left-hand side does not define
+them. Note: class `B` has its own `__eq__` and `__ne__` methods to override those of `object`, but
+these methods will be ignored here because they require a mismatched operand type.
 
 ```py
 from __future__ import annotations
@@ -148,9 +145,9 @@ reveal_type(C() <= C())  # revealed: float
 
 ## Reflected Comparisons with Subclasses
 
-When subclasses override comparison methods, these overridden methods take
-precedence over those in the parent class. Class `B` inherits from `A` and
-redefines comparison methods to return types other than `A`.
+When subclasses override comparison methods, these overridden methods take precedence over those in
+the parent class. Class `B` inherits from `A` and redefines comparison methods to return types other
+than `A`.
 
 ```py
 from __future__ import annotations
@@ -205,9 +202,8 @@ reveal_type(A() >= B())  # revealed: bytes
 
 ## Reflected Comparisons with Subclass But Falls Back to LHS
 
-In the case of a subclass, the right-hand side has priority. However, if the
-overridden dunder method has an mismatched type to operand, the comparison will
-fall back to the left-hand side.
+In the case of a subclass, the right-hand side has priority. However, if the overridden dunder
+method has an mismatched type to operand, the comparison will fall back to the left-hand side.
 
 ```py
 from __future__ import annotations
@@ -233,15 +229,13 @@ reveal_type(A() > B())  # revealed: B
 
 ## Operations involving instances of classes inheriting from `Any`
 
-`Any` and `Unknown` represent a set of possible runtime objects, wherein the
-bounds of the set are unknown. Whether the left-hand operand's dunder or the
-right-hand operand's reflected dunder depends on whether the right-hand operand
-is an instance of a class that is a subclass of the left-hand operand's class
-and overrides the reflected dunder. In the following example, because of the
-unknowable nature of `Any`/`Unknown`, we must consider both possibilities:
-`Any`/`Unknown` might resolve to an unknown third class that inherits from `X`
-and overrides `__gt__`; but it also might not. Thus, the correct answer here for
-the `reveal_type` is `int | Unknown`.
+`Any` and `Unknown` represent a set of possible runtime objects, wherein the bounds of the set are
+unknown. Whether the left-hand operand's dunder or the right-hand operand's reflected dunder depends
+on whether the right-hand operand is an instance of a class that is a subclass of the left-hand
+operand's class and overrides the reflected dunder. In the following example, because of the
+unknowable nature of `Any`/`Unknown`, we must consider both possibilities: `Any`/`Unknown` might
+resolve to an unknown third class that inherits from `X` and overrides `__gt__`; but it also might
+not. Thus, the correct answer here for the `reveal_type` is `int | Unknown`.
 
 (This test is referenced from `mdtest/binary/instances.md`)
 
@@ -262,12 +256,10 @@ reveal_type(X() < Y())  # revealed: int
 
 ## Equality and Inequality Fallback
 
-This test confirms that `==` and `!=` comparisons default to identity
-comparisons (`is`, `is not`) when argument types do not match the method
-signature.
+This test confirms that `==` and `!=` comparisons default to identity comparisons (`is`, `is not`)
+when argument types do not match the method signature.
 
-Please refer to the
-[docs](https://docs.python.org/3/reference/datamodel.html#object.__eq__)
+Please refer to the [docs](https://docs.python.org/3/reference/datamodel.html#object.__eq__)
 
 ```py
 from __future__ import annotations

@@ -1,8 +1,8 @@
 # Comparison: Membership Test
 
-In Python, the term "membership test operators" refers to the operators `in` and
-`not in`. To customize their behavior, classes can implement one of the special
-methods `__contains__`, `__iter__`, or `__getitem__`.
+In Python, the term "membership test operators" refers to the operators `in` and `not in`. To
+customize their behavior, classes can implement one of the special methods `__contains__`,
+`__iter__`, or `__getitem__`.
 
 For references, see:
 
@@ -28,8 +28,8 @@ reveal_type(42 not in A())  # revealed: bool
 
 ## Implements `__iter__`
 
-Classes that don't implement `__contains__`, but do implement `__iter__`, also
-support containment checks; the needle will be sought in their iterated items:
+Classes that don't implement `__contains__`, but do implement `__iter__`, also support containment
+checks; the needle will be sought in their iterated items:
 
 ```py
 class StringIterator:
@@ -48,11 +48,10 @@ reveal_type(42 not in A())  # revealed: bool
 
 ## Implements `__getitems__`
 
-The final fallback is to implement `__getitem__` for integer keys. Python will
-call `__getitem__` with `0`, `1`, `2`... until either the needle is found
-(leading the membership test to evaluate to `True`) or `__getitem__` raises
-`IndexError` (the raised exception is swallowed, but results in the membership
-test evaluating to `False`).
+The final fallback is to implement `__getitem__` for integer keys. Python will call `__getitem__`
+with `0`, `1`, `2`... until either the needle is found (leading the membership test to evaluate to
+`True`) or `__getitem__` raises `IndexError` (the raised exception is swallowed, but results in the
+membership test evaluating to `False`).
 
 ```py
 class A:
@@ -67,8 +66,8 @@ reveal_type(42 not in A())  # revealed: bool
 
 ## Wrong Return Type
 
-Python coerces the results of containment checks to `bool`, even if
-`__contains__` returns a non-bool:
+Python coerces the results of containment checks to `bool`, even if `__contains__` returns a
+non-bool:
 
 ```py
 class A:
@@ -81,8 +80,7 @@ reveal_type("hello" not in A())  # revealed: bool
 
 ## Literal Result for `in` and `not in`
 
-`__contains__` with a literal return type may result in a `BooleanLiteral`
-outcome.
+`__contains__` with a literal return type may result in a `BooleanLiteral` outcome.
 
 ```py
 from typing import Literal
@@ -106,9 +104,8 @@ reveal_type(42 not in AlwaysFalse())  # revealed: @Todo
 
 ## No Fallback for `__contains__`
 
-If `__contains__` is implemented, checking membership of a type it doesn't
-accept is an error; it doesn't result in a fallback to `__iter__` or
-`__getitem__`:
+If `__contains__` is implemented, checking membership of a type it doesn't accept is an error; it
+doesn't result in a fallback to `__iter__` or `__getitem__`:
 
 ```py
 class CheckContains: ...
@@ -151,8 +148,8 @@ reveal_type(CheckGetItem() in B())  # revealed: bool
 
 ## Invalid Old-Style Iteration
 
-If `__getitem__` is implemented but does not accept integer arguments, then the
-membership test is not supported and should trigger a diagnostic.
+If `__getitem__` is implemented but does not accept integer arguments, then the membership test is
+not supported and should trigger a diagnostic.
 
 ```py
 class A:

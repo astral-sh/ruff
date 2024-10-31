@@ -1,7 +1,6 @@
 # Binary operations on instances
 
-Binary operations in Python are implemented by means of magic double-underscore
-methods.
+Binary operations in Python are implemented by means of magic double-underscore methods.
 
 For references, see:
 
@@ -10,8 +9,8 @@ For references, see:
 
 ## Operations
 
-We support inference for all Python's binary operators: `+`, `-`, `*`, `@`, `/`,
-`//`, `%`, `**`, `<<`, `>>`, `&`, `^`, and `|`.
+We support inference for all Python's binary operators: `+`, `-`, `*`, `@`, `/`, `//`, `%`, `**`,
+`<<`, `>>`, `&`, `^`, and `|`.
 
 ```py
 class A:
@@ -153,9 +152,8 @@ reveal_type(B() - A())  # revealed: int
 
 ## Non-reflected precedence in general
 
-In general, if the left-hand side defines `__add__` and the right-hand side
-defines `__radd__` and the right-hand side is not a subtype of the left-hand
-side, `lhs.__add__` will take precedence:
+In general, if the left-hand side defines `__add__` and the right-hand side defines `__radd__` and
+the right-hand side is not a subtype of the left-hand side, `lhs.__add__` will take precedence:
 
 ```py
 class A:
@@ -182,9 +180,8 @@ reveal_type(C() + C())  # revealed: int
 
 ## Reflected precedence for subtypes (in some cases)
 
-If the right-hand operand is a subtype of the left-hand operand and has a
-different implementation of the reflected method, the reflected method on the
-right-hand operand takes precedence.
+If the right-hand operand is a subtype of the left-hand operand and has a different implementation
+of the reflected method, the reflected method on the right-hand operand takes precedence.
 
 ```py
 class A:
@@ -214,9 +211,8 @@ reveal_type(A() + C())  # revealed: str
 
 ## Reflected precedence 2
 
-If the right-hand operand is a subtype of the left-hand operand, but does not
-override the reflected method, the left-hand operand's non-reflected method
-still takes precedence:
+If the right-hand operand is a subtype of the left-hand operand, but does not override the reflected
+method, the left-hand operand's non-reflected method still takes precedence:
 
 ```py
 class A:
@@ -233,16 +229,15 @@ reveal_type(A() + B())  # revealed: str
 
 ## Only reflected supported
 
-For example, at runtime, `(1).__add__(1.2)` is `NotImplemented`, but
-`(1.2).__radd__(1) == 2.2`, meaning that `1 + 1.2` succeeds at runtime
-(producing `2.2`). The runtime tries the second one only if the first one
-returns `NotImplemented` to signal failure.
+For example, at runtime, `(1).__add__(1.2)` is `NotImplemented`, but `(1.2).__radd__(1) == 2.2`,
+meaning that `1 + 1.2` succeeds at runtime (producing `2.2`). The runtime tries the second one only
+if the first one returns `NotImplemented` to signal failure.
 
-Typeshed and other stubs annotate dunder-method calls that would return
-`NotImplemented` as being "illegal" calls. `int.__add__` is annotated as only
-"accepting" `int`s, even though it strictly-speaking "accepts" any other object
-without raising an exception -- it will simply return `NotImplemented`, allowing
-the runtime to try the `__radd__` method of the right-hand operand as well.
+Typeshed and other stubs annotate dunder-method calls that would return `NotImplemented` as being
+"illegal" calls. `int.__add__` is annotated as only "accepting" `int`s, even though it
+strictly-speaking "accepts" any other object without raising an exception -- it will simply return
+`NotImplemented`, allowing the runtime to try the `__radd__` method of the right-hand operand as
+well.
 
 ```py
 class A:
@@ -308,8 +303,8 @@ reveal_type(y + 4.12)  # revealed: int
 
 ## With literal types
 
-When we have a literal type for one operand, we're able to fall back to the
-instance handling for its instance super-type.
+When we have a literal type for one operand, we're able to fall back to the instance handling for
+its instance super-type.
 
 ```py
 class A:
@@ -348,15 +343,13 @@ reveal_type(literal_string_instance + A())  # revealed: @Todo
 
 ## Operations involving instances of classes inheriting from `Any`
 
-`Any` and `Unknown` represent a set of possible runtime objects, wherein the
-bounds of the set are unknown. Whether the left-hand operand's dunder or the
-right-hand operand's reflected dunder depends on whether the right-hand operand
-is an instance of a class that is a subclass of the left-hand operand's class
-and overrides the reflected dunder. In the following example, because of the
-unknowable nature of `Any`/`Unknown`, we must consider both possibilities:
-`Any`/`Unknown` might resolve to an unknown third class that inherits from `X`
-and overrides `__radd__`; but it also might not. Thus, the correct answer here
-for the `reveal_type` is `int | Unknown`.
+`Any` and `Unknown` represent a set of possible runtime objects, wherein the bounds of the set are
+unknown. Whether the left-hand operand's dunder or the right-hand operand's reflected dunder depends
+on whether the right-hand operand is an instance of a class that is a subclass of the left-hand
+operand's class and overrides the reflected dunder. In the following example, because of the
+unknowable nature of `Any`/`Unknown`, we must consider both possibilities: `Any`/`Unknown` might
+resolve to an unknown third class that inherits from `X` and overrides `__radd__`; but it also might
+not. Thus, the correct answer here for the `reveal_type` is `int | Unknown`.
 
 ```py
 from does_not_exist import Foo  # error: [unresolved-import]
@@ -404,8 +397,7 @@ reveal_type(A() + A())
 
 ### Wrong position
 
-A left-hand dunder method doesn't apply for the right-hand operand, or vice
-versa:
+A left-hand dunder method doesn't apply for the right-hand operand, or vice versa:
 
 ```py
 class A:
@@ -427,10 +419,9 @@ reveal_type(B() + C())
 
 ### Reflected dunder is not tried between two objects of the same type
 
-For the specific case where the left-hand operand is the exact same type as the
-right-hand operand, the reflected dunder of the right-hand operand is not tried;
-the runtime short-circuits after trying the unreflected dunder of the left-hand
-operand. For context, see
+For the specific case where the left-hand operand is the exact same type as the right-hand operand,
+the reflected dunder of the right-hand operand is not tried; the runtime short-circuits after trying
+the unreflected dunder of the left-hand operand. For context, see
 [this mailing list discussion](https://mail.python.org/archives/list/python-dev@python.org/thread/7NZUCODEAPQFMRFXYRMGJXDSIS3WJYIV/).
 
 ```py

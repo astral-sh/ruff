@@ -26,9 +26,8 @@ if isinstance(x, (int, object)):
 
 ## `classinfo` is a tuple of types
 
-Note: `isinstance(x, (int, str))` should not be confused with
-`isinstance(x, tuple[(int, str)])`. The former is equivalent to
-`isinstance(x, int | str)`:
+Note: `isinstance(x, (int, str))` should not be confused with `isinstance(x, tuple[(int, str)])`.
+The former is equivalent to `isinstance(x, int | str)`:
 
 ```py
 def bool_instance() -> bool:

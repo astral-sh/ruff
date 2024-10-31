@@ -101,8 +101,8 @@ reveal_type(f)  # revealed: Literal[f, f]
 
 ## Reimport with stub declaration
 
-When we have a declared type in one path and only an inferred-from-definition
-type in the other, we should still be able to unify those:
+When we have a declared type in one path and only an inferred-from-definition type in the other, we
+should still be able to unify those:
 
 ```py path=c.pyi
 x: int

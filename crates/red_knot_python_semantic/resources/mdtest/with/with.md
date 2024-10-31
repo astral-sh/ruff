@@ -2,8 +2,8 @@
 
 ## Basic `with` statement
 
-The type of the target variable in a `with` statement is the return type from
-the context manager's `__enter__` method.
+The type of the target variable in a `with` statement is the return type from the context manager's
+`__enter__` method.
 
 ```py
 class Target: ...
