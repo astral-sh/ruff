@@ -189,7 +189,7 @@ def interface():
                         Position::new(9, 8),
                     )),
                     range_length: Some(1),
-                    text: "".to_string(),
+                    text: String::new(),
                 },
                 TextDocumentContentChangeEvent {
                     range: Some(lsp_types::Range::new(
@@ -217,6 +217,6 @@ import click
 def interface():
     pass
 "#
-        )
+        );
     }
 }
