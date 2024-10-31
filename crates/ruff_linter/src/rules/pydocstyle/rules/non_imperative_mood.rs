@@ -43,6 +43,7 @@ static MOOD: LazyLock<Mood> = LazyLock::new(Mood::new);
 ///
 /// ## Options
 /// - `lint.pydocstyle.convention`
+/// - `lint.pydocstyle.property-decorators`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
