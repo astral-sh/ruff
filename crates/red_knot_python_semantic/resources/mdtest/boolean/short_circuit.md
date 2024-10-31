@@ -65,7 +65,7 @@ def bool_instance() -> bool:
     return True
 
 if bool_instance() or ((x := 1) and bool_instance()):
-    # error: "Name `x` used when possibly not defined"
+    # error: [possibly-unresolved-reference]
     reveal_type(x)  # revealed: Literal[1]
 
 if ((y := 1) and bool_instance()) or bool_instance():
