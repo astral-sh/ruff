@@ -64,6 +64,22 @@ fn symbol_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymbolI
         };
         // Intentionally ignore conflicting declared types; that's not our problem, it's the
         // problem of the module we are importing from.
+
+        // TODO: Our handling of boundness currently only depends on bindings, and ignores
+        // declarations. This is inconsistent, since we only look at bindings if the symbol
+        // may be undeclared. Consider the following example:
+        // ```py
+        // x: int
+        //
+        // if flag:
+        //     y: int
+        // else
+        //     y = 3
+        // ```
+        // If we import from this module, we will currently report `x` as a definitely-bound
+        // symbol (even though it has no bindings at all!) but report `y` as possibly-unbound
+        // (even though every path has either a binding or a declaration for it.)
+
         match undeclared_ty {
             Some(Symbol::Type(ty, boundness)) => Symbol::Type(
                 declarations_ty(db, declarations, Some(ty)).unwrap_or_else(|(ty, _)| ty),
