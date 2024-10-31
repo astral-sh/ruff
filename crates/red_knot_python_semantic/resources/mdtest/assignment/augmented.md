@@ -81,10 +81,8 @@ class Foo:
 
 f = Foo()
 
-# TODO: There should be an error here, but it should be an `unsupported-operator error`,
-# possibly with the information that `Foo.__iadd__` may be unbound as additional context.
-
-# error: [call-potentially-unbound-method] "Call to potentially unbound method `__iadd__` on object of type `Foo`"
+# TODO: We should emit an `unsupported-operator` error here, possibly with the information
+# that `Foo.__iadd__` may be unbound as additional context.
 f += "Hello, world!"
 
 reveal_type(f)  # revealed: int
@@ -105,10 +103,6 @@ class Foo:
 
 f = Foo()
 
-# TODO: There should not be a diagnostic here at all, since the case where `__iadd__` is
-# unbound should just fall back to `__add__`.
-
-# error: [call-potentially-unbound-method] "Call to potentially unbound method `__iadd__` on object of type `Foo`"
 f += "Hello, world!"
 
 # TODO(charlie): This should be `int | str`, since `__iadd__` may be unbound.

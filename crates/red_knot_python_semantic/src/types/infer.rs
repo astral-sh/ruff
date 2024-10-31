@@ -1552,18 +1552,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         if let Type::Instance(class) = target_type {
             match class.class_member(self.db, op.in_place_dunder()) {
                 SymbolLookupResult::Unbound => {}
-                SymbolLookupResult::Type(class_member, boundedness) => {
-                    if boundedness == Boundness::MayBeUnbound {
-                        self.diagnostics.add(
-                            assignment.into(),
-                            "call-potentially-unbound-method",
-                            format_args!(
-                                "Call to potentially unbound method `{}` on object of type `{}`",
-                                op.in_place_dunder(),
-                                target_type.display(self.db)
-                            ),
-                        );
-                    }
+                SymbolLookupResult::Type(class_member, _boundedness) => {
+                    // TODO: Handle the case where boundness is `MayBeUnbound`: fall back
+                    // to the binary-op behavior below and union the result with calling
+                    // the potentially-unbound in-place dunder.
 
                     let call = class_member.call(self.db, &[target_type, value_type]);
 
