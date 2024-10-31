@@ -80,6 +80,10 @@ class Foo:
             return 42
 
 f = Foo()
+
+# TODO: There should be an error here, but it should be an `unsupported-operator error`,
+# possibly with the information that `Foo.__iadd__` may be unbound as additional context.
+
 # error: [call-potentially-unbound-method] "Call to potentially unbound method `__iadd__` on object of type `Foo`"
 f += "Hello, world!"
 
@@ -100,6 +104,10 @@ class Foo:
             return 42
 
 f = Foo()
+
+# TODO: There should not be a diagnostic here at all, since the case where `__iadd__` is
+# unbound should just fall back to `__add__`.
+
 # error: [call-potentially-unbound-method] "Call to potentially unbound method `__iadd__` on object of type `Foo`"
 f += "Hello, world!"
 
