@@ -48,7 +48,7 @@ use crate::fix::edits::fits;
 /// ```
 /// ## Known issues
 /// This is an opinionated style rule that may not always be to everyone's
-/// taste, especially if the code makes use of complex `if` conditions.
+/// taste, especially for code that makes use of complex `if` conditions.
 /// Ternary operators can also make it harder to measure [code coverage]
 /// with tools that use line profiling.
 ///
