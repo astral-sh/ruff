@@ -1042,78 +1042,113 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let context_manager_ty = context_expression_ty.to_meta_type(self.db);
 
-        let enter_ty = context_manager_ty.member(self.db, "__enter__");
-        let exit_ty = context_manager_ty.member(self.db, "__exit__");
+        let enter = context_manager_ty.member(self.db, "__enter__");
+        let exit = context_manager_ty.member(self.db, "__exit__");
 
         // TODO: Make use of Protocols when we support it (the manager be assignable to `contextlib.AbstractContextManager`).
-        if enter_ty.is_unbound() && exit_ty.is_unbound() {
-            self.diagnostics.add(
-                context_expression.into(),
-                "invalid-context-manager",
-                format_args!(
-                    "Object of type {} cannot be used with `with` because it doesn't implement `__enter__` and `__exit__`",
-                    context_expression_ty.display(self.db)
-                ),
-            );
-            Type::Unknown
-        } else if enter_ty.is_unbound() {
-            self.diagnostics.add(
-                context_expression.into(),
-                "invalid-context-manager",
-                format_args!(
-                    "Object of type {} cannot be used with `with` because it doesn't implement `__enter__`",
-                    context_expression_ty.display(self.db)
-                ),
-            );
-            Type::Unknown
-        } else {
-            let target_ty = enter_ty
-                .call(self.db, &[context_expression_ty])
-                .return_ty_result(self.db, context_expression.into(), &mut self.diagnostics)
-                .unwrap_or_else(|err| {
-                    self.diagnostics.add(
-                        context_expression.into(),
-                        "invalid-context-manager",
-                        format_args!("
-                            Object of type {context_expression} cannot be used with `with` because the method `__enter__` of type {enter_ty} is not callable",
-                            context_expression = context_expression_ty.display(self.db),
-                            enter_ty = enter_ty.display(self.db)
-                        ),
-                    );
-                    err.return_ty()
-                });
-
-            if exit_ty.is_unbound() {
+        match (enter, exit) {
+            (SymbolLookupResult::Unbound, SymbolLookupResult::Unbound) => {
                 self.diagnostics.add(
                     context_expression.into(),
                     "invalid-context-manager",
                     format_args!(
-                        "Object of type {} cannot be used with `with` because it doesn't implement `__exit__`",
+                        "Object of type `{}` cannot be used with `with` because it doesn't implement `__enter__` and `__exit__`",
                         context_expression_ty.display(self.db)
                     ),
                 );
+                Type::Unknown
             }
-            // TODO: Use the `exit_ty` to determine if any raised exception is suppressed.
-            else if exit_ty
-                .call(
-                    self.db,
-                    &[context_manager_ty, Type::None, Type::None, Type::None],
-                )
-                .return_ty_result(self.db, context_expression.into(), &mut self.diagnostics)
-                .is_err()
-            {
+            (SymbolLookupResult::Unbound, _) => {
                 self.diagnostics.add(
                     context_expression.into(),
                     "invalid-context-manager",
                     format_args!(
-                        "Object of type {context_expression} cannot be used with `with` because the method `__exit__` of type {exit_ty} is not callable",
-                        context_expression = context_expression_ty.display(self.db),
-                        exit_ty = exit_ty.display(self.db),
+                        "Object of type `{}` cannot be used with `with` because it doesn't implement `__enter__`",
+                        context_expression_ty.display(self.db)
                     ),
                 );
+                Type::Unknown
             }
+            (SymbolLookupResult::Type(enter_ty, enter_boundness), exit) => {
+                if enter_boundness == Boundness::MayBeUnbound {
+                    self.diagnostics.add(
+                        context_expression.into(),
+                        "invalid-context-manager",
+                        format_args!(
+                            "Object of type `{context_expression}` cannot be used with `with` because the method `__enter__` is potentially unbound",
+                            context_expression = context_expression_ty.display(self.db),
+                        ),
+                    );
+                }
 
-            target_ty
+                let target_ty = enter_ty
+                    .call(self.db, &[context_expression_ty])
+                    .return_ty_result(self.db, context_expression.into(), &mut self.diagnostics)
+                    .unwrap_or_else(|err| {
+                        self.diagnostics.add(
+                            context_expression.into(),
+                            "invalid-context-manager",
+                            format_args!("
+                                Object of type `{context_expression}` cannot be used with `with` because the method `__enter__` of type `{enter_ty}` is not callable",
+                                context_expression = context_expression_ty.display(self.db),
+                                enter_ty = enter_ty.display(self.db)
+                            ),
+                        );
+                        err.return_ty()
+                    });
+
+                match exit {
+                    SymbolLookupResult::Unbound => {
+                        self.diagnostics.add(
+                            context_expression.into(),
+                            "invalid-context-manager",
+                            format_args!(
+                                "Object of type `{}` cannot be used with `with` because it doesn't implement `__exit__`",
+                                context_expression_ty.display(self.db)
+                            ),
+                        );
+                    }
+                    SymbolLookupResult::Type(exit_ty, exit_boundness) => {
+                        // TODO: Use the `exit_ty` to determine if any raised exception is suppressed.
+
+                        if exit_boundness == Boundness::MayBeUnbound {
+                            self.diagnostics.add(
+                                context_expression.into(),
+                                "invalid-context-manager",
+                                format_args!(
+                                    "Object of type `{context_expression}` cannot be used with `with` because the method `__exit__` is potentially unbound",
+                                    context_expression = context_expression_ty.display(self.db),
+                                ),
+                            );
+                        }
+
+                        if exit_ty
+                            .call(
+                                self.db,
+                                &[context_manager_ty, Type::None, Type::None, Type::None],
+                            )
+                            .return_ty_result(
+                                self.db,
+                                context_expression.into(),
+                                &mut self.diagnostics,
+                            )
+                            .is_err()
+                        {
+                            self.diagnostics.add(
+                                context_expression.into(),
+                                "invalid-context-manager",
+                                format_args!(
+                                    "Object of type `{context_expression}` cannot be used with `with` because the method `__exit__` of type `{exit_ty}` is not callable",
+                                    context_expression = context_expression_ty.display(self.db),
+                                    exit_ty = exit_ty.display(self.db),
+                                ),
+                            );
+                        }
+                    }
+                }
+
+                target_ty
+            }
         }
     }
 
