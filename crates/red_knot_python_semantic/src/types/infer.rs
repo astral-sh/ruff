@@ -2499,16 +2499,16 @@ impl<'db> TypeInferenceBuilder<'db> {
             .symbol_id_by_name(id)
             .expect("Expected the symbol table to create a symbol for every Name node");
         // if we're inferring types of deferred expressions, always treat them as public symbols
-        let (definitions, may_be_unbound) = if self.is_deferred() {
+        let (definitions, boundness) = if self.is_deferred() {
             (
                 use_def.public_bindings(symbol),
-                use_def.public_may_be_unbound(symbol),
+                use_def.public_boundness(symbol),
             )
         } else {
             let use_id = name.scoped_use_id(self.db, self.scope());
             (
                 use_def.bindings_at_use(use_id),
-                use_def.use_may_be_unbound(use_id),
+                use_def.use_boundness(use_id),
             )
         };
 
@@ -2516,13 +2516,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         let has_definitions = definitions.peek().is_some();
 
         let bindings_ty = bindings_ty(self.db, definitions);
-        if may_be_unbound {
+        if boundness == Boundness::MayBeUnbound {
             match self.lookup_name(name) {
                 SymbolLookupResult::Type(ty, _) => match bindings_ty {
-                    SymbolLookupResult::Type(bindings_ty, _) => {
-                        UnionType::from_elements(self.db, [bindings_ty, ty])
-                    }
-                    SymbolLookupResult::Unbound => ty,
+                    Some(bindings_ty) => UnionType::from_elements(self.db, [bindings_ty, ty]),
+                    None => ty,
                 },
                 SymbolLookupResult::Unbound => {
                     if has_definitions {
@@ -2538,13 +2536,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                             format_args!("Name `{id}` used when not defined"),
                         );
                     }
-                    bindings_ty.unwrap_or_unknown()
+                    bindings_ty.unwrap_or(Type::Unknown)
                 }
             }
         } else {
             match bindings_ty {
-                SymbolLookupResult::Type(ty, _) => ty,
-                SymbolLookupResult::Unbound => {
+                Some(ty) => ty,
+                None => {
                     self.diagnostics.add(
                         name.into(),
                         "unresolved-reference",

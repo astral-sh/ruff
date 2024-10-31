@@ -97,20 +97,6 @@ impl<'db> SymbolLookupResult<'db> {
             SymbolLookupResult::Type(_, Boundness::Bound) => false,
         }
     }
-
-    fn and_may_be_unbound(&self, yes: bool) -> SymbolLookupResult<'db> {
-        match self {
-            SymbolLookupResult::Type(ty, boundedness) => SymbolLookupResult::Type(
-                *ty,
-                if yes {
-                    Boundness::MayBeUnbound
-                } else {
-                    *boundedness
-                },
-            ),
-            SymbolLookupResult::Unbound => SymbolLookupResult::Unbound,
-        }
-    }
 }
 
 pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
@@ -145,7 +131,10 @@ fn symbol_ty_by_id<'db>(
         let undeclared_ty = if declarations.may_be_undeclared() {
             Some(
                 bindings_ty(db, use_def.public_bindings(symbol))
-                    .and_may_be_unbound(use_def.public_may_be_unbound(symbol)),
+                    .map(|bindings_ty| {
+                        SymbolLookupResult::Type(bindings_ty, use_def.public_boundness(symbol))
+                    })
+                    .unwrap_or(SymbolLookupResult::Unbound),
             )
         } else {
             None
@@ -165,7 +154,10 @@ fn symbol_ty_by_id<'db>(
         }
     } else {
         bindings_ty(db, use_def.public_bindings(symbol))
-            .and_may_be_unbound(use_def.public_may_be_unbound(symbol))
+            .map(|bindings_ty| {
+                SymbolLookupResult::Type(bindings_ty, use_def.public_boundness(symbol))
+            })
+            .unwrap_or(SymbolLookupResult::Unbound)
     }
 }
 
@@ -289,7 +281,7 @@ fn definition_expression_ty<'db>(
 fn bindings_ty<'map, 'db>(
     db: &'db dyn Db,
     bindings_with_constraints: impl Iterator<Item = BindingWithConstraints<'map, 'db>>,
-) -> SymbolLookupResult<'db>
+) -> Option<Type<'db>>
 where
     'db: 'map,
 {
@@ -318,15 +310,15 @@ where
 
     if let Some(first) = def_types.next() {
         if let Some(second) = def_types.next() {
-            SymbolLookupResult::Type(
-                UnionType::from_elements(db, [first, second].into_iter().chain(def_types)),
-                Boundness::Bound,
-            )
+            Some(UnionType::from_elements(
+                db,
+                [first, second].into_iter().chain(def_types),
+            ))
         } else {
-            SymbolLookupResult::Type(first, Boundness::Bound)
+            Some(first)
         }
     } else {
-        SymbolLookupResult::Unbound
+        None
     }
 }
 
