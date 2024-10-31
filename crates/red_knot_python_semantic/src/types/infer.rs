@@ -62,6 +62,8 @@ use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
 
+use super::mro::MroError;
+
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
 /// scope.
@@ -438,13 +440,55 @@ impl<'db> TypeInferenceBuilder<'db> {
             for definition in self.types.declarations.keys() {
                 if infer_definition_types(self.db, *definition).has_deferred {
                     let deferred = infer_deferred_types(self.db, *definition);
-                    deferred_expression_types.extend(deferred.expressions.iter());
+                    deferred_expression_types.extend(&deferred.expressions);
                 }
             }
-            self.types
-                .expressions
-                .extend(deferred_expression_types.iter());
+            self.types.expressions.extend(deferred_expression_types);
         }
+
+        self.check_class_mros();
+    }
+
+    /// Iterate over all class definitions to check that Python will be able to create
+    /// a consistent "[method resolution order]" for each class at runtime. If not,
+    /// issue a diagnostic.
+    ///
+    /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
+    fn check_class_mros(&mut self) {
+        let declarations = std::mem::take(&mut self.types.declarations);
+        let class_definitions = declarations
+            .values()
+            .filter_map(|ty| ty.into_class_literal_type());
+
+        for class in class_definitions {
+            match class.try_mro(self.db) {
+                Ok(_) => continue,
+                Err(MroError::InvalidBases(bases)) => {
+                    for (index, base_ty) in bases {
+                        let base_node = &class.node(self.db).bases()[*index];
+                        self.diagnostics.add(
+                            base_node.into(),
+                            "invalid-base",
+                            format_args!(
+                                "Invalid class base with type `{}` (all bases must be a class, `Any`, `Unknown` or `Todo`)",
+                                base_ty.display(self.db)
+                            )
+                        );
+                    }
+                },
+                Err(MroError::UnresolvableMro(bases)) => self.diagnostics.add(
+                    class.node(self.db).into(),
+                    "inconsistent-mro",
+                    format_args!(
+                        "Cannot create a consistent method resolution order (MRO) for class `{}` with bases list `[{}]`",
+                        class.name(self.db),
+                        bases.iter().map(|base|base.display(self.db)).join(", ")
+                    )
+                )
+            }
+        }
+
+        self.types.declarations = declarations;
     }
 
     fn infer_region_definition(&mut self, definition: Definition<'db>) {
@@ -4155,7 +4199,8 @@ mod tests {
     use crate::semantic_index::symbol::FileScopeId;
     use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
     use crate::types::{
-        check_types, global_symbol, infer_definition_types, symbol, TypeCheckDiagnostics,
+        check_types, definition_expression_ty, global_symbol, infer_definition_types, symbol,
+        TypeCheckDiagnostics,
     };
     use crate::{HasTy, ProgramSettings, SemanticModel};
     use ruff_db::files::{system_path_to_file, File};
@@ -4164,7 +4209,7 @@ mod tests {
     use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast::name::Name;
 
-    use super::TypeInferenceBuilder;
+    use super::*;
 
     fn setup_db() -> TestDb {
         let db = TestDb::new();
@@ -4297,8 +4342,15 @@ mod tests {
         let class = ty.expect_class_literal();
 
         let base_names: Vec<_> = class
-            .bases(&db)
-            .map(|base_ty| format!("{}", base_ty.display(&db)))
+            .node(&db)
+            .bases()
+            .iter()
+            .map(|base| {
+                format!(
+                    "{}",
+                    definition_expression_ty(&db, class.definition(&db), base).display(&db)
+                )
+            })
             .collect();
 
         assert_eq!(base_names, vec!["Literal[Base]"]);
@@ -4534,13 +4586,13 @@ mod tests {
         let a = system_path_to_file(&db, "src/a.py").expect("file to exist");
         let c_ty = global_symbol(&db, a, "C").expect_type();
         let c_class = c_ty.expect_class_literal();
-        let mut c_bases = c_class.bases(&db);
-        let b_ty = c_bases.next().unwrap();
-        let b_class = b_ty.expect_class_literal();
+        let c_mro = c_class.mro(&db);
+        let b_ty = c_mro[1];
+        let b_class = b_ty.expect_class();
         assert_eq!(b_class.name(&db), "B");
-        let mut b_bases = b_class.bases(&db);
-        let a_ty = b_bases.next().unwrap();
-        let a_class = a_ty.expect_class_literal();
+        let b_mro = b_class.mro(&db);
+        let a_ty = b_mro[1];
+        let a_class = a_ty.expect_class();
         assert_eq!(a_class.name(&db), "A");
 
         Ok(())
@@ -4689,15 +4741,8 @@ mod tests {
         db.write_file("/src/a.pyi", "class C(object): pass")?;
         let file = system_path_to_file(&db, "/src/a.pyi").unwrap();
         let ty = global_symbol(&db, file, "C").expect_type();
-
-        let base = ty
-            .expect_class_literal()
-            .bases(&db)
-            .next()
-            .expect("there should be at least one base");
-
-        assert_eq!(base.display(&db).to_string(), "Literal[object]");
-
+        let base = ty.expect_class_literal().mro(&db)[1];
+        assert_eq!(base.display(&db).to_string(), "<class 'object'>");
         Ok(())
     }
 

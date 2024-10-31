@@ -1,5 +1,7 @@
+use mro::{ClassBase, Mro, MroError};
 use ruff_db::files::File;
 use ruff_python_ast as ast;
+use std::borrow::Cow;
 
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::ast_ids::HasScopedAstId;
@@ -13,7 +15,7 @@ use crate::stdlib::{builtins_symbol, types_symbol, typeshed_symbol, typing_exten
 use crate::symbol::{Boundness, Symbol};
 use crate::types::diagnostic::TypeCheckDiagnosticsBuilder;
 use crate::types::narrow::narrowing_constraint;
-use crate::{Db, FxOrderSet, HasTy, Module, SemanticModel};
+use crate::{Db, FxOrderSet, Module};
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
 pub use self::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
@@ -26,6 +28,7 @@ mod builder;
 mod diagnostic;
 mod display;
 mod infer;
+mod mro;
 mod narrow;
 mod unpacker;
 
@@ -844,6 +847,14 @@ impl<'db> Type<'db> {
     /// as accessed from instances of the `Bar` class.
     #[must_use]
     pub(crate) fn member(&self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+        if name == "__mro__" {
+            if let Some(mro) = Mro::of_ty(db, *self) {
+                let mro_element_tys: Box<_> = mro.iter().copied().map(Type::from).collect();
+                let mro_ty = Type::Tuple(TupleType::new(db, mro_element_tys));
+                return Symbol::Type(mro_ty, Boundness::Bound);
+            }
+        }
+
         match self {
             Type::Any => Type::Any.into(),
             Type::Never => {
@@ -1808,6 +1819,7 @@ pub struct ClassType<'db> {
     known: Option<KnownClass>,
 }
 
+#[salsa::tracked]
 impl<'db> ClassType<'db> {
     pub fn is_known(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
         match self.known(db) {
@@ -1824,36 +1836,30 @@ impl<'db> ClassType<'db> {
             })
     }
 
-    /// Return an iterator over the types of this class's bases.
-    ///
-    /// # Panics:
-    /// If `definition` is not a `DefinitionKind::Class`.
-    pub fn bases(&self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
-        let definition = self.definition(db);
-        let DefinitionKind::Class(class_stmt_node) = definition.kind(db) else {
-            panic!("Class type definition must have DefinitionKind::Class");
-        };
-        class_stmt_node
-            .bases()
-            .iter()
-            .map(move |base_expr: &ast::Expr| {
-                if class_stmt_node.type_params.is_some() {
-                    // when we have a specialized scope, we'll look up the inference
-                    // within that scope
-                    let model: SemanticModel<'db> = SemanticModel::new(db, definition.file(db));
-                    base_expr.ty(&model)
-                } else {
-                    // Otherwise, we can do the lookup based on the definition scope
-                    definition_expression_ty(db, definition, base_expr)
-                }
-            })
+    /// Return the original [`ast::StmtClassDef`] node associated with this class
+    fn node(self, db: &'db dyn Db) -> &'db ast::StmtClassDef {
+        match self.definition(db).kind(db) {
+            DefinitionKind::Class(class_stmt_node) => class_stmt_node,
+            _ => panic!("Class type definition must have DefinitionKind::Class"),
+        }
+    }
+
+    #[salsa::tracked(return_ref)]
+    fn try_mro(self, db: &'db dyn Db) -> Result<Mro<'db>, MroError<'db>> {
+        Mro::of_class(db, self)
+    }
+
+    fn mro(self, db: &'db dyn Db) -> Cow<'db, Mro<'db>> {
+        self.try_mro(db)
+            .as_ref()
+            .map_or_else(|_| Cow::Owned(Mro::from_error(db, self)), Cow::Borrowed)
     }
 
     pub fn is_subclass_of(self, db: &'db dyn Db, other: ClassType) -> bool {
         // TODO: we need to iterate over the *MRO* here, not the bases
         (other == self)
-            || self.bases(db).any(|base| match base {
-                Type::ClassLiteral(base_class) => base_class == other,
+            || self.mro(db).iter().any(|base| match base {
+                ClassBase::Class(base_class) => *base_class == other,
                 // `is_subclass_of` is checking the subtype relation, in which gradual types do not
                 // participate, so we should not return `True` if we find `Any/Unknown` in the
                 // bases.
@@ -1880,10 +1886,17 @@ impl<'db> ClassType<'db> {
     }
 
     pub(crate) fn inherited_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
-        for base in self.bases(db) {
-            let member = base.member(db, name);
-            if !member.is_unbound() {
-                return member;
+        for superclass in self.mro(db).iter().skip(1) {
+            match superclass {
+                ClassBase::Any | ClassBase::Unknown | ClassBase::Todo => {
+                    return Type::from(*superclass).member(db, name)
+                }
+                ClassBase::Class(class) => {
+                    let member = class.own_class_member(db, name);
+                    if !member.is_unbound() {
+                        return member;
+                    }
+                }
             }
         }
 
