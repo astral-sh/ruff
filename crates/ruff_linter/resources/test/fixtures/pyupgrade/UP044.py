@@ -10,4 +10,10 @@ class D(Generic[Unpack  [Shape]]):
 
 def f(*args: Unpack[tuple[int, ...]]): pass
 
-def foo(*args: Unpack[int | str]) -> None: pass  # not supported
+def f(*args: Unpack[other.Type]): pass
+
+
+# Not valid unpackings but they are valid syntax
+def foo(*args: Unpack[int | str]) -> None: pass
+def foo(*args: Unpack[int and str]) -> None: pass
+def foo(*args: Unpack[int > str]) -> None: pass

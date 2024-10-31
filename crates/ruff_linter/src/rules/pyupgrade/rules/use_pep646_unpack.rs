@@ -69,8 +69,8 @@ pub(crate) fn use_pep646_unpack(checker: &mut Checker, expr: &ExprSubscript) {
         return;
     }
 
-    if slice.is_bin_op_expr() {
-        // fixing this would introduce a syntax error
+    // Skip semantically invalid subscript calls (e.g. `Unpack[str | num]`).
+    if !(slice.is_name_expr() || slice.is_subscript_expr() || slice.is_attribute_expr()) {
         return;
     }
 
