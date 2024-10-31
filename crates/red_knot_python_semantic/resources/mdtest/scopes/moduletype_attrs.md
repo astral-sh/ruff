@@ -19,7 +19,7 @@ reveal_type(__path__)  # revealed: @Todo
 
 # TODO: this should probably be added to typeshed; not sure why it isn't?
 # error: [unresolved-reference]
-# revealed: Unbound
+# revealed: Unknown
 reveal_type(__doc__)
 
 class X:
@@ -34,15 +34,15 @@ module globals; these are excluded:
 
 ```py path=unbound_dunders.py
 # error: [unresolved-reference]
-# revealed: Unbound
+# revealed: Unknown
 reveal_type(__getattr__)
 
 # error: [unresolved-reference]
-# revealed: Unbound
+# revealed: Unknown
 reveal_type(__dict__)
 
 # error: [unresolved-reference]
-# revealed: Unbound
+# revealed: Unknown
 reveal_type(__init__)
 ```
 
@@ -61,10 +61,10 @@ reveal_type(typing.__init__)  # revealed: Literal[__init__]
 
 # These come from `builtins.object`, not `types.ModuleType`:
 # TODO: we don't currently understand `types.ModuleType` as inheriting from `object`;
-# these should not reveal `Unbound`:
-reveal_type(typing.__eq__)  # revealed: Unbound
-reveal_type(typing.__class__)  # revealed: Unbound
-reveal_type(typing.__module__)  # revealed: Unbound
+# these should not reveal `Unknown`:
+reveal_type(typing.__eq__)  # revealed: Unknown
+reveal_type(typing.__class__)  # revealed: Unknown
+reveal_type(typing.__module__)  # revealed: Unknown
 
 # TODO: needs support for attribute access on instances, properties and generics;
 # should be `dict[str, Any]`
@@ -78,7 +78,7 @@ where we know exactly which module we're dealing with:
 ```py path=__getattr__.py
 import typing
 
-reveal_type(typing.__getattr__)  # revealed: Unbound
+reveal_type(typing.__getattr__)  # revealed: Unknown
 ```
 
 ## `types.ModuleType.__dict__` takes precedence over global variable `__dict__`
@@ -120,7 +120,7 @@ if returns_bool():
     __name__ = 1
 
 reveal_type(__file__)  # revealed: Literal[42]
-reveal_type(__name__)  # revealed: str | Literal[1]
+reveal_type(__name__)  # revealed: Literal[1] | str
 ```
 
 ## Conditionally global or `ModuleType` attribute, with annotation
@@ -137,5 +137,5 @@ if returns_bool():
     __name__: int = 1
 
 reveal_type(__file__)  # revealed: Literal[42]
-reveal_type(__name__)  # revealed: str | Literal[1]
+reveal_type(__name__)  # revealed: Literal[1] | str
 ```

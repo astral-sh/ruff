@@ -14,7 +14,7 @@ class IntIterable:
 for x in IntIterable():
     pass
 
-# revealed: Unbound | int
+# revealed: int
 # error: [possibly-unresolved-reference]
 reveal_type(x)
 ```
@@ -87,7 +87,7 @@ class OldStyleIterable:
 for x in OldStyleIterable():
     pass
 
-# revealed: Unbound | int
+# revealed: int
 # error: [possibly-unresolved-reference]
 reveal_type(x)
 ```
@@ -98,7 +98,7 @@ reveal_type(x)
 for x in (1, "a", b"foo"):
     pass
 
-# revealed: Unbound | Literal[1] | Literal["a"] | Literal[b"foo"]
+# revealed: Literal[1] | Literal["a"] | Literal[b"foo"]
 # error: [possibly-unresolved-reference]
 reveal_type(x)
 ```
@@ -120,7 +120,7 @@ class NotIterable:
 for x in NotIterable():  # error: "Object of type `NotIterable` is not iterable"
     pass
 
-# revealed: Unbound | Unknown
+# revealed: Unknown
 # error: [possibly-unresolved-reference]
 reveal_type(x)
 ```
@@ -240,7 +240,7 @@ def coinflip() -> bool:
 
 # TODO: we should emit a diagnostic here (it might not be iterable)
 for x in Test() if coinflip() else 42:
-    reveal_type(x)  # revealed: int | Unknown
+    reveal_type(x)  # revealed: int
 ```
 
 ## Union type as iterable where one union element has invalid `__iter__` method
@@ -261,9 +261,9 @@ class Test2:
 def coinflip() -> bool:
     return True
 
-# TODO: we should emit a diagnostic here (it might not be iterable)
+# error: "Object of type `Test | Test2` is not iterable"
 for x in Test() if coinflip() else Test2():
-    reveal_type(x)  # revealed: int | Unknown
+    reveal_type(x)  # revealed: Unknown
 ```
 
 ## Union type as iterator where one union element has no `__next__` method
@@ -277,7 +277,7 @@ class Test:
     def __iter__(self) -> TestIter | int:
         return TestIter()
 
-# TODO: we should emit a diagnostic here (it might not be iterable)
+# error: [not-iterable] "Object of type `Test` is not iterable"
 for x in Test():
-    reveal_type(x)  # revealed: int | Unknown
+    reveal_type(x)  # revealed: Unknown
 ```

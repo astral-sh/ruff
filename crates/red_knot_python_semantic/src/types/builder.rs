@@ -316,7 +316,6 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     self.add_positive(db, *neg);
                 }
             }
-            Type::Unbound => {}
             ty @ (Type::Any | Type::Unknown | Type::Todo) => {
                 // Adding any of these types to the negative side of an intersection
                 // is equivalent to adding it to the positive side. We do this to
@@ -367,15 +366,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
         }
     }
 
-    fn simplify_unbound(&mut self) {
-        if self.positive.contains(&Type::Unbound) {
-            self.positive.retain(Type::is_unbound);
-            self.negative.clear();
-        }
-    }
-
     fn build(mut self, db: &'db dyn Db) -> Type<'db> {
-        self.simplify_unbound();
         match (self.positive.len(), self.negative.len()) {
             (0, 0) => KnownClass::Object.to_instance(db),
             (1, 0) => self.positive[0],
@@ -394,7 +385,7 @@ mod tests {
     use crate::db::tests::TestDb;
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
-    use crate::stdlib::typing_symbol_ty;
+    use crate::stdlib::typing_symbol;
     use crate::types::{KnownClass, StringLiteralType, UnionBuilder};
     use crate::ProgramSettings;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
@@ -626,8 +617,10 @@ mod tests {
     #[test]
     fn intersection_negation_distributes_over_union() {
         let db = setup_db();
-        let st = typing_symbol_ty(&db, "Sized").to_instance(&db);
-        let ht = typing_symbol_ty(&db, "Hashable").to_instance(&db);
+        let st = typing_symbol(&db, "Sized").expect_type().to_instance(&db);
+        let ht = typing_symbol(&db, "Hashable")
+            .expect_type()
+            .to_instance(&db);
         // sh_t: Sized & Hashable
         let sh_t = IntersectionBuilder::new(&db)
             .add_positive(st)
@@ -653,8 +646,10 @@ mod tests {
     fn mixed_intersection_negation_distributes_over_union() {
         let db = setup_db();
         let it = KnownClass::Int.to_instance(&db);
-        let st = typing_symbol_ty(&db, "Sized").to_instance(&db);
-        let ht = typing_symbol_ty(&db, "Hashable").to_instance(&db);
+        let st = typing_symbol(&db, "Sized").expect_type().to_instance(&db);
+        let ht = typing_symbol(&db, "Hashable")
+            .expect_type()
+            .to_instance(&db);
         // s_not_h_t: Sized & ~Hashable
         let s_not_h_t = IntersectionBuilder::new(&db)
             .add_positive(st)
@@ -707,28 +702,6 @@ mod tests {
             .build();
 
         assert_eq!(ty, Type::Never);
-    }
-
-    #[test]
-    fn build_intersection_simplify_positive_unbound() {
-        let db = setup_db();
-        let ty = IntersectionBuilder::new(&db)
-            .add_positive(Type::Unbound)
-            .add_positive(Type::IntLiteral(1))
-            .build();
-
-        assert_eq!(ty, Type::Unbound);
-    }
-
-    #[test]
-    fn build_intersection_simplify_negative_unbound() {
-        let db = setup_db();
-        let ty = IntersectionBuilder::new(&db)
-            .add_negative(Type::Unbound)
-            .add_positive(Type::IntLiteral(1))
-            .build();
-
-        assert_eq!(ty, Type::IntLiteral(1));
     }
 
     #[test]

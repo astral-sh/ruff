@@ -46,7 +46,7 @@ with context_expr as f:
 ```py
 class Manager: ...
 
-# error: [invalid-context-manager] "Object of type Manager cannot be used with `with` because it doesn't implement `__enter__` and `__exit__`"
+# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it doesn't implement `__enter__` and `__exit__`"
 with Manager():
     ...
 ```
@@ -57,7 +57,7 @@ with Manager():
 class Manager:
     def __exit__(self, exc_tpe, exc_value, traceback): ...
 
-# error: [invalid-context-manager] "Object of type Manager cannot be used with `with` because it doesn't implement `__enter__`"
+# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it doesn't implement `__enter__`"
 with Manager():
     ...
 ```
@@ -68,7 +68,7 @@ with Manager():
 class Manager:
     def __enter__(self): ...
 
-# error: [invalid-context-manager] "Object of type Manager cannot be used with `with` because it doesn't implement `__exit__`"
+# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it doesn't implement `__exit__`"
 with Manager():
     ...
 ```
@@ -81,7 +81,7 @@ class Manager:
 
     def __exit__(self, exc_tpe, exc_value, traceback): ...
 
-# error: [invalid-context-manager] "Object of type Manager cannot be used with `with` because the method `__enter__` of type Literal[42] is not callable"
+# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because the method `__enter__` of type `Literal[42]` is not callable"
 with Manager():
     ...
 ```
@@ -94,12 +94,12 @@ class Manager:
 
     __exit__ = 32
 
-# error: [invalid-context-manager] "Object of type Manager cannot be used with `with` because the method `__exit__` of type Literal[32] is not callable"
+# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because the method `__exit__` of type `Literal[32]` is not callable"
 with Manager():
     ...
 ```
 
-## Context expression with non-callable union variants
+## Context expression with possibly-unbound union variants
 
 ```py
 def coinflip() -> bool:
@@ -115,10 +115,10 @@ class NotAContextManager: ...
 
 context_expr = Manager1() if coinflip() else NotAContextManager()
 
-# error: [invalid-context-manager] "Object of type Manager1 | NotAContextManager cannot be used with `with` because the method `__enter__` of type Literal[__enter__] | Unbound is not callable"
-# error: [invalid-context-manager] "Object of type Manager1 | NotAContextManager cannot be used with `with` because the method `__exit__` of type Literal[__exit__] | Unbound is not callable"
+# error: [invalid-context-manager] "Object of type `Manager1 | NotAContextManager` cannot be used with `with` because the method `__enter__` is possibly unbound"
+# error: [invalid-context-manager] "Object of type `Manager1 | NotAContextManager` cannot be used with `with` because the method `__exit__` is possibly unbound"
 with context_expr as f:
-    reveal_type(f)  # revealed: str | Unknown
+    reveal_type(f)  # revealed: str
 ```
 
 ## Context expression with "sometimes" callable `__enter__` method
@@ -134,7 +134,7 @@ class Manager:
 
     def __exit__(self, *args): ...
 
+# error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because the method `__enter__` is possibly unbound"
 with Manager() as f:
-    # TODO: This should emit an error that `__enter__` is possibly unbound.
     reveal_type(f)  # revealed: str
 ```

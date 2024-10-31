@@ -53,9 +53,9 @@ use crate::types::diagnostic::{
     TypeCheckDiagnostic, TypeCheckDiagnostics, TypeCheckDiagnosticsBuilder,
 };
 use crate::types::{
-    bindings_ty, builtins_symbol_ty, declarations_ty, global_symbol_ty, symbol_ty,
-    typing_extensions_symbol_ty, BytesLiteralType, ClassType, FunctionType, IterationOutcome,
-    KnownClass, KnownFunction, SliceLiteralType, StringLiteralType, Truthiness, TupleType, Type,
+    bindings_ty, builtins_symbol, declarations_ty, global_symbol, symbol, typing_extensions_symbol,
+    Boundness, BytesLiteralType, ClassType, FunctionType, IterationOutcome, KnownClass,
+    KnownFunction, SliceLiteralType, StringLiteralType, Symbol, Truthiness, TupleType, Type,
     TypeArrayDisplay, UnionBuilder, UnionType,
 };
 use crate::util::subscript::{PyIndex, PySlice};
@@ -586,7 +586,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let use_def = self.index.use_def_map(declaration.file_scope(self.db));
         let prior_bindings = use_def.bindings_at_declaration(declaration);
         // unbound_ty is Never because for this check we don't care about unbound
-        let inferred_ty = bindings_ty(self.db, prior_bindings, Some(Type::Never));
+        let inferred_ty = bindings_ty(self.db, prior_bindings).unwrap_or(Type::Never);
         let ty = if inferred_ty.is_assignable_to(self.db, ty) {
             ty
         } else {
@@ -1042,78 +1042,113 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let context_manager_ty = context_expression_ty.to_meta_type(self.db);
 
-        let enter_ty = context_manager_ty.member(self.db, "__enter__");
-        let exit_ty = context_manager_ty.member(self.db, "__exit__");
+        let enter = context_manager_ty.member(self.db, "__enter__");
+        let exit = context_manager_ty.member(self.db, "__exit__");
 
         // TODO: Make use of Protocols when we support it (the manager be assignable to `contextlib.AbstractContextManager`).
-        if enter_ty.is_unbound() && exit_ty.is_unbound() {
-            self.diagnostics.add(
-                context_expression.into(),
-                "invalid-context-manager",
-                format_args!(
-                    "Object of type {} cannot be used with `with` because it doesn't implement `__enter__` and `__exit__`",
-                    context_expression_ty.display(self.db)
-                ),
-            );
-            Type::Unknown
-        } else if enter_ty.is_unbound() {
-            self.diagnostics.add(
-                context_expression.into(),
-                "invalid-context-manager",
-                format_args!(
-                    "Object of type {} cannot be used with `with` because it doesn't implement `__enter__`",
-                    context_expression_ty.display(self.db)
-                ),
-            );
-            Type::Unknown
-        } else {
-            let target_ty = enter_ty
-                .call(self.db, &[context_expression_ty])
-                .return_ty_result(self.db, context_expression.into(), &mut self.diagnostics)
-                .unwrap_or_else(|err| {
-                    self.diagnostics.add(
-                        context_expression.into(),
-                        "invalid-context-manager",
-                        format_args!("
-                            Object of type {context_expression} cannot be used with `with` because the method `__enter__` of type {enter_ty} is not callable",
-                            context_expression = context_expression_ty.display(self.db),
-                            enter_ty = enter_ty.display(self.db)
-                        ),
-                    );
-                    err.return_ty()
-                });
-
-            if exit_ty.is_unbound() {
+        match (enter, exit) {
+            (Symbol::Unbound, Symbol::Unbound) => {
                 self.diagnostics.add(
                     context_expression.into(),
                     "invalid-context-manager",
                     format_args!(
-                        "Object of type {} cannot be used with `with` because it doesn't implement `__exit__`",
+                        "Object of type `{}` cannot be used with `with` because it doesn't implement `__enter__` and `__exit__`",
                         context_expression_ty.display(self.db)
                     ),
                 );
+                Type::Unknown
             }
-            // TODO: Use the `exit_ty` to determine if any raised exception is suppressed.
-            else if exit_ty
-                .call(
-                    self.db,
-                    &[context_manager_ty, Type::None, Type::None, Type::None],
-                )
-                .return_ty_result(self.db, context_expression.into(), &mut self.diagnostics)
-                .is_err()
-            {
+            (Symbol::Unbound, _) => {
                 self.diagnostics.add(
                     context_expression.into(),
                     "invalid-context-manager",
                     format_args!(
-                        "Object of type {context_expression} cannot be used with `with` because the method `__exit__` of type {exit_ty} is not callable",
-                        context_expression = context_expression_ty.display(self.db),
-                        exit_ty = exit_ty.display(self.db),
+                        "Object of type `{}` cannot be used with `with` because it doesn't implement `__enter__`",
+                        context_expression_ty.display(self.db)
                     ),
                 );
+                Type::Unknown
             }
+            (Symbol::Type(enter_ty, enter_boundness), exit) => {
+                if enter_boundness == Boundness::MayBeUnbound {
+                    self.diagnostics.add(
+                        context_expression.into(),
+                        "invalid-context-manager",
+                        format_args!(
+                            "Object of type `{context_expression}` cannot be used with `with` because the method `__enter__` is possibly unbound",
+                            context_expression = context_expression_ty.display(self.db),
+                        ),
+                    );
+                }
 
-            target_ty
+                let target_ty = enter_ty
+                    .call(self.db, &[context_expression_ty])
+                    .return_ty_result(self.db, context_expression.into(), &mut self.diagnostics)
+                    .unwrap_or_else(|err| {
+                        self.diagnostics.add(
+                            context_expression.into(),
+                            "invalid-context-manager",
+                            format_args!("
+                                Object of type `{context_expression}` cannot be used with `with` because the method `__enter__` of type `{enter_ty}` is not callable",
+                                context_expression = context_expression_ty.display(self.db),
+                                enter_ty = enter_ty.display(self.db)
+                            ),
+                        );
+                        err.return_ty()
+                    });
+
+                match exit {
+                    Symbol::Unbound => {
+                        self.diagnostics.add(
+                            context_expression.into(),
+                            "invalid-context-manager",
+                            format_args!(
+                                "Object of type `{}` cannot be used with `with` because it doesn't implement `__exit__`",
+                                context_expression_ty.display(self.db)
+                            ),
+                        );
+                    }
+                    Symbol::Type(exit_ty, exit_boundness) => {
+                        // TODO: Use the `exit_ty` to determine if any raised exception is suppressed.
+
+                        if exit_boundness == Boundness::MayBeUnbound {
+                            self.diagnostics.add(
+                                context_expression.into(),
+                                "invalid-context-manager",
+                                format_args!(
+                                    "Object of type `{context_expression}` cannot be used with `with` because the method `__exit__` is possibly unbound",
+                                    context_expression = context_expression_ty.display(self.db),
+                                ),
+                            );
+                        }
+
+                        if exit_ty
+                            .call(
+                                self.db,
+                                &[context_manager_ty, Type::None, Type::None, Type::None],
+                            )
+                            .return_ty_result(
+                                self.db,
+                                context_expression.into(),
+                                &mut self.diagnostics,
+                            )
+                            .is_err()
+                        {
+                            self.diagnostics.add(
+                                context_expression.into(),
+                                "invalid-context-manager",
+                                format_args!(
+                                    "Object of type `{context_expression}` cannot be used with `with` because the method `__exit__` of type `{exit_ty}` is not callable",
+                                    context_expression = context_expression_ty.display(self.db),
+                                    exit_ty = exit_ty.display(self.db),
+                                ),
+                            );
+                        }
+                    }
+                }
+
+                target_ty
+            }
         }
     }
 
@@ -1134,7 +1169,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             //
             // TODO should infer `ExceptionGroup` if all caught exceptions
             // are subclasses of `Exception` --Alex
-            builtins_symbol_ty(self.db, "BaseExceptionGroup").to_instance(self.db)
+            builtins_symbol(self.db, "BaseExceptionGroup")
+                .unwrap_or_unknown()
+                .to_instance(self.db)
         } else {
             // TODO: anything that's a consistent subtype of
             // `type[BaseException] | tuple[type[BaseException], ...]` should be valid;
@@ -1513,8 +1550,12 @@ impl<'db> TypeInferenceBuilder<'db> {
         // If the target defines, e.g., `__iadd__`, infer the augmented assignment as a call to that
         // dunder.
         if let Type::Instance(class) = target_type {
-            let class_member = class.class_member(self.db, op.in_place_dunder());
-            if !class_member.is_unbound() {
+            if let Some(class_member) = class.class_member(self.db, op.in_place_dunder()).as_type()
+            {
+                // TODO: Handle the case where boundness is `MayBeUnbound`: fall back
+                // to the binary-op behavior below and union the result with calling
+                // the possibly-unbound in-place dunder.
+
                 let call = class_member.call(self.db, &[target_type, value_type]);
                 return match call.return_ty_result(
                     self.db,
@@ -1776,21 +1817,20 @@ impl<'db> TypeInferenceBuilder<'db> {
                         asname: _,
                     } = alias;
 
-                    let member_ty = module_ty.member(self.db, &ast::name::Name::new(&name.id));
+                    // For possibly-unbound names, just eliminate Unbound from the type; we
+                    // must be in a bound path. TODO diagnostic for maybe-unbound import?
+                    module_ty
+                        .member(self.db, &ast::name::Name::new(&name.id))
+                        .as_type()
+                        .unwrap_or_else(|| {
+                            self.diagnostics.add(
+                                AnyNodeRef::Alias(alias),
+                                "unresolved-import",
+                                format_args!("Module `{module_name}` has no member `{name}`",),
+                            );
 
-                    if member_ty.is_unbound() {
-                        self.diagnostics.add(
-                            AnyNodeRef::Alias(alias),
-                            "unresolved-import",
-                            format_args!("Module `{module_name}` has no member `{name}`",),
-                        );
-
-                        Type::Unknown
-                    } else {
-                        // For possibly-unbound names, just eliminate Unbound from the type; we
-                        // must be in a bound path. TODO diagnostic for maybe-unbound import?
-                        member_ty.replace_unbound_with(self.db, Type::Never)
-                    }
+                            Type::Unknown
+                        })
                 } else {
                     self.diagnostics
                         .add_unresolved_module(import_from, *level, module);
@@ -1940,9 +1980,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .map(Type::IntLiteral)
                 .unwrap_or_else(|| KnownClass::Int.to_instance(self.db)),
             ast::Number::Float(_) => KnownClass::Float.to_instance(self.db),
-            ast::Number::Complex { .. } => {
-                builtins_symbol_ty(self.db, "complex").to_instance(self.db)
-            }
+            ast::Number::Complex { .. } => builtins_symbol(self.db, "complex")
+                .unwrap_or_unknown()
+                .to_instance(self.db),
         }
     }
 
@@ -2022,7 +2062,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         _literal: &ast::ExprEllipsisLiteral,
     ) -> Type<'db> {
-        builtins_symbol_ty(self.db, "Ellipsis")
+        builtins_symbol(self.db, "Ellipsis").unwrap_or_unknown()
     }
 
     fn infer_tuple_expression(&mut self, tuple: &ast::ExprTuple) -> Type<'db> {
@@ -2398,7 +2438,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     /// Look up a name reference that isn't bound in the local scope.
-    fn lookup_name(&mut self, name_node: &ast::ExprName) -> Type<'db> {
+    fn lookup_name(&mut self, name_node: &ast::ExprName) -> Symbol<'db> {
         let ast::ExprName { id: name, .. } = name_node;
         let file_scope_id = self.scope().file_scope_id(self.db);
         let is_bound = self
@@ -2432,36 +2472,39 @@ impl<'db> TypeInferenceBuilder<'db> {
                     // runtime, it is the scope that creates the cell for our closure.) If the name
                     // isn't bound in that scope, we should get an unbound name, not continue
                     // falling back to other scopes / globals / builtins.
-                    return symbol_ty(self.db, enclosing_scope_id, name);
+                    return symbol(self.db, enclosing_scope_id, name);
                 }
             }
 
             // No nonlocal binding, check module globals. Avoid infinite recursion if `self.scope`
             // already is module globals.
-            let ty = if file_scope_id.is_global() {
-                Type::Unbound
+            let global_symbol = if file_scope_id.is_global() {
+                Symbol::Unbound
             } else {
-                global_symbol_ty(self.db, self.file, name)
+                global_symbol(self.db, self.file, name)
             };
 
             // Fallback to builtins (without infinite recursion if we're already in builtins.)
-            if ty.may_be_unbound(self.db) && Some(self.scope()) != builtins_module_scope(self.db) {
-                let mut builtin_ty = builtins_symbol_ty(self.db, name);
-                if builtin_ty.is_unbound() && name == "reveal_type" {
+            if global_symbol.may_be_unbound()
+                && Some(self.scope()) != builtins_module_scope(self.db)
+            {
+                let mut symbol = builtins_symbol(self.db, name);
+                if symbol.is_unbound() && name == "reveal_type" {
                     self.diagnostics.add(
                         name_node.into(),
                         "undefined-reveal",
                         format_args!(
                             "`reveal_type` used without importing it; this is allowed for debugging convenience but will fail at runtime"),
                     );
-                    builtin_ty = typing_extensions_symbol_ty(self.db, name);
+                    symbol = typing_extensions_symbol(self.db, name);
                 }
-                ty.replace_unbound_with(self.db, builtin_ty)
+
+                global_symbol.replace_unbound_with(self.db, &symbol)
             } else {
-                ty
+                global_symbol
             }
         } else {
-            Type::Unbound
+            Symbol::Unbound
         }
     }
 
@@ -2481,41 +2524,44 @@ impl<'db> TypeInferenceBuilder<'db> {
             .symbol_id_by_name(id)
             .expect("Expected the symbol table to create a symbol for every Name node");
         // if we're inferring types of deferred expressions, always treat them as public symbols
-        let (definitions, may_be_unbound) = if self.is_deferred() {
+        let (definitions, boundness) = if self.is_deferred() {
             (
                 use_def.public_bindings(symbol),
-                use_def.public_may_be_unbound(symbol),
+                use_def.public_boundness(symbol),
             )
         } else {
             let use_id = name.scoped_use_id(self.db, self.scope());
             (
                 use_def.bindings_at_use(use_id),
-                use_def.use_may_be_unbound(use_id),
+                use_def.use_boundness(use_id),
             )
         };
 
-        let unbound_ty = if may_be_unbound {
-            Some(self.lookup_name(name))
+        let bindings_ty = bindings_ty(self.db, definitions);
+
+        if boundness == Boundness::MayBeUnbound {
+            match self.lookup_name(name) {
+                Symbol::Type(looked_up_ty, looked_up_boundness) => {
+                    if looked_up_boundness == Boundness::MayBeUnbound {
+                        self.diagnostics.add_possibly_unresolved_reference(name);
+                    }
+
+                    bindings_ty
+                        .map(|ty| UnionType::from_elements(self.db, [ty, looked_up_ty]))
+                        .unwrap_or(looked_up_ty)
+                }
+                Symbol::Unbound => {
+                    if bindings_ty.is_some() {
+                        self.diagnostics.add_possibly_unresolved_reference(name);
+                    } else {
+                        self.diagnostics.add_unresolved_reference(name);
+                    }
+                    bindings_ty.unwrap_or(Type::Unknown)
+                }
+            }
         } else {
-            None
-        };
-
-        let ty = bindings_ty(self.db, definitions, unbound_ty);
-        if ty.is_unbound() {
-            self.diagnostics.add(
-                name.into(),
-                "unresolved-reference",
-                format_args!("Name `{id}` used when not defined"),
-            );
-        } else if ty.may_be_unbound(self.db) {
-            self.diagnostics.add(
-                name.into(),
-                "possibly-unresolved-reference",
-                format_args!("Name `{id}` used when possibly not defined"),
-            );
+            bindings_ty.unwrap_or(Type::Unknown)
         }
-
-        ty
     }
 
     fn infer_name_expression(&mut self, name: &ast::ExprName) -> Type<'db> {
@@ -2536,7 +2582,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = attribute;
 
         let value_ty = self.infer_expression(value);
-        value_ty.member(self.db, &Name::new(&attr.id))
+        value_ty
+            .member(self.db, &Name::new(&attr.id))
+            .unwrap_or_unknown()
     }
 
     fn infer_attribute_expression(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {
@@ -2590,26 +2638,41 @@ impl<'db> TypeInferenceBuilder<'db> {
                         unreachable!("Not operator is handled in its own case");
                     }
                 };
-                let class_member = class.class_member(self.db, unary_dunder_method);
-                let call = class_member.call(self.db, &[operand_type]);
 
-                match call.return_ty_result(
-                    self.db,
-                    AnyNodeRef::ExprUnaryOp(unary),
-                    &mut self.diagnostics,
-                ) {
-                    Ok(t) => t,
-                    Err(e) => {
-                        self.diagnostics.add(
-                            unary.into(),
-                            "unsupported-operator",
-                            format_args!(
-                                "Unary operator `{op}` is unsupported for type `{}`",
-                                operand_type.display(self.db),
-                            ),
-                        );
-                        e.return_ty()
+                if let Symbol::Type(class_member, _) =
+                    class.class_member(self.db, unary_dunder_method)
+                {
+                    let call = class_member.call(self.db, &[operand_type]);
+
+                    match call.return_ty_result(
+                        self.db,
+                        AnyNodeRef::ExprUnaryOp(unary),
+                        &mut self.diagnostics,
+                    ) {
+                        Ok(t) => t,
+                        Err(e) => {
+                            self.diagnostics.add(
+                                unary.into(),
+                                "unsupported-operator",
+                                format_args!(
+                                    "Unary operator `{op}` is unsupported for type `{}`",
+                                    operand_type.display(self.db),
+                                ),
+                            );
+                            e.return_ty()
+                        }
                     }
+                } else {
+                    self.diagnostics.add(
+                        unary.into(),
+                        "unsupported-operator",
+                        format_args!(
+                            "Unary operator `{op}` is unsupported for type `{}`",
+                            operand_type.display(self.db),
+                        ),
+                    );
+
+                    Type::Unknown
                 }
             }
             _ => Type::Todo, // TODO other unary op types
@@ -2820,30 +2883,44 @@ impl<'db> TypeInferenceBuilder<'db> {
                         && rhs_reflected != left_class.class_member(self.db, reflected_dunder)
                     {
                         return rhs_reflected
+                            .unwrap_or(Type::Never)
                             .call(self.db, &[right_ty, left_ty])
                             .return_ty(self.db)
                             .or_else(|| {
                                 left_class
                                     .class_member(self.db, op.dunder())
+                                    .unwrap_or(Type::Never)
                                     .call(self.db, &[left_ty, right_ty])
                                     .return_ty(self.db)
                             });
                     }
                 }
-                left_class
-                    .class_member(self.db, op.dunder())
-                    .call(self.db, &[left_ty, right_ty])
-                    .return_ty(self.db)
-                    .or_else(|| {
-                        if left_class == right_class {
-                            None
-                        } else {
-                            right_class
-                                .class_member(self.db, op.reflected_dunder())
+
+                let call_on_left_instance = if let Symbol::Type(class_member, _) =
+                    left_class.class_member(self.db, op.dunder())
+                {
+                    class_member
+                        .call(self.db, &[left_ty, right_ty])
+                        .return_ty(self.db)
+                } else {
+                    None
+                };
+
+                call_on_left_instance.or_else(|| {
+                    if left_class == right_class {
+                        None
+                    } else {
+                        if let Symbol::Type(class_member, _) =
+                            right_class.class_member(self.db, op.reflected_dunder())
+                        {
+                            class_member
                                 .call(self.db, &[right_ty, left_ty])
                                 .return_ty(self.db)
+                        } else {
+                            None
                         }
-                    })
+                    }
+                })
             }
 
             (
@@ -3428,9 +3505,21 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // If the class defines `__getitem__`, return its return type.
                 //
                 // See: https://docs.python.org/3/reference/datamodel.html#class-getitem-versus-getitem
-                let dunder_getitem_method = value_meta_ty.member(self.db, "__getitem__");
-                if !dunder_getitem_method.is_unbound() {
-                    return dunder_getitem_method
+                match value_meta_ty.member(self.db, "__getitem__") {
+                    Symbol::Unbound => {}
+                    Symbol::Type(dunder_getitem_method, boundness) => {
+                        if boundness == Boundness::MayBeUnbound {
+                            self.diagnostics.add(
+                                value_node.into(),
+                                "call-possibly-unbound-method",
+                                format_args!(
+                                    "Method `__getitem__` of type `{}` is possibly unbound",
+                                    value_ty.display(self.db),
+                                ),
+                            );
+                        }
+
+                        return dunder_getitem_method
                         .call(self.db, &[slice_ty])
                         .return_ty_result(self.db, value_node.into(), &mut self.diagnostics)
                         .unwrap_or_else(|err| {
@@ -3445,6 +3534,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             );
                             err.return_ty()
                         });
+                    }
                 }
 
                 // Otherwise, if the value is itself a class and defines `__class_getitem__`,
@@ -3458,22 +3548,37 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // method in these `sys.version_info` branches.
                 if value_ty.is_subtype_of(self.db, KnownClass::Type.to_instance(self.db)) {
                     let dunder_class_getitem_method = value_ty.member(self.db, "__class_getitem__");
-                    if !dunder_class_getitem_method.is_unbound() {
-                        return dunder_class_getitem_method
-                            .call(self.db, &[slice_ty])
-                            .return_ty_result(self.db, value_node.into(), &mut self.diagnostics)
-                            .unwrap_or_else(|err| {
+
+                    match dunder_class_getitem_method {
+                        Symbol::Unbound => {}
+                        Symbol::Type(ty, boundness) => {
+                            if boundness == Boundness::MayBeUnbound {
                                 self.diagnostics.add(
                                     value_node.into(),
-                                    "call-non-callable",
+                                    "call-possibly-unbound-method",
                                     format_args!(
-                                        "Method `__class_getitem__` of type `{}` is not callable on object of type `{}`",
-                                        err.called_ty().display(self.db),
+                                        "Method `__class_getitem__` of type `{}` is possibly unbound",
                                         value_ty.display(self.db),
                                     ),
                                 );
-                                err.return_ty()
-                            });
+                            }
+
+                            return ty
+                                .call(self.db, &[slice_ty])
+                                .return_ty_result(self.db, value_node.into(), &mut self.diagnostics)
+                                .unwrap_or_else(|err| {
+                                    self.diagnostics.add(
+                                        value_node.into(),
+                                        "call-non-callable",
+                                        format_args!(
+                                            "Method `__class_getitem__` of type `{}` is not callable on object of type `{}`",
+                                            err.called_ty().display(self.db),
+                                            value_ty.display(self.db),
+                                        ),
+                                    );
+                                    err.return_ty()
+                                });
+                        }
                     }
 
                     if matches!(value_ty, Type::ClassLiteral(class) if class.is_known(self.db, KnownClass::Type))
@@ -3996,13 +4101,15 @@ fn perform_rich_comparison<'db>(
 
     let call_dunder =
         |op: RichCompareOperator, left_class: ClassType<'db>, right_class: ClassType<'db>| {
-            left_class
-                .class_member(db, op.dunder())
-                .call(
-                    db,
-                    &[Type::Instance(left_class), Type::Instance(right_class)],
-                )
-                .return_ty(db)
+            match left_class.class_member(db, op.dunder()) {
+                Symbol::Type(class_member_dunder, Boundness::Bound) => class_member_dunder
+                    .call(
+                        db,
+                        &[Type::Instance(left_class), Type::Instance(right_class)],
+                    )
+                    .return_ty(db),
+                _ => None,
+            }
         };
 
     // The reflected dunder has priority if the right-hand side is a strict subclass of the left-hand side.
@@ -4043,18 +4150,20 @@ fn perform_membership_test_comparison<'db>(
     let (left_instance, right_instance) = (Type::Instance(left_class), Type::Instance(right_class));
 
     let contains_dunder = right_class.class_member(db, "__contains__");
-
-    let compare_result_opt = if contains_dunder.is_unbound() {
-        // iteration-based membership test
-        match right_instance.iterate(db) {
-            IterationOutcome::Iterable { .. } => Some(KnownClass::Bool.to_instance(db)),
-            IterationOutcome::NotIterable { .. } => None,
+    let compare_result_opt = match contains_dunder {
+        Symbol::Type(contains_dunder, Boundness::Bound) => {
+            // If `__contains__` is available, it is used directly for the membership test.
+            contains_dunder
+                .call(db, &[right_instance, left_instance])
+                .return_ty(db)
         }
-    } else {
-        // If `__contains__` is available, it is used directly for the membership test.
-        contains_dunder
-            .call(db, &[right_instance, left_instance])
-            .return_ty(db)
+        _ => {
+            // iteration-based membership test
+            match right_instance.iterate(db) {
+                IterationOutcome::Iterable { .. } => Some(KnownClass::Bool.to_instance(db)),
+                IterationOutcome::NotIterable { .. } => None,
+            }
+        }
     };
 
     compare_result_opt
@@ -4087,7 +4196,7 @@ mod tests {
     use crate::semantic_index::symbol::FileScopeId;
     use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
     use crate::types::{
-        check_types, global_symbol_ty, infer_definition_types, symbol_ty, TypeCheckDiagnostics,
+        check_types, global_symbol, infer_definition_types, symbol, TypeCheckDiagnostics,
     };
     use crate::{HasTy, ProgramSettings, SemanticModel};
     use ruff_db::files::{system_path_to_file, File};
@@ -4147,7 +4256,7 @@ mod tests {
     fn assert_public_ty(db: &TestDb, file_name: &str, symbol_name: &str, expected: &str) {
         let file = system_path_to_file(db, file_name).expect("file to exist");
 
-        let ty = global_symbol_ty(db, file, symbol_name);
+        let ty = global_symbol(db, file, symbol_name).expect_type();
         assert_eq!(
             ty.display(db).to_string(),
             expected,
@@ -4177,7 +4286,7 @@ mod tests {
             assert_eq!(scope.name(db), *expected_scope_name);
         }
 
-        let ty = symbol_ty(db, scope, symbol_name);
+        let ty = symbol(db, scope, symbol_name).unwrap_or_unknown();
         assert_eq!(ty.display(db).to_string(), expected);
     }
 
@@ -4224,7 +4333,7 @@ mod tests {
         )?;
 
         let mod_file = system_path_to_file(&db, "src/mod.py").expect("file to exist");
-        let ty = global_symbol_ty(&db, mod_file, "Sub");
+        let ty = global_symbol(&db, mod_file, "Sub").expect_type();
 
         let class = ty.expect_class_literal();
 
@@ -4251,9 +4360,11 @@ mod tests {
         )?;
 
         let mod_file = system_path_to_file(&db, "src/mod.py").unwrap();
-        let ty = global_symbol_ty(&db, mod_file, "C");
+        let ty = global_symbol(&db, mod_file, "C").expect_type();
         let class_id = ty.expect_class_literal();
-        let member_ty = class_id.class_member(&db, &Name::new_static("f"));
+        let member_ty = class_id
+            .class_member(&db, &Name::new_static("f"))
+            .expect_type();
         let func = member_ty.expect_function_literal();
 
         assert_eq!(func.name(&db), "f");
@@ -4432,7 +4543,9 @@ mod tests {
         db.write_file("src/a.py", "def example() -> int: return 42")?;
 
         let mod_file = system_path_to_file(&db, "src/a.py").unwrap();
-        let function = global_symbol_ty(&db, mod_file, "example").expect_function_literal();
+        let function = global_symbol(&db, mod_file, "example")
+            .expect_type()
+            .expect_function_literal();
         let returns = function.return_type(&db);
         assert_eq!(returns.display(&db).to_string(), "int");
 
@@ -4460,7 +4573,7 @@ mod tests {
         )?;
 
         let a = system_path_to_file(&db, "src/a.py").expect("file to exist");
-        let c_ty = global_symbol_ty(&db, a, "C");
+        let c_ty = global_symbol(&db, a, "C").expect_type();
         let c_class = c_ty.expect_class_literal();
         let mut c_bases = c_class.bases(&db);
         let b_ty = c_bases.next().unwrap();
@@ -4497,10 +4610,10 @@ mod tests {
             .unwrap()
             .0
             .to_scope_id(&db, file);
-        let y_ty = symbol_ty(&db, function_scope, "y");
-        let x_ty = symbol_ty(&db, function_scope, "x");
+        let y_ty = symbol(&db, function_scope, "y").expect_type();
+        let x_ty = symbol(&db, function_scope, "x").expect_type();
 
-        assert_eq!(y_ty.display(&db).to_string(), "Unbound");
+        assert_eq!(y_ty.display(&db).to_string(), "Unknown");
         assert_eq!(x_ty.display(&db).to_string(), "Literal[2]");
 
         Ok(())
@@ -4528,10 +4641,11 @@ mod tests {
             .unwrap()
             .0
             .to_scope_id(&db, file);
-        let y_ty = symbol_ty(&db, function_scope, "y");
-        let x_ty = symbol_ty(&db, function_scope, "x");
 
-        assert_eq!(x_ty.display(&db).to_string(), "Unbound");
+        let x_ty = symbol(&db, function_scope, "x");
+        assert!(x_ty.is_unbound());
+
+        let y_ty = symbol(&db, function_scope, "y").expect_type();
         assert_eq!(y_ty.display(&db).to_string(), "Literal[1]");
 
         Ok(())
@@ -4597,7 +4711,7 @@ mod tests {
             ],
         )?;
 
-        assert_public_ty(&db, "/src/a.py", "x", "Unbound");
+        assert_public_ty(&db, "/src/a.py", "x", "Unknown");
 
         Ok(())
     }
@@ -4615,7 +4729,7 @@ mod tests {
         let mut db = setup_db();
         db.write_file("/src/a.pyi", "class C(object): pass")?;
         let file = system_path_to_file(&db, "/src/a.pyi").unwrap();
-        let ty = global_symbol_ty(&db, file, "C");
+        let ty = global_symbol(&db, file, "C").expect_type();
 
         let base = ty
             .expect_class_literal()
@@ -4906,20 +5020,12 @@ mod tests {
 
         db.write_dedented("src/a.py", "[z for z in x]")?;
 
-        assert_scope_ty(&db, "src/a.py", &["<listcomp>"], "x", "Unbound");
+        assert_scope_ty(&db, "src/a.py", &["<listcomp>"], "x", "Unknown");
 
         // Iterating over an `Unbound` yields `Unknown`:
         assert_scope_ty(&db, "src/a.py", &["<listcomp>"], "z", "Unknown");
 
-        // TODO: not the greatest error message in the world! --Alex
-        assert_file_diagnostics(
-            &db,
-            "src/a.py",
-            &[
-                "Name `x` used when not defined",
-                "Object of type `Unbound` is not iterable",
-            ],
-        );
+        assert_file_diagnostics(&db, "src/a.py", &["Name `x` used when not defined"]);
 
         Ok(())
     }
@@ -5050,7 +5156,7 @@ mod tests {
             ",
         )?;
 
-        assert_scope_ty(&db, "src/a.py", &["foo", "<listcomp>"], "z", "Unbound");
+        assert_scope_ty(&db, "src/a.py", &["foo", "<listcomp>"], "z", "Unknown");
 
         // (There is a diagnostic for invalid syntax that's emitted, but it's not listed by `assert_file_diagnostics`)
         assert_file_diagnostics(&db, "src/a.py", &["Name `z` used when not defined"]);
@@ -5175,7 +5281,7 @@ mod tests {
         ])?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
-        let x_ty = global_symbol_ty(&db, a, "x");
+        let x_ty = global_symbol(&db, a, "x").expect_type();
 
         assert_eq!(x_ty.display(&db).to_string(), "Literal[10]");
 
@@ -5184,7 +5290,7 @@ mod tests {
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
 
-        let x_ty_2 = global_symbol_ty(&db, a, "x");
+        let x_ty_2 = global_symbol(&db, a, "x").expect_type();
 
         assert_eq!(x_ty_2.display(&db).to_string(), "Literal[20]");
 
@@ -5201,7 +5307,7 @@ mod tests {
         ])?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
-        let x_ty = global_symbol_ty(&db, a, "x");
+        let x_ty = global_symbol(&db, a, "x").expect_type();
 
         assert_eq!(x_ty.display(&db).to_string(), "Literal[10]");
 
@@ -5211,7 +5317,7 @@ mod tests {
 
         db.clear_salsa_events();
 
-        let x_ty_2 = global_symbol_ty(&db, a, "x");
+        let x_ty_2 = global_symbol(&db, a, "x").expect_type();
 
         assert_eq!(x_ty_2.display(&db).to_string(), "Literal[10]");
 
@@ -5237,7 +5343,7 @@ mod tests {
         ])?;
 
         let a = system_path_to_file(&db, "/src/a.py").unwrap();
-        let x_ty = global_symbol_ty(&db, a, "x");
+        let x_ty = global_symbol(&db, a, "x").expect_type();
 
         assert_eq!(x_ty.display(&db).to_string(), "Literal[10]");
 
@@ -5247,7 +5353,7 @@ mod tests {
 
         db.clear_salsa_events();
 
-        let x_ty_2 = global_symbol_ty(&db, a, "x");
+        let x_ty_2 = global_symbol(&db, a, "x").expect_type();
 
         assert_eq!(x_ty_2.display(&db).to_string(), "Literal[10]");
 

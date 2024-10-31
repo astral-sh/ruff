@@ -80,9 +80,11 @@ class Foo:
             return 42
 
 f = Foo()
+
+# TODO: We should emit an `unsupported-operator` error here, possibly with the information
+# that `Foo.__iadd__` may be unbound as additional context.
 f += "Hello, world!"
 
-# TODO should emit a diagnostic warning that `Foo` might not have an `__iadd__` method
 reveal_type(f)  # revealed: int
 ```
 
