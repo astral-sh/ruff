@@ -1,0 +1,83 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+snapshot_kind: text
+---
+UP044.py:5:17: UP044 [*] Use `*` for unpacking
+  |
+3 | Shape = TypeVarTuple('Shape')
+4 | 
+5 | class C(Generic[Unpack[Shape]]):
+  |                 ^^^^^^^^^^^^^ UP044
+6 |     pass
+  |
+  = help: Convert to `*` for unpacking
+
+ℹ Safe fix
+2 2 | 
+3 3 | Shape = TypeVarTuple('Shape')
+4 4 | 
+5   |-class C(Generic[Unpack[Shape]]):
+  5 |+class C(Generic[*Shape]):
+6 6 |     pass
+7 7 | 
+8 8 | class D(Generic[Unpack  [Shape]]):
+
+UP044.py:8:17: UP044 [*] Use `*` for unpacking
+  |
+6 |     pass
+7 | 
+8 | class D(Generic[Unpack  [Shape]]):
+  |                 ^^^^^^^^^^^^^^^ UP044
+9 |     pass
+  |
+  = help: Convert to `*` for unpacking
+
+ℹ Safe fix
+5 5 | class C(Generic[Unpack[Shape]]):
+6 6 |     pass
+7 7 | 
+8   |-class D(Generic[Unpack  [Shape]]):
+  8 |+class D(Generic[*Shape]):
+9 9 |     pass
+10 10 | 
+11 11 | def f(*args: Unpack[tuple[int, ...]]): pass
+
+UP044.py:11:14: UP044 [*] Use `*` for unpacking
+   |
+ 9 |     pass
+10 | 
+11 | def f(*args: Unpack[tuple[int, ...]]): pass
+   |              ^^^^^^^^^^^^^^^^^^^^^^^ UP044
+12 | 
+13 | def f(*args: Unpack[other.Type]): pass
+   |
+   = help: Convert to `*` for unpacking
+
+ℹ Safe fix
+8  8  | class D(Generic[Unpack  [Shape]]):
+9  9  |     pass
+10 10 | 
+11    |-def f(*args: Unpack[tuple[int, ...]]): pass
+   11 |+def f(*args: *tuple[int, ...]): pass
+12 12 | 
+13 13 | def f(*args: Unpack[other.Type]): pass
+14 14 | 
+
+UP044.py:13:14: UP044 [*] Use `*` for unpacking
+   |
+11 | def f(*args: Unpack[tuple[int, ...]]): pass
+12 | 
+13 | def f(*args: Unpack[other.Type]): pass
+   |              ^^^^^^^^^^^^^^^^^^ UP044
+   |
+   = help: Convert to `*` for unpacking
+
+ℹ Safe fix
+10 10 | 
+11 11 | def f(*args: Unpack[tuple[int, ...]]): pass
+12 12 | 
+13    |-def f(*args: Unpack[other.Type]): pass
+   13 |+def f(*args: *other.Type): pass
+14 14 | 
+15 15 | 
+16 16 | # Not valid unpackings but they are valid syntax
