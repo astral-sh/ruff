@@ -2,8 +2,9 @@
 
 ## Basic `async with` statement
 
-The type of the target variable in a `with` statement should be the return type from the context manager's `__aenter__` method.
-However, `async with` statements aren't supported yet. This test asserts that it doesn't emit any context manager-related errors.
+The type of the target variable in a `with` statement should be the return type from the context
+manager's `__aenter__` method. However, `async with` statements aren't supported yet. This test
+asserts that it doesn't emit any context manager-related errors.
 
 ```py
 class Target: ...

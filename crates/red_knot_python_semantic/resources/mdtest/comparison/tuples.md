@@ -82,8 +82,8 @@ reveal_type(a >= b)  # revealed: bool
 
 #### Comparison Unsupported
 
-If two tuples contain types that do not support comparison, the result may be `Unknown`.
-However, `==` and `!=` are exceptions and can still provide definite results.
+If two tuples contain types that do not support comparison, the result may be `Unknown`. However,
+`==` and `!=` are exceptions and can still provide definite results.
 
 ```py
 a = (1, 2)
@@ -102,8 +102,8 @@ reveal_type(a > b)  # revealed: bool
 reveal_type(a >= b)  # revealed: bool
 ```
 
-However, if the lexicographic comparison completes without reaching a point where str and int are compared,
-Python will still produce a result based on the prior elements.
+However, if the lexicographic comparison completes without reaching a point where str and int are
+compared, Python will still produce a result based on the prior elements.
 
 ```py path=short_circuit.py
 a = (1, 2)

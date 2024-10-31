@@ -14,11 +14,10 @@ foo = 1
 reveal_type(x)
 ```
 
-Note: in this particular example, one could argue that the most likely error would
-be a wrong order of the `x`/`foo` definitions, and so it could be desirable to infer
-`Literal[1]` for the type of `x`. On the other hand, there might be a variable `fob`
-a little higher up in this file, and the actual error might have been just a typo.
-Inferring `Unknown` thus seems like the safest option.
+Note: in this particular example, one could argue that the most likely error would be a wrong order
+of the `x`/`foo` definitions, and so it could be desirable to infer `Literal[1]` for the type of
+`x`. On the other hand, there might be a variable `fob` a little higher up in this file, and the
+actual error might have been just a typo. Inferring `Unknown` thus seems like the safest option.
 
 ## Unbound class variable
 
