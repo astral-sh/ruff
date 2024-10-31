@@ -22,7 +22,8 @@ Inferring `Unknown` thus seems like the safest option.
 
 ## Unbound class variable
 
-Name lookups within a class scope fall back to globals, but lookups of class attributes don't.
+Name lookups within a class scope fall back to globals, but lookups of class
+attributes don't.
 
 ```py
 def bool_instance() -> bool:

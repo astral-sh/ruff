@@ -1,7 +1,7 @@
 # Comparison: Byte literals
 
-These tests assert that we infer precise `Literal` types for comparisons between objects
-inferred as having `Literal` bytes types:
+These tests assert that we infer precise `Literal` types for comparisons between
+objects inferred as having `Literal` bytes types:
 
 ```py
 reveal_type(b"abc" == b"abc")  # revealed: Literal[True]

@@ -1,8 +1,8 @@
 # Comparison: Membership Test
 
-In Python, the term "membership test operators" refers to the operators
-`in` and `not in`. To customize their behavior, classes can implement one of
-the special methods `__contains__`, `__iter__`, or `__getitem__`.
+In Python, the term "membership test operators" refers to the operators `in` and
+`not in`. To customize their behavior, classes can implement one of the special
+methods `__contains__`, `__iter__`, or `__getitem__`.
 
 For references, see:
 
@@ -67,8 +67,8 @@ reveal_type(42 not in A())  # revealed: bool
 
 ## Wrong Return Type
 
-Python coerces the results of containment checks to `bool`, even if `__contains__`
-returns a non-bool:
+Python coerces the results of containment checks to `bool`, even if
+`__contains__` returns a non-bool:
 
 ```py
 class A:
@@ -151,8 +151,8 @@ reveal_type(CheckGetItem() in B())  # revealed: bool
 
 ## Invalid Old-Style Iteration
 
-If `__getitem__` is implemented but does not accept integer arguments, then
-the membership test is not supported and should trigger a diagnostic.
+If `__getitem__` is implemented but does not accept integer arguments, then the
+membership test is not supported and should trigger a diagnostic.
 
 ```py
 class A:

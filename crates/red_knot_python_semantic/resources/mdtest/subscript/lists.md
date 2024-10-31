@@ -23,8 +23,8 @@ reveal_type(x["a"])  # revealed: @Todo
 
 ## Assignments within list assignment
 
-In assignment, we might also have a named assignment.
-This should also get type checked.
+In assignment, we might also have a named assignment. This should also get type
+checked.
 
 ```py
 x = [1, 2, 3]

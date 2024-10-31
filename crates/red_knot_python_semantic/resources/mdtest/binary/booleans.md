@@ -2,7 +2,8 @@
 
 ## Basic Arithmetic
 
-We try to be precise and all operations except for division will result in Literal type.
+We try to be precise and all operations except for division will result in
+Literal type.
 
 ```py
 a = True

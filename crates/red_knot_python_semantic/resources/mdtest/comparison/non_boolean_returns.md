@@ -5,9 +5,9 @@ Walking through examples:
 - `a = A() < B() < C()`
 
     1. `A() < B() and B() < C()` - split in N comparison
-    1. `A()` and `B()`              - evaluate outcome types
-    1. `bool` and `bool`            - evaluate truthiness
-    1. `A | B`                    - union of "first true" types
+    1. `A()` and `B()` - evaluate outcome types
+    1. `bool` and `bool` - evaluate truthiness
+    1. `A | B` - union of "first true" types
 
 - `b = 0 < 1 < A() < 3`
 

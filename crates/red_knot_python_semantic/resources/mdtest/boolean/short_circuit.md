@@ -2,9 +2,9 @@
 
 ## Not all boolean expressions must be evaluated
 
-In `or` expressions, if the left-hand side is truthy, the right-hand side is not evaluated.
-Similarly, in `and` expressions, if the left-hand side is falsy, the right-hand side is not
-evaluated.
+In `or` expressions, if the left-hand side is truthy, the right-hand side is not
+evaluated. Similarly, in `and` expressions, if the left-hand side is falsy, the
+right-hand side is not evaluated.
 
 ```py
 def bool_instance() -> bool:

@@ -1,6 +1,7 @@
 # Binary operations on instances
 
-Binary operations in Python are implemented by means of magic double-underscore methods.
+Binary operations in Python are implemented by means of magic double-underscore
+methods.
 
 For references, see:
 
@@ -9,8 +10,8 @@ For references, see:
 
 ## Operations
 
-We support inference for all Python's binary operators:
-`+`, `-`, `*`, `@`, `/`, `//`, `%`, `**`, `<<`, `>>`, `&`, `^`, and `|`.
+We support inference for all Python's binary operators: `+`, `-`, `*`, `@`, `/`,
+`//`, `%`, `**`, `<<`, `>>`, `&`, `^`, and `|`.
 
 ```py
 class A:
@@ -240,9 +241,8 @@ returns `NotImplemented` to signal failure.
 Typeshed and other stubs annotate dunder-method calls that would return
 `NotImplemented` as being "illegal" calls. `int.__add__` is annotated as only
 "accepting" `int`s, even though it strictly-speaking "accepts" any other object
-without raising an exception -- it will simply return `NotImplemented`,
-allowing the runtime to try the `__radd__` method of the right-hand operand
-as well.
+without raising an exception -- it will simply return `NotImplemented`, allowing
+the runtime to try the `__radd__` method of the right-hand operand as well.
 
 ```py
 class A:
@@ -404,7 +404,8 @@ reveal_type(A() + A())
 
 ### Wrong position
 
-A left-hand dunder method doesn't apply for the right-hand operand, or vice versa:
+A left-hand dunder method doesn't apply for the right-hand operand, or vice
+versa:
 
 ```py
 class A:
@@ -427,9 +428,9 @@ reveal_type(B() + C())
 ### Reflected dunder is not tried between two objects of the same type
 
 For the specific case where the left-hand operand is the exact same type as the
-right-hand operand, the reflected dunder of the right-hand operand is not
-tried; the runtime short-circuits after trying the unreflected dunder of the
-left-hand operand. For context, see
+right-hand operand, the reflected dunder of the right-hand operand is not tried;
+the runtime short-circuits after trying the unreflected dunder of the left-hand
+operand. For context, see
 [this mailing list discussion](https://mail.python.org/archives/list/python-dev@python.org/thread/7NZUCODEAPQFMRFXYRMGJXDSIS3WJYIV/).
 
 ```py

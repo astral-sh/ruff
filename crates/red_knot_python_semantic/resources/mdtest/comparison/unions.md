@@ -52,8 +52,8 @@ reveal_type(one_or_none is not None)  # revealed: bool
 
 ## Union on both sides of the comparison
 
-With unions on both sides, we need to consider the full cross product of
-options when building the resulting (union) type:
+With unions on both sides, we need to consider the full cross product of options
+when building the resulting (union) type:
 
 ```py
 def bool_instance() -> bool:

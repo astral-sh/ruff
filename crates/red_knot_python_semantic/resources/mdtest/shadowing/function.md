@@ -2,7 +2,8 @@
 
 ## Parameter
 
-Parameter `x` of type `str` is shadowed and reassigned with a new `int` value inside the function. No diagnostics should be generated.
+Parameter `x` of type `str` is shadowed and reassigned with a new `int` value
+inside the function. No diagnostics should be generated.
 
 ```py path=a.py
 def f(x: str):

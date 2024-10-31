@@ -62,7 +62,8 @@ reveal_type(x)  # revealed: Unknown | int
 
 ## Multiple non-callable elements in a union
 
-Calling a union with multiple non-callable elements should mention all of them in the diagnostic.
+Calling a union with multiple non-callable elements should mention all of them
+in the diagnostic.
 
 ```py
 def bool_instance() -> bool:

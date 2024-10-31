@@ -13,8 +13,8 @@ reveal_type(5 % 3)  # revealed: Literal[2]
 
 ## Power
 
-For power if the result fits in the int literal type it will be a Literal type. Otherwise the
-outcome is int.
+For power if the result fits in the int literal type it will be a Literal type.
+Otherwise the outcome is int.
 
 ```py
 largest_u32 = 4_294_967_295
@@ -25,16 +25,20 @@ reveal_type(2**largest_u32)  # revealed: int
 
 ## Division by Zero
 
-This error is really outside the current Python type system, because e.g. `int.__truediv__` and
-friends are not annotated to indicate that it's an error, and we don't even have a facility to
-permit such an annotation. So arguably divide-by-zero should be a lint error rather than a type
-checker error. But we choose to go ahead and error in the cases that are very likely to be an error:
-dividing something typed as `int` or `float` by something known to be `Literal[0]`.
+This error is really outside the current Python type system, because e.g.
+`int.__truediv__` and friends are not annotated to indicate that it's an error,
+and we don't even have a facility to permit such an annotation. So arguably
+divide-by-zero should be a lint error rather than a type checker error. But we
+choose to go ahead and error in the cases that are very likely to be an error:
+dividing something typed as `int` or `float` by something known to be
+`Literal[0]`.
 
-This isn't _definitely_ an error, because the object typed as `int` or `float` could be an instance
-of a custom subclass which overrides division behavior to handle zero without error. But if this
-unusual case occurs, the error can be avoided by explicitly typing the dividend as that safe custom
-subclass; we only emit the error if the LHS type is exactly `int` or `float`, not if its a subclass.
+This isn't _definitely_ an error, because the object typed as `int` or `float`
+could be an instance of a custom subclass which overrides division behavior to
+handle zero without error. But if this unusual case occurs, the error can be
+avoided by explicitly typing the dividend as that safe custom subclass; we only
+emit the error if the LHS type is exactly `int` or `float`, not if its a
+subclass.
 
 ```py
 a = 1 / 0  # error: "Cannot divide object of type `Literal[1]` by zero"

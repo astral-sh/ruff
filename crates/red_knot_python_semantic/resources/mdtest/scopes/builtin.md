@@ -2,8 +2,8 @@
 
 ## Conditionally global or builtin
 
-If a builtin name is conditionally defined as a global, a name lookup should union the builtin type
-with the conditionally-defined type:
+If a builtin name is conditionally defined as a global, a name lookup should
+union the builtin type with the conditionally-defined type:
 
 ```py
 def returns_bool() -> bool:

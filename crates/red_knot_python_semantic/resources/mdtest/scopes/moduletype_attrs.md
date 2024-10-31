@@ -2,10 +2,9 @@
 
 ## Implicit `ModuleType` globals
 
-All modules are instances of `types.ModuleType`.
-If a name can't be found in any local or global scope, we look it up
-as an attribute on `types.ModuleType` in typeshed
-before deciding that the name is unbound.
+All modules are instances of `types.ModuleType`. If a name can't be found in any
+local or global scope, we look it up as an attribute on `types.ModuleType` in
+typeshed before deciding that the name is unbound.
 
 ```py
 reveal_type(__name__)  # revealed: str
@@ -48,8 +47,8 @@ reveal_type(__init__)
 
 ## Accessed as attributes
 
-`ModuleType` attributes can also be accessed as attributes on module-literal types.
-The special attributes `__dict__` and `__init__`, and all attributes on
+`ModuleType` attributes can also be accessed as attributes on module-literal
+types. The special attributes `__dict__` and `__init__`, and all attributes on
 `builtins.object`, can also be accessed as attributes on module-literal types,
 despite the fact that these are inaccessible as globals from inside the module:
 
@@ -84,9 +83,9 @@ reveal_type(typing.__getattr__)  # revealed: Unknown
 ## `types.ModuleType.__dict__` takes precedence over global variable `__dict__`
 
 It's impossible to override the `__dict__` attribute of `types.ModuleType`
-instances from inside the module; we should prioritise the attribute in
-the `types.ModuleType` stub over a variable named `__dict__` in the module's
-global namespace:
+instances from inside the module; we should prioritise the attribute in the
+`types.ModuleType` stub over a variable named `__dict__` in the module's global
+namespace:
 
 ```py path=foo.py
 __dict__ = "foo"
@@ -106,9 +105,9 @@ reveal_type(foo_dict)  # revealed: @Todo
 
 ## Conditionally global or `ModuleType` attribute
 
-Attributes overridden in the module namespace take priority.
-If a builtin name is conditionally defined as a global, however,
-a name lookup should union the `ModuleType` type with the conditionally defined type:
+Attributes overridden in the module namespace take priority. If a builtin name
+is conditionally defined as a global, however, a name lookup should union the
+`ModuleType` type with the conditionally defined type:
 
 ```py
 __file__ = 42

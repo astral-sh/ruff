@@ -35,8 +35,8 @@ import foo as foo  # error: "Cannot resolve import `foo`"
 reveal_type(foo)  # revealed: Unknown
 ```
 
-Importing the unresolved import into a second file should not trigger an additional "unresolved
-import" violation:
+Importing the unresolved import into a second file should not trigger an
+additional "unresolved import" violation:
 
 ```py
 from a import foo

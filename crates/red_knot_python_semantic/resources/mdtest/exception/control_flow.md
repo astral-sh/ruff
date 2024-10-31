@@ -4,26 +4,26 @@ These tests assert that we understand the possible "definition states" (which
 symbols might or might not be defined) in the various branches of a
 `try`/`except`/`else`/`finally` block.
 
-For a full writeup on the semantics of exception handlers,
-see [this document][1].
+For a full writeup on the semantics of exception handlers, see
+[this document][1].
 
 The tests throughout this Markdown document use functions with names starting
-with `could_raise_*` to mark definitions that might or might not succeed
-(as the function could raise an exception). A type checker must assume that any
+with `could_raise_*` to mark definitions that might or might not succeed (as the
+function could raise an exception). A type checker must assume that any
 arbitrary function call could raise an exception in Python; this is just a
-naming convention used in these tests for clarity, and to future-proof the
-tests against possible future improvements whereby certain statements or
-expressions could potentially be inferred as being incapable of causing an
-exception to be raised.
+naming convention used in these tests for clarity, and to future-proof the tests
+against possible future improvements whereby certain statements or expressions
+could potentially be inferred as being incapable of causing an exception to be
+raised.
 
 ## A single bare `except`
 
-Consider the following `try`/`except` block, with a single bare `except:`.
-There are different types for the variable `x` in the two branches of this
-block, and we can't determine which branch might have been taken from the
-perspective of code following this block. The inferred type after the block's
-conclusion is therefore the union of the type at the end of the `try` suite
-(`str`) and the type at the end of the `except` suite (`Literal[2]`).
+Consider the following `try`/`except` block, with a single bare `except:`. There
+are different types for the variable `x` in the two branches of this block, and
+we can't determine which branch might have been taken from the perspective of
+code following this block. The inferred type after the block's conclusion is
+therefore the union of the type at the end of the `try` suite (`str`) and the
+type at the end of the `except` suite (`Literal[2]`).
 
 *Within* the `except` suite, we must infer a union of all possible "definition
 states" we could have been in at any point during the `try` suite. This is
@@ -33,8 +33,8 @@ because control flow could have jumped to the `except` suite without any of the
 successfully completing. The type of `x` at the beginning of the `except` suite
 in this example is therefore `Literal[1] | str`, taking into account that we
 might have jumped to the `except` suite before the
-`x = could_raise_returns_str()` redefinition, but we *also* could have jumped
-to the `except` suite *after* that redefinition.
+`x = could_raise_returns_str()` redefinition, but we *also* could have jumped to
+the `except` suite *after* that redefinition.
 
 ```py path=union_type_inferred.py
 def could_raise_returns_str() -> str:
@@ -77,9 +77,9 @@ reveal_type(x)  # revealed: str
 For simple `try`/`except` blocks, an `except TypeError:` handler has the same
 control flow semantics as an `except:` handler. An `except TypeError:` handler
 will not catch *all* exceptions: if this is the only handler, it opens up the
-possibility that an exception might occur that would not be handled. However,
-as described in [the document on exception-handling semantics][1], that would
-lead to termination of the scope. It's therefore irrelevant to consider this
+possibility that an exception might occur that would not be handled. However, as
+described in [the document on exception-handling semantics][1], that would lead
+to termination of the scope. It's therefore irrelevant to consider this
 possibility when it comes to control-flow analysis.
 
 ```py
@@ -102,11 +102,10 @@ reveal_type(x)  # revealed: str | Literal[2]
 
 ## Multiple `except` branches
 
-If the scope reaches the final `reveal_type` call in this example,
-either the `try`-block suite of statements was executed in its entirety,
-or exactly one `except` suite was executed in its entirety.
-The inferred type of `x` at this point is the union of the types at the end of
-the three suites:
+If the scope reaches the final `reveal_type` call in this example, either the
+`try`-block suite of statements was executed in its entirety, or exactly one
+`except` suite was executed in its entirety. The inferred type of `x` at this
+point is the union of the types at the end of the three suites:
 
 - At the end of `try`, `type(x) == str`
 - At the end of `except TypeError`, `x == 2`
@@ -136,11 +135,11 @@ reveal_type(x)  # revealed: str | Literal[2, 3]
 
 ## Exception handlers with `else` branches (but no `finally`)
 
-If we reach the `reveal_type` call at the end of this scope,
-either the `try` and `else` suites were both executed in their entireties,
-or the `except` suite was executed in its entirety. The type of `x` at this
-point is the union of the type at the end of the `else` suite and the type at
-the end of the `except` suite:
+If we reach the `reveal_type` call at the end of this scope, either the `try`
+and `else` suites were both executed in their entireties, or the `except` suite
+was executed in its entirety. The type of `x` at this point is the union of the
+type at the end of the `else` suite and the type at the end of the `except`
+suite:
 
 - At the end of `else`, `x == 3`
 - At the end of `except`, `x == 2`
@@ -168,10 +167,10 @@ reveal_type(x)  # revealed: Literal[2, 3]
 ```
 
 For a block that has multiple `except` branches and an `else` branch, the same
-principle applies. In order to reach the final `reveal_type` call,
-either exactly one of the `except` suites must have been executed in its
-entirety, or the `try` suite and the `else` suite must both have been executed
-in their entireties:
+principle applies. In order to reach the final `reveal_type` call, either
+exactly one of the `except` suites must have been executed in its entirety, or
+the `try` suite and the `else` suite must both have been executed in their
+entireties:
 
 ```py
 def could_raise_returns_str() -> str:
@@ -202,8 +201,8 @@ reveal_type(x)  # revealed: Literal[2, 3, 4]
 ## Exception handlers with `finally` branches (but no `except` branches)
 
 A `finally` suite is *always* executed. As such, if we reach the `reveal_type`
-call at the end of this example, we know that `x` *must* have been reassigned
-to `2` during the `finally` suite. The type of `x` at the end of the example is
+call at the end of this example, we know that `x` *must* have been reassigned to
+`2` during the `finally` suite. The type of `x` at the end of the example is
 therefore `Literal[2]`:
 
 ```py path=redef_in_finally.py
@@ -224,11 +223,10 @@ reveal_type(x)  # revealed: Literal[2]
 ```
 
 If `x` was *not* redefined in the `finally` suite, however, things are somewhat
-more complicated. If we reach the final `reveal_type` call,
-unlike the state when we're visiting the `finally` suite,
-we know that the `try`-block suite ran to completion.
-This means that there are fewer possible states at this point than there were
-when we were inside the `finally` block.
+more complicated. If we reach the final `reveal_type` call, unlike the state
+when we're visiting the `finally` suite, we know that the `try`-block suite ran
+to completion. This means that there are fewer possible states at this point
+than there were when we were inside the `finally` block.
 
 (Our current model does *not* correctly infer the types *inside* `finally`
 suites, however; this is still a TODO item for us.)
@@ -261,9 +259,9 @@ following possibilities inside `finally` suites:
     suite, and the `except` suite ran to completion
 - Or we could have jumped from halfway through the `try` suite straight to the
     `finally` suite due to an unhandled exception
-- Or we could have jumped from halfway through the `try` suite to an
-    `except` suite, only for an exception raised in the `except` suite to cause
-    us to jump to the `finally` suite before the `except` suite ran to completion
+- Or we could have jumped from halfway through the `try` suite to an `except`
+    suite, only for an exception raised in the `except` suite to cause us to
+    jump to the `finally` suite before the `except` suite ran to completion
 
 ```py path=redef_in_finally.py
 def could_raise_returns_str() -> str:
@@ -296,12 +294,12 @@ finally:
 reveal_type(x)  # revealed: Literal[2]
 ```
 
-Now for an example without a redefinition in the `finally` suite.
-As before, there *should* be fewer possibilities after completion of the
-`finally` suite than there were during the `finally` suite itself.
-(In some control-flow possibilities, some exceptions were merely *suspended*
-during the `finally` suite; these lead to the scope's termination following the
-conclusion of the `finally` suite.)
+Now for an example without a redefinition in the `finally` suite. As before,
+there *should* be fewer possibilities after completion of the `finally` suite
+than there were during the `finally` suite itself. (In some control-flow
+possibilities, some exceptions were merely *suspended* during the `finally`
+suite; these lead to the scope's termination following the conclusion of the
+`finally` suite.)
 
 ```py path=no_redef_in_finally.py
 def could_raise_returns_str() -> str:
@@ -479,15 +477,15 @@ reveal_type(x)  # revealed: bool | float | slice
 
 ## Nested `try`/`except` blocks
 
-It would take advanced analysis, which we are not yet capable of, to be able
-to determine that an exception handler always suppresses all exceptions. This
-is partly because it is possible for statements in `except`, `else` and
-`finally` suites to raise exceptions as well as statements in `try` suites.
-This means that if an exception handler is nested inside the `try` statement of
-an enclosing exception handler, it should (at least for now) be treated the
-same as any other node: as a suite containing statements that could possibly
-raise exceptions, which would lead to control flow jumping out of that suite
-prior to the suite running to completion.
+It would take advanced analysis, which we are not yet capable of, to be able to
+determine that an exception handler always suppresses all exceptions. This is
+partly because it is possible for statements in `except`, `else` and `finally`
+suites to raise exceptions as well as statements in `try` suites. This means
+that if an exception handler is nested inside the `try` statement of an
+enclosing exception handler, it should (at least for now) be treated the same as
+any other node: as a suite containing statements that could possibly raise
+exceptions, which would lead to control flow jumping out of that suite prior to
+the suite running to completion.
 
 ```py
 def could_raise_returns_str() -> str:
