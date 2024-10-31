@@ -156,6 +156,7 @@ mod tests {
     use ruff_python_ast::PySourceType;
     use ruff_python_parser::{parse, AsMode};
     use ruff_python_trivia::CommentRanges;
+    use ruff_source_file::{LineIndex, OneIndexed};
     use ruff_text_size::{TextRange, TextSize};
 
     use crate::{format_module_ast, format_module_source, format_range, PyFormatOptions};
