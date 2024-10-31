@@ -523,11 +523,6 @@ impl<'db> Type<'db> {
                 .elements(db)
                 .iter()
                 .any(|&elem_ty| ty.is_subtype_of(db, elem_ty)),
-            (Type::Instance(self_class), Type::Instance(target_class))
-                if self_class.is_known(db, KnownClass::NoneType) =>
-            {
-                target_class.is_known(db, KnownClass::NoneType)
-            }
             (Type::Instance(self_class), Type::Instance(target_class)) => {
                 self_class.is_subclass_of(db, target_class)
             }
@@ -566,10 +561,17 @@ impl<'db> Type<'db> {
     }
 
     /// Return true if this type is equivalent to type `other`.
-    pub(crate) fn is_equivalent_to(self, _db: &'db dyn Db, other: Type<'db>) -> bool {
+    pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         // TODO equivalent but not identical structural types, differently-ordered unions and
         // intersections, other cases?
+
+        // TODO: The following is a workaround that is required to unify the two different
+        // versions of `NoneType` in typeshed. This should not be required anymore once we
+        // understand `sys.version_info` branches.
         self == other
+            || matches!((self, other),
+                (Type::Instance(self_class), Type::Instance(target_class))
+                    if self_class.is_known(db, KnownClass::NoneType) && target_class.is_known(db, KnownClass::NoneType))
     }
 
     /// Return true if this type and `other` have no common elements.
