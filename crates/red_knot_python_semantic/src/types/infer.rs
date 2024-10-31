@@ -61,7 +61,7 @@ use crate::types::{
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
 
-use super::Boundedness;
+use super::Boundness;
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -1520,7 +1520,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             match class.class_member(self.db, op.in_place_dunder()) {
                 SymbolLookupResult::Unbound => {}
                 SymbolLookupResult::Type(class_member, boundedness) => {
-                    if boundedness == Boundedness::MayBeUnbound {
+                    if boundedness == Boundness::MayBeUnbound {
                         self.diagnostics.add(
                             assignment.into(),
                             "call-potentially-unbound-method",
@@ -3507,7 +3507,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 match value_meta_ty.member(self.db, "__getitem__") {
                     SymbolLookupResult::Unbound => {}
                     SymbolLookupResult::Type(dunder_getitem_method, boundedness) => {
-                        if boundedness == Boundedness::MayBeUnbound {
+                        if boundedness == Boundness::MayBeUnbound {
                             self.diagnostics.add(
                                 value_node.into(),
                                 "call-potentially-unbound-method",
@@ -3551,7 +3551,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     match dunder_class_getitem_method {
                         SymbolLookupResult::Unbound => {}
                         SymbolLookupResult::Type(ty, boundedness) => {
-                            if boundedness == Boundedness::MayBeUnbound {
+                            if boundedness == Boundness::MayBeUnbound {
                                 self.diagnostics.add(
                                     value_node.into(),
                                     "call-potentially-unbound-method",
@@ -4098,20 +4098,19 @@ fn perform_rich_comparison<'db>(
     // TODO: this currently gives the return type even if the arg types are invalid
     // (e.g. int.__lt__ with string instance should be errored, currently bool)
 
-    let call_dunder =
-        |op: RichCompareOperator, left_class: ClassType<'db>, right_class: ClassType<'db>| {
-            match left_class.class_member(db, op.dunder()) {
-                SymbolLookupResult::Type(class_member_dunder, Boundedness::Bound) => {
-                    class_member_dunder
-                        .call(
-                            db,
-                            &[Type::Instance(left_class), Type::Instance(right_class)],
-                        )
-                        .return_ty(db)
-                }
-                _ => None,
-            }
-        };
+    let call_dunder = |op: RichCompareOperator,
+                       left_class: ClassType<'db>,
+                       right_class: ClassType<'db>| {
+        match left_class.class_member(db, op.dunder()) {
+            SymbolLookupResult::Type(class_member_dunder, Boundness::Bound) => class_member_dunder
+                .call(
+                    db,
+                    &[Type::Instance(left_class), Type::Instance(right_class)],
+                )
+                .return_ty(db),
+            _ => None,
+        }
+    };
 
     // The reflected dunder has priority if the right-hand side is a strict subclass of the left-hand side.
     if left_class != right_class && right_class.is_subclass_of(db, left_class) {
@@ -4152,7 +4151,7 @@ fn perform_membership_test_comparison<'db>(
 
     let contains_dunder = right_class.class_member(db, "__contains__");
     let compare_result_opt = match contains_dunder {
-        SymbolLookupResult::Type(contains_dunder, Boundedness::Bound) => {
+        SymbolLookupResult::Type(contains_dunder, Boundness::Bound) => {
             // If `__contains__` is available, it is used directly for the membership test.
             contains_dunder
                 .call(db, &[right_instance, left_instance])
