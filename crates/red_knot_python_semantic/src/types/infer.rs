@@ -55,8 +55,8 @@ use crate::types::diagnostic::{
 use crate::types::{
     bindings_ty, builtins_symbol_ty, declarations_ty, global_symbol_ty, symbol_ty,
     typing_extensions_symbol_ty, Boundness, BytesLiteralType, ClassType, FunctionType,
-    IterationOutcome, KnownClass, KnownFunction, SliceLiteralType, StringLiteralType,
-    SymbolLookupResult, Truthiness, TupleType, Type, TypeArrayDisplay, UnionBuilder, UnionType,
+    IterationOutcome, KnownClass, KnownFunction, SliceLiteralType, StringLiteralType, Symbol,
+    Truthiness, TupleType, Type, TypeArrayDisplay, UnionBuilder, UnionType,
 };
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
@@ -1047,7 +1047,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         // TODO: Make use of Protocols when we support it (the manager be assignable to `contextlib.AbstractContextManager`).
         match (enter, exit) {
-            (SymbolLookupResult::Unbound, SymbolLookupResult::Unbound) => {
+            (Symbol::Unbound, Symbol::Unbound) => {
                 self.diagnostics.add(
                     context_expression.into(),
                     "invalid-context-manager",
@@ -1058,7 +1058,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 );
                 Type::Unknown
             }
-            (SymbolLookupResult::Unbound, _) => {
+            (Symbol::Unbound, _) => {
                 self.diagnostics.add(
                     context_expression.into(),
                     "invalid-context-manager",
@@ -1069,7 +1069,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 );
                 Type::Unknown
             }
-            (SymbolLookupResult::Type(enter_ty, enter_boundness), exit) => {
+            (Symbol::Type(enter_ty, enter_boundness), exit) => {
                 if enter_boundness == Boundness::MayBeUnbound {
                     self.diagnostics.add(
                         context_expression.into(),
@@ -1098,7 +1098,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     });
 
                 match exit {
-                    SymbolLookupResult::Unbound => {
+                    Symbol::Unbound => {
                         self.diagnostics.add(
                             context_expression.into(),
                             "invalid-context-manager",
@@ -1108,7 +1108,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             ),
                         );
                     }
-                    SymbolLookupResult::Type(exit_ty, exit_boundness) => {
+                    Symbol::Type(exit_ty, exit_boundness) => {
                         // TODO: Use the `exit_ty` to determine if any raised exception is suppressed.
 
                         if exit_boundness == Boundness::MayBeUnbound {
@@ -2439,7 +2439,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     }
 
     /// Look up a name reference that isn't bound in the local scope.
-    fn lookup_name(&mut self, name_node: &ast::ExprName) -> SymbolLookupResult<'db> {
+    fn lookup_name(&mut self, name_node: &ast::ExprName) -> Symbol<'db> {
         let ast::ExprName { id: name, .. } = name_node;
         let file_scope_id = self.scope().file_scope_id(self.db);
         let is_bound = self
@@ -2480,7 +2480,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             // No nonlocal binding, check module globals. Avoid infinite recursion if `self.scope`
             // already is module globals.
             let ty = if file_scope_id.is_global() {
-                SymbolLookupResult::Unbound
+                Symbol::Unbound
             } else {
                 global_symbol_ty(self.db, self.file, name)
             };
@@ -2503,7 +2503,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 ty
             }
         } else {
-            SymbolLookupResult::Unbound
+            Symbol::Unbound
         }
     }
 
@@ -2540,7 +2540,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         if boundness == Boundness::MayBeUnbound {
             match self.lookup_name(name) {
-                SymbolLookupResult::Type(looked_up_ty, looked_up_boundness) => {
+                Symbol::Type(looked_up_ty, looked_up_boundness) => {
                     if looked_up_boundness == Boundness::MayBeUnbound {
                         self.diagnostics.add_possibly_unresolved_reference(name);
                     }
@@ -2549,7 +2549,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         .map(|ty| UnionType::from_elements(self.db, [ty, looked_up_ty]))
                         .unwrap_or(looked_up_ty)
                 }
-                SymbolLookupResult::Unbound => {
+                Symbol::Unbound => {
                     if bindings_ty.is_some() {
                         self.diagnostics.add_possibly_unresolved_reference(name);
                     } else {
@@ -2638,7 +2638,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 };
 
-                if let SymbolLookupResult::Type(class_member, _) =
+                if let Symbol::Type(class_member, _) =
                     class.class_member(self.db, unary_dunder_method)
                 {
                     let call = class_member.call(self.db, &[operand_type]);
@@ -2895,7 +2895,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 }
 
-                let call_on_left_instance = if let SymbolLookupResult::Type(class_member, _) =
+                let call_on_left_instance = if let Symbol::Type(class_member, _) =
                     left_class.class_member(self.db, op.dunder())
                 {
                     class_member
@@ -2909,7 +2909,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     if left_class == right_class {
                         None
                     } else {
-                        if let SymbolLookupResult::Type(class_member, _) =
+                        if let Symbol::Type(class_member, _) =
                             right_class.class_member(self.db, op.reflected_dunder())
                         {
                             class_member
@@ -3505,8 +3505,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 //
                 // See: https://docs.python.org/3/reference/datamodel.html#class-getitem-versus-getitem
                 match value_meta_ty.member(self.db, "__getitem__") {
-                    SymbolLookupResult::Unbound => {}
-                    SymbolLookupResult::Type(dunder_getitem_method, boundedness) => {
+                    Symbol::Unbound => {}
+                    Symbol::Type(dunder_getitem_method, boundedness) => {
                         if boundedness == Boundness::MayBeUnbound {
                             self.diagnostics.add(
                                 value_node.into(),
@@ -3549,8 +3549,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                     let dunder_class_getitem_method = value_ty.member(self.db, "__class_getitem__");
 
                     match dunder_class_getitem_method {
-                        SymbolLookupResult::Unbound => {}
-                        SymbolLookupResult::Type(ty, boundedness) => {
+                        Symbol::Unbound => {}
+                        Symbol::Type(ty, boundedness) => {
                             if boundedness == Boundness::MayBeUnbound {
                                 self.diagnostics.add(
                                     value_node.into(),
@@ -4098,19 +4098,18 @@ fn perform_rich_comparison<'db>(
     // TODO: this currently gives the return type even if the arg types are invalid
     // (e.g. int.__lt__ with string instance should be errored, currently bool)
 
-    let call_dunder = |op: RichCompareOperator,
-                       left_class: ClassType<'db>,
-                       right_class: ClassType<'db>| {
-        match left_class.class_member(db, op.dunder()) {
-            SymbolLookupResult::Type(class_member_dunder, Boundness::Bound) => class_member_dunder
-                .call(
-                    db,
-                    &[Type::Instance(left_class), Type::Instance(right_class)],
-                )
-                .return_ty(db),
-            _ => None,
-        }
-    };
+    let call_dunder =
+        |op: RichCompareOperator, left_class: ClassType<'db>, right_class: ClassType<'db>| {
+            match left_class.class_member(db, op.dunder()) {
+                Symbol::Type(class_member_dunder, Boundness::Bound) => class_member_dunder
+                    .call(
+                        db,
+                        &[Type::Instance(left_class), Type::Instance(right_class)],
+                    )
+                    .return_ty(db),
+                _ => None,
+            }
+        };
 
     // The reflected dunder has priority if the right-hand side is a strict subclass of the left-hand side.
     if left_class != right_class && right_class.is_subclass_of(db, left_class) {
@@ -4151,7 +4150,7 @@ fn perform_membership_test_comparison<'db>(
 
     let contains_dunder = right_class.class_member(db, "__contains__");
     let compare_result_opt = match contains_dunder {
-        SymbolLookupResult::Type(contains_dunder, Boundness::Bound) => {
+        Symbol::Type(contains_dunder, Boundness::Bound) => {
             // If `__contains__` is available, it is used directly for the membership test.
             contains_dunder
                 .call(db, &[right_instance, left_instance])

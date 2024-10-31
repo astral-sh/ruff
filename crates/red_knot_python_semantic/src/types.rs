@@ -4,7 +4,7 @@ use ruff_python_ast as ast;
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::ast_ids::HasScopedAstId;
 use crate::semantic_index::definition::{Definition, DefinitionKind};
-use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, Symbol};
+use crate::semantic_index::symbol::{self as symbol, ScopeId, ScopedSymbolId};
 use crate::semantic_index::{
     global_scope, semantic_index, symbol_table, use_def_map, BindingWithConstraints,
     BindingWithConstraintsIterator, DeclarationsIterator,
@@ -36,34 +36,30 @@ pub enum Boundness {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum SymbolLookupResult<'db> {
+pub enum Symbol<'db> {
     Type(Type<'db>, Boundness),
     Unbound,
 }
 
-impl<'db> SymbolLookupResult<'db> {
+impl<'db> Symbol<'db> {
     pub fn is_unbound(&self) -> bool {
-        matches!(self, SymbolLookupResult::Unbound)
+        matches!(self, Symbol::Unbound)
     }
 
     #[must_use]
-    pub fn replace_unbound_with(
-        self,
-        db: &'db dyn Db,
-        replacement: &SymbolLookupResult<'db>,
-    ) -> SymbolLookupResult<'db> {
+    pub fn replace_unbound_with(self, db: &'db dyn Db, replacement: &Symbol<'db>) -> Symbol<'db> {
         match replacement {
-            SymbolLookupResult::Type(replacement, _) => SymbolLookupResult::Type(
+            Symbol::Type(replacement, _) => Symbol::Type(
                 match self {
-                    SymbolLookupResult::Type(ty, Boundness::Bound) => ty,
-                    SymbolLookupResult::Type(ty, Boundness::MayBeUnbound) => {
+                    Symbol::Type(ty, Boundness::Bound) => ty,
+                    Symbol::Type(ty, Boundness::MayBeUnbound) => {
                         UnionType::from_elements(db, [*replacement, ty])
                     }
-                    SymbolLookupResult::Unbound => *replacement,
+                    Symbol::Unbound => *replacement,
                 },
                 Boundness::Bound,
             ),
-            SymbolLookupResult::Unbound => self,
+            Symbol::Unbound => self,
         }
     }
 
@@ -71,7 +67,7 @@ impl<'db> SymbolLookupResult<'db> {
     #[track_caller]
     fn expect_bound(self) -> Type<'db> {
         match self {
-            SymbolLookupResult::Type(ty, Boundness::Bound) => ty,
+            Symbol::Type(ty, Boundness::Bound) => ty,
             _ => {
                 panic!("Expected a bound type")
             }
@@ -80,15 +76,15 @@ impl<'db> SymbolLookupResult<'db> {
 
     fn unwrap_or(&self, other: Type<'db>) -> Type<'db> {
         match self {
-            SymbolLookupResult::Type(ty, _) => *ty,
-            SymbolLookupResult::Unbound => other,
+            Symbol::Type(ty, _) => *ty,
+            Symbol::Unbound => other,
         }
     }
 
     fn as_type(&self) -> Option<Type<'db>> {
         match self {
-            SymbolLookupResult::Type(ty, _) => Some(*ty),
-            SymbolLookupResult::Unbound => None,
+            Symbol::Type(ty, _) => Some(*ty),
+            Symbol::Unbound => None,
         }
     }
 
@@ -98,10 +94,8 @@ impl<'db> SymbolLookupResult<'db> {
 
     fn may_be_unbound(&self) -> bool {
         match self {
-            SymbolLookupResult::Type(_, Boundness::MayBeUnbound) | SymbolLookupResult::Unbound => {
-                true
-            }
-            SymbolLookupResult::Type(_, Boundness::Bound) => false,
+            Symbol::Type(_, Boundness::MayBeUnbound) | Symbol::Unbound => true,
+            Symbol::Type(_, Boundness::Bound) => false,
         }
     }
 }
@@ -125,7 +119,7 @@ fn symbol_ty_by_id<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     symbol: ScopedSymbolId,
-) -> SymbolLookupResult<'db> {
+) -> Symbol<'db> {
     let _span = tracing::trace_span!("symbol_ty_by_id", ?symbol).entered();
 
     let use_def = use_def_map(db, scope);
@@ -138,10 +132,8 @@ fn symbol_ty_by_id<'db>(
         let undeclared_ty = if declarations.may_be_undeclared() {
             Some(
                 bindings_ty(db, use_def.public_bindings(symbol))
-                    .map(|bindings_ty| {
-                        SymbolLookupResult::Type(bindings_ty, use_def.public_boundness(symbol))
-                    })
-                    .unwrap_or(SymbolLookupResult::Unbound),
+                    .map(|bindings_ty| Symbol::Type(bindings_ty, use_def.public_boundness(symbol)))
+                    .unwrap_or(Symbol::Unbound),
             )
         } else {
             None
@@ -149,31 +141,29 @@ fn symbol_ty_by_id<'db>(
         // Intentionally ignore conflicting declared types; that's not our problem, it's the
         // problem of the module we are importing from.
         match undeclared_ty {
-            Some(SymbolLookupResult::Type(ty, boundedness)) => SymbolLookupResult::Type(
+            Some(Symbol::Type(ty, boundedness)) => Symbol::Type(
                 declarations_ty(db, declarations, Some(ty)).unwrap_or_else(|(ty, _)| ty),
                 boundedness,
             ),
-            None | Some(SymbolLookupResult::Unbound) => SymbolLookupResult::Type(
+            None | Some(Symbol::Unbound) => Symbol::Type(
                 declarations_ty(db, declarations, None).unwrap_or_else(|(ty, _)| ty),
                 Boundness::Bound,
             ),
         }
     } else {
         bindings_ty(db, use_def.public_bindings(symbol))
-            .map(|bindings_ty| {
-                SymbolLookupResult::Type(bindings_ty, use_def.public_boundness(symbol))
-            })
-            .unwrap_or(SymbolLookupResult::Unbound)
+            .map(|bindings_ty| Symbol::Type(bindings_ty, use_def.public_boundness(symbol)))
+            .unwrap_or(Symbol::Unbound)
     }
 }
 
 /// Shorthand for `symbol_ty_by_id` that takes a symbol name instead of an ID.
-fn symbol_ty<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> SymbolLookupResult<'db> {
+fn symbol_ty<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> {
     let table = symbol_table(db, scope);
     table
         .symbol_id_by_name(name)
         .map(|symbol| symbol_ty_by_id(db, scope, symbol))
-        .unwrap_or(SymbolLookupResult::Unbound)
+        .unwrap_or(Symbol::Unbound)
 }
 
 /// Return a list of the symbols that typeshed declares in the body scope of
@@ -205,18 +195,14 @@ fn module_type_symbols<'db>(db: &'db dyn Db) -> smallvec::SmallVec<[ast::name::N
     module_type_symbol_table
         .symbols()
         .filter(|symbol| symbol.is_declared())
-        .map(Symbol::name)
+        .map(symbol::Symbol::name)
         .filter(|symbol_name| !matches!(&***symbol_name, "__dict__" | "__getattr__" | "__init__"))
         .cloned()
         .collect()
 }
 
 /// Looks up a module-global symbol by name in a file.
-pub(crate) fn global_symbol_ty<'db>(
-    db: &'db dyn Db,
-    file: File,
-    name: &str,
-) -> SymbolLookupResult<'db> {
+pub(crate) fn global_symbol_ty<'db>(db: &'db dyn Db, file: File, name: &str) -> Symbol<'db> {
     let explicit_ty = symbol_ty(db, global_scope(db, file), name);
 
     if !explicit_ty.may_be_unbound() {
@@ -912,7 +898,7 @@ impl<'db> Type<'db> {
     /// `foo.member(&db, "baz")` returns the type of `baz` attributes
     /// as accessed from instances of the `Bar` class.
     #[must_use]
-    pub fn member(&self, db: &'db dyn Db, name: &str) -> SymbolLookupResult<'db> {
+    pub fn member(&self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         match self {
             Type::Any => Type::Any.into(),
             Type::Never => {
@@ -977,10 +963,10 @@ impl<'db> Type<'db> {
                 for ty in union.elements(db) {
                     let ty_member = ty.member(db, name);
                     match ty_member {
-                        SymbolLookupResult::Unbound => {
+                        Symbol::Unbound => {
                             may_be_unbound = true;
                         }
-                        SymbolLookupResult::Type(ty_member, member_boundness) => {
+                        Symbol::Type(ty_member, member_boundness) => {
                             // TODO: raise a diagnostic if member_boundness indicates potential unboundness
                             if member_boundness == Boundness::MayBeUnbound {
                                 may_be_unbound = true;
@@ -993,9 +979,9 @@ impl<'db> Type<'db> {
                 }
 
                 if all_unbound {
-                    SymbolLookupResult::Unbound
+                    Symbol::Unbound
                 } else {
-                    SymbolLookupResult::Type(
+                    Symbol::Type(
                         builder.build(),
                         if may_be_unbound {
                             Boundness::MayBeUnbound
@@ -1124,7 +1110,7 @@ impl<'db> Type<'db> {
                 // Since `__call__` is a dunder, we need to access it as an attribute on the class
                 // rather than the instance (matching runtime semantics).
                 match class.class_member(db, "__call__") {
-                    SymbolLookupResult::Type(dunder_call_method, Boundness::Bound) => {
+                    Symbol::Type(dunder_call_method, Boundness::Bound) => {
                         let args = std::iter::once(self)
                             .chain(arg_types.iter().copied())
                             .collect::<Vec<_>>();
@@ -1182,7 +1168,7 @@ impl<'db> Type<'db> {
         let iterable_meta_type = self.to_meta_type(db);
 
         let dunder_iter_method = iterable_meta_type.member(db, "__iter__");
-        if let SymbolLookupResult::Type(dunder_iter_method, _) = dunder_iter_method {
+        if let Symbol::Type(dunder_iter_method, _) = dunder_iter_method {
             let Some(iterator_ty) = dunder_iter_method.call(db, &[self]).return_ty(db) else {
                 return IterationOutcome::NotIterable {
                     not_iterable_ty: self,
@@ -1190,7 +1176,7 @@ impl<'db> Type<'db> {
             };
 
             match iterator_ty.to_meta_type(db).member(db, "__next__") {
-                SymbolLookupResult::Type(dunder_next_method, Boundness::Bound) => {
+                Symbol::Type(dunder_next_method, Boundness::Bound) => {
                     return dunder_next_method
                         .call(db, &[iterator_ty])
                         .return_ty(db)
@@ -1214,15 +1200,13 @@ impl<'db> Type<'db> {
         // TODO(Alex) this is only valid if the `__getitem__` method is annotated as
         // accepting `int` or `SupportsIndex`
         match iterable_meta_type.member(db, "__getitem__") {
-            SymbolLookupResult::Type(dunder_get_item_method, Boundness::Bound) => {
-                dunder_get_item_method
-                    .call(db, &[self, KnownClass::Int.to_instance(db)])
-                    .return_ty(db)
-                    .map(|element_ty| IterationOutcome::Iterable { element_ty })
-                    .unwrap_or(IterationOutcome::NotIterable {
-                        not_iterable_ty: self,
-                    })
-            }
+            Symbol::Type(dunder_get_item_method, Boundness::Bound) => dunder_get_item_method
+                .call(db, &[self, KnownClass::Int.to_instance(db)])
+                .return_ty(db)
+                .map(|element_ty| IterationOutcome::Iterable { element_ty })
+                .unwrap_or(IterationOutcome::NotIterable {
+                    not_iterable_ty: self,
+                }),
             _ => IterationOutcome::NotIterable {
                 not_iterable_ty: self,
             },
@@ -1327,9 +1311,9 @@ impl<'db> From<&Type<'db>> for Type<'db> {
     }
 }
 
-impl<'db> From<Type<'db>> for SymbolLookupResult<'db> {
+impl<'db> From<Type<'db>> for Symbol<'db> {
     fn from(value: Type<'db>) -> Self {
-        SymbolLookupResult::Type(value, Boundness::Bound)
+        Symbol::Type(value, Boundness::Bound)
     }
 }
 
@@ -1932,7 +1916,7 @@ impl<'db> ClassType<'db> {
     /// Returns the class member of this class named `name`.
     ///
     /// The member resolves to a member of the class itself or any of its bases.
-    pub fn class_member(self, db: &'db dyn Db, name: &str) -> SymbolLookupResult<'db> {
+    pub fn class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         let member = self.own_class_member(db, name);
         if !member.is_unbound() {
             return member;
@@ -1942,12 +1926,12 @@ impl<'db> ClassType<'db> {
     }
 
     /// Returns the inferred type of the class member named `name`.
-    pub fn own_class_member(self, db: &'db dyn Db, name: &str) -> SymbolLookupResult<'db> {
+    pub fn own_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         let scope = self.body_scope(db);
         symbol_ty(db, scope, name)
     }
 
-    pub fn inherited_class_member(self, db: &'db dyn Db, name: &str) -> SymbolLookupResult<'db> {
+    pub fn inherited_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         for base in self.bases(db) {
             let member = base.member(db, name);
             if !member.is_unbound() {
@@ -1955,7 +1939,7 @@ impl<'db> ClassType<'db> {
             }
         }
 
-        SymbolLookupResult::Unbound
+        Symbol::Unbound
     }
 }
 
