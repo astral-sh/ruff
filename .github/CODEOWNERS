@@ -17,5 +17,5 @@
 /scripts/fuzz-parser/ @AlexWaygood
 
 # red-knot
-/crates/red_knot* @carljm @MichaReiser @AlexWaygood
-/crates/ruff_db/ @carljm @MichaReiser @AlexWaygood
+/crates/red_knot* @carljm @MichaReiser @AlexWaygood @sharkdp
+/crates/ruff_db/ @carljm @MichaReiser @AlexWaygood @sharkdp
