@@ -1932,7 +1932,6 @@ impl<'db> ClassType<'db> {
     pub fn class_member(self, db: &'db dyn Db, name: &str) -> SymbolLookupResult<'db> {
         let member = self.own_class_member(db, name);
         if !member.is_unbound() {
-            // TODO diagnostic if maybe unbound?
             return member;
         }
 
