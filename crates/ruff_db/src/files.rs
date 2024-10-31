@@ -18,6 +18,7 @@ use crate::vendored::{VendoredPath, VendoredPathBuf};
 use crate::{vendored, Db, FxDashMap};
 
 mod file_root;
+pub mod location;
 mod path;
 
 /// Interns a file system path and returns a salsa `File` ingredient.
@@ -365,6 +366,17 @@ impl File {
     pub fn sync_virtual_path(db: &mut dyn Db, path: &SystemVirtualPath) {
         if let Some(virtual_file) = db.files().try_virtual_file(path) {
             virtual_file.sync(db);
+        }
+    }
+
+    pub fn try_url(&self, db: &dyn Db) -> url::Url {
+        let p = self.path(db);
+        match p {
+            FilePath::System(s) => {
+                url::Url::parse(&("file://".to_string() + &s.to_string())).unwrap()
+            }
+            FilePath::SystemVirtual(_) => todo!(),
+            FilePath::Vendored(_) => todo!(),
         }
     }
 

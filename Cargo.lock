@@ -2209,6 +2209,7 @@ dependencies = [
  "ruff_cache",
  "ruff_db",
  "ruff_python_ast",
+ "ruff_source_file",
  "ruff_text_size",
  "rustc-hash 2.0.0",
  "salsa",
@@ -2425,6 +2426,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "tracing-tree",
+ "url",
  "web-time",
  "zip",
 ]

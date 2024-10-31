@@ -21,4 +21,8 @@ impl NodeKey {
             range: node.range(),
         }
     }
+
+    pub(super) fn range(&self) -> TextRange {
+        self.range
+    }
 }

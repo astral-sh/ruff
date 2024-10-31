@@ -285,6 +285,17 @@ impl<'db> UseDefMap<'db> {
         self.bindings_iterator(self.public_symbols[symbol].bindings())
     }
 
+    pub(crate) fn first_binding_for_symbol_id(
+        &self,
+        symbol: ScopedSymbolId,
+    ) -> Option<Definition<'db>> {
+        if let Some(binding) = self.public_bindings(symbol).next() {
+            Some(binding.binding)
+        } else {
+            None
+        }
+    }
+
     pub(crate) fn public_may_be_unbound(&self, symbol: ScopedSymbolId) -> bool {
         self.public_symbols[symbol].may_be_unbound()
     }
