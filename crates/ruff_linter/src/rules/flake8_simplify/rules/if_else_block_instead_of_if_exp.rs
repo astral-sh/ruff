@@ -18,11 +18,6 @@ use crate::fix::edits::fits;
 /// `if`-`else`-blocks that assign a value to a variable in both branches can
 /// be expressed more concisely by using a ternary or binary operator.
 ///
-/// Note that some users find this rule is not suitable as ternary
-/// operators restrict [code coverage] for tools that use line profiling
-/// and that they can make code harder to parse, especially with complex
-/// conditions.
-///
 /// ## Example
 ///
 /// ```python
@@ -51,6 +46,11 @@ use crate::fix::edits::fits;
 /// ```python
 /// z = cond or other_cond
 /// ```
+/// ## Known issues
+/// This is an opinionated style rule that may not always be to everyone's
+/// taste, especially if the code makes use of complex `if` conditions.
+/// Ternary operators can also make it harder to measure [code coverage]
+/// with tools that use line profiling.
 ///
 /// ## References
 /// - [Python documentation: Conditional expressions](https://docs.python.org/3/reference/expressions.html#conditional-expressions)
