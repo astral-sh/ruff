@@ -3680,9 +3680,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             Some(Type::Instance(class)) if class.is_known(self.db, KnownClass::NoneType) => {
                 SliceArg::Arg(None)
             }
-            Some(Type::Instance(class)) if class.is_known(self.db, KnownClass::NoneType) => {
-                SliceArg::Arg(None)
-            }
             None => SliceArg::Arg(None),
             _ => SliceArg::Unsupported,
         };
