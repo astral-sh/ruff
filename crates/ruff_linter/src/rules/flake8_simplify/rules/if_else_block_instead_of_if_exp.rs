@@ -47,10 +47,17 @@ use crate::fix::edits::fits;
 /// z = cond or other_cond
 /// ```
 ///
+/// ## Known issues
+/// This is an opinionated style rule that may not always be to everyone's
+/// taste, especially for code that makes use of complex `if` conditions.
+/// Ternary operators can also make it harder to measure [code coverage]
+/// with tools that use line profiling.
+///
 /// ## References
 /// - [Python documentation: Conditional expressions](https://docs.python.org/3/reference/expressions.html#conditional-expressions)
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
+/// [code coverage]: https://github.com/nedbat/coveragepy/issues/509
 #[violation]
 pub struct IfElseBlockInsteadOfIfExp {
     /// The ternary or binary expression to replace the `if`-`else`-block.

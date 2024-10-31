@@ -1,9 +1,8 @@
 # Stepsize zero in slices
 
-We raise a `zero-stepsize-in-slice` diagnostic when trying to slice a literal
-string, bytes, or tuple with a step size of zero (see tests in `string.md`,
-`bytes.md` and `tuple.md`). But we don't want to raise this diagnostic when
-slicing a custom type:
+We raise a `zero-stepsize-in-slice` diagnostic when trying to slice a literal string, bytes, or
+tuple with a step size of zero (see tests in `string.md`, `bytes.md` and `tuple.md`). But we don't
+want to raise this diagnostic when slicing a custom type:
 
 ```py
 class MySequence:

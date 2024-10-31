@@ -176,6 +176,7 @@ pub(crate) struct AssignmentDefinitionNodeRef<'a> {
 pub(crate) struct WithItemDefinitionNodeRef<'a> {
     pub(crate) node: &'a ast::WithItem,
     pub(crate) target: &'a ast::ExprName,
+    pub(crate) is_async: bool,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -277,12 +278,15 @@ impl DefinitionNodeRef<'_> {
                     DefinitionKind::ParameterWithDefault(AstNodeRef::new(parsed, parameter))
                 }
             },
-            DefinitionNodeRef::WithItem(WithItemDefinitionNodeRef { node, target }) => {
-                DefinitionKind::WithItem(WithItemDefinitionKind {
-                    node: AstNodeRef::new(parsed.clone(), node),
-                    target: AstNodeRef::new(parsed, target),
-                })
-            }
+            DefinitionNodeRef::WithItem(WithItemDefinitionNodeRef {
+                node,
+                target,
+                is_async,
+            }) => DefinitionKind::WithItem(WithItemDefinitionKind {
+                node: AstNodeRef::new(parsed.clone(), node),
+                target: AstNodeRef::new(parsed, target),
+                is_async,
+            }),
             DefinitionNodeRef::MatchPattern(MatchPatternDefinitionNodeRef {
                 pattern,
                 identifier,
@@ -329,7 +333,11 @@ impl DefinitionNodeRef<'_> {
                 ast::AnyParameterRef::Variadic(parameter) => parameter.into(),
                 ast::AnyParameterRef::NonVariadic(parameter) => parameter.into(),
             },
-            Self::WithItem(WithItemDefinitionNodeRef { node: _, target }) => target.into(),
+            Self::WithItem(WithItemDefinitionNodeRef {
+                node: _,
+                target,
+                is_async: _,
+            }) => target.into(),
             Self::MatchPattern(MatchPatternDefinitionNodeRef { identifier, .. }) => {
                 identifier.into()
             }
@@ -534,6 +542,7 @@ pub enum AssignmentKind {
 pub struct WithItemDefinitionKind {
     node: AstNodeRef<ast::WithItem>,
     target: AstNodeRef<ast::ExprName>,
+    is_async: bool,
 }
 
 impl WithItemDefinitionKind {
@@ -543,6 +552,10 @@ impl WithItemDefinitionKind {
 
     pub(crate) fn target(&self) -> &ast::ExprName {
         self.target.node()
+    }
+
+    pub(crate) const fn is_async(&self) -> bool {
+        self.is_async
     }
 }
 

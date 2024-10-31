@@ -4,14 +4,13 @@ use ruff_python_ast as ast;
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::ast_ids::HasScopedAstId;
 use crate::semantic_index::definition::{Definition, DefinitionKind};
-use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, Symbol};
+use crate::semantic_index::symbol::{self as symbol, ScopeId, ScopedSymbolId};
 use crate::semantic_index::{
     global_scope, semantic_index, symbol_table, use_def_map, BindingWithConstraints,
     BindingWithConstraintsIterator, DeclarationsIterator,
 };
-use crate::stdlib::{
-    builtins_symbol_ty, types_symbol_ty, typeshed_symbol_ty, typing_extensions_symbol_ty,
-};
+use crate::stdlib::{builtins_symbol, types_symbol, typeshed_symbol, typing_extensions_symbol};
+use crate::symbol::{Boundness, Symbol};
 use crate::types::diagnostic::TypeCheckDiagnosticsBuilder;
 use crate::types::narrow::narrowing_constraint;
 use crate::{Db, FxOrderSet, HasTy, Module, SemanticModel};
@@ -44,7 +43,7 @@ pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
 }
 
 /// Infer the public type of a symbol (its type as seen from outside its scope).
-fn symbol_ty_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymbolId) -> Type<'db> {
+fn symbol_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymbolId) -> Symbol<'db> {
     let _span = tracing::trace_span!("symbol_ty_by_id", ?symbol).entered();
 
     let use_def = use_def_map(db, scope);
@@ -55,37 +54,56 @@ fn symbol_ty_by_id<'db>(db: &'db dyn Db, scope: ScopeId<'db>, symbol: ScopedSymb
         let declarations = use_def.public_declarations(symbol);
         // If the symbol is undeclared in some paths, include the inferred type in the public type.
         let undeclared_ty = if declarations.may_be_undeclared() {
-            Some(bindings_ty(
-                db,
-                use_def.public_bindings(symbol),
-                use_def
-                    .public_may_be_unbound(symbol)
-                    .then_some(Type::Unbound),
-            ))
+            Some(
+                bindings_ty(db, use_def.public_bindings(symbol))
+                    .map(|bindings_ty| Symbol::Type(bindings_ty, use_def.public_boundness(symbol)))
+                    .unwrap_or(Symbol::Unbound),
+            )
         } else {
             None
         };
         // Intentionally ignore conflicting declared types; that's not our problem, it's the
         // problem of the module we are importing from.
-        declarations_ty(db, declarations, undeclared_ty).unwrap_or_else(|(ty, _)| ty)
+
+        // TODO: Our handling of boundness currently only depends on bindings, and ignores
+        // declarations. This is inconsistent, since we only look at bindings if the symbol
+        // may be undeclared. Consider the following example:
+        // ```py
+        // x: int
+        //
+        // if flag:
+        //     y: int
+        // else
+        //     y = 3
+        // ```
+        // If we import from this module, we will currently report `x` as a definitely-bound
+        // symbol (even though it has no bindings at all!) but report `y` as possibly-unbound
+        // (even though every path has either a binding or a declaration for it.)
+
+        match undeclared_ty {
+            Some(Symbol::Type(ty, boundness)) => Symbol::Type(
+                declarations_ty(db, declarations, Some(ty)).unwrap_or_else(|(ty, _)| ty),
+                boundness,
+            ),
+            None | Some(Symbol::Unbound) => Symbol::Type(
+                declarations_ty(db, declarations, None).unwrap_or_else(|(ty, _)| ty),
+                Boundness::Bound,
+            ),
+        }
     } else {
-        bindings_ty(
-            db,
-            use_def.public_bindings(symbol),
-            use_def
-                .public_may_be_unbound(symbol)
-                .then_some(Type::Unbound),
-        )
+        bindings_ty(db, use_def.public_bindings(symbol))
+            .map(|bindings_ty| Symbol::Type(bindings_ty, use_def.public_boundness(symbol)))
+            .unwrap_or(Symbol::Unbound)
     }
 }
 
-/// Shorthand for `symbol_ty_by_id` that takes a symbol name instead of an ID.
-fn symbol_ty<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Type<'db> {
+/// Shorthand for `symbol_by_id` that takes a symbol name instead of an ID.
+fn symbol<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Symbol<'db> {
     let table = symbol_table(db, scope);
     table
         .symbol_id_by_name(name)
-        .map(|symbol| symbol_ty_by_id(db, scope, symbol))
-        .unwrap_or(Type::Unbound)
+        .map(|symbol| symbol_by_id(db, scope, symbol))
+        .unwrap_or(Symbol::Unbound)
 }
 
 /// Return a list of the symbols that typeshed declares in the body scope of
@@ -117,17 +135,18 @@ fn module_type_symbols<'db>(db: &'db dyn Db) -> smallvec::SmallVec<[ast::name::N
     module_type_symbol_table
         .symbols()
         .filter(|symbol| symbol.is_declared())
-        .map(Symbol::name)
+        .map(symbol::Symbol::name)
         .filter(|symbol_name| !matches!(&***symbol_name, "__dict__" | "__getattr__" | "__init__"))
         .cloned()
         .collect()
 }
 
 /// Looks up a module-global symbol by name in a file.
-pub(crate) fn global_symbol_ty<'db>(db: &'db dyn Db, file: File, name: &str) -> Type<'db> {
-    let explicit_ty = symbol_ty(db, global_scope(db, file), name);
-    if !explicit_ty.may_be_unbound(db) {
-        return explicit_ty;
+pub(crate) fn global_symbol<'db>(db: &'db dyn Db, file: File, name: &str) -> Symbol<'db> {
+    let explicit_symbol = symbol(db, global_scope(db, file), name);
+
+    if !explicit_symbol.may_be_unbound() {
+        return explicit_symbol;
     }
 
     // Not defined explicitly in the global scope?
@@ -140,12 +159,10 @@ pub(crate) fn global_symbol_ty<'db>(db: &'db dyn Db, file: File, name: &str) -> 
         // TODO: this should use `.to_instance(db)`. but we don't understand attribute access
         // on instance types yet.
         let module_type_member = KnownClass::ModuleType.to_class(db).member(db, name);
-        if !module_type_member.is_unbound() {
-            return explicit_ty.replace_unbound_with(db, module_type_member);
-        }
+        return explicit_symbol.replace_unbound_with(db, &module_type_member);
     }
 
-    explicit_ty
+    explicit_symbol
 }
 
 /// Infer the type of a binding.
@@ -178,27 +195,14 @@ fn definition_expression_ty<'db>(
     }
 }
 
-/// Infer the combined type of an iterator of bindings, plus one optional "unbound type".
+/// Infer the combined type of an iterator of bindings.
 ///
-/// Will return a union if there is more than one binding, or at least one plus an unbound
-/// type.
-///
-/// The "unbound type" represents the type in case control flow may not have passed through any
-/// bindings in this scope. If this isn't possible, then it will be `None`. If it is possible, and
-/// the result in that case should be Unbound (e.g. an unbound function local), then it will be
-/// `Some(Type::Unbound)`. If it is possible and the result should be something else (e.g. an
-/// implicit global lookup), then `unbound_type` will be `Some(the_global_symbol_type)`.
-///
-/// # Panics
-/// Will panic if called with zero bindings and no `unbound_ty`. This is a logic error, as any
-/// symbol with zero visible bindings clearly may be unbound, and the caller should provide an
-/// `unbound_ty`.
+/// Will return a union if there is more than one binding.
 fn bindings_ty<'db>(
     db: &'db dyn Db,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
-    unbound_ty: Option<Type<'db>>,
-) -> Type<'db> {
-    let def_types = bindings_with_constraints.map(
+) -> Option<Type<'db>> {
+    let mut def_types = bindings_with_constraints.map(
         |BindingWithConstraints {
              binding,
              constraints,
@@ -220,16 +224,18 @@ fn bindings_ty<'db>(
             }
         },
     );
-    let mut all_types = unbound_ty.into_iter().chain(def_types);
 
-    let first = all_types
-        .next()
-        .expect("bindings_ty should never be called with zero definitions and no unbound_ty");
-
-    if let Some(second) = all_types.next() {
-        UnionType::from_elements(db, [first, second].into_iter().chain(all_types))
+    if let Some(first) = def_types.next() {
+        if let Some(second) = def_types.next() {
+            Some(UnionType::from_elements(
+                db,
+                [first, second].into_iter().chain(def_types),
+            ))
+        } else {
+            Some(first)
+        }
     } else {
-        first
+        None
     }
 }
 
@@ -301,9 +307,6 @@ pub enum Type<'db> {
     /// Unknown type (either no annotation, or some kind of type error).
     /// Equivalent to Any, or possibly to object in strict mode
     Unknown,
-    /// Name does not exist or is not bound to any value (this represents an error, but with some
-    /// leniency options it could be silently resolved to Unknown in some cases)
-    Unbound,
     /// The None object -- TODO remove this in favor of Instance(types.NoneType)
     None,
     /// Temporary type for symbols that can't be inferred yet because of missing implementations.
@@ -347,10 +350,6 @@ pub enum Type<'db> {
 }
 
 impl<'db> Type<'db> {
-    pub const fn is_unbound(&self) -> bool {
-        matches!(self, Type::Unbound)
-    }
-
     pub const fn is_never(&self) -> bool {
         matches!(self, Type::Never)
     }
@@ -460,27 +459,6 @@ impl<'db> Type<'db> {
 
     pub const fn is_literal_string(&self) -> bool {
         matches!(self, Type::LiteralString)
-    }
-
-    pub fn may_be_unbound(&self, db: &'db dyn Db) -> bool {
-        match self {
-            Type::Unbound => true,
-            Type::Union(union) => union.elements(db).contains(&Type::Unbound),
-            // Unbound can't appear in an intersection, because an intersection with Unbound
-            // simplifies to just Unbound.
-            _ => false,
-        }
-    }
-
-    #[must_use]
-    pub fn replace_unbound_with(&self, db: &'db dyn Db, replacement: Type<'db>) -> Type<'db> {
-        match self {
-            Type::Unbound => replacement,
-            Type::Union(union) => {
-                union.map(db, |element| element.replace_unbound_with(db, replacement))
-            }
-            _ => *self,
-        }
     }
 
     pub fn is_stdlib_symbol(&self, db: &'db dyn Db, module_name: &str, name: &str) -> bool {
@@ -601,7 +579,6 @@ impl<'db> Type<'db> {
 
             (Type::Any, _) | (_, Type::Any) => false,
             (Type::Unknown, _) | (_, Type::Unknown) => false,
-            (Type::Unbound, _) | (_, Type::Unbound) => false,
             (Type::Todo, _) | (_, Type::Todo) => false,
 
             (Type::Union(union), other) | (other, Type::Union(union)) => union
@@ -754,7 +731,6 @@ impl<'db> Type<'db> {
             | Type::Never
             | Type::Unknown
             | Type::Todo
-            | Type::Unbound
             | Type::Instance(..) // TODO some instance types can be singleton types (EllipsisType, NotImplementedType)
             | Type::IntLiteral(..)
             | Type::StringLiteral(..)
@@ -837,7 +813,6 @@ impl<'db> Type<'db> {
             Type::Any
             | Type::Never
             | Type::Unknown
-            | Type::Unbound
             | Type::Todo
             | Type::Union(..)
             | Type::Intersection(..)
@@ -850,31 +825,22 @@ impl<'db> Type<'db> {
     /// For example, if `foo` is `Type::Instance(<Bar>)`,
     /// `foo.member(&db, "baz")` returns the type of `baz` attributes
     /// as accessed from instances of the `Bar` class.
-    ///
-    /// TODO: use of this method currently requires manually checking
-    /// whether the returned type is `Unknown`/`Unbound`
-    /// (or a union with `Unknown`/`Unbound`) in many places.
-    /// Ideally we'd use a more type-safe pattern, such as returning
-    /// an `Option` or a `Result` from this method, which would force
-    /// us to explicitly consider whether to handle an error or propagate
-    /// it up the call stack.
     #[must_use]
-    pub fn member(&self, db: &'db dyn Db, name: &str) -> Type<'db> {
+    pub(crate) fn member(&self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         match self {
-            Type::Any => Type::Any,
+            Type::Any => Type::Any.into(),
             Type::Never => {
                 // TODO: attribute lookup on Never type
-                Type::Todo
+                Type::Todo.into()
             }
-            Type::Unknown => Type::Unknown,
-            Type::Unbound => Type::Unbound,
+            Type::Unknown => Type::Unknown.into(),
             Type::None => {
                 // TODO: attribute lookup on None type
-                Type::Todo
+                Type::Todo.into()
             }
             Type::FunctionLiteral(_) => {
                 // TODO: attribute lookup on function type
-                Type::Todo
+                Type::Todo.into()
             }
             Type::ModuleLiteral(file) => {
                 // `__dict__` is a very special member that is never overridden by module globals;
@@ -886,7 +852,7 @@ impl<'db> Type<'db> {
                         .member(db, "__dict__");
                 }
 
-                let global_lookup = symbol_ty(db, global_scope(db, *file), name);
+                let global_lookup = symbol(db, global_scope(db, *file), name);
 
                 // If it's unbound, check if it's present as an instance on `types.ModuleType`
                 // or `builtins.object`.
@@ -903,15 +869,11 @@ impl<'db> Type<'db> {
                 // ignore `__getattr__`. Typeshed has a fake `__getattr__` on `types.ModuleType`
                 // to help out with dynamic imports; we shouldn't use it for `ModuleLiteral` types
                 // where we know exactly which module we're dealing with.
-                if name != "__getattr__" && global_lookup.may_be_unbound(db) {
+                if name != "__getattr__" && global_lookup.may_be_unbound() {
                     // TODO: this should use `.to_instance()`, but we don't understand instance attribute yet
                     let module_type_instance_member =
                         KnownClass::ModuleType.to_class(db).member(db, name);
-                    if module_type_instance_member.is_unbound() {
-                        global_lookup
-                    } else {
-                        global_lookup.replace_unbound_with(db, module_type_instance_member)
-                    }
+                    global_lookup.replace_unbound_with(db, &module_type_instance_member)
                 } else {
                     global_lookup
                 }
@@ -919,42 +881,77 @@ impl<'db> Type<'db> {
             Type::ClassLiteral(class) => class.class_member(db, name),
             Type::Instance(_) => {
                 // TODO MRO? get_own_instance_member, get_instance_member
-                Type::Todo
+                Type::Todo.into()
             }
-            Type::Union(union) => union.map(db, |element| element.member(db, name)),
+            Type::Union(union) => {
+                let mut builder = UnionBuilder::new(db);
+
+                let mut all_unbound = true;
+                let mut may_be_unbound = false;
+                for ty in union.elements(db) {
+                    let ty_member = ty.member(db, name);
+                    match ty_member {
+                        Symbol::Unbound => {
+                            may_be_unbound = true;
+                        }
+                        Symbol::Type(ty_member, member_boundness) => {
+                            // TODO: raise a diagnostic if member_boundness indicates potential unboundness
+                            if member_boundness == Boundness::MayBeUnbound {
+                                may_be_unbound = true;
+                            }
+
+                            all_unbound = false;
+                            builder = builder.add(ty_member);
+                        }
+                    }
+                }
+
+                if all_unbound {
+                    Symbol::Unbound
+                } else {
+                    Symbol::Type(
+                        builder.build(),
+                        if may_be_unbound {
+                            Boundness::MayBeUnbound
+                        } else {
+                            Boundness::Bound
+                        },
+                    )
+                }
+            }
             Type::Intersection(_) => {
                 // TODO perform the get_member on each type in the intersection
                 // TODO return the intersection of those results
-                Type::Todo
+                Type::Todo.into()
             }
             Type::IntLiteral(_) => {
                 // TODO raise error
-                Type::Todo
+                Type::Todo.into()
             }
-            Type::BooleanLiteral(_) => Type::Todo,
+            Type::BooleanLiteral(_) => Type::Todo.into(),
             Type::StringLiteral(_) => {
                 // TODO defer to `typing.LiteralString`/`builtins.str` methods
                 // from typeshed's stubs
-                Type::Todo
+                Type::Todo.into()
             }
             Type::LiteralString => {
                 // TODO defer to `typing.LiteralString`/`builtins.str` methods
                 // from typeshed's stubs
-                Type::Todo
+                Type::Todo.into()
             }
             Type::BytesLiteral(_) => {
                 // TODO defer to Type::Instance(<bytes from typeshed>).member
-                Type::Todo
+                Type::Todo.into()
             }
             Type::SliceLiteral(_) => {
                 // TODO defer to `builtins.slice` methods
-                Type::Todo
+                Type::Todo.into()
             }
             Type::Tuple(_) => {
                 // TODO: implement tuple methods
-                Type::Todo
+                Type::Todo.into()
             }
-            Type::Todo => Type::Todo,
+            Type::Todo => Type::Todo.into(),
         }
     }
 
@@ -964,9 +961,7 @@ impl<'db> Type<'db> {
     /// when `bool(x)` is called on an object `x`.
     fn bool(&self, db: &'db dyn Db) -> Truthiness {
         match self {
-            Type::Any | Type::Todo | Type::Never | Type::Unknown | Type::Unbound => {
-                Truthiness::Ambiguous
-            }
+            Type::Any | Type::Todo | Type::Never | Type::Unknown => Truthiness::Ambiguous,
             Type::None => Truthiness::AlwaysFalse,
             Type::FunctionLiteral(_) => Truthiness::AlwaysTrue,
             Type::ModuleLiteral(_) => Truthiness::AlwaysTrue,
@@ -1009,9 +1004,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Return the type resulting from calling an object of this type.
-    ///
-    /// Returns `None` if `self` is not a callable type.
+    /// Return the outcome of calling an object of this type.
     #[must_use]
     fn call(self, db: &'db dyn Db, arg_types: &[Type<'db>]) -> CallOutcome<'db> {
         match self {
@@ -1044,14 +1037,14 @@ impl<'db> Type<'db> {
             Type::Instance(class) => {
                 // Since `__call__` is a dunder, we need to access it as an attribute on the class
                 // rather than the instance (matching runtime semantics).
-                let dunder_call_method = class.class_member(db, "__call__");
-                if dunder_call_method.is_unbound() {
-                    CallOutcome::not_callable(self)
-                } else {
-                    let args = std::iter::once(self)
-                        .chain(arg_types.iter().copied())
-                        .collect::<Vec<_>>();
-                    dunder_call_method.call(db, &args)
+                match class.class_member(db, "__call__") {
+                    Symbol::Type(dunder_call_method, Boundness::Bound) => {
+                        let args = std::iter::once(self)
+                            .chain(arg_types.iter().copied())
+                            .collect::<Vec<_>>();
+                        dunder_call_method.call(db, &args)
+                    }
+                    _ => CallOutcome::not_callable(self),
                 }
             }
 
@@ -1092,7 +1085,7 @@ impl<'db> Type<'db> {
             };
         }
 
-        if let Type::Unknown | Type::Any = self {
+        if matches!(self, Type::Unknown | Type::Any | Type::Todo) {
             // Explicit handling of `Unknown` and `Any` necessary until `type[Unknown]` and
             // `type[Any]` are not defined as `Todo` anymore.
             return IterationOutcome::Iterable { element_ty: self };
@@ -1103,21 +1096,29 @@ impl<'db> Type<'db> {
         let iterable_meta_type = self.to_meta_type(db);
 
         let dunder_iter_method = iterable_meta_type.member(db, "__iter__");
-        if !dunder_iter_method.is_unbound() {
+        if let Symbol::Type(dunder_iter_method, _) = dunder_iter_method {
             let Some(iterator_ty) = dunder_iter_method.call(db, &[self]).return_ty(db) else {
                 return IterationOutcome::NotIterable {
                     not_iterable_ty: self,
                 };
             };
 
-            let dunder_next_method = iterator_ty.to_meta_type(db).member(db, "__next__");
-            return dunder_next_method
-                .call(db, &[iterator_ty])
-                .return_ty(db)
-                .map(|element_ty| IterationOutcome::Iterable { element_ty })
-                .unwrap_or(IterationOutcome::NotIterable {
-                    not_iterable_ty: self,
-                });
+            match iterator_ty.to_meta_type(db).member(db, "__next__") {
+                Symbol::Type(dunder_next_method, Boundness::Bound) => {
+                    return dunder_next_method
+                        .call(db, &[iterator_ty])
+                        .return_ty(db)
+                        .map(|element_ty| IterationOutcome::Iterable { element_ty })
+                        .unwrap_or(IterationOutcome::NotIterable {
+                            not_iterable_ty: self,
+                        });
+                }
+                _ => {
+                    return IterationOutcome::NotIterable {
+                        not_iterable_ty: self,
+                    };
+                }
+            }
         }
 
         // Although it's not considered great practice,
@@ -1126,15 +1127,18 @@ impl<'db> Type<'db> {
         //
         // TODO(Alex) this is only valid if the `__getitem__` method is annotated as
         // accepting `int` or `SupportsIndex`
-        let dunder_get_item_method = iterable_meta_type.member(db, "__getitem__");
-
-        dunder_get_item_method
-            .call(db, &[self, KnownClass::Int.to_instance(db)])
-            .return_ty(db)
-            .map(|element_ty| IterationOutcome::Iterable { element_ty })
-            .unwrap_or(IterationOutcome::NotIterable {
+        match iterable_meta_type.member(db, "__getitem__") {
+            Symbol::Type(dunder_get_item_method, Boundness::Bound) => dunder_get_item_method
+                .call(db, &[self, KnownClass::Int.to_instance(db)])
+                .return_ty(db)
+                .map(|element_ty| IterationOutcome::Iterable { element_ty })
+                .unwrap_or(IterationOutcome::NotIterable {
+                    not_iterable_ty: self,
+                }),
+            _ => IterationOutcome::NotIterable {
                 not_iterable_ty: self,
-            })
+            },
+        }
     }
 
     #[must_use]
@@ -1143,7 +1147,6 @@ impl<'db> Type<'db> {
             Type::Any => Type::Any,
             Type::Todo => Type::Todo,
             Type::Unknown => Type::Unknown,
-            Type::Unbound => Type::Unknown,
             Type::Never => Type::Never,
             Type::ClassLiteral(class) => Type::Instance(*class),
             Type::Union(union) => union.map(db, |element| element.to_instance(db)),
@@ -1170,7 +1173,6 @@ impl<'db> Type<'db> {
     #[must_use]
     pub fn to_meta_type(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
-            Type::Unbound => Type::Unbound,
             Type::Never => Type::Never,
             Type::Instance(class) => Type::ClassLiteral(*class),
             Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
@@ -1187,9 +1189,9 @@ impl<'db> Type<'db> {
             // TODO can we do better here? `type[LiteralString]`?
             Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class(db),
             // TODO: `type[Any]`?
-            Type::Any => Type::Todo,
+            Type::Any => Type::Any,
             // TODO: `type[Unknown]`?
-            Type::Unknown => Type::Todo,
+            Type::Unknown => Type::Unknown,
             // TODO intersections
             Type::Intersection(_) => Type::Todo,
             Type::Todo => Type::Todo,
@@ -1234,6 +1236,12 @@ impl<'db> Type<'db> {
 impl<'db> From<&Type<'db>> for Type<'db> {
     fn from(value: &Type<'db>) -> Self {
         *value
+    }
+}
+
+impl<'db> From<Type<'db>> for Symbol<'db> {
+    fn from(value: Type<'db>) -> Self {
+        Symbol::Type(value, Boundness::Bound)
     }
 }
 
@@ -1308,12 +1316,12 @@ impl<'db> KnownClass {
             | Self::Tuple
             | Self::Set
             | Self::Dict
-            | Self::Slice => builtins_symbol_ty(db, self.as_str()),
+            | Self::Slice => builtins_symbol(db, self.as_str()).unwrap_or_unknown(),
             Self::GenericAlias | Self::ModuleType | Self::FunctionType => {
-                types_symbol_ty(db, self.as_str())
+                types_symbol(db, self.as_str()).unwrap_or_unknown()
             }
 
-            Self::NoneType => typeshed_symbol_ty(db, self.as_str()),
+            Self::NoneType => typeshed_symbol(db, self.as_str()).unwrap_or_unknown(),
         }
     }
 
@@ -1836,23 +1844,22 @@ impl<'db> ClassType<'db> {
     /// Returns the class member of this class named `name`.
     ///
     /// The member resolves to a member of the class itself or any of its bases.
-    pub fn class_member(self, db: &'db dyn Db, name: &str) -> Type<'db> {
+    pub(crate) fn class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         let member = self.own_class_member(db, name);
         if !member.is_unbound() {
-            // TODO diagnostic if maybe unbound?
-            return member.replace_unbound_with(db, Type::Never);
+            return member;
         }
 
         self.inherited_class_member(db, name)
     }
 
     /// Returns the inferred type of the class member named `name`.
-    pub fn own_class_member(self, db: &'db dyn Db, name: &str) -> Type<'db> {
+    pub(crate) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         let scope = self.body_scope(db);
-        symbol_ty(db, scope, name)
+        symbol(db, scope, name)
     }
 
-    pub fn inherited_class_member(self, db: &'db dyn Db, name: &str) -> Type<'db> {
+    pub(crate) fn inherited_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         for base in self.bases(db) {
             let member = base.member(db, name);
             if !member.is_unbound() {
@@ -1860,7 +1867,7 @@ impl<'db> ClassType<'db> {
             }
         }
 
-        Type::Unbound
+        Symbol::Unbound
     }
 }
 
@@ -2026,7 +2033,7 @@ mod tests {
                 Ty::BooleanLiteral(b) => Type::BooleanLiteral(b),
                 Ty::LiteralString => Type::LiteralString,
                 Ty::BytesLiteral(s) => Type::BytesLiteral(BytesLiteralType::new(db, s.as_bytes())),
-                Ty::BuiltinInstance(s) => builtins_symbol_ty(db, s).to_instance(db),
+                Ty::BuiltinInstance(s) => builtins_symbol(db, s).expect_type().to_instance(db),
                 Ty::Union(tys) => {
                     UnionType::from_elements(db, tys.into_iter().map(|ty| ty.into_type(db)))
                 }
@@ -2143,8 +2150,8 @@ mod tests {
         .unwrap();
         let module = ruff_db::files::system_path_to_file(&db, "/src/module.py").unwrap();
 
-        let type_a = super::global_symbol_ty(&db, module, "A");
-        let type_u = super::global_symbol_ty(&db, module, "U");
+        let type_a = super::global_symbol(&db, module, "A").expect_type();
+        let type_u = super::global_symbol(&db, module, "U").expect_type();
 
         assert!(type_a.is_class_literal());
         assert!(type_a.is_subtype_of(&db, Ty::BuiltinInstance("type").into_type(&db)));
@@ -2243,8 +2250,8 @@ mod tests {
         .unwrap();
         let module = ruff_db::files::system_path_to_file(&db, "/src/module.py").unwrap();
 
-        let type_a = super::global_symbol_ty(&db, module, "A");
-        let type_u = super::global_symbol_ty(&db, module, "U");
+        let type_a = super::global_symbol(&db, module, "A").expect_type();
+        let type_u = super::global_symbol(&db, module, "U").expect_type();
 
         assert!(type_a.is_class_literal());
         assert!(type_u.is_union());
