@@ -46,6 +46,7 @@ use crate::fix::edits::fits;
 /// ```python
 /// z = cond or other_cond
 /// ```
+///
 /// ## Known issues
 /// This is an opinionated style rule that may not always be to everyone's
 /// taste, especially for code that makes use of complex `if` conditions.
