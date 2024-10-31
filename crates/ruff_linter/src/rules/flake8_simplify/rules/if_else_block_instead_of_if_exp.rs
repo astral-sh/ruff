@@ -18,6 +18,11 @@ use crate::fix::edits::fits;
 /// `if`-`else`-blocks that assign a value to a variable in both branches can
 /// be expressed more concisely by using a ternary or binary operator.
 ///
+/// Note that some users find this rule is not suitable as ternary
+/// operators restrict [code coverage] for tools that use line profiling
+/// and that they can make code harder to parse, especially with complex
+/// conditions.
+///
 /// ## Example
 ///
 /// ```python
@@ -51,6 +56,7 @@ use crate::fix::edits::fits;
 /// - [Python documentation: Conditional expressions](https://docs.python.org/3/reference/expressions.html#conditional-expressions)
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
+/// [code coverage]: https://github.com/nedbat/coveragepy/issues/509
 #[violation]
 pub struct IfElseBlockInsteadOfIfExp {
     /// The ternary or binary expression to replace the `if`-`else`-block.
