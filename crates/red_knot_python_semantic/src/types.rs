@@ -694,8 +694,9 @@ impl<'db> Type<'db> {
 
             (Type::Instance(..), Type::Instance(..)) => {
                 // TODO: once we have support for `final`, there might be some cases where
-                // we can determine that two types are disjoint. For non-final classes, we
-                // return false (multiple inheritance).
+                // we can determine that two types are disjoint. Once we do this, some cases
+                // above (e.g. NoneType) can be removed. For non-final classes, we return
+                // false (multiple inheritance).
 
                 // TODO: is there anything specific to do for instances of KnownClass::Type?
 
