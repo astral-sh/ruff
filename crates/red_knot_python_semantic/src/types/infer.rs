@@ -1045,9 +1045,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         let enter_ty = context_manager_ty.member(self.db, "__enter__");
         let exit_ty = context_manager_ty.member(self.db, "__exit__");
 
-        // TODO: The checks here should be simplified to checking if context manager implements the `contextlib.AbstractContextManager` protocol.
+        // TODO: Make use of Protocols when we support it (the manager be assignable to `contextlib.AbstractContextManager`).
         if enter_ty.is_unbound() && exit_ty.is_unbound() {
-            self.add_diagnostic(
+            self.diagnostics.add(
                 context_expression.into(),
                 "invalid-context-manager",
                 format_args!(
@@ -1057,7 +1057,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             );
             Type::Unknown
         } else if enter_ty.is_unbound() {
-            self.add_diagnostic(
+            self.diagnostics.add(
                 context_expression.into(),
                 "invalid-context-manager",
                 format_args!(
@@ -1069,9 +1069,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         } else {
             let target_ty = enter_ty
                 .call(self.db, &[context_expression_ty])
-                .return_ty_result(self.db, context_expression.into(), self)
+                .return_ty_result(self.db, context_expression.into(), &mut self.diagnostics)
                 .unwrap_or_else(|err| {
-                    self.add_diagnostic(
+                    self.diagnostics.add(
                         context_expression.into(),
                         "invalid-context-manager",
                         format_args!("
@@ -1084,7 +1084,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 });
 
             if exit_ty.is_unbound() {
-                self.add_diagnostic(
+                self.diagnostics.add(
                     context_expression.into(),
                     "invalid-context-manager",
                     format_args!(
@@ -1092,15 +1092,17 @@ impl<'db> TypeInferenceBuilder<'db> {
                         context_expression_ty.display(self.db)
                     ),
                 );
-            } else if exit_ty
+            }
+            // TODO: Use the `exit_ty` to determine if any raised exception is suppressed.
+            else if exit_ty
                 .call(
                     self.db,
                     &[context_manager_ty, Type::None, Type::None, Type::None],
                 )
-                .return_ty_result(self.db, context_expression.into(), self)
+                .return_ty_result(self.db, context_expression.into(), &mut self.diagnostics)
                 .is_err()
             {
-                self.add_diagnostic(
+                self.diagnostics.add(
                     context_expression.into(),
                     "invalid-context-manager",
                     format_args!(

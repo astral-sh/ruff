@@ -1009,7 +1009,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Return the type resulting from calling an object of this type.
+    /// Return the outcome of calling an object of this type.
     #[must_use]
     fn call(self, db: &'db dyn Db, arg_types: &[Type<'db>]) -> CallOutcome<'db> {
         match self {

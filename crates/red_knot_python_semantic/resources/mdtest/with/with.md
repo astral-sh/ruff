@@ -1,4 +1,4 @@
-# With declarations
+# With statements
 
 ## Basic `with` statement
 

@@ -1,9 +1,9 @@
-# Async with declarations
+# Async with statements
 
 ## Basic `async with` statement
 
 The type of the target variable in a `with` statement should be the return type from the context manager's `__aenter__` method.
-However, Knot doesn't support `async with` statements yet. This test asserts that it doesn't emit any context manager-related errors.
+However, `async with` statements aren't supported yet. This test asserts that it doesn't emit any context manager-related errors.
 
 ```py
 class Target: ...
