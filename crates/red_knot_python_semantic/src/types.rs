@@ -71,9 +71,9 @@ fn symbol_ty_by_id<'db>(
         // Intentionally ignore conflicting declared types; that's not our problem, it's the
         // problem of the module we are importing from.
         match undeclared_ty {
-            Some(Symbol::Type(ty, boundedness)) => Symbol::Type(
+            Some(Symbol::Type(ty, boundness)) => Symbol::Type(
                 declarations_ty(db, declarations, Some(ty)).unwrap_or_else(|(ty, _)| ty),
-                boundedness,
+                boundness,
             ),
             None | Some(Symbol::Unbound) => Symbol::Type(
                 declarations_ty(db, declarations, None).unwrap_or_else(|(ty, _)| ty),

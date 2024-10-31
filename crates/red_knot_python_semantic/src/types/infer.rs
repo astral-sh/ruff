@@ -3505,8 +3505,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // See: https://docs.python.org/3/reference/datamodel.html#class-getitem-versus-getitem
                 match value_meta_ty.member(self.db, "__getitem__") {
                     Symbol::Unbound => {}
-                    Symbol::Type(dunder_getitem_method, boundedness) => {
-                        if boundedness == Boundness::MayBeUnbound {
+                    Symbol::Type(dunder_getitem_method, boundness) => {
+                        if boundness == Boundness::MayBeUnbound {
                             self.diagnostics.add(
                                 value_node.into(),
                                 "call-possibly-unbound-method",
@@ -3549,8 +3549,8 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                     match dunder_class_getitem_method {
                         Symbol::Unbound => {}
-                        Symbol::Type(ty, boundedness) => {
-                            if boundedness == Boundness::MayBeUnbound {
+                        Symbol::Type(ty, boundness) => {
+                            if boundness == Boundness::MayBeUnbound {
                                 self.diagnostics.add(
                                     value_node.into(),
                                     "call-possibly-unbound-method",
