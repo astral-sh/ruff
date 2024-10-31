@@ -54,14 +54,12 @@ use crate::types::diagnostic::{
 };
 use crate::types::{
     bindings_ty, builtins_symbol_ty, declarations_ty, global_symbol_ty, symbol_ty,
-    typing_extensions_symbol_ty, BytesLiteralType, ClassType, FunctionType, IterationOutcome,
-    KnownClass, KnownFunction, SliceLiteralType, StringLiteralType, SymbolLookupResult, Truthiness,
-    TupleType, Type, TypeArrayDisplay, UnionBuilder, UnionType,
+    typing_extensions_symbol_ty, Boundness, BytesLiteralType, ClassType, FunctionType,
+    IterationOutcome, KnownClass, KnownFunction, SliceLiteralType, StringLiteralType,
+    SymbolLookupResult, Truthiness, TupleType, Type, TypeArrayDisplay, UnionBuilder, UnionType,
 };
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
-
-use super::Boundness;
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
