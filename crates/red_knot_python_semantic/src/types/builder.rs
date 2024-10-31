@@ -25,11 +25,11 @@
 //!   * No type in an intersection can be a supertype of any other type in the intersection (just
 //!     eliminate the supertype from the intersection).
 //!   * An intersection containing two non-overlapping types should simplify to [`Type::Never`].
+
+use super::KnownClass;
 use crate::types::{IntersectionType, Type, UnionType};
 use crate::{Db, FxOrderSet};
 use smallvec::SmallVec;
-
-use super::KnownClass;
 
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<Type<'db>>,
@@ -80,7 +80,6 @@ impl<'db> UnionBuilder<'db> {
                         to_remove.push(index);
                     }
                 }
-
                 match to_remove[..] {
                     [] => self.elements.push(to_add),
                     [index] => self.elements[index] = to_add,
@@ -103,7 +102,6 @@ impl<'db> UnionBuilder<'db> {
                 }
             }
         }
-
         self
     }
 
@@ -386,8 +384,9 @@ mod tests {
     use crate::program::{Program, SearchPathSettings};
     use crate::python_version::PythonVersion;
     use crate::stdlib::typing_symbol;
-    use crate::types::{KnownClass, StringLiteralType, UnionBuilder};
+    use crate::types::{global_symbol, KnownClass, StringLiteralType, UnionBuilder};
     use crate::ProgramSettings;
+    use ruff_db::files::system_path_to_file;
     use ruff_db::system::{DbWithTestSystem, SystemPathBuf};
     use test_case::test_case;
 
@@ -992,5 +991,65 @@ mod tests {
             .add_positive(ty)
             .build();
         assert_eq!(result, ty);
+    }
+
+    #[test]
+    fn build_intersection_of_two_unions_simplify() {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/module.py",
+            "
+            class A: ...
+            class B: ...
+            a = A()
+            b = B()
+        ",
+        )
+        .unwrap();
+
+        let file = system_path_to_file(&db, "src/module.py").expect("file to exist");
+
+        let a = global_symbol(&db, file, "a").expect_type();
+        let b = global_symbol(&db, file, "b").expect_type();
+        let union = UnionBuilder::new(&db).add(a).add(b).build();
+        let reversed_union = UnionBuilder::new(&db).add(b).add(a).build();
+        let intersection = IntersectionBuilder::new(&db)
+            .add_positive(union)
+            .add_positive(reversed_union)
+            .build();
+        assert_eq!(intersection.display(&db).to_string(), "B | A");
+    }
+
+    #[test]
+    fn build_union_of_two_intersections_simplify() {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/module.py",
+            "
+            class A: ...
+            class B: ...
+            a = A()
+            b = B()
+        ",
+        )
+        .unwrap();
+
+        let file = system_path_to_file(&db, "src/module.py").expect("file to exist");
+
+        let a = global_symbol(&db, file, "a").expect_type();
+        let b = global_symbol(&db, file, "b").expect_type();
+        let intersection = IntersectionBuilder::new(&db)
+            .add_positive(a)
+            .add_positive(b)
+            .build();
+        let reversed_intersection = IntersectionBuilder::new(&db)
+            .add_positive(b)
+            .add_positive(a)
+            .build();
+        let union = UnionBuilder::new(&db)
+            .add(intersection)
+            .add(reversed_intersection)
+            .build();
+        assert_eq!(union.display(&db).to_string(), "A & B");
     }
 }

@@ -10,7 +10,9 @@ use crate::types::{
 use crate::Db;
 use itertools::Itertools;
 use ruff_python_ast as ast;
+use ruff_python_ast::{BoolOp, ExprBoolOp};
 use rustc_hash::FxHashMap;
+use std::collections::hash_map::Entry;
 use std::sync::Arc;
 
 /// Return the type constraint that `test` (if true) would place on `definition`, if any.
@@ -99,6 +101,26 @@ fn generate_isinstance_constraint<'db>(
 
 type NarrowingConstraints<'db> = FxHashMap<ScopedSymbolId, Type<'db>>;
 
+fn merge_constraints<'db>(
+    into: &mut NarrowingConstraints<'db>,
+    from: NarrowingConstraints<'db>,
+    db: &'db dyn Db,
+) {
+    for (key, value) in from {
+        match into.entry(key) {
+            Entry::Occupied(mut entry) => {
+                *entry.get_mut() = IntersectionBuilder::new(db)
+                    .add_positive(*entry.get())
+                    .add_positive(value)
+                    .build()
+            }
+            Entry::Vacant(entry) => {
+                entry.insert(value);
+            }
+        }
+    }
+}
+
 struct NarrowingConstraintsBuilder<'db> {
     db: &'db dyn Db,
     constraint: ConstraintNode<'db>,
@@ -151,6 +173,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             ast::Expr::Call(expr_call) => self.add_expr_call(expr_call, expression, is_positive),
             ast::Expr::UnaryOp(unary_op) if unary_op.op == ast::UnaryOp::Not => self
                 .evaluate_expression_node_constraint(&unary_op.operand, expression, !is_positive),
+            ast::Expr::BoolOp(bool_op) => self.add_bool_op(bool_op, expression, is_positive),
             _ => None, // TODO other test expression kinds
         }
     }
@@ -331,6 +354,69 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             Some(constraints)
         } else {
             None
+        }
+    }
+
+    fn add_bool_op(
+        &mut self,
+        expr_bool_op: &ExprBoolOp,
+        expression: Expression<'db>,
+        is_positive: bool,
+    ) -> Option<NarrowingConstraints<'db>> {
+        match (expr_bool_op.op, is_positive) {
+            (BoolOp::And, true) | (BoolOp::Or, false) => {
+                let mut aggregated_constraints: Option<NarrowingConstraints<'db>> = None;
+                for sub_constraint in expr_bool_op
+                    .values
+                    .iter()
+                    .filter_map(|sub_expr| {
+                        self.evaluate_expression_node_constraint(sub_expr, expression, is_positive)
+                    })
+                    .collect::<Vec<_>>()
+                {
+                    if let Some(ref mut some_aggregated_constraints) = aggregated_constraints {
+                        merge_constraints(some_aggregated_constraints, sub_constraint, self.db);
+                    } else {
+                        aggregated_constraints = Some(sub_constraint);
+                    }
+                }
+                aggregated_constraints
+            }
+            (BoolOp::Or, true) | (BoolOp::And, false) => {
+                let sub_constraints = expr_bool_op
+                    .values
+                    .iter()
+                    .filter_map(|sub_expr| {
+                        self.evaluate_expression_node_constraint(sub_expr, expression, is_positive)
+                    })
+                    // In order to narrow down based on OR operator, all arms must create a constraint,
+                    // and all constraints must be of exactly one symbol.
+                    .filter(|x| x.len() == 1)
+                    .collect::<Vec<_>>();
+                if sub_constraints.len() < expr_bool_op.values.len() {
+                    return None;
+                }
+                // Now we should validate that all sub constraints are about the same symbol id,
+                // and union its constraints across arms.
+                let mut found_symbol: Option<ScopedSymbolId> = None;
+                let mut union = UnionBuilder::new(self.db);
+
+                for sub_constraint in &sub_constraints {
+                    for (symbol, ty) in sub_constraint {
+                        if let Some(found_symbol) = found_symbol {
+                            if *symbol != found_symbol {
+                                return None;
+                            }
+                        } else {
+                            found_symbol = Some(*symbol);
+                        }
+                        union = union.add(*ty);
+                    }
+                }
+                let mut constraints = NarrowingConstraints::default();
+                constraints.insert(found_symbol?, union.build());
+                Some(constraints)
+            }
         }
     }
 }
