@@ -50,18 +50,21 @@ impl<'db> SymbolLookupResult<'db> {
     pub fn replace_unbound_with(
         self,
         db: &'db dyn Db,
-        replacement: Type<'db>,
+        replacement: &SymbolLookupResult<'db>,
     ) -> SymbolLookupResult<'db> {
-        SymbolLookupResult::Type(
-            match self {
-                SymbolLookupResult::Type(ty, Boundness::Bound) => ty,
-                SymbolLookupResult::Type(ty, Boundness::MayBeUnbound) => {
-                    UnionType::from_elements(db, [replacement, ty])
-                }
-                SymbolLookupResult::Unbound => replacement,
-            },
-            Boundness::Bound,
-        )
+        match replacement {
+            SymbolLookupResult::Type(replacement, _) => SymbolLookupResult::Type(
+                match self {
+                    SymbolLookupResult::Type(ty, Boundness::Bound) => ty,
+                    SymbolLookupResult::Type(ty, Boundness::MayBeUnbound) => {
+                        UnionType::from_elements(db, [*replacement, ty])
+                    }
+                    SymbolLookupResult::Unbound => *replacement,
+                },
+                Boundness::Bound,
+            ),
+            SymbolLookupResult::Unbound => self,
+        }
     }
 
     #[cfg(test)]
@@ -231,11 +234,8 @@ pub(crate) fn global_symbol_ty<'db>(
     {
         // TODO: this should use `.to_instance(db)`. but we don't understand attribute access
         // on instance types yet.
-        if let SymbolLookupResult::Type(module_type_member, _) =
-            KnownClass::ModuleType.to_class(db).member(db, name)
-        {
-            return explicit_ty.replace_unbound_with(db, module_type_member);
-        }
+        let module_type_member = KnownClass::ModuleType.to_class(db).member(db, name);
+        return explicit_ty.replace_unbound_with(db, &module_type_member);
     }
 
     explicit_ty
@@ -962,13 +962,9 @@ impl<'db> Type<'db> {
                 // where we know exactly which module we're dealing with.
                 if name != "__getattr__" && global_lookup.may_be_unbound() {
                     // TODO: this should use `.to_instance()`, but we don't understand instance attribute yet
-                    if let SymbolLookupResult::Type(module_type_instance_member, _) =
-                        KnownClass::ModuleType.to_class(db).member(db, name)
-                    {
-                        global_lookup.replace_unbound_with(db, module_type_instance_member)
-                    } else {
-                        global_lookup
-                    }
+                    let module_type_instance_member =
+                        KnownClass::ModuleType.to_class(db).member(db, name);
+                    global_lookup.replace_unbound_with(db, &module_type_instance_member)
                 } else {
                     global_lookup
                 }

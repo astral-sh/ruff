@@ -2,7 +2,7 @@ use crate::module_name::ModuleName;
 use crate::module_resolver::resolve_module;
 use crate::semantic_index::global_scope;
 use crate::semantic_index::symbol::ScopeId;
-use crate::types::{global_symbol_ty, SymbolLookupResult, Type};
+use crate::types::{global_symbol_ty, Boundness, SymbolLookupResult, Type};
 use crate::Db;
 
 /// Enumeration of various core stdlib modules, for which we have dedicated Salsa queries.
@@ -45,7 +45,10 @@ fn core_module_symbol_ty<'db>(
             if res.is_unbound() {
                 res
             } else {
-                res.replace_unbound_with(db, Type::Never)
+                res.replace_unbound_with(
+                    db,
+                    &SymbolLookupResult::Type(Type::Never, Boundness::Bound),
+                )
             }
         })
         .unwrap_or(SymbolLookupResult::Unbound)

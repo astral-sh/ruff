@@ -2474,12 +2474,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     builtin_ty = typing_extensions_symbol_ty(self.db, name);
                 }
 
-                match builtin_ty {
-                    SymbolLookupResult::Type(builtin_ty, _) => {
-                        ty.replace_unbound_with(self.db, builtin_ty)
-                    }
-                    SymbolLookupResult::Unbound => ty,
-                }
+                ty.replace_unbound_with(self.db, &builtin_ty)
             } else {
                 ty
             }
