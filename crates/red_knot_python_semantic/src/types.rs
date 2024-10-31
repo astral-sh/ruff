@@ -85,6 +85,13 @@ impl<'db> SymbolLookupResult<'db> {
         }
     }
 
+    fn as_type(&self) -> Option<Type<'db>> {
+        match self {
+            SymbolLookupResult::Type(ty, _) => Some(*ty),
+            SymbolLookupResult::Unbound => None,
+        }
+    }
+
     fn unwrap_or_unknown(&self) -> Type<'db> {
         self.unwrap_or(Type::Unknown)
     }

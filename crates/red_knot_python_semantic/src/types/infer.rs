@@ -1550,23 +1550,22 @@ impl<'db> TypeInferenceBuilder<'db> {
         // If the target defines, e.g., `__iadd__`, infer the augmented assignment as a call to that
         // dunder.
         if let Type::Instance(class) = target_type {
-            match class.class_member(self.db, op.in_place_dunder()) {
-                SymbolLookupResult::Unbound => {}
-                SymbolLookupResult::Type(class_member, _boundedness) => {
-                    // TODO: Handle the case where boundness is `MayBeUnbound`: fall back
-                    // to the binary-op behavior below and union the result with calling
-                    // the possibly-unbound in-place dunder.
+            if let Some(class_member) = class.class_member(self.db, op.in_place_dunder()).as_type()
+            {
+                // TODO: Handle the case where boundness is `MayBeUnbound`: fall back
+                // to the binary-op behavior below and union the result with calling
+                // the possibly-unbound in-place dunder.
 
-                    let call = class_member.call(self.db, &[target_type, value_type]);
+                let call = class_member.call(self.db, &[target_type, value_type]);
 
-                    return match call.return_ty_result(
-                        self.db,
-                        AnyNodeRef::StmtAugAssign(assignment),
-                        &mut self.diagnostics,
-                    ) {
-                        Ok(t) => t,
-                        Err(e) => {
-                            self.diagnostics.add(
+                return match call.return_ty_result(
+                    self.db,
+                    AnyNodeRef::StmtAugAssign(assignment),
+                    &mut self.diagnostics,
+                ) {
+                    Ok(t) => t,
+                    Err(e) => {
+                        self.diagnostics.add(
                                 assignment.into(),
                                 "unsupported-operator",
                                 format_args!(
@@ -1575,10 +1574,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                                     value_type.display(self.db)
                                 ),
                             );
-                            e.return_ty()
-                        }
-                    };
-                }
+                        e.return_ty()
+                    }
+                };
             }
         }
 
@@ -1820,21 +1818,20 @@ impl<'db> TypeInferenceBuilder<'db> {
                         asname: _,
                     } = alias;
 
-                    if let SymbolLookupResult::Type(member_ty, _) =
-                        module_ty.member(self.db, &ast::name::Name::new(&name.id))
-                    {
-                        // For possibly-unbound names, just eliminate Unbound from the type; we
-                        // must be in a bound path. TODO diagnostic for maybe-unbound import?
-                        member_ty
-                    } else {
-                        self.diagnostics.add(
-                            AnyNodeRef::Alias(alias),
-                            "unresolved-import",
-                            format_args!("Module `{module_name}` has no member `{name}`",),
-                        );
+                    // For possibly-unbound names, just eliminate Unbound from the type; we
+                    // must be in a bound path. TODO diagnostic for maybe-unbound import?
+                    module_ty
+                        .member(self.db, &ast::name::Name::new(&name.id))
+                        .as_type()
+                        .unwrap_or_else(|| {
+                            self.diagnostics.add(
+                                AnyNodeRef::Alias(alias),
+                                "unresolved-import",
+                                format_args!("Module `{module_name}` has no member `{name}`",),
+                            );
 
-                        Type::Unknown
-                    }
+                            Type::Unknown
+                        })
                 } else {
                     self.diagnostics
                         .add_unresolved_module(import_from, *level, module);
