@@ -146,11 +146,10 @@ fn symbol_ty_by_id<'db>(
                 declarations_ty(db, declarations, Some(ty)).unwrap_or_else(|(ty, _)| ty),
                 boundedness,
             ),
-            None => SymbolLookupResult::Type(
+            None | Some(SymbolLookupResult::Unbound) => SymbolLookupResult::Type(
                 declarations_ty(db, declarations, None).unwrap_or_else(|(ty, _)| ty),
                 Boundness::Bound,
             ),
-            Some(SymbolLookupResult::Unbound) => SymbolLookupResult::Unbound,
         }
     } else {
         bindings_ty(db, use_def.public_bindings(symbol))

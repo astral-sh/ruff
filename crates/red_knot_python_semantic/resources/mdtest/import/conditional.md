@@ -56,6 +56,24 @@ reveal_type(x)  # revealed: Literal[3]
 reveal_type(y)  # revealed: int
 ```
 
+## Maybe undeclared
+
+Importing a potentially undeclared name still gives us its maybe-declared type:
+
+```py path=maybe_undeclared.py
+def bool_instance() -> bool:
+    return True
+
+if bool_instance():
+    x: int
+```
+
+```py
+from maybe_undeclared import x
+
+reveal_type(x)  # revealed: int
+```
+
 ## Reimport
 
 ```py path=c.py
