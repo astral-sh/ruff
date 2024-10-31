@@ -2512,10 +2512,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             )
         };
 
-        let mut definitions = definitions.peekable();
-        let has_definitions = definitions.peek().is_some();
-
         let bindings_ty = bindings_ty(self.db, definitions);
+
         if boundness == Boundness::MayBeUnbound {
             match self.lookup_name(name) {
                 SymbolLookupResult::Type(ty, _) => match bindings_ty {
@@ -2523,7 +2521,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     None => ty,
                 },
                 SymbolLookupResult::Unbound => {
-                    if has_definitions {
+                    if bindings_ty.is_some() {
                         self.diagnostics.add(
                             name.into(),
                             "possibly-unresolved-reference",
