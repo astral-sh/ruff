@@ -1,8 +1,8 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{
-    Expr, ExprCall, ExprContext, ExprList, ExprStringLiteral, StringLiteral, StringLiteralFlags,
-    StringLiteralValue,
+    Expr, ExprCall, ExprContext, ExprList, ExprStringLiteral, ExprUnaryOp, StringLiteral,
+    StringLiteralFlags, StringLiteralValue, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextRange};
 
@@ -37,11 +37,11 @@ impl Violation for SplitOfStaticString {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Consider using a list instead of string split")
+        format!("Consider using a list instead of `str.split`")
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Replace string split with list literal"))
+        Some(format!("Replace `str.split` with list literal"))
     }
 }
 
@@ -78,6 +78,8 @@ fn split_default(str_value: &str, max_split: usize) -> Option<Expr> {
         Some(construct_replacement(&list_items))
     } else {
         // Autofix for maxsplit without separator not yet implemented
+        // split_whitespace().remainder() is still experimental:
+        // https://doc.rust-lang.org/std/str/struct.SplitWhitespace.html#method.remainder
         None
     }
 }
@@ -112,13 +114,19 @@ pub(crate) fn split_of_static_string(
 
     let maxsplit_value = if let Some(maxsplit) = maxsplit_arg {
         match maxsplit {
+            // Python allows maxsplit to be set to -1
+            Expr::UnaryOp(ExprUnaryOp {
+                op: UnaryOp::USub,
+                operand,
+                ..
+            }) if matches!(**operand, Expr::NumberLiteral { .. }) => 0,
             Expr::NumberLiteral(maxsplit_val) => {
-                if let Some(int_value) = maxsplit_val.value.as_int() {
-                    if let Some(usize_value) = int_value.as_usize() {
-                        usize_value
-                    } else {
-                        return;
-                    }
+                if let Some(value) = maxsplit_val
+                    .value
+                    .as_int()
+                    .and_then(ruff_python_ast::Int::as_usize)
+                {
+                    value
                 } else {
                     return;
                 }
@@ -157,6 +165,7 @@ pub(crate) fn split_of_static_string(
     if let Some(ref replacement_expr) = split_replacement {
         // Construct replacement list
         let replacement = checker.generator().expr(replacement_expr);
+        // Unsafe because the fix does not preserve comments within implicit string concatenation
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             replacement,
             call.range(),

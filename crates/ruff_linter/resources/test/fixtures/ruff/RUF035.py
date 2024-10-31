@@ -29,10 +29,48 @@ no_sep = None
 '   1   2   3   '.split()
 '1<>2<>3<4'.split('<>')
 
+" a*a a*a a ".split("*", -1)  # [' a', 'a a', 'a a ']
+"".split()  # []
+""" 	
+""".split()  # []
+"   	".split()  # []
+"/abc/".split() # ['/abc/']
+("a,b,c"
+# comment
+.split()
+)  # ['a,b,c']
+("a,b,c"
+# comment
+.split(",")
+) # ['a', 'b', 'c']
+("a,"
+# comment
+"b,"
+"c"
+.split(",")
+) # ['a', 'b', 'c']
+
+"hello "\
+	"world".split()
+# ['hello', 'world']
+
+# prefixes and isc
+u"a b".split()  # ['a', 'b']
+r"a \n b".split()  # ['a', '\\n', 'b']
+("a " "b").split()  # ['a', 'b']
+"a " "b".split()  # ['a', 'b']
+u"a " "b".split()  # ['a', 'b']
+"a " u"b".split()  # ['a', 'b']
+u"a " r"\n".split()  # ['a', '\\n']
+r"\n " u"\n".split()  # ['\\n']
+r"\n " "\n".split()  # ['\\n']
+"a " r"\n".split()  # ['a', '\\n']
+
 # negatives
 
-# test 
+# invalid values should not cause panic 
 "a,b,c,d".split(maxsplit="hello")
+"a,b,c,d".split(maxsplit=-"hello")
 
 # variable names not implemented
 "a,b,c,d".split(sep)

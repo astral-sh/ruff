@@ -403,7 +403,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                                     string_value.to_str(),
                                 );
                             }
-                        } else if attr == "split" || attr == "rsplit" {
+                        } else if matches!(attr, "split" | "rsplit") {
                             // "...".split(...) call
                             if checker.enabled(Rule::SplitOfStaticString) {
                                 ruff::rules::split_of_static_string(
