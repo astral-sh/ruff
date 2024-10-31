@@ -1557,7 +1557,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // the possibly-unbound in-place dunder.
 
                 let call = class_member.call(self.db, &[target_type, value_type]);
-
                 return match call.return_ty_result(
                     self.db,
                     AnyNodeRef::StmtAugAssign(assignment),
@@ -1566,14 +1565,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Ok(t) => t,
                     Err(e) => {
                         self.diagnostics.add(
-                                assignment.into(),
-                                "unsupported-operator",
-                                format_args!(
-                                    "Operator `{op}=` is unsupported between objects of type `{}` and `{}`",
-                                    target_type.display(self.db),
-                                    value_type.display(self.db)
-                                ),
-                            );
+                            assignment.into(),
+                            "unsupported-operator",
+                            format_args!(
+                                "Operator `{op}=` is unsupported between objects of type `{}` and `{}`",
+                                target_type.display(self.db),
+                                value_type.display(self.db)
+                            ),
+                        );
                         e.return_ty()
                     }
                 };
