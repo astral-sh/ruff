@@ -74,7 +74,9 @@ impl<'db> Mro<'db> {
                 match single_base {
                     Ok(base) => {
                         if base.into_class_literal_type() == Some(class) {
-                            Err(MroError::CyclicClassDefinition(0))
+                            Err(MroError::CyclicClassDefinition {
+                                invalid_base_index: 0,
+                            })
                         } else {
                             let mro = std::iter::once(ClassBase::Class(class))
                                 .chain(Mro::of_base(db, base).elements())
@@ -102,7 +104,9 @@ impl<'db> Mro<'db> {
                     match ClassBase::try_from_node(db, base_node, class_stmt_node, definition) {
                         Ok(valid_base) => {
                             if valid_base.into_class_literal_type() == Some(class) {
-                                return Err(MroError::CyclicClassDefinition(i));
+                                return Err(MroError::CyclicClassDefinition {
+                                    invalid_base_index: i,
+                                });
                             }
                             valid_bases.push(valid_base);
                         }
@@ -134,7 +138,9 @@ impl<'db> Mro<'db> {
                     }
 
                     if duplicate_bases.is_empty() {
-                        MroError::UnresolvableMro(valid_bases.into_boxed_slice())
+                        MroError::UnresolvableMro {
+                            bases_list: valid_bases.into_boxed_slice(),
+                        }
                     } else {
                         MroError::DuplicateBases(duplicate_bases.into_boxed_slice())
                     }
@@ -202,26 +208,35 @@ pub(super) enum MroError<'db> {
     /// To avoid excessive complexity in our implementation,
     /// we only permit classes to inherit from class-literal types,
     /// `Todo`, `Unknown` or `Any`. Anything else results in us
-    /// emitting a diagnostic. This variant records the indices and types
-    /// of class bases that we deem to be invalid.
+    /// emitting a diagnostic.
+    ///
+    /// This variant records the indices and types of class bases
+    /// that we deem to be invalid. The indices are the indices of nodes
+    /// in the bases list of the class's [`ast::StmtClassDef`] node:
+    /// each index is the index of a node representing an invalid base.
     InvalidBases(Box<[(usize, Type<'db>)]>),
 
     /// The class inherits from itself!
     ///
     /// This is very unlikely to happen in real-world code,
-    /// but it's important to explicitly account for it,
-    /// as there's a possibility of an infinite loop and a panic
-    /// if we don't.
-    CyclicClassDefinition(usize),
+    /// but it's important to explicitly account for it.
+    /// If we don't, there's a possibility of an infinite loop and a panic.
+    ///
+    /// `invalid_base_index` here is the index of the AST node
+    /// representing the invalid base relative. The index is relative
+    /// to the bases list present on the class's [`ast::StmtClassDef`] node.
+    CyclicClassDefinition { invalid_base_index: usize },
 
     /// The class has one or more duplicate bases.
     ///
     /// This variant records the indices and [`ClassType`]s
-    /// of the duplicate bases.
+    /// of the duplicate bases. The indices are the indices of nodes
+    /// in the bases list of the class's [`ast::StmtClassDef`] node:
+    /// each index is the index of a node representing a duplicate base.
     DuplicateBases(Box<[(usize, ClassType<'db>)]>),
 
     /// The MRO is otherwise unresolvable through the C3-merge algorithm.
-    UnresolvableMro(Box<[ClassBase<'db>]>),
+    UnresolvableMro { bases_list: Box<[ClassBase<'db>]> },
 }
 
 /// Enumeration of the possible kinds of types we allow in class bases.

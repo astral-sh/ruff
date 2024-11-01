@@ -464,7 +464,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         for class in class_definitions {
             match class.try_mro(self.db) {
                 Ok(_) => continue,
-                Err(MroError::CyclicClassDefinition(base_index)) => {
+                Err(MroError::CyclicClassDefinition{invalid_base_index: base_index}) => {
                     let base = &class.node(self.db).bases()[*base_index];
                     self.diagnostics.add(
                         base.into(),
@@ -498,13 +498,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                         );
                     }
                 },
-                Err(MroError::UnresolvableMro(bases)) => self.diagnostics.add(
+                Err(MroError::UnresolvableMro{bases_list}) => self.diagnostics.add(
                     class.node(self.db).into(),
                     "inconsistent-mro",
                     format_args!(
                         "Cannot create a consistent method resolution order (MRO) for class `{}` with bases list `[{}]`",
                         class.name(self.db),
-                        bases.iter().map(|base|base.display(self.db)).join(", ")
+                        bases_list.iter().map(|base| base.display(self.db)).join(", ")
                     )
                 )
             }
