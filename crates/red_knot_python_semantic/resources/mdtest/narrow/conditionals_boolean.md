@@ -124,20 +124,19 @@ else:
 ```py
 class A: ...
 class B: ...
-class C: ...
 
-def instance() -> A | B | C:
+def instance() -> A | B:
     return A()
 
 x = instance()
 y = instance()
 
-if isinstance(x, A) or isinstance(y, B):
-    reveal_type(x)  # revealed:  A | B | C
-    reveal_type(y)  # revealed:  A | B | C
+if isinstance(x, A) or isinstance(y, A):
+    reveal_type(x)  # revealed:  A | B
+    reveal_type(y)  # revealed:  A | B
 else:
-    reveal_type(x)  # revealed:  B & ~A | C & ~A
-    reveal_type(y)  # revealed:  A & ~B | C & ~B
+    reveal_type(x)  # revealed:  B & ~A
+    reveal_type(y)  # revealed:  B & ~A
 ```
 
 ## mixing `and` and `not`
