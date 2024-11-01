@@ -464,10 +464,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         for class in class_definitions {
             match class.try_mro(self.db).as_ref().map_err(|err| &err.kind) {
                 Ok(_) => continue,
-                Err(MroErrorKind::CyclicClassDefinition{invalid_base_index: base_index}) => {
-                    let base = &class.node(self.db).bases()[*base_index];
+                Err(MroErrorKind::CyclicClassDefinition) => {
                     self.diagnostics.add(
-                        base.into(),
+                        class.node(self.db).into(),
                         "cyclic-class-def",
                         format_args!(
                             "Invalid class definition `{}`: class cannot inherit from itself",

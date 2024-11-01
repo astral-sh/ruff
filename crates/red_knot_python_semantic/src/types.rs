@@ -1,6 +1,7 @@
 use mro::{ClassBase, Mro, MroError};
 use ruff_db::files::File;
 use ruff_python_ast as ast;
+use rustc_hash::FxHashSet;
 
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::ast_ids::HasScopedAstId;
@@ -14,7 +15,7 @@ use crate::stdlib::{builtins_symbol, types_symbol, typeshed_symbol, typing_exten
 use crate::symbol::{Boundness, Symbol};
 use crate::types::diagnostic::TypeCheckDiagnosticsBuilder;
 use crate::types::narrow::narrowing_constraint;
-use crate::{Db, FxOrderSet, Module};
+use crate::{Db, FxOrderSet, HasTy, Module, SemanticModel};
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
 pub use self::diagnostic::{TypeCheckDiagnostic, TypeCheckDiagnostics};
@@ -1926,6 +1927,54 @@ impl<'db> ClassType<'db> {
         }
 
         Symbol::Unbound
+    }
+
+    /// Iterate through the inferred types of the class's explicit bases.
+    ///
+    /// Note that any class (except for `object`) that has no explicit
+    /// bases will implicitly inherit from `object` at runtime. Nonetheless,
+    /// this method does *not* include `object` in the bases it iterates over.
+    fn bases(self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
+        let definition = self.definition(db);
+        let class_stmt = self.node(db);
+        let has_type_params = class_stmt.type_params.is_some();
+
+        class_stmt.bases().iter().map(move |base_node| {
+            if has_type_params {
+                let model = SemanticModel::new(db, definition.file(db));
+                base_node.ty(&model)
+            } else {
+                definition_expression_ty(db, definition, base_node)
+            }
+        })
+    }
+
+    /// Return `true` if this class appears to be a cyclic definition,
+    /// i.e., it inherits either directly or indirectly from itself.
+    ///
+    /// A class definition like this will fail at runtime,
+    /// but we must be resilient to it or we could panic.
+    #[salsa::tracked]
+    fn is_cyclically_defined(self, db: &'db dyn Db) -> bool {
+        fn is_cyclically_defined_recursive<'db>(
+            db: &'db dyn Db,
+            class: ClassType<'db>,
+            mut classes_to_watch: FxHashSet<ClassType<'db>>,
+        ) -> bool {
+            if !classes_to_watch.insert(class) {
+                return true;
+            }
+            class
+                .bases(db)
+                .filter_map(Type::into_class_literal_type)
+                .any(|base_class| {
+                    is_cyclically_defined_recursive(db, base_class, classes_to_watch.clone())
+                })
+        }
+
+        self.bases(db)
+            .filter_map(Type::into_class_literal_type)
+            .any(|base_class| is_cyclically_defined_recursive(db, base_class, FxHashSet::default()))
     }
 }
 

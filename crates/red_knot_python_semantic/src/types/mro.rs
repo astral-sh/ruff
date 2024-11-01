@@ -36,8 +36,14 @@ impl<'db> Mro<'db> {
     /// Attempt to resolve the MRO of a given class
     pub(super) fn of_class(db: &'db dyn Db, class: ClassType<'db>) -> Result<Self, MroError<'db>> {
         let class_stmt_node = class.node(db);
+        let class_bases = class_stmt_node.bases();
 
-        match class_stmt_node.bases() {
+        if !class_bases.is_empty() && class.is_cyclically_defined(db) {
+            let error = MroError::new(db, class, MroErrorKind::CyclicClassDefinition);
+            return Err(error);
+        }
+
+        match class_bases {
             // `builtins.object` is the special case:
             // the only class in Python that has an MRO with length <2
             [] if class.is_known(db, KnownClass::Object) => {
@@ -71,26 +77,19 @@ impl<'db> Mro<'db> {
                     class_stmt_node,
                     class.definition(db),
                 );
-                match single_base {
-                    Ok(base) => {
-                        if base.into_class_literal_type() == Some(class) {
-                            let error_kind = MroErrorKind::CyclicClassDefinition {
-                                invalid_base_index: 0,
-                            };
-                            Err(MroError::new(db, class, error_kind))
-                        } else {
-                            let mro = std::iter::once(ClassBase::Class(class))
-                                .chain(Mro::of_base(db, base).elements())
-                                .collect();
-                            Ok(mro)
-                        }
-                    }
-                    Err(invalid_base_ty) => {
+                single_base.map_or_else(
+                    |invalid_base_ty| {
                         let error_kind =
                             MroErrorKind::InvalidBases(Box::from([(0, invalid_base_ty)]));
                         Err(MroError::new(db, class, error_kind))
-                    }
-                }
+                    },
+                    |single_base| {
+                        let mro = std::iter::once(ClassBase::Class(class))
+                            .chain(Mro::of_base(db, single_base).elements())
+                            .collect();
+                        Ok(mro)
+                    },
+                )
             }
 
             // The class has multiple explicit bases.
@@ -105,15 +104,7 @@ impl<'db> Mro<'db> {
 
                 for (i, base_node) in multiple_bases.iter().enumerate() {
                     match ClassBase::try_from_node(db, base_node, class_stmt_node, definition) {
-                        Ok(valid_base) => {
-                            if valid_base.into_class_literal_type() == Some(class) {
-                                let error_kind = MroErrorKind::CyclicClassDefinition {
-                                    invalid_base_index: i,
-                                };
-                                return Err(MroError::new(db, class, error_kind));
-                            }
-                            valid_bases.push(valid_base);
-                        }
+                        Ok(valid_base) => valid_bases.push(valid_base),
                         Err(invalid_base) => invalid_bases.push((i, invalid_base)),
                     }
                 }
@@ -247,7 +238,7 @@ pub(super) enum MroErrorKind<'db> {
     /// `invalid_base_index` here is the index of the AST node
     /// representing the invalid base relative. The index is relative
     /// to the bases list present on the class's [`ast::StmtClassDef`] node.
-    CyclicClassDefinition { invalid_base_index: usize },
+    CyclicClassDefinition,
 
     /// The class has one or more duplicate bases.
     ///

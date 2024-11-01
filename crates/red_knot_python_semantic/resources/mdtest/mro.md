@@ -348,7 +348,7 @@ reveal_type(unknown_object.__mro__)  # revealed: Unknown
 These are invalid, but we need to be able to handle them gracefully without panicking.
 
 ```py path=a.pyi
-# error: 11 [cyclic-class-def] "Invalid class definition `Foo`: class cannot inherit from itself"
+# error: [cyclic-class-def] "Invalid class definition `Foo`: class cannot inherit from itself"
 class Foo(Foo): ...
 
 reveal_type(Foo)  # revealed: Literal[Foo]
@@ -357,9 +357,64 @@ reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Unknown, Literal[objec
 class Bar: ...
 class Baz: ...
 
-# error: 21 [cyclic-class-def] "Invalid class definition `Boz`: class cannot inherit from itself"
+# error: [cyclic-class-def] "Invalid class definition `Boz`: class cannot inherit from itself"
 class Boz(Bar, Baz, Boz): ...
 
 reveal_type(Boz)  # revealed: Literal[Boz]
 reveal_type(Boz.__mro__)  # revealed: tuple[Literal[Boz], Unknown, Literal[object]]
+```
+
+## Classes with indirect cycles in their MROs
+
+These are similarly unlikely, but we still shouldn't crash:
+
+```py path=a.pyi
+# error: [cyclic-class-def] "Invalid class definition `Foo`: class cannot inherit from itself"
+class Foo(Bar): ...
+# error: [cyclic-class-def] "Invalid class definition `Bar`: class cannot inherit from itself"
+class Bar(Baz): ...
+# error: [cyclic-class-def] "Invalid class definition `Baz`: class cannot inherit from itself"
+class Baz(Foo): ...
+
+reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Unknown, Literal[object]]
+reveal_type(Bar.__mro__)  # revealed: tuple[Literal[Bar], Unknown, Literal[object]]
+reveal_type(Baz.__mro__)  # revealed: tuple[Literal[Baz], Unknown, Literal[object]]
+```
+
+## Classes with cycles in their MROs, and multiple inheritance
+
+```py path=a.pyi
+class Spam: ...
+
+# error: [cyclic-class-def] "Invalid class definition `Foo`: class cannot inherit from itself"
+class Foo(Bar): ...
+# error: [cyclic-class-def] "Invalid class definition `Bar`: class cannot inherit from itself"
+class Bar(Baz): ...
+# error: [cyclic-class-def] "Invalid class definition `Baz`: class cannot inherit from itself"
+class Baz(Foo, Spam): ...
+
+reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Unknown, Literal[object]]
+reveal_type(Bar.__mro__)  # revealed: tuple[Literal[Bar], Unknown, Literal[object]]
+reveal_type(Baz.__mro__)  # revealed: tuple[Literal[Baz], Unknown, Literal[object]]
+```
+
+## Classes with cycles in their MRO, and a sub-graph
+
+```py path=a.pyi
+# error: [cyclic-class-def] "Invalid class definition `FooCycle`: class cannot inherit from itself"
+class FooCycle(BarCycle): ...
+
+class Foo: ...
+
+# error: [cyclic-class-def] "Invalid class definition `BarCycle`: class cannot inherit from itself"
+class BarCycle(FooCycle): ...
+
+class Bar(Foo): ...
+
+# error: [cyclic-class-def] "Invalid class definition `Baz`: class cannot inherit from itself"
+class Baz(Bar, BarCycle): ...
+
+reveal_type(FooCycle.__mro__)  # revealed: tuple[Literal[FooCycle], Unknown, Literal[object]]
+reveal_type(BarCycle.__mro__)  # revealed: tuple[Literal[BarCycle], Unknown, Literal[object]]
+reveal_type(Baz.__mro__)  # revealed: tuple[Literal[Baz], Unknown, Literal[object]]
 ```
