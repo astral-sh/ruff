@@ -13,7 +13,7 @@ use crate::{Db, HasTy, SemanticModel};
 /// The inferred method resolution order of a given class.
 ///
 /// See [`ClassType::mro`] for more details.
-#[derive(PartialEq, Eq, Default, Hash, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub(super) struct Mro<'db>(Box<[ClassBase<'db>]>);
 
 impl<'db> Mro<'db> {
@@ -195,7 +195,7 @@ impl<'db> FromIterator<ClassBase<'db>> for Mro<'db> {
 }
 
 /// Possible ways in which attempting to resolve the MRO of a class might fail.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq)]
 pub(super) enum MroError<'db> {
     /// The class inherits from one or more invalid bases.
     ///
@@ -229,7 +229,7 @@ pub(super) enum MroError<'db> {
 /// This is much more limited than the [`Type`] enum:
 /// all types that would be invalid to have as a class base are
 /// transformed into [`ClassBase::Unknown`]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub(super) enum ClassBase<'db> {
     Any,
     Unknown,

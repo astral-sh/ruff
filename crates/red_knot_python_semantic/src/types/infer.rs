@@ -455,8 +455,9 @@ impl<'db> TypeInferenceBuilder<'db> {
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
     fn check_class_mros(&mut self) {
-        let declarations = std::mem::take(&mut self.types.declarations);
-        let class_definitions = declarations
+        let class_definitions = self
+            .types
+            .declarations
             .values()
             .filter_map(|ty| ty.into_class_literal_type());
 
@@ -508,8 +509,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 )
             }
         }
-
-        self.types.declarations = declarations;
     }
 
     fn infer_region_definition(&mut self, definition: Definition<'db>) {
