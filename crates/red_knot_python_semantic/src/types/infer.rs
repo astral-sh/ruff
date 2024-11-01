@@ -463,11 +463,32 @@ impl<'db> TypeInferenceBuilder<'db> {
         for class in class_definitions {
             match class.try_mro(self.db) {
                 Ok(_) => continue,
-                Err(MroError::InvalidBases(bases)) => {
-                    for (index, base_ty) in bases {
-                        let base_node = &class.node(self.db).bases()[*index];
+                Err(MroError::CyclicClassDefinition(base_index)) => {
+                    let base = &class.node(self.db).bases()[*base_index];
+                    self.diagnostics.add(
+                        base.into(),
+                        "cyclic-class-def",
+                        format_args!(
+                            "Invalid class definition `{}`: class cannot inherit from itself",
+                            class.name(self.db)
+                        )
+                    );
+                }
+                Err(MroError::DuplicateBases(duplicates)) => {
+                    let base_nodes = class.node(self.db).bases();
+                    for (index, duplicate) in duplicates {
                         self.diagnostics.add(
-                            base_node.into(),
+                            (&base_nodes[*index]).into(),
+                             "duplicate-base",
+                             format_args!("Duplicate base class `{}`", duplicate.name(self.db))
+                        );
+                    }
+                }
+                Err(MroError::InvalidBases(bases)) => {
+                    let base_nodes = class.node(self.db).bases();
+                    for (index, base_ty) in bases {
+                        self.diagnostics.add(
+                            (&base_nodes[*index]).into(),
                             "invalid-base",
                             format_args!(
                                 "Invalid class base with type `{}` (all bases must be a class, `Any`, `Unknown` or `Todo`)",

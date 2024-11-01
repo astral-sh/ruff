@@ -847,14 +847,6 @@ impl<'db> Type<'db> {
     /// as accessed from instances of the `Bar` class.
     #[must_use]
     pub(crate) fn member(&self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
-        if name == "__mro__" {
-            if let Some(mro) = Mro::of_ty(db, *self) {
-                let mro_element_tys: Box<_> = mro.iter().copied().map(Type::from).collect();
-                let mro_ty = Type::Tuple(TupleType::new(db, mro_element_tys));
-                return Symbol::Type(mro_ty, Boundness::Bound);
-            }
-        }
-
         match self {
             Type::Any => Type::Any.into(),
             Type::Never => {
@@ -1844,11 +1836,27 @@ impl<'db> ClassType<'db> {
         }
     }
 
+    /// Attempt to resolve the [method resolution order] ("MRO") for this class.
+    /// If the MRO is unresolvable, return an error indicating why the class's MRO
+    /// cannot be accurately determined.
+    ///
+    /// The MRO is the tuple of classes that can be retrieved as the `__mro__`
+    /// attribute on a class at runtime.
+    ///
+    /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
     #[salsa::tracked(return_ref)]
     fn try_mro(self, db: &'db dyn Db) -> Result<Mro<'db>, MroError<'db>> {
         Mro::of_class(db, self)
     }
 
+    /// Return the [method resolution order] ("MRO") of the class.
+    ///
+    /// If the MRO could not be accurately resolved, this method falls back to
+    /// an MRO that has the class directly inheriting from `Unknown`. Use
+    /// [`ClassType::try_mro`] if you need to distinguish between the success and failure
+    /// cases rather than simply iterating over the inferred resolution order for the class.
+    ///
+    /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
     fn mro(self, db: &'db dyn Db) -> Cow<'db, Mro<'db>> {
         self.try_mro(db)
             .as_ref()
@@ -1871,6 +1879,13 @@ impl<'db> ClassType<'db> {
     ///
     /// The member resolves to a member of the class itself or any of its bases.
     pub(crate) fn class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+        if name == "__mro__" {
+            return Symbol::Type(
+                Type::Tuple(self.mro(db).as_tuple_type(db)),
+                Boundness::Bound,
+            );
+        }
+
         let member = self.own_class_member(db, name);
         if !member.is_unbound() {
             return member;
