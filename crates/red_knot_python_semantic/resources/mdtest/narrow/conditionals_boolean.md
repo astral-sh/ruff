@@ -80,7 +80,6 @@ x = instance()
 if isinstance(x, A) or isinstance(x, B):
     reveal_type(x)  # revealed:  A | B
 else:
-    # TODO: Should be simplified to C
     reveal_type(x)  # revealed:  C & ~A & ~B
 ```
 
