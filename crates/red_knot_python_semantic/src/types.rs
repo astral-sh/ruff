@@ -1864,10 +1864,9 @@ impl<'db> ClassType<'db> {
     }
 
     pub fn is_subclass_of(self, db: &'db dyn Db, other: ClassType) -> bool {
-        // TODO: we need to iterate over the *MRO* here, not the bases
         (other == self)
-            || self.mro(db).iter().any(|base| match base {
-                ClassBase::Class(base_class) => *base_class == other,
+            || self.mro(db).elements().any(|superclass| match superclass {
+                ClassBase::Class(superclass) => superclass == other,
                 // `is_subclass_of` is checking the subtype relation, in which gradual types do not
                 // participate, so we should not return `True` if we find `Any/Unknown` in the
                 // bases.
@@ -1901,10 +1900,10 @@ impl<'db> ClassType<'db> {
     }
 
     pub(crate) fn inherited_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
-        for superclass in self.mro(db).iter().skip(1) {
+        for superclass in self.mro(db).elements().skip(1) {
             match superclass {
                 ClassBase::Any | ClassBase::Unknown | ClassBase::Todo => {
-                    return Type::from(*superclass).member(db, name)
+                    return Type::from(superclass).member(db, name)
                 }
                 ClassBase::Class(class) => {
                     let member = class.own_class_member(db, name);
@@ -2159,6 +2158,10 @@ mod tests {
     #[test_case(Ty::Tuple(vec![Ty::IntLiteral(42), Ty::StringLiteral("foo")]), Ty::Tuple(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")]))]
     #[test_case(Ty::Tuple(vec![Ty::BuiltinInstance("int"), Ty::StringLiteral("foo")]), Ty::Tuple(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")]))]
     #[test_case(Ty::Tuple(vec![Ty::IntLiteral(42), Ty::BuiltinInstance("str")]), Ty::Tuple(vec![Ty::BuiltinInstance("int"), Ty::BuiltinInstance("str")]))]
+    #[test_case(
+        Ty::BuiltinInstance("FloatingPointError"),
+        Ty::BuiltinInstance("Exception")
+    )]
     fn is_subtype_of(from: Ty, to: Ty) {
         let db = setup_db();
         assert!(from.into_type(&db).is_subtype_of(&db, to.into_type(&db)));

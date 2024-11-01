@@ -46,7 +46,7 @@ impl<'db> Mro<'db> {
 
             // All other classes in Python have an MRO with length >=2.
             // Even if a class has no explicit base classes,
-            // it will implicitly inherit from `objet` at runtime;
+            // it will implicitly inherit from `object` at runtime;
             // `object` will appear in the class's `__bases__` list and `__mro__`:
             //
             // ```pycon
