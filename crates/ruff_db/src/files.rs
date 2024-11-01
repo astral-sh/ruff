@@ -102,7 +102,9 @@ impl Files {
                     Ok(metadata) if metadata.file_type().is_directory() => {
                         builder.status(FileStatus::IsADirectory)
                     }
-                    _ => builder.status(FileStatus::NotFound),
+                    _ => builder
+                        .status(FileStatus::NotFound)
+                        .status_durability(Durability::MEDIUM.max(durability)),
                 };
 
                 builder.new(db)
