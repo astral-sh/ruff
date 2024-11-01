@@ -2341,13 +2341,15 @@ impl<'db> TypeInferenceBuilder<'db> {
             orelse,
         } = if_expression;
 
-        self.infer_expression(test);
-
-        // TODO detect statically known truthy or falsy test
+        let test_ty = self.infer_expression(test);
         let body_ty = self.infer_expression(body);
         let orelse_ty = self.infer_expression(orelse);
 
-        UnionType::from_elements(self.db, [body_ty, orelse_ty])
+        match test_ty.bool(self.db) {
+            Truthiness::AlwaysTrue => body_ty,
+            Truthiness::AlwaysFalse => orelse_ty,
+            Truthiness::Ambiguous => UnionType::from_elements(self.db, [body_ty, orelse_ty]),
+        }
     }
 
     fn infer_lambda_body(&mut self, lambda_expression: &ast::ExprLambda) {
