@@ -160,19 +160,17 @@ fn benchmark_incremental(criterion: &mut Criterion) {
 }
 
 fn benchmark_cold(criterion: &mut Criterion) {
+    fn cold(case: &mut Case) {
+        let Case { db, .. } = case;
+        let result = db.check().unwrap();
+
+        assert_eq!(result, EXPECTED_DIAGNOSTICS);
+    }
+
     setup_rayon();
 
     criterion.bench_function("red_knot_check_file[cold]", |b| {
-        b.iter_batched_ref(
-            setup_case,
-            |case| {
-                let Case { db, .. } = case;
-                let result = db.check().unwrap();
-
-                assert_eq!(result, EXPECTED_DIAGNOSTICS);
-            },
-            BatchSize::SmallInput,
-        );
+        b.iter_batched_ref(setup_case, cold, BatchSize::SmallInput);
     });
 }
 
