@@ -23,12 +23,20 @@ else:
 class A: ...
 class B: ...
 
+def bool_instance() -> bool:
+    return True
+
 def instance() -> A | B:
     return A()
 
 x = instance()
 
-if isinstance(x, A) and True:
+if isinstance(x, A) and bool_instance():
+    reveal_type(x)  # revealed: A
+else:
+    reveal_type(x)  # revealed: A | B
+
+if bool_instance() and isinstance(x, A):
     reveal_type(x)  # revealed: A
 else:
     reveal_type(x)  # revealed: A | B
@@ -36,6 +44,13 @@ else:
 if True and isinstance(x, A):
     reveal_type(x)  # revealed: A
 else:
+    # TODO: Consider statically known arms. Should be B & ~A
+    reveal_type(x)  # revealed: A | B
+
+if isinstance(x, A) and True:
+    reveal_type(x)  # revealed: A
+else:
+    # TODO: Consider statically known arms. Should be B & ~A
     reveal_type(x)  # revealed: A | B
 
 reveal_type(x)  # revealed: A | B
