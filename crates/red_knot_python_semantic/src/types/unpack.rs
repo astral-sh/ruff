@@ -4,8 +4,8 @@ use ruff_db::files::File;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use rustc_hash::FxHashMap;
 
+use crate::ast_node_ref::AstNodeRef;
 use crate::semantic_index::ast_ids::{HasScopedAstId, ScopedExpressionId};
-use crate::semantic_index::definition::UnpackTarget;
 use crate::semantic_index::symbol::{FileScopeId, ScopeId};
 use crate::types::{TupleType, Type, TypeCheckDiagnostics, TypeCheckDiagnosticsBuilder};
 use crate::Db;
@@ -20,7 +20,7 @@ pub struct Unpack<'db> {
 
     #[no_eq]
     #[return_ref]
-    pub(crate) target: UnpackTarget,
+    pub(crate) target: AstNodeRef<ast::Expr>,
 
     #[no_eq]
     pub(crate) value_ty: Type<'db>,
@@ -52,7 +52,7 @@ impl<'db> Unpacker<'db> {
 
     pub(crate) fn unpack(&mut self, unpack: Unpack<'db>) {
         self.unpack_inner(
-            unpack.target(self.db).node(),
+            unpack.target(self.db),
             unpack.value_ty(self.db),
             unpack.scope(self.db),
         );

@@ -41,7 +41,7 @@ use crate::module_name::ModuleName;
 use crate::module_resolver::{file_to_module, resolve_module};
 use crate::semantic_index::ast_ids::{HasScopedAstId, HasScopedUseId, ScopedExpressionId};
 use crate::semantic_index::definition::{
-    AssignmentKind, Definition, DefinitionKind, DefinitionNodeKey, ExceptHandlerDefinitionKind,
+    Definition, DefinitionKind, DefinitionNodeKey, ExceptHandlerDefinitionKind, TargetKind,
 };
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::semantic_index;
@@ -452,9 +452,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             DefinitionKind::Assignment(assignment) => {
                 self.infer_assignment_definition(
+                    assignment.target(),
                     assignment.value(),
                     assignment.name(),
-                    assignment.kind(),
                     definition,
                 );
             }
@@ -1332,9 +1332,9 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_assignment_definition(
         &mut self,
+        target: &TargetKind,
         value: &ast::Expr,
         name: &ast::ExprName,
-        kind: AssignmentKind,
         definition: Definition<'db>,
     ) {
         let expression = self.index.expression(value);
@@ -1344,14 +1344,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         let value_ty = self.expression_ty(value);
         let name_ast_id = name.scoped_ast_id(self.db, self.scope());
 
-        let target_ty = match kind {
-            AssignmentKind::Sequence => {
-                let target = definition.kind(self.db).as_unpack_target().unwrap();
+        let target_ty = match target {
+            TargetKind::Sequence(target) => {
                 let unpack = Unpack::new(
                     self.db,
                     self.file,
                     definition.file_scope(self.db),
-                    target,
+                    target.clone(),
                     value_ty,
                     countme::Count::default(),
                 );
@@ -1359,7 +1358,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.diagnostics.extend(unpacked.diagnostics());
                 unpacked.get(name_ast_id).unwrap_or(Type::Unknown)
             }
-            AssignmentKind::Name => value_ty,
+            TargetKind::Name => value_ty,
         };
 
         self.add_binding(name.into(), definition, target_ty);

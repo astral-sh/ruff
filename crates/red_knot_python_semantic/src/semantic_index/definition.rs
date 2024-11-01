@@ -158,6 +158,22 @@ impl<'a> From<MatchPatternDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
     }
 }
 
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum TargetNodeRef<'a> {
+    Sequence(&'a ast::Expr),
+    Name,
+}
+
+impl TargetNodeRef<'_> {
+    pub(super) fn from_expr(expr: &ast::Expr) -> Option<TargetNodeRef<'_>> {
+        match expr {
+            ast::Expr::List(_) | ast::Expr::Tuple(_) => Some(TargetNodeRef::Sequence(expr)),
+            ast::Expr::Name(_) => Some(TargetNodeRef::Name),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ImportFromDefinitionNodeRef<'a> {
     pub(crate) node: &'a ast::StmtImportFrom,
@@ -166,10 +182,9 @@ pub(crate) struct ImportFromDefinitionNodeRef<'a> {
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct AssignmentDefinitionNodeRef<'a> {
-    pub(crate) assignment: &'a ast::StmtAssign,
-    pub(crate) target_index: usize,
+    pub(crate) target: TargetNodeRef<'a>,
+    pub(crate) value: &'a ast::Expr,
     pub(crate) name: &'a ast::ExprName,
-    pub(crate) kind: AssignmentKind,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -234,16 +249,22 @@ impl DefinitionNodeRef<'_> {
                 DefinitionKind::NamedExpression(AstNodeRef::new(parsed, named))
             }
             DefinitionNodeRef::Assignment(AssignmentDefinitionNodeRef {
-                assignment,
-                target_index,
+                value,
+                target,
                 name,
-                kind,
-            }) => DefinitionKind::Assignment(AssignmentDefinitionKind {
-                assignment: AstNodeRef::new(parsed.clone(), assignment),
-                target_index,
-                name: AstNodeRef::new(parsed, name),
-                kind,
-            }),
+            }) => {
+                let target = match target {
+                    TargetNodeRef::Sequence(node) => {
+                        TargetKind::Sequence(AstNodeRef::new(parsed.clone(), node))
+                    }
+                    TargetNodeRef::Name => TargetKind::Name,
+                };
+                DefinitionKind::Assignment(AssignmentDefinitionKind {
+                    target,
+                    value: AstNodeRef::new(parsed.clone(), value),
+                    name: AstNodeRef::new(parsed, name),
+                })
+            }
             DefinitionNodeRef::AnnotatedAssignment(assign) => {
                 DefinitionKind::AnnotatedAssignment(AstNodeRef::new(parsed, assign))
             }
@@ -316,10 +337,9 @@ impl DefinitionNodeRef<'_> {
             Self::Class(node) => node.into(),
             Self::NamedExpression(node) => node.into(),
             Self::Assignment(AssignmentDefinitionNodeRef {
-                assignment: _,
-                target_index: _,
+                value: _,
+                target: _,
                 name,
-                kind: _,
             }) => name.into(),
             Self::AnnotatedAssignment(node) => node.into(),
             Self::AugmentedAssignment(node) => node.into(),
@@ -401,24 +421,6 @@ pub enum DefinitionKind {
 }
 
 impl DefinitionKind {
-    pub(crate) fn as_unpack_target(&self) -> Option<UnpackTarget> {
-        match self {
-            DefinitionKind::Assignment(AssignmentDefinitionKind {
-                assignment,
-                target_index,
-                ..
-            }) => Some(UnpackTarget::Assignment(UnpackTargetAssignment {
-                assignment: assignment.clone(),
-                target_index: *target_index,
-            })),
-            DefinitionKind::For(ForStmtDefinitionKind { .. }) => {
-                // TODO
-                None
-            }
-            _ => None,
-        }
-    }
-
     pub(crate) fn category(&self) -> DefinitionCategory {
         match self {
             // functions, classes, and imports always bind, and we consider them declarations
@@ -461,6 +463,12 @@ impl DefinitionKind {
             | DefinitionKind::ExceptHandler(_) => DefinitionCategory::Binding,
         }
     }
+}
+
+#[derive(Clone, Debug)]
+pub enum TargetKind {
+    Sequence(AstNodeRef<ast::Expr>),
+    Name,
 }
 
 #[derive(Clone, Debug)]
@@ -525,31 +533,23 @@ impl ImportFromDefinitionKind {
 
 #[derive(Clone, Debug)]
 pub struct AssignmentDefinitionKind {
-    assignment: AstNodeRef<ast::StmtAssign>,
-    target_index: usize,
+    target: TargetKind,
+    value: AstNodeRef<ast::Expr>,
     name: AstNodeRef<ast::ExprName>,
-    kind: AssignmentKind,
 }
 
 impl AssignmentDefinitionKind {
+    pub(crate) fn target(&self) -> &TargetKind {
+        &self.target
+    }
+
     pub(crate) fn value(&self) -> &ast::Expr {
-        &self.assignment.node().value
+        self.value.node()
     }
 
     pub(crate) fn name(&self) -> &ast::ExprName {
         self.name.node()
     }
-
-    pub(crate) fn kind(&self) -> AssignmentKind {
-        self.kind
-    }
-}
-
-/// The kind of assignment target expression.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum AssignmentKind {
-    Sequence,
-    Name,
 }
 
 #[derive(Clone, Debug)]
@@ -686,32 +686,5 @@ impl From<&ast::Identifier> for DefinitionNodeKey {
 impl From<&ast::ExceptHandlerExceptHandler> for DefinitionNodeKey {
     fn from(handler: &ast::ExceptHandlerExceptHandler) -> Self {
         Self(NodeKey::from_node(handler))
-    }
-}
-
-#[derive(Clone, Debug)]
-pub enum UnpackTarget {
-    Assignment(UnpackTargetAssignment),
-    For(AstNodeRef<ast::Expr>),
-}
-
-impl UnpackTarget {
-    pub(crate) fn node(&self) -> &ast::Expr {
-        match self {
-            UnpackTarget::Assignment(assignment) => assignment.target(),
-            UnpackTarget::For(target) => target,
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct UnpackTargetAssignment {
-    assignment: AstNodeRef<ast::StmtAssign>,
-    target_index: usize,
-}
-
-impl UnpackTargetAssignment {
-    pub(crate) fn target(&self) -> &ast::Expr {
-        &self.assignment.targets[self.target_index]
     }
 }

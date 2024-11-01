@@ -29,8 +29,8 @@ use crate::Db;
 
 use super::constraint::{Constraint, ConstraintNode, PatternConstraint};
 use super::definition::{
-    AssignmentKind, DefinitionCategory, ExceptHandlerDefinitionNodeRef,
-    MatchPatternDefinitionNodeRef, WithItemDefinitionNodeRef,
+    DefinitionCategory, ExceptHandlerDefinitionNodeRef, MatchPatternDefinitionNodeRef,
+    TargetNodeRef, WithItemDefinitionNodeRef,
 };
 
 mod except_handlers;
@@ -621,21 +621,16 @@ where
                 debug_assert_eq!(&self.current_assignments, &[]);
                 self.visit_expr(&node.value);
                 self.add_standalone_expression(&node.value);
-                for (target_index, target) in node.targets.iter().enumerate() {
-                    let kind = match target {
-                        ast::Expr::List(_) | ast::Expr::Tuple(_) => Some(AssignmentKind::Sequence),
-                        ast::Expr::Name(_) => Some(AssignmentKind::Name),
-                        _ => None,
-                    };
-                    if let Some(kind) = kind {
+                for expr in &node.targets {
+                    let target = TargetNodeRef::from_expr(expr);
+                    if let Some(target) = target {
                         self.push_assignment(CurrentAssignment::Assign {
-                            assignment: node,
-                            target_index,
-                            kind,
+                            target,
+                            value: &node.value,
                         });
                     }
-                    self.visit_expr(target);
-                    if kind.is_some() {
+                    self.visit_expr(expr);
+                    if target.is_some() {
                         // only need to pop in the case where we pushed something
                         self.pop_assignment();
                     }
@@ -971,18 +966,13 @@ where
 
                 if is_definition {
                     match self.current_assignment().copied() {
-                        Some(CurrentAssignment::Assign {
-                            assignment,
-                            target_index,
-                            kind,
-                        }) => {
+                        Some(CurrentAssignment::Assign { target, value }) => {
                             self.add_definition(
                                 symbol,
                                 AssignmentDefinitionNodeRef {
-                                    assignment,
-                                    target_index,
+                                    target,
+                                    value,
                                     name: name_node,
-                                    kind,
                                 },
                             );
                         }
@@ -1229,9 +1219,8 @@ where
 #[derive(Copy, Clone, Debug, PartialEq)]
 enum CurrentAssignment<'a> {
     Assign {
-        assignment: &'a ast::StmtAssign,
-        target_index: usize,
-        kind: AssignmentKind,
+        target: TargetNodeRef<'a>,
+        value: &'a ast::Expr,
     },
     AnnAssign(&'a ast::StmtAnnAssign),
     AugAssign(&'a ast::StmtAugAssign),
