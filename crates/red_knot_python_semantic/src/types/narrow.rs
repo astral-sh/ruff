@@ -112,7 +112,7 @@ fn merge_constraints<'db>(
                 *entry.get_mut() = IntersectionBuilder::new(db)
                     .add_positive(*entry.get())
                     .add_positive(value)
-                    .build()
+                    .build();
             }
             Entry::Vacant(entry) => {
                 entry.insert(value);
