@@ -84,7 +84,7 @@ else:
     reveal_type(x)  # revealed:  C & ~A & ~B
 ```
 
-## In `or`, All arms should add constraint in order to narrow
+## In `or`, all arms should add constraint in order to narrow
 
 ```py
 class A: ...
@@ -206,4 +206,24 @@ else:
     # ~A | (C & ~B) ->
     # ~A | (C & ~B)  The positive side of ~A is  A | B | C ->
     reveal_type(x)  # revealed:  B & ~A | C & ~A | C & ~B
+```
+
+## Boolean expression internal narrowing
+
+```py
+def optional_string() -> str | None:
+    return None
+
+x = optional_string()
+y = optional_string()
+
+if x is None and y is not x:
+    reveal_type(y)  # revealed: str
+
+# Neither of the conditions alone is sufficient for narrowing y's type:
+if x is None:
+    reveal_type(y)  # revealed: str | None
+
+if y is not x:
+    reveal_type(y)  # revealed: str | None
 ```
