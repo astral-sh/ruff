@@ -104,13 +104,23 @@ def clean_file_content(content: str, title: str) -> str:
     return f"# {title}\n\n" + content
 
 
-def generate_rule_metadata(rule_doc: Path) -> str:
-    """Add metadata containing rule code & description to the rule doc."""
-    # Read the rule doc into lines
+def generate_rule_metadata(rule_doc: Path) -> None:
+    """Add frontmatter metadata containing a rule's code and description.
+
+    For example:
+    ```yaml
+    ---
+    description: Checks for abstract classes without abstract methods.
+    tags:
+    - B024
+    ---
+    ```
+    """
+    # Read the rule doc into lines.
     with rule_doc.open("r", encoding="utf-8") as f:
         lines = f.readlines()
 
-    # Get the description & rule code from the rule doc lines
+    # Get the description and rule code from the rule doc lines.
     rule_code = None
     description = None
     what_it_does_found = False
@@ -118,10 +128,13 @@ def generate_rule_metadata(rule_doc: Path) -> str:
         if line == "\n":
             continue
 
-        # Assume that the only first-level heading is the rule title & code
+        # Assume that the only first-level heading is the rule title and code.
+        #
+        # For example: given `# abstract-base-class-without-abstract-method (B024)`,
+        # extract the rule code (`B024`).
         if line.startswith("# "):
             rule_code = line.strip().rsplit("(", 1)
-            rule_code = rule_code[1][:-1]  # Remove the trailing )
+            rule_code = rule_code[1][:-1]
 
         if line.startswith("## What it does"):
             what_it_does_found = True
