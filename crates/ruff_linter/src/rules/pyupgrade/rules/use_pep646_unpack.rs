@@ -58,6 +58,17 @@ pub(crate) fn use_pep646_unpack(checker: &mut Checker, expr: &ExprSubscript) {
         return;
     }
 
+    // ignore kwarg unpacks like `def f(**kwargs: Unpack[CustomTypedDict]):`
+    if checker
+        .semantic()
+        .current_statement()
+        .as_function_def_stmt()
+        .and_then(|stmt| stmt.parameters.kwarg.as_ref())
+        .map_or(false, |kwarg| kwarg.range.contains_range(expr.range))
+    {
+        return;
+    }
+
     let ExprSubscript {
         range,
         value,
