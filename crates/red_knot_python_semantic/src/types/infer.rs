@@ -1594,10 +1594,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 Type::Unknown
                             });
 
-                        UnionType::from_elements(
-                            self.db,
-                            [augmented_return_ty, binary_return_ty]
-                        )
+                        UnionType::from_elements(self.db, [augmented_return_ty, binary_return_ty])
                     }
                 };
             }
