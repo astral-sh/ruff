@@ -129,7 +129,7 @@ impl Violation for UnusedClassMethodArgument {
 /// Use instead:
 /// ```python
 /// class Class:
-///     @static
+///     @staticmethod
 ///     def foo(arg1):
 ///         print(arg1)
 /// ```
