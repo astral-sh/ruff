@@ -104,31 +104,55 @@ def clean_file_content(content: str, title: str) -> str:
     return f"# {title}\n\n" + content
 
 
-def add_meta_description(rule_doc: Path) -> str:
-    """Add a meta description to the rule doc."""
+def generate_rule_metadata(rule_doc: Path) -> str:
+    """Add metadata containing rule code & description to the rule doc."""
     # Read the rule doc into lines
     with rule_doc.open("r", encoding="utf-8") as f:
         lines = f.readlines()
 
-    # Get the description from the rule doc lines
+    # Get the description & rule code from the rule doc lines
+    rule_code = None
+    description = None
     what_it_does_found = False
     for line in lines:
         if line == "\n":
             continue
 
+        # Assume that the only first-level heading is the rule title & code
+        if line.startswith("# "):
+            rule_code = line.strip().rsplit("(", 1)
+            rule_code = rule_code[1][:-1]  # Remove the trailing )
+
         if line.startswith("## What it does"):
             what_it_does_found = True
             continue  # Skip the '## What it does' line
 
-        if what_it_does_found:
+        if what_it_does_found and not description:
             description = line.removesuffix("\n")
+
+        if all([rule_code, description]):
             break
     else:
+        if not rule_code:
+            raise ValueError("Missing title line")
+
         if not what_it_does_found:
             raise ValueError(f"Missing '## What it does' in {rule_doc}")
 
     with rule_doc.open("w", encoding="utf-8") as f:
-        f.writelines("\n".join(["---", f"description: {description}", "---", "", ""]))
+        f.writelines(
+            "\n".join(
+                [
+                    "---",
+                    f"description: {description}",
+                    "tags:",
+                    f"- {rule_code}",
+                    "---",
+                    "",
+                    "",
+                ]
+            )
+        )
         f.writelines(lines)
 
 
@@ -198,7 +222,7 @@ def main() -> None:
         # support.
         mdformat.file(rule_doc, extensions=["mkdocs", "admon", "no-escape-text"])
 
-        add_meta_description(rule_doc)
+        generate_rule_metadata(rule_doc)
 
     with Path("mkdocs.template.yml").open(encoding="utf8") as fp:
         config = yaml.safe_load(fp)
