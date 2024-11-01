@@ -209,7 +209,7 @@ else:
 
 reveal_type(x)  # revealed: Literal[A, B]
 
-# error: [invalid-base] "Invalid class base with type `Literal[A, B]` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
+# error: 11 [invalid-base] "Invalid class base with type `Literal[A, B]` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
 class Foo(x): ...
 
 reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Unknown, Literal[object]]
@@ -239,8 +239,8 @@ else:
 reveal_type(x)  # revealed: Literal[A, B]
 reveal_type(y)  # revealed: Literal[C, D]
 
-# error: [invalid-base] "Invalid class base with type `Literal[A, B]` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
-# error: [invalid-base] "Invalid class base with type `Literal[C, D]` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
+# error: 11 [invalid-base] "Invalid class base with type `Literal[A, B]` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
+# error: 14 [invalid-base] "Invalid class base with type `Literal[C, D]` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
 class Foo(x, y): ...
 
 reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Unknown, Literal[object]]
@@ -261,7 +261,7 @@ if bool():
 else:
     foo = object
 
-# error: [invalid-base] "Invalid class base with type `Literal[Y, object]` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
+# error: 21 [invalid-base] "Invalid class base with type `Literal[Y, object]` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
 class PossibleError(foo, X): ...
 
 reveal_type(PossibleError.__mro__)  # revealed: tuple[Literal[PossibleError], Unknown, Literal[object]]
@@ -279,7 +279,7 @@ else:
 # revealed: tuple[Literal[B], Literal[X], Literal[Y], Literal[O], Literal[object]] | tuple[Literal[B], Literal[Y], Literal[X], Literal[O], Literal[object]]
 reveal_type(B.__mro__)
 
-# error: [invalid-base] "Invalid class base with type `Literal[B, B]` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
+# error: 12 [invalid-base] "Invalid class base with type `Literal[B, B]` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
 class Z(A, B): ...
 
 reveal_type(Z.__mro__)  # revealed: tuple[Literal[Z], Unknown, Literal[object]]
@@ -288,16 +288,18 @@ reveal_type(Z.__mro__)  # revealed: tuple[Literal[Z], Unknown, Literal[object]]
 ## `__bases__` lists with duplicate bases
 
 ```py
-class Foo(str, str): ...  # error: [duplicate-base] "Duplicate base class `str`"
+class Foo(str, str): ...  # error: 16 [duplicate-base] "Duplicate base class `str`"
 
 reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Unknown, Literal[object]]
 
 class Spam: ...
 class Eggs: ...
-
-# error: [duplicate-base] "Duplicate base class `Spam`"
-# error: [duplicate-base] "Duplicate base class `Eggs`"
-class Ham(Spam, Eggs, Spam, Eggs): ...
+class Ham(
+    Spam,
+    Eggs,
+    Spam,  # error: [duplicate-base] "Duplicate base class `Spam`"
+    Eggs,  # error: [duplicate-base] "Duplicate base class `Eggs`"
+): ...
 
 reveal_type(Ham.__mro__)  # revealed: tuple[Literal[Ham], Unknown, Literal[object]]
 
@@ -322,6 +324,10 @@ reveal_type(unknown_object_2)  # revealed: Unknown
 # However, we don't complain about "duplicate base classes" here,
 # even though two classes are both inferred as being `Unknown`.
 #
+# (TODO: should we revisit this? Does it violate the gradual guarantee?
+# Should we just silently infer `[Foo, Unknown, object]` as the MRO here
+# without emitting any error at all? Not sure...)
+#
 # error: [inconsistent-mro] "Cannot create a consistent method resolution order (MRO) for class `Foo` with bases list `[Unknown, Unknown]`"
 class Foo(unknown_object_1, unknown_object_2): ...
 
@@ -342,7 +348,7 @@ reveal_type(unknown_object.__mro__)  # revealed: Unknown
 These are invalid, but we need to be able to handle them gracefully without panicking.
 
 ```py path=a.pyi
-# error: [cyclic-class-def] "Invalid class definition `Foo`: class cannot inherit from itself"
+# error: 11 [cyclic-class-def] "Invalid class definition `Foo`: class cannot inherit from itself"
 class Foo(Foo): ...
 
 reveal_type(Foo)  # revealed: Literal[Foo]
@@ -351,7 +357,7 @@ reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Unknown, Literal[objec
 class Bar: ...
 class Baz: ...
 
-# error: [cyclic-class-def] "Invalid class definition `Boz`: class cannot inherit from itself"
+# error: 21 [cyclic-class-def] "Invalid class definition `Boz`: class cannot inherit from itself"
 class Boz(Bar, Baz, Boz): ...
 
 reveal_type(Boz)  # revealed: Literal[Boz]

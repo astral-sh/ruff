@@ -4218,10 +4218,7 @@ mod tests {
     use crate::semantic_index::definition::Definition;
     use crate::semantic_index::symbol::FileScopeId;
     use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
-    use crate::types::{
-        check_types, definition_expression_ty, global_symbol, infer_definition_types, symbol,
-        TypeCheckDiagnostics,
-    };
+    use crate::types::check_types;
     use crate::{HasTy, ProgramSettings, SemanticModel};
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::parsed::parsed_module;
@@ -4338,43 +4335,6 @@ mod tests {
         let mut db = setup_db();
         db.write_file("src/foo.py", "from import bar")?;
         assert_public_ty(&db, "src/foo.py", "bar", "Unknown");
-        Ok(())
-    }
-
-    #[test]
-    fn resolve_base_class_by_name() -> anyhow::Result<()> {
-        let mut db = setup_db();
-
-        db.write_dedented(
-            "src/mod.py",
-            "
-            class Base:
-                pass
-
-            class Sub(Base):
-                pass
-            ",
-        )?;
-
-        let mod_file = system_path_to_file(&db, "src/mod.py").expect("file to exist");
-        let ty = global_symbol(&db, mod_file, "Sub").expect_type();
-
-        let class = ty.expect_class_literal();
-
-        let base_names: Vec<_> = class
-            .node(&db)
-            .bases()
-            .iter()
-            .map(|base| {
-                format!(
-                    "{}",
-                    definition_expression_ty(&db, class.definition(&db), base).display(&db)
-                )
-            })
-            .collect();
-
-        assert_eq!(base_names, vec!["Literal[Base]"]);
-
         Ok(())
     }
 
