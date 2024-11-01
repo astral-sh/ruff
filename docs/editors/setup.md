@@ -383,6 +383,46 @@ Alternatively, it can be used via the [Apheleia](https://github.com/radian-softw
 Ruff is also available via the [`textmate2-ruff-linter`](https://github.com/vigo/textmate2-ruff-linter)
 bundle for TextMate.
 
+## Wing Pro
+
+Ruff can be used with Wing Pro, both for code warnings and reformatting your code.
+
+### Code Warnings
+
+You can enable Ruff as a source of code warnings shown in the `Code Warnings` tool:
+
+1. Open the `Code Warnings` tool from the `Tools` menu
+1. Click on the dropdown at the top to select `Configuration: Defaults`
+1. Turn on `Enable External Checkers`
+1. Click on `Configure`, go to the `Ruff` tab, and check on `Enabled`
+1. Optionally, set the command line to use or other options.  The default command line runs Ruff
+   using the project's Python configuration.  If Ruff isn't installed there, you can either add
+   it using the `Packages` tool in Wing Pro or select a different command line for running Ruff.
+   
+Once this is done, Wing Pro will show code warnings sourced from Ruff along with any other
+warnings in the `Code Warnings` tool.  The contents of the tool is updated when you open or
+save a file.
+
+The `Code Warnings` tool is ['documented here'](https://wingware.com/doc/warnings).
+
+### Reformatting
+
+You can also use Ruff to reformat code in Wing Pro, either on demand or automatically as you work on
+code.
+
+To request reformatting on-demand with Ruff, use the Ruff menu items in the `Reformatting` sub-menu
+of the `Source` menu, either `Reformat File with Ruff` or `Reformat Selection with Ruff`.  You can
+also bind a key binding to the commands `ruff-file` or `ruff-selection` using the 
+`User Interface > Keyboard > Custom Key Bindings` preference in Wing.
+
+To enable automatic reformatting, set `Auto-Reformet` under the `Options` tab of `Project
+Properties` accessed from the `Project` menu to either `Lines After Edit` or `Whole Files After
+Save` and then set the `Reformatter` to Ruff.  Note that you can click on the icons next to these
+properties to instead set the values in preferences, which will be used in all projects that don't
+override the default setting.
+
+Wing Pro's auto-reformatting features are ['documented here'](https://wingware.com/doc/edit/auto-reformatting).
+
 ## Zed
 
 Ruff is available as an extension for the Zed editor. To install it:
