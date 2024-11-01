@@ -120,40 +120,42 @@ fn setup_rayon() {
 }
 
 fn benchmark_incremental(criterion: &mut Criterion) {
+    fn setup() -> Case {
+        let case = setup_case();
+        let result = case.db.check().unwrap();
+
+        assert_eq!(result, EXPECTED_DIAGNOSTICS);
+
+        case.fs
+            .write_file(
+                &case.re_path,
+                format!("{}\n# A comment\n", source_text(&case.db, case.re).as_str()),
+            )
+            .unwrap();
+
+        case
+    }
+
+    fn incremental(case: &mut Case) {
+        let Case { db, .. } = case;
+
+        db.apply_changes(
+            vec![ChangeEvent::Changed {
+                path: case.re_path.clone(),
+                kind: ChangedKind::FileContent,
+            }],
+            None,
+        );
+
+        let result = db.check().unwrap();
+
+        assert_eq!(result, EXPECTED_DIAGNOSTICS);
+    }
+
     setup_rayon();
 
     criterion.bench_function("red_knot_check_file[incremental]", |b| {
-        b.iter_batched_ref(
-            || {
-                let case = setup_case();
-                case.db.check().unwrap();
-
-                case.fs
-                    .write_file(
-                        &case.re_path,
-                        format!("{}\n# A comment\n", source_text(&case.db, case.re).as_str()),
-                    )
-                    .unwrap();
-
-                case
-            },
-            |case| {
-                let Case { db, .. } = case;
-
-                db.apply_changes(
-                    vec![ChangeEvent::Changed {
-                        path: case.re_path.clone(),
-                        kind: ChangedKind::FileContent,
-                    }],
-                    None,
-                );
-
-                let result = db.check().unwrap();
-
-                assert_eq!(result, EXPECTED_DIAGNOSTICS);
-            },
-            BatchSize::SmallInput,
-        );
+        b.iter_batched_ref(setup, incremental, BatchSize::SmallInput);
     });
 }
 
