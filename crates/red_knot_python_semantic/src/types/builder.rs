@@ -1012,7 +1012,9 @@ mod tests {
         let a = global_symbol(&db, file, "a").expect_type();
         let b = global_symbol(&db, file, "b").expect_type();
         let union = UnionBuilder::new(&db).add(a).add(b).build();
+        assert_eq!(union.display(&db).to_string(), "A | B");
         let reversed_union = UnionBuilder::new(&db).add(b).add(a).build();
+        assert_eq!(reversed_union.display(&db).to_string(), "B | A");
         let intersection = IntersectionBuilder::new(&db)
             .add_positive(union)
             .add_positive(reversed_union)
