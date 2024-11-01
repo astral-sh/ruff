@@ -348,17 +348,14 @@ reveal_type(unknown_object.__mro__)  # revealed: Unknown
 These are invalid, but we need to be able to handle them gracefully without panicking.
 
 ```py path=a.pyi
-# error: [cyclic-class-def] "Invalid class definition `Foo`: class cannot inherit from itself"
-class Foo(Foo): ...
+class Foo(Foo): ...  # error: [cyclic-class-def]
 
 reveal_type(Foo)  # revealed: Literal[Foo]
 reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Unknown, Literal[object]]
 
 class Bar: ...
 class Baz: ...
-
-# error: [cyclic-class-def] "Invalid class definition `Boz`: class cannot inherit from itself"
-class Boz(Bar, Baz, Boz): ...
+class Boz(Bar, Baz, Boz): ...  # error: [cyclic-class-def]
 
 reveal_type(Boz)  # revealed: Literal[Boz]
 reveal_type(Boz.__mro__)  # revealed: tuple[Literal[Boz], Unknown, Literal[object]]
@@ -369,52 +366,44 @@ reveal_type(Boz.__mro__)  # revealed: tuple[Literal[Boz], Unknown, Literal[objec
 These are similarly unlikely, but we still shouldn't crash:
 
 ```py path=a.pyi
-# error: [cyclic-class-def] "Invalid class definition `Foo`: class cannot inherit from itself"
-class Foo(Bar): ...
-# error: [cyclic-class-def] "Invalid class definition `Bar`: class cannot inherit from itself"
-class Bar(Baz): ...
-# error: [cyclic-class-def] "Invalid class definition `Baz`: class cannot inherit from itself"
-class Baz(Foo): ...
+class Foo(Bar): ...  # error: [cyclic-class-def]
+class Bar(Baz): ...  # error: [cyclic-class-def]
+class Baz(Foo): ...  # error: [cyclic-class-def]
 
-reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Unknown, Literal[object]]
-reveal_type(Bar.__mro__)  # revealed: tuple[Literal[Bar], Unknown, Literal[object]]
-reveal_type(Baz.__mro__)  # revealed: tuple[Literal[Baz], Unknown, Literal[object]]
+reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Literal[Bar], Unknown, Literal[object]]
+reveal_type(Bar.__mro__)  # revealed: tuple[Literal[Bar], Literal[Baz], Unknown, Literal[object]]
+reveal_type(Baz.__mro__)  # revealed: tuple[Literal[Baz], Literal[Foo], Unknown, Literal[object]]
 ```
 
 ## Classes with cycles in their MROs, and multiple inheritance
 
 ```py path=a.pyi
 class Spam: ...
+class Foo(Bar): ...  # error: [cyclic-class-def]
+class Bar(Baz): ...  # error: [cyclic-class-def]
+class Baz(Foo, Spam): ...  # error: [cyclic-class-def]
 
-# error: [cyclic-class-def] "Invalid class definition `Foo`: class cannot inherit from itself"
-class Foo(Bar): ...
-# error: [cyclic-class-def] "Invalid class definition `Bar`: class cannot inherit from itself"
-class Bar(Baz): ...
-# error: [cyclic-class-def] "Invalid class definition `Baz`: class cannot inherit from itself"
-class Baz(Foo, Spam): ...
-
-reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Unknown, Literal[object]]
-reveal_type(Bar.__mro__)  # revealed: tuple[Literal[Bar], Unknown, Literal[object]]
+reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Literal[Bar], Unknown, Literal[object]]
+reveal_type(Bar.__mro__)  # revealed: tuple[Literal[Bar], Literal[Baz], Unknown, Literal[object]]
 reveal_type(Baz.__mro__)  # revealed: tuple[Literal[Baz], Unknown, Literal[object]]
 ```
 
 ## Classes with cycles in their MRO, and a sub-graph
 
 ```py path=a.pyi
-# error: [cyclic-class-def] "Invalid class definition `FooCycle`: class cannot inherit from itself"
-class FooCycle(BarCycle): ...
-
+class FooCycle(BarCycle): ...  # error: [cyclic-class-def]
 class Foo: ...
-
-# error: [cyclic-class-def] "Invalid class definition `BarCycle`: class cannot inherit from itself"
-class BarCycle(FooCycle): ...
-
+class BarCycle(FooCycle): ...  # error: [cyclic-class-def]
 class Bar(Foo): ...
 
-# error: [cyclic-class-def] "Invalid class definition `Baz`: class cannot inherit from itself"
-class Baz(Bar, BarCycle): ...
+# TODO: can we avoid emitting the errors for these?
+# The classes have cyclic superclasses,
+# but are not themselves cyclic...
+class Baz(Bar, BarCycle): ...  # error: [cyclic-class-def]
+class Spam(Baz): ...  # error: [cyclic-class-def]
 
-reveal_type(FooCycle.__mro__)  # revealed: tuple[Literal[FooCycle], Unknown, Literal[object]]
-reveal_type(BarCycle.__mro__)  # revealed: tuple[Literal[BarCycle], Unknown, Literal[object]]
+reveal_type(FooCycle.__mro__)  # revealed: tuple[Literal[FooCycle], Literal[BarCycle], Unknown, Literal[object]]
+reveal_type(BarCycle.__mro__)  # revealed: tuple[Literal[BarCycle], Literal[FooCycle], Unknown, Literal[object]]
 reveal_type(Baz.__mro__)  # revealed: tuple[Literal[Baz], Unknown, Literal[object]]
+reveal_type(Spam.__mro__)  # revealed: tuple[Literal[Spam], Literal[Baz], Unknown, Literal[object]]
 ```

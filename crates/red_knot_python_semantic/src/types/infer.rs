@@ -446,7 +446,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             self.types.expressions.extend(deferred_expression_types);
         }
 
-        self.check_class_mros();
+        self.check_class_definitions();
     }
 
     /// Iterate over all class definitions to check that Python will be able to create
@@ -454,7 +454,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// issue a diagnostic.
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
-    fn check_class_mros(&mut self) {
+    fn check_class_definitions(&mut self) {
         let class_definitions = self
             .types
             .declarations
@@ -462,18 +462,20 @@ impl<'db> TypeInferenceBuilder<'db> {
             .filter_map(|ty| ty.into_class_literal_type());
 
         for class in class_definitions {
+            if class.is_cyclically_defined(self.db) {
+                self.diagnostics.add(
+                    class.node(self.db).into(),
+                    "cyclic-class-def",
+                    format_args!(
+                        "Cyclic definition of `{}` or bases of `{}` (class cannot inherit from itself)",
+                        class.name(self.db),
+                        class.name(self.db)
+                    )
+                );
+            }
+
             match class.try_mro(self.db).as_ref().map_err(|err| &err.kind) {
-                Ok(_) => continue,
-                Err(MroErrorKind::CyclicClassDefinition) => {
-                    self.diagnostics.add(
-                        class.node(self.db).into(),
-                        "cyclic-class-def",
-                        format_args!(
-                            "Invalid class definition `{}`: class cannot inherit from itself",
-                            class.name(self.db)
-                        )
-                    );
-                }
+                Ok(_) => {},
                 Err(MroErrorKind::DuplicateBases(duplicates)) => {
                     let base_nodes = class.node(self.db).bases();
                     for (index, duplicate) in duplicates {

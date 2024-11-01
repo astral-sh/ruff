@@ -38,11 +38,6 @@ impl<'db> Mro<'db> {
         let class_stmt_node = class.node(db);
         let class_bases = class_stmt_node.bases();
 
-        if !class_bases.is_empty() && class.is_cyclically_defined(db) {
-            let error = MroError::new(db, class, MroErrorKind::CyclicClassDefinition);
-            return Err(error);
-        }
-
         match class_bases {
             // `builtins.object` is the special case:
             // the only class in Python that has an MRO with length <2
@@ -84,6 +79,21 @@ impl<'db> Mro<'db> {
                         Err(MroError::new(db, class, error_kind))
                     },
                     |single_base| {
+                        if let ClassBase::Class(class_base) = single_base {
+                            if class_base.is_cyclically_defined(db) {
+                                let mro = if class == class_base {
+                                    Mro::from_error(db, class)
+                                } else {
+                                    Mro::from([
+                                        ClassBase::Class(class),
+                                        single_base,
+                                        ClassBase::Unknown,
+                                        ClassBase::object(db),
+                                    ])
+                                };
+                                return Ok(mro);
+                            }
+                        }
                         let mro = std::iter::once(ClassBase::Class(class))
                             .chain(Mro::of_base(db, single_base).elements())
                             .collect();
@@ -98,6 +108,10 @@ impl<'db> Mro<'db> {
             // what MRO Python will give this class at runtime
             // (if an MRO is indeed resolvable at all!)
             multiple_bases => {
+                if class.is_cyclically_defined(db) {
+                    return Ok(Mro::from_error(db, class));
+                }
+
                 let definition = class.definition(db);
                 let mut valid_bases = vec![];
                 let mut invalid_bases = vec![];
@@ -228,17 +242,6 @@ pub(super) enum MroErrorKind<'db> {
     /// in the bases list of the class's [`ast::StmtClassDef`] node:
     /// each index is the index of a node representing an invalid base.
     InvalidBases(Box<[(usize, Type<'db>)]>),
-
-    /// The class inherits from itself!
-    ///
-    /// This is very unlikely to happen in real-world code,
-    /// but it's important to explicitly account for it.
-    /// If we don't, there's a possibility of an infinite loop and a panic.
-    ///
-    /// `invalid_base_index` here is the index of the AST node
-    /// representing the invalid base relative. The index is relative
-    /// to the bases list present on the class's [`ast::StmtClassDef`] node.
-    CyclicClassDefinition,
 
     /// The class has one or more duplicate bases.
     ///
