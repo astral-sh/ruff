@@ -126,8 +126,7 @@ else:
     f = 42.0
 f += 12
 
-# TODO(charlie): This should be `str | int | float`
-reveal_type(f)  # revealed: @Todo
+reveal_type(f)  # revealed: int | str | float
 ```
 
 ## Target union
@@ -148,6 +147,36 @@ else:
     f = 42.0
 f += 12
 
-# TODO(charlie): This should be `str | float`.
-reveal_type(f)  # revealed: @Todo
+reveal_type(f)  # revealed: str | float
+```
+
+## Partially bound target union with `__add__`
+
+```py
+def bool_instance() -> bool:
+    return True
+
+flag = bool_instance()
+
+class Foo:
+    def __add__(self, other: int) -> str:
+        return "Hello, world!"
+    if bool_instance():
+        def __iadd__(self, other: int) -> int:
+            return 42
+
+class Bar:
+    def __add__(self, other: int) -> bytes:
+        return b"Hello, world!"
+
+    def __iadd__(self, other: int) -> float:
+        return 42.0
+
+if flag:
+    f = Foo()
+else:
+    f = Bar()
+f += 12
+
+reveal_type(f)  # revealed: int | str | float
 ```

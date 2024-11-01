@@ -1902,7 +1902,7 @@ impl<'db> UnionType<'db> {
     pub fn map(
         &self,
         db: &'db dyn Db,
-        transform_fn: impl Fn(&Type<'db>) -> Type<'db>,
+        transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
     ) -> Type<'db> {
         Self::from_elements(db, self.elements(db).iter().map(transform_fn))
     }
