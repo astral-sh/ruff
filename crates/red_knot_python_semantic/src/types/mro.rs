@@ -38,10 +38,32 @@ impl<'db> Mro<'db> {
         let class_stmt_node = class.node(db);
 
         match class_stmt_node.bases() {
+            // `builtins.object` is the special case:
+            // the only class in Python that has an MRO with length <2
             [] if class.is_known(db, KnownClass::Object) => {
                 Ok(Self::from([ClassBase::Class(class)]))
             }
+
+            // All other classes in Python have an MRO with length >=2.
+            // Even if a class has no explicit base classes,
+            // it will implicitly inherit from `objet` at runtime;
+            // `object` will appear in the class's `__bases__` list and `__mro__`:
+            //
+            // ```pycon
+            // >>> class Foo: ...
+            // ...
+            // >>> Foo.__bases__
+            // (<class 'object'>,)
+            // >>> Foo.__mro__
+            // (<class '__main__.Foo'>, <class 'object'>)
+            // ```
             [] => Ok(Self::from([ClassBase::Class(class), ClassBase::object(db)])),
+
+            // Fast path for a class that has only a single explicit base.
+            //
+            // This *could* theoretically be handled by the final branch below,
+            // but it's a common case (i.e., worth optimizing for),
+            // and the `c3_merge` function requires lots of allocations.
             [single_base_node] => {
                 let single_base = ClassBase::try_from_node(
                     db,
@@ -65,6 +87,12 @@ impl<'db> Mro<'db> {
                     }
                 }
             }
+
+            // The class has multiple explicit bases.
+            //
+            // We'll fallback to a full implementation of the C3-merge algorithm to determine
+            // what MRO Python will give this class at runtime
+            // (if an MRO is indeed resolvable at all!)
             multiple_bases => {
                 let definition = class.definition(db);
                 let mut valid_bases = vec![];
@@ -270,6 +298,9 @@ impl<'db> ClassBase<'db> {
         Self::try_from_ty(base_ty).ok_or(base_ty)
     }
 
+    /// Attempt to resolve `ty` into a `ClassBase`.
+    ///
+    /// Return `None` if `ty` is not an acceptable type for a class base.
     fn try_from_ty(ty: Type<'db>) -> Option<Self> {
         match ty {
             Type::Any => Some(Self::Any),
