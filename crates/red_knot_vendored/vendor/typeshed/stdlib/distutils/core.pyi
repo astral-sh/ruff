@@ -1,4 +1,4 @@
-from _typeshed import StrOrBytesPath
+from _typeshed import Incomplete, StrOrBytesPath
 from collections.abc import Mapping
 from distutils.cmd import Command as Command
 from distutils.dist import Distribution as Distribution
@@ -32,7 +32,7 @@ def setup(
     distclass: type[Distribution] = ...,
     script_name: str = ...,
     script_args: list[str] = ...,
-    options: Mapping[str, Any] = ...,
+    options: Mapping[str, Incomplete] = ...,
     license: str = ...,
     keywords: list[str] | str = ...,
     platforms: list[str] | str = ...,
@@ -43,7 +43,7 @@ def setup(
     provides: list[str] = ...,
     requires: list[str] = ...,
     command_packages: list[str] = ...,
-    command_options: Mapping[str, Mapping[str, tuple[Any, Any]]] = ...,
+    command_options: Mapping[str, Mapping[str, tuple[Incomplete, Incomplete]]] = ...,
     package_data: Mapping[str, list[str]] = ...,
     include_package_data: bool | Literal[0, 1] = ...,
     libraries: list[str] = ...,
@@ -52,6 +52,7 @@ def setup(
     include_dirs: list[str] = ...,
     password: str = ...,
     fullname: str = ...,
+    # Custom Distributions could accept more params
     **attrs: Any,
 ) -> Distribution: ...
 def run_setup(script_name: str, script_args: list[str] | None = None, stop_after: str = "run") -> Distribution: ...

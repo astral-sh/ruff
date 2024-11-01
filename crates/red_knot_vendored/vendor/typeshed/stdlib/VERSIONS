@@ -22,6 +22,7 @@ __main__: 3.0-
 _ast: 3.0-
 _asyncio: 3.0-
 _bisect: 3.0-
+_blake2: 3.6-
 _bootlocale: 3.4-3.9
 _codecs: 3.0-
 _collections_abc: 3.3-
@@ -33,6 +34,8 @@ _curses: 3.0-
 _decimal: 3.3-
 _dummy_thread: 3.0-3.8
 _dummy_threading: 3.0-3.8
+_frozen_importlib: 3.0-
+_frozen_importlib_external: 3.5-
 _heapq: 3.0-
 _imp: 3.0-
 _interpchannels: 3.13-
@@ -160,6 +163,8 @@ imghdr: 3.0-3.12
 imp: 3.0-3.11
 importlib: 3.0-
 importlib._abc: 3.10-
+importlib._bootstrap: 3.0-
+importlib._bootstrap_external: 3.5-
 importlib.metadata: 3.8-
 importlib.metadata._meta: 3.10-
 importlib.metadata.diagnose: 3.13-

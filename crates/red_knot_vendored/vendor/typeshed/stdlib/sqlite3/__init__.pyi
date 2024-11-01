@@ -1,5 +1,5 @@
 import sys
-from _typeshed import ReadableBuffer, StrOrBytesPath, SupportsLenAndGetItem, Unused
+from _typeshed import MaybeNone, ReadableBuffer, StrOrBytesPath, SupportsLenAndGetItem, Unused
 from collections.abc import Callable, Generator, Iterable, Iterator, Mapping, Sequence
 from sqlite3.dbapi2 import (
     PARSE_COLNAMES as PARSE_COLNAMES,
@@ -397,13 +397,13 @@ class Connection:
         self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None, /
     ) -> Literal[False]: ...
 
-class Cursor(Iterator[Any]):
+class Cursor:
     arraysize: int
     @property
     def connection(self) -> Connection: ...
-    # May be None, but using | Any instead to avoid slightly annoying false positives.
+    # May be None, but using `| MaybeNone` (`| Any`) instead to avoid slightly annoying false positives.
     @property
-    def description(self) -> tuple[tuple[str, None, None, None, None, None, None], ...] | Any: ...
+    def description(self) -> tuple[tuple[str, None, None, None, None, None, None], ...] | MaybeNone: ...
     @property
     def lastrowid(self) -> int | None: ...
     row_factory: Callable[[Cursor, Row], object] | None

@@ -7,7 +7,7 @@ from _asyncio import (
     _register_task as _register_task,
     _unregister_task as _unregister_task,
 )
-from collections.abc import Awaitable, Coroutine, Generator, Iterable, Iterator
+from collections.abc import AsyncIterator, Awaitable, Coroutine, Generator, Iterable, Iterator
 from typing import Any, Literal, Protocol, TypeVar, overload
 from typing_extensions import TypeAlias
 
@@ -84,7 +84,12 @@ FIRST_COMPLETED = concurrent.futures.FIRST_COMPLETED
 FIRST_EXCEPTION = concurrent.futures.FIRST_EXCEPTION
 ALL_COMPLETED = concurrent.futures.ALL_COMPLETED
 
-if sys.version_info >= (3, 10):
+if sys.version_info >= (3, 13):
+    class _SyncAndAsyncIterator(Iterator[_T_co], AsyncIterator[_T_co], Protocol[_T_co]): ...
+
+    def as_completed(fs: Iterable[_FutureLike[_T]], *, timeout: float | None = None) -> _SyncAndAsyncIterator[Future[_T]]: ...
+
+elif sys.version_info >= (3, 10):
     def as_completed(fs: Iterable[_FutureLike[_T]], *, timeout: float | None = None) -> Iterator[Future[_T]]: ...
 
 else:

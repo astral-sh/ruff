@@ -1,6 +1,6 @@
-from _typeshed import Unused
+from _typeshed import Incomplete, Unused
 from collections.abc import Callable
-from typing import Any, ClassVar
+from typing import ClassVar
 
 from ..cmd import Command
 
@@ -11,15 +11,15 @@ class build_clib(Command):
     user_options: ClassVar[list[tuple[str, str, str]]]
     boolean_options: ClassVar[list[str]]
     help_options: ClassVar[list[tuple[str, str | None, str, Callable[[], Unused]]]]
-    build_clib: Any
-    build_temp: Any
-    libraries: Any
-    include_dirs: Any
-    define: Any
-    undef: Any
-    debug: Any
+    build_clib: Incomplete
+    build_temp: Incomplete
+    libraries: Incomplete
+    include_dirs: Incomplete
+    define: Incomplete
+    undef: Incomplete
+    debug: Incomplete
     force: int
-    compiler: Any
+    compiler: Incomplete
     def initialize_options(self) -> None: ...
     def finalize_options(self) -> None: ...
     def run(self) -> None: ...

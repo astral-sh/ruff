@@ -1,4 +1,5 @@
-from typing import Any, ClassVar
+from _typeshed import Incomplete
+from typing import ClassVar
 
 from ..cmd import Command
 
@@ -6,9 +7,9 @@ class install_headers(Command):
     description: str
     user_options: ClassVar[list[tuple[str, str, str]]]
     boolean_options: ClassVar[list[str]]
-    install_dir: Any
+    install_dir: Incomplete
     force: int
-    outfiles: Any
+    outfiles: Incomplete
     def initialize_options(self) -> None: ...
     def finalize_options(self) -> None: ...
     def run(self) -> None: ...
