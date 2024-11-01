@@ -1550,14 +1550,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         // If the target defines, e.g., `__iadd__`, infer the augmented assignment as a call to that
         // dunder.
         if let Type::Instance(class) = target_type {
-            if let Some(class_member) = class.class_member(self.db, op.in_place_dunder()).as_type()
+            if let Symbol::Type(class_member, boundness) =
+                class.class_member(self.db, op.in_place_dunder())
             {
-                // TODO: Handle the case where boundness is `MayBeUnbound`: fall back
-                // to the binary-op behavior below and union the result with calling
-                // the possibly-unbound in-place dunder.
-
                 let call = class_member.call(self.db, &[target_type, value_type]);
-                return match call.return_ty_result(
+                let augmented_return_ty = match call.return_ty_result(
                     self.db,
                     AnyNodeRef::StmtAugAssign(assignment),
                     &mut self.diagnostics,
@@ -1574,6 +1571,33 @@ impl<'db> TypeInferenceBuilder<'db> {
                             ),
                         );
                         e.return_ty()
+                    }
+                };
+
+                return match boundness {
+                    Boundness::Bound => augmented_return_ty,
+                    Boundness::MayBeUnbound => {
+                        let left_ty = target_type;
+                        let right_ty = value_type;
+
+                        let binary_return_ty = self.infer_binary_expression_type(left_ty, right_ty, *op)
+                            .unwrap_or_else(|| {
+                                self.diagnostics.add(
+                                    assignment.into(),
+                                    "unsupported-operator",
+                                    format_args!(
+                                        "Operator `{op}=` is unsupported between objects of type `{}` and `{}`",
+                                        left_ty.display(self.db),
+                                        right_ty.display(self.db)
+                                    ),
+                                );
+                                Type::Unknown
+                            });
+
+                        UnionBuilder::new(self.db)
+                            .add(augmented_return_ty)
+                            .add(binary_return_ty)
+                            .build()
                     }
                 };
             }
