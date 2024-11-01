@@ -85,7 +85,7 @@ f = Foo()
 # that `Foo.__iadd__` may be unbound as additional context.
 f += "Hello, world!"
 
-reveal_type(f)  # revealed: int
+reveal_type(f)  # revealed: int | @Todo
 ```
 
 ## Partially bound with `__add__`
@@ -104,8 +104,7 @@ class Foo:
 f = Foo()
 f += "Hello, world!"
 
-# TODO(charlie): This should be `int | str`, since `__iadd__` may be unbound.
-reveal_type(f)  # revealed: int
+reveal_type(f)  # revealed: int | str
 ```
 
 ## Partially bound target union
