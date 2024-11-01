@@ -74,9 +74,10 @@ impl<'db> Mro<'db> {
                 match single_base {
                     Ok(base) => {
                         if base.into_class_literal_type() == Some(class) {
-                            Err(MroError::CyclicClassDefinition {
+                            let error_kind = MroErrorKind::CyclicClassDefinition {
                                 invalid_base_index: 0,
-                            })
+                            };
+                            Err(MroError::new(db, class, error_kind))
                         } else {
                             let mro = std::iter::once(ClassBase::Class(class))
                                 .chain(Mro::of_base(db, base).elements())
@@ -85,7 +86,9 @@ impl<'db> Mro<'db> {
                         }
                     }
                     Err(invalid_base_ty) => {
-                        Err(MroError::InvalidBases(Box::from([(0, invalid_base_ty)])))
+                        let error_kind =
+                            MroErrorKind::InvalidBases(Box::from([(0, invalid_base_ty)]));
+                        Err(MroError::new(db, class, error_kind))
                     }
                 }
             }
@@ -104,9 +107,10 @@ impl<'db> Mro<'db> {
                     match ClassBase::try_from_node(db, base_node, class_stmt_node, definition) {
                         Ok(valid_base) => {
                             if valid_base.into_class_literal_type() == Some(class) {
-                                return Err(MroError::CyclicClassDefinition {
+                                let error_kind = MroErrorKind::CyclicClassDefinition {
                                     invalid_base_index: i,
-                                });
+                                };
+                                return Err(MroError::new(db, class, error_kind));
                             }
                             valid_bases.push(valid_base);
                         }
@@ -115,7 +119,8 @@ impl<'db> Mro<'db> {
                 }
 
                 if !invalid_bases.is_empty() {
-                    return Err(MroError::InvalidBases(invalid_bases.into_boxed_slice()));
+                    let error_kind = MroErrorKind::InvalidBases(invalid_bases.into_boxed_slice());
+                    return Err(MroError::new(db, class, error_kind));
                 }
 
                 let mut seqs = vec![VecDeque::from([ClassBase::Class(class)])];
@@ -137,13 +142,15 @@ impl<'db> Mro<'db> {
                         }
                     }
 
-                    if duplicate_bases.is_empty() {
-                        MroError::UnresolvableMro {
+                    let error_kind = if duplicate_bases.is_empty() {
+                        MroErrorKind::UnresolvableMro {
                             bases_list: valid_bases.into_boxed_slice(),
                         }
                     } else {
-                        MroError::DuplicateBases(duplicate_bases.into_boxed_slice())
-                    }
+                        MroErrorKind::DuplicateBases(duplicate_bases.into_boxed_slice())
+                    };
+
+                    MroError::new(db, class, error_kind)
                 })
             }
         }
@@ -169,7 +176,7 @@ impl<'db> Mro<'db> {
                 Cow::Owned(Mro::from([ClassBase::Unknown, ClassBase::object(db)]))
             }
             ClassBase::Todo => Cow::Owned(Mro::from([ClassBase::Todo, ClassBase::object(db)])),
-            ClassBase::Class(class) => class.mro(db),
+            ClassBase::Class(class) => Cow::Borrowed(class.mro(db)),
         }
     }
 }
@@ -200,9 +207,24 @@ impl<'db> FromIterator<ClassBase<'db>> for Mro<'db> {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct MroError<'db> {
+    pub(super) kind: MroErrorKind<'db>,
+    pub(super) fallback_mro: Mro<'db>,
+}
+
+impl<'db> MroError<'db> {
+    fn new(db: &'db dyn Db, class: ClassType<'db>, kind: MroErrorKind<'db>) -> Self {
+        Self {
+            kind,
+            fallback_mro: Mro::from_error(db, class),
+        }
+    }
+}
+
 /// Possible ways in which attempting to resolve the MRO of a class might fail.
 #[derive(Debug, PartialEq, Eq)]
-pub(super) enum MroError<'db> {
+pub(super) enum MroErrorKind<'db> {
     /// The class inherits from one or more invalid bases.
     ///
     /// To avoid excessive complexity in our implementation,

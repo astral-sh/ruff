@@ -1,7 +1,6 @@
 use mro::{ClassBase, Mro, MroError};
 use ruff_db::files::File;
 use ruff_python_ast as ast;
-use std::borrow::Cow;
 
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::ast_ids::HasScopedAstId;
@@ -1832,7 +1831,7 @@ impl<'db> ClassType<'db> {
     fn node(self, db: &'db dyn Db) -> &'db ast::StmtClassDef {
         match self.definition(db).kind(db) {
             DefinitionKind::Class(class_stmt_node) => class_stmt_node,
-            _ => panic!("Class type definition must have DefinitionKind::Class"),
+            _ => unreachable!("Class type definition should always have DefinitionKind::Class"),
         }
     }
 
@@ -1857,10 +1856,11 @@ impl<'db> ClassType<'db> {
     /// cases rather than simply iterating over the inferred resolution order for the class.
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
-    fn mro(self, db: &'db dyn Db) -> Cow<'db, Mro<'db>> {
-        self.try_mro(db)
-            .as_ref()
-            .map_or_else(|_| Cow::Owned(Mro::from_error(db, self)), Cow::Borrowed)
+    fn mro(self, db: &'db dyn Db) -> &'db Mro<'db> {
+        match self.try_mro(db) {
+            Ok(mro) => mro,
+            Err(MroError { fallback_mro, .. }) => fallback_mro,
+        }
     }
 
     pub fn is_subclass_of(self, db: &'db dyn Db, other: ClassType) -> bool {
@@ -1869,14 +1869,14 @@ impl<'db> ClassType<'db> {
                 ClassBase::Class(superclass) => superclass == other,
                 // `is_subclass_of` is checking the subtype relation, in which gradual types do not
                 // participate, so we should not return `True` if we find `Any/Unknown` in the
-                // bases.
+                // MRO.
                 _ => false,
             })
     }
 
     /// Returns the class member of this class named `name`.
     ///
-    /// The member resolves to a member of the class itself or any of its bases.
+    /// The member resolves to a member on the class itself or any of its proper superclasses.
     pub(crate) fn class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         if name == "__mro__" {
             return Symbol::Type(
@@ -1894,14 +1894,25 @@ impl<'db> ClassType<'db> {
     }
 
     /// Returns the inferred type of the class member named `name`.
+    ///
+    /// Returns [`Symbol::Unbound`] if `name` cannot be found in this class's scope
+    /// directly. Use [`ClassType::class_member`] if you require a method that will
+    /// traverse through the MRO until it finds the member.
     pub(crate) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         let scope = self.body_scope(db);
         symbol(db, scope, name)
     }
 
+    /// Iterate over all superclasses of this class, excluding this class itself.
+    fn proper_superclasses(self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> {
+        self.mro(db).elements().skip(1)
+    }
+
     pub(crate) fn inherited_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
-        for superclass in self.mro(db).elements().skip(1) {
+        for superclass in self.proper_superclasses(db) {
             match superclass {
+                // TODO we may instead want to record the fact that we encountered dynamic, and intersect it with
+                // the type found on the next "real" class.
                 ClassBase::Any | ClassBase::Unknown | ClassBase::Todo => {
                     return Type::from(superclass).member(db, name)
                 }

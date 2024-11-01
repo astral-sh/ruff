@@ -62,7 +62,7 @@ use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
 
-use super::mro::MroError;
+use super::mro::MroErrorKind;
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -462,9 +462,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             .filter_map(|ty| ty.into_class_literal_type());
 
         for class in class_definitions {
-            match class.try_mro(self.db) {
+            match class.try_mro(self.db).as_ref().map_err(|err| &err.kind) {
                 Ok(_) => continue,
-                Err(MroError::CyclicClassDefinition{invalid_base_index: base_index}) => {
+                Err(MroErrorKind::CyclicClassDefinition{invalid_base_index: base_index}) => {
                     let base = &class.node(self.db).bases()[*base_index];
                     self.diagnostics.add(
                         base.into(),
@@ -475,7 +475,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         )
                     );
                 }
-                Err(MroError::DuplicateBases(duplicates)) => {
+                Err(MroErrorKind::DuplicateBases(duplicates)) => {
                     let base_nodes = class.node(self.db).bases();
                     for (index, duplicate) in duplicates {
                         self.diagnostics.add(
@@ -485,7 +485,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         );
                     }
                 }
-                Err(MroError::InvalidBases(bases)) => {
+                Err(MroErrorKind::InvalidBases(bases)) => {
                     let base_nodes = class.node(self.db).bases();
                     for (index, base_ty) in bases {
                         self.diagnostics.add(
@@ -498,7 +498,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         );
                     }
                 },
-                Err(MroError::UnresolvableMro{bases_list}) => self.diagnostics.add(
+                Err(MroErrorKind::UnresolvableMro{bases_list}) => self.diagnostics.add(
                     class.node(self.db).into(),
                     "inconsistent-mro",
                     format_args!(
