@@ -328,3 +328,42 @@ with aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 if True:
     with anyio.CancelScope(shield=True) if get_running_loop() else contextlib.nullcontext() as b:
         pass
+
+
+# Regression test for https://github.com/astral-sh/ruff/issues/14001
+with (
+    open(
+        "some/path.txt",
+        "rb",
+    )
+    if True
+    else open("other/path.txt")
+    # Bar
+):
+    pass
+
+
+with (  # trailing comment
+    open(
+        "some/path.txt",
+        "rb",
+    )
+    if True
+    else open("other/path.txt")
+    # Bar
+):
+    pass
+
+
+with (
+    (
+        open(
+            "some/path.txt",
+            "rb",
+        )
+        if True
+        else open("other/path.txt")
+    )
+    # Bar
+):
+    pass
