@@ -1885,7 +1885,22 @@ impl<'db> ClassType<'db> {
             );
         }
 
-        for superclass in self.mro(db).elements() {
+        let member = self.own_class_member(db, name);
+        if !member.is_unbound() {
+            return member;
+        }
+
+        self.inherited_class_member(db, name)
+    }
+
+    /// Returns the inferred type of the class member named `name`.
+    pub(crate) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+        let scope = self.body_scope(db);
+        symbol(db, scope, name)
+    }
+
+    pub(crate) fn inherited_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
+        for superclass in self.mro(db).elements().skip(1) {
             match superclass {
                 ClassBase::Any | ClassBase::Unknown | ClassBase::Todo => {
                     return Type::from(superclass).member(db, name)
@@ -1900,12 +1915,6 @@ impl<'db> ClassType<'db> {
         }
 
         Symbol::Unbound
-    }
-
-    /// Returns the inferred type of the class member named `name`.
-    pub(crate) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
-        let scope = self.body_scope(db);
-        symbol(db, scope, name)
     }
 }
 
