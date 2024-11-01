@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{
@@ -65,7 +67,7 @@ fn construct_replacement(list_items: &[&str]) -> Expr {
     })
 }
 
-fn split_default(str_value: &str, max_split: usize) -> Option<Expr> {
+fn split_default(str_value: &str, max_split: i32) -> Option<Expr> {
     // From the Python documentation:
     // > If sep is not specified or is None, a different splitting algorithm is applied: runs of
     // > consecutive whitespace are regarded as a single separator, and the result will contain
@@ -73,28 +75,74 @@ fn split_default(str_value: &str, max_split: usize) -> Option<Expr> {
     // > Consequently, splitting an empty string or a string consisting of just whitespace with
     // > a None separator returns [].
     // https://docs.python.org/3/library/stdtypes.html#str.split
-    if max_split == 0 {
-        let list_items: Vec<&str> = str_value.split_whitespace().collect();
-        Some(construct_replacement(&list_items))
-    } else {
-        // Autofix for maxsplit without separator not yet implemented
-        // split_whitespace().remainder() is still experimental:
-        // https://doc.rust-lang.org/std/str/struct.SplitWhitespace.html#method.remainder
-        None
+    match max_split.cmp(&0) {
+        Ordering::Greater => {
+            // Autofix for maxsplit without separator not yet implemented
+            // split_whitespace().remainder() is still experimental:
+            // https://doc.rust-lang.org/std/str/struct.SplitWhitespace.html#method.remainder
+            None
+        }
+        Ordering::Equal => {
+            let list_items: Vec<&str> = vec![str_value];
+            Some(construct_replacement(&list_items))
+        }
+        Ordering::Less => {
+            let list_items: Vec<&str> = str_value.split_whitespace().collect();
+            Some(construct_replacement(&list_items))
+        }
     }
 }
 
-fn split_sep(str_value: &str, sep_value: &str, max_split: usize, direction_left: bool) -> Expr {
-    let list_items: Vec<&str> = if direction_left && max_split > 0 {
-        str_value.splitn(max_split + 1, sep_value).collect()
-    } else if !direction_left && max_split > 0 {
-        str_value.rsplitn(max_split + 1, sep_value).collect()
-    } else if direction_left && max_split == 0 {
-        str_value.split(sep_value).collect()
+fn split_sep(str_value: &str, sep_value: &str, max_split: i32, direction_left: bool) -> Expr {
+    let list_items: Vec<&str> = if let Ok(split_n) = usize::try_from(max_split) {
+        if direction_left {
+            str_value.splitn(split_n + 1, sep_value).collect()
+        } else {
+            str_value.rsplitn(split_n + 1, sep_value).collect()
+        }
     } else {
-        str_value.rsplit(sep_value).collect()
+        if direction_left {
+            str_value.split(sep_value).collect()
+        } else {
+            str_value.rsplit(sep_value).collect()
+        }
     };
+
     construct_replacement(&list_items)
+}
+
+fn get_maxsplit_value(maxsplit_arg: Option<&Expr>) -> Option<i32> {
+    let maxsplit_value = if let Some(maxsplit) = maxsplit_arg {
+        match maxsplit {
+            // Negative number
+            Expr::UnaryOp(ExprUnaryOp {
+                op: UnaryOp::USub,
+                operand,
+                ..
+            }) => {
+                match &**operand {
+                    Expr::NumberLiteral(maxsplit_val) => maxsplit_val
+                        .value
+                        .as_int()
+                        .and_then(ruff_python_ast::Int::as_i32)
+                        .map(|f| -f),
+                    // Ignore when `maxsplit` is not a numeric value
+                    _ => None,
+                }
+            }
+            // Positive number
+            Expr::NumberLiteral(maxsplit_val) => maxsplit_val
+                .value
+                .as_int()
+                .and_then(ruff_python_ast::Int::as_i32),
+            // Ignore when `maxsplit` is not a numeric value
+            _ => None,
+        }
+    } else {
+        // Default value is -1 (no splits)
+        Some(-1)
+    };
+    maxsplit_value
 }
 
 /// SIM905
@@ -106,40 +154,15 @@ pub(crate) fn split_static_string(
 ) {
     let ExprCall { arguments, .. } = call;
 
-    let sep_arg = arguments.find_argument("sep", 0);
     let maxsplit_arg = arguments.find_argument("maxsplit", 1);
+    let Some(maxsplit_value) = get_maxsplit_value(maxsplit_arg) else {
+        return;
+    };
 
     // `split` vs `rsplit`
     let direction_left = attr == "split";
 
-    let maxsplit_value = if let Some(maxsplit) = maxsplit_arg {
-        match maxsplit {
-            // Python allows maxsplit to be set to -1
-            Expr::UnaryOp(ExprUnaryOp {
-                op: UnaryOp::USub,
-                operand,
-                ..
-            }) if matches!(**operand, Expr::NumberLiteral { .. }) => 0,
-            Expr::NumberLiteral(maxsplit_val) => {
-                if let Some(value) = maxsplit_val
-                    .value
-                    .as_int()
-                    .and_then(ruff_python_ast::Int::as_usize)
-                {
-                    value
-                } else {
-                    return;
-                }
-            }
-            // Ignore when `maxsplit` is not a numeric value
-            _ => {
-                return;
-            }
-        }
-    } else {
-        0
-    };
-
+    let sep_arg = arguments.find_argument("sep", 0);
     let split_replacement = if let Some(sep) = sep_arg {
         match sep {
             Expr::NoneLiteral(_) => split_default(str_value, maxsplit_value),

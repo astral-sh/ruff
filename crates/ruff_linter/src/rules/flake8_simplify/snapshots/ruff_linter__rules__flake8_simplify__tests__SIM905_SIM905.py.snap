@@ -739,7 +739,7 @@ SIM905.py:66:1: SIM905 [*] Consider using a list instead of `str.split`
    66 |+["\\n"]  # ['\\n']
 67 67 | "a " r"\n".split()  # ['a', '\\n']
 68 68 | 
-69 69 | # negatives
+69 69 | "a,b,c".split(',', maxsplit=0) # ['a,b,c']
 
 SIM905.py:67:1: SIM905 [*] Consider using a list instead of `str.split`
    |
@@ -748,7 +748,7 @@ SIM905.py:67:1: SIM905 [*] Consider using a list instead of `str.split`
 67 | "a " r"\n".split()  # ['a', '\\n']
    | ^^^^^^^^^^^^^^^^^^ SIM905
 68 | 
-69 | # negatives
+69 | "a,b,c".split(',', maxsplit=0) # ['a,b,c']
    |
    = help: Replace `str.split` with list literal
 
@@ -759,5 +759,87 @@ SIM905.py:67:1: SIM905 [*] Consider using a list instead of `str.split`
 67    |-"a " r"\n".split()  # ['a', '\\n']
    67 |+["a", "\\n"]  # ['a', '\\n']
 68 68 | 
-69 69 | # negatives
-70 70 |
+69 69 | "a,b,c".split(',', maxsplit=0) # ['a,b,c']
+70 70 | "a,b,c".split(',', maxsplit=-1)  # ['a', 'b', 'c']
+
+SIM905.py:69:1: SIM905 [*] Consider using a list instead of `str.split`
+   |
+67 | "a " r"\n".split()  # ['a', '\\n']
+68 | 
+69 | "a,b,c".split(',', maxsplit=0) # ['a,b,c']
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM905
+70 | "a,b,c".split(',', maxsplit=-1)  # ['a', 'b', 'c']
+71 | "a,b,c".split(',', maxsplit=-2)  # ['a', 'b', 'c']
+   |
+   = help: Replace `str.split` with list literal
+
+ℹ Unsafe fix
+66 66 | r"\n " "\n".split()  # ['\\n']
+67 67 | "a " r"\n".split()  # ['a', '\\n']
+68 68 | 
+69    |-"a,b,c".split(',', maxsplit=0) # ['a,b,c']
+   69 |+["a,b,c"] # ['a,b,c']
+70 70 | "a,b,c".split(',', maxsplit=-1)  # ['a', 'b', 'c']
+71 71 | "a,b,c".split(',', maxsplit=-2)  # ['a', 'b', 'c']
+72 72 | "a,b,c".split(',', maxsplit=-0)  # ['a,b,c']
+
+SIM905.py:70:1: SIM905 [*] Consider using a list instead of `str.split`
+   |
+69 | "a,b,c".split(',', maxsplit=0) # ['a,b,c']
+70 | "a,b,c".split(',', maxsplit=-1)  # ['a', 'b', 'c']
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM905
+71 | "a,b,c".split(',', maxsplit=-2)  # ['a', 'b', 'c']
+72 | "a,b,c".split(',', maxsplit=-0)  # ['a,b,c']
+   |
+   = help: Replace `str.split` with list literal
+
+ℹ Unsafe fix
+67 67 | "a " r"\n".split()  # ['a', '\\n']
+68 68 | 
+69 69 | "a,b,c".split(',', maxsplit=0) # ['a,b,c']
+70    |-"a,b,c".split(',', maxsplit=-1)  # ['a', 'b', 'c']
+   70 |+["a", "b", "c"]  # ['a', 'b', 'c']
+71 71 | "a,b,c".split(',', maxsplit=-2)  # ['a', 'b', 'c']
+72 72 | "a,b,c".split(',', maxsplit=-0)  # ['a,b,c']
+73 73 | 
+
+SIM905.py:71:1: SIM905 [*] Consider using a list instead of `str.split`
+   |
+69 | "a,b,c".split(',', maxsplit=0) # ['a,b,c']
+70 | "a,b,c".split(',', maxsplit=-1)  # ['a', 'b', 'c']
+71 | "a,b,c".split(',', maxsplit=-2)  # ['a', 'b', 'c']
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM905
+72 | "a,b,c".split(',', maxsplit=-0)  # ['a,b,c']
+   |
+   = help: Replace `str.split` with list literal
+
+ℹ Unsafe fix
+68 68 | 
+69 69 | "a,b,c".split(',', maxsplit=0) # ['a,b,c']
+70 70 | "a,b,c".split(',', maxsplit=-1)  # ['a', 'b', 'c']
+71    |-"a,b,c".split(',', maxsplit=-2)  # ['a', 'b', 'c']
+   71 |+["a", "b", "c"]  # ['a', 'b', 'c']
+72 72 | "a,b,c".split(',', maxsplit=-0)  # ['a,b,c']
+73 73 | 
+74 74 | # negatives
+
+SIM905.py:72:1: SIM905 [*] Consider using a list instead of `str.split`
+   |
+70 | "a,b,c".split(',', maxsplit=-1)  # ['a', 'b', 'c']
+71 | "a,b,c".split(',', maxsplit=-2)  # ['a', 'b', 'c']
+72 | "a,b,c".split(',', maxsplit=-0)  # ['a,b,c']
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM905
+73 | 
+74 | # negatives
+   |
+   = help: Replace `str.split` with list literal
+
+ℹ Unsafe fix
+69 69 | "a,b,c".split(',', maxsplit=0) # ['a,b,c']
+70 70 | "a,b,c".split(',', maxsplit=-1)  # ['a', 'b', 'c']
+71 71 | "a,b,c".split(',', maxsplit=-2)  # ['a', 'b', 'c']
+72    |-"a,b,c".split(',', maxsplit=-0)  # ['a,b,c']
+   72 |+["a,b,c"]  # ['a,b,c']
+73 73 | 
+74 74 | # negatives
+75 75 |

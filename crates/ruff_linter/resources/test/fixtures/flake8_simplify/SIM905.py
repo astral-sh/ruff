@@ -66,6 +66,11 @@ r"\n " u"\n".split()  # ['\\n']
 r"\n " "\n".split()  # ['\\n']
 "a " r"\n".split()  # ['a', '\\n']
 
+"a,b,c".split(',', maxsplit=0) # ['a,b,c']
+"a,b,c".split(',', maxsplit=-1)  # ['a', 'b', 'c']
+"a,b,c".split(',', maxsplit=-2)  # ['a', 'b', 'c']
+"a,b,c".split(',', maxsplit=-0)  # ['a,b,c']
+
 # negatives
 
 # invalid values should not cause panic 
